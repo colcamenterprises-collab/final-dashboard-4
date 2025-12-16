@@ -1,23 +1,19 @@
 import { createRoot } from "react-dom/client";
-import App from "./App";
-import "./index.css";
 
-console.log("🟢 main.tsx: SCRIPT START");
+console.log("🟢 main.tsx: BARE METAL BOOT");
 
-// Force light mode - remove dark class if present
-document.documentElement.classList.remove("dark");
-localStorage.removeItem("restaurant-ui-theme");
+const root = document.getElementById("root");
 
-const rootElement = document.getElementById("root");
-console.log("🟢 main.tsx: Root element found:", !!rootElement);
-
-if (rootElement) {
-  console.log("🟢 main.tsx: Creating React root...");
-  const root = createRoot(rootElement);
-  console.log("🟢 main.tsx: Rendering App...");
-  root.render(<App />);
-  console.log("🟢 main.tsx: App render called");
+if (root) {
+  console.log("🟢 main.tsx: Root found, mounting React");
+  createRoot(root).render(
+    <div style={{ padding: 40, backgroundColor: "#f0fff0", minHeight: "100vh" }}>
+      <h1 style={{ fontSize: 48, color: "green" }}>REACT BOOT OK</h1>
+      <p style={{ fontSize: 24 }}>If you see this, React is mounting.</p>
+      <p style={{ fontSize: 16, color: "#666" }}>Timestamp: {new Date().toISOString()}</p>
+    </div>
+  );
+  console.log("🟢 main.tsx: Render called");
 } else {
-  console.error("🔴 main.tsx: ROOT ELEMENT NOT FOUND!");
-  document.body.innerHTML = '<h1 style="color:red;padding:40px;">FATAL: #root element not found</h1>';
+  console.error("🔴 main.tsx: Root element not found");
 }
