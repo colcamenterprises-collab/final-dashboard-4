@@ -1,0 +1,243 @@
+🔒 REPLIT AGENT — READ-ONLY AUDIT MODE
+
+Paste EVERYTHING below into the Replit Agent prompt.
+
+
+---
+
+AGENT DIRECTIVE — NON-NEGOTIABLE
+
+You are operating in READ-ONLY AUDIT MODE.
+
+ABSOLUTE RULES
+
+❌ DO NOT modify any files
+
+❌ DO NOT refactor
+
+❌ DO NOT rename
+
+❌ DO NOT install dependencies
+
+❌ DO NOT run migrations
+
+❌ DO NOT commit or push
+
+❌ DO NOT suggest improvements
+
+
+Your ONLY job is to locate files and report their contents.
+
+If you break these rules, STOP immediately.
+
+
+---
+
+AUDIT OBJECTIVE
+
+We are auditing new or recently modified systems from the last ~2 weeks.
+
+Daily Sales & Daily Stock forms are OUT OF SCOPE.
+
+
+---
+
+STEP 1 — REPORT PROJECT STRUCTURE
+
+List the following (paths only, no opinions):
+
+Backend folder structure
+
+Frontend folder structure
+
+Services folder
+
+Jobs / scheduler / cron folder
+
+Prisma or ORM schema location
+
+
+
+---
+
+STEP 2 — LOCATE AND REPORT THESE FILES
+
+For EACH file below:
+
+Confirm if it exists
+
+Output the full file contents
+
+If not found, explicitly say NOT FOUND
+
+
+A. Profit & Loss / Prime Cost
+
+Search for files containing:
+
+primeCost
+
+profit
+
+pnl
+
+%
+
+wage calculations
+
+food / beverage expense aggregation
+
+
+Likely locations:
+
+server/services/
+server/utils/
+server/jobs/
+
+
+---
+
+B. Receipts & POS Ingestion
+
+Search for:
+
+receipt ingestion logic
+
+modifier parsing
+
+shift window logic (6pm–3am)
+
+POS / Loyverse references
+
+
+Keywords:
+
+receipt
+modifier
+shift
+6pm
+3am
+Bangkok
+
+
+---
+
+C. Ingredient & Recipe Logic
+
+Search for:
+
+ingredient source of truth
+
+CSV vs DB logic
+
+portion size vs package size
+
+recipe breakdown
+
+
+Keywords:
+
+ingredient
+recipe
+portion
+package
+
+
+---
+
+D. AI / Analysis Engine (Jussi)
+
+Search for:
+
+AI analysis logic
+
+anomaly detection
+
+variance calculations
+
+sold vs expected comparisons
+
+
+Keywords:
+
+analysis
+insight
+variance
+anomaly
+expected
+
+
+---
+
+E. Scheduled Jobs / Emails
+
+Search for:
+
+scheduled tasks
+
+cron-like logic
+
+email sending
+
+PDF generation
+
+
+Keywords:
+
+cron
+schedule
+job
+email
+pdf
+report
+
+
+---
+
+STEP 3 — OUTPUT FORMAT (STRICT)
+
+Output in this order:
+
+=== PROJECT STRUCTURE ===
+<paths>
+
+=== PRIME COST / P&L ===
+<file path>
+<full contents>
+
+=== RECEIPTS ===
+<file path>
+<full contents>
+
+=== INGREDIENTS ===
+<file path>
+<full contents>
+
+=== AI / ANALYSIS ===
+<file path>
+<full contents>
+
+=== SCHEDULED JOBS ===
+<file path>
+<full contents>
+
+If a section has multiple files, list them one by one.
+
+
+---
+
+STEP 4 — STOP
+
+After outputting files:
+
+STOP
+
+Do NOT propose fixes
+
+Do NOT summarise
+
+Do NOT continue
+
+
+
+---
