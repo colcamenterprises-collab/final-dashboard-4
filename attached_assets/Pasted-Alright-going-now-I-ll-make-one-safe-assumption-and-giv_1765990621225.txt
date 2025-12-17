@@ -1,0 +1,248 @@
+Alright — going now.
+I’ll make one safe assumption and give you a surgical frontend-only patch that fixes the “Running” issue and makes the features actually visible.
+
+This patch does not touch backend, does not touch logic, does not refactor.
+
+
+---
+
+🔧 PATCH 6 — FRONTEND VISIBILITY & ROUTING FIX
+
+Scope: React only
+Goal: Make Ingredients / Recipes / Purchase History pages render in the real dashboard
+
+
+---
+
+ASSUMPTION (SAFE & COMMON)
+
+Your app uses:
+
+A central router (React Router)
+
+An Operations section with a shared layout
+
+A placeholder component rendering "Running" when routes are not mounted correctly
+
+
+We will:
+
+Register routes in the same place as other working operations pages
+
+Wrap them in the existing Operations layout
+
+Remove fallback placeholder behavior
+
+
+
+---
+
+🔒 ABSOLUTE RULES FOR AGENT
+
+❌ Do NOT modify backend
+
+❌ Do NOT touch APIs
+
+❌ Do NOT change logic
+
+❌ Do NOT rename files already created
+
+❌ Do NOT refactor routing globally
+
+
+
+---
+
+STEP 1 — LOCATE THE REAL OPERATIONS ROUTER
+
+Find the file that currently renders working operations pages
+(one of these WILL exist):
+
+client/src/pages/operations/index.tsx
+client/src/router/operations.tsx
+client/src/app/operations/layout.tsx
+
+This file will contain routes like:
+
+daily sales
+
+stock
+
+reports
+
+analysis
+
+
+👉 This is where the new pages must be registered.
+
+
+---
+
+STEP 2 — IMPORT THE NEW PAGES
+
+Add imports (paths already created by previous patch):
+
+import IngredientsMaster from "@/pages/operations/IngredientsMaster";
+import RecipesMaster from "@/pages/operations/Recipes";
+import PurchaseHistory from "@/pages/operations/PurchaseHistory";
+
+(Adjust import aliases if your project doesn’t use @)
+
+
+---
+
+STEP 3 — REGISTER ROUTES (CRITICAL FIX)
+
+Inside the existing Operations routes, add:
+
+<Route path="ingredients-master" element={<IngredientsMaster />} />
+<Route path="recipes-master" element={<RecipesMaster />} />
+<Route path="purchase-history" element={<PurchaseHistory />} />
+
+⚠️ IMPORTANT
+These must be:
+
+Nested under the Operations layout
+
+Not top-level routes
+
+Not wrapped in placeholder components
+
+
+Example (pattern):
+
+<Route path="/operations" element={<OperationsLayout />}>
+  {/* existing working routes */}
+
+  <Route path="ingredients-master" element={<IngredientsMaster />} />
+  <Route path="recipes-master" element={<RecipesMaster />} />
+  <Route path="purchase-history" element={<PurchaseHistory />} />
+</Route>
+
+
+---
+
+STEP 4 — REMOVE “RUNNING” PLACEHOLDER FALLBACK
+
+Search for a component rendering:
+
+return <div>Running</div>;
+
+This is usually in:
+
+a default route
+
+a temporary placeholder page
+
+an index route
+
+
+If that placeholder is used instead of the real page:
+
+Replace it with <Outlet />
+
+OR remove it if it hijacks rendering
+
+
+Example fix:
+
+// ❌ BAD
+return <div>Running</div>;
+
+// ✅ GOOD
+return <Outlet />;
+
+
+---
+
+STEP 5 — VERIFY MANUALLY (NO GUESSING)
+
+Open browser and visit:
+
+/operations/ingredients-master
+
+/operations/recipes-master
+
+/operations/purchase-history
+
+
+Expected result:
+
+Tables render
+
+No “Running”
+
+API calls fire
+
+Data confidence banner visible
+
+
+
+---
+
+STOP CONDITION
+
+Once:
+
+All 3 pages render
+
+No placeholder text appears
+
+
+➡️ STOP. Do not continue. Do not improve. Do not add nav yet.
+
+
+---
+
+WHAT THIS GIVES YOU (IMPORTANT)
+
+After this patch:
+
+You can see ingredients
+
+You can see recipes
+
+You can see purchase history
+
+You can trust what you’re seeing
+
+You can use the system like an operator
+
+
+Only after this does it make sense to:
+
+Publish
+
+Review UX
+
+Decide what feels wrong
+
+
+
+---
+
+NEXT (AFTER THIS WORKS)
+
+Once you confirm the pages render, next logical steps are:
+
+1. Add nav links (optional)
+
+
+2. Publish
+
+
+3. Do your operator walkthrough
+
+
+4. Fix only what feels broken
+
+
+
+Run this patch now.
+When you see the tables instead of “Running”, come back and say:
+
+> “Pages render.”
+
+
+
+Then we move to publish + real-world review.
