@@ -1,0 +1,253 @@
+🔒 DO NOT — NON-NEGOTIABLE (READ FIRST)
+
+DO NOT touch, reset, truncate, migrate, or re-seed any database tables
+
+DO NOT run prisma migrate reset, db push --force, or any destructive command
+
+DO NOT modify schemas, models, or data services
+
+DO NOT add new features, patches, or refactors
+
+DO NOT rely on Playwright, Replit Preview status pages, or “Running” banners for validation
+
+DO NOT leave debug pages, debug text, or temporary boot code in production
+
+DO NOT proceed past a step unless the acceptance criteria is visibly confirmed in a real browser
+
+
+This patch is frontend-only and data-safe by design.
+
+
+---
+
+🔧 PATCH UI-BOOT-RESTORE — FULL APPLICATION BOOTSTRAP RESTORATION
+
+OBJECTIVE (NO DEVIATION)
+
+Restore the full React application bootstrap so that:
+
+The app actually mounts
+
+The sidebar, routes, and real UI render
+
+/admin/data-safety is visible and usable
+
+All debug scaffolding is completely removed
+
+
+Right now the system is:
+
+> ✅ Backend working
+❌ Frontend not mounting
+
+
+
+This patch fixes only that.
+
+
+---
+
+STEP 1 — REMOVE ALL DEBUG / TEMPORARY CODE (MANDATORY)
+
+Files to clean:
+
+client/src/main.tsx
+
+REMOVE any of the following if present:
+
+REACT BOOT OK
+
+Hardcoded <div>Running</div>
+
+Temporary JSX renders
+
+Console-only test renders
+
+
+RESTORE standard bootstrap:
+
+
+import React from "react";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+
+const root = document.getElementById("root");
+if (!root) throw new Error("Root element not found");
+
+createRoot(root).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+
+---
+
+client/src/pages/admin/DebugPage.tsx
+
+DELETE THIS FILE
+
+
+
+---
+
+client/src/components/ErrorBoundary.tsx
+
+DELETE if it was added only for debugging
+(We will reintroduce error boundaries later in a controlled patch)
+
+
+
+---
+
+STEP 2 — RESTORE FULL APP BOOTSTRAP (NO SHORTCUTS)
+
+client/src/App.tsx
+
+Must include all real providers and routing, for example:
+
+Router (BrowserRouter)
+
+App shell / layout
+
+Sidebar / navigation
+
+Existing routes:
+
+/
+
+/admin/data-safety
+
+POS
+
+KDS
+
+Menu V3
+
+Finance / Operations pages
+
+
+
+Do not gate routes. Do not use Suspense fallback text like "Running".
+
+If Suspense is required, fallback must be a visible UI component, e.g.:
+
+<Suspense fallback={<div>Loading application…</div>}>
+
+
+---
+
+STEP 3 — VERIFY STATIC BUILD & SERVING (NO GUESSING)
+
+The agent must explicitly verify:
+
+1. Build output exists
+
+dist/public/index.html
+
+dist/public/assets/*.js
+
+
+
+2. HTML contains
+
+<div id="root"></div>
+<script type="module" src="/assets/xxxx.js"></script>
+
+
+3. Server static path
+
+Express / server must serve exactly dist/public
+
+No other static folders
+
+
+
+4. JS bundle loads
+
+Open browser devtools → Network → confirm JS loads with 200
+
+No red errors in Console
+
+
+
+
+
+---
+
+STEP 4 — REAL BROWSER VERIFICATION (MANDATORY)
+
+Using the actual Replit deployed URL (not Playwright):
+
+Must visually confirm:
+
+Sidebar renders
+
+Navigation links visible
+
+/admin/data-safety shows:
+
+Backup status
+
+Backup run button
+
+Historical import controls
+
+
+Dashboard shows numbers, not empty placeholders
+
+
+If the page shows only “Running”: ➡️ STOP IMMEDIATELY ➡️ Report which file reintroduced it
+
+
+---
+
+ACCEPTANCE CRITERIA (ALL REQUIRED)
+
+✅ React mounts (no blank screen)
+
+✅ Sidebar visible
+
+✅ Routes navigate
+
+✅ /admin/data-safety usable
+
+✅ No debug text anywhere
+
+✅ Zero database changes
+
+✅ Zero data loss
+
+
+
+---
+
+STOP CONDITIONS (ABSOLUTE)
+
+The agent must STOP and report if:
+
+“Running” appears again
+
+React does not mount
+
+JS bundle not executed
+
+Any temptation to “just refactor” appears
+
+
+
+---
+
+CONTEXT (FOR AGENT)
+
+Backend systems (Backup, Loyverse Import, Metrics) are already complete
+
+This patch is purely UI boot restoration
+
+Investor demo and live business depend on this being solid
+
+Data safety is paramount — frontend failure is acceptable, data loss is not
+
+
+
+---
