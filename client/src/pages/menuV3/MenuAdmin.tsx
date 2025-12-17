@@ -17,10 +17,7 @@ export default function MenuAdmin() {
         <button onClick={() => setView("categories")}>Categories</button>
         <button onClick={() => setView("items")}>Items</button>
         <button onClick={() => setView("modifiers")}>Modifiers</button>
-        <button
-          disabled={!selectedItem}
-          onClick={() => setView("recipes")}
-        >
+        <button onClick={() => setView("recipes")}>
           Recipes
         </button>
       </div>
@@ -28,7 +25,7 @@ export default function MenuAdmin() {
       {/* Views */}
       {view === "categories" && <CategoriesEditor />}
       {view === "items" && (
-        <ItemsEditor onSelectItem={(item) => {
+        <ItemsEditor onSelectItem={(item: any) => {
           setSelectedItem(item);
           setView("recipes");
         }} />
@@ -36,6 +33,12 @@ export default function MenuAdmin() {
       {view === "modifiers" && <ModifiersEditor />}
       {view === "recipes" && selectedItem && (
         <RecipeEditor item={selectedItem} />
+      )}
+      {view === "recipes" && !selectedItem && (
+        <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>
+          <p style={{ fontSize: "18px", marginBottom: "12px" }}>No recipes yet</p>
+          <p>Select a menu item from the Items tab to create or edit its recipe.</p>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,8 @@
 export const ROUTES = {
   // Home
   HOME: "/",
+  DASHBOARD: "/dashboard",
+  HOME_ALIAS: "/home",
 
   // Operations (Core active routes only)
   DAILY_STOCK: "/operations/daily-stock",

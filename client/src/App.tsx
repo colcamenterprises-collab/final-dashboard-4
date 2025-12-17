@@ -98,6 +98,8 @@ export default function App() {
 
               <Route element={<PageShell />}>
                 <Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
+                <Route path="/dashboard" element={<Navigate to="/" replace />} />
+                <Route path="/home" element={<Navigate to="/" replace />} />
 
                 <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
                 <Route path="/operations/daily-sales-library" element={<Guard><DailySalesV2Library /></Guard>} />
