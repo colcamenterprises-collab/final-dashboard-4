@@ -24,6 +24,9 @@ export const ROUTES = {
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",
   SYSTEM_HEALTH: "/operations/system-health",
+  INGREDIENTS_MASTER: "/operations/ingredients-master",
+  RECIPES_MASTER: "/operations/recipes-master",
+  PURCHASE_HISTORY: "/operations/purchase-history",
 
   // Finance
   FINANCE: "/finance",

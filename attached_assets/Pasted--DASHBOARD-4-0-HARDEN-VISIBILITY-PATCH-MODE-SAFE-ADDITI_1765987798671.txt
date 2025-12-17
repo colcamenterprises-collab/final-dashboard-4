@@ -1,0 +1,370 @@
+🔒 DASHBOARD 4.0 — HARDEN & VISIBILITY PATCH
+
+MODE: SAFE / ADDITIVE / READ-WRITE (LIMITED)
+
+ABSOLUTE RULES (NON-NEGOTIABLE)
+
+❌ DO NOT modify Daily Sales forms
+
+❌ DO NOT modify Daily Stock forms
+
+❌ DO NOT change existing calculations
+
+❌ DO NOT refactor services
+
+❌ DO NOT rename tables or columns
+
+❌ DO NOT remove code
+
+❌ DO NOT “improve” logic
+
+
+You may:
+
+✅ Add new read-only UI pages
+
+✅ Add flags / status fields
+
+✅ Add guards / checks
+
+✅ Add visibility
+
+✅ Add locks
+
+
+
+---
+
+OBJECTIVE
+
+Make all existing functionality:
+
+Visible to operators
+
+Locked against silent failure
+
+Honest about data confidence
+
+
+No new features.
+No UI polish.
+Just clarity and safety.
+
+
+---
+
+PATCH 1 — INGREDIENTS MASTER (VISIBILITY + LOCK)
+
+Backend
+
+1. Extend ingredients table
+
+Add columns:
+
+verified BOOLEAN DEFAULT false
+
+locked BOOLEAN DEFAULT false
+
+
+
+
+2. Update ingredientService
+
+Expose:
+
+listIngredients()
+
+ingredient status (verified / locked)
+
+
+Prevent updates if locked = true
+
+
+
+
+⚠️ Do NOT change existing ingredient fields or logic.
+
+
+---
+
+Frontend
+
+3. Create new page
+
+
+
+client/src/pages/operations/IngredientsMaster.tsx
+
+4. Display table (READ-ONLY by default) Columns:
+
+
+
+Ingredient Name
+
+Category
+
+Package Size
+
+Portion Size
+
+Cost
+
+Status (Verified / Unverified / Locked)
+
+
+5. Actions
+
+
+
+Toggle verified
+
+Toggle locked (admin only)
+
+
+No bulk edits.
+No inline recalculation.
+
+
+---
+
+PATCH 2 — RECIPES VISIBILITY (READ-ONLY)
+
+Backend
+
+1. Expose existing BOM logic
+
+
+
+Add endpoint:
+
+
+GET /api/recipes
+
+Returns:
+
+Menu item
+
+Ingredients
+
+Quantity per ingredient
+
+Calculated total cost
+
+
+
+⚠️ Do NOT rewrite BOM logic.
+Just expose what already exists.
+
+
+---
+
+Frontend
+
+2. Create page
+
+
+
+client/src/pages/operations/Recipes.tsx
+
+3. Render table Columns:
+
+
+
+Menu Item
+
+Ingredients (list)
+
+Cost (calculated)
+
+Last Updated (if available)
+
+
+Read-only.
+No editing.
+
+
+---
+
+PATCH 3 — PURCHASE HISTORY ANALYTICS (READ-ONLY)
+
+Backend
+
+1. Create aggregation endpoint
+
+
+
+GET /api/purchases/summary
+
+Filters:
+
+period: daily | weekly | monthly
+
+date range (optional)
+
+
+Aggregate from:
+
+expenses table
+
+Group by item
+
+Sum quantity + cost
+
+
+⚠️ Do NOT alter expenses logic.
+
+
+---
+
+Frontend
+
+2. Create page
+
+
+
+client/src/pages/operations/PurchaseHistory.tsx
+
+3. Table Columns:
+
+
+
+Item
+
+Quantity
+
+Total Cost
+
+Period
+
+
+Filters:
+
+Daily / Weekly / Monthly toggle
+
+
+
+---
+
+PATCH 4 — DATA CONFIDENCE STATUS (GLOBAL)
+
+Backend
+
+1. Create service
+
+
+
+server/services/dataConfidenceService.ts
+
+Checks:
+
+All ingredients verified?
+
+Sales form exists?
+
+Stock form exists?
+
+Receipts present for shift?
+
+
+Return:
+
+status: GREEN | YELLOW | RED
+reasons: string[]
+
+
+---
+
+Frontend
+
+2. Add status banner Visible on:
+
+
+
+Dashboard home
+
+Reports
+
+Email header
+
+
+Text examples:
+
+GREEN: “All data verified”
+
+YELLOW: “Some data incomplete”
+
+RED: “Action required”
+
+
+No hiding.
+No dismissing.
+
+
+---
+
+PATCH 5 — POWER TOOL LOCKS
+
+Backend
+
+1. Wrap these services
+
+
+
+loyverseHistoricalImport
+
+backupService
+
+
+Add guard:
+
+Require ENABLE_DANGEROUS_TOOLS=true
+
+Require explicit confirmation param
+
+
+If not present:
+
+Abort
+
+Log attempt
+
+
+
+---
+
+DEPLOYMENT RULES
+
+Apply patches in order
+
+Verify each page loads
+
+No production publish until:
+
+Ingredients visible
+
+Recipes visible
+
+Purchase history visible
+
+Status banner shows
+
+
+
+
+---
+
+STOP CONDITION
+
+After completing:
+
+STOP
+
+Do NOT add extras
+
+Do NOT continue
+
+Report completion only
+
+
+
+---

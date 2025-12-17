@@ -6,6 +6,39 @@ export async function getAllIngredients() {
   return db.select().from(ingredients).orderBy(ingredients.name);
 }
 
+export async function listIngredientsWithStatus() {
+  const all = await db.select().from(ingredients).orderBy(ingredients.name);
+  return all.map(ing => ({
+    ...ing,
+    status: ing.locked ? 'locked' : (ing.verified ? 'verified' : 'unverified')
+  }));
+}
+
+export async function toggleIngredientVerified(id: number) {
+  const current = await getIngredientById(id);
+  if (!current) throw new Error("Ingredient not found");
+  if (current.locked) throw new Error("Cannot modify locked ingredient");
+  
+  const result = await db
+    .update(ingredients)
+    .set({ verified: !current.verified })
+    .where(eq(ingredients.id, id))
+    .returning();
+  return result[0];
+}
+
+export async function toggleIngredientLocked(id: number) {
+  const current = await getIngredientById(id);
+  if (!current) throw new Error("Ingredient not found");
+  
+  const result = await db
+    .update(ingredients)
+    .set({ locked: !current.locked })
+    .where(eq(ingredients.id, id))
+    .returning();
+  return result[0];
+}
+
 export async function getIngredientById(id: number) {
   const result = await db.select().from(ingredients).where(eq(ingredients.id, id));
   return result[0] || null;
@@ -76,6 +109,10 @@ export async function updateIngredient(id: number, data: Partial<{
   portionUnit: string;
   portionsPerPurchase: number;
 }>) {
+  const current = await getIngredientById(id);
+  if (current?.locked) {
+    throw new Error("Cannot update locked ingredient");
+  }
   // Recalculate portion cost if purchase cost or portions changed
   let portionCost = undefined;
   if (data.purchaseCost !== undefined || data.portionsPerPurchase !== undefined) {

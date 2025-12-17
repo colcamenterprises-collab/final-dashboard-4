@@ -99,6 +99,7 @@ import loyverseMenuImportRouter from "./routes/loyverseMenuImport";
 import adminBackupRouter from "./routes/adminBackup";
 import adminHistoricalImportRouter from "./routes/adminHistoricalImport";
 import executiveMetricsRouter from "./routes/executiveMetrics";
+import dashboard4Routes from "./routes/dashboard4Routes";
 // Email functionality will be added when needed
 
 
@@ -3225,6 +3226,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/admin/backup', adminBackupRouter);
   app.use('/api/admin/historical', adminHistoricalImportRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
+  app.use(dashboard4Routes);
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

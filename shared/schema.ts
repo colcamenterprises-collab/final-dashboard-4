@@ -460,6 +460,8 @@ export const ingredients = pgTable("ingredients", {
   lastUpdated: timestamp("last_updated").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow().$onUpdate(() => new Date()),
   createdAt: timestamp("created_at").defaultNow(),
+  verified: boolean("verified").default(false),
+  locked: boolean("locked").default(false),
 });
 
 // Recipes table - Market-leading comprehensive recipe management

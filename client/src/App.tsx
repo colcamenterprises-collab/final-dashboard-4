@@ -76,6 +76,9 @@ import Login from "./pages/auth/Login";
 import TenantSwitcher from "./pages/settings/TenantSwitcher";
 import PaymentProviders from "./pages/settings/PaymentProviders";
 import DataSafety from "./pages/admin/DataSafety";
+import IngredientsMaster from "./pages/operations/IngredientsMaster";
+import RecipesPage from "./pages/operations/Recipes";
+import PurchaseHistory from "./pages/operations/PurchaseHistory";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -120,6 +123,9 @@ export default function App() {
                 
                 <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
                 <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
+                <Route path="/operations/ingredients-master" element={<Guard><IngredientsMaster /></Guard>} />
+                <Route path="/operations/recipes-master" element={<Guard><RecipesPage /></Guard>} />
+                <Route path="/operations/purchase-history" element={<Guard><PurchaseHistory /></Guard>} />
                 
                 <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                   <Route index element={null} />

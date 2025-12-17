@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import { ModernHeader, ModernSidebar, BottomNav } from "@/components/navigation";
+import DataConfidenceBanner from "@/components/DataConfidenceBanner";
 
 export default function PageShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -23,6 +24,9 @@ export default function PageShell() {
             title="Restaurant Dashboard"
             subtitle="Manage your operations efficiently"
           />
+
+          {/* Data Confidence Banner */}
+          <DataConfidenceBanner />
 
           {/* Content with proper scrolling */}
           <main className="flex-1 overflow-y-scroll bg-slate-50 dark:bg-slate-900">
