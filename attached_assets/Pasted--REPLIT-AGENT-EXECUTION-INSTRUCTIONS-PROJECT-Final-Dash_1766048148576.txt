@@ -1,0 +1,176 @@
+🔐 REPLIT AGENT — EXECUTION INSTRUCTIONS
+
+PROJECT: Final Dashboard 4.0
+PATCH NAME: Menu Masters Route Rewire
+SCOPE: Frontend routing only
+RISK LEVEL: LOW (Visibility change only)
+
+
+---
+
+🚫 HARD STOPS (NON-NEGOTIABLE)
+
+The agent MUST NOT:
+
+Modify PageShell
+
+Modify backend code
+
+Modify APIs
+
+Refactor files or folders
+
+Rename components
+
+Add new features
+
+Touch Daily Sales or Daily Stock forms
+
+Add sidebar links
+
+Move physical files
+
+
+If any of the above is required, STOP IMMEDIATELY.
+
+
+---
+
+🎯 OBJECTIVE
+
+Rewire existing pages to their correct allowed route groups.
+
+Page	Old (Wrong)	New (Correct)
+
+Ingredients Master	/operations/*	/menu/ingredients
+Recipes Master	/operations/*	/menu/recipes
+
+
+
+---
+
+📁 FILES ALLOWED TO TOUCH
+
+✅ client/src/router/RouteRegistry.tsx
+❌ Any other file = DO NOT TOUCH
+
+
+---
+
+🧩 STEP-BY-STEP TASKS
+
+STEP 1 — IMPORT PAGES (NO CHANGES TO FILE LOCATION)
+
+At the top of RouteRegistry.tsx:
+
+import IngredientsMaster from "@/pages/operations/ingredients-master";
+import RecipesMaster from "@/pages/operations/recipes-master";
+
+⚠️ Do not change component names or exports.
+
+
+---
+
+STEP 2 — ADD ROUTES UNDER /menu
+
+Locate the /menu route group.
+
+Add:
+
+{
+  path: "/menu/ingredients",
+  element: <IngredientsMaster />,
+},
+{
+  path: "/menu/recipes",
+  element: <RecipesMaster />,
+},
+
+
+---
+
+STEP 3 — DISABLE OLD /operations ROUTES
+
+Locate the /operations route group.
+
+Comment out or remove these routes only:
+
+/operations/ingredients-master
+
+/operations/recipes-master
+
+
+⚠️ Do NOT delete components or files.
+
+
+---
+
+🧪 VERIFICATION (MANDATORY)
+
+The agent must confirm:
+
+App builds successfully
+
+No console errors
+
+Pages load at:
+
+/menu/ingredients
+
+/menu/recipes
+
+
+
+If any error occurs → REVERT PATCH
+
+
+---
+
+🚫 DO NOT CONTINUE TO NEXT STEPS
+
+The agent MUST NOT:
+
+Add sidebar links
+
+Move Purchase History
+
+Modify layout
+
+“Clean up” unused routes
+
+
+These actions require explicit approval.
+
+
+---
+
+✅ SUCCESS CRITERIA
+
+Pages render correctly
+
+Routing complies with allow-list
+
+No regressions
+
+No side effects
+
+
+
+---
+
+🧾 AGENT FINAL RESPONSE FORMAT
+
+Agent must reply with only:
+
+Ingredients Master OK
+
+Recipes Master OK
+
+
+or
+
+ERROR: followed by exact error message
+
+
+
+---

@@ -35,10 +35,10 @@ export const ROUTES = {
 
   // Menu Mgmt
   RECIPES: "/menu/recipes",
-  RECIPES_MASTER: "/menu/recipes-master",
+  // RECIPES_MASTER: merged into RECIPES
   RECIPE_CARDS: "/menu/recipe-cards",
   INGREDIENT_MANAGEMENT: "/menu/ingredient-management",
-  INGREDIENTS_MASTER: "/menu/ingredients-master",
+  // INGREDIENTS_MASTER: merged into INGREDIENTS
   COST_CALCULATOR: "/menu/cost-calculator",
   INGREDIENTS: "/menu/ingredients",
   MENU_MGR: "/menu/manager",
