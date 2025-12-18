@@ -97,7 +97,7 @@
     "get-stream": "^9.0.1",
     "glob": "^11.0.3",
     "google-auth-library": "^10.2.1",
-    "googleapis": "^150.0.1",
+    "googleapis": "^148.0.0",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
     "jsbarcode": "^3.12.1",
