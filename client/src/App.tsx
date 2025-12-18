@@ -123,8 +123,6 @@ export default function App() {
                 
                 <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
                 <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
-                <Route path="/operations/ingredients-master" element={<Guard><IngredientsMaster /></Guard>} />
-                <Route path="/operations/recipes-master" element={<Guard><RecipesPage /></Guard>} />
                 <Route path="/operations/purchase-history" element={<Guard><PurchaseHistory /></Guard>} />
                 
                 <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
@@ -162,8 +160,10 @@ export default function App() {
                 <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
                 <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
                 <Route path={ROUTES.RECIPES} element={<Guard><RecipesUnified /></Guard>} />
+                <Route path={ROUTES.RECIPES_MASTER} element={<Guard><RecipesPage /></Guard>} />
                 <Route path={ROUTES.RECIPE_CARDS} element={<Guard><RecipeCards /></Guard>} />
                 <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<Guard><IngredientManagement /></Guard>} />
+                <Route path={ROUTES.INGREDIENTS_MASTER} element={<Guard><IngredientsMaster /></Guard>} />
 
                 <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
                 <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />

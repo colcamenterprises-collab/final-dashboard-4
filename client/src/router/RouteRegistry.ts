@@ -24,8 +24,6 @@ export const ROUTES = {
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",
   SYSTEM_HEALTH: "/operations/system-health",
-  INGREDIENTS_MASTER: "/operations/ingredients-master",
-  RECIPES_MASTER: "/operations/recipes-master",
   PURCHASE_HISTORY: "/operations/purchase-history",
 
   // Finance
@@ -37,8 +35,10 @@ export const ROUTES = {
 
   // Menu Mgmt
   RECIPES: "/menu/recipes",
+  RECIPES_MASTER: "/menu/recipes-master",
   RECIPE_CARDS: "/menu/recipe-cards",
-  INGREDIENT_MANAGEMENT: "/menu/ingredient-management", 
+  INGREDIENT_MANAGEMENT: "/menu/ingredient-management",
+  INGREDIENTS_MASTER: "/menu/ingredients-master",
   COST_CALCULATOR: "/menu/cost-calculator",
   INGREDIENTS: "/menu/ingredients",
   MENU_MGR: "/menu/manager",
