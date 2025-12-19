@@ -1,0 +1,201 @@
+🔐 REPLIT AGENT — MEGA PATCH (GIT CLEAN + PUSH)
+
+📌 PATCH METADATA
+
+PROJECT: Final Dashboard 4.0
+PATCH NAME: Git History Sanitation & GitHub Push
+SCOPE: Git history + repository hygiene
+RISK LEVEL: HIGH (history rewrite, expected and approved)
+CHANGE TYPE: Infrastructure / Version Control
+
+
+---
+
+🚫 HARD STOPS (NON-NEGOTIABLE)
+
+The agent MUST NOT:
+
+Modify application code
+
+Modify backend logic
+
+Modify frontend logic
+
+Refactor files
+
+Rename folders
+
+Touch Daily Sales or Daily Stock
+
+Add new features
+
+Continue if any step fails
+
+
+This patch is Git-only.
+
+
+---
+
+🎯 OBJECTIVE
+
+Clean the Git history by removing oversized backup files, enforce .gitignore rules to prevent recurrence, and force-push a clean repository to GitHub so GitHub becomes the source of truth.
+
+
+---
+
+📁 FILES / AREAS ALLOWED TO TOUCH
+
+✅ .gitignore
+✅ Git history (via filter-repo)
+✅ Git remotes and push state
+
+❌ Everything else → DO NOT TOUCH
+
+
+---
+
+🧩 EXECUTION PLAN (AGENT MUST FOLLOW EXACTLY)
+
+STEP 1 — ENSURE .gitignore BLOCKS LARGE FILES
+
+Agent must append the following exact block to .gitignore (do not remove existing entries):
+
+# Backups & archives (never commit)
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.bak
+backup/
+backups/
+
+# Large binary artifacts
+*.sqlite
+*.db
+*.dump
+
+Then:
+
+Stage .gitignore
+
+Commit with message:
+
+
+chore: block backups and large binary artifacts
+
+If nothing changes, proceed without error.
+
+
+---
+
+STEP 2 — INSTALL git-filter-repo
+
+Agent must install the tool using Python:
+
+pip install git-filter-repo
+
+If already installed, continue.
+
+
+---
+
+STEP 3 — REMOVE LARGE FILES FROM ALL GIT HISTORY
+
+Agent must run git filter-repo to permanently remove the following files from all commits:
+
+restaurant-system.zip
+
+restaurant-app-backup.zip
+
+zijinsA2s
+
+
+Exact operation logic:
+
+Remove these paths
+
+Preserve all other files
+
+Rewrite full history
+
+
+
+---
+
+STEP 4 — VERIFY HISTORY IS CLEAN
+
+Agent must confirm that:
+
+git log --stat no longer references:
+
+restaurant-system.zip
+
+restaurant-app-backup.zip
+
+zijinsA2s
+
+
+
+If any are found → STOP AND REPORT ERROR
+
+
+---
+
+STEP 5 — FORCE PUSH CLEAN HISTORY TO GITHUB
+
+Agent must run a force push to the existing GitHub repo:
+
+Branch: main
+
+Remote: origin
+
+
+This is explicitly approved because:
+
+Repo is new
+
+No collaborators
+
+GitHub currently rejected previous pushes
+
+
+
+---
+
+🧪 VERIFICATION (MANDATORY)
+
+Agent must verify:
+
+Push completes successfully
+
+No GitHub file-size errors occur
+
+Repository is populated on GitHub
+
+Commit history exists
+
+
+
+---
+
+🧾 AGENT FINAL RESPONSE FORMAT (STRICT)
+
+Agent must reply with ONLY ONE of the following:
+
+Git sanitation and push OK
+
+ERROR: <exact error output>
+
+
+No explanations.
+No suggestions.
+No follow-ups.
+
+
+---
+
+🔒 END OF MEGA PATCH
+
+
+---

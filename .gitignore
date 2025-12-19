@@ -4,3 +4,16 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Backups & archives (never commit)
+*.zip
+*.tar
+*.7z
+*.bak
+backup/
+backups/
+
+# Large binary artifacts
+*.sqlite
+*.db
+*.dump
