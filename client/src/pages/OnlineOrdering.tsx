@@ -21,13 +21,17 @@ type ModifierOption = {
   defaultSelected?: boolean 
 };
 
+type ModifierGroupType = "REQUIRED" | "OPTIONAL" | "BUNDLE";
+
 type ModifierGroup = { 
   id: string; 
   name: string; 
   type: "single" | "multi"; 
   required?: boolean; 
+  isBundle?: boolean;
   maxSelections?: number; 
-  options: ModifierOption[] 
+  options: ModifierOption[];
+  normalizedType?: ModifierGroupType;
 };
 
 type MenuItem = { 
@@ -39,7 +43,8 @@ type MenuItem = {
   category: string; 
   image?: string; 
   groups?: ModifierGroup[]; 
-  available?: boolean 
+  available?: boolean;
+  isMealDeal?: boolean;
 };
 
 type CartLine = { 
@@ -176,6 +181,30 @@ const uid = (p = "id") => `${p}_${Math.random().toString(36).slice(2, 9)}`;
 const lineTotal = (l: CartLine) => (l.basePrice + l.modifiers.reduce((s, m) => s + m.priceDelta, 0)) * l.qty;
 const getParam = (k: string) => new URLSearchParams(location.search).get(k);
 
+// PATCH 3 — Normalize modifier group types for consistent behavior
+const normalizeModifierGroups = (groups: ModifierGroup[] | undefined): ModifierGroup[] => {
+  if (!groups) return [];
+  return groups.map(g => ({
+    ...g,
+    normalizedType: g.required ? "REQUIRED" : g.isBundle ? "BUNDLE" : "OPTIONAL"
+  }));
+};
+
+// PATCH 3 — Order groups: REQUIRED first, then OPTIONAL, then BUNDLE
+const orderModifierGroups = (groups: ModifierGroup[]): ModifierGroup[] => {
+  const normalized = normalizeModifierGroups(groups);
+  return [
+    ...normalized.filter(g => g.normalizedType === "REQUIRED"),
+    ...normalized.filter(g => g.normalizedType === "OPTIONAL"),
+    ...normalized.filter(g => g.normalizedType === "BUNDLE"),
+  ];
+};
+
+// PATCH 3 — Check if item is a meal deal (sets category or explicit flag)
+const isMealDeal = (item: MenuItem): boolean => {
+  return item.isMealDeal === true || item.category === "sets";
+};
+
 // ---------- Storage Keys ----------
 const LS_MENU = "sbb_menu_json_v1";
 const LS_CART = "sbb_cart_v1";
@@ -258,7 +287,7 @@ export default function OnlineOrderingPage() {
       return []; 
     } 
   });
-  const [itemModal, setItemModal] = useState<{ open: boolean; item?: MenuItem; draft?: CartLine }>({ open: false });
+  const [itemModal, setItemModal] = useState<{ open: boolean; item?: MenuItem; draft?: CartLine; error?: string }>({ open: false });
   const [showCheckout, setShowCheckout] = useState(false);
 
   useEffect(() => { 
@@ -345,7 +374,20 @@ export default function OnlineOrderingPage() {
   }
 
   function commitDraft() { 
-    if (!itemModal.draft) return; 
+    if (!itemModal.draft || !itemModal.item) return; 
+    
+    // PATCH 3 — Enforce required modifier selection
+    const normalizedGroups = normalizeModifierGroups(itemModal.item.groups);
+    const requiredGroups = normalizedGroups.filter(g => g.normalizedType === "REQUIRED");
+    const missingRequired = requiredGroups.some(g => 
+      !itemModal.draft!.modifiers.some(m => m.groupId === g.id)
+    );
+    
+    if (missingRequired) {
+      setItemModal({ ...itemModal, error: "Please select all required options" });
+      return;
+    }
+    
     setCart((p) => [...p, itemModal.draft!]); 
     setItemModal({ open: false }); 
   }
@@ -504,10 +546,25 @@ export default function OnlineOrderingPage() {
               </button>
             </div>
             <div className="p-4 space-y-4">
-              {itemModal.item.groups?.map(g => (
+              {/* PATCH 3 — Error message for required modifiers */}
+              {itemModal.error && (
+                <div className="bg-red-500/20 border border-red-500/50 rounded-xl px-4 py-2 text-sm text-red-300" data-testid="error-message">
+                  {itemModal.error}
+                </div>
+              )}
+              
+              {/* PATCH 3 — Render groups in order: REQUIRED, OPTIONAL, BUNDLE */}
+              {orderModifierGroups(itemModal.item.groups || []).map(g => {
+                // PATCH 3 — For meal deals, only show drink/side modifiers (skip extras)
+                const isDeal = isMealDeal(itemModal.item!);
+                if (isDeal && g.normalizedType === "OPTIONAL" && !g.name.toLowerCase().includes("drink") && !g.name.toLowerCase().includes("side")) {
+                  return null;
+                }
+                
+                return (
                 <div key={g.id}>
                   <div className="text-sm font-semibold">
-                    {g.name} {g.required && <span className="text-white/50 text-xs">(required)</span>}
+                    {g.name} {g.normalizedType === "REQUIRED" && <span className="text-yellow-400 text-xs">(required)</span>}
                   </div>
                   <div className="mt-2 flex flex-wrap gap-2">
                     {g.options.map(o => {
@@ -515,7 +572,11 @@ export default function OnlineOrderingPage() {
                       return (
                         <button 
                           key={o.id} 
-                          onClick={() => toggleDraftModifier(g, o)} 
+                          onClick={() => {
+                            toggleDraftModifier(g, o);
+                            // Clear error on selection
+                            if (itemModal.error) setItemModal(prev => ({ ...prev, error: undefined }));
+                          }} 
                           className={`px-3 py-2 rounded-xl border text-sm ${
                             selected ? "bg-white text-black" : "bg-transparent"
                           }`} 
@@ -528,7 +589,7 @@ export default function OnlineOrderingPage() {
                     })}
                   </div>
                 </div>
-              ))}
+              );})}
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -591,14 +652,15 @@ export default function OnlineOrderingPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="font-semibold leading-tight">{l.name}</div>
+                        {/* PATCH 3 — Clean ticket output: Item + Modifiers */}
                         {l.modifiers.length > 0 && (
-                          <ul className="text-xs text-white/70 list-disc ml-5 mt-1">
+                          <div className="text-xs text-white/70 mt-1 space-y-0.5">
                             {l.modifiers.map(m => (
-                              <li key={`${l.id}_${m.optionId}`}>
-                                {m.groupName}: {m.optionName} {m.priceDelta ? `(+${THB(m.priceDelta)})` : ""}
-                              </li>
+                              <div key={`${l.id}_${m.optionId}`}>
+                                + {m.optionName}{m.priceDelta ? ` (+${THB(m.priceDelta)})` : ""}
+                              </div>
                             ))}
-                          </ul>
+                          </div>
                         )}
                       </div>
                       <div className="text-right min-w-[120px]">

@@ -1,0 +1,210 @@
+
+🔒 DECISION (LOCKED)
+
+DO NOT refactor into multiple files.
+Modify the existing single file only.
+
+Keep: client/src/pages/OnlineOrdering.tsx
+
+Keep: /api/menu-ordering/full
+
+We align behaviour, not architecture
+
+
+This is the fastest, safest path.
+
+
+---
+
+🔐 PATCH 3 — ONLINE ORDERING (REVISED & EXECUTABLE)
+
+📌 PATCH METADATA
+
+PROJECT: Final Dashboard 4.0
+PATCH NAME: Online Ordering – Menu & Modifier Alignment (Single File)
+SCOPE: Frontend only
+RISK LEVEL: LOW
+CHANGE TYPE: Logic alignment
+FILE TARGET: client/src/pages/OnlineOrdering.tsx
+
+
+---
+
+🚫 HARD STOPS (STILL ACTIVE)
+
+Agent MUST NOT:
+
+Refactor file structure
+
+Create new files
+
+Touch POS menu endpoints
+
+Change backend APIs
+
+Change pricing
+
+Touch Recipes or Daily systems
+
+
+
+---
+
+🎯 OBJECTIVE
+
+Make Online Ordering behave like POS using its existing API by enforcing:
+
+Required modifiers
+
+Modifier order
+
+Meal deal logic
+
+Clean ticket output
+
+
+
+---
+
+🧩 EXECUTION — MODIFY OnlineOrdering.tsx ONLY
+
+STEP 1 — ACCEPT ONLINE MENU SOURCE (NO CHANGE)
+
+Leave this as-is:
+
+GET /api/menu-ordering/full
+
+We are not unifying APIs right now.
+We are unifying behaviour.
+
+
+---
+
+STEP 2 — NORMALISE MODIFIER GROUP TYPES (INLINE)
+
+Inside OnlineOrdering.tsx, introduce a local normalisation step after menu fetch:
+
+const normalisedModifierGroups = modifierGroups.map(g => ({
+  ...g,
+  type: g.required
+    ? "REQUIRED"
+    : g.isBundle
+    ? "BUNDLE"
+    : "OPTIONAL",
+}));
+
+This avoids backend changes.
+
+
+---
+
+STEP 3 — ENFORCE REQUIRED MODIFIERS (CRITICAL)
+
+Before allowing “Add to Cart”, inject this guard:
+
+const hasMissingRequired = normalisedModifierGroups
+  .filter(g => g.type === "REQUIRED")
+  .some(g => !selectedModifiers[g.id]?.length);
+
+if (hasMissingRequired) {
+  setError("Please select required options");
+  return;
+}
+
+No bypasses.
+
+
+---
+
+STEP 4 — LOCK MODIFIER DISPLAY ORDER
+
+When rendering modifier groups:
+
+const orderedGroups = [
+  ...normalisedModifierGroups.filter(g => g.type === "REQUIRED"),
+  ...normalisedModifierGroups.filter(g => g.type === "OPTIONAL"),
+  ...normalisedModifierGroups.filter(g => g.type === "BUNDLE"),
+];
+
+Render only orderedGroups.
+Ignore any existing order from API.
+
+
+---
+
+STEP 5 — MEAL DEAL HANDLING (INLINE LOGIC)
+
+If an item is flagged as a deal (existing flag or category check):
+
+if (item.isMealDeal) {
+  disableExtraModifiers();
+  forceSideAndDrinkSelection();
+}
+
+Do not allow:
+
+Extra cheese on deal items
+
+Duplicate modifiers from child items
+
+
+
+---
+
+STEP 6 — TICKET OUTPUT SANITY
+
+Ensure cart rendering follows:
+
+Item Name
+  + Modifier
+  + Modifier
+
+No collapsing.
+No hidden defaults.
+
+This is display-only.
+
+
+---
+
+🧪 VERIFICATION (MANDATORY)
+
+Agent must test:
+
+1. Burger → cannot add without required mods (if any)
+
+
+2. Meal deal → forced drink + side
+
+
+3. Drink → no food modifiers
+
+
+4. Cart display readable in <3 seconds
+
+
+5. No console errors
+
+
+
+
+---
+
+🧾 AGENT FINAL RESPONSE (STRICT)
+
+Agent must reply only:
+
+PATCH 3 COMPLETE — Online ordering aligned
+
+or
+
+BLOCKED — <specific reason>
+
+
+
+---
+
+🔒 END PATCH 3 (REVISED)
+
+
+---
