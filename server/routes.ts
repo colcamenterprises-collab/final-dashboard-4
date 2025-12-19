@@ -99,6 +99,7 @@ import loyverseMenuImportRouter from "./routes/loyverseMenuImport";
 import adminBackupRouter from "./routes/adminBackup";
 import adminHistoricalImportRouter from "./routes/adminHistoricalImport";
 import executiveMetricsRouter from "./routes/executiveMetrics";
+import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./services/menuCanonicalService";
 import dashboard4Routes from "./routes/dashboard4Routes";
 // Email functionality will be added when needed
 
@@ -3227,6 +3228,41 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/admin/historical', adminHistoricalImportRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
+
+  // PATCH 5 — Canonical Menu Drift Report (Internal Admin)
+  app.get('/api/admin/menu-canonical/status', async (req: Request, res: Response) => {
+    try {
+      const status = getCacheStatus();
+      res.json(status);
+    } catch (err) {
+      console.error('[CANONICAL] Status error:', err);
+      res.status(500).json({ error: 'Failed to get canonical menu status' });
+    }
+  });
+
+  app.post('/api/admin/menu-canonical/load', async (req: Request, res: Response) => {
+    try {
+      const items = loadCanonicalMenu();
+      res.json({ 
+        success: true, 
+        itemCount: items.length,
+        message: `Loaded ${items.length} items from Loyverse CSV` 
+      });
+    } catch (err) {
+      console.error('[CANONICAL] Load error:', err);
+      res.status(500).json({ error: 'Failed to load canonical menu' });
+    }
+  });
+
+  app.get('/api/admin/menu-canonical/drift', async (req: Request, res: Response) => {
+    try {
+      const report = await generateDriftReport();
+      res.json(report);
+    } catch (err) {
+      console.error('[CANONICAL] Drift report error:', err);
+      res.status(500).json({ error: 'Failed to generate drift report' });
+    }
+  });
 
   // Legacy Expense Import Routes
   import('./api/expenseImports').then(async expenseModule => {

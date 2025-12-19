@@ -1,0 +1,83 @@
+PATCH 5 — MENU CANONICAL INJECTION (READ-ONLY)
+📌 PATCH METADATA
+PROJECT: Final Dashboard 4.0
+PATCH NAME: Menu Canonical Injection (Loyverse CSV)
+SCOPE: Backend (read-only reference) + Internal comparison
+RISK LEVEL: LOW
+CHANGE TYPE: Data ingestion (non-destructive)
+🚫 HARD STOPS (NON-NEGOTIABLE)
+Agent MUST NOT:
+Replace /api/menu-ordering/full
+Change Online Ordering UI behaviour
+Change pricing
+Touch POS endpoints
+Modify Recipes
+Modify Daily Sales / Stock
+Affect live orders
+This patch is read-only + internal only.
+🎯 OBJECTIVE
+Load the Loyverse CSV as the canonical menu reference so we can:
+Detect menu drift
+Validate Online Ordering vs POS vs CSV
+Prepare a safe switch later (optional)
+Customers see no change.
+📁 FILES / AREAS ALLOWED TO TOUCH
+✅ Backend utility / service layer
+✅ Temporary reference storage (DB table or in-memory cache)
+✅ Internal admin endpoint or service function
+❌ Frontend Online Ordering
+❌ POS APIs
+❌ Pricing logic
+🧩 EXECUTION STEPS
+STEP 1 — INGEST CSV (READ-ONLY)
+Load the provided Loyverse CSV:
+Item Name
+SKU
+Category
+Normalise fields:
+Trim whitespace
+Standardise category casing
+Store as:
+menu_canonical_loyverse (table or in-memory structure)
+⚠️ This dataset is not used by live ordering.
+STEP 2 — NORMALISE CURRENT MENUS
+Fetch and normalise:
+POS menu (existing source)
+Online Ordering menu (/api/menu-ordering/full)
+Normalisation rules:
+Compare by SKU where possible
+Fallback to name match (case-insensitive)
+STEP 3 — GENERATE MENU DRIFT REPORT
+Produce an internal comparison result:
+Required outputs:
+Items in CSV but missing online
+Items online but not in CSV
+Category mismatches
+Duplicate names / SKUs
+Items live online but disabled in POS
+Store result as:
+JSON report
+Timestamped
+No UI exposure yet unless already available internally.
+STEP 4 — INTERNAL ACCESS ONLY
+Expose results via:
+Internal admin endpoint or
+Console/log output clearly labelled:
+Copy code
+
+MENU DRIFT REPORT — LOYVERSE vs ONLINE
+No customer-facing surface.
+🧪 VERIFICATION (MANDATORY)
+Agent must confirm:
+CSV loaded successfully
+No impact to live ordering
+Drift report generated
+No errors in logs
+No schema conflicts
+🧾 AGENT FINAL RESPONSE (STRICT)
+Agent must reply only with:
+PATCH 5 COMPLETE — Canonical menu loaded (read-only)
+or
+BLOCKED — <exact reason>
+No commentary.
+🔒 END PATCH 5
