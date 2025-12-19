@@ -1,0 +1,211 @@
+🔐 REPLIT AGENT — PATCH 3 (EXECUTE IMMEDIATELY)
+
+📌 PATCH METADATA
+
+PROJECT: Final Dashboard 4.0
+PATCH NAME: Online Ordering – Menu & Modifier Alignment
+SCOPE: Frontend (Online Ordering only)
+RISK LEVEL: LOW–MEDIUM
+CHANGE TYPE: Wiring / Flow Alignment
+SOURCE OF TRUTH: Loyverse menu + Patch 2 modifier rules
+
+
+---
+
+🚫 HARD STOPS (NON-NEGOTIABLE)
+
+Agent MUST NOT:
+
+Modify backend APIs
+
+Modify POS logic
+
+Modify Recipes
+
+Modify pricing logic
+
+Add new menu items not in Loyverse
+
+Touch Daily Sales / Stock systems
+
+Refactor unrelated UI
+
+
+If blocked → STOP AND REPORT
+
+
+---
+
+🎯 OBJECTIVE
+
+Make Online Ordering load the same menu + modifier logic as POS, so:
+
+One menu truth
+
+Same modifier rules
+
+Clean tickets
+
+Zero staff confusion
+
+
+
+---
+
+📁 FILES ALLOWED TO TOUCH (STRICT)
+
+✅ client/src/pages/online-ordering/Menu.tsx
+✅ client/src/pages/online-ordering/ItemModal.tsx
+✅ client/src/pages/online-ordering/modifiers.ts
+✅ client/src/data/menu.ts (if exists)
+
+❌ Everything else → DO NOT TOUCH
+
+
+---
+
+🧩 STEP 1 — MENU SOURCE LOCK (CRITICAL)
+
+Replace any hardcoded online menu with canonical menu data.
+
+Required behaviour
+
+Online ordering menu must load from the same menu dataset used for POS
+
+Categories must match Loyverse categories exactly
+
+No duplicate menu definitions
+
+
+Implementation
+
+In Menu.tsx:
+
+import { getCanonicalMenu } from "@/data/menu";
+
+const menu = getCanonicalMenu(); // single source of truth
+
+❌ Remove any inline arrays, mock data, or duplicated menu objects.
+
+
+---
+
+🧩 STEP 2 — MODIFIER GROUP TYPES (FROM PATCH 2)
+
+In modifiers.ts, enforce explicit modifier group typing:
+
+export type ModifierGroupType = "REQUIRED" | "OPTIONAL" | "BUNDLE";
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  type: ModifierGroupType;
+  modifiers: Modifier[];
+}
+
+
+---
+
+🧩 STEP 3 — REQUIRED MODIFIER ENFORCEMENT
+
+In ItemModal.tsx, block add-to-cart unless REQUIRED groups are satisfied:
+
+const missingRequired = modifierGroups
+  .filter(g => g.type === "REQUIRED")
+  .some(g => !selectedModifiers[g.id]);
+
+if (missingRequired) {
+  setError("Please select required options");
+  return;
+}
+
+No exceptions.
+
+
+---
+
+🧩 STEP 4 — MODIFIER DISPLAY ORDER (LOCKED)
+
+Render modifier groups in this order only:
+
+const orderedGroups = [
+  ...groups.filter(g => g.type === "REQUIRED"),
+  ...groups.filter(g => g.type === "OPTIONAL"),
+  ...groups.filter(g => g.type === "BUNDLE"),
+];
+
+❌ No per-item overrides
+❌ No UI reordering
+
+
+---
+
+🧩 STEP 5 — MEAL DEAL HANDLING
+
+Meal deals must:
+
+Be parent items
+
+Force side + drink selection
+
+Prevent duplicate modifiers
+
+
+Implementation rule:
+
+if (item.type === "MEAL_DEAL") {
+  disableChildModifiers();
+}
+
+This prevents double-ups and POS confusion.
+
+
+---
+
+🧩 STEP 6 — TICKET OUTPUT SANITY
+
+Ensure cart summary renders as:
+
+Item Name
+  + Modifier 1
+  + Modifier 2
+
+No hidden defaults.
+No collapsed modifiers.
+
+
+---
+
+🧪 VERIFICATION (MANDATORY)
+
+Agent must verify:
+
+Burger order → modifiers enforced
+
+Meal deal → forced drink + side
+
+Drink → no food modifiers
+
+Cart output mirrors POS ticket style
+
+No console errors
+
+
+
+---
+
+🧾 AGENT FINAL RESPONSE (STRICT)
+
+Agent must reply with only one:
+
+PATCH 3 COMPLETE — Online ordering aligned
+
+BLOCKED — <exact blocker>
+
+
+No explanations.
+
+
+---
+
+🔒 END OF PATCH 3
