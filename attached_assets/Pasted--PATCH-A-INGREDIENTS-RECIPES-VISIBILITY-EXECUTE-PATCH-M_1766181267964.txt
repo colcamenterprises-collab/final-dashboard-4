@@ -1,0 +1,115 @@
+🔐 PATCH A — INGREDIENTS & RECIPES VISIBILITY (EXECUTE)
+📌 PATCH METADATA
+PROJECT: Final Dashboard 4.0
+PATCH NAME: Ingredients & Recipes – Data Wiring + Visibility
+SCOPE: Frontend data wiring only
+RISK LEVEL: LOW
+CHANGE TYPE: Visibility / Wiring
+EXPECTED RESULT: Ingredient list and recipe list actually display data
+🚫 HARD STOPS (NON-NEGOTIABLE)
+Agent MUST NOT:
+Modify backend APIs
+Modify database schema
+Modify Recipes logic
+Modify Ingredients logic
+Add new features
+Refactor components
+Touch Daily Sales / Stock
+Touch Online Ordering
+If data is missing → WIRE EXISTING API ONLY, do not invent.
+🎯 OBJECTIVE
+Ensure that:
+Ingredients Master page shows ingredient rows
+Recipes page shows recipe rows
+Empty states are only shown if API returns empty
+Pages no longer look “unfinished”
+📁 FILES ALLOWED TO TOUCH (STRICT)
+Ingredients
+✅ client/src/pages/operations/ingredients-master.tsx (or equivalent Ingredients Master page)
+Recipes
+✅ client/src/pages/menu/recipes-master.tsx (or equivalent Recipes page)
+❌ Any other files → DO NOT TOUCH
+🧩 PATCH A — EXECUTION STEPS
+STEP 1 — INGREDIENTS MASTER: DATA FETCH WIRING
+In the Ingredients Master page:
+Confirm the page mounts successfully
+Wire it to the existing ingredients endpoint
+(do NOT create a new one)
+Expected existing API (one of these already exists):
+Copy code
+Ts
+GET /api/ingredients
+OR
+GET /api/ingredients/master
+On mount:
+Copy code
+Ts
+useEffect(() => {
+  fetchIngredients();
+}, []);
+Render returned ingredient rows in a table or list:
+Copy code
+Ts
+ingredients.map(ingredient => (
+  <tr key={ingredient.id}>
+    <td>{ingredient.name}</td>
+    <td>{ingredient.category}</td>
+    <td>{ingredient.unit}</td>
+    <td>{ingredient.cost}</td>
+  </tr>
+));
+⚠️ If the API returns data but UI is empty → fix the mapping, not the API.
+STEP 2 — INGREDIENTS EMPTY STATE (ONLY IF TRULY EMPTY)
+Only show “No ingredients found” if:
+Copy code
+Ts
+ingredients.length === 0
+❌ Do NOT show placeholder text if data exists.
+STEP 3 — RECIPES MASTER: DATA FETCH WIRING
+In the Recipes Master page:
+Wire to the existing recipes endpoint:
+Copy code
+Ts
+GET /api/recipes
+OR
+GET /api/recipes/master
+On mount:
+Copy code
+Ts
+useEffect(() => {
+  fetchRecipes();
+}, []);
+Render recipe list:
+Copy code
+Ts
+recipes.map(recipe => (
+  <tr key={recipe.id}>
+    <td>{recipe.name}</td>
+    <td>{recipe.category}</td>
+    <td>{recipe.ingredients.length}</td>
+  </tr>
+));
+No editing controls.
+Read-only only.
+STEP 4 — REMOVE PLACEHOLDER UI
+If either page contains:
+Dummy arrays
+Mock data
+“Coming soon”
+Commented-out renders
+→ REMOVE OR BYPASS THEM
+Pages must render real data or real empty state.
+🧪 VERIFICATION (MANDATORY)
+Agent must verify:
+/operations/ingredients-master shows ingredient rows
+/menu/recipes shows recipe rows
+No console errors
+No API changes
+No blank pages unless data truly empty
+🧾 AGENT FINAL RESPONSE (STRICT)
+Agent must reply only with:
+PATCH A COMPLETE — Ingredients & Recipes visible
+or
+BLOCKED — <exact technical reason>
+No commentary.
+🔒 END PATCH A

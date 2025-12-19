@@ -31,7 +31,7 @@ export default function IngredientsMaster() {
 
   const toggleVerified = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("POST", `/api/ingredients/${id}/toggle-verified`);
+      return apiRequest(`/api/ingredients/${id}/toggle-verified`, { method: "POST" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients/master"] });
@@ -44,7 +44,7 @@ export default function IngredientsMaster() {
 
   const toggleLocked = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("POST", `/api/ingredients/${id}/toggle-locked`);
+      return apiRequest(`/api/ingredients/${id}/toggle-locked`, { method: "POST" });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients/master"] });
