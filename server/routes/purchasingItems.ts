@@ -106,6 +106,116 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
+// GET /api/purchasing-items/export/csv - Export all purchasing items as CSV
+router.get('/export/csv', async (req, res) => {
+  try {
+    const items = await prisma.purchasingItem.findMany({
+      orderBy: [
+        { category: 'asc' },
+        { item: 'asc' },
+      ],
+    });
+
+    const headers = ['id', 'item', 'category', 'supplierName', 'brand', 'supplierSku', 'orderUnit', 'unitDescription', 'unitCost', 'lastReviewDate'];
+    const csvLines = [headers.join(',')];
+    
+    for (const row of items) {
+      const csvRow = [
+        row.id,
+        `"${(row.item || '').replace(/"/g, '""')}"`,
+        `"${(row.category || '').replace(/"/g, '""')}"`,
+        `"${(row.supplierName || '').replace(/"/g, '""')}"`,
+        `"${(row.brand || '').replace(/"/g, '""')}"`,
+        `"${(row.supplierSku || '').replace(/"/g, '""')}"`,
+        `"${(row.orderUnit || '').replace(/"/g, '""')}"`,
+        `"${(row.unitDescription || '').replace(/"/g, '""')}"`,
+        row.unitCost || '',
+        `"${(row.lastReviewDate || '').replace(/"/g, '""')}"`,
+      ];
+      csvLines.push(csvRow.join(','));
+    }
+    
+    const csvContent = csvLines.join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="purchasing-items-export.csv"');
+    console.log(`[/api/purchasing-items/export/csv] Exported ${items.length} items`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting purchasing items:', error);
+    res.status(500).json({ ok: false, error: 'Failed to export purchasing items' });
+  }
+});
+
+// POST /api/purchasing-items/import/csv - Import purchasing items from CSV (upsert by item, supplierName, brand)
+router.post('/import/csv', async (req, res) => {
+  try {
+    const { csvData } = req.body;
+    
+    if (!csvData || !Array.isArray(csvData)) {
+      return res.status(400).json({ ok: false, error: 'csvData array required' });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+    
+    for (const row of csvData) {
+      const item = (row.item || '').trim();
+      const supplierName = (row.supplierName || '').trim() || null;
+      const brand = (row.brand || '').trim() || null;
+      
+      if (!item) continue;
+      
+      // Check if exists
+      const existing = await prisma.purchasingItem.findFirst({
+        where: {
+          item,
+          supplierName: supplierName || undefined,
+          brand: brand || undefined,
+        },
+      });
+      
+      if (existing) {
+        // Update
+        await prisma.purchasingItem.update({
+          where: { id: existing.id },
+          data: {
+            category: row.category || null,
+            supplierSku: row.supplierSku || null,
+            orderUnit: row.orderUnit || null,
+            unitDescription: row.unitDescription || null,
+            unitCost: row.unitCost ? parseFloat(row.unitCost) : null,
+            lastReviewDate: row.lastReviewDate || null,
+          },
+        });
+        updated++;
+      } else {
+        // Insert
+        await prisma.purchasingItem.create({
+          data: {
+            item,
+            category: row.category || null,
+            supplierName: supplierName,
+            brand: brand,
+            supplierSku: row.supplierSku || null,
+            orderUnit: row.orderUnit || null,
+            unitDescription: row.unitDescription || null,
+            unitCost: row.unitCost ? parseFloat(row.unitCost) : null,
+            lastReviewDate: row.lastReviewDate || null,
+          },
+        });
+        inserted++;
+      }
+    }
+    
+    console.log(`[/api/purchasing-items/import/csv] Imported: ${inserted} inserted, ${updated} updated`);
+    res.json({ ok: true, inserted, updated });
+  } catch (error) {
+    console.error('Error importing purchasing items:', error);
+    res.status(500).json({ ok: false, error: 'Failed to import purchasing items' });
+  }
+});
+
 // Sync purchasing list items to Daily Stock V2 form
 router.post('/sync-to-daily-stock', async (req, res) => {
   try {

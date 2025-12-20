@@ -19,7 +19,7 @@ import {
   DialogTitle, 
   DialogFooter 
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, Upload } from 'lucide-react';
 
 type PurchasingItem = {
   id: number;
@@ -183,6 +183,63 @@ export default function PurchasingPage() {
             <Plus className="h-4 w-4 mr-1" />
             Add Item
           </Button>
+          <Button
+            data-testid="button-export-csv"
+            variant="outline"
+            onClick={() => {
+              window.open('/api/purchasing-items/export/csv', '_blank');
+            }}
+            className="text-xs rounded-[4px] border-slate-200"
+          >
+            <Download className="h-4 w-4 mr-1" />
+            Export CSV
+          </Button>
+          <label>
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const text = await file.text();
+                const lines = text.split('\n');
+                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                const csvData = [];
+                for (let i = 1; i < lines.length; i++) {
+                  if (!lines[i].trim()) continue;
+                  const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                  const row: any = {};
+                  headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+                  csvData.push(row);
+                }
+                const res = await fetch('/api/purchasing-items/import/csv', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ csvData }),
+                });
+                const result = await res.json();
+                if (result.ok) {
+                  queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
+                  alert(`Imported: ${result.inserted} new, ${result.updated} updated`);
+                } else {
+                  alert('Import failed: ' + (result.error || 'Unknown error'));
+                }
+                e.target.value = '';
+              }}
+            />
+            <Button
+              data-testid="button-import-csv"
+              variant="outline"
+              className="text-xs rounded-[4px] border-slate-200"
+              asChild
+            >
+              <span>
+                <Upload className="h-4 w-4 mr-1" />
+                Import CSV
+              </span>
+            </Button>
+          </label>
         </div>
       </Card>
 

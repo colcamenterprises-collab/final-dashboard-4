@@ -1,0 +1,158 @@
+PAC-E — PURCHASING MASTER + SHOPPING LIST (FINAL PATCH)
+⚠️ AGENT RULES (READ FIRST)
+DO NOT rename Form 2 fields
+DO NOT add pricing anywhere except purchasing_items
+DO NOT attach ingredients to recipes
+DO NOT change schemas beyond what is explicitly stated
+DO NOT introduce hardcoded pricing arrays
+ONLY read purchasing data from purchasing_items
+✅ PATCH OBJECTIVE
+Restore and fully wire:
+Purchasing Master List (single source of truth)
+Shopping List generation from Form 2
+CSV import + export
+Field-to-item mapping
+Purchasing shift history
+🔹 STEP 1 — VERIFY TABLES (NO SCHEMA CHANGES)
+Confirm these tables exist (they already should):
+Copy code
+Sql
+purchasing_items
+purchasing_field_map
+purchasing_shift_items
+If missing STOP AND REPORT BLOCKED.
+🔹 STEP 2 — PURCHASING MASTER API
+Backend
+Create or confirm:
+Copy code
+
+GET  /api/purchasing/items
+POST /api/purchasing/import/csv
+GET  /api/purchasing/export/csv
+GET /items
+Copy code
+Ts
+SELECT *
+FROM purchasing_items
+ORDER BY category, item;
+POST /import/csv
+Upsert by (item, supplierName, brand)
+Update:
+unitCost
+unitDescription
+supplierSku
+category
+orderUnit
+Never delete rows
+GET /export/csv
+Dump full purchasing_items table
+🔹 STEP 3 — PURCHASING MASTER FRONTEND
+Page:
+Copy code
+
+/operations/purchasing
+Wire table to GET /api/purchasing/items
+Columns:
+Copy code
+
+Item
+Category
+Supplier
+Brand
+SKU
+Order Unit
+Unit Description
+Unit Cost
+Buttons:
+Add Item
+Import CSV
+Export CSV
+⚠️ If table shows “No items found” while DB has data → BLOCKED
+🔹 STEP 4 — FORM 2 → PURCHASING FIELD MAP
+Table: purchasing_field_map
+Fields:
+Copy code
+
+fieldKey (string)  // exact Form 2 field name
+purchasingItemId  // FK
+API
+Copy code
+
+GET  /api/purchasing/field-map
+POST /api/purchasing/field-map
+Frontend
+Admin-only page:
+Copy code
+
+Form Field | Purchasing Item (dropdown)
+Dropdown populated from purchasing_items
+One-to-one mapping only
+🔹 STEP 5 — SHOPPING LIST (CRITICAL)
+Page:
+Copy code
+
+/operations/shopping-list/:dailyStockId
+Logic (MANDATORY)
+For given dailyStockId:
+Load daily_stock_v2.purchasingJson
+Loop keys:
+Copy code
+Ts
+for (fieldKey in purchasingJson) {
+  qty = purchasingJson[fieldKey]
+  if (qty > 0) {
+    map = purchasing_field_map[fieldKey]
+    item = purchasing_items[map.purchasingItemId]
+  }
+}
+Render table:
+Copy code
+
+Item | Brand | SKU | Supplier | Unit | Qty | Unit Cost | Line Total
+Totals:
+Copy code
+
+lineTotal = qty * unitCost
+grandTotal = SUM(lineTotal)
+HARD RULES
+❌ No prices from ingredients
+❌ No prices from recipes
+❌ No fallback pricing
+✅ Only purchasing_items.unitCost
+Add:
+CSV export button
+🔹 STEP 6 — PURCHASING SHIFT LOG (WRITE ONLY)
+On Form 2 submit:
+For each purchasingJson entry:
+Copy code
+Ts
+UPSERT purchasing_shift_items (
+  dailyStockId,
+  purchasingItemId,
+  quantity
+)
+Unique index:
+Copy code
+Sql
+UNIQUE(dailyStockId, purchasingItemId)
+🔹 STEP 7 — GUARD RAILS
+Add runtime checks:
+If purchasing_items empty → show warning
+If Shopping List item has no price → block export
+Recipe editor must not show ingredient or pricing fields
+✅ SUCCESS CRITERIA (AGENT MUST CONFIRM)
+Purchasing List populated
+Shopping List renders with totals
+CSV import/export works
+Mapping page saves correctly
+No ingredient data attached to recipes
+No schema regressions
+🧾 FINAL RESPONSE FORMAT (MANDATORY)
+Agent must respond only with:
+Copy code
+
+PAC-E COMPLETE — Purchasing Master + Shopping List live
+or
+Copy code
+
+BLOCKED — <exact error + file + reason>
