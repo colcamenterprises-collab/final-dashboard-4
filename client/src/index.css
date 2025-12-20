@@ -985,3 +985,10 @@ h1, h2, h3 { color: inherit !important; }
   background-color: #fef3c7 !important; /* amber-100 */
   color: #d97706 !important; /* amber-600 */
 }
+
+/* Print styles for Health & Safety Audit */
+@media print {
+  button {
+    display: none !important;
+  }
+}

@@ -103,6 +103,7 @@ import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./servic
 import dashboard4Routes from "./routes/dashboard4Routes";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
+import healthSafetyPdf from "./routes/healthSafety/pdf";
 // Email functionality will be added when needed
 
 
@@ -4741,6 +4742,7 @@ app.use("/api/bank-imports", bankUploadRouter);
   // PATCH A — Health & Safety Audit Routes
   app.use("/api/health-safety/questions", healthSafetyQuestions);
   app.use("/api/health-safety/audits", healthSafetyAudits);
+  app.use("/api/health-safety/pdf", healthSafetyPdf);
 
   // Shift Report Balance Review endpoint
   app.get("/api/shift-reports/balance-review", async (req: Request, res: Response) => {

@@ -13,6 +13,7 @@ export default function HealthSafetyAuditPage() {
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
   const [managerName, setManagerName] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [lastAuditId, setLastAuditId] = useState<string | null>(null);
 
   useEffect(() => {
     axios.get("/api/health-safety/questions").then(res => {
@@ -38,15 +39,19 @@ export default function HealthSafetyAuditPage() {
     }));
 
     setSubmitting(true);
-    await axios.post("/api/health-safety/audits", {
-      managerName,
-      items,
-    });
+    try {
+      const res = await axios.post("/api/health-safety/audits", {
+        managerName,
+        items,
+      });
+      setLastAuditId(res.data.id);
+      alert("Audit submitted successfully");
+      setAnswers({});
+      setManagerName("");
+    } catch (err) {
+      alert("Failed to submit audit");
+    }
     setSubmitting(false);
-
-    alert("Audit submitted successfully");
-    setAnswers({});
-    setManagerName("");
   };
 
   return (
@@ -103,6 +108,30 @@ export default function HealthSafetyAuditPage() {
       >
         {submitting ? "Submitting..." : "Submit Audit"}
       </button>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <button
+          className="border py-3 rounded"
+          onClick={() => window.print()}
+          data-testid="button-print"
+        >
+          Print
+        </button>
+
+        <button
+          className="border py-3 rounded"
+          onClick={() => {
+            if (!lastAuditId) {
+              alert("Submit audit first");
+              return;
+            }
+            window.open(`/api/health-safety/pdf/${lastAuditId}`, "_blank");
+          }}
+          data-testid="button-download-pdf"
+        >
+          Download PDF
+        </button>
+      </div>
     </div>
   );
 }

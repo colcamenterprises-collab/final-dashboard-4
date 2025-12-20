@@ -1,0 +1,166 @@
+PATCH D — HEALTH & SAFETY AUDIT (PDF + PRINT)
+Scope
+Generate printable PDF for any completed audit
+Print button (browser print)
+Download PDF button
+Red-highlight failed critical items
+Manager sign-off + timestamp included
+Risk: LOW
+Isolation: FULL (Health & Safety only)
+⚠️ AGENT RULES (MANDATORY)
+DO
+Copy-paste files exactly
+Reuse existing PDF infra (do not invent a new engine)
+Keep layout simple, checklist-style
+DO NOT
+Modify Daily Sales PDFs
+Touch email logic
+Change audit schema
+Add icons/emojis
+1️⃣ BACKEND — PDF GENERATOR
+📄 Create:
+server/services/pdf/healthSafetyAuditPdf.ts
+Copy code
+Ts
+import PDFDocument from "pdfkit";
+import { prisma } from "../../prisma";
+
+export async function generateHealthSafetyAuditPDF(auditId: string) {
+  const audit = await prisma.healthSafetyAudit.findUnique({
+    where: { id: auditId },
+    include: {
+      items: {
+        include: { question: true },
+      },
+    },
+  });
+
+  if (!audit) throw new Error("Audit not found");
+
+  const doc = new PDFDocument({ margin: 40, size: "A4" });
+
+  doc.fontSize(18).text("Daily Health & Safety Audit", { align: "center" });
+  doc.moveDown();
+
+  doc.fontSize(10);
+  doc.text(`Manager: ${audit.managerName}`);
+  doc.text(`Completed: ${audit.completedAt.toLocaleString("en-GB")}`);
+  doc.text(`Status: ${audit.status}`);
+  doc.moveDown();
+
+  let currentSection = "";
+
+  audit.items.forEach(item => {
+    if (item.question.section !== currentSection) {
+      currentSection = item.question.section;
+      doc.moveDown();
+      doc.fontSize(12).text(currentSection, { underline: true });
+      doc.moveDown(0.5);
+    }
+
+    const isFail = item.question.isCritical && !item.checked;
+
+    doc
+      .fontSize(10)
+      .fillColor(isFail ? "red" : "black")
+      .text(`[${item.checked ? "✔" : "✘"}] ${item.question.label}`);
+  });
+
+  doc.moveDown();
+  doc.fillColor("black");
+  doc.text("Manager Sign-Off:");
+  doc.moveDown(2);
+  doc.text("______________________________");
+
+  doc.moveDown();
+  doc.fontSize(8).text(`Audit ID: ${audit.id}`, { align: "right" });
+
+  doc.end();
+
+  return doc;
+}
+2️⃣ BACKEND — PDF ROUTE
+📄 Create:
+server/routes/healthSafety/pdf.ts
+Copy code
+Ts
+import { Router } from "express";
+import { generateHealthSafetyAuditPDF } from "../../services/pdf/healthSafetyAuditPdf";
+
+const router = Router();
+
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const doc = await generateHealthSafetyAuditPDF(id);
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename=health-safety-audit-${id}.pdf`
+  );
+
+  doc.pipe(res);
+});
+
+export default router;
+3️⃣ REGISTER ROUTE
+📄 server/index.ts
+👉 ADD ONLY
+Copy code
+Ts
+import healthSafetyPdf from "./routes/healthSafety/pdf";
+
+app.use("/api/health-safety/pdf", healthSafetyPdf);
+4️⃣ FRONTEND — PRINT + PDF BUTTONS
+📄 Update:
+client/src/pages/operations/health-safety-audit/index.tsx
+👉 ADD BELOW SUBMIT BUTTON
+Copy code
+Tsx
+<div className="mt-6 grid grid-cols-2 gap-3">
+  <button
+    className="border py-3 rounded"
+    onClick={() => window.print()}
+  >
+    Print
+  </button>
+
+  <button
+    className="border py-3 rounded"
+    onClick={() => {
+      if (!lastAuditId) {
+        alert("Submit audit first");
+        return;
+      }
+      window.open(`/api/health-safety/pdf/${lastAuditId}`, "_blank");
+    }}
+  >
+    Download PDF
+  </button>
+</div>
+⚠️ You’ll also need to store the returned audit.id after submit:
+Copy code
+Ts
+const [lastAuditId, setLastAuditId] = useState<string | null>(null);
+Inside submit success:
+Copy code
+Ts
+const res = await axios.post(...);
+setLastAuditId(res.data.id);
+5️⃣ PRINT STYLES (OPTIONAL BUT RECOMMENDED)
+📄 Global CSS
+Copy code
+Css
+@media print {
+  button {
+    display: none !important;
+  }
+}
+6️⃣ TEST CHECKLIST (MANDATORY)
+Submit audit → get audit ID
+Print opens clean checklist
+Download PDF works
+Failed critical items show red
+Timestamp correct (BKK time)
+No impact on other PDFs
