@@ -1,0 +1,207 @@
+PATCH A — HEALTH & SAFETY AUDIT (BACKEND)
+Scope: Database + API only
+Risk Level: LOW (isolated module)
+Touches: NEW FILES ONLY + Prisma schema
+Does NOT touch: Daily Sales, Stock, Purchasing, Recipes, Ingredients
+⚠️ AGENT RULES (NON-NEGOTIABLE)
+DO
+Copy-paste files exactly
+Run Prisma migrate exactly once
+Test via Postman / browser
+DO NOT
+Modify any existing tables
+Rename enums, roles, or users
+Reuse Daily Sales logic
+Add shift logic (explicitly removed)
+1️⃣ PRISMA SCHEMA PATCH
+📄 prisma/schema.prisma
+👉 ADD THIS BLOCK ONLY (do not edit existing models)
+Copy code
+Prisma
+model HealthSafetyQuestion {
+  id          String   @id @default(cuid())
+  section     String
+  label       String
+  isCritical  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int
+  createdAt  DateTime @default(now())
+
+  auditItems HealthSafetyAuditItem[]
+}
+
+model HealthSafetyAudit {
+  id           String   @id @default(cuid())
+  managerName  String
+  status       AuditStatus
+  notes        String?
+  completedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  items        HealthSafetyAuditItem[]
+}
+
+model HealthSafetyAuditItem {
+  id          String   @id @default(cuid())
+  auditId     String
+  questionId  String
+  checked     Boolean
+
+  audit       HealthSafetyAudit    @relation(fields: [auditId], references: [id])
+  question    HealthSafetyQuestion @relation(fields: [questionId], references: [id])
+}
+
+enum AuditStatus {
+  PASS
+  FAIL
+}
+2️⃣ MIGRATION
+Run once only:
+Copy code
+Bash
+npx prisma migrate dev --name health_safety_audit
+3️⃣ API ROUTES
+📄 Create folder:
+server/routes/healthSafety
+📄 server/routes/healthSafety/questions.ts
+Copy code
+Ts
+import { Router } from "express";
+import { prisma } from "../../prisma";
+
+const router = Router();
+
+// Get active questions
+router.get("/", async (_req, res) => {
+  const questions = await prisma.healthSafetyQuestion.findMany({
+    where: { isActive: true },
+    orderBy: [{ section: "asc" }, { sortOrder: "asc" }],
+  });
+  res.json(questions);
+});
+
+// Admin: create question
+router.post("/", async (req, res) => {
+  const { section, label, isCritical, sortOrder } = req.body;
+
+  const question = await prisma.healthSafetyQuestion.create({
+    data: {
+      section,
+      label,
+      isCritical,
+      sortOrder,
+    },
+  });
+
+  res.json(question);
+});
+
+// Admin: update question
+router.put("/:id", async (req, res) => {
+  const { id } = req.params;
+  const { section, label, isCritical, isActive, sortOrder } = req.body;
+
+  const question = await prisma.healthSafetyQuestion.update({
+    where: { id },
+    data: { section, label, isCritical, isActive, sortOrder },
+  });
+
+  res.json(question);
+});
+
+// Admin: delete (soft)
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  await prisma.healthSafetyQuestion.update({
+    where: { id },
+    data: { isActive: false },
+  });
+
+  res.json({ success: true });
+});
+
+export default router;
+📄 server/routes/healthSafety/audits.ts
+Copy code
+Ts
+import { Router } from "express";
+import { prisma } from "../../prisma";
+
+const router = Router();
+
+// Submit audit
+router.post("/", async (req, res) => {
+  const { managerName, items, notes } = req.body;
+
+  // Fetch critical questions
+  const criticalIds = await prisma.healthSafetyQuestion.findMany({
+    where: { isCritical: true, isActive: true },
+    select: { id: true },
+  });
+
+  const criticalSet = new Set(criticalIds.map(q => q.id));
+
+  let status: "PASS" | "FAIL" = "PASS";
+
+  for (const item of items) {
+    if (criticalSet.has(item.questionId) && item.checked === false) {
+      status = "FAIL";
+      break;
+    }
+  }
+
+  const audit = await prisma.healthSafetyAudit.create({
+    data: {
+      managerName,
+      status,
+      notes,
+      items: {
+        create: items.map((i: any) => ({
+          questionId: i.questionId,
+          checked: i.checked,
+        })),
+      },
+    },
+  });
+
+  res.json(audit);
+});
+
+// Get audit history
+router.get("/", async (_req, res) => {
+  const audits = await prisma.healthSafetyAudit.findMany({
+    orderBy: { completedAt: "desc" },
+    include: {
+      items: {
+        include: { question: true },
+      },
+    },
+  });
+
+  res.json(audits);
+});
+
+export default router;
+4️⃣ ROUTE REGISTRATION
+📄 server/index.ts (or main router file)
+👉 ADD ONLY:
+Copy code
+Ts
+import healthSafetyQuestions from "./routes/healthSafety/questions";
+import healthSafetyAudits from "./routes/healthSafety/audits";
+
+app.use("/api/health-safety/questions", healthSafetyQuestions);
+app.use("/api/health-safety/audits", healthSafetyAudits);
+5️⃣ TEST CHECKLIST (MANDATORY)
+GET /api/health-safety/questions
+Create a critical question
+Submit audit with critical unchecked → status FAIL
+Submit audit with all critical checked → status PASS
+Confirm completedAt auto-filled
+✅ PATCH A COMPLETE
+You now have:
+Dynamic question engine
+Auto-fail logic
+Timestamped audits (no shift)
+Fully isolated backend

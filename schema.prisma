@@ -2058,3 +2058,42 @@ model migration_reports_v1 {
   report        Json?
   restaurantId  String?
 }
+
+// PATCH A — HEALTH & SAFETY AUDIT
+model HealthSafetyQuestion {
+  id          String   @id @default(cuid())
+  section     String
+  label       String
+  isCritical  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  sortOrder   Int
+  createdAt   DateTime @default(now())
+
+  auditItems  HealthSafetyAuditItem[]
+}
+
+model HealthSafetyAudit {
+  id           String   @id @default(cuid())
+  managerName  String
+  status       AuditStatus
+  notes        String?
+  completedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  items        HealthSafetyAuditItem[]
+}
+
+model HealthSafetyAuditItem {
+  id          String   @id @default(cuid())
+  auditId     String
+  questionId  String
+  checked     Boolean
+
+  audit       HealthSafetyAudit    @relation(fields: [auditId], references: [id])
+  question    HealthSafetyQuestion @relation(fields: [questionId], references: [id])
+}
+
+enum AuditStatus {
+  PASS
+  FAIL
+}
