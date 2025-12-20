@@ -84,6 +84,56 @@ async function initTables() {
   `);
 }
 
+// PATCH D: CSV Export endpoint
+// GET /api/recipes/export/csv - Export all recipes as CSV
+router.get('/export/csv', async (req, res) => {
+  try {
+    await initTables();
+    const { rows } = await pool.query(`
+      SELECT 
+        id,
+        name,
+        category,
+        menu_price_thb as price,
+        description,
+        is_active as verified,
+        yield_unit,
+        created_at
+      FROM recipes 
+      ORDER BY name ASC
+    `);
+
+    // Build CSV
+    const headers = ['id', 'name', 'category', 'price', 'sku', 'verified', 'bom_status', 'source', 'created_at'];
+    const csvLines = [headers.join(',')];
+    
+    for (const row of rows) {
+      const csvRow = [
+        row.id,
+        `"${(row.name || '').replace(/"/g, '""')}"`,
+        `"${(row.category || '').replace(/"/g, '""')}"`,
+        row.price || 0,
+        '', // sku - not available in current schema
+        'false', // verified - not available in current schema, default false per PATCH D spec
+        'INCOMPLETE', // bom_status - not available in current schema
+        'loyverse', // source - default
+        row.created_at ? new Date(row.created_at).toISOString() : ''
+      ];
+      csvLines.push(csvRow.join(','));
+    }
+    
+    const csvContent = csvLines.join('\n');
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="recipes-export.csv"');
+    console.log(`[/api/recipes/export/csv] Exported ${rows.length} recipes`);
+    res.send(csvContent);
+  } catch (error) {
+    console.error('[/api/recipes/export/csv] Error:', error);
+    res.status(500).json({ ok: false, error: 'Failed to export recipes' });
+  }
+});
+
 // Recipe Cards API endpoints (moved to top for proper routing)
 // GET /api/recipes/cards - Get all recipes for cards library  
 router.get('/cards', async (req, res) => {

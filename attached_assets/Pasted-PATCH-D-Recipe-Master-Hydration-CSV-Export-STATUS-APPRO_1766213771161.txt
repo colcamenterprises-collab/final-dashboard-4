@@ -1,0 +1,125 @@
+PATCH D — Recipe Master Hydration + CSV Export
+STATUS: APPROVED · EXECUTE IMMEDIATELY
+RISK: LOW
+SCOPE: BACKEND + DATA + 1 API ENDPOINT
+NO UI CHANGES REQUIRED
+🎯 OBJECTIVES (LOCKED)
+Hydrate Recipe Master from Loyverse CSV
+Make all recipes downloadable as CSV (bulk export)
+After this patch:
+Recipes page shows real menu scale
+Recipes DB becomes the source of truth
+You can export recipes at any time for audit / editing
+📦 INPUT SOURCE
+File: Loyverse Menu CSV (already provided / mounted)
+Role: Bootstrap only
+Future: DB overrides Loyverse forever after import
+🧱 DATA MODEL ASSUMPTIONS (DO NOT CHANGE)
+Assume existing recipes table has (or equivalent):
+id
+name
+category
+price
+sku
+verified (boolean)
+bom_status (string / enum)
+source (string)
+created_at
+⚠️ DO NOT ALTER SCHEMA
+Populate what exists. Skip what doesn’t.
+1️⃣ SCRIPT: IMPORT RECIPES FROM LOYVERSE CSV
+📍 Location (NEW FILE)
+Copy code
+
+server/scripts/importLoyverseRecipes.ts
+🔒 RULES
+Script is idempotent
+Match on sku if present, else name
+Do NOT duplicate recipes
+Do NOT delete existing recipes
+🔧 LOGIC (MANDATORY)
+For each row in CSV:
+Extract:
+Item Name → name
+Category → category
+SKU → sku
+Price → price
+Insert recipe if not exists with:
+verified = false
+bom_status = 'INCOMPLETE'
+source = 'loyverse'
+🛑 HARD STOPS
+Skip rows with empty names
+Log skipped rows
+No silent failures
+2️⃣ RUN SCRIPT ONCE (MANUAL EXECUTION)
+Command (Shell):
+Copy code
+
+npx ts-node server/scripts/importLoyverseRecipes.ts
+Expected Output:
+Count of recipes inserted
+Count skipped
+Zero crashes
+3️⃣ API: EXPORT RECIPES AS CSV
+📍 New Endpoint
+Copy code
+
+GET /api/recipes/export/csv
+📄 Response
+Content-Type: text/csv
+Content-Disposition: attachment; filename="recipes-export.csv"
+📑 CSV COLUMNS (EXACT)
+Copy code
+
+id,
+name,
+category,
+price,
+sku,
+verified,
+bom_status,
+source,
+created_at
+🔒 RULES
+Export all recipes
+No pagination
+No filtering
+DB is the truth
+4️⃣ WIRING (SAFE)
+Route added under existing recipes router
+No auth changes
+No UI dependency
+No sidebar changes
+✅ VERIFICATION CHECKLIST (NON-NEGOTIABLE)
+After patch:
+/menu/recipes shows many recipes, not 2
+No duplicate names
+CSV downloads correctly
+CSV opens in Excel / Sheets cleanly
+verified = false everywhere
+bom_status = INCOMPLETE everywhere
+If any of the above fail → PATCH IS INVALID
+🚫 EXPLICITLY FORBIDDEN IN PATCH D
+UI redesign
+Ingredient assignment
+Modifier logic
+Cost calculations
+Online ordering changes
+Schema edits
+Refactors
+WHAT THIS UNBLOCKS NEXT (FYI ONLY)
+PATCH E: Recipe → Ingredient BOM assignment
+PATCH F: Modifiers
+PATCH G: Online ordering wiring
+PATCH H: Costing + Prime Cost truth
+But NONE of that happens until PATCH D is DONE and VERIFIED.
+🔐 FINAL INSTRUCTION TO AGENT
+Implement PATCH D exactly as written.
+No interpretation.
+No improvements.
+No shortcuts.
+Once executed, reply ONLY with:
+Copy code
+
+PATCH D COMPLETE — X recipes imported, CSV export live
