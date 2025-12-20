@@ -25,6 +25,7 @@ export const ROUTES = {
   DAILY_REPORTS: "/operations/daily-reports",
   SYSTEM_HEALTH: "/operations/system-health",
   PURCHASE_HISTORY: "/operations/purchase-history",
+  HEALTH_SAFETY_AUDIT: "/operations/health-safety-audit",
 
   // Finance
   FINANCE: "/finance",

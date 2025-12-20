@@ -79,6 +79,7 @@ import DataSafety from "./pages/admin/DataSafety";
 import IngredientsMaster from "./pages/operations/IngredientsMaster";
 import RecipesPage from "./pages/operations/Recipes";
 import PurchaseHistory from "./pages/operations/PurchaseHistory";
+import HealthSafetyAuditPage from "./pages/operations/health-safety-audit";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -124,6 +125,7 @@ export default function App() {
                 <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
                 <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
                 <Route path="/operations/purchase-history" element={<Guard><PurchaseHistory /></Guard>} />
+                <Route path="/operations/health-safety-audit" element={<Guard><HealthSafetyAuditPage /></Guard>} />
                 
                 <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                   <Route index element={null} />

@@ -27,6 +27,7 @@ const groups: Group[] = [
     title: "Operations",
     items: [
       { to: "/operations", label: "Operations" },
+      { to: "/operations/health-safety-audit", label: "Health & Safety Audit" },
     ],
   },
   {

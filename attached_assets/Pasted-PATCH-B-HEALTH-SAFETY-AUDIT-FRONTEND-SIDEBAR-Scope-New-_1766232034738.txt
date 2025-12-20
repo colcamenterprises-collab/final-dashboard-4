@@ -1,0 +1,162 @@
+PATCH B — HEALTH & SAFETY AUDIT (FRONTEND + SIDEBAR)
+Scope:
+New Operations page
+Sidebar entry
+Responsive audit form
+Submit → PASS / FAIL logic
+Read-only timestamp
+No PDF yet (that’s Patch D)
+Risk: LOW
+Touches: Frontend only
+Does NOT touch: Daily Sales, Stock, Purchasing, Recipes, Ingredients
+⚠️ AGENT RULES (REPEAT – NON-NEGOTIABLE)
+DO
+Copy-paste files exactly
+Follow existing Operations page patterns
+Keep styles consistent (no icons, no emojis)
+DO NOT
+Modify backend logic
+Hardcode questions
+Add shift/date inputs
+Refactor shared components
+1️⃣ SIDEBAR ENTRY
+📄 client/src/components/Sidebar/operations.ts
+(or equivalent Operations menu config)
+👉 ADD ONLY:
+Copy code
+Ts
+{
+  label: "Health & Safety Audit",
+  path: "/operations/health-safety-audit",
+}
+2️⃣ ROUTE REGISTRATION
+📄 client/src/App.tsx or route registry
+👉 ADD ONLY:
+Copy code
+Tsx
+import HealthSafetyAuditPage from "@/pages/operations/health-safety-audit";
+
+<Route
+  path="/operations/health-safety-audit"
+  element={<HealthSafetyAuditPage />}
+/>
+3️⃣ PAGE FILE
+📄 Create:
+client/src/pages/operations/health-safety-audit/index.tsx
+Copy code
+Tsx
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+type Question = {
+  id: string;
+  section: string;
+  label: string;
+  isCritical: boolean;
+};
+
+export default function HealthSafetyAuditPage() {
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [answers, setAnswers] = useState<Record<string, boolean>>({});
+  const [managerName, setManagerName] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    axios.get("/api/health-safety/questions").then(res => {
+      setQuestions(res.data);
+    });
+  }, []);
+
+  const grouped = questions.reduce<Record<string, Question[]>>((acc, q) => {
+    acc[q.section] = acc[q.section] || [];
+    acc[q.section].push(q);
+    return acc;
+  }, {});
+
+  const submitAudit = async () => {
+    if (!managerName.trim()) {
+      alert("Manager name is required");
+      return;
+    }
+
+    const items = questions.map(q => ({
+      questionId: q.id,
+      checked: answers[q.id] ?? false,
+    }));
+
+    setSubmitting(true);
+    await axios.post("/api/health-safety/audits", {
+      managerName,
+      items,
+    });
+    setSubmitting(false);
+
+    alert("Audit submitted successfully");
+    setAnswers({});
+    setManagerName("");
+  };
+
+  return (
+    <div className="p-4 max-w-4xl mx-auto">
+      <h1 className="text-xl font-semibold mb-2">Daily Health & Safety Audit</h1>
+
+      <div className="mb-4">
+        <label className="block text-sm mb-1">Manager Name</label>
+        <input
+          className="w-full border rounded px-3 py-2"
+          value={managerName}
+          onChange={e => setManagerName(e.target.value)}
+        />
+      </div>
+
+      {Object.entries(grouped).map(([section, qs]) => (
+        <div key={section} className="mb-6">
+          <h2 className="font-semibold mb-2">{section}</h2>
+
+          <div className="space-y-2">
+            {qs.map(q => (
+              <label
+                key={q.id}
+                className={`flex items-start gap-3 p-3 border rounded ${
+                  q.isCritical ? "border-red-400" : ""
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={answers[q.id] || false}
+                  onChange={e =>
+                    setAnswers(a => ({
+                      ...a,
+                      [q.id]: e.target.checked,
+                    }))
+                  }
+                />
+                <span>{q.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      <button
+        disabled={submitting}
+        onClick={submitAudit}
+        className="w-full bg-black text-white py-3 rounded"
+      >
+        {submitting ? "Submitting..." : "Submit Audit"}
+      </button>
+    </div>
+  );
+}
+4️⃣ RESPONSIVE CHECK
+Tablet: stacked sections, large tap targets
+Mobile: single-column, full-width submit
+No side effects on other pages
+5️⃣ TEST CHECKLIST (MANDATORY)
+Sidebar shows Health & Safety Audit
+Page loads questions dynamically
+Critical questions visually identifiable
+Manager name required
+Submit creates PASS / FAIL correctly
+Timestamp auto-generated (backend)
