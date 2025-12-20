@@ -128,6 +128,7 @@ export default function App() {
                 <Route path="/operations/purchase-history" element={<Guard><PurchaseHistory /></Guard>} />
                 <Route path="/operations/health-safety-audit" element={<Guard><HealthSafetyAuditPage /></Guard>} />
                 <Route path="/operations/health-safety-audit/questions" element={<Guard><HealthSafetyQuestionManager /></Guard>} />
+                <Route path="/operations/ingredients-master" element={<Guard><IngredientsMaster /></Guard>} />
                 
                 <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                   <Route index element={null} />
