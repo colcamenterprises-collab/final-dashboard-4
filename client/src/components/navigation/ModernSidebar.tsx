@@ -85,7 +85,8 @@ const navigationGroups: NavGroup[] = [
         ]
       },
       { to: "/operations/daily-reports", label: "Daily Summary Reports", icon: BarChart3, testId: "nav-daily-reports" },
-      { to: "/operations/system-health", label: "System Health Test", icon: Settings, testId: "nav-system-health" }
+      { to: "/operations/system-health", label: "System Health Test", icon: Settings, testId: "nav-system-health" },
+      { to: "/operations/health-safety-audit", label: "Health & Safety Audit", icon: Settings, testId: "nav-health-safety" }
     ]
   },
   {
