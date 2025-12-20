@@ -1,0 +1,118 @@
+PACK F — INGREDIENT MASTER REFINEMENT (FINAL PATCH)
+⚠️ AGENT RULES (NON-NEGOTIABLE)
+DO NOT attach ingredients to recipes
+DO NOT add pricing logic to recipes
+DO NOT change purchasing prices or purchasing schemas
+DO NOT auto-link ingredients to purchasing items
+ONLY allow manual selection by user
+NO hardcoded units or assumptions
+🎯 PACK F OBJECTIVE
+Create a clean, editable Ingredient Master List that:
+Represents what goes into food
+Is independent of purchasing
+Can optionally reference purchasing items for cost preview
+Is ready for later recipe portion assignment
+🧱 INGREDIENT MASTER MODEL (NO SCHEMA BREAKS)
+Table: ingredients
+Required fields (already exist or must be added additively only):
+id
+name
+category
+baseUnit
+enum/text: g, ml, unit, slice, etc.
+defaultPortion (nullable)
+e.g. 90, 12, 1
+linkedPurchasingItemId (nullable FK → purchasing_items.id)
+verified (boolean)
+❌ No cost stored here
+❌ No supplier info
+❌ No prices
+🔹 STEP 1 — INGREDIENT MASTER API (READ / WRITE)
+Create or confirm endpoints:
+Copy code
+
+GET    /api/ingredients
+POST   /api/ingredients
+PUT    /api/ingredients/:id
+Behaviour
+All fields editable except cost
+linkedPurchasingItemId optional
+Validation:
+name required
+baseUnit required
+defaultPortion optional
+🔹 STEP 2 — INGREDIENT MASTER UI (CRITICAL)
+Page:
+Copy code
+
+/operations/ingredients-master
+Table columns (EXACT):
+Copy code
+
+Ingredient Name
+Category
+Base Unit
+Default Portion
+Linked Purchasing Item
+Cost Preview (read-only)
+Verified
+Editable behaviour
+Inline edit:
+name
+category
+baseUnit (dropdown)
+defaultPortion
+linkedPurchasingItemId (dropdown from purchasing_items)
+Verified toggle (manual only)
+Cost Preview logic (READ-ONLY)
+If linkedPurchasingItemId exists:
+Copy code
+
+purchasing unitCost / purchasing unit size
+→ derive cost per baseUnit
+⚠️ Display only
+⚠️ Not stored
+⚠️ Recipes not affected
+🔹 STEP 3 — PURCHASING LINK DROPDOWN
+Dropdown source:
+Copy code
+
+GET /api/purchasing/items
+Label format:
+Copy code
+
+Item Name — Brand — Unit Description — ฿UnitCost
+Selection:
+Saves linkedPurchasingItemId
+Does NOT auto-calculate anything else
+🔹 STEP 4 — VERIFIED STATE RULES
+New ingredients = verified = false
+Verified can only be toggled manually
+No auto-verify
+No bulk verify
+🔹 STEP 5 — GUARD RAILS
+❌ Ingredient Master must NOT expose recipe fields
+❌ Ingredient Master must NOT show supplier pricing editor
+❌ No shopping list logic here
+❌ No recipe attachment UI
+✅ SUCCESS CONDITIONS (AGENT MUST CONFIRM)
+Ingredient Master page loads with rows
+All columns editable as specified
+Purchasing items selectable per ingredient
+Cost preview visible when linked
+No recipes modified
+No shopping list logic touched
+🧾 FINAL RESPONSE FORMAT (STRICT)
+Agent must respond only with:
+Copy code
+
+PACK F COMPLETE — Ingredient Master refined and editable
+or
+Copy code
+
+BLOCKED — <exact file + reason>
+🧠 WHAT THIS UNLOCKS NEXT (FYI ONLY)
+PACK G — Manual Recipe Ingredient Assignment
+PACK H — Portion-level costing
+PACK I — Online Ordering ingredient-aware pricing
+But none proceed until PACK F is reviewed by you.

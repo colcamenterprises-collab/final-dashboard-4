@@ -553,6 +553,12 @@ model IngredientV2 {
   category  String?
   brand     String?
 
+  // PACK F fields
+  baseUnit              String?  @map("base_unit") // e.g., "g", "ml", "unit", "slice"
+  defaultPortion        Decimal? @map("default_portion") // e.g., 90, 12, 1
+  linkedPurchasingItemId Int?    @map("linked_purchasing_item_id")
+  verified              Boolean  @default(false)
+
   // Purchasing (pack-based - for shopping lists)
   purchaseUnit String? @map("purchase_unit") // e.g., "kg", "pack"
   purchaseQty  Decimal? @map("purchase_qty") // e.g., 1.0 kg per pack
