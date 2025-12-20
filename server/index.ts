@@ -439,6 +439,10 @@ async function checkSchema() {
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
   app.use('/api/system-health', systemHealthRouter);
 
+  // Ingredient Master route (PACK F)
+  const ingredientMasterRouter = (await import('./routes/ingredientMaster')).default;
+  app.use('/api/ingredient-master', ingredientMasterRouter);
+
   // Error guard middleware - must be LAST
   app.use(errorGuard);
 
