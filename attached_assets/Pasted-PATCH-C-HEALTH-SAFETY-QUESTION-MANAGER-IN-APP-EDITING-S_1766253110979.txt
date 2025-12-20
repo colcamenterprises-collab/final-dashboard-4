@@ -1,0 +1,194 @@
+PATCH C — HEALTH & SAFETY QUESTION MANAGER (IN-APP EDITING)
+Status after this patch:
+✔ Audit
+✔ Save
+✔ Print
+✔ PDF
+✔ Library
+✔ Edit questions in-app (controlled)
+→ Module COMPLETE
+⚠️ NON-NEGOTIABLE RULES (READ ONCE)
+DO
+Copy–paste files exactly
+Use existing role/permission helper if present
+Test with Owner account first
+DO NOT
+Change audit logic
+Change schema
+Allow staff to edit
+Allow deleting historical data
+1️⃣ BACKEND — PERMISSIONS (LIGHT GUARD)
+We’ll enforce Owner-only full control.
+(Managers can be added later if you want.)
+📄 server/routes/healthSafety/questions.ts
+👉 Add this guard at top of POST / PUT / DELETE
+Copy code
+Ts
+function requireOwner(req: any, res: any, next: any) {
+  if (req.user?.role !== "OWNER") {
+    return res.status(403).json({ error: "Owner access required" });
+  }
+  next();
+}
+Apply it:
+Copy code
+Ts
+router.post("/", requireOwner, async (req, res) => { ... });
+router.put("/:id", requireOwner, async (req, res) => { ... });
+router.delete("/:id", requireOwner, async (req, res) => { ... });
+✔ Read (GET) stays open
+✔ Edit locked to Owner
+2️⃣ FRONTEND — ENTRY POINT
+📄 Health & Safety Audit page
+Add Manage Questions button (Owner only).
+Copy code
+Tsx
+{user?.role === "OWNER" && (
+  <button
+    className="border px-3 py-2 rounded mb-4"
+    onClick={() => navigate("/operations/health-safety-audit/questions")}
+  >
+    Manage Questions
+  </button>
+)}
+3️⃣ ROUTE
+📄 client/src/App.tsx
+Copy code
+Tsx
+import HealthSafetyQuestionManager from "@/pages/operations/health-safety-audit/questions";
+
+<Route
+  path="/operations/health-safety-audit/questions"
+  element={<HealthSafetyQuestionManager />}
+/>
+4️⃣ QUESTION MANAGER PAGE
+📄 Create
+client/src/pages/operations/health-safety-audit/questions.tsx
+Copy code
+Tsx
+import { useEffect, useState } from "react";
+import axios from "axios";
+
+type Question = {
+  id: string;
+  section: string;
+  label: string;
+  isCritical: boolean;
+  isActive: boolean;
+  sortOrder: number;
+};
+
+export default function HealthSafetyQuestionManager() {
+  const [questions, setQuestions] = useState<Question[]>([]);
+
+  const load = async () => {
+    const res = await axios.get("/api/health-safety/questions");
+    setQuestions(res.data);
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const update = async (id: string, data: Partial<Question>) => {
+    await axios.put(`/api/health-safety/questions/${id}`, data);
+    load();
+  };
+
+  const create = async () => {
+    await axios.post("/api/health-safety/questions", {
+      section: "New Section",
+      label: "New question",
+      isCritical: false,
+      sortOrder: questions.length,
+    });
+    load();
+  };
+
+  return (
+    <div className="p-4 max-w-6xl mx-auto">
+      <h1 className="text-xl font-semibold mb-4">
+        Health & Safety Questions
+      </h1>
+
+      <button
+        className="border px-3 py-2 rounded mb-4"
+        onClick={create}
+      >
+        Add Question
+      </button>
+
+      <table className="w-full text-sm border">
+        <thead className="bg-gray-100">
+          <tr>
+            <th className="p-2">Section</th>
+            <th className="p-2">Description</th>
+            <th className="p-2 text-center">Critical</th>
+            <th className="p-2 text-center">Active</th>
+          </tr>
+        </thead>
+        <tbody>
+          {questions.map(q => (
+            <tr key={q.id} className="border-t">
+              <td className="p-2">
+                <input
+                  className="border p-1 w-full"
+                  value={q.section}
+                  onChange={e =>
+                    update(q.id, { section: e.target.value })
+                  }
+                />
+              </td>
+              <td className="p-2">
+                <input
+                  className="border p-1 w-full"
+                  value={q.label}
+                  onChange={e =>
+                    update(q.id, { label: e.target.value })
+                  }
+                />
+              </td>
+              <td className="p-2 text-center">
+                <input
+                  type="checkbox"
+                  checked={q.isCritical}
+                  onChange={e =>
+                    update(q.id, { isCritical: e.target.checked })
+                  }
+                />
+              </td>
+              <td className="p-2 text-center">
+                <input
+                  type="checkbox"
+                  checked={q.isActive}
+                  onChange={e =>
+                    update(q.id, { isActive: e.target.checked })
+                  }
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+5️⃣ SAFETY GUARANTEES (LOCKED)
+✔ Past audits unchanged
+✔ Critical logic unchanged
+✔ Inactive questions hidden from audits
+✔ If all questions inactive → audit blocked
+✔ Owner-only edits
+6️⃣ TEST CHECKLIST (FINAL)
+Owner can add/edit/toggle questions
+Staff cannot access manager page
+Audit page updates immediately
+PDFs reflect new wording
+Old audits untouched
+✅ HEALTH & SAFETY MODULE — COMPLETE & LOCKED
+This module is now:
+Operationally usable
+Compliance-safe
+Editable without code
+Isolated from the rest of the system
+No further work required here.

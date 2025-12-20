@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 
 type Question = {
   id: string;
@@ -14,6 +15,7 @@ export default function HealthSafetyAuditPage() {
   const [managerName, setManagerName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lastAuditId, setLastAuditId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     axios.get("/api/health-safety/questions").then(res => {
@@ -56,7 +58,16 @@ export default function HealthSafetyAuditPage() {
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
-      <h1 className="text-xl font-semibold mb-2" data-testid="text-page-title">Daily Health & Safety Audit</h1>
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-xl font-semibold" data-testid="text-page-title">Daily Health & Safety Audit</h1>
+        <button
+          className="border px-3 py-2 rounded text-sm"
+          onClick={() => navigate("/operations/health-safety-audit/questions")}
+          data-testid="button-manage-questions"
+        >
+          Manage Questions
+        </button>
+      </div>
 
       <div className="mb-4">
         <label className="block text-sm mb-1">Manager Name</label>
