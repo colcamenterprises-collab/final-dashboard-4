@@ -1,0 +1,146 @@
+FINAL PATCH — Health & Safety Questions (Routing + Seeding)
+Purpose:
+Fix 404 on Question Manager and only 1 question showing
+Root cause: Route registry mismatch + missing seed data
+This patch fixes both.
+⚠️ ABSOLUTE AGENT RULES (READ FIRST)
+DO
+Follow steps in order
+Modify only the files specified
+Copy-paste exactly
+DO NOT
+Touch App.tsx routing
+Invent new routers
+Assume flat routing
+Change audit logic
+Say “complete” until verified
+🧩 PART A — FIX THE 404 (ROUTING — NON-NEGOTIABLE)
+1️⃣ Locate the Operations Route Registry
+One of these WILL exist — find the real one used by the app:
+Copy code
+
+client/src/router/RouteRegistry.ts
+client/src/router/operations.ts
+client/src/router/operationsRoutes.ts
+client/src/router/routes/operations.ts
+You will already see this entry (or equivalent):
+Copy code
+Ts
+{
+  path: "/operations/health-safety-audit",
+  element: <HealthSafetyAuditPage />
+}
+2️⃣ ADD THIS ROUTE DIRECTLY UNDER IT
+Copy code
+Ts
+{
+  path: "/operations/health-safety-audit/questions",
+  element: <HealthSafetyQuestionManager />,
+  hidden: true
+}
+✅ This must be in the same registry
+❌ Do NOT add this to App.tsx
+3️⃣ Verify Imports at Top of File
+Copy code
+Ts
+import HealthSafetyAuditPage from "@/pages/operations/health-safety-audit";
+import HealthSafetyQuestionManager from "@/pages/operations/health-safety-audit/questions";
+🧩 PART B — FIX “ONLY 1 QUESTION” (DATA SEED)
+4️⃣ Create Seed Script (ONE-TIME USE)
+📄 Create file:
+Copy code
+
+server/scripts/seedHealthSafetyQuestions.ts
+📌 PASTE THIS EXACTLY
+Copy code
+Ts
+import { prisma } from "../prisma";
+
+const QUESTIONS = [
+  { section: "Raw Meat Storage", label: "Raw meat stored below cooked food", isCritical: true },
+  { section: "Raw Meat Storage", label: "Meat fridge ≤ 4°C", isCritical: true },
+  { section: "Raw Meat Storage", label: "Freezer ≤ -18°C", isCritical: true },
+  { section: "Raw Meat Handling", label: "Separate raw meat prep area", isCritical: true },
+  { section: "Raw Meat Handling", label: "Separate boards and utensils used", isCritical: true },
+  { section: "Cooking Safety", label: "Burgers fully cooked (no raw centre)", isCritical: true },
+  { section: "Cooking Safety", label: "No bare-hand contact with cooked food", isCritical: true },
+
+  { section: "Frying & Hot Food", label: "Fryer oil clean and changed on schedule", isCritical: false },
+  { section: "Frying & Hot Food", label: "Food not mixed between old and new batches", isCritical: false },
+
+  { section: "Cleaning & Sanitation", label: "Prep surfaces cleaned and sanitised", isCritical: false },
+  { section: "Cleaning & Sanitation", label: "Floors clean and dry", isCritical: false },
+  { section: "Cleaning & Sanitation", label: "Bins emptied and lined", isCritical: false },
+
+  { section: "Staff Hygiene", label: "Clean uniforms worn", isCritical: false },
+  { section: "Staff Hygiene", label: "Hands washed correctly", isCritical: false },
+
+  { section: "Environment & Pest Control", label: "No signs of pests", isCritical: false },
+
+  { section: "Equipment & Safety", label: "Fire extinguisher accessible", isCritical: true },
+  { section: "Equipment & Safety", label: "Fire blanket accessible", isCritical: true }
+];
+
+async function run() {
+  await prisma.healthSafetyQuestion.deleteMany();
+
+  for (let i = 0; i < QUESTIONS.length; i++) {
+    await prisma.healthSafetyQuestion.create({
+      data: {
+        ...QUESTIONS[i],
+        isActive: true,
+        sortOrder: i + 1
+      }
+    });
+  }
+
+  console.log("✅ Health & Safety questions seeded:", QUESTIONS.length);
+  process.exit(0);
+}
+
+run().catch(err => {
+  console.error(err);
+  process.exit(1);
+});
+5️⃣ Run Seed ONCE
+Copy code
+Bash
+npx ts-node server/scripts/seedHealthSafetyQuestions.ts
+⚠️ Run once only
+⚠️ This replaces existing questions intentionally
+🧩 PART C — VERIFY (MANDATORY)
+Agent must confirm ALL below before saying “done”:
+Visit
+Copy code
+
+/api/health-safety/questions
+→ returns 15+ questions
+Visit
+Copy code
+
+/operations/health-safety-audit
+→ full checklist visible
+Click Manage Questions
+Copy code
+
+/operations/health-safety-audit/questions
+→ ❌ NO 404
+Toggle a question inactive → disappears from audit
+🚫 WHAT THE AGENT MUST NOT DO
+❌ Do not touch App.tsx
+❌ Do not add fallback routes
+❌ Do not say “Replit issue”
+❌ Do not change permissions
+❌ Do not add UI logic
+✅ SUCCESS STATE (THIS IS THE DEFINITION)
+When complete:
+Sidebar works
+Audit page shows many questions
+Question Manager loads
+Questions editable
+No 404s
+No “only 1 question”
+Final instruction to the agent (you can paste this verbatim):
+Apply the patch exactly as written.
+Do not deviate.
+Do not declare success until all verification steps pass.
