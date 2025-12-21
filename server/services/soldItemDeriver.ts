@@ -1,5 +1,31 @@
 import { prisma } from "../../lib/prisma";
 
+async function resolveRecipeIdFromSku(
+  sku: string | null,
+  channel: string
+): Promise<string | null> {
+  if (!sku) return null;
+
+  // POS SKU → internal item
+  const skuMap = await prisma.externalSkuMap.findFirst({
+    where: {
+      channel,
+      channelSku: sku
+    }
+  });
+
+  if (!skuMap) return null;
+
+  // internal item → recipe (via recipe_v2 name matching)
+  const recipe = await prisma.recipeV2.findFirst({
+    where: {
+      name: skuMap.internalId
+    }
+  });
+
+  return recipe?.id ?? null;
+}
+
 function deriveShiftId(date: Date): string | null {
   const bkk = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
   const hour = bkk.getHours();
@@ -38,7 +64,7 @@ export async function deriveAllSoldItems() {
             channel: item.receipt.provider,
             externalSku: item.sku,
             internalItemId: null,
-            recipeId: null,
+            recipeId: await resolveRecipeIdFromSku(item.sku, item.receipt.provider),
             unitPrice: item.unitPrice,
             quantity: 1,
             grossAmount: item.unitPrice,

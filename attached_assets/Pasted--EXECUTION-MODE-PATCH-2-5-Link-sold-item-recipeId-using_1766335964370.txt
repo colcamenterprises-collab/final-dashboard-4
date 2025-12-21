@@ -1,0 +1,113 @@
+🔐 EXECUTION MODE — PATCH 2.5
+Link sold_item → recipeId using existing mappings
+🎯 OBJECTIVE
+Populate sold_item.recipeId during derivation by reusing existing mapping logic:
+Copy code
+
+POS SKU
+ → ExternalSkuMap
+ → internal menu item
+ → menu_item_recipes_v3
+ → recipeId
+After this:
+Patch 2 (ingredient usage) will immediately populate
+No guessing
+No heuristics
+No schema changes
+🚨 ABSOLUTE RULES (AGENT MUST FOLLOW)
+❌ DO NOT add new tables
+❌ DO NOT change schema
+❌ DO NOT change existing mapping tables
+❌ DO NOT infer recipes by name
+❌ DO NOT touch UI
+❌ DO NOT modify Patch 2 or Patch 3 logic
+✅ ONLY modify the SoldItem derivation service
+✅ Use existing tables only
+✅ If mapping not found → leave recipeId = null
+📁 FILE TO MODIFY (ONLY THIS FILE)
+Copy code
+
+server/services/soldItemDeriver.ts
+🔧 CHANGE REQUIRED (MINIMAL DIFF)
+1️⃣ Import Prisma + mapping tables (if not already)
+At the top (adjust import path if needed):
+Copy code
+Ts
+import { prisma } from "../db";
+2️⃣ Add this helper function inside the file
+Copy code
+Ts
+async function resolveRecipeIdFromSku(
+  sku: string | null,
+  channel: string
+): Promise<string | null> {
+  if (!sku) return null;
+
+  // POS SKU → internal item
+  const skuMap = await prisma.externalSkuMap.findFirst({
+    where: {
+      channel,
+      channelSku: sku
+    }
+  });
+
+  if (!skuMap) return null;
+
+  // internal item → recipe
+  const recipe = await prisma.menuItemRecipeV3.findFirst({
+    where: {
+      menuItemId: skuMap.internalId
+    }
+  });
+
+  return recipe?.recipeId ?? null;
+}
+⚠️ Notes:
+Uses existing tables only
+No fallback logic
+One-to-one mapping only
+3️⃣ Modify the soldItem.create block
+BEFORE (current):
+Copy code
+Ts
+recipeId: null,
+AFTER (replace with):
+Copy code
+Ts
+recipeId: await resolveRecipeIdFromSku(
+  item.sku,
+  item.receipt.provider
+),
+That’s it.
+No other changes.
+🔁 REQUIRED REBUILD SEQUENCE (IN THIS ORDER)
+The agent must run these commands in order:
+1️⃣ Rebuild sold items (with recipe linking):
+Copy code
+
+node server/scripts/rebuildSoldItems.ts
+2️⃣ Rebuild ingredient usage:
+Copy code
+
+node server/scripts/rebuildIngredientUsage.ts
+3️⃣ Rebuild reconciliation (optional but recommended):
+Copy code
+
+node server/scripts/rebuildReconciliation.ts
+✅ EXPECTED RESULTS (VALIDATION CHECK)
+After rebuilds:
+sold_item:
+recipeId populated for mapped menu items
+recipeId = null for unmapped items (expected)
+shift_ingredient_usage:
+NOW > 0 rows
+Ingredient quantities populated
+Units preserved exactly from recipe definitions
+No crashes
+No UI changes
+Deterministic on re-run
+🛑 STOP CONDITION
+After completion, the agent must STOP and report:
+Number of sold_item rows with recipeId NOT NULL
+Number of shift_ingredient_usage rows created
+Any SKUs that failed to map (count only)
