@@ -1,0 +1,325 @@
+🔐 EXECUTION MODE — PATCHES 1–3 (BUNDLED)
+Canonical Sales → Ingredient Usage → Reconciliation Spine
+THIS IS A FOUNDATIONAL DATA PATCH. The agent must follow this exactly.
+🚨 ABSOLUTE RULES FOR THE REPLIT AGENT
+❌ DO NOT modify any existing tables
+❌ DO NOT modify UI
+❌ DO NOT refactor existing logic
+❌ DO NOT touch snapshot, analytics, or legacy scripts
+❌ DO NOT “optimize” anything
+❌ DO NOT infer missing data
+✅ ONLY add new tables
+✅ ONLY derive from existing truth
+✅ ALL tables must be rebuildable
+✅ ALL logic must be deterministic
+If unsure → STOP.
+PATCH 1 — CANONICAL SOLD ITEM LAYER
+🎯 Purpose
+Create a single atomic sales truth:
+“One row = one item sold”
+Derived only from POS line items.
+1️⃣ Prisma Schema Changes
+File: prisma/schema.prisma
+ADD — DO NOT EDIT EXISTING MODELS
+Copy code
+Prisma
+model SoldItem {
+  id              String   @id @default(uuid())
+
+  receiptId       String   @index
+  receiptItemId   String   @index
+  soldAt          DateTime @index
+  shiftId         String   @index
+
+  channel         String
+  externalSku     String?
+  internalItemId  String?
+  recipeId        String?
+
+  unitPrice       Int
+  quantity        Int      // ALWAYS 1
+  grossAmount     Int
+  discountAmount  Int
+  netAmount       Int
+
+  createdAt       DateTime @default(now())
+}
+
+model SoldItemModifier {
+  id         String @id @default(uuid())
+  soldItemId String @index
+  name       String
+  priceDelta Int
+  createdAt  DateTime @default(now())
+}
+Migration name:
+Copy code
+
+add_sold_item_canonical_layer
+2️⃣ Derivation Service
+File: server/services/soldItemDeriver.ts (NEW)
+Copy code
+Ts
+import { prisma } from "../db";
+
+function deriveShiftId(date: Date): string | null {
+  const bkk = new Date(date.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+  const hour = bkk.getHours();
+  if (hour >= 3 && hour < 18) return null;
+  return `SHIFT_${bkk.toISOString().slice(0,10).replace(/-/g,"")}`;
+}
+
+export async function deriveAllSoldItems() {
+  const receiptItems = await prisma.receiptItem.findMany({
+    include: { receipt: true, modifiers: true }
+  });
+
+  const grouped: Record<string, typeof receiptItems> = {};
+
+  for (const item of receiptItems) {
+    const shiftId = deriveShiftId(item.receipt.datetime);
+    if (!shiftId) continue;
+    grouped[shiftId] ??= [];
+    grouped[shiftId].push(item);
+  }
+
+  for (const shiftId of Object.keys(grouped)) {
+    await prisma.soldItem.deleteMany({ where: { shiftId } });
+
+    for (const item of grouped[shiftId]) {
+      for (let i = 0; i < item.qty; i++) {
+        const sold = await prisma.soldItem.create({
+          data: {
+            receiptId: item.receiptId,
+            receiptItemId: item.id,
+            soldAt: item.receipt.datetime,
+            shiftId,
+            channel: item.receipt.provider,
+            externalSku: item.sku,
+            internalItemId: null,
+            recipeId: null,
+            unitPrice: item.unitPrice,
+            quantity: 1,
+            grossAmount: item.unitPrice,
+            discountAmount: 0,
+            netAmount: item.unitPrice
+          }
+        });
+
+        for (const mod of item.modifiers ?? []) {
+          await prisma.soldItemModifier.create({
+            data: {
+              soldItemId: sold.id,
+              name: mod.name,
+              priceDelta: mod.priceDelta ?? 0
+            }
+          });
+        }
+      }
+    }
+  }
+}
+3️⃣ Rebuild Script
+File: server/scripts/rebuildSoldItems.ts
+Copy code
+Ts
+import { deriveAllSoldItems } from "../services/soldItemDeriver";
+
+(async () => {
+  console.log("Rebuilding sold_item...");
+  await deriveAllSoldItems();
+  console.log("Done.");
+})();
+PATCH 2 — MATERIALISED INGREDIENT USAGE
+🎯 Purpose
+Freeze food usage per shift.
+4️⃣ Prisma Schema
+Copy code
+Prisma
+model ShiftIngredientUsage {
+  id             String   @id @default(uuid())
+  shiftId        String   @index
+  ingredientId   String   @index
+  ingredientName String
+  quantityUsed   Decimal
+  unit           String
+  source         String   // SOLD_ITEM_RECIPE
+  createdAt      DateTime @default(now())
+}
+Migration:
+Copy code
+
+add_shift_ingredient_usage
+5️⃣ Deriver
+File: server/services/ingredientUsageDeriver.ts
+Copy code
+Ts
+import { prisma } from "../db";
+
+export async function rebuildIngredientUsage() {
+  const shifts = await prisma.soldItem.findMany({
+    distinct: ["shiftId"],
+    where: { recipeId: { not: null } }
+  });
+
+  for (const { shiftId } of shifts) {
+    await prisma.shiftIngredientUsage.deleteMany({ where: { shiftId } });
+
+    const items = await prisma.soldItem.findMany({
+      where: { shiftId, recipeId: { not: null } }
+    });
+
+    const usage: Record<string, any> = {};
+
+    for (const item of items) {
+      const lines = await prisma.recipeLine.findMany({
+        where: { recipeId: item.recipeId! }
+      });
+
+      for (const line of lines) {
+        const key = `${line.ingredientId}-${line.unit}`;
+        usage[key] ??= {
+          ingredientId: line.ingredientId,
+          ingredientName: line.ingredientName,
+          unit: line.unit,
+          qty: 0
+        };
+        usage[key].qty += line.quantity;
+      }
+    }
+
+    for (const u of Object.values(usage)) {
+      await prisma.shiftIngredientUsage.create({
+        data: {
+          shiftId,
+          ingredientId: u.ingredientId,
+          ingredientName: u.ingredientName,
+          quantityUsed: u.qty,
+          unit: u.unit,
+          source: "SOLD_ITEM_RECIPE"
+        }
+      });
+    }
+  }
+}
+6️⃣ Script
+File: server/scripts/rebuildIngredientUsage.ts
+Copy code
+Ts
+import { rebuildIngredientUsage } from "../services/ingredientUsageDeriver";
+
+(async () => {
+  console.log("Rebuilding ingredient usage...");
+  await rebuildIngredientUsage();
+  console.log("Done.");
+})();
+PATCH 3 — RECONCILIATION V2 (POS vs DAILY SALES)
+🎯 Purpose
+Produce a read-only reconciliation truth table.
+7️⃣ Prisma Schema
+Copy code
+Prisma
+enum ReconciliationStatus {
+  OK
+  WARNING
+  FAIL
+}
+
+model ShiftReconciliation {
+  id String @id @default(uuid())
+  shiftId String @index
+
+  posSales Int
+  declaredSales Int
+  salesVariance Int
+
+  expectedBuns Int
+  declaredBuns Int
+  bunsVariance Int
+
+  expectedMeat Decimal
+  declaredMeat Decimal
+  meatVariance Decimal
+
+  status ReconciliationStatus
+  createdAt DateTime @default(now())
+}
+Migration:
+Copy code
+
+add_shift_reconciliation_v2
+8️⃣ Deriver
+File: server/services/reconciliationDeriver.ts
+Copy code
+Ts
+import { prisma } from "../db";
+
+export async function rebuildReconciliation() {
+  const shifts = await prisma.soldItem.findMany({ distinct: ["shiftId"] });
+
+  for (const { shiftId } of shifts) {
+    await prisma.shiftReconciliation.deleteMany({ where: { shiftId } });
+
+    const posSales = await prisma.soldItem.aggregate({
+      where: { shiftId },
+      _sum: { netAmount: true }
+    });
+
+    const daily = await prisma.dailySalesV2.findFirst({ where: { shiftId } });
+    if (!daily) {
+      await prisma.shiftReconciliation.create({
+        data: {
+          shiftId,
+          posSales: posSales._sum.netAmount ?? 0,
+          declaredSales: 0,
+          salesVariance: 0,
+          expectedBuns: 0,
+          declaredBuns: 0,
+          bunsVariance: 0,
+          expectedMeat: 0,
+          declaredMeat: 0,
+          meatVariance: 0,
+          status: "FAIL"
+        }
+      });
+      continue;
+    }
+
+    const status = Math.abs(daily.totalSales - (posSales._sum.netAmount ?? 0)) > 0
+      ? "FAIL"
+      : "OK";
+
+    await prisma.shiftReconciliation.create({
+      data: {
+        shiftId,
+        posSales: posSales._sum.netAmount ?? 0,
+        declaredSales: daily.totalSales,
+        salesVariance: daily.totalSales - (posSales._sum.netAmount ?? 0),
+        expectedBuns: daily.expectedBuns,
+        declaredBuns: daily.bunsUsed,
+        bunsVariance: daily.bunsUsed - daily.expectedBuns,
+        expectedMeat: daily.expectedMeat,
+        declaredMeat: daily.meatUsed,
+        meatVariance: daily.meatUsed - daily.expectedMeat,
+        status
+      }
+    });
+  }
+}
+9️⃣ Script
+File: server/scripts/rebuildReconciliation.ts
+Copy code
+Ts
+import { rebuildReconciliation } from "../services/reconciliationDeriver";
+
+(async () => {
+  console.log("Rebuilding reconciliation...");
+  await rebuildReconciliation();
+  console.log("Done.");
+})();
+✅ FINAL AGENT CHECKLIST
+[ ] Run all 3 migrations
+[ ] Run all 3 rebuild scripts
+[ ] Re-run scripts → identical counts
+[ ] No existing pages broken
+[ ] STOP after completion

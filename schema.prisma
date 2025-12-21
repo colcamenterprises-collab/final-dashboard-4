@@ -2103,3 +2103,102 @@ enum AuditStatus {
   PASS
   FAIL
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATCH 1 — CANONICAL SOLD ITEM LAYER
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model SoldItem {
+  id              String   @id @default(uuid())
+
+  receiptId       String
+  receiptItemId   String
+  soldAt          DateTime
+  shiftId         String
+
+  channel         String
+  externalSku     String?
+  internalItemId  String?
+  recipeId        String?
+
+  unitPrice       Int
+  quantity        Int      // ALWAYS 1
+  grossAmount     Int
+  discountAmount  Int
+  netAmount       Int
+
+  createdAt       DateTime @default(now())
+
+  modifiers       SoldItemModifier[]
+
+  @@index([receiptId])
+  @@index([receiptItemId])
+  @@index([soldAt])
+  @@index([shiftId])
+  @@map("sold_items")
+}
+
+model SoldItemModifier {
+  id         String   @id @default(uuid())
+  soldItemId String
+  name       String
+  priceDelta Int
+  createdAt  DateTime @default(now())
+
+  soldItem   SoldItem @relation(fields: [soldItemId], references: [id], onDelete: Cascade)
+
+  @@index([soldItemId])
+  @@map("sold_item_modifiers")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATCH 2 — MATERIALISED INGREDIENT USAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ShiftIngredientUsage {
+  id             String   @id @default(uuid())
+  shiftId        String
+  ingredientId   String
+  ingredientName String
+  quantityUsed   Decimal
+  unit           String
+  source         String   // SOLD_ITEM_RECIPE
+  createdAt      DateTime @default(now())
+
+  @@index([shiftId])
+  @@index([ingredientId])
+  @@map("shift_ingredient_usage")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATCH 3 — RECONCILIATION V2 (POS vs DAILY SALES)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+enum ReconciliationStatus {
+  OK
+  WARNING
+  FAIL
+}
+
+model ShiftReconciliation {
+  id             String               @id @default(uuid())
+  shiftId        String
+
+  posSales       Int
+  declaredSales  Int
+  salesVariance  Int
+
+  expectedBuns   Int
+  declaredBuns   Int
+  bunsVariance   Int
+
+  expectedMeat   Decimal
+  declaredMeat   Decimal
+  meatVariance   Decimal
+
+  status         ReconciliationStatus
+  createdAt      DateTime             @default(now())
+
+  @@index([shiftId])
+  @@map("shift_reconciliation")
+}
