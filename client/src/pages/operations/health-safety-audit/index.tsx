@@ -213,39 +213,44 @@ export default function HealthSafetyAuditPage() {
           </div>
 
           {/* Mobile Card View */}
-          <div className="sm:hidden space-y-2">
+          <div className="sm:hidden space-y-3">
             {qs.map((q, idx) => (
               <div
                 key={q.id}
-                className={`border border-slate-200 rounded-[4px] p-3 ${q.isCritical ? "bg-red-50 border-red-300" : "bg-white"}`}
+                className={`border rounded-[4px] p-4 ${q.isCritical ? "bg-red-50 border-red-300" : "bg-white border-slate-200"}`}
                 data-testid={`card-question-${q.id}`}
               >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-xs font-medium mb-1 ${q.isCritical ? "text-red-600" : "text-slate-700"}`}>
-                      {showThai ? "ข้อ" : "Item"} {idx + 1}
-                      {q.isCritical && <span className="ml-1 text-red-500">*</span>}
-                    </div>
-                    <p className="text-xs text-slate-600 break-words">
-                      {getTranslatedLabel(q.label)}
-                    </p>
-                  </div>
-                  <input
-                    type="checkbox"
-                    className="w-6 h-6 accent-emerald-600 cursor-pointer flex-shrink-0 mt-1"
-                    checked={answers[q.id] || false}
-                    onChange={e =>
-                      setAnswers(a => ({
-                        ...a,
-                        [q.id]: e.target.checked,
-                      }))
-                    }
-                    data-testid={`checkbox-question-mobile-${q.id}`}
-                  />
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-xs font-semibold ${q.isCritical ? "text-red-600" : "text-slate-700"}`}>
+                    #{idx + 1}
+                    {q.isCritical && <span className="text-red-500">*</span>}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-700 leading-relaxed mb-3">
+                  {getTranslatedLabel(q.label)}
+                </p>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 accent-emerald-600 cursor-pointer"
+                      checked={answers[q.id] || false}
+                      onChange={e =>
+                        setAnswers(a => ({
+                          ...a,
+                          [q.id]: e.target.checked,
+                        }))
+                      }
+                      data-testid={`checkbox-question-mobile-${q.id}`}
+                    />
+                    <span className="text-xs text-slate-600">
+                      {showThai ? "ตรวจสอบแล้ว" : "Checked"}
+                    </span>
+                  </label>
                 </div>
                 <input
                   type="text"
-                  className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs mt-1"
+                  className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs mt-3"
                   placeholder={showThai ? "เพิ่มหมายเหตุ..." : "Add note..."}
                   value={notes[q.id] || ""}
                   onChange={e => setNotes(n => ({ ...n, [q.id]: e.target.value }))}
