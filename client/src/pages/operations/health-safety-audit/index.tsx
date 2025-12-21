@@ -45,6 +45,7 @@ const questionTranslations: Record<string, string> = {
 export default function HealthSafetyAuditPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<string, boolean>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [managerName, setManagerName] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [lastAuditId, setLastAuditId] = useState<string | null>(null);
@@ -82,6 +83,7 @@ export default function HealthSafetyAuditPage() {
     const items = questions.map(q => ({
       questionId: q.id,
       checked: answers[q.id] ?? false,
+      note: notes[q.id] || "",
     }));
 
     setSubmitting(true);
@@ -93,6 +95,7 @@ export default function HealthSafetyAuditPage() {
       setLastAuditId(res.data.id);
       alert(showThai ? "ส่งรายงานสำเร็จ" : "Audit submitted successfully");
       setAnswers({});
+      setNotes({});
       setManagerName("");
     } catch (err) {
       alert(showThai ? "ส่งรายงานไม่สำเร็จ" : "Failed to submit audit");
@@ -101,12 +104,12 @@ export default function HealthSafetyAuditPage() {
   };
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold" data-testid="text-page-title">
+    <div className="p-3 sm:p-4 max-w-4xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <h1 className="text-lg sm:text-xl font-semibold" data-testid="text-page-title">
           {showThai ? "การตรวจสอบสุขภาพและความปลอดภัย" : "Health & Safety Audit"}
         </h1>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-600">TH</span>
             <Switch
@@ -144,17 +147,21 @@ export default function HealthSafetyAuditPage() {
             {getTranslatedSection(section)}
           </h2>
 
-          <div className="border border-slate-200 rounded-[4px] overflow-hidden">
+          {/* Desktop Table View */}
+          <div className="hidden sm:block border border-slate-200 rounded-[4px] overflow-hidden">
             <table className="w-full text-xs">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="p-2 text-left font-medium text-slate-600 w-1/4">
+                  <th className="p-2 text-left font-medium text-slate-600 w-16">
                     {showThai ? "หัวข้อ" : "Title"}
                   </th>
                   <th className="p-2 text-left font-medium text-slate-600">
                     {showThai ? "รายละเอียด" : "Description"}
                   </th>
-                  <th className="p-2 text-center font-medium text-slate-600 w-20">
+                  <th className="p-2 text-left font-medium text-slate-600 w-32">
+                    {showThai ? "หมายเหตุ" : "Notes"}
+                  </th>
+                  <th className="p-2 text-center font-medium text-slate-600 w-16">
                     {showThai ? "ตรวจสอบ" : "Check"}
                   </th>
                 </tr>
@@ -166,19 +173,29 @@ export default function HealthSafetyAuditPage() {
                     className={`border-t border-slate-200 ${q.isCritical ? "bg-red-50" : ""}`}
                     data-testid={`row-question-${q.id}`}
                   >
-                    <td className="p-2 text-slate-700">
+                    <td className="p-2 text-slate-700 align-top">
                       <span className={q.isCritical ? "text-red-600 font-medium" : ""}>
-                        {showThai ? "ข้อ" : "Item"} {idx + 1}
-                        {q.isCritical && <span className="ml-1 text-red-500">*</span>}
+                        {idx + 1}
+                        {q.isCritical && <span className="ml-0.5 text-red-500">*</span>}
                       </span>
                     </td>
-                    <td className="p-2 text-slate-600">
+                    <td className="p-2 text-slate-600 align-top">
                       {getTranslatedLabel(q.label)}
                     </td>
-                    <td className="p-2 text-center">
+                    <td className="p-2 align-top">
+                      <input
+                        type="text"
+                        className="w-full border border-slate-200 rounded px-1.5 py-1 text-xs"
+                        placeholder={showThai ? "เพิ่มหมายเหตุ..." : "Add note..."}
+                        value={notes[q.id] || ""}
+                        onChange={e => setNotes(n => ({ ...n, [q.id]: e.target.value }))}
+                        data-testid={`input-note-${q.id}`}
+                      />
+                    </td>
+                    <td className="p-2 text-center align-top">
                       <input
                         type="checkbox"
-                        className="w-4 h-4 accent-emerald-600 cursor-pointer"
+                        className="w-5 h-5 accent-emerald-600 cursor-pointer"
                         checked={answers[q.id] || false}
                         onChange={e =>
                           setAnswers(a => ({
@@ -194,13 +211,56 @@ export default function HealthSafetyAuditPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card View */}
+          <div className="sm:hidden space-y-2">
+            {qs.map((q, idx) => (
+              <div
+                key={q.id}
+                className={`border border-slate-200 rounded-[4px] p-3 ${q.isCritical ? "bg-red-50 border-red-300" : "bg-white"}`}
+                data-testid={`card-question-${q.id}`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-xs font-medium mb-1 ${q.isCritical ? "text-red-600" : "text-slate-700"}`}>
+                      {showThai ? "ข้อ" : "Item"} {idx + 1}
+                      {q.isCritical && <span className="ml-1 text-red-500">*</span>}
+                    </div>
+                    <p className="text-xs text-slate-600 break-words">
+                      {getTranslatedLabel(q.label)}
+                    </p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    className="w-6 h-6 accent-emerald-600 cursor-pointer flex-shrink-0 mt-1"
+                    checked={answers[q.id] || false}
+                    onChange={e =>
+                      setAnswers(a => ({
+                        ...a,
+                        [q.id]: e.target.checked,
+                      }))
+                    }
+                    data-testid={`checkbox-question-mobile-${q.id}`}
+                  />
+                </div>
+                <input
+                  type="text"
+                  className="w-full border border-slate-200 rounded px-2 py-1.5 text-xs mt-1"
+                  placeholder={showThai ? "เพิ่มหมายเหตุ..." : "Add note..."}
+                  value={notes[q.id] || ""}
+                  onChange={e => setNotes(n => ({ ...n, [q.id]: e.target.value }))}
+                  data-testid={`input-note-mobile-${q.id}`}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       ))}
 
       <button
         disabled={submitting}
         onClick={submitAudit}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-[4px] text-xs font-medium disabled:opacity-50"
+        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-[4px] text-xs font-medium disabled:opacity-50"
         data-testid="button-submit-audit"
       >
         {submitting 
