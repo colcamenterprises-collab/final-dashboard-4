@@ -11,32 +11,93 @@ type Question = {
   sortOrder: number;
 };
 
+type EditingState = {
+  [key: string]: {
+    section: string;
+    label: string;
+  };
+};
+
 export default function HealthSafetyQuestionManager() {
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [editing, setEditing] = useState<EditingState>({});
+  const [saving, setSaving] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const load = async () => {
     const res = await axios.get("/api/health-safety/questions/all");
     setQuestions(res.data);
+    const editState: EditingState = {};
+    res.data.forEach((q: Question) => {
+      editState[q.id] = { section: q.section, label: q.label };
+    });
+    setEditing(editState);
   };
 
   useEffect(() => {
     load();
   }, []);
 
-  const update = async (id: string, data: Partial<Question>) => {
-    await axios.put(`/api/health-safety/questions/${id}`, data);
-    load();
+  const handleFieldChange = (id: string, field: 'section' | 'label', value: string) => {
+    setEditing(prev => ({
+      ...prev,
+      [id]: { ...prev[id], [field]: value }
+    }));
+  };
+
+  const saveField = async (id: string, field: 'section' | 'label') => {
+    const value = editing[id]?.[field];
+    if (value === undefined) return;
+    
+    const question = questions.find(q => q.id === id);
+    if (!question || question[field] === value) return;
+
+    setSaving(id);
+    try {
+      await axios.put(`/api/health-safety/questions/${id}`, { [field]: value });
+      setQuestions(prev => prev.map(q => 
+        q.id === id ? { ...q, [field]: value } : q
+      ));
+    } catch (err) {
+      alert("Failed to save changes");
+      setEditing(prev => ({
+        ...prev,
+        [id]: { ...prev[id], [field]: question[field] }
+      }));
+    }
+    setSaving(null);
+  };
+
+  const updateToggle = async (id: string, data: Partial<Question>) => {
+    setSaving(id);
+    try {
+      await axios.put(`/api/health-safety/questions/${id}`, data);
+      setQuestions(prev => prev.map(q => 
+        q.id === id ? { ...q, ...data } : q
+      ));
+    } catch (err) {
+      alert("Failed to update");
+    }
+    setSaving(null);
   };
 
   const create = async () => {
-    await axios.post("/api/health-safety/questions", {
-      section: "New Section",
-      label: "New question",
-      isCritical: false,
-      sortOrder: questions.length,
-    });
-    load();
+    try {
+      const res = await axios.post("/api/health-safety/questions", {
+        section: "New Section",
+        label: "New question",
+        isCritical: false,
+        sortOrder: questions.length,
+      });
+      const newQ = res.data;
+      setQuestions(prev => [...prev, newQ]);
+      setEditing(prev => ({
+        ...prev,
+        [newQ.id]: { section: newQ.section, label: newQ.label }
+      }));
+    } catch (err) {
+      alert("Failed to create question");
+    }
   };
 
   return (
@@ -46,7 +107,7 @@ export default function HealthSafetyQuestionManager() {
           Health & Safety Questions
         </h1>
         <button
-          className="border px-3 py-2 rounded text-sm"
+          className="border border-slate-200 px-3 py-1.5 rounded-[4px] text-xs hover:bg-slate-50"
           onClick={() => navigate("/operations/health-safety-audit")}
           data-testid="button-back-to-audit"
         >
@@ -55,69 +116,81 @@ export default function HealthSafetyQuestionManager() {
       </div>
 
       <button
-        className="border px-3 py-2 rounded mb-4 text-sm"
+        className="border border-slate-200 px-3 py-1.5 rounded-[4px] mb-4 text-xs hover:bg-slate-50"
         onClick={create}
         data-testid="button-add-question"
       >
         Add Question
       </button>
 
-      <table className="w-full text-sm border">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="p-2 text-left">Section</th>
-            <th className="p-2 text-left">Description</th>
-            <th className="p-2 text-center">Critical</th>
-            <th className="p-2 text-center">Active</th>
-          </tr>
-        </thead>
-        <tbody>
-          {questions.map(q => (
-            <tr key={q.id} className="border-t">
-              <td className="p-2">
-                <input
-                  className="border p-1 w-full rounded"
-                  value={q.section}
-                  onChange={e =>
-                    update(q.id, { section: e.target.value })
-                  }
-                  data-testid={`input-section-${q.id}`}
-                />
-              </td>
-              <td className="p-2">
-                <input
-                  className="border p-1 w-full rounded"
-                  value={q.label}
-                  onChange={e =>
-                    update(q.id, { label: e.target.value })
-                  }
-                  data-testid={`input-label-${q.id}`}
-                />
-              </td>
-              <td className="p-2 text-center">
-                <input
-                  type="checkbox"
-                  checked={q.isCritical}
-                  onChange={e =>
-                    update(q.id, { isCritical: e.target.checked })
-                  }
-                  data-testid={`checkbox-critical-${q.id}`}
-                />
-              </td>
-              <td className="p-2 text-center">
-                <input
-                  type="checkbox"
-                  checked={q.isActive}
-                  onChange={e =>
-                    update(q.id, { isActive: e.target.checked })
-                  }
-                  data-testid={`checkbox-active-${q.id}`}
-                />
-              </td>
+      <div className="border border-slate-200 rounded-[4px] overflow-hidden">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="p-2 text-left font-medium text-slate-600">Section</th>
+              <th className="p-2 text-left font-medium text-slate-600">Description</th>
+              <th className="p-2 text-center font-medium text-slate-600 w-20">Critical</th>
+              <th className="p-2 text-center font-medium text-slate-600 w-20">Active</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {questions.map(q => (
+              <tr key={q.id} className={`border-t border-slate-200 ${saving === q.id ? 'opacity-50' : ''}`}>
+                <td className="p-2">
+                  <input
+                    className="border border-slate-200 p-1.5 w-full rounded-[4px] text-xs"
+                    value={editing[q.id]?.section ?? q.section}
+                    onChange={e => handleFieldChange(q.id, 'section', e.target.value)}
+                    onBlur={() => saveField(q.id, 'section')}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    data-testid={`input-section-${q.id}`}
+                  />
+                </td>
+                <td className="p-2">
+                  <input
+                    className="border border-slate-200 p-1.5 w-full rounded-[4px] text-xs"
+                    value={editing[q.id]?.label ?? q.label}
+                    onChange={e => handleFieldChange(q.id, 'label', e.target.value)}
+                    onBlur={() => saveField(q.id, 'label')}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    data-testid={`input-label-${q.id}`}
+                  />
+                </td>
+                <td className="p-2 text-center">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-red-600 cursor-pointer"
+                    checked={q.isCritical}
+                    onChange={e => updateToggle(q.id, { isCritical: e.target.checked })}
+                    data-testid={`checkbox-critical-${q.id}`}
+                  />
+                </td>
+                <td className="p-2 text-center">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 accent-emerald-600 cursor-pointer"
+                    checked={q.isActive}
+                    onChange={e => updateToggle(q.id, { isActive: e.target.checked })}
+                    data-testid={`checkbox-active-${q.id}`}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-xs text-slate-500 mt-3">
+        Changes to section and description are saved when you click away or press Enter.
+      </p>
     </div>
   );
 }
