@@ -149,15 +149,15 @@ recipeMappingRouter.post('/api/admin/rebuild-usage', async (req, res) => {
     
     // 1. Rebuild sold items with recipe mappings
     logs.push('📦 Rebuilding sold items...');
-    const { rebuildSoldItems } = await import('../services/soldItemsDeriver');
-    await rebuildSoldItems();
+    const { deriveAllSoldItems } = await import('../services/soldItemDeriver');
+    await deriveAllSoldItems();
     logs.push('✅ Sold items rebuilt');
     
     // 2. Rebuild ingredient usage
     logs.push('🧂 Rebuilding ingredient usage...');
     try {
-      const { rebuildAllIngredientUsage } = await import('../services/ingredientUsageDeriver');
-      await rebuildAllIngredientUsage();
+      const { rebuildIngredientUsage } = await import('../services/ingredientUsageDeriver');
+      await rebuildIngredientUsage();
       logs.push('✅ Ingredient usage rebuilt');
     } catch (e: any) {
       logs.push(`⚠️ Ingredient usage: ${e.message}`);
@@ -166,8 +166,8 @@ recipeMappingRouter.post('/api/admin/rebuild-usage', async (req, res) => {
     // 3. Rebuild reconciliation
     logs.push('📊 Rebuilding reconciliation...');
     try {
-      const { rebuildAllReconciliation } = await import('../services/reconciliationDeriver');
-      await rebuildAllReconciliation();
+      const { rebuildReconciliation } = await import('../services/reconciliationDeriver');
+      await rebuildReconciliation();
       logs.push('✅ Reconciliation rebuilt');
     } catch (e: any) {
       logs.push(`⚠️ Reconciliation: ${e.message}`);
@@ -176,8 +176,8 @@ recipeMappingRouter.post('/api/admin/rebuild-usage', async (req, res) => {
     // 4. Rebuild recipe coverage
     logs.push('📈 Rebuilding recipe coverage...');
     try {
-      const { rebuildAllRecipeCoverage } = await import('../services/recipeCoverageDeriver');
-      await rebuildAllRecipeCoverage();
+      const { rebuildRecipeCoverage } = await import('../services/recipeCoverageDeriver');
+      await rebuildRecipeCoverage();
       logs.push('✅ Recipe coverage rebuilt');
     } catch (e: any) {
       logs.push(`⚠️ Recipe coverage: ${e.message}`);
@@ -186,8 +186,8 @@ recipeMappingRouter.post('/api/admin/rebuild-usage', async (req, res) => {
     // 5. Rebuild alerts
     logs.push('🚨 Rebuilding alerts...');
     try {
-      const { rebuildAllAlerts } = await import('../services/alertDeriver');
-      await rebuildAllAlerts();
+      const { rebuildAlerts } = await import('../services/alertDeriver');
+      await rebuildAlerts();
       logs.push('✅ Alerts rebuilt');
     } catch (e: any) {
       logs.push(`⚠️ Alerts: ${e.message}`);
