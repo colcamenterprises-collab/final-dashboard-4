@@ -28,6 +28,7 @@ export const ROUTES = {
   HEALTH_SAFETY_AUDIT: "/operations/health-safety-audit",
   HEALTH_SAFETY_QUESTIONS: "/operations/health-safety-audit/questions",
   INGREDIENTS_MASTER: "/operations/ingredients-master",
+  RECIPE_MAPPING: "/operations/recipe-mapping",
 
   // Finance
   FINANCE: "/finance",

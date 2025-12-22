@@ -81,6 +81,7 @@ import RecipesPage from "./pages/operations/Recipes";
 import PurchaseHistory from "./pages/operations/PurchaseHistory";
 import HealthSafetyAuditPage from "./pages/operations/health-safety-audit";
 import HealthSafetyQuestionManager from "./pages/operations/health-safety-audit/questions";
+import RecipeMappingPage from "./pages/operations/recipe-mapping";
 
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
@@ -129,6 +130,7 @@ export default function App() {
                 <Route path="/operations/health-safety-audit" element={<Guard><HealthSafetyAuditPage /></Guard>} />
                 <Route path="/operations/health-safety-audit/questions" element={<Guard><HealthSafetyQuestionManager /></Guard>} />
                 <Route path="/operations/ingredients-master" element={<Guard><IngredientsMaster /></Guard>} />
+                <Route path="/operations/recipe-mapping" element={<Guard><RecipeMappingPage /></Guard>} />
                 
                 <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                   <Route index element={null} />

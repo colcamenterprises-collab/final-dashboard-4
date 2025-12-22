@@ -4744,6 +4744,10 @@ app.use("/api/bank-imports", bankUploadRouter);
   app.use("/api/health-safety/audits", healthSafetyAudits);
   app.use("/api/health-safety/pdf", healthSafetyPdf);
 
+  // PATCH B — Recipe SKU Mapping Routes
+  const { recipeMappingRouter } = await import('./routes/recipeMapping');
+  app.use(recipeMappingRouter);
+
   // Shift Report Balance Review endpoint
   app.get("/api/shift-reports/balance-review", async (req: Request, res: Response) => {
     try {
