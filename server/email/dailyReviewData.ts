@@ -14,6 +14,85 @@ function dayRange(businessDate: string) {
   return { start, end };
 }
 
+function shiftIdFromDate(dateISO: string): string {
+  return `SHIFT_${dateISO.replace(/-/g, '')}`;
+}
+
+// PATCH: Load sales from canonical sold_items table
+export async function loadCanonicalSales(dateISO: string) {
+  const shiftId = shiftIdFromDate(dateISO);
+  
+  const soldItems = await prisma.soldItem.findMany({
+    where: { shiftId }
+  });
+
+  // Group by category
+  const itemsByCategory: Record<string, number> = {};
+  for (const item of soldItems) {
+    const cat = item.category || 'Other';
+    itemsByCategory[cat] = (itemsByCategory[cat] || 0) + 1;
+  }
+
+  // Calculate totals (amounts are in satang, convert to THB)
+  const totalRevenue = soldItems.reduce((sum, item) => sum + item.netAmount, 0) / 100;
+
+  return {
+    totalSales: totalRevenue,
+    itemCount: soldItems.length,
+    itemsByCategory: Object.entries(itemsByCategory).map(([category, qty]) => ({ category, qty }))
+  };
+}
+
+// PATCH: Load shift expenses from canonical pnl_expense table  
+export async function loadCanonicalShiftExpenses(dateISO: string) {
+  const { start, end } = dayRange(dateISO);
+  
+  const expenses = await prisma.pnlExpense.findMany({
+    where: {
+      sourceType: 'SHIFT',
+      date: { gte: start, lt: end }
+    }
+  });
+
+  const byCategory: Record<string, number> = {};
+  for (const exp of expenses) {
+    byCategory[exp.category] = (byCategory[exp.category] || 0) + Number(exp.amount);
+  }
+
+  const total = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+  return {
+    shiftExpenses: Object.entries(byCategory).map(([category, amount]) => ({ category, amount })),
+    totalShiftExpenses: total
+  };
+}
+
+// PATCH: Load reconciliation from canonical shift_reconciliation table
+export async function loadCanonicalReconciliation(dateISO: string) {
+  const shiftId = shiftIdFromDate(dateISO);
+  
+  const recon = await prisma.shiftReconciliation.findFirst({
+    where: { shiftId }
+  });
+
+  if (!recon) {
+    return null;
+  }
+
+  return {
+    posSales: recon.posSales / 100,  // Convert satang to THB
+    declaredSales: recon.declaredSales / 100,
+    salesVariance: recon.salesVariance / 100,
+    expectedBuns: recon.expectedBuns,
+    declaredBuns: recon.declaredBuns,
+    bunsVariance: recon.bunsVariance,
+    expectedMeat: Number(recon.expectedMeat),
+    declaredMeat: Number(recon.declaredMeat),
+    meatVariance: Number(recon.meatVariance),
+    status: recon.status
+  };
+}
+
 export async function loadStaffForm(dateISO: string) {
   const { start, end } = dayRange(dateISO);
   

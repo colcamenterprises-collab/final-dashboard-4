@@ -1,0 +1,214 @@
+🔐 FINAL EXECUTION PATCH
+TABLE-BASED DAILY REVIEW EMAIL (AUTHORITATIVE)
+🎯 OBJECTIVE (LOCKED)
+Keep existing Daily Review email
+Replace lists → tables
+Populate real data from canonical tables
+One email = management truth
+No schema changes
+No new cron jobs
+No UI changes
+🚫 ABSOLUTE PROHIBITIONS (VERY IMPORTANT)
+The agent MUST NOT:
+Change email timing (still 09:00 BKK)
+Add new emails
+Modify Daily Sales / Stock forms
+Add calculations not already in services
+Touch schema or migrations
+Change styling system or colours
+📂 FILES TO TOUCH (ONLY THESE)
+Email builder
+Copy code
+
+server/services/dailyReviewEmailBuilder.ts
+(Optional, only if split)
+Copy code
+
+server/templates/emails/dailyReview.html.ts
+⚠️ If the template is inline, modify inline HTML only.
+🧱 DATA SOURCES (MANDATORY)
+The email must read ONLY from:
+sold_items
+shift_reconciliation
+pnl_expense
+daily_sales_v2
+POS shift snapshot (existing service)
+shopping list service (existing)
+❌ Do NOT read:
+analytics_daily
+legacy snapshot tables
+placeholder “summary” objects
+🧩 IMPLEMENTATION DETAILS
+1️⃣ SALES FIGURES — TABLE
+Replace list renderer with this table
+Copy code
+Html
+<table width="100%" cellpadding="6" cellspacing="0">
+  <thead>
+    <tr>
+      <th align="left">Channel</th>
+      <th align="right">Amount (THB)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Cash</td><td align="right">฿{{cashSales}}</td></tr>
+    <tr><td>QR</td><td align="right">฿{{qrSales}}</td></tr>
+    <tr><td>Grab</td><td align="right">฿{{grabSales}}</td></tr>
+    <tr><td>Other</td><td align="right">฿{{otherSales}}</td></tr>
+    <tr>
+      <td><strong>Total Sales</strong></td>
+      <td align="right"><strong>฿{{totalSales}}</strong></td>
+    </tr>
+  </tbody>
+</table>
+Source logic (already exists):
+POS totals derived from sold_items
+2️⃣ SHIFT EXPENSES — TABLE
+Copy code
+Html
+<table width="100%" cellpadding="6" cellspacing="0">
+  <thead>
+    <tr>
+      <th align="left">Category</th>
+      <th align="right">Amount (THB)</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each shiftExpenses}}
+      <tr>
+        <td>{{category}}</td>
+        <td align="right">฿{{amount}}</td>
+      </tr>
+    {{/each}}
+    <tr>
+      <td><strong>Total Shift Expenses</strong></td>
+      <td align="right"><strong>฿{{totalShiftExpenses}}</strong></td>
+    </tr>
+  </tbody>
+</table>
+Source:
+Copy code
+Ts
+SELECT * FROM pnl_expense
+WHERE source_type = 'SHIFT'
+AND date = :shiftDate
+3️⃣ FINANCE / CASH CONTROL — TABLE
+Copy code
+Html
+<table width="100%" cellpadding="6" cellspacing="0">
+  <tbody>
+    <tr><td>Starting Cash</td><td align="right">฿{{startingCash}}</td></tr>
+    <tr><td>Cash Sales</td><td align="right">฿{{cashSales}}</td></tr>
+    <tr><td>Expected Register</td><td align="right">฿{{expectedRegister}}</td></tr>
+    <tr><td>Actual Register</td><td align="right">฿{{actualRegister}}</td></tr>
+    <tr>
+      <td>Variance</td>
+      <td align="right"><strong>฿{{cashVariance}}</strong></td>
+    </tr>
+    <tr><td>Balanced</td><td>{{balanced}}</td></tr>
+    <tr><td>Cash to Bank</td><td align="right">฿{{cashToBank}}</td></tr>
+    <tr><td>QR to Bank</td><td align="right">฿{{qrToBank}}</td></tr>
+  </tbody>
+</table>
+Source:
+daily_sales_v2
+shift_reconciliation
+4️⃣ POS vs DAILY SALES — RECONCILIATION TABLE
+Copy code
+Html
+<table width="100%" cellpadding="6" cellspacing="0">
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>POS</th>
+      <th>Daily Form</th>
+      <th>Variance</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Gross Sales</td>
+      <td>฿{{posSales}}</td>
+      <td>฿{{declaredSales}}</td>
+      <td>฿{{salesVariance}}</td>
+    </tr>
+    <tr>
+      <td>Cash</td>
+      <td>฿{{posCash}}</td>
+      <td>฿{{declaredCash}}</td>
+      <td>฿{{cashVariance}}</td>
+    </tr>
+    <tr>
+      <td>Buns</td>
+      <td>{{expectedBuns}}</td>
+      <td>{{actualBuns}}</td>
+      <td>{{bunVariance}}</td>
+    </tr>
+    <tr>
+      <td>Meat (g)</td>
+      <td>{{expectedMeat}}</td>
+      <td>{{actualMeat}}</td>
+      <td>{{meatVariance}}</td>
+    </tr>
+  </tbody>
+</table>
+Source:
+shift_reconciliation (single row per shift)
+5️⃣ ITEMS SOLD — CATEGORY TABLE
+Copy code
+Html
+<table width="100%" cellpadding="6" cellspacing="0">
+  <thead>
+    <tr>
+      <th align="left">Category</th>
+      <th align="right">Qty</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each itemsByCategory}}
+      <tr>
+        <td>{{category}}</td>
+        <td align="right">{{qty}}</td>
+      </tr>
+    {{/each}}
+  </tbody>
+</table>
+Source:
+sold_items grouped by category
+6️⃣ PURCHASING — TABLE
+Copy code
+Html
+<table width="100%" cellpadding="6" cellspacing="0">
+  <thead>
+    <tr>
+      <th>Item</th>
+      <th>Qty</th>
+      <th>Est. Cost</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each shoppingList}}
+      <tr>
+        <td>{{item}}</td>
+        <td>{{qty}}</td>
+        <td>฿{{cost}}</td>
+      </tr>
+    {{/each}}
+    <tr>
+      <td colspan="2"><strong>Total Est. Cost</strong></td>
+      <td><strong>฿{{shoppingTotal}}</strong></td>
+    </tr>
+  </tbody>
+</table>
+🧪 VERIFICATION CHECKLIST (AGENT MUST CONFIRM)
+[ ] No ฿0.00 placeholders unless data is genuinely missing
+[ ] No “INSUFFICIENT DATA” if Daily Sales exists
+[ ] Tables render correctly on mobile Gmail
+[ ] One email only
+[ ] Subject unchanged
+✅ FINAL OUTCOME
+You will now have:
+A proper management report
+Data that matches the dashboard
+Tables that can be skim-read in 30 seconds
+One email that actually matters

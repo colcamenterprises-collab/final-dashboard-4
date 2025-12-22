@@ -72,15 +72,23 @@ export class CronEmailService {
 
       console.log(`📊 Generating Daily Review email for ${yesterday}`);
 
-      const { loadStaffForm, loadPosShift, loadDailyReview, loadFinance, buildFBvsSalesChart, rollsStatus, meatStatus } = await import('../email/dailyReviewData');
+      const { loadStaffForm, loadPosShift, loadDailyReview, loadFinance, buildFBvsSalesChart, rollsStatus, meatStatus, loadCanonicalSales, loadCanonicalShiftExpenses, loadCanonicalReconciliation } = await import('../email/dailyReviewData');
       const { dailySummaryTemplate } = await import('../email/templates/dailySummary');
       const { sendMail } = await import('../email/mailer');
 
+      // Load from legacy sources
       const [form, pos, review, fin] = await Promise.all([
         loadStaffForm(yesterday),
         loadPosShift(yesterday),
         loadDailyReview(yesterday),
         loadFinance(yesterday),
+      ]);
+
+      // Load from canonical sources (PATCH: Table-based Daily Review)
+      const [canonicalSales, canonicalExpenses, canonicalRecon] = await Promise.all([
+        loadCanonicalSales(yesterday),
+        loadCanonicalShiftExpenses(yesterday),
+        loadCanonicalReconciliation(yesterday),
       ]);
 
       const fbVsSalesChartDataUrl =
@@ -90,6 +98,19 @@ export class CronEmailService {
 
       const rStatus = rollsStatus(pos.expectedRolls, form.rollsRecorded);
       const mStatus = meatStatus(pos.expectedMeatGrams, form.meatRecordedGrams);
+
+      // Build canonical reconciliation data
+      const canonicalReconciliation = canonicalRecon ? {
+        posSales: canonicalRecon.posSales,
+        declaredSales: canonicalRecon.declaredSales,
+        salesVariance: canonicalRecon.salesVariance,
+        expectedBuns: canonicalRecon.expectedBuns,
+        actualBuns: canonicalRecon.declaredBuns,
+        bunVariance: canonicalRecon.bunsVariance,
+        expectedMeat: canonicalRecon.expectedMeat,
+        actualMeat: canonicalRecon.declaredMeat,
+        meatVariance: canonicalRecon.meatVariance,
+      } : null;
 
       const html = dailySummaryTemplate({
         dateISO: yesterday,
@@ -135,6 +156,13 @@ export class CronEmailService {
             varianceGrams: mStatus.varianceG,
             status: mStatus.status,
           },
+        },
+        // PATCH: Add canonical data from canonical tables
+        canonical: {
+          shiftExpenses: canonicalExpenses.shiftExpenses,
+          totalShiftExpenses: canonicalExpenses.totalShiftExpenses,
+          reconciliation: canonicalReconciliation,
+          itemsByCategory: canonicalSales.itemsByCategory,
         },
       });
 

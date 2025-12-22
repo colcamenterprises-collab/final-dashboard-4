@@ -1,4 +1,4 @@
-// Minimal, professional email template. No emojis. Montserrat with fallbacks.
+// Table-based Daily Review email template. Uses canonical data sources.
 export function dailySummaryTemplate(input: {
   dateISO: string;
   form: {
@@ -9,6 +9,9 @@ export function dailySummaryTemplate(input: {
     balanced: boolean | null;
     itemisedSales: Array<{ name: string; qty: number; total: number }>;
     itemisedExpenses: Array<{ name: string; total: number }>;
+    startingCash?: number | null;
+    expectedRegister?: number | null;
+    cashVariance?: number | null;
   };
   pos: {
     totalSales: number | null;
@@ -44,6 +47,39 @@ export function dailySummaryTemplate(input: {
       status: "OK" | "FLAG" | "INSUFFICIENT_DATA";
     };
   };
+  // NEW: Canonical data sources
+  canonical?: {
+    salesChannels?: { cashSales: number; qrSales: number; grabSales: number; otherSales: number; totalSales: number };
+    shiftExpenses?: Array<{ category: string; amount: number }>;
+    totalShiftExpenses?: number;
+    reconciliation?: {
+      posSales: number;
+      declaredSales: number;
+      salesVariance: number;
+      posCash?: number;
+      declaredCash?: number;
+      cashVariance?: number;
+      expectedBuns: number;
+      actualBuns: number;
+      bunVariance: number;
+      expectedMeat: number;
+      actualMeat: number;
+      meatVariance: number;
+    } | null;
+    itemsByCategory?: Array<{ category: string; qty: number }>;
+    shoppingList?: Array<{ item: string; qty: number; cost: number }>;
+    shoppingTotal?: number;
+    cashControl?: {
+      startingCash: number;
+      cashSales: number;
+      expectedRegister: number;
+      actualRegister: number;
+      cashVariance: number;
+      balanced: boolean;
+      cashToBank: number;
+      qrToBank: number;
+    };
+  };
 }) {
   const css = `
 :root { color-scheme: light; }
@@ -57,15 +93,14 @@ body { margin:0; padding:0; background:#0B0C10; }
 .small { font-size:12px; color:#9AA7B2; }
 .row { display:flex; gap:16px; flex-wrap:wrap; }
 .col { flex:1 1 300px; }
-.kpi { display:flex; justify-content:space-between; padding:10px 0; border-top:1px solid #1F2430; }
-.kpi:first-child { border-top:none; }
-.kpi .label { color:#A9B4BF; font-size:12px; }
-.kpi .value { color:#E6EDF5; font-weight:600; font-size:14px; }
+.table { width:100%; border-collapse:collapse; }
+.table th, .table td { text-align:left; padding:8px 6px; border-bottom:1px solid #1F2430; color:#C7CFD9; font-size:13px; }
+.table th { color:#9AA7B2; font-weight:600; }
+.table td.right, .table th.right { text-align:right; }
+.table tr.total td { font-weight:700; color:#E6EDF5; border-top:2px solid #3A4553; }
 .tag { font-size:12px; padding:3px 8px; border-radius:999px; border:1px solid #2A3441; color:#B9C3CE; }
 .tag.ok { border-color:#234B2A; color:#CFEAD3; background:#102015; }
 .tag.flag { border-color:#5A1F22; color:#F2C6C9; background:#1F1011; }
-.table { width:100%; border-collapse:collapse; }
-.table th, .table td { text-align:left; padding:8px 0; border-bottom:1px solid #1F2430; color:#C7CFD9; font-size:13px; }
 .header { padding-bottom:8px; margin-bottom:16px; border-bottom:1px solid #1F2430; }
 `;
   const currency = (n: number | null | undefined) =>
@@ -80,16 +115,23 @@ body { margin:0; padding:0; background:#0B0C10; }
       ? `<span class="tag flag">FLAG</span>`
       : `<span class="tag">INSUFFICIENT DATA</span>`;
 
-  const listRows = (rows: Array<{ name: string; qty?: number; total?: number }>) =>
-    rows
-      .map(
-        (r) => `<tr>
-  <td>${r.name}</td>
-  ${"qty" in r ? `<td>${qty(r.qty as any)}</td>` : ""}
-  ${"total" in r ? `<td>${currency(r.total as any)}</td>` : ""}
-</tr>`
-      )
-      .join("");
+  // Use canonical data if available, otherwise fall back to form data
+  const salesChannels = input.canonical?.salesChannels || {
+    cashSales: input.form.itemisedSales.find(s => s.name === 'Cash')?.total || 0,
+    qrSales: input.form.itemisedSales.find(s => s.name === 'QR/Promptpay')?.total || 0,
+    grabSales: input.form.itemisedSales.find(s => s.name === 'Grab')?.total || 0,
+    otherSales: input.form.itemisedSales.find(s => s.name === 'Other')?.total || 0,
+    totalSales: input.form.totalSales || 0
+  };
+
+  const shiftExpenses = input.canonical?.shiftExpenses || input.form.itemisedExpenses.map(e => ({ category: e.name, amount: e.total }));
+  const totalShiftExpenses = input.canonical?.totalShiftExpenses || shiftExpenses.reduce((sum, e) => sum + e.amount, 0);
+
+  const recon = input.canonical?.reconciliation;
+  const itemsByCategory = input.canonical?.itemsByCategory || [];
+  const shoppingList = input.canonical?.shoppingList || [];
+  const shoppingTotal = input.canonical?.shoppingTotal || 0;
+  const cashControl = input.canonical?.cashControl;
 
   return `<!doctype html>
 <html>
@@ -106,87 +148,115 @@ body { margin:0; padding:0; background:#0B0C10; }
       <div class="small">Generated automatically at 09:00 (Bangkok)</div>
     </div>
 
-    <div class="row">
-      <div class="col">
-        <div class="card">
-          <div class="h2">Daily Sales & Stock (Staff Form)</div>
-          <div class="kpi"><span class="label">Total Sales</span><span class="value">${currency(input.form.totalSales)}</span></div>
-          <div class="kpi"><span class="label">Closing Cash</span><span class="value">${currency(input.form.closingCash)}</span></div>
-          <div class="kpi"><span class="label">Cash Banked</span><span class="value">${currency(input.form.bankedCash)}</span></div>
-          <div class="kpi"><span class="label">QR Transfer</span><span class="value">${currency(input.form.bankedQR)}</span></div>
-          <div class="kpi"><span class="label">Balanced?</span><span class="value">${input.form.balanced === null ? "—" : input.form.balanced ? "Yes" : "No"}</span></div>
-          <div style="margin-top:12px" class="small">Itemised Sales</div>
-          <table class="table">
-            <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
-            <tbody>${listRows(input.form.itemisedSales as any)}</tbody>
-          </table>
-          <div style="margin-top:12px" class="small">Itemised Expenses</div>
-          <table class="table">
-            <thead><tr><th>Category</th><th>Total</th></tr></thead>
-            <tbody>${listRows(input.form.itemisedExpenses as any)}</tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="col">
-        <div class="card">
-          <div class="h2">POS Shift Report</div>
-          <div class="kpi"><span class="label">Total Sales</span><span class="value">${currency(input.pos.totalSales)}</span></div>
-          <div class="kpi"><span class="label">Expenses</span><span class="value">${currency(input.pos.expensesTotal)}</span></div>
-          <div class="kpi"><span class="label">Expected Cash</span><span class="value">${currency(input.pos.expectedCash)}</span></div>
-          <div class="kpi"><span class="label">Actual Cash</span><span class="value">${currency(input.pos.actualCash)}</span></div>
-          <div class="kpi"><span class="label">Balanced?</span><span class="value">${input.pos.balanced === null ? "—" : input.pos.balanced ? "Yes" : "No"}</span></div>
-          <div style="margin-top:12px" class="small">Itemised Sales</div>
-          <table class="table">
-            <thead><tr><th>Item</th><th>Qty</th><th>Total</th></tr></thead>
-            <tbody>${listRows(input.pos.itemisedSales as any)}</tbody>
-          </table>
-          <div style="margin-top:12px" class="small">Itemised Expenses</div>
-          <table class="table">
-            <thead><tr><th>Category</th><th>Total</th></tr></thead>
-            <tbody>${listRows(input.pos.itemisedExpenses as any)}</tbody>
-          </table>
-        </div>
-      </div>
+    <!-- 1. SALES FIGURES TABLE -->
+    <div class="card">
+      <div class="h2">Sales Figures</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Channel</th>
+            <th class="right">Amount (THB)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Cash</td><td class="right">${currency(salesChannels.cashSales)}</td></tr>
+          <tr><td>QR</td><td class="right">${currency(salesChannels.qrSales)}</td></tr>
+          <tr><td>Grab</td><td class="right">${currency(salesChannels.grabSales)}</td></tr>
+          <tr><td>Other</td><td class="right">${currency(salesChannels.otherSales)}</td></tr>
+          <tr class="total">
+            <td><strong>Total Sales</strong></td>
+            <td class="right"><strong>${currency(salesChannels.totalSales)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
+    <!-- 2. SHIFT EXPENSES TABLE -->
     <div class="card">
-      <div class="h2">Anomalies & Manager Notes</div>
-      ${
-        input.anomalies.length
-          ? `<ul style="margin:0; padding-left:18px; color:#C7CFD9; font-size:14px;">${input.anomalies
-              .map((a) => `<li><strong>${a.title}</strong>${a.detail ? ` — ${a.detail}` : ""}</li>`)
-              .join("")}</ul>`
-          : `<div class="p">No anomalies recorded.</div>`
-      }
-      ${
-        input.managerNotes
-          ? `<div style="margin-top:12px"><div class="small">Manager Notes</div><div class="p">${input.managerNotes}</div></div>`
-          : ""
-      }
-    </div>
-
-    <div class="card">
-      <div class="h2">Finance / Expenses</div>
-      <div class="row">
-        <div class="col">
-          <div class="kpi"><span class="label">MTD Business Expenses</span><span class="value">${currency(input.mtd.businessExpenses)}</span></div>
-          <div class="kpi"><span class="label">MTD Shift Expenses</span><span class="value">${currency(input.mtd.shiftExpenses)}</span></div>
-          <div class="kpi"><span class="label">Business Expenses (Today)</span><span class="value">${currency(input.mtd.businessExpensesToday)}</span></div>
-          <div class="kpi"><span class="label">Shift Expenses (Today)</span><span class="value">${currency(input.mtd.shiftExpensesToday)}</span></div>
-        </div>
-        <div class="col">
-          <div class="kpi"><span class="label">MTD F&B Expenses</span><span class="value">${currency(input.mtd.foodAndBeverageExpenses)}</span></div>
-          <div class="kpi"><span class="label">MTD Sales Income</span><span class="value">${currency(input.mtd.salesIncome)}</span></div>
-          ${
-            input.mtd.fbVsSalesChartDataUrl
-              ? `<div style="margin-top:8px"><img alt="F&B vs Sales" src="${input.mtd.fbVsSalesChartDataUrl}" style="max-width:100%; border-radius:8px;"/></div>`
-              : ""
+      <div class="h2">Shift Expenses</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="right">Amount (THB)</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shiftExpenses.length > 0 
+            ? shiftExpenses.map(e => `<tr><td>${e.category}</td><td class="right">${currency(e.amount)}</td></tr>`).join('')
+            : `<tr><td colspan="2" style="color:#9AA7B2;">No shift expenses recorded</td></tr>`
           }
-        </div>
-      </div>
+          <tr class="total">
+            <td><strong>Total Shift Expenses</strong></td>
+            <td class="right"><strong>${currency(totalShiftExpenses)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
+    <!-- 3. FINANCE / CASH CONTROL TABLE -->
+    <div class="card">
+      <div class="h2">Finance / Cash Control</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <tbody>
+          <tr><td>Starting Cash</td><td class="right">${currency(cashControl?.startingCash ?? input.form.startingCash ?? 0)}</td></tr>
+          <tr><td>Cash Sales</td><td class="right">${currency(cashControl?.cashSales ?? salesChannels.cashSales)}</td></tr>
+          <tr><td>Expected Register</td><td class="right">${currency(cashControl?.expectedRegister ?? input.form.expectedRegister ?? null)}</td></tr>
+          <tr><td>Actual Register</td><td class="right">${currency(cashControl?.actualRegister ?? input.form.closingCash)}</td></tr>
+          <tr>
+            <td>Variance</td>
+            <td class="right"><strong>${currency(cashControl?.cashVariance ?? input.form.cashVariance ?? null)}</strong></td>
+          </tr>
+          <tr><td>Balanced</td><td class="right">${(cashControl?.balanced ?? input.form.balanced) === null ? "—" : (cashControl?.balanced ?? input.form.balanced) ? "Yes" : "No"}</td></tr>
+          <tr><td>Cash to Bank</td><td class="right">${currency(cashControl?.cashToBank ?? input.form.bankedCash)}</td></tr>
+          <tr><td>QR to Bank</td><td class="right">${currency(cashControl?.qrToBank ?? input.form.bankedQR)}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 4. POS vs DAILY SALES RECONCILIATION TABLE -->
+    ${recon ? `
+    <div class="card">
+      <div class="h2">POS vs Daily Sales — Reconciliation</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="right">POS</th>
+            <th class="right">Daily Form</th>
+            <th class="right">Variance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Gross Sales</td>
+            <td class="right">${currency(recon.posSales)}</td>
+            <td class="right">${currency(recon.declaredSales)}</td>
+            <td class="right">${currency(recon.salesVariance)}</td>
+          </tr>
+          ${recon.posCash != null ? `
+          <tr>
+            <td>Cash</td>
+            <td class="right">${currency(recon.posCash)}</td>
+            <td class="right">${currency(recon.declaredCash)}</td>
+            <td class="right">${currency(recon.cashVariance)}</td>
+          </tr>` : ''}
+          <tr>
+            <td>Buns</td>
+            <td class="right">${qty(recon.expectedBuns)}</td>
+            <td class="right">${qty(recon.actualBuns)}</td>
+            <td class="right">${qty(recon.bunVariance)}</td>
+          </tr>
+          <tr>
+            <td>Meat (g)</td>
+            <td class="right">${qty(recon.expectedMeat)}</td>
+            <td class="right">${qty(recon.actualMeat)}</td>
+            <td class="right">${qty(recon.meatVariance)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    ` : `
     <div class="card">
       <div class="h2">Priority Flags — Rolls & Meat</div>
       <table class="table">
@@ -212,6 +282,86 @@ body { margin:0; padding:0; background:#0B0C10; }
       </table>
       <div class="small" style="margin-top:8px">Thresholds: Rolls ±5 units; Meat ±500 g.</div>
     </div>
+    `}
+
+    <!-- 5. ITEMS SOLD BY CATEGORY TABLE -->
+    ${itemsByCategory.length > 0 ? `
+    <div class="card">
+      <div class="h2">Items Sold by Category</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="right">Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsByCategory.map(c => `<tr><td>${c.category}</td><td class="right">${c.qty}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+
+    <!-- 6. PURCHASING TABLE -->
+    ${shoppingList.length > 0 ? `
+    <div class="card">
+      <div class="h2">Purchasing</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th class="right">Qty</th>
+            <th class="right">Est. Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${shoppingList.map(s => `<tr><td>${s.item}</td><td class="right">${s.qty}</td><td class="right">${currency(s.cost)}</td></tr>`).join('')}
+          <tr class="total">
+            <td colspan="2"><strong>Total Est. Cost</strong></td>
+            <td class="right"><strong>${currency(shoppingTotal)}</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    ` : ''}
+
+    <!-- MTD FINANCE -->
+    <div class="card">
+      <div class="h2">Month-to-Date Finance</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <tbody>
+          <tr><td>MTD Business Expenses</td><td class="right">${currency(input.mtd.businessExpenses)}</td></tr>
+          <tr><td>MTD Shift Expenses</td><td class="right">${currency(input.mtd.shiftExpenses)}</td></tr>
+          <tr><td>MTD F&B Expenses</td><td class="right">${currency(input.mtd.foodAndBeverageExpenses)}</td></tr>
+          <tr><td>MTD Sales Income</td><td class="right">${currency(input.mtd.salesIncome)}</td></tr>
+          <tr><td>Today Business Expenses</td><td class="right">${currency(input.mtd.businessExpensesToday)}</td></tr>
+          <tr><td>Today Shift Expenses</td><td class="right">${currency(input.mtd.shiftExpensesToday)}</td></tr>
+        </tbody>
+      </table>
+      ${input.mtd.fbVsSalesChartDataUrl
+        ? `<div style="margin-top:12px"><img alt="F&B vs Sales" src="${input.mtd.fbVsSalesChartDataUrl}" style="max-width:100%; border-radius:8px;"/></div>`
+        : ""
+      }
+    </div>
+
+    <!-- ANOMALIES & NOTES -->
+    ${input.anomalies.length > 0 || input.managerNotes ? `
+    <div class="card">
+      <div class="h2">Anomalies & Manager Notes</div>
+      ${
+        input.anomalies.length
+          ? `<ul style="margin:0; padding-left:18px; color:#C7CFD9; font-size:14px;">${input.anomalies
+              .map((a) => `<li><strong>${a.title}</strong>${a.detail ? ` — ${a.detail}` : ""}</li>`)
+              .join("")}</ul>`
+          : `<div class="p">No anomalies recorded.</div>`
+      }
+      ${
+        input.managerNotes
+          ? `<div style="margin-top:12px"><div class="small">Manager Notes</div><div class="p">${input.managerNotes}</div></div>`
+          : ""
+      }
+    </div>
+    ` : ''}
 
     <div class="small" style="margin-top:12px; text-align:center; color:#8C98A4;">
       Smash Brothers Burgers — Daily Review Email
