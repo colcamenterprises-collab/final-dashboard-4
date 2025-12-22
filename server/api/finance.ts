@@ -185,6 +185,89 @@ router.get('/pnl-expenses', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/finance/pnl-summary - PATCH 7: Unified P&L with coverage warnings
+// Public endpoint for P&L display (no auth required)
+router.get('/pnl-summary', async (req: Request, res: Response) => {
+  try {
+    const startDate = req.query.start ? new Date(req.query.start as string) : undefined;
+    const endDate = req.query.end ? new Date(req.query.end as string) : undefined;
+
+    const dateFilter = startDate && endDate ? {
+      soldAt: { gte: startDate, lte: endDate }
+    } : {};
+    const expenseDateFilter = startDate && endDate ? {
+      date: { gte: startDate, lte: endDate }
+    } : {};
+
+    // Revenue from sold_items (canonical source)
+    const soldItems = await prisma.soldItem.findMany({
+      where: dateFilter,
+      select: { netAmount: true, shiftId: true }
+    });
+    const revenue = soldItems.reduce((sum, item) => sum + item.netAmount, 0);
+    const uniqueShiftIds = [...new Set(soldItems.map(s => s.shiftId))];
+
+    // Expenses from pnl_expense (canonical source)
+    const pnlExpenses = await prisma.pnlExpense.findMany({
+      where: expenseDateFilter
+    });
+    const expenses = pnlExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+
+    // Gross profit
+    const grossProfit = revenue - expenses;
+
+    // Food cost from ingredient usage
+    const ingredientUsage = await prisma.shiftIngredientUsage.findMany({
+      where: uniqueShiftIds.length > 0 ? { shiftId: { in: uniqueShiftIds } } : undefined
+    });
+    const hasFoodCostData = ingredientUsage.length > 0;
+
+    // Coverage warnings
+    const coverageData = await prisma.shiftRecipeCoverage.findMany({
+      where: uniqueShiftIds.length > 0 ? { shiftId: { in: uniqueShiftIds } } : undefined
+    });
+    const totalItems = coverageData.reduce((sum, c) => sum + c.totalSoldItems, 0);
+    const mappedItems = coverageData.reduce((sum, c) => sum + c.mappedItems, 0);
+    const overallCoverage = totalItems === 0 ? 100 : Math.round((mappedItems / totalItems) * 100);
+
+    // Alerts
+    const alerts = await prisma.alertEvent.findMany({
+      where: uniqueShiftIds.length > 0 ? { shiftId: { in: uniqueShiftIds } } : undefined,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      revenue: revenue / 100, // Convert satang to THB
+      expenses: expenses,
+      grossProfit: (revenue / 100) - expenses,
+      foodCost: hasFoodCostData ? {
+        available: true,
+        ingredientCount: ingredientUsage.length
+      } : {
+        available: false,
+        message: "Awaiting recipe mapping"
+      },
+      coverage: {
+        percent: overallCoverage,
+        totalItems,
+        mappedItems,
+        unmappedItems: totalItems - mappedItems,
+        warning: overallCoverage < 100 ? `${100 - overallCoverage}% of items not mapped to recipes` : null
+      },
+      alerts: {
+        critical: alerts.filter(a => a.severity === 'CRITICAL').length,
+        warning: alerts.filter(a => a.severity === 'WARNING').length,
+        items: alerts.slice(0, 10) // Return top 10 alerts
+      },
+      shiftCount: uniqueShiftIds.length,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('P&L summary error:', error);
+    res.status(500).json({ error: 'Failed to fetch P&L summary' });
+  }
+});
+
 // Apply authentication to all other finance routes below
 router.use(requireAuth);
 
