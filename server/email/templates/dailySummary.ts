@@ -66,7 +66,7 @@ export function dailySummaryTemplate(input: {
       actualMeat: number;
       meatVariance: number;
     } | null;
-    itemsByCategory?: Array<{ category: string; qty: number }>;
+    itemsByCategory?: Array<{ category: string; qty: number; sales?: number }>;
     shoppingList?: Array<{ item: string; qty: number; cost: number }>;
     shoppingTotal?: number;
     cashControl?: {
@@ -110,10 +110,10 @@ body { margin:0; padding:0; background:#0B0C10; }
 
   const statusTag = (s: "OK" | "FLAG" | "INSUFFICIENT_DATA") =>
     s === "OK"
-      ? `<span class="tag ok">OK</span>`
+      ? `✅`
       : s === "FLAG"
-      ? `<span class="tag flag">FLAG</span>`
-      : `<span class="tag">INSUFFICIENT DATA</span>`;
+      ? `❌`
+      : `⚠️`;
 
   // Use canonical data if available, otherwise fall back to form data
   const salesChannels = input.canonical?.salesChannels || {
@@ -207,7 +207,7 @@ body { margin:0; padding:0; background:#0B0C10; }
             <td>Variance</td>
             <td class="right"><strong>${currency(cashControl?.cashVariance ?? input.form.cashVariance ?? null)}</strong></td>
           </tr>
-          <tr><td>Balanced</td><td class="right">${(cashControl?.balanced ?? input.form.balanced) === null ? "—" : (cashControl?.balanced ?? input.form.balanced) ? "Yes" : "No"}</td></tr>
+          <tr><td>Balanced</td><td class="right">${(cashControl?.balanced ?? input.form.balanced) === null ? "—" : (cashControl?.balanced ?? input.form.balanced) ? "✅" : "❌"}</td></tr>
           <tr><td>Cash to Bank</td><td class="right">${currency(cashControl?.cashToBank ?? input.form.bankedCash)}</td></tr>
           <tr><td>QR to Bank</td><td class="right">${currency(cashControl?.qrToBank ?? input.form.bankedQR)}</td></tr>
         </tbody>
@@ -229,74 +229,103 @@ body { margin:0; padding:0; background:#0B0C10; }
         </thead>
         <tbody>
           <tr>
-            <td>Gross Sales</td>
+            <td>Total Sales</td>
             <td class="right">${currency(recon.posSales)}</td>
             <td class="right">${currency(recon.declaredSales)}</td>
-            <td class="right">${currency(recon.salesVariance)}</td>
+            <td class="right">${recon.salesVariance !== 0 ? `<strong>${currency(recon.salesVariance)}</strong>` : currency(recon.salesVariance)}</td>
           </tr>
           ${recon.posCash != null ? `
           <tr>
             <td>Cash</td>
             <td class="right">${currency(recon.posCash)}</td>
             <td class="right">${currency(recon.declaredCash)}</td>
-            <td class="right">${currency(recon.cashVariance)}</td>
+            <td class="right">${recon.cashVariance !== 0 ? `<strong>${currency(recon.cashVariance)}</strong>` : currency(recon.cashVariance)}</td>
           </tr>` : ''}
-          <tr>
-            <td>Buns</td>
-            <td class="right">${qty(recon.expectedBuns)}</td>
-            <td class="right">${qty(recon.actualBuns)}</td>
-            <td class="right">${qty(recon.bunVariance)}</td>
-          </tr>
-          <tr>
-            <td>Meat (g)</td>
-            <td class="right">${qty(recon.expectedMeat)}</td>
-            <td class="right">${qty(recon.actualMeat)}</td>
-            <td class="right">${qty(recon.meatVariance)}</td>
-          </tr>
         </tbody>
       </table>
     </div>
-    ` : `
+
+    <!-- 5. MEAT & BUNS — CRITICAL TABLE -->
     <div class="card">
-      <div class="h2">Priority Flags — Rolls & Meat</div>
-      <table class="table">
+      <div class="h2">Meat & Buns — Expected vs Actual</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
         <thead>
-          <tr><th>Item</th><th>Expected</th><th>Recorded</th><th>Variance</th><th>Status</th></tr>
+          <tr>
+            <th>Item</th>
+            <th class="right">Expected</th>
+            <th class="right">Recorded</th>
+            <th class="right">Variance</th>
+            <th class="right">Status</th>
+          </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Rolls (units)</td>
-            <td>${qty(input.priority.rolls.expected ?? null)}</td>
-            <td>${qty(input.priority.rolls.recorded ?? null)}</td>
-            <td>${qty(input.priority.rolls.variance ?? null)}</td>
-            <td>${statusTag(input.priority.rolls.status)}</td>
+            <td>Buns (units)</td>
+            <td class="right">${qty(recon.expectedBuns)}</td>
+            <td class="right">${qty(recon.actualBuns)}</td>
+            <td class="right">${recon.bunVariance !== 0 ? `<strong>${qty(recon.bunVariance)}</strong>` : qty(recon.bunVariance)}</td>
+            <td class="right">${Math.abs(recon.bunVariance) <= 5 ? '✅' : Math.abs(recon.bunVariance) <= 10 ? '⚠️' : '❌'}</td>
           </tr>
           <tr>
             <td>Meat (grams)</td>
-            <td>${qty(input.priority.meat.expectedGrams ?? null)}</td>
-            <td>${qty(input.priority.meat.recordedGrams ?? null)}</td>
-            <td>${qty(input.priority.meat.varianceGrams ?? null)}</td>
-            <td>${statusTag(input.priority.meat.status)}</td>
+            <td class="right">${qty(recon.expectedMeat)}</td>
+            <td class="right">${qty(recon.actualMeat)}</td>
+            <td class="right">${recon.meatVariance !== 0 ? `<strong>${qty(recon.meatVariance)}</strong>` : qty(recon.meatVariance)}</td>
+            <td class="right">${Math.abs(recon.meatVariance) <= 500 ? '✅' : Math.abs(recon.meatVariance) <= 1000 ? '⚠️' : '❌'}</td>
           </tr>
         </tbody>
       </table>
-      <div class="small" style="margin-top:8px">Thresholds: Rolls ±5 units; Meat ±500 g.</div>
+      <div class="small" style="margin-top:8px; color:#9AA7B2;">Thresholds: Rolls ±5 units · Meat ±500 g</div>
+    </div>
+    ` : `
+    <!-- FALLBACK: Priority Flags when no canonical recon data -->
+    <div class="card">
+      <div class="h2">Meat & Buns — Expected vs Actual</div>
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th class="right">Expected</th>
+            <th class="right">Recorded</th>
+            <th class="right">Variance</th>
+            <th class="right">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Buns (units)</td>
+            <td class="right">${qty(input.priority.rolls.expected ?? null)}</td>
+            <td class="right">${qty(input.priority.rolls.recorded ?? null)}</td>
+            <td class="right">${qty(input.priority.rolls.variance ?? null)}</td>
+            <td class="right">${statusTag(input.priority.rolls.status)}</td>
+          </tr>
+          <tr>
+            <td>Meat (grams)</td>
+            <td class="right">${qty(input.priority.meat.expectedGrams ?? null)}</td>
+            <td class="right">${qty(input.priority.meat.recordedGrams ?? null)}</td>
+            <td class="right">${qty(input.priority.meat.varianceGrams ?? null)}</td>
+            <td class="right">${statusTag(input.priority.meat.status)}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div class="small" style="margin-top:8px; color:#9AA7B2;">Thresholds: Rolls ±5 units · Meat ±500 g</div>
     </div>
     `}
 
     <!-- 5. ITEMS SOLD BY CATEGORY TABLE -->
     ${itemsByCategory.length > 0 ? `
     <div class="card">
-      <div class="h2">Items Sold by Category</div>
+      <div class="h2">Items Sold — Category Summary</div>
       <table class="table" width="100%" cellpadding="6" cellspacing="0">
         <thead>
           <tr>
             <th>Category</th>
             <th class="right">Qty</th>
+            <th class="right">Sales (THB)</th>
           </tr>
         </thead>
         <tbody>
-          ${itemsByCategory.map(c => `<tr><td>${c.category}</td><td class="right">${c.qty}</td></tr>`).join('')}
+          ${itemsByCategory.map(c => `<tr><td>${c.category}</td><td class="right">${c.qty}</td><td class="right">${currency(c.sales ?? 0)}</td></tr>`).join('')}
         </tbody>
       </table>
     </div>
@@ -329,19 +358,19 @@ body { margin:0; padding:0; background:#0B0C10; }
     <div class="card">
       <div class="h2">Month-to-Date Finance</div>
       <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Metric</th>
+            <th class="right">Amount (THB)</th>
+          </tr>
+        </thead>
         <tbody>
+          <tr><td>MTD Sales Income</td><td class="right">${currency(input.mtd.salesIncome)}</td></tr>
           <tr><td>MTD Business Expenses</td><td class="right">${currency(input.mtd.businessExpenses)}</td></tr>
           <tr><td>MTD Shift Expenses</td><td class="right">${currency(input.mtd.shiftExpenses)}</td></tr>
           <tr><td>MTD F&B Expenses</td><td class="right">${currency(input.mtd.foodAndBeverageExpenses)}</td></tr>
-          <tr><td>MTD Sales Income</td><td class="right">${currency(input.mtd.salesIncome)}</td></tr>
-          <tr><td>Today Business Expenses</td><td class="right">${currency(input.mtd.businessExpensesToday)}</td></tr>
-          <tr><td>Today Shift Expenses</td><td class="right">${currency(input.mtd.shiftExpensesToday)}</td></tr>
         </tbody>
       </table>
-      ${input.mtd.fbVsSalesChartDataUrl
-        ? `<div style="margin-top:12px"><img alt="F&B vs Sales" src="${input.mtd.fbVsSalesChartDataUrl}" style="max-width:100%; border-radius:8px;"/></div>`
-        : ""
-      }
     </div>
 
     <!-- ANOMALIES & NOTES -->
