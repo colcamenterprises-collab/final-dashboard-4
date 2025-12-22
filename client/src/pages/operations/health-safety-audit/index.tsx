@@ -147,8 +147,8 @@ export default function HealthSafetyAuditPage() {
             {getTranslatedSection(section)}
           </h2>
 
-          {/* Desktop Table View */}
-          <div className="hidden sm:block border border-slate-200 rounded-[4px] overflow-hidden">
+          {/* Desktop Table View - only on large screens */}
+          <div className="hidden lg:block border border-slate-200 rounded-[4px] overflow-hidden">
             <table className="w-full text-xs">
               <thead className="bg-slate-50">
                 <tr>
@@ -212,8 +212,8 @@ export default function HealthSafetyAuditPage() {
             </table>
           </div>
 
-          {/* Mobile Card View */}
-          <div className="sm:hidden space-y-3">
+          {/* Mobile/Tablet Card View - phones and tablets */}
+          <div className="lg:hidden space-y-3">
             {qs.map((q, idx) => (
               <div
                 key={q.id}
