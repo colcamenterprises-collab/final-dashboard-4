@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { plRow, plCategoryMap, plMonthCache, loyverseReceipts, expenses, expenseCategories } from "../../shared/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
+import { prisma } from "../../lib/prisma";
 
 const router = Router();
 
@@ -132,6 +133,55 @@ router.get('/summary/today', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Current month summary error:', error);
     res.status(500).json({ error: 'Failed to fetch current month summary' });
+  }
+});
+
+// GET /api/finance/pnl-expenses - PATCH 4: Read from canonical pnl_expense table
+// Public endpoint for P&L display (no auth required)
+router.get('/pnl-expenses', async (req: Request, res: Response) => {
+  try {
+    const startDate = req.query.start ? new Date(req.query.start as string) : undefined;
+    const endDate = req.query.end ? new Date(req.query.end as string) : undefined;
+
+    const whereClause: any = {};
+    if (startDate && endDate) {
+      whereClause.date = {
+        gte: startDate,
+        lte: endDate
+      };
+    }
+
+    const pnlExpenses = await prisma.pnlExpense.findMany({
+      where: Object.keys(whereClause).length > 0 ? whereClause : undefined,
+      orderBy: { date: 'desc' }
+    });
+
+    // Calculate totals
+    const bankTotal = pnlExpenses
+      .filter(e => e.paymentMethod === 'BANK')
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+    
+    const cashTotal = pnlExpenses
+      .filter(e => e.paymentMethod === 'CASH')
+      .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    // Group by category
+    const byCategory: Record<string, number> = {};
+    for (const exp of pnlExpenses) {
+      byCategory[exp.category] = (byCategory[exp.category] || 0) + Number(exp.amount);
+    }
+
+    res.json({
+      total: bankTotal + cashTotal,
+      bankTotal,
+      cashTotal,
+      byCategory,
+      count: pnlExpenses.length,
+      expenses: pnlExpenses
+    });
+  } catch (error) {
+    console.error('P&L expenses error:', error);
+    res.status(500).json({ error: 'Failed to fetch P&L expenses' });
   }
 });
 
