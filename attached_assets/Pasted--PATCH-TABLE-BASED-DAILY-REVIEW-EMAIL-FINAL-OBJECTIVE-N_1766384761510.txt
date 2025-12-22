@@ -1,0 +1,176 @@
+🔐 PATCH — TABLE-BASED DAILY REVIEW EMAIL (FINAL)
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Replace list-style / card-style email sections with clean, compact tables so that:
+Numbers are scannable in <30 seconds
+Variances jump out immediately
+Managers can forward the email without explanation
+No fake data, no filler, no empty cards pretending to be useful
+This patch affects EMAIL ONLY.
+No dashboard UI changes. No forms. No auth. No permissions.
+✅ WHAT STAYS
+Subject: Daily Review — YYYY-MM-DD
+Send time: 09:00 Bangkok
+Dark theme styling
+Typography / spacing (already good)
+Single consolidated email (kill the other two later)
+🧱 SECTION-BY-SECTION TABLE DESIGN
+1️⃣ SALES FIGURES (TABLE)
+Replace current card with this table
+Channel
+Amount (THB)
+Cash
+฿8,704
+QR
+฿2,176
+Grab
+฿16,035
+Other
+฿0
+Total Sales
+฿26,915
+Rules
+Values pulled from canonical sales source
+No “—” if zero → show ฿0
+Total always bold
+2️⃣ SHIFT EXPENSES (ITEMISED TABLE)
+Category
+Amount (THB)
+Shopping
+฿1,200
+Wages
+฿3,000
+Bonus
+฿500
+Other
+฿0
+Total Shift Expenses
+฿4,700
+Rules
+Source: pnl_expense where source_type = SHIFT
+Grouped by category
+If none exist → single row: No shift expenses recorded
+3️⃣ FINANCE / CASH CONTROL (COMPACT TABLE)
+Metric
+Value
+Starting Cash
+฿5,000
+Cash Sales
+฿8,704
+Expected Register
+฿13,704
+Actual Register
+฿13,500
+Variance
+-฿204
+Balanced
+❌
+Cash to Bank
+฿5,000
+QR to Bank
+฿2,176
+Rules
+Variance row bold
+❌ / ✅ only (no text explanations here)
+If missing inputs → show INSUFFICIENT DATA
+4️⃣ POS vs DAILY SALES — RECONCILIATION SUMMARY
+Metric
+POS
+Staff
+Variance
+Total Sales
+฿26,915
+฿26,915
+฿0
+Cash
+฿8,704
+฿8,500
+-฿204
+Receipts
+143
+143
+0
+Discounts
+฿450
+฿450
+0
+Refunds
+฿0
+฿0
+0
+Rules
+Source: shift_reconciliation
+Any non-zero variance → bold
+No explanations here — facts only
+5️⃣ ITEMS SOLD — CATEGORY SUMMARY
+Category
+Qty
+Sales (THB)
+Burgers
+82
+฿17,200
+Meal Deals
+21
+฿6,300
+Side Orders
+34
+฿2,040
+Drinks
+41
+฿1,375
+Kids
+0
+฿0
+6️⃣ MEAT & BUNS — EXPECTED vs ACTUAL (CRITICAL TABLE)
+Item
+Expected
+Recorded
+Variance
+Status
+Buns (units)
+103
+98
+-5
+⚠️
+Meat (grams)
+9,270
+8,600
+-670
+❌
+Rules
+Thresholds shown below table:
+Rolls ±5 units · Meat ±500 g
+Status logic already exists — just render it
+7️⃣ PURCHASING SUMMARY
+Item
+Qty
+Est. Cost (THB)
+Burger Buns
+120
+฿1,080
+Minced Beef
+9 kg
+฿3,150
+Coke Cans
+24
+฿360
+Total Expected Cost
+
+฿4,590
+8️⃣ MONTH-TO-DATE FINANCE (FINAL TABLE)
+Metric
+Amount (THB)
+MTD Sales Income
+฿312,450
+MTD Business Expenses
+฿42,100
+MTD Shift Expenses
+฿87,300
+MTD F&B Expenses
+฿129,400
+🧠 IMPLEMENTATION NOTES (FOR AGENT)
+Email renderer: replace card components with <table> blocks
+Keep container cards, but tables inside cards
+No charts
+No emojis
+No empty sections pretending to be useful
+If a section has zero meaningful rows → show one line, not a table
