@@ -1,5 +1,5 @@
 import { rebuildAlerts } from "../services/alertDeriver";
-import { prisma } from "../db";
+import { prisma } from "../../lib/prisma";
 
 (async () => {
   console.log("Rebuilding alerts...");

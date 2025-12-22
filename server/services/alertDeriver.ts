@@ -1,4 +1,4 @@
-import { prisma } from "../db";
+import { prisma } from "../../lib/prisma";
 
 export async function rebuildAlerts() {
   const shifts = await prisma.shiftReconciliation.findMany();

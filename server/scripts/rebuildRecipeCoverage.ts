@@ -1,5 +1,5 @@
 import { rebuildRecipeCoverage } from "../services/recipeCoverageDeriver";
-import { prisma } from "../db";
+import { prisma } from "../../lib/prisma";
 
 (async () => {
   console.log("Rebuilding recipe coverage...");
