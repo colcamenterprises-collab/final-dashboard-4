@@ -116,11 +116,13 @@ export async function getPurchasingShiftMatrix(fromDate?: string, toDate?: strin
 
   let entries: any[] = [];
   if (stockIds.length > 0) {
-    const entriesResult = await db.execute(sql`
+    // Use IN clause with ARRAY constructor for proper PostgreSQL handling
+    const stockIdsLiteral = stockIds.map(id => `'${id}'`).join(',');
+    const entriesResult = await db.execute(sql.raw(`
       SELECT "dailyStockId", "purchasingItemId", quantity
       FROM purchasing_shift_items
-      WHERE "dailyStockId" = ANY(${stockIds})
-    `);
+      WHERE "dailyStockId" IN (${stockIdsLiteral})
+    `));
     entries = (entriesResult.rows || []).map((r: any) => ({
       dailyStockId: r.dailyStockId,
       purchasingItemId: r.purchasingItemId,

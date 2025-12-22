@@ -1,0 +1,95 @@
+🔐 EXECUTION MODE — STEP 2
+Daily Stock V2 WRITE FAILURE (CRITICAL BLOCKER)
+🎯 Objective
+Restore writes into daily_stock_v2 so:
+Shift Log populates
+Purchasing backfill processes
+Shopping List fills
+F&B Analysis loads shifts
+Daily Review email has stock data
+Meat & buns anomalies work
+Right now:
+daily_stock_v2 has 0 rows
+That is why everything downstream is dead.
+🔍 ROOT CAUSE (CONFIRMED)
+You already uncovered it earlier:
+Form 2 writes:
+rollsEnd
+meatEndKg
+drinkStockJson
+Backend readers expect:
+burgerBuns
+meatWeightG
+drinkStockJson (this one matches)
+So:
+Form submits successfully
+Data is never written to the columns analytics uses
+No errors thrown
+System appears “working” but produces zero usable data
+This is a classic silent schema drift.
+🧱 FIX STRATEGY (SAFE + FAST)
+We will not change the form
+We will not change analytics
+We will not refactor services
+We will add a write-time field bridge in one place.
+🛠️ IMPLEMENTATION (SERVER ONLY)
+File
+Copy code
+
+server/api/daily-stock.ts
+Location
+Inside the handler that persists daily_stock_v2
+🔧 ADD THIS MAPPING (EXACT)
+Copy code
+Ts
+// 🔐 WRITE-TIME FIELD BRIDGE (DO NOT REMOVE)
+
+const rollsEnd = payload.rollsEnd ?? null;
+const meatEndKg = payload.meatEndKg ?? null;
+
+const burgerBuns = rollsEnd;
+const meatWeightG = meatEndKg !== null ? Math.round(meatEndKg * 1000) : null;
+And ensure the DB insert includes:
+Copy code
+Ts
+burgerBuns,
+meatWeightG,
+rollsEnd,
+meatEndKg,
+drinkStockJson,
+⚠️ Both sets must be written
+This preserves backward compatibility and fixes analytics instantly.
+🧪 REQUIRED VERIFICATION (MANDATORY)
+1️⃣ Submit ONE Daily Stock form
+(any test shift date)
+2️⃣ Run:
+Copy code
+Sql
+SELECT
+  shift_date,
+  rollsEnd,
+  burgerBuns,
+  meatEndKg,
+  meatWeightG
+FROM daily_stock_v2
+ORDER BY created_at DESC
+LIMIT 3;
+✅ Expected:
+rollsEnd = value entered
+burgerBuns = same value
+meatEndKg = value entered
+meatWeightG = kg × 1000
+🔁 IMMEDIATE EFFECT (NO RESTARTS)
+Once one row exists in daily_stock_v2:
+Purchasing Shift Log → FILLS
+Backfill → processed > 0
+Shopping List → ITEMS APPEAR
+F&B Analysis → SHIFTS LOAD
+Daily Review Email → REAL DATA
+Meat & buns variance → WORKING
+🚫 RULES
+❌ No UI changes
+❌ No renaming fields
+❌ No migrations
+❌ No refactors
+✅ Single write-time bridge only

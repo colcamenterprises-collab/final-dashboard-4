@@ -413,6 +413,29 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       return res.status(404).json({ ok: false, error: "Record not found" });
     }
 
+    // 🔐 WRITE-TIME FIELD BRIDGE (DO NOT REMOVE)
+    // Map form fields to analytics columns for daily_stock_v2
+    const burgerBuns = rollsEnd ?? 0;
+    const meatWeightG = meatEnd ?? 0; // meatEnd already in grams from form
+    
+    // Upsert into daily_stock_v2 for purchasing/analytics systems
+    try {
+      await pool.query(
+        `INSERT INTO daily_stock_v2 (id, "salesId", "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", "createdAt")
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
+         ON CONFLICT ("salesId") 
+         DO UPDATE SET 
+           "burgerBuns" = EXCLUDED."burgerBuns",
+           "meatWeightG" = EXCLUDED."meatWeightG",
+           "drinksJson" = EXCLUDED."drinksJson",
+           "purchasingJson" = EXCLUDED."purchasingJson"`,
+        [id, burgerBuns, meatWeightG, JSON.stringify(drinkStock || {}), JSON.stringify(purchasingJson)]
+      );
+      console.log(`[FIELD BRIDGE] Synced daily_stock_v2: salesId=${id}, burgerBuns=${burgerBuns}, meatWeightG=${meatWeightG}`);
+    } catch (stockErr) {
+      console.error('[FIELD BRIDGE] Failed to sync daily_stock_v2 (non-blocking):', stockErr);
+    }
+
     console.log(`Updated daily sales record ${id} with stock data`);
     console.log('About to send updated email with complete data...');
     
