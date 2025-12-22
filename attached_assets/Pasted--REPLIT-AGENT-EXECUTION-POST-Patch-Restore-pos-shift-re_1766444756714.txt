@@ -1,0 +1,80 @@
+🔧 REPLIT AGENT EXECUTION POST
+Patch: Restore pos_shift_report Contract (Read-Only Fix)
+Context (DO NOT CHANGE)
+The application expects a relation named pos_shift_report
+The database contains "PosShiftReport" (case-sensitive)
+This mismatch breaks analytics, Daily Review UI, and Daily Review email
+Data ingestion is working; reads are broken
+This fix restores the contract without refactors or data mutation
+🎯 OBJECTIVE
+Restore compatibility by creating a read-only SQL VIEW named pos_shift_report that maps to "PosShiftReport".
+🛑 SAFETY RULES (MANDATORY)
+❌ Do NOT rename tables
+❌ Do NOT alter data
+❌ Do NOT modify ingestion code
+❌ Do NOT touch Prisma schema
+✅ ONLY create a SQL VIEW
+✅ This patch must be reversible and non-destructive
+✅ STEP 1 — Create Compatibility View
+Run exactly this command:
+Copy code
+Bash
+psql "$DATABASE_URL" <<'SQL'
+CREATE OR REPLACE VIEW pos_shift_report AS
+SELECT *
+FROM "PosShiftReport";
+SQL
+✅ STEP 2 — Verify View Exists and Has Data
+Copy code
+Bash
+psql "$DATABASE_URL" -c "
+SELECT shift_date, COUNT(*) AS rows
+FROM pos_shift_report
+GROUP BY shift_date
+ORDER BY shift_date DESC
+LIMIT 7;
+"
+Expected result:
+At least one row returned.
+If zero rows → STOP and report.
+✅ STEP 3 — Verify View Matches Source Table
+Copy code
+Bash
+psql "$DATABASE_URL" -c "
+SELECT
+  (SELECT COUNT(*) FROM \"PosShiftReport\") AS source_rows,
+  (SELECT COUNT(*) FROM pos_shift_report) AS view_rows;
+"
+Expected: source_rows = view_rows
+✅ STEP 4 — Rebuild Dependent Derived Tables
+Run ONLY these rebuilds:
+Copy code
+Bash
+psql "$DATABASE_URL" -c "SELECT rebuild_shift_reconciliation(NULL);"
+psql "$DATABASE_URL" -c "SELECT rebuild_daily_reports_v2(NULL);"
+⚠️ If functions require a date instead of NULL, STOP and report function signature.
+✅ STEP 5 — (Optional) Trigger Daily Review Email
+If manual runner exists:
+Copy code
+Bash
+node server/scripts/sendDailyReviewEmail.ts --date=yesterday
+If not available, SKIP.
+🧪 SUCCESS CRITERIA
+pos_shift_report query returns rows
+Daily Review UI shows POS totals
+Daily Review email includes POS data
+No schema changes
+No data mutation
+📌 NOTES FOR RECORD
+This fix restores a broken read contract
+Ingestion was never the problem
+This explains why shift reports worked previously
+Long-term fix may include:
+migration-backed view
+casing guard test
+explicit DB contract documentation
+🚨 STOP AFTER COMPLETION
+Do not proceed to refactors or optimizations unless explicitly instructed.
+When this is done, tell me:
+✅ Step 2 output (rows per date)
+❌ Any errors encountered
