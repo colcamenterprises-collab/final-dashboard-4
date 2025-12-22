@@ -147,22 +147,22 @@ export default function HealthSafetyAuditPage() {
             {getTranslatedSection(section)}
           </h2>
 
-          {/* Desktop Table View - only on large screens */}
+          {/* Desktop/Tablet Table View - only on large screens */}
           <div className="hidden lg:block border border-slate-200 rounded-[4px] overflow-hidden">
-            <table className="w-full text-xs">
+            <table className="w-full text-xs table-fixed">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="p-2 text-left font-medium text-slate-600 w-16">
+                  <th className="p-2 text-left font-medium text-slate-600" style={{ width: '25%' }}>
                     {showThai ? "หัวข้อ" : "Title"}
                   </th>
-                  <th className="p-2 text-left font-medium text-slate-600">
+                  <th className="p-2 text-left font-medium text-slate-600" style={{ width: '20%' }}>
                     {showThai ? "รายละเอียด" : "Description"}
                   </th>
-                  <th className="p-2 text-left font-medium text-slate-600 w-32">
+                  <th className="p-2 text-left font-medium text-slate-600" style={{ width: '45%' }}>
                     {showThai ? "หมายเหตุ" : "Notes"}
                   </th>
-                  <th className="p-2 text-center font-medium text-slate-600 w-16">
-                    {showThai ? "ตรวจสอบ" : "Check"}
+                  <th className="p-2 text-center font-medium text-slate-600" style={{ width: '10%' }}>
+                    {showThai ? "ผ่าน" : "Y/N"}
                   </th>
                 </tr>
               </thead>
@@ -175,18 +175,20 @@ export default function HealthSafetyAuditPage() {
                   >
                     <td className="p-2 text-slate-700 align-top">
                       <span className={q.isCritical ? "text-red-600 font-medium" : ""}>
-                        {idx + 1}
-                        {q.isCritical && <span className="ml-0.5 text-red-500">*</span>}
+                        {getTranslatedLabel(q.label)}
+                        {q.isCritical && <span className="ml-1 text-red-500">*</span>}
                       </span>
                     </td>
-                    <td className="p-2 text-slate-600 align-top">
-                      {getTranslatedLabel(q.label)}
+                    <td className="p-2 text-slate-500 align-top text-xs">
+                      {q.isCritical 
+                        ? (showThai ? "รายการสำคัญ" : "Critical item") 
+                        : (showThai ? "มาตรฐาน" : "Standard")}
                     </td>
                     <td className="p-2 align-top">
                       <input
                         type="text"
-                        className="w-full border border-slate-200 rounded px-1.5 py-1 text-xs"
-                        placeholder={showThai ? "เพิ่มหมายเหตุ..." : "Add note..."}
+                        className="w-full border border-slate-200 rounded-[4px] px-2 py-1.5 text-xs"
+                        placeholder={showThai ? "เพิ่มหมายเหตุ..." : "Enter notes here..."}
                         value={notes[q.id] || ""}
                         onChange={e => setNotes(n => ({ ...n, [q.id]: e.target.value }))}
                         data-testid={`input-note-${q.id}`}
