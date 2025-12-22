@@ -1,0 +1,91 @@
+🔐 EXECUTION MODE — STEP 1
+Purchasing Canonical Restore (FOUNDATION FIX)
+🎯 Objective
+Restore the minimum canonical purchasing data graph required for:
+Purchasing List
+Shopping List
+Shift Log
+Backfill logic
+Downstream F&B analysis
+This step does not touch UI, does not modify forms, and does not change business logic.
+🧱 CANONICAL TABLES TO RESTORE
+1️⃣ purchasing_field_map (MISSING — BLOCKER)
+This table maps Daily Stock V2 fields → Purchasing Items.
+Without it, nothing can backfill.
+CREATE TABLE
+Copy code
+Sql
+CREATE TABLE IF NOT EXISTS purchasing_field_map (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  stock_field_key TEXT NOT NULL,          -- e.g. 'rollsEnd', 'meatEndKg'
+  purchasing_item_id UUID NOT NULL,
+  unit TEXT NOT NULL,                      -- 'units', 'kg', 'liters'
+  created_at TIMESTAMP DEFAULT now()
+);
+2️⃣ purchasing_items (EXISTS but EMPTY — BLOCKER)
+This table defines what can ever appear on a shopping list.
+MINIMUM REQUIRED SEED (SAFE DEFAULTS)
+Copy code
+Sql
+INSERT INTO purchasing_items (id, name, category, unit, created_at)
+VALUES
+  (gen_random_uuid(), 'Burger Buns', 'BREAD', 'units', now()),
+  (gen_random_uuid(), 'Beef Patties', 'MEAT', 'kg', now()),
+  (gen_random_uuid(), 'Cheese Slices', 'DAIRY', 'units', now()),
+  (gen_random_uuid(), 'Bacon', 'MEAT', 'kg', now()),
+  (gen_random_uuid(), 'Cooking Oil', 'OIL', 'liters', now())
+ON CONFLICT DO NOTHING;
+⚠️ This does not affect pricing or recipes.
+It only enables visibility and backfill.
+3️⃣ Link Stock Fields → Purchasing Items
+This is the critical wiring.
+MAP DAILY STOCK V2 → PURCHASING
+Copy code
+Sql
+INSERT INTO purchasing_field_map (stock_field_key, purchasing_item_id, unit)
+SELECT
+  'rollsEnd',
+  id,
+  'units'
+FROM purchasing_items
+WHERE name = 'Burger Buns';
+
+INSERT INTO purchasing_field_map (stock_field_key, purchasing_item_id, unit)
+SELECT
+  'meatEndKg',
+  id,
+  'kg'
+FROM purchasing_items
+WHERE name = 'Beef Patties';
+You can add more later.
+These two alone will unblock 90% of the system.
+🔁 VERIFICATION QUERIES (MANDATORY)
+Run after inserts:
+Copy code
+Sql
+SELECT * FROM purchasing_items;
+SELECT * FROM purchasing_field_map;
+Expected:
+purchasing_items → ≥ 5 rows
+purchasing_field_map → ≥ 2 rows
+🚀 IMMEDIATE NEXT ACTION (after Step 1)
+Once Step 1 is complete:
+Copy code
+Bash
+POST /api/purchasing-shift-backfill
+Expected results:
+purchasing_shift_items populated
+Shift Log shows rows
+Shopping List shows items
+Purchasing List shows data
+If this does not happen, we stop and inspect only:
+Copy code
+
+server/services/purchasingShiftSync.ts
+🚫 HARD RULES FOR AGENT
+❌ Do NOT touch frontend
+❌ Do NOT rename fields
+❌ Do NOT refactor services
+❌ Do NOT “improve” schema
+✅ SQL only
+✅ Data enablement only
