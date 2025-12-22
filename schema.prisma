@@ -2221,3 +2221,42 @@ model PnlExpense {
   @@index([date])
   @@map("pnl_expense")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATCH 5 — RECIPE COVERAGE VISIBILITY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model ShiftRecipeCoverage {
+  id              String   @id @default(uuid())
+  shiftId         String
+  totalSoldItems  Int
+  mappedItems     Int
+  unmappedItems   Int
+  coveragePercent Int
+  createdAt       DateTime @default(now())
+
+  @@index([shiftId])
+  @@map("shift_recipe_coverage")
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATCH 6 — OPERATIONAL ALERTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model AlertEvent {
+  id        String        @id @default(uuid())
+  shiftId   String
+  type      String
+  severity  AlertSeverity
+  payload   Json
+  createdAt DateTime      @default(now())
+
+  @@index([shiftId])
+  @@map("alert_events")
+}

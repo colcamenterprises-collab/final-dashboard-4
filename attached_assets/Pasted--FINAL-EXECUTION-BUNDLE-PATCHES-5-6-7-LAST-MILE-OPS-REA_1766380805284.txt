@@ -1,0 +1,169 @@
+🔐 FINAL EXECUTION BUNDLE
+PATCHES 5, 6, 7 (LAST MILE – OPS READY)
+These are lightweight, additive, safe, and will not block ops.
+🔧 PATCH 5 — RECIPE COVERAGE VISIBILITY
+(Make missing mappings visible instead of silent)
+Why
+Right now:
+Ingredient usage = 0
+That’s correct, but invisible to managers
+We must show coverage % per shift
+Schema (ADD ONLY)
+Copy code
+Prisma
+model ShiftRecipeCoverage {
+  id              String   @id @default(uuid())
+  shiftId         String   @index
+  totalSoldItems  Int
+  mappedItems     Int
+  unmappedItems   Int
+  coveragePercent Int
+  createdAt       DateTime @default(now())
+}
+Migration:
+Copy code
+
+add_shift_recipe_coverage
+Deriver
+Copy code
+Ts
+// server/services/recipeCoverageDeriver.ts
+import { prisma } from "../db";
+
+export async function rebuildRecipeCoverage() {
+  const shifts = await prisma.soldItem.findMany({ distinct: ["shiftId"] });
+
+  for (const { shiftId } of shifts) {
+    await prisma.shiftRecipeCoverage.deleteMany({ where: { shiftId } });
+
+    const total = await prisma.soldItem.count({ where: { shiftId } });
+    const mapped = await prisma.soldItem.count({
+      where: { shiftId, recipeId: { not: null } }
+    });
+
+    await prisma.shiftRecipeCoverage.create({
+      data: {
+        shiftId,
+        totalSoldItems: total,
+        mappedItems: mapped,
+        unmappedItems: total - mapped,
+        coveragePercent: total === 0 ? 100 : Math.round((mapped / total) * 100)
+      }
+    });
+  }
+}
+Script:
+Copy code
+Ts
+// server/scripts/rebuildRecipeCoverage.ts
+import { rebuildRecipeCoverage } from "../services/recipeCoverageDeriver";
+(async () => { await rebuildRecipeCoverage(); })();
+✅ Result: managers can see why food cost is missing.
+🔧 PATCH 6 — OPERATIONAL ALERTS (NO NOISE)
+Why
+You already know when things are wrong — we just need to surface it cleanly.
+Schema
+Copy code
+Prisma
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+model AlertEvent {
+  id        String @id @default(uuid())
+  shiftId   String @index
+  type      String
+  severity  AlertSeverity
+  payload   Json
+  createdAt DateTime @default(now())
+}
+Migration:
+Copy code
+
+add_alert_events
+Alert Rules (NO NEW MATH)
+Trigger alerts from existing truth:
+Condition
+Severity
+shift_reconciliation.status = FAIL
+CRITICAL
+recipe_coverage < 100%
+WARNING
+cash variance ≠ 0
+CRITICAL
+meat variance > 500g
+WARNING
+buns variance > 5
+WARNING
+Deriver (read-only sources)
+Copy code
+Ts
+// server/services/alertDeriver.ts
+import { prisma } from "../db";
+
+export async function rebuildAlerts() {
+  const shifts = await prisma.shiftReconciliation.findMany();
+
+  for (const s of shifts) {
+    await prisma.alertEvent.deleteMany({ where: { shiftId: s.shiftId } });
+
+    if (s.status === "FAIL") {
+      await prisma.alertEvent.create({
+        data: {
+          shiftId: s.shiftId,
+          type: "RECONCILIATION_FAIL",
+          severity: "CRITICAL",
+          payload: s
+        }
+      });
+    }
+
+    const coverage = await prisma.shiftRecipeCoverage.findFirst({
+      where: { shiftId: s.shiftId }
+    });
+
+    if (coverage && coverage.coveragePercent < 100) {
+      await prisma.alertEvent.create({
+        data: {
+          shiftId: s.shiftId,
+          type: "RECIPE_COVERAGE_LOW",
+          severity: "WARNING",
+          payload: coverage
+        }
+      });
+    }
+  }
+}
+Script:
+Copy code
+Ts
+// server/scripts/rebuildAlerts.ts
+import { rebuildAlerts } from "../services/alertDeriver";
+(async () => { await rebuildAlerts(); })();
+✅ Result: clean, auditable alerts. No scripts. No AI guessing.
+🔧 PATCH 7 — FINAL P&L USABILITY (NO LIES)
+You already wired expenses. This finishes usability.
+Backend
+Expose:
+Revenue → sold_items
+Expenses → pnl_expense
+Gross Profit → revenue − expenses
+Food cost → only if ingredient usage exists
+Else return: "Awaiting recipe mapping"
+Frontend
+Display numbers
+Display warnings (coverage < 100%)
+Do not fake food cost
+This keeps trust intact.
+🔁 FINAL RUN ORDER (ONE TIME)
+Copy code
+Bash
+npx prisma migrate dev
+node server/scripts/rebuildSoldItems.ts
+node server/scripts/rebuildIngredientUsage.ts
+node server/scripts/rebuildReconciliation.ts
+node server/scripts/rebuildRecipeCoverage.ts
+node server/scripts/rebuildPnlExpenses.ts
+node server/scripts/rebuildAlerts.ts
