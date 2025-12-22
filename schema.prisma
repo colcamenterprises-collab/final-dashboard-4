@@ -2202,3 +2202,22 @@ model ShiftReconciliation {
   @@index([shiftId])
   @@map("shift_reconciliation")
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PATCH 4 — UNIFIED P&L EXPENSE DERIVATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+model PnlExpense {
+  id            String   @id @default(uuid())
+  sourceType    String   // BUSINESS | SHIFT
+  sourceId      String
+  date          DateTime
+  shiftId       String?
+  amount        Decimal
+  category      String
+  paymentMethod String   // BANK | CASH
+  createdAt     DateTime @default(now())
+
+  @@index([date])
+  @@map("pnl_expense")
+}

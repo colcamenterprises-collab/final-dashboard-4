@@ -1,0 +1,193 @@
+🔐 EXECUTION MODE — PATCH 4
+Unified P&L Expense Derivation (FIRST TIME WIRED)
+🚨 ABSOLUTE RULES (AGENT MUST FOLLOW)
+❌ DO NOT modify existing expense entry flows
+❌ DO NOT modify existing expense tables
+❌ DO NOT add permissions or auth
+❌ DO NOT guess or re-categorise
+❌ DO NOT perform calculations in UI
+✅ ONLY add a new derived table
+✅ ONLY read from existing sources
+✅ MUST be rebuildable (delete → rebuild)
+✅ MUST not break existing pages
+If unsure → STOP.
+🎯 OBJECTIVE
+Create one canonical expense truth table for Profit & Loss:
+Copy code
+
+pnl_expense
+P&L will read only this table.
+No other expense tables are touched.
+🧱 SOURCE TABLES (READ-ONLY)
+BUSINESS (Bank / Outside Shift)
+Expense
+ExpenseLine
+SHIFT (Cash / During Shift)
+ShoppingPurchase
+WageEntry
+OtherExpense
+1️⃣ PRISMA SCHEMA (ADD ONLY)
+File: prisma/schema.prisma
+Append to the end of the file
+Copy code
+Prisma
+model PnlExpense {
+  id            String   @id @default(uuid())
+  sourceType    String   // BUSINESS | SHIFT
+  sourceId      String
+  date          DateTime @index
+  shiftId       String?
+  amount        Decimal
+  category      String
+  paymentMethod String   // BANK | CASH
+  createdAt     DateTime @default(now())
+}
+Migration name
+Copy code
+
+add_pnl_expense_canonical
+2️⃣ DERIVER SERVICE (NEW)
+File: server/services/pnlExpenseDeriver.ts
+Copy code
+Ts
+import { prisma } from "../db";
+
+export async function rebuildPnlExpenses() {
+  // Full rebuild (safe – derived table only)
+  await prisma.pnlExpense.deleteMany();
+
+  /** -------------------------
+   * BUSINESS EXPENSES (BANK)
+   * ------------------------*/
+  const expenses = await prisma.expense.findMany({
+    include: { lines: true }
+  });
+
+  for (const exp of expenses) {
+    for (const line of exp.lines) {
+      await prisma.pnlExpense.create({
+        data: {
+          sourceType: "BUSINESS",
+          sourceId: line.id,
+          date: exp.expenseDate,
+          shiftId: null,
+          amount: line.amount,
+          category: line.category ?? "Uncategorised",
+          paymentMethod: "BANK"
+        }
+      });
+    }
+  }
+
+  /** -------------------------
+   * SHIFT EXPENSES (CASH)
+   * ------------------------*/
+
+  // Shopping purchases
+  const shopping = await prisma.shoppingPurchase.findMany();
+  for (const s of shopping) {
+    await prisma.pnlExpense.create({
+      data: {
+        sourceType: "SHIFT",
+        sourceId: s.id,
+        date: s.createdAt,
+        shiftId: s.shiftId,
+        amount: s.amount,
+        category: "Shopping",
+        paymentMethod: "CASH"
+      }
+    });
+  }
+
+  // Wages
+  const wages = await prisma.wageEntry.findMany();
+  for (const w of wages) {
+    await prisma.pnlExpense.create({
+      data: {
+        sourceType: "SHIFT",
+        sourceId: w.id,
+        date: w.createdAt,
+        shiftId: w.shiftId,
+        amount: w.amount,
+        category: "Wages",
+        paymentMethod: "CASH"
+      }
+    });
+  }
+
+  // Other shift expenses
+  const others = await prisma.otherExpense.findMany();
+  for (const o of others) {
+    await prisma.pnlExpense.create({
+      data: {
+        sourceType: "SHIFT",
+        sourceId: o.id,
+        date: o.createdAt,
+        shiftId: o.shiftId,
+        amount: o.amount,
+        category: o.category ?? "Other",
+        paymentMethod: "CASH"
+      }
+    });
+  }
+}
+3️⃣ REBUILD SCRIPT (NEW)
+File: server/scripts/rebuildPnlExpenses.ts
+Copy code
+Ts
+import { rebuildPnlExpenses } from "../services/pnlExpenseDeriver";
+
+(async () => {
+  console.log("Rebuilding P&L expenses...");
+  await rebuildPnlExpenses();
+  console.log("P&L expenses rebuild complete.");
+})();
+4️⃣ BACKEND: P&L READ SOURCE (MINIMAL CHANGE)
+Wherever the P&L API currently exists
+(e.g. server/api/finance.ts or similar):
+BEFORE
+Multiple queries to Expense, ShoppingPurchase, etc.
+AFTER
+Read ONLY from pnl_expense
+Example pattern:
+Copy code
+Ts
+const expenses = await prisma.pnlExpense.findMany({
+  where: {
+    date: {
+      gte: startDate,
+      lte: endDate
+    }
+  }
+});
+⚠️ Do not add calculations here.
+Totals/grouping can be simple SUM(amount).
+5️⃣ FRONTEND (READ-ONLY WIRING)
+If the P&L page exists but is empty:
+Point it at the updated backend endpoint
+Render:
+Total expenses
+Optional breakdown by category
+Optional split: CASH vs BANK
+❌ No editing
+❌ No permissions
+❌ No logic in UI
+🔁 REQUIRED RUN ORDER
+The agent must run:
+Copy code
+Bash
+npx prisma migrate dev
+node server/scripts/rebuildPnlExpenses.ts
+✅ EXPECTED RESULTS (VALIDATION)
+After rebuild:
+pnl_expense has rows
+P&L page shows numbers for the first time
+Totals match raw tables exactly
+Re-running script produces identical counts
+No other pages break
+🛑 STOP CONDITION
+After Patch 4:
+The agent must STOP and report:
+Total pnl_expense row count
+Total BANK vs CASH amounts
+Confirmation P&L page renders data
