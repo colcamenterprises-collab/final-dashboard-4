@@ -1,0 +1,153 @@
+🔐 EXECUTION MODE — COMBINED PATCH
+CSV RECIPE MAPPING (SPEED) + UI MAPPING PAGE (CONTROL)
+🎯 OBJECTIVE (LOCKED)
+Immediately populate recipe mappings via CSV
+Expose a minimal UI to manage mappings going forward
+Trigger rebuilds so food usage, reconciliation, alerts, and emails populate
+No schema changes
+No changes to existing forms, emails, or cron schedules
+🚫 ABSOLUTE PROHIBITIONS
+The agent MUST NOT:
+Modify existing Daily Review email layout
+Modify POS ingestion logic
+Modify recipe definitions or ingredient quantities
+Add permissions / auth
+Add heuristics or inferred mappings
+Touch analytics or legacy tables
+Rename existing tables or enums
+🧱 PART A — CSV SEED (IMMEDIATE VALUE)
+📄 CSV FILE (NEW)
+Create file:
+Copy code
+
+data/recipe_mapping_seed.csv
+Example structure (do NOT change headers):
+Copy code
+Csv
+channel,channelSku,recipeId
+pos,SBB-SMASH-01,RECIPE_SINGLE_SMASH
+pos,SBB-SMASH-02,RECIPE_DOUBLE_SMASH
+pos,SBB-CHICK-01,RECIPE_CHICKEN
+grab,GB-SMASH-01,RECIPE_SINGLE_SMASH
+grab,GB-SMASH-02,RECIPE_DOUBLE_SMASH
+🛠️ IMPORT SCRIPT (NEW)
+Create file:
+Copy code
+
+server/scripts/importRecipeMappings.ts
+Responsibilities (STRICT)
+Read data/recipe_mapping_seed.csv
+For each row:
+Upsert into ExternalSkuMap
+channel
+channelSku
+internalId = recipeId
+kind = 'RECIPE'
+Validate:
+recipeId exists in recipe_v2
+If recipe does not exist:
+Log warning
+Skip row
+Do NOT crash
+Output
+Log:
+Imported count
+Skipped count
+Unmatched SKUs
+🔁 PART B — REQUIRED REBUILD SEQUENCE (MANDATORY)
+After CSV import, the agent MUST RUN THESE IN ORDER:
+Copy code
+Bash
+npx tsx server/scripts/importRecipeMappings.ts
+npx tsx server/scripts/rebuildSoldItems.ts
+npx tsx server/scripts/rebuildIngredientUsage.ts
+npx tsx server/scripts/rebuildReconciliation.ts
+🚫 Do not reorder
+🚫 Do not skip
+🧱 PART C — UI: RECIPE MAPPING PAGE (MINIMAL)
+📍 ROUTE (NEW)
+Copy code
+
+/operations/recipe-mapping
+Add route to:
+Copy code
+
+client/src/router/RouteRegistry.ts
+📄 PAGE FILE (NEW)
+Copy code
+
+client/src/pages/operations/recipe-mapping/index.tsx
+🧩 UI REQUIREMENTS (NO DEVIATION)
+Table only. No cards. No charts.
+Columns: | Channel | SKU | Recipe | Status |
+Channel → text
+SKU → text
+Recipe → dropdown (from recipe_v2)
+Status:
+✅ mapped
+⚠ unmapped
+Actions:
+Save mapping (row-level or batch)
+“Rebuild Usage” button (manual trigger)
+🔌 API ENDPOINTS (READ / WRITE)
+GET
+Copy code
+
+GET /api/recipe-mapping
+Returns:
+channel
+channelSku
+recipeId
+recipeName
+mapped (boolean)
+POST
+Copy code
+
+POST /api/recipe-mapping
+Body:
+Copy code
+Json
+{
+  "channel": "pos",
+  "channelSku": "SBB-SMASH-01",
+  "recipeId": "RECIPE_SINGLE_SMASH"
+}
+Behavior:
+Upsert ExternalSkuMap
+No rebuild here
+🔄 REBUILD BUTTON (CRITICAL)
+Button triggers:
+Copy code
+
+POST /api/admin/rebuild-usage
+Backend handler:
+Calls:
+rebuildSoldItems
+rebuildIngredientUsage
+rebuildReconciliation
+Returns success JSON
+Logs execution time
+🚫 No background jobs
+🚫 Manual only
+🧪 VERIFICATION CHECKLIST (AGENT MUST CONFIRM)
+After patch:
+[ ] ExternalSkuMap populated
+[ ] shift_recipe_coverage.coverage_percent > 0
+[ ] shift_ingredient_usage has rows
+[ ] Daily Review email shows:
+Meat sold
+Buns sold
+Food cost populated
+[ ] Alerts now reference real variances
+[ ] UI page loads without auth
+[ ] Rebuild button works
+✅ EXPECTED OUTCOME
+After this patch:
+Daily Review email becomes fully populated
+Food cost is real and defensible
+Purchasing section becomes actionable
+Alerts become meaningful
+No more “INSUFFICIENT DATA” unless genuinely missing
+This completes the core operational loop.
+🛑 STOP CONFIRMATION
+The agent must STOP after this patch and report results. No additional “improvements”.

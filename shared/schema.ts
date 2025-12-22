@@ -1309,6 +1309,25 @@ export const externalSkuMapV2 = pgTable("external_sku_map_v2", {
   ingredientIdIdx: index("external_sku_map_v2_ingredient_id_idx").on(table.ingredientId),
 }));
 
+// === Recipe SKU Mapping (CSV RECIPE MAPPING PATCH) ===
+// Simple mapping from external channel SKUs to recipe IDs
+export const recipeSkuMap = pgTable("recipe_sku_map", {
+  id: serial("id").primaryKey(),
+  channel: text("channel").notNull(), // LOYVERSE, GRAB, FOODPANDA, etc.
+  channelSku: text("channel_sku").notNull(), // External SKU code
+  recipeId: integer("recipe_id").notNull(), // Reference to recipes.id
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  channelSkuIdx: index("recipe_sku_map_channel_sku_idx").on(table.channel, table.channelSku),
+  recipeIdIdx: index("recipe_sku_map_recipe_id_idx").on(table.recipeId),
+}));
+
+export const insertRecipeSkuMapSchema = createInsertSchema(recipeSkuMap).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertRecipeSkuMap = z.infer<typeof insertRecipeSkuMapSchema>;
+export type SelectRecipeSkuMap = typeof recipeSkuMap.$inferSelect;
+
 // Checklist Assignments table - Fort Knox security for server-side task binding
 export const checklistAssignments = pgTable("checklist_assignments", {
   id: text("id").primaryKey().default(sql`gen_random_uuid()`), // assignmentId UUID
