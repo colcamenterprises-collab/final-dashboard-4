@@ -1632,6 +1632,21 @@ model MissingSkuEvent {
   @@unique([channel, kind, sku])
 }
 
+// PATCH: Recipe SKU Mapping (CSV RECIPE MAPPING PATCH)
+model RecipeSkuMap {
+  id         Int      @id @default(autoincrement())
+  channel    String   // LOYVERSE, GRAB, FOODPANDA, etc.
+  channelSku String   @map("channel_sku")
+  recipeId   Int      @map("recipe_id") // Reference to recipes.id
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+
+  @@index([channel, channelSku], name: "recipe_sku_map_channel_sku_idx")
+  @@index([recipeId], name: "recipe_sku_map_recipe_id_idx")
+  @@map("recipe_sku_map")
+}
+
 model PurchasingItem {
   id              Int      @id @default(autoincrement())
   item            String

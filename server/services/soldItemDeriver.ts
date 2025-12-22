@@ -6,20 +6,32 @@ async function resolveRecipeIdFromSku(
 ): Promise<string | null> {
   if (!sku) return null;
 
-  // POS SKU → internal item
-  const skuMap = await prisma.externalSkuMap.findFirst({
+  // PATCH: Use recipe_sku_map table for direct SKU → recipe mapping
+  const skuMap = await prisma.recipeSkuMap.findFirst({
+    where: {
+      channel,
+      channelSku: sku,
+      active: true
+    }
+  });
+
+  if (skuMap) {
+    return skuMap.recipeId.toString();
+  }
+
+  // Fallback: Legacy external_sku_map → recipe_v2 mapping
+  const legacyMap = await prisma.externalSkuMap.findFirst({
     where: {
       channel,
       channelSku: sku
     }
   });
 
-  if (!skuMap) return null;
+  if (!legacyMap) return null;
 
-  // internal item → recipe (via recipe_v2 name matching)
   const recipe = await prisma.recipeV2.findFirst({
     where: {
-      name: skuMap.internalId
+      name: legacyMap.internalId
     }
   });
 
