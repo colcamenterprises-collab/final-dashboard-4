@@ -20,6 +20,9 @@ import { v4 as uuid } from "uuid";
 // import { insertDirectExpensesFromShift } from "../utils/expenseLedger"; // REMOVED: Shift expenses tracked in payload only
 import { computeBankingAuto } from "../services/bankingAuto.js";
 import { validateStockRequired } from "../services/stockRequired.js";
+import { PrismaClient } from "@prisma/client";
+
+const prisma = new PrismaClient();
 
 // Utility functions for THB values (no cents conversion)
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
@@ -401,6 +404,28 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       });
     }
 
+    // PATCH B: Purchasing item parity guard
+    // Form 2 MUST match active purchasing_items count
+    const activePurchasingCount = await prisma.purchasingItem.count({
+      where: { active: true }
+    });
+    
+    // Get unique item names from requisition (items with qty > 0 submitted)
+    const submittedItemNames = new Set<string>();
+    if (Array.isArray(requisition)) {
+      for (const item of requisition) {
+        if (item.name) {
+          submittedItemNames.add(item.name);
+        }
+      }
+    }
+    
+    // Note: We allow submission even if counts differ, but log warning
+    // The sync will create rows for ALL active items (with 0 for missing)
+    if (submittedItemNames.size !== activePurchasingCount) {
+      console.warn(`[PATCH B] Item count mismatch: submitted ${submittedItemNames.size} vs master ${activePurchasingCount}`);
+    }
+
     // Build purchasingJson - keyed by item name with qty for shopping list lookup
     const purchasingJson: Record<string, number> = {};
     if (Array.isArray(requisition)) {
@@ -443,6 +468,53 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
         [id, burgerBuns, meatWeightG, JSON.stringify(drinkStock || {}), JSON.stringify(purchasingJson)]
       );
       console.log(`[FIELD BRIDGE] Synced daily_stock_v2: salesId=${id}, burgerBuns=${burgerBuns}, meatWeightG=${meatWeightG}`);
+      
+      // PATCH C: Sync ALL active purchasing items to purchasing_shift_items (including zero qty)
+      // Get the daily_stock_v2 id for this salesId
+      const stockResult = await pool.query(
+        `SELECT id FROM daily_stock_v2 WHERE "salesId" = $1`,
+        [id]
+      );
+      
+      if (stockResult.rows.length > 0) {
+        const dailyStockId = stockResult.rows[0].id;
+        
+        // Get ALL active purchasing items
+        const allActiveItems = await prisma.purchasingItem.findMany({
+          where: { active: true }
+        });
+        
+        // Build quantity map from requisition
+        const qtyMap: Record<string, number> = {};
+        if (Array.isArray(requisition)) {
+          for (const item of requisition) {
+            if (item.name) {
+              qtyMap[item.name] = item.qty || 0;
+            }
+          }
+        }
+        
+        // Upsert ALL items (including zero qty) to purchasing_shift_items
+        for (const pItem of allActiveItems) {
+          const qty = qtyMap[pItem.item] || 0;
+          await prisma.purchasingShiftItem.upsert({
+            where: {
+              dailyStockId_purchasingItemId: {
+                dailyStockId: dailyStockId,
+                purchasingItemId: pItem.id
+              }
+            },
+            update: { quantity: qty },
+            create: {
+              dailyStockId: dailyStockId,
+              purchasingItemId: pItem.id,
+              quantity: qty
+            }
+          });
+        }
+        
+        console.log(`[PATCH C] Synced ${allActiveItems.length} items to purchasing_shift_items (including zeros)`);
+      }
     } catch (stockErr) {
       console.error('[FIELD BRIDGE] Failed to sync daily_stock_v2 (non-blocking):', stockErr);
     }

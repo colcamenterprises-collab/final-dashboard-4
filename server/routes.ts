@@ -44,6 +44,7 @@ import shoppingListRoutes from './routes/shoppingListRoutes';
 import purchasingFieldMappingRouter from './routes/purchasingFieldMapping';
 import purchasingShiftLogRouter from './routes/purchasingShiftLog';
 import purchasingAnalyticsRouter from './routes/purchasingAnalytics';
+import debugPurchasingRouter from './routes/debugPurchasing';
 import { estimateShoppingList } from './services/shoppingList';
 import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
@@ -3229,6 +3230,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/purchasing-field-mapping', purchasingFieldMappingRouter); // Purchasing field mapping admin UI
   app.use('/api/purchasing-shift-log', purchasingShiftLogRouter); // Purchasing shift log visibility
   app.use('/api/purchasing-analytics', purchasingAnalyticsRouter); // Purchasing analytics metrics
+  app.use('/api/debug', debugPurchasingRouter); // PATCH A: Purchasing parity check
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
   app.use('/api/expenses-v2', expensesV2Routes);

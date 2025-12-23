@@ -1,0 +1,147 @@
+🔒 REPLIT AGENT PATCH — PURCHASING FOUNDATION FREEZE (MANDATORY)
+🚨 EXECUTION MODE
+MODE: READ / FIX / GUARD ONLY
+ABSOLUTE RULE:
+❌ NO new pages
+❌ NO new UI features
+❌ NO analytics
+❌ NO refactors
+❌ NO “improvements”
+✅ ONLY data correctness, parity, and guards
+If any instruction is ambiguous, choose the safest, least-changing option.
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Establish one canonical purchasing master list and enforce item parity across:
+Purchasing List (master)
+Daily Stock Form V2 (Form 2)
+Purchasing Shift Log
+Shopping List
+If parity is broken → fail loudly (API error or visible banner).
+🧱 CANONICAL SOURCE (LOCK THIS IN)
+Canonical table:
+purchasing_items
+This table is the ONLY source of truth for:
+Items selectable in Form 2
+Items shown in Shift Log
+Items shown in Shopping List
+No other table, JSON payload, or cache may introduce items.
+📦 PATCH A — PURCHASING MASTER PARITY CHECK (BACKEND)
+Add new READ-ONLY debug endpoint
+File: server/routes/debugPurchasing.ts (new)
+Copy code
+Ts
+GET /api/debug/purchasing-parity
+Response format (exact):
+Copy code
+Json
+{
+  "purchasing_items": <count>,
+  "daily_stock_items": <count>,
+  "shift_log_items": <count>,
+  "shopping_list_items": <count>,
+  "parity": true | false
+}
+Counting rules
+purchasing_items → count rows where active = true
+daily_stock_items → DISTINCT item IDs referenced in Form 2 source
+shift_log_items → DISTINCT purchasing_item_id in purchasing_shift_items
+shopping_list_items → DISTINCT purchasing_item_id in latest list
+If any count ≠ purchasing_items → parity = false
+🧱 PATCH B — FORM 2 HARD BINDING (NO FALLBACKS)
+File: server/forms/dailySalesV2.ts (or equivalent)
+Rules
+Form 2 MUST load items only from:
+Copy code
+
+GET /api/purchasing-items?active=true
+❌ Do NOT load from ingredients
+❌ Do NOT load from payload cache
+❌ Do NOT infer items from previous submissions
+Guard (MANDATORY)
+On submit:
+Compare number of submitted items vs active purchasing_items
+If mismatch → reject submission with clear error:
+Copy code
+Json
+{
+  "error": "Purchasing item mismatch. Master list has changed. Please reload the form."
+}
+🧱 PATCH C — PURCHASING SHIFT LOG (FULL MATRIX)
+File: server/services/purchasingShiftSync.ts
+Required behaviour
+For every shift:
+Every active purchasing_item must appear
+Quantity may be 0
+Rows must NOT disappear due to zero usage
+Explicit prohibition
+❌ No filtering like:
+WHERE qty > 0
+HAVING SUM(qty) > 0
+Zero is valid data.
+🧱 PATCH D — SHOPPING LIST = PURE PROJECTION
+File: server/routes/shoppingListRoutes.ts
+Rules
+Shopping List must be generated ONLY from:
+Copy code
+
+purchasing_shift_items
+JOIN purchasing_items
+❌ No JSON fallback
+❌ No legacy tables
+❌ No inferred items
+If no rows exist:
+Return empty list with explanation
+Copy code
+Json
+{
+  "items": [],
+  "reason": "No purchasing_shift_items exist for selected date"
+}
+🧱 PATCH E — VISIBLE DATA SOURCE LABELS (NO UI REDESIGN)
+Add small text labels only (no styling work):
+Page
+Required label
+Purchasing List
+Source: purchasing_items
+Form 2
+Source: purchasing_items
+Shift Log
+Source: purchasing_shift_items
+Shopping List
+Source: purchasing_shift_items
+This is not cosmetic — it is operational clarity.
+🧱 PATCH F — PRODUCTION LOCK GUARD
+If PRODUCTION_LOCK=1:
+Block:
+Deleting purchasing items
+Renaming purchasing items
+Allow:
+Quantity entry
+Cost updates
+Active/inactive toggle
+Errors must be explicit.
+🧪 PATCH G — VERIFICATION STEPS (MANDATORY)
+Agent MUST verify:
+Purchasing List shows ALL items (expected ~72–75)
+Form 2 shows same count
+Shift Log shows same items × shifts (including zero rows)
+Shopping List shows items when shifts exist
+/api/debug/purchasing-parity returns:
+Copy code
+Json
+"parity": true
+If parity ≠ true → STOP and report. Do not continue.
+🚫 ABSOLUTE DO-NOT-DO LIST
+❌ No analytics
+❌ No charts
+❌ No exports
+❌ No supplier grouping
+❌ No anomaly logic
+❌ No emojis
+❌ No UI “enhancements”
+✅ DEFINITION OF “DONE”
+The patch is complete only when:
+One purchasing item list exists
+Every page shows the same items
+Zero-usage items are visible
+Parity endpoint confirms alignment
+System survives reload without drift
