@@ -1,6 +1,17 @@
+/**
+ * 🔒 CANONICAL PURCHASING FLOW (AUTO-SYNC)
+ * purchasing_items → Form 2 → purchasing_shift_items → Shopping List
+ *
+ * RULES:
+ * - purchasing_items is the ONLY source of truth
+ * - Form 2 auto-loads items (no manual sync)
+ * - Shopping List & Shift Log are read-only views
+ * - DO NOT duplicate or derive items elsewhere
+ */
 import { Router } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
+import { foodCostings } from '../data/foodCostings';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -19,7 +30,11 @@ const purchasingItemSchema = z.object({
 
 router.get('/', async (req, res) => {
   try {
+    const activeOnly = req.query.active === 'true';
+    const whereClause = activeOnly ? { active: true } : {};
+    
     const items = await prisma.purchasingItem.findMany({
+      where: whereClause,
       orderBy: [
         { category: 'asc' },
         { item: 'asc' },
@@ -216,13 +231,14 @@ router.post('/import/csv', async (req, res) => {
   }
 });
 
-// Sync purchasing list items to Daily Stock V2 form
+// Sync purchasing list items to Daily Stock V2 form (live from DB)
 router.post('/sync-to-daily-stock', async (req, res) => {
   try {
     console.log('[purchasing/sync] Syncing purchasing items to Daily Stock V2...');
     
-    // Get all purchasing items from database
+    // Get all ACTIVE purchasing items from database
     const purchasingItems = await prisma.purchasingItem.findMany({
+      where: { active: true },
       orderBy: [
         { category: 'asc' },
         { item: 'asc' },
@@ -245,6 +261,71 @@ router.post('/sync-to-daily-stock', async (req, res) => {
   } catch (error) {
     console.error('[purchasing/sync] Error syncing to Daily Stock:', error);
     res.status(500).json({ ok: false, error: 'Failed to sync purchasing items' });
+  }
+});
+
+/**
+ * POST /api/purchasing-items/populate-catalog
+ * Populates purchasing_items from foodCostings TypeScript source of truth
+ * This should be run once to seed the catalog, then items managed via API
+ */
+router.post('/populate-catalog', async (req, res) => {
+  try {
+    console.log('[purchasing/populate] Populating purchasing_items from foodCostings catalog...');
+    
+    let inserted = 0;
+    let updated = 0;
+    
+    for (const item of foodCostings) {
+      // Parse cost (removes ฿ symbol and commas)
+      const costStr = (item.cost || '').replace(/[฿,]/g, '').trim();
+      const unitCost = parseFloat(costStr) || null;
+      
+      // Check if exists by item name
+      const existing = await prisma.purchasingItem.findFirst({
+        where: { item: item.item },
+      });
+      
+      if (existing) {
+        // Update existing
+        await prisma.purchasingItem.update({
+          where: { id: existing.id },
+          data: {
+            category: item.category || null,
+            supplierName: item.supplier || null,
+            brand: item.brand || null,
+            orderUnit: item.packagingQty || null,
+            unitDescription: item.averageMenuPortion || null,
+            unitCost: unitCost,
+            lastReviewDate: item.lastReviewDate || null,
+            active: true,
+          },
+        });
+        updated++;
+      } else {
+        // Insert new
+        await prisma.purchasingItem.create({
+          data: {
+            item: item.item,
+            category: item.category || null,
+            supplierName: item.supplier || null,
+            brand: item.brand || null,
+            orderUnit: item.packagingQty || null,
+            unitDescription: item.averageMenuPortion || null,
+            unitCost: unitCost,
+            lastReviewDate: item.lastReviewDate || null,
+            active: true,
+          },
+        });
+        inserted++;
+      }
+    }
+    
+    console.log(`[purchasing/populate] Catalog populated: ${inserted} inserted, ${updated} updated`);
+    res.json({ ok: true, inserted, updated, total: foodCostings.length });
+  } catch (error) {
+    console.error('[purchasing/populate] Error populating catalog:', error);
+    res.status(500).json({ ok: false, error: 'Failed to populate catalog' });
   }
 });
 
