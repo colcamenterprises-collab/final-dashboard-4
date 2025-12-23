@@ -1,9 +1,33 @@
 import { Router } from "express";
-import { db as drizzleDb } from "../db";
+import { db as drizzleDb, pool } from "../db";
 import { dailySalesV2, dailyStockV2, ingredients } from "../../shared/schema";
 import { sql, desc } from "drizzle-orm";
 
 const router = Router();
+
+router.get("/", async (_req, res) => {
+  const checks: Record<string, number> = {};
+
+  const tables = [
+    'daily_stock_v2',
+    'daily_sales_v2',
+    'purchasing_items',
+    'purchasing_shift_items',
+  ];
+
+  for (const table of tables) {
+    const r = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM ${table}`,
+    );
+    checks[table] = r.rows[0].count;
+  }
+
+  res.json({
+    status: 'OK',
+    productionLock: process.env.PRODUCTION_LOCK === '1',
+    tables: checks,
+  });
+});
 
 interface HealthCheck {
   name: string;

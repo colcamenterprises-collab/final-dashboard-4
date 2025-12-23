@@ -98,6 +98,7 @@ import ingredientUsageRoutes from "./routes/analytics/ingredientUsageRoutes";
 import loyverseMenuImportRouter from "./routes/loyverseMenuImport";
 import adminBackupRouter from "./routes/adminBackup";
 import adminHistoricalImportRouter from "./routes/adminHistoricalImport";
+import systemHealthRouter from "./routes/systemHealth";
 import executiveMetricsRouter from "./routes/executiveMetrics";
 import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./services/menuCanonicalService";
 import dashboard4Routes from "./routes/dashboard4Routes";
@@ -3244,6 +3245,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/admin/import', loyverseMenuImportRouter);
   app.use('/api/admin/backup', adminBackupRouter);
   app.use('/api/admin/historical', adminHistoricalImportRouter);
+  app.use('/api/system-health', systemHealthRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
 
