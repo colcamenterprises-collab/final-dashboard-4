@@ -129,8 +129,8 @@ export default function ShoppingList() {
           <p className="text-xs text-slate-500 mt-1">
             Grouped by supplier for easy purchasing
             {shiftDate && <span className="ml-2">• Shift: {formatDate(shiftDate)}</span>}
-            {source && <span className="ml-2 text-emerald-600">• Source: {source}</span>}
           </p>
+          <p className="text-xs text-slate-400">Source: purchasing_shift_items</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <div className="flex items-center gap-2">

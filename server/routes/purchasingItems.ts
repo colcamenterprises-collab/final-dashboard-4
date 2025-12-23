@@ -85,6 +85,20 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    // PATCH F: Production lock guard - block renames if PRODUCTION_LOCK=1
+    if (process.env.PRODUCTION_LOCK === '1') {
+      // Check if trying to rename
+      if (parsed.data.item) {
+        const existing = await prisma.purchasingItem.findUnique({ where: { id } });
+        if (existing && existing.item !== parsed.data.item) {
+          return res.status(403).json({
+            ok: false,
+            error: 'PRODUCTION_LOCK: Renaming items is blocked. Deactivate and create new item instead.'
+          });
+        }
+      }
+    }
+
     const item = await prisma.purchasingItem.update({
       where: { id },
       data: parsed.data,
@@ -102,12 +116,21 @@ router.put('/:id', async (req, res) => {
 
 /**
  * 🔒 SYSTEM LOCK: Prevent deletion if item is referenced in historical data
+ * PATCH F: Also block deletion if PRODUCTION_LOCK=1
  */
 router.delete('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
       return res.status(400).json({ ok: false, error: 'Invalid ID' });
+    }
+
+    // PATCH F: Production lock guard - block deletions if PRODUCTION_LOCK=1
+    if (process.env.PRODUCTION_LOCK === '1') {
+      return res.status(403).json({
+        ok: false,
+        error: 'PRODUCTION_LOCK: Deleting items is blocked. Deactivate items instead.'
+      });
     }
 
     // Check if item is referenced in purchasing_shift_items (historical data)

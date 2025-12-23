@@ -228,6 +228,7 @@ export default function PurchasingPage() {
       <div className="mb-4">
         <h1 className="text-3xl font-bold text-slate-900 mb-1">Purchasing List</h1>
         <p className="text-xs text-slate-600">Master control panel for all items. Changes here affect Form 2, Shopping List, and Analytics.</p>
+        <p className="text-xs text-slate-400 mt-1">Source: purchasing_items</p>
       </div>
 
       <div className="flex gap-3 mb-4">

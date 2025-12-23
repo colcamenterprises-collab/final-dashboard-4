@@ -100,6 +100,7 @@ export default function PurchasingShiftLog() {
               </span>
             )}
           </p>
+          <p className="text-xs text-slate-400">Source: purchasing_shift_items</p>
         </div>
         <div className="flex gap-2 flex-wrap items-center">
           <select

@@ -519,7 +519,10 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       </AlertDialog>
 
       <div className="flex flex-col sm:flex-row items-start sm:items-baseline justify-between gap-3">
-        <h1 className="text-3xl font-semibold">{L.pageTitle}</h1>
+        <div>
+          <h1 className="text-3xl font-semibold">{L.pageTitle}</h1>
+          <p className="text-xs text-slate-400 mt-1">Source: purchasing_items</p>
+        </div>
         <div className="text-xs text-slate-600">
           {shiftId ? (
             <span className="inline-flex items-center gap-2 rounded-[4px] border border-slate-200 px-3 py-1">{L.linkedToShift}: {shiftId}</span>
