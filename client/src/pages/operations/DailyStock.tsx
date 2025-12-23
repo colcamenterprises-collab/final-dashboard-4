@@ -204,16 +204,25 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
     }
   };
 
+  /**
+   * 🔒 CANONICAL PURCHASING FLOW (AUTO-SYNC)
+   * Auto-load items from purchasing_items table via API
+   * NO manual sync needed - Form 2 always uses purchasing_items as source of truth
+   */
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/costing/ingredients");
+        // Auto-load from purchasing_items (canonical source of truth)
+        const res = await fetch("/api/purchasing-items/sync-to-daily-stock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
         const data: IngredientsResponse = await res.json();
         if (!mounted) return;
         setIngredients(data.list || []);
       } catch (e) {
-        console.error("Failed to load ingredients catalog:", e);
+        console.error("Failed to load items from purchasing catalog:", e);
       } finally {
         if (mounted) setLoading(false);
       }

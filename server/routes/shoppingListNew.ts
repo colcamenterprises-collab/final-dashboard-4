@@ -1,3 +1,12 @@
+/**
+ * 🔒 CANONICAL PURCHASING FLOW (AUTO-SYNC)
+ * purchasing_items → Form 2 → purchasing_shift_items → Shopping List
+ *
+ * RULES:
+ * - Shopping List reads ONLY from purchasing_shift_items + purchasing_items
+ * - NO reading from purchasingJson or payload
+ * - This is a read-only view of shift purchases
+ */
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
@@ -18,8 +27,86 @@ type ShoppingListLine = {
 };
 
 /**
- * Helper function to build shopping list from Daily Sales V2 record
- * Uses purchasingJson from payload and looks up purchasing_items via purchasing_field_map
+ * 🔒 CANONICAL: Build shopping list from purchasing_shift_items (NOT from JSON)
+ * Reads from: purchasing_shift_items JOIN purchasing_items
+ * Uses dailyStockId to find the shift's purchases
+ */
+async function buildShoppingListFromShiftItems(stockId: string) {
+  // Get the stock record and associated sales record
+  const stockResult = await db.execute(sql`
+    SELECT ds.id as stock_id, dsv."shiftDate", dsv.id as sales_id
+    FROM daily_stock_v2 ds
+    JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
+    WHERE ds.id = ${stockId}
+    LIMIT 1
+  `);
+
+  if (stockResult.rows.length === 0) {
+    throw new Error('Stock record not found');
+  }
+
+  const record = stockResult.rows[0] as any;
+  const shiftDate = record.shiftDate;
+  const salesId = record.sales_id;
+
+  // Get all purchasing items for this shift from purchasing_shift_items
+  const itemsResult = await db.execute(sql`
+    SELECT 
+      psi."purchasingItemId",
+      psi.quantity,
+      pi.item,
+      pi.category,
+      pi.brand,
+      pi."supplierName",
+      pi."supplierSku",
+      pi."unitDescription",
+      pi."orderUnit",
+      pi."unitCost"
+    FROM purchasing_shift_items psi
+    JOIN purchasing_items pi ON psi."purchasingItemId" = pi.id
+    WHERE psi."dailyStockId" = ${stockId}
+      AND psi.quantity > 0
+    ORDER BY pi.category, pi.item
+  `);
+
+  const lines: ShoppingListLine[] = [];
+
+  for (const row of itemsResult.rows as any[]) {
+    const qty = Number(row.quantity) || 0;
+    if (qty <= 0) continue;
+
+    const unitCost = Number(row.unitCost) || 0;
+    const lineTotal = qty * unitCost;
+
+    lines.push({
+      fieldKey: `item-${row.purchasingItemId}`,
+      quantity: qty,
+      item: row.item,
+      brand: row.brand || null,
+      supplier: row.supplierName || null,
+      sku: row.supplierSku || null,
+      unitDescription: row.unitDescription || row.orderUnit || null,
+      unitCost,
+      lineTotal,
+      category: row.category || null,
+    });
+  }
+
+  const grandTotal = lines.reduce((sum, l) => sum + l.lineTotal, 0);
+
+  return {
+    salesId,
+    stockId,
+    shiftDate,
+    lines,
+    grandTotal,
+    itemCount: lines.length,
+  };
+}
+
+/**
+ * LEGACY: Build shopping list from JSON payload (for backward compatibility)
+ * @deprecated Use buildShoppingListFromShiftItems for new data
  */
 async function buildShoppingListFromSales(salesId: string) {
   // 1) Load the Daily Sales V2 record
@@ -106,36 +193,54 @@ async function buildShoppingListFromSales(salesId: string) {
 }
 
 /**
- * GET /api/purchasing-list/latest
- * Returns shopping list from the most recent Daily Sales V2 with purchasingJson
+ * 🔒 CANONICAL: GET /api/purchasing-list/latest
+ * Returns shopping list from the most recent shift that has purchasing_shift_items
+ * Reads from purchasing_shift_items table (NOT from JSON)
  */
 router.get('/latest', async (req: Request, res: Response) => {
   try {
-    // Find most recent daily_sales_v2 with purchasingJson
+    // Find most recent daily_stock_v2 that has purchasing_shift_items
     const latestResult = await db.execute(sql`
-      SELECT id, "shiftDate", payload 
-      FROM daily_sales_v2 
-      WHERE payload->'purchasingJson' IS NOT NULL 
-        AND payload->>'purchasingJson' != '{}'
-        AND payload->>'purchasingJson' != 'null'
-        AND "deletedAt" IS NULL
-      ORDER BY "createdAt" DESC 
+      SELECT DISTINCT ON (ds.id) ds.id as stock_id
+      FROM daily_stock_v2 ds
+      JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
+      JOIN purchasing_shift_items psi ON psi."dailyStockId" = ds.id
+      WHERE dsv."deletedAt" IS NULL
+        AND ds."deletedAt" IS NULL
+      ORDER BY ds.id, ds."createdAt" DESC
       LIMIT 1
     `);
 
     if (latestResult.rows.length === 0) {
-      return res.json({ 
-        salesId: null, 
-        lines: [], 
-        grandTotal: 0, 
-        itemCount: 0,
-        message: 'No Form 2 submissions with purchasing data found'
-      });
+      // Fallback to legacy JSON approach if no purchasing_shift_items found
+      const legacyResult = await db.execute(sql`
+        SELECT id FROM daily_sales_v2 
+        WHERE payload->'purchasingJson' IS NOT NULL 
+          AND payload->>'purchasingJson' != '{}'
+          AND payload->>'purchasingJson' != 'null'
+          AND "deletedAt" IS NULL
+        ORDER BY "createdAt" DESC 
+        LIMIT 1
+      `);
+      
+      if (legacyResult.rows.length === 0) {
+        return res.json({ 
+          salesId: null, 
+          lines: [], 
+          grandTotal: 0, 
+          itemCount: 0,
+          message: 'No purchasing data found'
+        });
+      }
+      
+      const salesId = (legacyResult.rows[0] as any).id;
+      const result = await buildShoppingListFromSales(salesId);
+      return res.json({ ...result, source: 'legacy_json' });
     }
 
-    const salesId = (latestResult.rows[0] as any).id;
-    const result = await buildShoppingListFromSales(salesId);
-    return res.json(result);
+    const stockId = (latestResult.rows[0] as any).stock_id;
+    const result = await buildShoppingListFromShiftItems(stockId);
+    return res.json({ ...result, source: 'purchasing_shift_items' });
   } catch (err: any) {
     console.error('Error getting latest shopping list:', err);
     return res.status(500).json({ error: err.message || 'Failed to get shopping list' });
