@@ -18,7 +18,7 @@ router.get('/purchasing-parity', async (req: Request, res: Response) => {
 
     // Count distinct items in purchasing_shift_items (shift log source)
     const shiftLogResult = await db.execute(sql`
-      SELECT COUNT(DISTINCT purchasing_item_id) as count FROM purchasing_shift_items
+      SELECT COUNT(DISTINCT "purchasingItemId") as count FROM purchasing_shift_items
     `);
     const shiftLogItemsCount = parseInt(shiftLogResult.rows[0]?.count || '0', 10);
 
