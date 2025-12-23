@@ -1,0 +1,162 @@
+🔐 REPLIT AGENT — SYSTEM LOCKDOWN PATCH
+Objective: Freeze the system in its current working state, prevent regression, accidental refactors, or schema drift.
+Mode: PROTECT + VERIFY ONLY
+NO FEATURES. NO REFACTORING. NO OPTIMIZATION.
+🚫 ABSOLUTE RULES (NON-NEGOTIABLE)
+The agent MUST NOT:
+Modify any database schema
+Modify any Prisma models
+Modify any Drizzle schema
+Rename tables or columns
+“Clean up” unused code
+Improve performance
+Touch UI styling or components
+Change auth logic except where explicitly stated
+Add new features
+Add migrations
+Add new routes
+If unsure → STOP.
+🧱 PART 1 — FREEZE CRITICAL DATA PATHS
+🔒 Files to lock (DO NOT EDIT CONTENT)
+Add file-level header comments ONLY to the following files:
+Copy code
+
+server/forms/dailySalesV2.ts
+server/services/purchasingShiftSync.ts
+server/routes/shoppingListRoutes.ts
+server/routes/profitLoss.ts
+server/services/dailyReviewEmail.ts
+Header to add (top of file, no logic change):
+Copy code
+Ts
+/**
+ * 🔐 PRODUCTION LOCK — DO NOT MODIFY
+ * This file is part of the live Smash Brothers Burgers operations stack.
+ * Changes here can break purchasing, P&L, shift analysis, or emails.
+ *
+ * Allowed actions:
+ * - READ
+ * - LOGGING ONLY (console.log)
+ *
+ * Any functional changes require owner approval.
+ */
+⚠️ No other edits allowed in these files.
+🧱 PART 2 — LOCK DATABASE WRITE PATHS (SOFT LOCK)
+Add a runtime guard (NO schema changes)
+Create file:
+Copy code
+
+server/utils/productionGuard.ts
+Content:
+Copy code
+Ts
+export function assertProductionWriteAllowed(area: string) {
+  if (process.env.PRODUCTION_LOCK === '1') {
+    throw new Error(
+      `🚫 WRITE BLOCKED: ${area} is locked in production mode`,
+    );
+  }
+}
+Apply guard ONLY to these write locations:
+1️⃣ Shopping list generation
+File:
+Copy code
+
+server/services/shoppingListService.ts
+Before any INSERT/UPSERT:
+Copy code
+Ts
+assertProductionWriteAllowed('shopping_list');
+2️⃣ Purchasing backfill
+File:
+Copy code
+
+server/services/purchasingShiftSync.ts
+Before inserting into purchasing_shift_items:
+Copy code
+Ts
+assertProductionWriteAllowed('purchasing_shift_items');
+⚠️ Do NOT block reads. Reads must continue working.
+🧱 PART 3 — ENVIRONMENT LOCK
+Update .env.example ONLY
+Add:
+Copy code
+Env
+# === PRODUCTION SAFETY ===
+PRODUCTION_LOCK=1
+⚠️ Do NOT modify .env itself.
+🧱 PART 4 — ADD READ-ONLY HEALTH CHECK (SAFE)
+Create endpoint (NO DB WRITES)
+File:
+Copy code
+
+server/routes/systemHealth.ts
+Content:
+Copy code
+Ts
+import { Router } from 'express';
+import { pool } from '../db';
+
+const router = Router();
+
+router.get('/system-health', async (_req, res) => {
+  const checks = {};
+
+  const tables = [
+    'daily_stock_v2',
+    'daily_sales_v2',
+    'purchasing_items',
+    'purchasing_shift_items',
+  ];
+
+  for (const table of tables) {
+    const r = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM ${table}`,
+    );
+    checks[table] = r.rows[0].count;
+  }
+
+  res.json({
+    status: 'OK',
+    productionLock: process.env.PRODUCTION_LOCK === '1',
+    tables: checks,
+  });
+});
+
+export default router;
+Register it in server/routes.ts:
+Copy code
+Ts
+app.use('/api/system-health', systemHealthRoutes);
+⚠️ No auth. No writes. No side effects.
+🧱 PART 5 — VERIFY (MANDATORY)
+The agent must run only these commands:
+Copy code
+Bash
+npm run dev
+curl http://localhost:3000/api/system-health
+Expected:
+status: OK
+productionLock: true
+table counts > 0 for:
+daily_stock_v2
+purchasing_shift_items
+🧾 PART 6 — AGENT EXIT CRITERIA
+The agent MUST STOP after:
+Headers added
+Guard added
+Health endpoint verified
+The agent MUST NOT:
+“Continue improving”
+“Fix related issues”
+“Refactor while here”
+✅ SUCCESS DEFINITION
+The system is now:
+Operational
+Protected from accidental damage
+Observable
+Safe to run daily operations
+Ready for controlled future changes
+🛑 FINAL INSTRUCTION TO AGENT
+If you feel tempted to improve anything — STOP.
+This patch is about stability, not elegance.

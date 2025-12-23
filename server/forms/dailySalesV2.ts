@@ -1,3 +1,14 @@
+/**
+ * 🔐 PRODUCTION LOCK — DO NOT MODIFY
+ * This file is part of the live Smash Brothers Burgers operations stack.
+ * Changes here can break purchasing, P&L, shift analysis, or emails.
+ *
+ * Allowed actions:
+ * - READ
+ * - LOGGING ONLY (console.log)
+ *
+ * Any functional changes require owner approval.
+ */
 // 🚫 GOLDEN FILE — DO NOT MODIFY WITHOUT CAM'S APPROVAL
 // Smash Brothers Burgers — Daily Sales & Stock Backend (V2)
 

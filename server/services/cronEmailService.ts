@@ -1,3 +1,14 @@
+/**
+ * 🔐 PRODUCTION LOCK — DO NOT MODIFY
+ * This file is part of the live Smash Brothers Burgers operations stack.
+ * Changes here can break purchasing, P&L, shift analysis, or emails.
+ *
+ * Allowed actions:
+ * - READ
+ * - LOGGING ONLY (console.log)
+ *
+ * Any functional changes require owner approval.
+ */
 import cron from 'node-cron';
 import { db } from '../db';
 import { dailyStockSales, shoppingList, aiInsights } from '../../shared/schema';
