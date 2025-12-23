@@ -1568,7 +1568,16 @@ export const insertPurchasingShiftItemSchema = createInsertSchema(purchasingShif
 export type PurchasingShiftItem = typeof purchasingShiftItems.$inferSelect;
 export type InsertPurchasingShiftItem = z.infer<typeof insertPurchasingShiftItemSchema>;
 
-// Purchasing Items - Master list of purchasable items with pricing
+/**
+ * 🔒 CANONICAL PURCHASING FLOW (AUTO-SYNC)
+ * purchasing_items → Form 2 → purchasing_shift_items → Shopping List
+ *
+ * RULES:
+ * - purchasing_items is the ONLY source of truth
+ * - Form 2 auto-loads items (no manual sync)
+ * - Shopping List & Shift Log are read-only views
+ * - DO NOT duplicate or derive items elsewhere
+ */
 export const purchasingItems = pgTable("purchasing_items", {
   id: serial("id").primaryKey(),
   item: varchar("item").notNull(),
@@ -1580,6 +1589,7 @@ export const purchasingItems = pgTable("purchasing_items", {
   unitDescription: varchar("unitDescription"),
   unitCost: decimal("unitCost", { precision: 10, scale: 2 }),
   lastReviewDate: varchar("lastReviewDate"),
+  active: boolean("active").notNull().default(true),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });

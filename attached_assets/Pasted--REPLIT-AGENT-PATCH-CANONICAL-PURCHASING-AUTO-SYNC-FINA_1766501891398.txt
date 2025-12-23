@@ -1,0 +1,139 @@
+🔐 REPLIT AGENT — PATCH: CANONICAL PURCHASING AUTO-SYNC (FINAL)
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Restore Purchasing List as the single source of truth and auto-sync it everywhere:
+Copy code
+
+purchasing_items (MASTER)
+        ↓
+Form 2 (Daily Stock) — auto-loaded
+        ↓
+purchasing_shift_items (per shift)
+        ↓
+Shopping List + Shift Log
+No duplication. No JSON hacks. No derived item lists.
+🚫 ABSOLUTE RULES (DO NOT VIOLATE)
+❌ DO NOT create new purchasing tables
+❌ DO NOT store purchase items in JSON
+❌ DO NOT hardcode item lists anywhere
+❌ DO NOT change business logic unrelated to purchasing
+❌ DO NOT touch UI styling
+✅ STEP 1 — PURCHASING LIST = CANONICAL MASTER
+Action
+Ensure ALL purchasable items live in:
+Copy code
+
+purchasing_items
+Required columns:
+id
+name
+category
+supplier
+brand
+sku
+order_unit
+unit_cost
+active (boolean)
+Verification
+Copy code
+Sql
+SELECT COUNT(*) FROM purchasing_items WHERE active = true;
+Expected: ~72 items (or full catalog)
+✅ STEP 2 — AUTO-SYNC FORM 2 (NO MANUAL SYNC)
+Action
+Form 2 (Daily Stock) must:
+Load items LIVE from:
+Copy code
+
+GET /api/purchasing-items?active=true
+Render items dynamically
+NEVER store item definitions locally
+ONLY allow staff to enter quantities
+Explicit Removal
+Remove:
+Any static item arrays
+Any derived stock lists
+Any fallback mappings
+Verification
+Purchasing page and Form 2 show identical items
+Adding/removing an item in Purchasing List updates Form 2 immediately (page refresh only)
+✅ STEP 3 — WRITE PURCHASES CANONICALLY (FORM 2 SUBMIT)
+Action
+On Form 2 submit:
+For each item with quantity > 0:
+Resolve purchasing_item_id
+Insert into:
+Copy code
+
+purchasing_shift_items
+Required fields:
+shift_date
+purchasing_item_id
+quantity
+source = 'FORM_2'
+Hard Rule
+❌ Do NOT infer items by name
+❌ Do NOT write to payload JSON
+❌ Do NOT calculate costs here
+Verification
+Copy code
+Sql
+SELECT * FROM purchasing_shift_items ORDER BY created_at DESC LIMIT 10;
+Rows appear immediately after submission.
+✅ STEP 4 — SHOPPING LIST = READ-ONLY VIEW
+Action
+Shopping List API MUST:
+Read ONLY from:
+Copy code
+
+purchasing_shift_items
+Join:
+Copy code
+
+purchasing_items
+for name, unit, cost
+Explicitly Forbidden
+Reading from daily_stock_v2
+Reading from payload JSON
+Any fallback logic
+Verification
+Shopping List populates after Form 2 submit
+Costs reflect Purchasing List instantly
+Historical lists load correctly
+✅ STEP 5 — SHIFT LOG VISIBILITY (COMPLETE)
+Action
+Shift Log must:
+Display ALL active purchasing_items
+Show per-shift quantities from purchasing_shift_items
+Show zero where no quantity exists
+Verification
+Every purchasing item appears as a row
+Shifts align with Daily Stock dates
+🔒 STEP 6 — LOCKDOWN HEADER (MANDATORY)
+Add this header to ALL modified files:
+Copy code
+Ts
+/**
+ * 🔒 CANONICAL PURCHASING FLOW (AUTO-SYNC)
+ * purchasing_items → Form 2 → purchasing_shift_items → Shopping List
+ *
+ * RULES:
+ * - purchasing_items is the ONLY source of truth
+ * - Form 2 auto-loads items (no manual sync)
+ * - Shopping List & Shift Log are read-only views
+ * - DO NOT duplicate or derive items elsewhere
+ */
+✅ FINAL ACCEPTANCE CRITERIA (MUST ALL PASS)
+✅ Purchasing List shows full catalog
+✅ Form 2 auto-updates when Purchasing List changes
+✅ Submitting Form 2 creates purchasing_shift_items rows
+✅ Shopping List populates correctly
+✅ Shift Log shows all items + all shifts
+✅ No JSON-based purchasing logic remains
+🧠 WHY THIS IS LOCKED
+This design:
+Eliminates drift
+Eliminates silent failures
+Makes costs editable in one place
+Is safe for staff + ops + finance
+Is scalable to multi-store later
+This is the final purchasing architecture.
