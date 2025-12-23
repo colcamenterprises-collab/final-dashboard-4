@@ -1,9 +1,21 @@
+/**
+ * 🔒 CANONICAL PURCHASING FLOW (CONTROL PANEL)
+ * purchasing_items → Form 2 → purchasing_shift_items → Shopping List
+ *
+ * RULES:
+ * - This is the MASTER control panel for all purchasing items
+ * - Deactivating an item removes it from Form 2 but keeps historical data
+ * - Editing unit cost updates Shopping List estimates and analytics
+ * - NO duplicates, NO missing fields
+ */
 import { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { 
   Table, 
   TableBody, 
@@ -19,7 +31,7 @@ import {
   DialogTitle, 
   DialogFooter 
 } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2, Search, Download, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Download, Upload, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 
 type PurchasingItem = {
   id: number;
@@ -32,6 +44,7 @@ type PurchasingItem = {
   unitDescription: string | null;
   unitCost: number | null;
   lastReviewDate: string | null;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -44,9 +57,12 @@ const thb = (v: unknown): string => {
 export default function PurchasingPage() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<PurchasingItem | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [showCostWarning, setShowCostWarning] = useState(false);
+  const [pendingCostUpdate, setPendingCostUpdate] = useState<{ id: number; oldCost: number | null; newCost: number } | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['purchasing-items'],
@@ -90,22 +106,46 @@ export default function PurchasingPage() {
     },
   });
 
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, active }: { id: number; active: boolean }) => {
+      const res = await fetch(`/api/purchasing-items/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active }),
+      });
+      if (!res.ok) throw new Error('Failed to toggle item');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/purchasing-items/${id}`, {
         method: 'DELETE',
       });
-      if (!res.ok) throw new Error('Failed to delete item');
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to delete item');
+      }
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
       setDeleteId(null);
     },
+    onError: (err: Error) => {
+      alert(err.message);
+      setDeleteId(null);
+    },
   });
 
   const items: PurchasingItem[] = data?.items || [];
 
+  const activeCount = items.filter(i => i.active).length;
+  const inactiveCount = items.filter(i => !i.active).length;
   const categories = Array.from(new Set(items.map(i => i.category).filter(Boolean)));
 
   const filteredItems = items.filter(item => {
@@ -117,12 +157,19 @@ export default function PurchasingPage() {
     
     const matchesCategory = !categoryFilter || item.category === categoryFilter;
     
-    return matchesSearch && matchesCategory;
+    const matchesStatus = 
+      statusFilter === 'all' ? true :
+      statusFilter === 'active' ? item.active :
+      !item.active;
+    
+    return matchesSearch && matchesCategory && matchesStatus;
   });
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    const newCost = formData.get('unitCost') ? parseFloat(formData.get('unitCost') as string) : null;
+    
     const data = {
       item: formData.get('item') as string,
       category: formData.get('category') as string || null,
@@ -131,27 +178,78 @@ export default function PurchasingPage() {
       supplierSku: formData.get('supplierSku') as string || null,
       orderUnit: formData.get('orderUnit') as string || null,
       unitDescription: formData.get('unitDescription') as string || null,
-      unitCost: formData.get('unitCost') ? parseFloat(formData.get('unitCost') as string) : null,
+      unitCost: newCost,
       lastReviewDate: formData.get('lastReviewDate') as string || null,
+      active: (formData.get('active') as string) === 'true',
     };
+
+    if (editingItem && editingItem.unitCost !== newCost && newCost !== null && editingItem.unitCost !== null) {
+      const costChange = newCost - editingItem.unitCost;
+      if (Math.abs(costChange) > 10) {
+        setPendingCostUpdate({ id: editingItem.id, oldCost: editingItem.unitCost, newCost });
+        setShowCostWarning(true);
+        return;
+      }
+    }
 
     if (editingItem) {
       updateMutation.mutate({ id: editingItem.id, data });
     } else {
-      createMutation.mutate(data);
+      createMutation.mutate({ ...data, active: true });
     }
+  };
+
+  const confirmCostUpdate = () => {
+    if (pendingCostUpdate && editingItem) {
+      const formEl = document.querySelector('form');
+      if (formEl) {
+        const formData = new FormData(formEl);
+        const data = {
+          item: formData.get('item') as string,
+          category: formData.get('category') as string || null,
+          supplierName: formData.get('supplierName') as string || null,
+          brand: formData.get('brand') as string || null,
+          supplierSku: formData.get('supplierSku') as string || null,
+          orderUnit: formData.get('orderUnit') as string || null,
+          unitDescription: formData.get('unitDescription') as string || null,
+          unitCost: pendingCostUpdate.newCost,
+          lastReviewDate: formData.get('lastReviewDate') as string || null,
+          active: (formData.get('active') as string) === 'true',
+        };
+        updateMutation.mutate({ id: editingItem.id, data });
+      }
+    }
+    setShowCostWarning(false);
+    setPendingCostUpdate(null);
   };
 
   return (
     <div className="p-4">
       <div className="mb-4">
         <h1 className="text-3xl font-bold text-slate-900 mb-1">Purchasing List</h1>
-        <p className="text-xs text-slate-600">Master list of all items we buy. Used for daily purchasing and stock planning.</p>
+        <p className="text-xs text-slate-600">Master control panel for all items. Changes here affect Form 2, Shopping List, and Analytics.</p>
+      </div>
+
+      <div className="flex gap-3 mb-4">
+        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
+          <CheckCircle className="h-4 w-4 text-emerald-600" />
+          <span className="text-sm font-medium text-slate-900">{activeCount}</span>
+          <span className="text-xs text-slate-600">Active</span>
+        </Card>
+        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
+          <XCircle className="h-4 w-4 text-slate-400" />
+          <span className="text-sm font-medium text-slate-900">{inactiveCount}</span>
+          <span className="text-xs text-slate-600">Inactive</span>
+        </Card>
+        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-900">{items.length}</span>
+          <span className="text-xs text-slate-600">Total Items</span>
+        </Card>
       </div>
 
       <Card className="p-4 mb-4 rounded-[4px] border-slate-200">
-        <div className="flex gap-3 items-center mb-4">
-          <div className="flex-1 relative">
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="flex-1 min-w-[200px] relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               data-testid="input-search"
@@ -171,6 +269,16 @@ export default function PurchasingPage() {
             {categories.map(cat => (
               <option key={cat} value={cat || ''}>{cat}</option>
             ))}
+          </select>
+          <select
+            data-testid="select-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+            className="text-xs px-3 py-2 border border-slate-200 rounded-[4px] bg-white"
+          >
+            <option value="active">Active Only</option>
+            <option value="inactive">Inactive Only</option>
+            <option value="all">All Items</option>
           </select>
           <Button
             data-testid="button-add-item"
@@ -248,9 +356,10 @@ export default function PurchasingPage() {
       ) : (
         <Card className="rounded-[4px] border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1100px]">
+            <Table className="min-w-[1200px]">
               <TableHeader>
                 <TableRow className="border-slate-200">
+                  <TableHead className="text-xs font-medium text-slate-900 w-16 text-center">Active</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900 sticky left-0 bg-slate-50 z-10">Item</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
@@ -265,16 +374,35 @@ export default function PurchasingPage() {
               </TableHeader>
               <TableBody>
                 {filteredItems.map((item) => (
-                  <TableRow key={item.id} className="border-slate-200" data-testid={`row-item-${item.id}`}>
-                    <TableCell className="text-xs text-slate-900 font-medium sticky left-0 bg-white z-10">{item.item}</TableCell>
+                  <TableRow 
+                    key={item.id} 
+                    className={`border-slate-200 ${!item.active ? 'opacity-50 bg-slate-50' : ''}`} 
+                    data-testid={`row-item-${item.id}`}
+                  >
+                    <TableCell className="text-center">
+                      <Switch
+                        data-testid={`switch-active-${item.id}`}
+                        checked={item.active}
+                        onCheckedChange={(checked) => {
+                          toggleActiveMutation.mutate({ id: item.id, active: checked });
+                        }}
+                        disabled={toggleActiveMutation.isPending}
+                      />
+                    </TableCell>
+                    <TableCell className="text-xs text-slate-900 font-medium sticky left-0 bg-white z-10">
+                      {item.item}
+                      {!item.active && (
+                        <Badge variant="secondary" className="ml-2 text-[10px]">Inactive</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-xs text-slate-600">{item.category || '-'}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.supplierName || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.supplierName || <span className="text-amber-600">Missing</span>}</TableCell>
                     <TableCell className="text-xs text-slate-600">{item.brand || '-'}</TableCell>
                     <TableCell className="text-xs text-slate-600">{item.supplierSku || '-'}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.orderUnit || '-'}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{item.orderUnit || <span className="text-amber-600">Missing</span>}</TableCell>
                     <TableCell className="text-xs text-slate-600">{item.unitDescription || '-'}</TableCell>
                     <TableCell className="text-xs text-slate-900 font-medium text-right">
-                      {item.unitCost !== null ? thb(item.unitCost) : '-'}
+                      {item.unitCost !== null ? thb(item.unitCost) : <span className="text-amber-600">Missing</span>}
                     </TableCell>
                     <TableCell className="text-xs text-slate-600">{item.lastReviewDate || '-'}</TableCell>
                     <TableCell className="sticky right-0 bg-white z-10 border-l border-slate-200">
@@ -306,7 +434,7 @@ export default function PurchasingPage() {
                 ))}
                 {filteredItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-xs text-slate-600 py-8">
+                    <TableCell colSpan={11} className="text-center text-xs text-slate-600 py-8">
                       No items found
                     </TableCell>
                   </TableRow>
@@ -417,6 +545,20 @@ export default function PurchasingPage() {
                   className="text-xs rounded-[4px] border-slate-200"
                 />
               </div>
+              {editingItem && (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="hidden"
+                    name="active"
+                    value={editingItem.active ? 'true' : 'false'}
+                  />
+                  <label className="text-xs font-medium text-slate-900">Active Status:</label>
+                  <Badge variant={editingItem.active ? 'default' : 'secondary'}>
+                    {editingItem.active ? 'Active' : 'Inactive'}
+                  </Badge>
+                  <span className="text-xs text-slate-500">(Use toggle in table to change)</span>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button
@@ -450,7 +592,7 @@ export default function PurchasingPage() {
             <DialogTitle>Confirm Delete</DialogTitle>
           </DialogHeader>
           <p className="text-sm text-slate-600 py-4">
-            Are you sure you want to delete this item? This action cannot be undone.
+            Are you sure you want to delete this item? Consider deactivating it instead to preserve historical data.
           </p>
           <DialogFooter>
             <Button
@@ -469,6 +611,56 @@ export default function PurchasingPage() {
               className="text-xs rounded-[4px]"
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showCostWarning} onOpenChange={setShowCostWarning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              High-Impact Cost Change
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm text-slate-600 mb-4">
+              You are about to change the unit cost by more than ฿10. This will affect:
+            </p>
+            <ul className="text-sm text-slate-600 list-disc pl-6 space-y-1 mb-4">
+              <li>Shopping List estimates (future shifts)</li>
+              <li>Purchasing analytics</li>
+              <li>Cost projections</li>
+            </ul>
+            {pendingCostUpdate && (
+              <div className="bg-amber-50 border border-amber-200 rounded-[4px] p-3">
+                <p className="text-xs text-amber-800">
+                  Cost change: {thb(pendingCostUpdate.oldCost || 0)} → {thb(pendingCostUpdate.newCost)}
+                  <span className="font-medium ml-2">
+                    ({pendingCostUpdate.newCost - (pendingCostUpdate.oldCost || 0) > 0 ? '+' : ''}
+                    {thb(pendingCostUpdate.newCost - (pendingCostUpdate.oldCost || 0))})
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCostWarning(false);
+                setPendingCostUpdate(null);
+              }}
+              className="text-xs rounded-[4px] border-slate-200"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmCostUpdate}
+              className="bg-amber-600 hover:bg-amber-700 text-xs rounded-[4px]"
+            >
+              Confirm Cost Change
             </Button>
           </DialogFooter>
         </DialogContent>

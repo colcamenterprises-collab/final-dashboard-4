@@ -1,0 +1,111 @@
+🔐 REPLIT AGENT — PATCH SET: PURCHASING INTELLIGENCE (NO ORDERING)
+🧠 FOUNDATIONAL RULE (RECONFIRMED)
+Copy code
+
+purchasing_items (MASTER)
+→ Form 2 (Daily Stock)
+→ purchasing_shift_items
+→ Shopping List / Shift Log / Analytics
+No ordering actions. Read-only intelligence only.
+PATCH A — PURCHASING LIST (FULL RESTORE + CONTROL)
+Objective
+Turn Purchasing into the single control panel for everything that follows.
+Required Enhancements
+Ensure ALL items exist (≈72)
+Enforce:
+SKU (nullable allowed)
+Supplier
+Brand
+Order unit
+Unit cost
+Active flag
+New Behaviours
+Deactivating an item:
+Removes it from Form 2
+Keeps historical data intact
+Editing unit cost:
+Immediately updates:
+Shopping List estimates
+All analytics (future-facing only)
+Acceptance
+Purchasing List = full catalog
+No duplicates
+No missing fields
+PATCH B — FORM 2 INTELLIGENCE (AUTO + SAFE)
+Objective
+Make Form 2 staff-proof and fully driven by Purchasing List.
+Behaviour
+Items auto-load from purchasing_items WHERE active=true
+Staff can only enter:
+Quantity
+No prices visible to staff
+No manual sync button
+Validation Rules
+Quantity must be ≥ 0
+Empty form submits allowed
+Submission always creates a shift record
+PATCH C — SHOPPING LIST (REAL OPERATIONAL VIEW)
+Objective
+Shopping List becomes what the manager actually buys.
+Behaviour
+Group by Supplier
+Show per item:
+Quantity needed
+Order unit
+Unit cost
+Line total
+Show:
+Supplier subtotal
+Grand total (read-only)
+Controls
+Date selector
+Refresh
+Export CSV (supplier-friendly)
+Explicitly Excluded
+❌ No “Order now”
+❌ No supplier API
+❌ No mutations
+PATCH D — PURCHASING SHIFT LOG (FULL VISIBILITY)
+Objective
+Answer: “What did we need, when, and why?”
+Behaviour
+Rows = ALL purchasing_items
+Columns = shifts
+Values = quantities entered
+Totals per:
+Item
+Shift
+Date range
+Visual Flags
+🔴 Unusually high quantity (rule-based)
+🟡 Zero when normally used
+🟢 Normal
+(No AI yet — deterministic rules only)
+PATCH E — PURCHASING ANALYTICS (MANAGER-LEVEL)
+New Page: Purchasing → Analysis
+Metrics
+Top 10 items by spend (MTD)
+Top 10 by quantity
+Supplier spend breakdown
+Category spend breakdown
+Avg daily usage per item
+Time Filters
+Last 7 days
+Last 30 days
+MTD
+Custom range
+PATCH F — COST IMPACT VISIBILITY (CRITICAL)
+Objective
+Tie purchasing → profit without touching recipes yet
+Behaviour
+When unit cost changes:
+Log cost delta
+Show:
+“+฿X / day impact (based on last 30 days usage)”
+Display on Purchasing List row
+This gives you immediate financial awareness.
+PATCH G — SYSTEM LOCK EXTENSION (MANDATORY)
+Additions
+Prevent deletion of purchasing_items if referenced
+Prevent editing order_unit if historical data exists
+Add warning modal (not block) for high-impact cost edits

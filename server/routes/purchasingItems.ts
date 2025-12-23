@@ -100,11 +100,26 @@ router.put('/:id', async (req, res) => {
   }
 });
 
+/**
+ * 🔒 SYSTEM LOCK: Prevent deletion if item is referenced in historical data
+ */
 router.delete('/:id', async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
       return res.status(400).json({ ok: false, error: 'Invalid ID' });
+    }
+
+    // Check if item is referenced in purchasing_shift_items (historical data)
+    const refCount = await prisma.purchasingShiftItem.count({
+      where: { purchasingItemId: id },
+    });
+
+    if (refCount > 0) {
+      return res.status(400).json({ 
+        ok: false, 
+        error: `Cannot delete: Item is referenced in ${refCount} shift records. Deactivate it instead to preserve historical data.` 
+      });
     }
 
     await prisma.purchasingItem.delete({
