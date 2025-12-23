@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { estimateShoppingList } from '../services/shoppingList';
 import { db as drizzleDb } from '../db';
 import { sql } from 'drizzle-orm';
-import { shoppingListV2 } from '../../shared/schema';
+// Uses canonical shopping_list and shopping_list_items tables via raw SQL
 
 const router = Router();
 
@@ -18,45 +18,71 @@ router.get('/:id/estimate', async (req, res) => {
   }
 });
 
-// NEW: Latest shopping list
+// Latest shopping list - uses canonical shopping_list table
 router.get('/latest', async (_req, res) => {
   try {
-    const [row] = await drizzleDb
-      .select()
-      .from(shoppingListV2)
-      .orderBy(sql`"created_at" DESC`)
-      .limit(1);
+    const result = await drizzleDb.execute(sql`
+      SELECT sl.*, 
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', sli.id,
+            'name', sli.ingredient_name,
+            'quantity', sli.requested_qty,
+            'unit', sli.requested_unit,
+            'notes', sli.notes
+          ))
+          FROM shopping_list_items sli 
+          WHERE sli.shopping_list_id = sl.id), '[]'::json
+        ) as items
+      FROM shopping_list sl
+      ORDER BY sl.created_at DESC
+      LIMIT 1
+    `);
 
+    const row = result.rows?.[0];
     if (!row) return res.json({ date: null, items: [] });
 
     res.json({
-      date: (row as any).shiftDate,
-      items: (row as any).itemsJson || [],
+      date: (row as any).list_date || (row as any).created_at,
+      items: (row as any).items || [],
     });
   } catch (err) {
     console.error('shopping-list.latest error', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Failed to fetch shopping list' });
   }
 });
 
-// NEW: List by date
+// List by date - uses canonical shopping_list table
 router.get('/by-date', async (req, res) => {
   try {
     const { date } = req.query as { date?: string };
     if (!date) return res.status(400).json({ error: 'date is required' });
 
-    const [row] = await drizzleDb
-      .select()
-      .from(shoppingListV2)
-      .where(sql`"shiftDate" = ${date}`)
-      .limit(1);
+    const result = await drizzleDb.execute(sql`
+      SELECT sl.*, 
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', sli.id,
+            'name', sli.ingredient_name,
+            'quantity', sli.requested_qty,
+            'unit', sli.requested_unit,
+            'notes', sli.notes
+          ))
+          FROM shopping_list_items sli 
+          WHERE sli.shopping_list_id = sl.id), '[]'::json
+        ) as items
+      FROM shopping_list sl
+      WHERE sl.list_date::date = ${date}::date
+      LIMIT 1
+    `);
 
+    const row = result.rows?.[0];
     if (!row)
       return res.status(404).json({ error: 'Shopping list not found for this date' });
 
     res.json({
       date,
-      items: (row as any).itemsJson || [],
+      items: (row as any).items || [],
     });
   } catch (err) {
     console.error('shopping-list.by-date error', err);

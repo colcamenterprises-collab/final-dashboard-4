@@ -1,9 +1,11 @@
 // PATCH 2 — SHOPPING LIST PROTECTION & TRIPWIRES
 // ONLY retrieval is allowed via this route.
 // Mutation is strictly forbidden.
+// Uses canonical shopping_list table (not shopping_list_v2)
 
 import { Router } from "express";
-import { db } from "../lib/prisma";
+import { db as drizzleDb } from "../db";
+import { sql } from "drizzle-orm";
 import { generateShoppingListPDF } from "../services/shoppingListPDF";
 import { generateShoppingListZip } from "../services/shoppingListZip";
 
@@ -22,12 +24,33 @@ router.use((req, res, next) => {
 
 router.get("/latest", async (req, res) => {
   try {
-    const prisma = db();
-    const latest = await prisma.shoppingListV2.findFirst({
-      orderBy: { createdAt: "desc" },
-    });
+    const result = await drizzleDb.execute(sql`
+      SELECT sl.*, 
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', sli.id,
+            'name', sli.ingredient_name,
+            'quantity', sli.requested_qty,
+            'unit', sli.requested_unit,
+            'notes', sli.notes
+          ))
+          FROM shopping_list_items sli 
+          WHERE sli.shopping_list_id = sl.id), '[]'::json
+        ) as items
+      FROM shopping_list sl
+      ORDER BY sl.created_at DESC
+      LIMIT 1
+    `);
 
-    return res.status(200).json(latest || { items: [] });
+    const row = result.rows?.[0];
+    if (!row) return res.status(200).json({ items: [] });
+
+    return res.status(200).json({
+      id: (row as any).id,
+      createdAt: (row as any).created_at,
+      date: (row as any).list_date || (row as any).created_at,
+      items: (row as any).items || [],
+    });
   } catch (err) {
     console.error("ShoppingList fetch error:", err);
     res.status(500).json({ error: "Failed to fetch shopping list" });
@@ -82,10 +105,29 @@ router.get("/pdf/range", async (req, res) => {
 
 router.get("/history", async (req, res) => {
   try {
-    const prisma = db();
-    const lists = await prisma.shoppingListV2.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    const result = await drizzleDb.execute(sql`
+      SELECT sl.id, sl.created_at, sl.list_date,
+        COALESCE(
+          (SELECT json_agg(json_build_object(
+            'id', sli.id,
+            'name', sli.ingredient_name,
+            'quantity', sli.requested_qty,
+            'unit', sli.requested_unit
+          ))
+          FROM shopping_list_items sli 
+          WHERE sli.shopping_list_id = sl.id), '[]'::json
+        ) as items
+      FROM shopping_list sl
+      ORDER BY sl.created_at DESC
+      LIMIT 50
+    `);
+
+    const lists = (result.rows || []).map((row: any) => ({
+      id: row.id,
+      createdAt: row.created_at,
+      date: row.list_date || row.created_at,
+      items: row.items || [],
+    }));
 
     res.json({ lists });
   } catch (err) {
