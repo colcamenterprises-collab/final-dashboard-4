@@ -151,6 +151,7 @@ export async function backfillPurchasingShiftItems(): Promise<{ processed: numbe
   let totalSynced = 0;
 
   try {
+    // First: sync from purchasingJson (legacy)
     const stockRecords = await db.execute(sql`
       SELECT id, "purchasingJson"
       FROM daily_stock_v2
@@ -168,10 +169,73 @@ export async function backfillPurchasingShiftItems(): Promise<{ processed: numbe
       allErrors.push(...errors);
     }
 
+    // Second: sync from mapped columns (burgerBuns, meatWeightG)
+    const { synced: mappedSynced, errors: mappedErrors } = await syncFromMappedColumns();
+    totalSynced += mappedSynced;
+    allErrors.push(...mappedErrors);
+
     console.log(`[backfill] Processed ${totalProcessed} records, synced ${totalSynced} items`);
     return { processed: totalProcessed, synced: totalSynced, errors: allErrors };
   } catch (err: any) {
     console.error('[backfill] Error:', err);
     return { processed: totalProcessed, synced: totalSynced, errors: [err.message, ...allErrors] };
+  }
+}
+
+/**
+ * Sync purchasing_shift_items from mapped stock columns (burgerBuns, meatWeightG)
+ * Uses purchasing_field_map to determine which columns map to which purchasing items
+ */
+export async function syncFromMappedColumns(): Promise<{ synced: number; errors: string[] }> {
+  const errors: string[] = [];
+  let synced = 0;
+
+  try {
+    // Get field mappings: fieldKey -> purchasingItemId
+    const fieldMappings = await db.select().from(purchasingFieldMap);
+    
+    // Map: fieldKey (rollsEnd, meatEndKg) -> column name in daily_stock_v2 (burgerBuns, meatWeightG)
+    const fieldToColumn: Record<string, string> = {
+      'rollsEnd': 'burgerBuns',
+      'meatEndKg': 'meatWeightG'
+    };
+
+    // Get all daily_stock_v2 records
+    const stockRecords = await db.execute(sql`
+      SELECT id, "burgerBuns", "meatWeightG"
+      FROM daily_stock_v2
+      WHERE "deletedAt" IS NULL
+    `);
+
+    for (const record of (stockRecords.rows || [])) {
+      const stockId = record.id as string;
+
+      for (const mapping of fieldMappings) {
+        const columnName = fieldToColumn[mapping.fieldKey];
+        if (!columnName) continue;
+
+        const value = (record as any)[columnName];
+        const qty = Number(value) || 0;
+        if (qty <= 0) continue;
+
+        try {
+          await db.execute(sql`
+            INSERT INTO purchasing_shift_items ("dailyStockId", "purchasingItemId", quantity, "createdAt", "updatedAt")
+            VALUES (${stockId}, ${mapping.purchasingItemId}, ${qty}, NOW(), NOW())
+            ON CONFLICT ("dailyStockId", "purchasingItemId")
+            DO UPDATE SET quantity = EXCLUDED.quantity, "updatedAt" = NOW()
+          `);
+          synced++;
+        } catch (err: any) {
+          errors.push(`Failed to sync mapped column ${columnName} for stock ${stockId}: ${err.message}`);
+        }
+      }
+    }
+
+    console.log(`[syncFromMappedColumns] Synced ${synced} items from mapped columns`);
+    return { synced, errors };
+  } catch (err: any) {
+    console.error('[syncFromMappedColumns] Error:', err);
+    return { synced: 0, errors: [err.message] };
   }
 }

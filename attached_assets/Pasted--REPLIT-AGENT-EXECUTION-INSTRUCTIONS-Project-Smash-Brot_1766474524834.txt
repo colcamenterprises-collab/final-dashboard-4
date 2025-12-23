@@ -1,0 +1,175 @@
+🔐 REPLIT AGENT — EXECUTION INSTRUCTIONS
+Project: Smash Brothers Burgers – Final Dashboard
+Mode: Surgical Recovery (No Refactors, No UI Redesigns)
+Goal: Restore full business operability TODAY
+🚨 ABSOLUTE RULES (NON-NEGOTIABLE)
+DO NOT refactor
+DO NOT rename tables
+DO NOT change form schemas
+DO NOT invent data
+DO NOT touch UI styling
+NO fixes without a read-only diagnostic first
+Every fix must name:
+Writer
+Reader
+Table
+After each step, prove rows exist with SQL
+If you violate any rule, STOP.
+✅ CURRENT VERIFIED STATE (DO NOT RECHECK)
+These are already fixed and verified:
+daily_stock_v2 now receives data
+Historical backfill completed
+Purchasing items seeded
+purchasing_field_map exists
+Purchasing Shift Log shows shifts
+F&B Analysis loads shifts
+You must not redo or undo these.
+🧱 PATCH SEQUENCE (MANDATORY ORDER)
+🔹 PATCH 3 — PURCHASING → SHOPPING LIST POPULATION
+🎯 Objective
+Make Shopping List and Purchasing List populate with real data.
+🔍 READ-ONLY DIAGNOSTIC (REQUIRED FIRST)
+Confirm requisition fields exist in daily_stock_v2.payload
+Confirm purchasing_field_map mappings:
+rollsEnd
+meatEndKg
+drinkStockJson
+Confirm purchasing item names exactly match map targets
+DO NOT FIX until diagnostic output is shown.
+🔧 FIX (ONLY IF DIAGNOSTIC CONFIRMS)
+Action
+Extend purchasing sync logic to:
+Read mapped stock fields
+Create purchasing_shift_items rows
+Scope
+File: server/services/purchasingShiftSync.ts
+Tables:
+READ: daily_stock_v2
+WRITE: purchasing_shift_items
+Constraints
+No calculations
+No aggregation
+1 shift → N purchasing items
+Idempotent (safe re-run)
+✅ VERIFICATION (MANDATORY)
+Run and paste results:
+Copy code
+Sql
+SELECT COUNT(*) FROM purchasing_shift_items;
+SELECT shift_date, COUNT(*) FROM purchasing_shift_items GROUP BY shift_date;
+🔹 PATCH 4 — SHOPPING LIST API RESTORATION
+🎯 Objective
+Make Shopping List page show items.
+🔍 READ-ONLY DIAGNOSTIC
+Identify which route serves:
+/api/shopping-list/latest
+Identify which ORM is used (Prisma vs Drizzle)
+Identify actual table name being queried
+🔧 FIX
+Action
+Remove references to non-existent:
+ShoppingListV2
+shopping_list_v2
+Replace with canonical tables:
+shopping_list
+shopping_list_items
+Scope
+Backend route only
+No schema changes
+No UI changes
+✅ VERIFICATION
+Copy code
+Sql
+SELECT * FROM shopping_list ORDER BY created_at DESC LIMIT 1;
+SELECT COUNT(*) FROM shopping_list_items;
+Shopping List page must show data.
+🔹 PATCH 5 — P&L 401 AUTH BLOCKER
+🎯 Objective
+Remove authentication blockage preventing P&L from loading.
+🔍 READ-ONLY DIAGNOSTIC
+Confirm /api/profit-loss middleware
+Confirm required headers:
+x-user-id
+x-restaurant-id
+Confirm frontend sends none
+🔧 FIX (CHOOSE ONE, DEFAULT = A)
+Option A (Preferred):
+Allow internal dashboard access without auth
+Keep auth for external calls
+Option B:
+Inject headers from frontend session
+No role system changes allowed.
+✅ VERIFICATION
+Copy code
+Bash
+curl /api/profit-loss
+P&L page must load without 401.
+🔹 PATCH 6 — DAILY REVIEW EMAIL (TOP PRIORITY)
+🎯 Objective
+Restore ONE SINGLE EMAIL:
+“Daily Review – Manager Summary”
+📧 EMAIL MUST INCLUDE (TABLES ONLY)
+Sales Summary
+Cash / QR / Grab / Other
+Total Sales
+Shift Expenses
+Itemised
+Total
+Finance
+Starting Cash
+Expected Register
+Actual Register
+Balanced (Yes/No)
+Cash to Bank
+QR to Bank
+POS vs Daily Sales
+Variances
+Receipts
+Discounts
+Refunds
+Items Sold
+Category
+Qty
+Sales
+Meat & Buns
+Expected
+Actual
+Variance
+Status
+Purchasing
+Items
+Qty
+Estimated Cost
+RULES
+HTML tables only
+No charts
+No emojis
+No placeholders
+If data missing → explicitly say why
+✅ VERIFICATION
+Trigger email manually
+Paste rendered output
+Confirm real numbers, not zeros
+🔹 PATCH 7 — FINAL SYSTEM SANITY CHECK
+🎯 Objective
+Confirm business can operate.
+REQUIRED PAGES TO LOAD DATA
+Purchasing List ✅
+Shopping List ✅
+Shift Log ✅
+F&B Analysis ✅
+Sales & Shift Analysis ✅
+Daily Review Email ✅
+P&L ✅
+🛑 STOP CONDITIONS
+Agent MUST STOP if:
+A table is empty unexpectedly
+A route queries a non-existent model
+An auth error appears
+Any fix would require refactor
+📌 FINAL NOTE TO AGENT
+This system worked last week.
+Your job is not to redesign — it is to reconnect broken wires.
+If unsure: ➡️ Diagnose
+➡️ Show SQL
+➡️ Ask before changing
