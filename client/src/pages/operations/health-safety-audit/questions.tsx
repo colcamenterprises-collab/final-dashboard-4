@@ -137,12 +137,26 @@ export default function HealthSafetyQuestionManager() {
 
   const getDisplaySection = (section: string) => {
     if (!showThai) return section;
-    return thaiSectionMap[section] || section;
+    const key = section.trim();
+    if (thaiSectionMap[key]) return thaiSectionMap[key];
+    for (const [engKey, thaiVal] of Object.entries(thaiSectionMap)) {
+      if (key.toLowerCase() === engKey.toLowerCase()) {
+        return thaiVal;
+      }
+    }
+    return section;
   };
 
   const getDisplayLabel = (label: string) => {
     if (!showThai) return label;
-    return thaiLabelMap[label] || label;
+    const key = label.trim();
+    if (thaiLabelMap[key]) return thaiLabelMap[key];
+    for (const [engKey, thaiVal] of Object.entries(thaiLabelMap)) {
+      if (key.toLowerCase() === engKey.toLowerCase()) {
+        return thaiVal;
+      }
+    }
+    return label;
   };
 
   return (

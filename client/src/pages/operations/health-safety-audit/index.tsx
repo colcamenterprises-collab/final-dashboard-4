@@ -89,12 +89,22 @@ export default function HealthSafetyAuditPage() {
 
   const getTranslatedSection = (section: string) => {
     if (!showThai) return section;
-    return thaiTranslations[section]?.section || section;
+    const key = section.trim();
+    return thaiTranslations[key]?.section || section;
   };
 
   const getTranslatedLabel = (label: string) => {
     if (!showThai) return label;
-    return questionTranslations[label] || label;
+    const key = label.trim();
+    if (questionTranslations[key]) {
+      return questionTranslations[key];
+    }
+    for (const [engKey, thaiVal] of Object.entries(questionTranslations)) {
+      if (key.toLowerCase() === engKey.toLowerCase()) {
+        return thaiVal;
+      }
+    }
+    return label;
   };
 
   const submitAudit = async () => {
