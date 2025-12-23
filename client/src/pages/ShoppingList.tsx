@@ -1,8 +1,19 @@
+/**
+ * 🔒 CANONICAL PURCHASING FLOW (READ-ONLY VIEW)
+ * purchasing_items → Form 2 → purchasing_shift_items → Shopping List
+ *
+ * RULES:
+ * - This is a READ-ONLY operational view of what to buy
+ * - Grouped by Supplier for easy purchasing
+ * - NO ordering actions, NO mutations
+ * - Export CSV is supplier-friendly
+ */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Download, ShoppingBag, Package, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Download, ShoppingBag, Package, RefreshCw, Calendar, Truck } from "lucide-react";
 
 type ShoppingListLine = {
   fieldKey: string;
@@ -19,15 +30,18 @@ type ShoppingListLine = {
 
 type ShoppingListResponse = {
   salesId: string | null;
+  stockId?: string;
   shiftDate?: string;
   lines: ShoppingListLine[];
   grandTotal: number;
   itemCount: number;
   message?: string;
+  source?: string;
 };
 
 export default function ShoppingList() {
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>("");
 
   const { data, isLoading, refetch, isFetching } = useQuery<ShoppingListResponse>({
     queryKey: ["/api/purchasing-list/latest"],
@@ -37,6 +51,7 @@ export default function ShoppingList() {
   const grandTotal = data?.grandTotal || 0;
   const itemCount = data?.itemCount || 0;
   const shiftDate = data?.shiftDate;
+  const source = data?.source;
 
   const handleDownloadCSV = async () => {
     setIsDownloading(true);
@@ -70,17 +85,28 @@ export default function ShoppingList() {
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
-  // Group lines by category
-  const groupedByCategory = lines.reduce((acc, line) => {
-    const cat = line.category || 'Other';
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(line);
+  // Group lines by SUPPLIER (not category) as per PATCH C
+  const groupedBySupplier = lines.reduce((acc, line) => {
+    const supplier = line.supplier || 'No Supplier';
+    if (!acc[supplier]) acc[supplier] = [];
+    acc[supplier].push(line);
     return acc;
   }, {} as Record<string, ShoppingListLine[]>);
 
-  // Calculate category totals
-  const getCategoryTotal = (items: ShoppingListLine[]) => {
+  // Sort suppliers alphabetically, but put "No Supplier" last
+  const sortedSuppliers = Object.keys(groupedBySupplier).sort((a, b) => {
+    if (a === 'No Supplier') return 1;
+    if (b === 'No Supplier') return -1;
+    return a.localeCompare(b);
+  });
+
+  // Calculate supplier totals
+  const getSupplierTotal = (items: ShoppingListLine[]) => {
     return items.reduce((sum, item) => sum + item.lineTotal, 0);
+  };
+
+  const getSupplierItemCount = (items: ShoppingListLine[]) => {
+    return items.reduce((sum, item) => sum + item.quantity, 0);
   };
 
   if (isLoading) {
@@ -100,13 +126,23 @@ export default function ShoppingList() {
             <ShoppingBag className="h-6 w-6 text-emerald-600" />
             Shopping List
           </h1>
-          {shiftDate && (
-            <p className="text-xs text-slate-500 mt-1">
-              From shift: {formatDate(shiftDate)}
-            </p>
-          )}
+          <p className="text-xs text-slate-500 mt-1">
+            Grouped by supplier for easy purchasing
+            {shiftDate && <span className="ml-2">• Shift: {formatDate(shiftDate)}</span>}
+            {source && <span className="ml-2 text-emerald-600">• Source: {source}</span>}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-slate-400" />
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="text-xs h-9 w-36 rounded-[4px] border-slate-200"
+              data-testid="input-date-selector"
+            />
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -126,110 +162,119 @@ export default function ShoppingList() {
             data-testid="button-download-csv"
           >
             <Download className="h-4 w-4 mr-1" />
-            {isDownloading ? 'Downloading...' : 'Download CSV'}
+            {isDownloading ? 'Exporting...' : 'Export CSV'}
           </Button>
         </div>
       </div>
 
-      {/* Grand Total Banner */}
-      {grandTotal > 0 && (
-        <div className="p-4 bg-emerald-50 rounded-[4px] border border-emerald-200">
-          <div className="flex justify-between items-center">
-            <div>
-              <span className="text-xs font-medium text-slate-700">Estimated Grand Total</span>
-              <span className="text-xs text-slate-500 ml-2">({itemCount} items)</span>
-            </div>
-            <span className="text-2xl font-bold text-emerald-600" data-testid="text-grand-total">
-              {formatCurrency(grandTotal)}
-            </span>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Card className="rounded-[4px] border-slate-200 p-3">
+          <div className="text-xs text-slate-500">Total Items</div>
+          <div className="text-xl font-bold text-slate-900">{itemCount}</div>
+        </Card>
+        <Card className="rounded-[4px] border-slate-200 p-3">
+          <div className="text-xs text-slate-500">Suppliers</div>
+          <div className="text-xl font-bold text-slate-900">{sortedSuppliers.length}</div>
+        </Card>
+        <Card className="rounded-[4px] border-emerald-200 bg-emerald-50 p-3 col-span-2">
+          <div className="text-xs text-emerald-700">Estimated Grand Total</div>
+          <div className="text-2xl font-bold text-emerald-700" data-testid="text-grand-total">
+            {formatCurrency(grandTotal)}
           </div>
+        </Card>
+      </div>
+
+      {/* Shopping List by Supplier */}
+      {itemCount === 0 ? (
+        <Card className="rounded-[4px] border-slate-200 p-8 text-center">
+          <ShoppingBag className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm text-slate-500">No items in shopping list</p>
+          <p className="text-xs text-slate-400 mt-1">
+            Submit Form 2 (Daily Stock) with purchase quantities to generate a shopping list
+          </p>
+        </Card>
+      ) : (
+        <div className="space-y-4">
+          {sortedSuppliers.map((supplier) => {
+            const items = groupedBySupplier[supplier];
+            const supplierTotal = getSupplierTotal(items);
+            const supplierQty = getSupplierItemCount(items);
+            
+            return (
+              <Card key={supplier} className="rounded-[4px] border-slate-200 overflow-hidden">
+                <CardHeader className="py-3 px-4 bg-slate-50 border-b border-slate-200">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-emerald-600" />
+                      {supplier}
+                      <span className="text-xs font-normal text-slate-500">
+                        ({items.length} items, {supplierQty} units)
+                      </span>
+                    </CardTitle>
+                    <div className="text-right">
+                      <span className="text-xs text-slate-500 mr-2">Subtotal:</span>
+                      <span className="text-sm font-bold text-emerald-600">{formatCurrency(supplierTotal)}</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs" data-testid={`table-supplier-${supplier.toLowerCase().replace(/\s+/g, '-')}`}>
+                      <thead className="bg-slate-50 border-b border-slate-100">
+                        <tr>
+                          <th className="px-4 py-2 text-left font-medium text-slate-600">Item</th>
+                          <th className="px-4 py-2 text-left font-medium text-slate-600">Brand</th>
+                          <th className="px-4 py-2 text-left font-medium text-slate-600">SKU</th>
+                          <th className="px-4 py-2 text-left font-medium text-slate-600">Order Unit</th>
+                          <th className="px-4 py-2 text-center font-medium text-slate-600">Qty</th>
+                          <th className="px-4 py-2 text-right font-medium text-slate-600">Unit Cost</th>
+                          <th className="px-4 py-2 text-right font-medium text-slate-600">Line Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {items.map((line, idx) => (
+                          <tr 
+                            key={idx} 
+                            className="border-b border-slate-50 hover:bg-slate-50"
+                            data-testid={`row-item-${line.item.toLowerCase().replace(/\s+/g, '-')}`}
+                          >
+                            <td className="px-4 py-2 font-medium text-slate-900">{line.item}</td>
+                            <td className="px-4 py-2 text-slate-600">{line.brand || '-'}</td>
+                            <td className="px-4 py-2 text-slate-600">{line.sku || '-'}</td>
+                            <td className="px-4 py-2 text-slate-600">{line.unitDescription || '-'}</td>
+                            <td className="px-4 py-2 text-center font-bold text-slate-900">{line.quantity}</td>
+                            <td className="px-4 py-2 text-right text-slate-600">{formatCurrency(line.unitCost)}</td>
+                            <td className="px-4 py-2 text-right font-semibold text-emerald-600">{formatCurrency(line.lineTotal)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+
+          {/* Grand Total Footer */}
+          <Card className="rounded-[4px] border-emerald-300 bg-emerald-50 p-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="text-sm font-bold text-emerald-800">GRAND TOTAL</span>
+                <span className="text-xs text-emerald-600 ml-2">({itemCount} items from {sortedSuppliers.length} suppliers)</span>
+              </div>
+              <span className="text-2xl font-bold text-emerald-700">
+                {formatCurrency(grandTotal)}
+              </span>
+            </div>
+          </Card>
         </div>
       )}
 
-      {/* Shopping List Table */}
-      <Card className="rounded-[4px] border-slate-200">
-        <CardHeader className="pb-2 border-b border-slate-100">
-          <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <Package className="h-4 w-4 text-emerald-600" />
-            Items to Purchase
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {itemCount === 0 ? (
-            <div className="p-8 text-center">
-              <ShoppingBag className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-sm text-slate-500">No items in shopping list</p>
-              <p className="text-xs text-slate-400 mt-1">
-                Submit Form 2 (Daily Stock) with purchase quantities to generate a shopping list
-              </p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs" data-testid="table-shopping-list">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-slate-600 uppercase">Item</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-600 uppercase">Brand</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-600 uppercase">SKU</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-600 uppercase">Supplier</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-600 uppercase">Unit</th>
-                    <th className="px-3 py-2 text-center font-medium text-slate-600 uppercase">Qty</th>
-                    <th className="px-3 py-2 text-right font-medium text-slate-600 uppercase">Unit Cost</th>
-                    <th className="px-3 py-2 text-right font-medium text-slate-600 uppercase">Line Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(groupedByCategory).map(([category, items]) => (
-                    <>
-                      {/* Category Header Row */}
-                      <tr key={`cat-${category}`} className="bg-slate-100 border-y border-slate-200">
-                        <td colSpan={6} className="px-3 py-2 font-semibold text-slate-800">
-                          {category}
-                        </td>
-                        <td className="px-3 py-2 text-right text-slate-500 font-medium">Subtotal:</td>
-                        <td className="px-3 py-2 text-right font-semibold text-emerald-600">
-                          {formatCurrency(getCategoryTotal(items))}
-                        </td>
-                      </tr>
-                      {/* Item Rows */}
-                      {items.map((line, idx) => (
-                        <tr 
-                          key={`${category}-${idx}`} 
-                          className="border-b border-slate-100 hover:bg-slate-50"
-                          data-testid={`row-item-${line.item.toLowerCase().replace(/\s+/g, '-')}`}
-                        >
-                          <td className="px-3 py-2 font-medium text-slate-900">{line.item}</td>
-                          <td className="px-3 py-2 text-slate-600">{line.brand || '-'}</td>
-                          <td className="px-3 py-2 text-slate-600">{line.sku || '-'}</td>
-                          <td className="px-3 py-2 text-slate-600">{line.supplier || '-'}</td>
-                          <td className="px-3 py-2 text-slate-600">{line.unitDescription || '-'}</td>
-                          <td className="px-3 py-2 text-center font-semibold text-slate-900">{line.quantity}</td>
-                          <td className="px-3 py-2 text-right text-slate-600">{formatCurrency(line.unitCost)}</td>
-                          <td className="px-3 py-2 text-right font-semibold text-emerald-600">{formatCurrency(line.lineTotal)}</td>
-                        </tr>
-                      ))}
-                    </>
-                  ))}
-                  {/* Grand Total Row */}
-                  <tr className="bg-emerald-50 border-t-2 border-emerald-200">
-                    <td colSpan={6} className="px-3 py-3"></td>
-                    <td className="px-3 py-3 text-right font-bold text-slate-800 uppercase">Grand Total:</td>
-                    <td className="px-3 py-3 text-right font-bold text-emerald-700 text-sm">
-                      {formatCurrency(grandTotal)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Info Note */}
       <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-[4px] border border-slate-200">
-        <strong>Note:</strong> This shopping list is generated from Form 2 (Daily Stock) submissions. 
-        All item details and prices come from your Purchasing List. 
-        Update prices in the Purchasing List to see updated estimates here.
+        <strong>Read-Only View:</strong> This shopping list shows what to purchase based on Form 2 submissions. 
+        Item details and prices come from the Purchasing List. No ordering actions available - use this as a reference for manual purchasing.
       </div>
     </div>
   );

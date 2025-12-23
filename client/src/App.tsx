@@ -14,6 +14,7 @@ import ShoppingList from "./pages/ShoppingList";
 import PurchasingList from "./pages/operations/PurchasingList";
 import PurchasingFieldMapping from "./pages/operations/PurchasingFieldMapping";
 import PurchasingShiftLog from "./pages/operations/PurchasingShiftLog";
+import PurchasingAnalytics from "./pages/operations/PurchasingAnalytics";
 import Receipts from "./pages/Receipts";
 import UploadStatements from "./pages/UploadStatements";
 import ProfitLoss from "./pages/ProfitLoss";
@@ -113,6 +114,7 @@ export default function App() {
                 <Route path="/operations/purchasing-list/:id" element={<Guard><PurchasingList /></Guard>} />
                 <Route path="/operations/purchasing-mapping" element={<Guard><PurchasingFieldMapping /></Guard>} />
                 <Route path="/operations/purchasing-shift-log" element={<Guard><PurchasingShiftLog /></Guard>} />
+                <Route path="/operations/purchasing-analytics" element={<Guard><PurchasingAnalytics /></Guard>} />
                 
                 <Route path="/operations/daily-sales" element={<DailySalesForm />} />
                 <Route path="/operations/daily-sales/edit/:id" element={<DailySalesForm />} />
