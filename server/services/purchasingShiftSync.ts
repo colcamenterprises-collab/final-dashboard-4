@@ -11,6 +11,7 @@
  */
 import { db } from '../db';
 import { purchasingShiftItems, purchasingFieldMap, purchasingItems } from '../../shared/schema';
+import { assertProductionWriteAllowed } from '../utils/productionGuard';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 
 interface PurchasingItem {
@@ -74,6 +75,7 @@ export async function syncPurchasingShiftItems(
       }
     }
 
+    assertProductionWriteAllowed('purchasing_shift_items');
     for (const { purchasingItemId, quantity } of itemsToUpsert) {
       try {
         await db.execute(sql`
@@ -218,6 +220,7 @@ export async function syncFromMappedColumns(): Promise<{ synced: number; errors:
       WHERE "deletedAt" IS NULL
     `);
 
+    assertProductionWriteAllowed('purchasing_shift_items');
     for (const record of (stockRecords.rows || [])) {
       const stockId = record.id as string;
 
