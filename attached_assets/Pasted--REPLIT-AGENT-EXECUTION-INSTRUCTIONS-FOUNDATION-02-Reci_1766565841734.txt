@@ -1,0 +1,111 @@
+🔐 REPLIT AGENT — EXECUTION INSTRUCTIONS
+FOUNDATION-02: Recipe Authority (LOCK-FIRST)
+🚨 READ THIS FIRST (NON-NEGOTIABLE)
+This patch establishes Recipe Authority.
+This is NOT a UI rebuild.
+This is NOT analytics.
+This is NOT modifiers or bundles.
+This is schema + backend only, with read-only consumption.
+Do not refactor or delete existing code.
+Do not change staff workflows or forms.
+Do not guess. If unclear, STOP and report.
+🎯 OBJECTIVE (SINGLE SENTENCE)
+Create a single authoritative Recipe layer that defines how menu items are made and costed, derived strictly from Purchasing Items (ingredients), and safely mapped to POS items.
+🧱 CANONICAL DATA CONTRACT (MUST FOLLOW)
+Authoritative Sources
+purchasing_items → MASTER for everything bought
+purchasing_items.is_ingredient = true → ingredients subset
+NEW recipe → how food is prepared
+NEW recipe_ingredient → ingredient quantities per recipe
+NEW pos_item_recipe_map → POS item → recipe mapping
+Derived Only (NO WRITES)
+Recipe cost
+Ingredient usage
+Analytics
+Emails
+UI displays
+🗂️ PART 1 — DATABASE SCHEMA (REQUIRED)
+1️⃣ Create recipe table
+Fields:
+id (pk)
+name (string, unique)
+yield_units (numeric, nullable)
+active (boolean, default true)
+created_at
+2️⃣ Create recipe_ingredient table
+Fields:
+id (pk)
+recipe_id (fk → recipe.id)
+purchasing_item_id (fk → purchasing_items.id)
+quantity (numeric, required)
+unit (string, required)
+Constraints:
+Unique (recipe_id, purchasing_item_id)
+Do NOT duplicate ingredient costs here
+3️⃣ Create pos_item_recipe_map table
+Fields:
+id (pk)
+pos_item_id (string / external ID)
+recipe_id (fk → recipe.id)
+Constraints:
+One POS item → one recipe
+Recipe may map to many POS items
+🧠 PART 2 — SERVER LOGIC (STRICT)
+4️⃣ Recipe Cost Calculation (READ-ONLY)
+Implement server-side function:
+Copy code
+
+recipe_cost =
+  SUM(
+    recipe_ingredient.quantity
+    × purchasing_items.unit_cost
+  )
+Rules:
+No caching
+No rounding tricks
+No UI calculations
+Always computed fresh
+🔗 PART 3 — SAFE CONSUMERS (READ-ONLY ONLY)
+Update only these consumers to READ from recipes:
+F&B Analysis → show recipe cost if mapping exists
+Purchasing Analytics → ingredient usage via recipes
+Online Ordering → display recipe-based cost (read-only)
+Daily Review Email → include recipe cost where available
+❌ Do NOT modify:
+Forms
+Purchasing UI
+Shopping List logic
+Shift Log logic
+🛑 EXPLICITLY OUT OF SCOPE (DO NOT TOUCH)
+Modifiers
+Bundles / meal deals
+AI logic
+UI editing flows
+Staff-facing inputs
+Purchasing sync logic
+Existing ingredient_v2 cleanup
+🧪 VERIFICATION REQUIREMENTS (MANDATORY)
+Before marking complete, verify:
+purchasing_items remains unchanged
+Ingredients derive only from is_ingredient = true
+Recipes cannot exist without ingredients
+Recipe cost updates automatically when purchasing cost changes
+Deleting a purchasing item used in a recipe is blocked
+No existing pages break
+No data migration alters existing rows
+📦 DELIVERABLES
+Schema changes committed
+Backend services added
+Read-only integrations wired
+Short verification summary
+NO UI screenshots required
+🛑 STOP CONDITION
+If any of the following occurs, STOP and report:
+Ambiguity about data ownership
+Need to refactor existing flows
+Missing purchasing data
+Conflicting schema definitions
+✅ SUCCESS CRITERIA (FINAL)
+After this patch, the system can truthfully answer:
+“What do we sell, how is it made, and what does it cost?”
+Nothing more. Nothing less.

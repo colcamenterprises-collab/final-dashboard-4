@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum, unique } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1717,3 +1717,45 @@ export const drinkPurchasesV2 = pgTable('drink_purchases_v2', {
   quantity: integer('quantity'),             // units purchased for that SKU
   createdAt: timestamp('created_at').defaultNow(),
 });
+
+// -----------------------------------------------------------------------------
+// 🔒 FOUNDATION-02: RECIPE AUTHORITY
+// Recipe defines how menu items are made and costed
+// Ingredients come ONLY from purchasing_items.is_ingredient = true
+// -----------------------------------------------------------------------------
+
+export const recipe = pgTable('recipe', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
+  yieldUnits: decimal('yield_units', { precision: 10, scale: 2 }),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const recipeIngredient = pgTable('recipe_ingredient', {
+  id: serial('id').primaryKey(),
+  recipeId: integer('recipe_id').notNull().references(() => recipe.id, { onDelete: 'cascade' }),
+  purchasingItemId: integer('purchasing_item_id').notNull().references(() => purchasingItems.id),
+  quantity: decimal('quantity', { precision: 10, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+}, (table) => ({
+  uniqueRecipeIngredient: unique().on(table.recipeId, table.purchasingItemId),
+}));
+
+export const posItemRecipeMap = pgTable('pos_item_recipe_map', {
+  id: serial('id').primaryKey(),
+  posItemId: varchar('pos_item_id', { length: 255 }).notNull().unique(),
+  recipeId: integer('recipe_id').notNull().references(() => recipe.id, { onDelete: 'cascade' }),
+});
+
+// Recipe Insert Schemas and Types
+export const insertRecipeSchema = createInsertSchema(recipe).omit({ id: true, createdAt: true });
+export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredient).omit({ id: true });
+export const insertPosItemRecipeMapSchema = createInsertSchema(posItemRecipeMap).omit({ id: true });
+
+export type Recipe = typeof recipe.$inferSelect;
+export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
+export type RecipeIngredient = typeof recipeIngredient.$inferSelect;
+export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;
+export type PosItemRecipeMap = typeof posItemRecipeMap.$inferSelect;
+export type InsertPosItemRecipeMap = z.infer<typeof insertPosItemRecipeMapSchema>;
