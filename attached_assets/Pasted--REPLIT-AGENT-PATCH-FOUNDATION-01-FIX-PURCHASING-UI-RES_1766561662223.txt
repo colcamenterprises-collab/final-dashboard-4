@@ -1,0 +1,78 @@
+🔧 REPLIT AGENT PATCH — FOUNDATION-01-FIX (PURCHASING UI RESTORE)
+PATCH NAME
+FOUNDATION-01-FIX: Purchasing List Render Restore
+🎯 OBJECTIVE
+Restore full rendering of the Purchasing List table, so managers can:
+See all ~75 items
+Toggle Ingredient
+Edit purchasing data as before
+🚫 ABSOLUTE RULES
+Agent MUST NOT:
+Touch database schema
+Change backend logic
+Add new endpoints
+Change Ingredients or Recipes pages
+Add new UI features
+This is READ / FIX / GUARD ONLY.
+🧩 PATCH STEPS (EXECUTE IN ORDER)
+STEP 1 — Verify API Response
+In browser devtools or server logs:
+Confirm this endpoint returns data:
+Copy code
+
+GET /api/purchasing-items
+Expected:
+Array
+~75 items
+Each item includes:
+id
+item
+category
+unitCost
+isIngredient (new)
+❗ If API fails → fix backend route ONLY so it returns data again.
+STEP 2 — Fix Frontend Mapping
+Open:
+Copy code
+
+client/src/pages/operations/purchasing/index.tsx
+(or equivalent Purchasing List component)
+Verify:
+Table renders from the API response
+Columns reference correct keys:
+item ❌ not name
+unitCost ❌ not cost
+isIngredient ❌ not missing / undefined
+Most common bug:
+UI expects old field names.
+Fix mappings, nothing else.
+STEP 3 — Remove Blocking Placeholder Logic
+Search for logic like:
+Copy code
+Ts
+if (!items.length) return <EmptyState />
+Replace with:
+Loading state while fetching
+Empty state ONLY after confirmed empty response
+Right now it is likely short-circuiting render.
+STEP 4 — Confirm Ingredient Toggle Wiring
+Verify toggle:
+Reads from item.isIngredient
+PATCH request updates isIngredient
+UI updates optimistically or refetches
+NO new logic.
+STEP 5 — Smoke Test (MANDATORY)
+After fix:
+Purchasing List shows all items
+Toggle Burger Buns → Ingredient = ON
+Go to Ingredients (from Purchasing)
+Burger Buns appears immediately
+/api/debug/ingredient-parity shows ingredientItems > 0
+✅ ACCEPTANCE CRITERIA
+This patch is complete ONLY if:
+[ ] Purchasing List table renders
+[ ] ~75 items visible
+[ ] Ingredient toggle clickable
+[ ] Ingredients page updates correctly
+[ ] No backend changes required
+[ ] No regressions in Shopping List / Shift Log
