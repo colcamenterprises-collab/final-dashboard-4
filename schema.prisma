@@ -1659,6 +1659,10 @@ model PurchasingItem {
   unitCost        Decimal? @db.Decimal(10, 2)
   lastReviewDate  String?
   active          Boolean  @default(true)
+  isIngredient    Boolean  @default(false) @map("is_ingredient")
+  portionUnit     String?  @map("portion_unit")
+  portionSize     Decimal? @db.Decimal(10, 3) @map("portion_size")
+  yield           Decimal? @db.Decimal(5, 2)
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
