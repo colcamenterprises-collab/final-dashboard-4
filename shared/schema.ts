@@ -1748,14 +1748,14 @@ export const posItemRecipeMap = pgTable('pos_item_recipe_map', {
   recipeId: integer('recipe_id').notNull().references(() => recipe.id, { onDelete: 'cascade' }),
 });
 
-// Recipe Insert Schemas and Types
-export const insertRecipeSchema = createInsertSchema(recipe).omit({ id: true, createdAt: true });
-export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredient).omit({ id: true });
+// FOUNDATION-02 Recipe Insert Schemas and Types
+export const insertRecipeV2Schema = createInsertSchema(recipe).omit({ id: true, createdAt: true });
+export const insertRecipeIngredientV2Schema = createInsertSchema(recipeIngredient).omit({ id: true });
 export const insertPosItemRecipeMapSchema = createInsertSchema(posItemRecipeMap).omit({ id: true });
 
-export type Recipe = typeof recipe.$inferSelect;
-export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
-export type RecipeIngredient = typeof recipeIngredient.$inferSelect;
-export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;
+export type RecipeV2 = typeof recipe.$inferSelect;
+export type InsertRecipeV2 = z.infer<typeof insertRecipeV2Schema>;
+export type RecipeIngredientV2 = typeof recipeIngredient.$inferSelect;
+export type InsertRecipeIngredientV2 = z.infer<typeof insertRecipeIngredientV2Schema>;
 export type PosItemRecipeMap = typeof posItemRecipeMap.$inferSelect;
 export type InsertPosItemRecipeMap = z.infer<typeof insertPosItemRecipeMapSchema>;

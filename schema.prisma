@@ -1667,7 +1667,47 @@ model PurchasingItem {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
+  recipeIngredients RecipeIngredientAuthority[]
+
   @@map("purchasing_items")
+}
+
+// FOUNDATION-02: RECIPE AUTHORITY (Canonical - linked to purchasing_items)
+model RecipeAuthority {
+  id         Int       @id @default(autoincrement())
+  name       String    @unique @db.VarChar(255)
+  yieldUnits Decimal?  @map("yield_units") @db.Decimal(10, 2)
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  ingredients    RecipeIngredientAuthority[]
+  posItemMaps    PosItemRecipeMap[]
+
+  @@map("recipe")
+}
+
+model RecipeIngredientAuthority {
+  id               Int      @id @default(autoincrement())
+  recipeId         Int      @map("recipe_id")
+  purchasingItemId Int      @map("purchasing_item_id")
+  quantity         Decimal  @db.Decimal(10, 4)
+  unit             String   @db.VarChar(50)
+
+  recipe           RecipeAuthority  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  purchasingItem   PurchasingItem   @relation(fields: [purchasingItemId], references: [id])
+
+  @@unique([recipeId, purchasingItemId])
+  @@map("recipe_ingredient")
+}
+
+model PosItemRecipeMap {
+  id        Int    @id @default(autoincrement())
+  posItemId String @unique @map("pos_item_id") @db.VarChar(255)
+  recipeId  Int    @map("recipe_id")
+
+  recipe    RecipeAuthority @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@map("pos_item_recipe_map")
 }
 
 // PATCH 1 — SHIFT REPORT REBUILD MODULE
