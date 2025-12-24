@@ -29,6 +29,7 @@ const labels = {
     totalSales: 'Total Sales',
     expenses: 'Expenses',
     shiftExpenses: 'Shift Expenses',
+    shiftExpensesHint: 'Do not group together items - Enter each expense separately',
     item: 'Item',
     cost: 'Cost',
     shopName: 'Shop Name',
@@ -86,6 +87,7 @@ const labels = {
     totalSales: 'ยอดขายรวม',
     expenses: 'ค่าใช้จ่าย',
     shiftExpenses: 'ค่าใช้จ่ายกะ',
+    shiftExpensesHint: 'ห้ามรวมรายการ - กรอกค่าใช้จ่ายแต่ละรายการแยกกัน',
     item: 'รายการ',
     cost: 'ราคา',
     shopName: 'ชื่อร้าน',
@@ -596,7 +598,8 @@ export default function DailySales() {
             
             {/* Shift Expenses */}
             <div className="mb-8">
-              <h4 className="mb-3 text-[14px] font-semibold">{L.shiftExpenses}</h4>
+              <h4 className="mb-1 text-[14px] font-semibold">{L.shiftExpenses}</h4>
+              <p className="mb-3 text-xs text-slate-500">{L.shiftExpensesHint}</p>
               <div className="space-y-4">
                 {shiftExpenses.map((row) => (
                   <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
