@@ -49,4 +49,34 @@ router.get('/purchasing-parity', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * PART F - Ingredient Parity Check
+ * READ-ONLY debug endpoint to verify ingredient derivation from purchasing
+ */
+router.get('/ingredient-parity', async (req: Request, res: Response) => {
+  try {
+    // Count total active purchasing items
+    const purchasingResult = await db.execute(sql`
+      SELECT COUNT(*) as count FROM purchasing_items WHERE active = true
+    `);
+    const purchasingItemsCount = parseInt(purchasingResult.rows[0]?.count || '0', 10);
+
+    // Count items flagged as ingredients
+    const ingredientResult = await db.execute(sql`
+      SELECT COUNT(*) as count FROM purchasing_items WHERE is_ingredient = true
+    `);
+    const ingredientItemsCount = parseInt(ingredientResult.rows[0]?.count || '0', 10);
+
+    res.json({
+      purchasingItems: purchasingItemsCount,
+      ingredientItems: ingredientItemsCount,
+      isDerived: true,
+      source: 'purchasing_items.is_ingredient'
+    });
+  } catch (error) {
+    console.error('[DEBUG] Ingredient parity check failed:', error);
+    res.status(500).json({ error: 'Failed to check ingredient parity' });
+  }
+});
+
 export default router;
