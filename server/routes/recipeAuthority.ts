@@ -11,6 +11,10 @@ import { insertRecipeV2Schema, insertRecipeIngredientV2Schema, insertPosItemReci
 
 const router = Router();
 
+// ========================================
+// STATIC ROUTES (must come before parameterized routes)
+// ========================================
+
 /**
  * GET /api/recipe-authority
  * Get all recipes with calculated costs
@@ -24,6 +28,77 @@ router.get('/', async (_req: Request, res: Response) => {
     res.status(500).json({ ok: false, error: 'Failed to fetch recipes' });
   }
 });
+
+/**
+ * GET /api/recipe-authority/available-ingredients
+ * Get all purchasing items that can be used as ingredients (is_ingredient = true)
+ */
+router.get('/available-ingredients', async (_req: Request, res: Response) => {
+  try {
+    const ingredients = await recipeService.getAvailableIngredients();
+    res.json({ ok: true, ingredients });
+  } catch (error) {
+    console.error('[RecipeAuthority] Error fetching available ingredients:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch available ingredients' });
+  }
+});
+
+/**
+ * GET /api/recipe-authority/pos-mappings
+ * Get all POS item to recipe mappings
+ */
+router.get('/pos-mappings', async (_req: Request, res: Response) => {
+  try {
+    const mappings = await recipeService.getAllPosItemMappings();
+    res.json({ ok: true, mappings });
+  } catch (error) {
+    console.error('[RecipeAuthority] Error fetching POS mappings:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch POS mappings' });
+  }
+});
+
+/**
+ * POST /api/recipe-authority/pos-mappings
+ * Map a POS item to a recipe
+ */
+router.post('/pos-mappings', async (req: Request, res: Response) => {
+  try {
+    const { posItemId, recipeId } = req.body;
+    if (!posItemId || !recipeId) {
+      return res.status(400).json({ ok: false, error: 'Missing required fields: posItemId, recipeId' });
+    }
+
+    const mapping = await recipeService.mapPosItemToRecipe(posItemId, recipeId);
+    res.status(201).json({ ok: true, mapping });
+  } catch (error) {
+    console.error('[RecipeAuthority] Error creating POS mapping:', error);
+    res.status(500).json({ ok: false, error: 'Failed to create POS mapping' });
+  }
+});
+
+/**
+ * GET /api/recipe-authority/pos-item/:posItemId/recipe
+ * Get recipe for a POS item
+ */
+router.get('/pos-item/:posItemId/recipe', async (req: Request, res: Response) => {
+  try {
+    const { posItemId } = req.params;
+    const recipe = await recipeService.getRecipeForPosItem(posItemId);
+    
+    if (!recipe) {
+      return res.json({ ok: true, recipe: null, message: 'No recipe mapped to this POS item' });
+    }
+
+    res.json({ ok: true, recipe });
+  } catch (error) {
+    console.error('[RecipeAuthority] Error fetching recipe for POS item:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch recipe' });
+  }
+});
+
+// ========================================
+// PARAMETERIZED ROUTES
+// ========================================
 
 /**
  * GET /api/recipe-authority/:id
@@ -200,59 +275,6 @@ router.delete('/:id/ingredients/:ingredientId', async (req: Request, res: Respon
   } catch (error) {
     console.error('[RecipeAuthority] Error removing ingredient:', error);
     res.status(500).json({ ok: false, error: 'Failed to remove ingredient' });
-  }
-});
-
-/**
- * GET /api/recipe-authority/pos-mappings
- * Get all POS item to recipe mappings
- */
-router.get('/pos-mappings', async (_req: Request, res: Response) => {
-  try {
-    const mappings = await recipeService.getAllPosItemMappings();
-    res.json({ ok: true, mappings });
-  } catch (error) {
-    console.error('[RecipeAuthority] Error fetching POS mappings:', error);
-    res.status(500).json({ ok: false, error: 'Failed to fetch POS mappings' });
-  }
-});
-
-/**
- * POST /api/recipe-authority/pos-mappings
- * Map a POS item to a recipe
- */
-router.post('/pos-mappings', async (req: Request, res: Response) => {
-  try {
-    const { posItemId, recipeId } = req.body;
-    if (!posItemId || !recipeId) {
-      return res.status(400).json({ ok: false, error: 'Missing required fields: posItemId, recipeId' });
-    }
-
-    const mapping = await recipeService.mapPosItemToRecipe(posItemId, recipeId);
-    res.status(201).json({ ok: true, mapping });
-  } catch (error) {
-    console.error('[RecipeAuthority] Error creating POS mapping:', error);
-    res.status(500).json({ ok: false, error: 'Failed to create POS mapping' });
-  }
-});
-
-/**
- * GET /api/recipe-authority/pos-item/:posItemId/recipe
- * Get recipe for a POS item
- */
-router.get('/pos-item/:posItemId/recipe', async (req: Request, res: Response) => {
-  try {
-    const { posItemId } = req.params;
-    const recipe = await recipeService.getRecipeForPosItem(posItemId);
-    
-    if (!recipe) {
-      return res.json({ ok: true, recipe: null, message: 'No recipe mapped to this POS item' });
-    }
-
-    res.json({ ok: true, recipe });
-  } catch (error) {
-    console.error('[RecipeAuthority] Error fetching recipe for POS item:', error);
-    res.status(500).json({ ok: false, error: 'Failed to fetch recipe' });
   }
 });
 

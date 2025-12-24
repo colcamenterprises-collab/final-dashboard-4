@@ -321,3 +321,30 @@ export async function getRecipesUsingPurchasingItem(purchasingItemId: number): P
   
   return results.map(r => r.recipeName);
 }
+
+/**
+ * Get all purchasing items that can be used as ingredients
+ * Only items with is_ingredient = true are valid for recipe creation
+ */
+export async function getAvailableIngredients() {
+  const items = await db
+    .select({
+      id: purchasingItems.id,
+      item: purchasingItems.item,
+      category: purchasingItems.category,
+      unitCost: purchasingItems.unitCost,
+      orderUnit: purchasingItems.orderUnit,
+      portionUnit: purchasingItems.portionUnit,
+      portionSize: purchasingItems.portionSize,
+    })
+    .from(purchasingItems)
+    .where(
+      and(
+        eq(purchasingItems.isIngredient, true),
+        eq(purchasingItems.active, true)
+      )
+    )
+    .orderBy(purchasingItems.category, purchasingItems.item);
+  
+  return items;
+}
