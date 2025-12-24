@@ -45,6 +45,10 @@ type PurchasingItem = {
   unitCost: number | null;
   lastReviewDate: string | null;
   active: boolean;
+  isIngredient: boolean;
+  portionUnit: string | null;
+  portionSize: number | null;
+  yield: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -114,6 +118,21 @@ export default function PurchasingPage() {
         body: JSON.stringify({ active }),
       });
       if (!res.ok) throw new Error('Failed to toggle item');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
+    },
+  });
+
+  const toggleIngredientMutation = useMutation({
+    mutationFn: async ({ id, isIngredient }: { id: number; isIngredient: boolean }) => {
+      const res = await fetch(`/api/purchasing-items/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isIngredient }),
+      });
+      if (!res.ok) throw new Error('Failed to toggle ingredient status');
       return res.json();
     },
     onSuccess: () => {
@@ -361,6 +380,7 @@ export default function PurchasingPage() {
               <TableHeader>
                 <TableRow className="border-slate-200">
                   <TableHead className="text-xs font-medium text-slate-900 w-16 text-center">Active</TableHead>
+                  <TableHead className="text-xs font-medium text-slate-900 w-16 text-center">Ingredient</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900 sticky left-0 bg-slate-50 z-10">Item</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
                   <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
@@ -388,6 +408,16 @@ export default function PurchasingPage() {
                           toggleActiveMutation.mutate({ id: item.id, active: checked });
                         }}
                         disabled={toggleActiveMutation.isPending}
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Switch
+                        data-testid={`switch-ingredient-${item.id}`}
+                        checked={item.isIngredient || false}
+                        onCheckedChange={(checked) => {
+                          toggleIngredientMutation.mutate({ id: item.id, isIngredient: checked });
+                        }}
+                        disabled={toggleIngredientMutation.isPending}
                       />
                     </TableCell>
                     <TableCell className="text-xs text-slate-900 font-medium sticky left-0 bg-white z-10">
@@ -435,7 +465,7 @@ export default function PurchasingPage() {
                 ))}
                 {filteredItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-xs text-slate-600 py-8">
+                    <TableCell colSpan={12} className="text-center text-xs text-slate-600 py-8">
                       No items found
                     </TableCell>
                   </TableRow>

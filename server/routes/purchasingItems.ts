@@ -26,6 +26,11 @@ const purchasingItemSchema = z.object({
   unitDescription: z.string().optional().nullable(),
   unitCost: z.number().optional().nullable(),
   lastReviewDate: z.string().optional().nullable(),
+  active: z.boolean().optional(),
+  isIngredient: z.boolean().optional(),
+  portionUnit: z.string().optional().nullable(),
+  portionSize: z.number().optional().nullable(),
+  yield: z.number().optional().nullable(),
 });
 
 router.get('/', async (req, res) => {
