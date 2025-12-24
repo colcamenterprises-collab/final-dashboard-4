@@ -12,6 +12,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { foodCostings } from '../data/foodCostings';
+import { isPurchasingItemUsedInRecipe, getRecipesUsingPurchasingItem } from '../services/recipeAuthority';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -151,6 +152,16 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json({
         ok: false,
         error: 'Item is in use and cannot be deleted. Unmark as ingredient first, or deactivate it.'
+      });
+    }
+
+    // FOUNDATION-02: Check if item is used in any recipe
+    const usedInRecipe = await isPurchasingItemUsedInRecipe(id);
+    if (usedInRecipe) {
+      const recipeNames = await getRecipesUsingPurchasingItem(id);
+      return res.status(400).json({
+        ok: false,
+        error: `Cannot delete: Item is used in recipes: ${recipeNames.join(', ')}. Remove from recipes first or deactivate it.`
       });
     }
 

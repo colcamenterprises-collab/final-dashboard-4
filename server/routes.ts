@@ -108,6 +108,7 @@ import dashboard4Routes from "./routes/dashboard4Routes";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
 import healthSafetyPdf from "./routes/healthSafety/pdf";
+import recipeAuthorityRouter from "./routes/recipeAuthority";
 // Email functionality will be added when needed
 
 
@@ -3231,6 +3232,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/purchasing-shift-log', purchasingShiftLogRouter); // Purchasing shift log visibility
   app.use('/api/purchasing-analytics', purchasingAnalyticsRouter); // Purchasing analytics metrics
   app.use('/api/debug', debugPurchasingRouter); // PATCH A: Purchasing parity check
+  app.use('/api/recipe-authority', recipeAuthorityRouter); // FOUNDATION-02: Recipe Authority
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
   app.use('/api/expenses-v2', expensesV2Routes);
