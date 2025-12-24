@@ -1,0 +1,142 @@
+🔒 REPLIT AGENT PATCH — FOUNDATION: PURCHASING → INGREDIENTS → RECIPES (PHASE 1)
+PATCH NAME
+FOUNDATION-01: Canonical Ingredients From Purchasing Items
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Establish a single source of truth for ingredients by deriving them from the Purchasing List, without breaking:
+POS sync
+Daily forms
+Purchasing
+Shopping list
+Analytics
+This patch does NOT:
+Rebuild recipes
+Change costs
+Modify Loyverse sync
+Add analytics
+Touch modifiers
+🧠 CANONICAL MODEL (LOCK THIS)
+Copy code
+
+Purchasing Items (MASTER)
+ ├─ isIngredient = false → Non-food / ops items
+ └─ isIngredient = true  → Ingredients
+
+Ingredients (VIEW, NOT SOURCE)
+ └─ Derived from purchasing_items WHERE isIngredient = true
+
+Recipes (NEXT PATCH)
+ └─ Menu Item → Ingredients → Cost
+🚫 ABSOLUTE PROHIBITIONS
+The agent MUST NOT:
+Create new purchasing tables
+Duplicate ingredient costs
+Introduce new recipe logic
+Rename database tables
+Delete any data
+Backfill historical costs
+Add UI features beyond what’s specified
+✅ PATCH SCOPE (WHAT TO DO)
+PART A — Database (SAFE, ADDITIVE ONLY)
+1️⃣ Add ingredient flag to purchasing_items
+SQL ONLY (no migrations tooling):
+Copy code
+Sql
+ALTER TABLE purchasing_items
+ADD COLUMN IF NOT EXISTS is_ingredient BOOLEAN DEFAULT false;
+DO NOT
+Remove columns
+Change existing costs
+Modify IDs
+PART B — Purchasing List UI (MANAGER ONLY)
+2️⃣ Add “Ingredient” toggle
+Add a toggle/checkbox column:
+Label: Ingredient
+Binds to purchasing_items.is_ingredient
+Visible to manager/admin only
+Inline update (existing update endpoint)
+Guard
+If PRODUCTION_LOCK=1, toggling is allowed
+Deletion still blocked (already implemented)
+PART C — INGREDIENTS MASTER (CONVERT TO VIEW)
+3️⃣ Ingredients Master page MUST:
+STOP using any standalone ingredient table
+READ ONLY from:
+Copy code
+Sql
+SELECT *
+FROM purchasing_items
+WHERE is_ingredient = true
+ORDER BY category, item;
+Editable fields (stored back onto purchasing_items):
+Portion unit (g / ml / piece)
+Portion size
+Optional yield (nullable)
+❗ Cost is NOT editable here
+Cost remains owned by Purchasing List.
+PART D — UI COPY & CLARITY (CRITICAL)
+4️⃣ Rename & clarify semantics (UI-only)
+Current Label
+Replace With
+Recipes
+Menu Recipes
+“No ingredients”
+No recipe defined
+Ingredients Master
+Ingredients (from Purchasing)
+Add helper text (non-interactive):
+“Ingredients are derived from your Purchasing List. Costs are managed centrally.”
+No logic change.
+PART E — SAFETY GUARDS
+5️⃣ Deletion Protection (REINFORCE)
+A Purchasing Item cannot be deleted if:
+is_ingredient = true
+OR referenced by:
+recipe_ingredients (future)
+purchasing_shift_items (already exists)
+Return:
+Copy code
+Json
+{
+  "error": "Item is in use and cannot be deleted"
+}
+PART F — VERIFICATION ENDPOINT (READ-ONLY)
+6️⃣ Add debug endpoint
+Route
+Copy code
+
+GET /api/debug/ingredient-parity
+Response
+Copy code
+Json
+{
+  "purchasingItems": 75,
+  "ingredientItems": 42,
+  "isDerived": true,
+  "source": "purchasing_items.is_ingredient"
+}
+No writes.
+No auth required (internal only).
+✅ ACCEPTANCE CRITERIA (MANDATORY)
+The patch is ONLY accepted if:
+[ ] Purchasing List shows Ingredient toggle
+[ ] Ingredients Master shows ONLY flagged items
+[ ] Ingredient cost matches Purchasing List exactly
+[ ] No duplicated ingredient tables exist
+[ ] No recipe logic changed
+[ ] No analytics changed
+[ ] No forms broken
+[ ] /api/debug/ingredient-parity returns valid data
+🧱 WHAT THIS ENABLES NEXT (NOT IN THIS PATCH)
+Future patches (explicitly out of scope now):
+Recipe ingredient binding
+Modifier cost logic
+Per-item recipe cost rollups
+Purchasing anomaly detection
+One-click reorder
+This patch unblocks all of them cleanly.
+🔐 FINAL NOTE TO AGENT (IMPORTANT)
+This patch is foundational.
+Do not optimize.
+Do not refactor.
+Do not “improve” UX beyond labels.
+Implement exactly as specified.

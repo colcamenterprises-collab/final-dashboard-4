@@ -1590,6 +1590,10 @@ export const purchasingItems = pgTable("purchasing_items", {
   unitCost: decimal("unitCost", { precision: 10, scale: 2 }),
   lastReviewDate: varchar("lastReviewDate"),
   active: boolean("active").notNull().default(true),
+  isIngredient: boolean("is_ingredient").notNull().default(false),
+  portionUnit: varchar("portion_unit"),
+  portionSize: decimal("portion_size", { precision: 10, scale: 3 }),
+  yield: decimal("yield", { precision: 5, scale: 2 }),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });
