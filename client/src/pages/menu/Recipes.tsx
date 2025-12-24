@@ -5,10 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Upload, Image, ChefHat, Calculator, FileText } from "lucide-react";
+import { ChefHat, Calculator, FileText, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-// import ChefRamsayGordon from "@/components/ChefRamsayGordon"; // DISABLED
 import { Link } from "wouter";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 // ---- Types ----
 type UnitType = "g" | "kg" | "ml" | "litre" | "cup" | "tbsp" | "tsp" | "pcs" | "oz" | "lb" | "each";
@@ -444,17 +444,22 @@ export default function RecipesUnified() {
 
   return (
     <div className="min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: "Poppins, sans-serif" }}>
+      {/* READ-ONLY BANNER */}
+      <Alert className="mb-6 border-amber-200 bg-amber-50">
+        <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <AlertTitle className="text-amber-800">POS Items (Read-Only) – Not Recipe Management</AlertTitle>
+        <AlertDescription className="text-amber-700">
+          This page shows POS item data for reference only. For recipe editing, go to{" "}
+          <Link href="/recipe-management" className="text-blue-600 underline font-medium">
+            Recipe Management
+          </Link>
+        </AlertDescription>
+      </Alert>
+
       <div className="flex items-baseline justify-between mb-6">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">Recipe Management</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">POS Items Reference</h1>
         <div className="flex gap-3 items-center">
-          <Button 
-            onClick={() => setView(view === "cards" ? "calculator" : "cards")}
-            variant={view === "calculator" ? "default" : "outline"}
-            className="flex items-center gap-2 text-xs rounded-[4px]"
-          >
-            {view === "cards" ? <Calculator className="h-4 w-4" /> : <ChefHat className="h-4 w-4" />}
-            {view === "cards" ? "Cost Calculator" : "Recipe Cards"}
-          </Button>
+          <Badge variant="outline" className="text-amber-600 border-amber-300">Read-Only</Badge>
         </div>
       </div>
 

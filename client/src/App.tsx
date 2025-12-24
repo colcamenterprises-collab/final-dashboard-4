@@ -31,6 +31,7 @@ import IngredientEdit from "./pages/menu/IngredientEdit";
 // RecipesUnified replaced by RecipesPage from operations
 import RecipeCards from "./pages/menu/RecipeCards";
 import IngredientManagement from "./pages/menu/IngredientManagement";
+import RecipeManagement from "./pages/RecipeManagement";
 import ShiftReports from "./pages/ShiftReports";
 import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
@@ -171,6 +172,7 @@ export default function App() {
                 <Route path={ROUTES.RECIPES} element={<Guard><RecipesPage /></Guard>} />
                 <Route path={ROUTES.RECIPE_CARDS} element={<Guard><RecipeCards /></Guard>} />
                 <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<Guard><IngredientManagement /></Guard>} />
+                <Route path="/recipe-management" element={<Guard><RecipeManagement /></Guard>} />
                 <Route path={ROUTES.INGREDIENTS} element={<Guard><IngredientsMaster /></Guard>} />
 
                 <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />

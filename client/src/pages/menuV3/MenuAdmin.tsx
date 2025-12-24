@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import CategoriesEditor from "./CategoriesEditor";
 import ItemsEditor from "./ItemsEditor";
 import ModifiersEditor from "./ModifiersEditor";
-import RecipeEditor from "./RecipeEditor";
+import { Link } from "wouter";
 
 export default function MenuAdmin() {
   const [view, setView] = useState("categories");
@@ -17,9 +17,6 @@ export default function MenuAdmin() {
         <button onClick={() => setView("categories")}>Categories</button>
         <button onClick={() => setView("items")}>Items</button>
         <button onClick={() => setView("modifiers")}>Modifiers</button>
-        <button onClick={() => setView("recipes")}>
-          Recipes
-        </button>
       </div>
 
       {/* Views */}
@@ -27,19 +24,19 @@ export default function MenuAdmin() {
       {view === "items" && (
         <ItemsEditor onSelectItem={(item: any) => {
           setSelectedItem(item);
-          setView("recipes");
         }} />
       )}
       {view === "modifiers" && <ModifiersEditor />}
-      {view === "recipes" && selectedItem && (
-        <RecipeEditor item={selectedItem} />
-      )}
-      {view === "recipes" && !selectedItem && (
-        <div style={{ padding: "40px", textAlign: "center", color: "#666" }}>
-          <p style={{ fontSize: "18px", marginBottom: "12px" }}>No recipes yet</p>
-          <p>Select a menu item from the Items tab to create or edit its recipe.</p>
-        </div>
-      )}
+      
+      {/* Recipe editing redirect notice */}
+      <div style={{ marginTop: "24px", padding: "16px", backgroundColor: "#fef3c7", borderRadius: "8px", border: "1px solid #f59e0b" }}>
+        <p style={{ color: "#92400e", fontWeight: 500 }}>
+          Recipe editing has moved to{" "}
+          <Link href="/recipe-management" style={{ color: "#1d4ed8", textDecoration: "underline" }}>
+            Recipe Management
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }

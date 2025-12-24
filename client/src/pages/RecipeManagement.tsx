@@ -12,19 +12,52 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertRecipeSchema, insertRecipeIngredientSchema, type Recipe, type Ingredient, type RecipeIngredient } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, FileText, Share2, Megaphone, Package, Search, Users, Filter } from "lucide-react";
+import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, FileText, Share2, Megaphone, Package, Search, Users, Filter, AlertCircle } from "lucide-react";
 import { IngredientForm } from "@/components/IngredientForm";
 import { z } from "zod";
-import { fetchWithLegacyFallback } from "@/lib/api";
-import { LegacyDataAlert } from "@/components/ui/legacy-data-alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-const recipeFormSchema = insertRecipeSchema.extend({
+const recipeFormSchema = z.object({
+  name: z.string().min(1, "Recipe name is required"),
   category: z.string().min(1, "Category is required"),
-  servingSize: z.number().min(1, "Serving size must be at least 1"),
+  description: z.string().optional(),
+  yieldUnits: z.string().optional(),
 });
+
+type RecipeAuthority = {
+  id: number;
+  name: string;
+  category?: string;
+  description?: string;
+  yieldUnits?: string | null;
+  active: boolean;
+  createdAt: string;
+  ingredients: RecipeIngredientAuthority[];
+  totalCost: number;
+};
+
+type RecipeIngredientAuthority = {
+  id: number;
+  recipeId: number;
+  purchasingItemId: number;
+  quantity: string;
+  unit: string;
+  itemName?: string;
+  unitCost?: number;
+  lineCost?: number;
+};
+
+type AvailableIngredient = {
+  id: number;
+  item: string;
+  category: string | null;
+  unitCost: number | null;
+  orderUnit: string | null;
+  portionUnit: string | null;
+  portionSize: number | null;
+};
 
 const recipeIngredientFormSchema = z.object({
   recipeId: z.number(),
@@ -39,53 +72,30 @@ const recipeIngredientFormSchema = z.object({
 export default function RecipeManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedRecipe, setSelectedRecipe] = useState<Recipe | null>(null);
+  const [selectedRecipe, setSelectedRecipe] = useState<RecipeAuthority | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAddIngredientDialogOpen, setIsAddIngredientDialogOpen] = useState(false);
-  const [editingIngredient, setEditingIngredient] = useState<RecipeIngredient | null>(null);
-  const [isMarketingDialogOpen, setIsMarketingDialogOpen] = useState(false);
-  const [marketingOutputType, setMarketingOutputType] = useState<'delivery' | 'advertising' | 'social'>('delivery');
-  const [marketingNotes, setMarketingNotes] = useState('');
-  const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [editingIngredient, setEditingIngredient] = useState<RecipeIngredientAuthority | null>(null);
   
-  // Ingredient Management state
-  const [activeTab, setActiveTab] = useState<'recipes' | 'ingredients'>('recipes');
-  const [editingIngredientItem, setEditingIngredientItem] = useState<Ingredient | null>(null);
-  const [isIngredientFormOpen, setIsIngredientFormOpen] = useState(false);
-  const [ingredientSearchTerm, setIngredientSearchTerm] = useState('');
-  const [ingredientCategoryFilter, setIngredientCategoryFilter] = useState('all');
-
-  // Ingredient categories
-  const INGREDIENT_CATEGORIES = [
-    'Ingredients', // Legacy category for existing data
-    'Stock Items',
-    'Fresh Food',
-    'Frozen Food',
-    'Shelf Items',
-    'Drinks',
-    'Kitchen Items',
-    'Packaging Items'
-  ];
-
-  // Queries with legacy fallback
-  const { data: recipesResult, isLoading: recipesLoading } = useQuery({
-    queryKey: ['/api/recipes', 'with-legacy'],
-    queryFn: () => fetchWithLegacyFallback('/api/recipes', '/api/legacy-bridge/recipes'),
+  // Recipe Authority API - canonical source
+  const { data: recipesData, isLoading: recipesLoading } = useQuery<{ ok: boolean; recipes: RecipeAuthority[] }>({
+    queryKey: ['/api/recipe-authority'],
+    queryFn: async () => {
+      const res = await fetch('/api/recipe-authority/');
+      return res.json();
+    },
   });
-  const recipes = recipesResult?.rows || [];
-  const recipesSource = recipesResult?.source || 'v2';
+  const recipes = recipesData?.recipes || [];
 
-  const { data: ingredientsResult, isLoading: ingredientsLoading } = useQuery({
-    queryKey: ['/api/ingredients', 'with-legacy'],
-    queryFn: () => fetchWithLegacyFallback('/api/ingredients', '/api/legacy-bridge/ingredients'),
+  // Available ingredients from purchasing items (is_ingredient = true)
+  const { data: ingredientsData, isLoading: ingredientsLoading } = useQuery<{ ok: boolean; ingredients: AvailableIngredient[] }>({
+    queryKey: ['/api/recipe-authority/available-ingredients'],
+    queryFn: async () => {
+      const res = await fetch('/api/recipe-authority/available-ingredients');
+      return res.json();
+    },
   });
-  const ingredients = ingredientsResult?.rows || [];
-  const ingredientsSource = ingredientsResult?.source || 'v2';
-
-  const { data: recipeIngredients = [], isLoading: recipeIngredientsLoading, refetch: refetchRecipeIngredients } = useQuery({
-    queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'],
-    enabled: !!selectedRecipe?.id,
-  });
+  const ingredients = ingredientsData?.ingredients || [];
 
   // Forms
   const recipeForm = useForm({
@@ -94,12 +104,7 @@ export default function RecipeManagement() {
       name: "",
       category: "",
       description: "",
-      servingSize: 1,
-      preparationTime: 30,
-      totalCost: "0.00",
-      profitMargin: "40",
-      sellingPrice: "",
-      isActive: true,
+      yieldUnits: "",
     },
   });
 
@@ -109,16 +114,22 @@ export default function RecipeManagement() {
       recipeId: 0,
       ingredientId: "",
       quantity: "1",
-      unit: "",
-      cost: "",
+      unit: "g",
     },
   });
 
-  // Mutations
+  // Mutations using Recipe Authority API
   const createRecipeMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', '/api/recipes', data),
+    mutationFn: async (data: any) => {
+      const res = await fetch('/api/recipe-authority/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
       setIsCreateDialogOpen(false);
       recipeForm.reset();
       toast({ title: "Recipe created successfully" });
@@ -126,10 +137,20 @@ export default function RecipeManagement() {
   });
 
   const addIngredientMutation = useMutation({
-    mutationFn: (data: any) => apiRequest('POST', '/api/recipe-ingredients', data),
+    mutationFn: async (data: { recipeId: number; purchasingItemId: number; quantity: string; unit: string }) => {
+      const res = await fetch(`/api/recipe-authority/${data.recipeId}/ingredients`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          purchasingItemId: data.purchasingItemId,
+          quantity: data.quantity,
+          unit: data.unit,
+        }),
+      });
+      return res.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
       setIsAddIngredientDialogOpen(false);
       ingredientForm.reset();
       toast({ title: "Ingredient added successfully" });
@@ -137,21 +158,30 @@ export default function RecipeManagement() {
   });
 
   const updateIngredientMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => 
-      apiRequest('PUT', `/api/recipe-ingredients/${id}`, data),
+    mutationFn: async ({ recipeId, ingredientId, data }: { recipeId: number; ingredientId: number; data: { quantity: string; unit: string } }) => {
+      const res = await fetch(`/api/recipe-authority/${recipeId}/ingredients/${ingredientId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
       setEditingIngredient(null);
       toast({ title: "Ingredient updated successfully" });
     },
   });
 
   const removeIngredientMutation = useMutation({
-    mutationFn: (id: number) => apiRequest(`/api/recipe-ingredients/${id}`, { method: 'DELETE' }),
+    mutationFn: async ({ recipeId, ingredientId }: { recipeId: number; ingredientId: number }) => {
+      const res = await fetch(`/api/recipe-authority/${recipeId}/ingredients/${ingredientId}`, {
+        method: 'DELETE',
+      });
+      return res.json();
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
       toast({ title: "Ingredient removed successfully" });
     },
     onError: (error: any) => {
@@ -161,6 +191,18 @@ export default function RecipeManagement() {
         description: error.message || 'An error occurred while removing the ingredient',
         variant: "destructive" 
       });
+    },
+  });
+
+  const deleteRecipeMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await fetch(`/api/recipe-authority/${id}`, { method: 'DELETE' });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
+      setSelectedRecipe(null);
+      toast({ title: "Recipe deleted successfully" });
     },
   });
 
