@@ -365,12 +365,12 @@ export default function ExpenseUpload() {
 
                 <div>
                   <Label>Currency Column (Optional)</Label>
-                  <Select onValueChange={(value) => setColumnMapping({ ...columnMapping, currency: value })}>
+                  <Select onValueChange={(value) => setColumnMapping({ ...columnMapping, currency: value === "__none__" ? "" : value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select currency column" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="__none__">None</SelectItem>
                       {csvHeaders.map((header) => (
                         <SelectItem key={header} value={header}>
                           {header}
@@ -473,12 +473,12 @@ export default function ExpenseUpload() {
                     <div>
                       <Label className="text-xs">Vendor</Label>
                       <Select
-                        value={line.vendorGuess || ''}
+                        value={line.vendorGuess || '__none__'}
                         onValueChange={(value) => 
                           updateLineMutation.mutate({
                             batchId: currentBatchId!,
                             lineId: line.id,
-                            vendorId: parseInt(value) || undefined,
+                            vendorId: value === "__none__" ? undefined : (parseInt(value) || undefined),
                           })
                         }
                       >
@@ -486,7 +486,7 @@ export default function ExpenseUpload() {
                           <SelectValue placeholder="Select vendor" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {vendors.map((vendor) => (
                             <SelectItem key={vendor.id} value={vendor.id.toString()}>
                               {vendor.displayName}
@@ -499,12 +499,12 @@ export default function ExpenseUpload() {
                     <div>
                       <Label className="text-xs">Category</Label>
                       <Select
-                        value={line.categoryGuessId?.toString() || ''}
+                        value={line.categoryGuessId?.toString() || '__none__'}
                         onValueChange={(value) =>
                           updateLineMutation.mutate({
                             batchId: currentBatchId!,
                             lineId: line.id,
-                            categoryId: parseInt(value) || undefined,
+                            categoryId: value === "__none__" ? undefined : (parseInt(value) || undefined),
                           })
                         }
                       >
@@ -512,7 +512,7 @@ export default function ExpenseUpload() {
                           <SelectValue placeholder="Select category" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="__none__">None</SelectItem>
                           {categories.map((category) => (
                             <SelectItem key={category.id} value={category.id.toString()}>
                               {category.name}

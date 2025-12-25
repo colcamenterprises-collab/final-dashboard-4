@@ -152,14 +152,14 @@ export default function IngredientsMaster() {
                       </TableCell>
                       <TableCell className="p-1">
                         <Select
-                          value={ing.portionUnit || ""}
-                          onValueChange={(v) => handleUpdate(ing.id, "portionUnit", v || null)}
+                          value={ing.portionUnit || "__none__"}
+                          onValueChange={(v) => handleUpdate(ing.id, "portionUnit", v === "__none__" ? null : v)}
                         >
                           <SelectTrigger className="h-8 text-xs" data-testid={`select-portion-unit-${ing.id}`}>
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="__none__">None</SelectItem>
                             {PORTION_UNITS.map(u => (
                               <SelectItem key={u} value={u}>{u}</SelectItem>
                             ))}
