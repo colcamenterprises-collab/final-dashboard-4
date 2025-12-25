@@ -1,0 +1,82 @@
+🔐 REPLIT AGENT PATCH — INGREDIENT MASTER CRASH FIX
+MODE: READ / FIX / GUARD ONLY
+❗ PROBLEM (CONFIRMED)
+The Ingredient Master page hard-crashes due to an invalid Radix Select usage:
+Copy code
+
+<Select.Item /> must have a value prop that is not an empty string
+This happens because at least one <SelectItem value=""> exists.
+Radix UI forbids empty string values and throws a runtime error.
+This blocks:
+Ingredients Master
+Recipe setup
+Costing workflow
+Purchasing → Ingredients pipeline
+🎯 OBJECTIVE
+Restore Ingredient Master page functionality by fixing invalid Select values.
+No scope creep
+No schema changes
+No UI redesign
+No logic changes beyond value handling
+✅ REQUIRED FIX (MANDATORY)
+1️⃣ FIND ALL EMPTY SELECT VALUES
+Search the frontend for empty SelectItem values:
+Copy code
+
+<SelectItem value="">
+Likely files (check all):
+client/src/pages/operations/IngredientsMaster.tsx
+Any shared Select used for:
+portion unit
+supplier
+brand
+category
+2️⃣ REPLACE EMPTY VALUE WITH SENTINEL
+❌ BEFORE (INVALID)
+Copy code
+Tsx
+<SelectItem value="">
+  None
+</SelectItem>
+✅ AFTER (VALID)
+Copy code
+Tsx
+<SelectItem value="__none__">
+  None
+</SelectItem>
+3️⃣ HANDLE SENTINEL IN STATE LOGIC
+Wherever the Select value is consumed:
+Copy code
+Ts
+const normalizedValue =
+  value === "__none__" ? null : value;
+Apply this only where the value is persisted or validated.
+🛡️ GUARD REQUIREMENT (DO NOT SKIP)
+Ensure no SelectItem anywhere in the app uses:
+value=""
+undefined
+null
+All SelectItem values must be non-empty strings.
+🧪 VERIFICATION STEPS (MANDATORY)
+After applying the fix:
+Reload /operations/ingredients-master
+Page must:
+Render fully
+No red React error overlay
+Open every dropdown on the page
+Selecting “None” must:
+Not crash
+Clear the value correctly
+Console must show zero runtime errors
+🚫 EXPLICITLY NOT ALLOWED
+❌ No disabling Radix warnings
+❌ No try/catch wrappers
+❌ No UI hiding
+❌ No replacing Select component
+❌ No changes outside Select value handling
+✅ SUCCESS CRITERIA
+Ingredient Master loads
+Dropdowns function
+No runtime crash
+No side effects
+System unblocked for operations
