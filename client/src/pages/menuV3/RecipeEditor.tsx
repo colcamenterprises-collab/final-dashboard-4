@@ -42,6 +42,9 @@ export default function RecipeEditor({ item }) {
 
   return (
     <div>
+      <div className="bg-amber-50 border border-amber-200 rounded p-3 mb-4 text-sm text-amber-800">
+        <strong>Read-only</strong> — Recipe editing is managed in <a href="/recipe-management" className="text-emerald-600 underline">Recipe Management</a>
+      </div>
       <h2>Recipe for: {item.name}</h2>
 
       {/* Add ingredient */}

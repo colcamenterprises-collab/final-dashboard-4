@@ -424,10 +424,18 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       const data = await res.json();
 
       if (!res.ok || data?.ok === false) {
-        // Show detailed error if drinks are missing
-        if (data?.error === "STOCK_REQUIRED" && data?.details?.drinksMissing) {
-          const missing = data.details.drinksMissing.join(', ');
-          throw new Error(`Missing drink counts: ${missing}. Please enter 0 if none remaining.`);
+        // Show blocking modal for stock validation errors
+        if (data?.error === "STOCK_REQUIRED" && data?.details) {
+          const details: { rolls?: string; meat?: string; drinks?: string[] } = {};
+          if (data.details.rollsEnd) details.rolls = data.details.rollsEnd;
+          if (data.details.meatEnd) details.meat = data.details.meatEnd;
+          if (data.details.drinksMissing && data.details.drinksMissing.length > 0) {
+            details.drinks = data.details.drinksMissing;
+          }
+          setValidationDetails(details);
+          setShowValidationDialog(true);
+          setSubmitting(false);
+          return; // Don't throw, show modal instead
         }
         throw new Error(data?.error || "Unable to submit stock.");
       }

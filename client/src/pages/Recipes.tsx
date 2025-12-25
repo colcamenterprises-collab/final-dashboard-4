@@ -299,6 +299,12 @@ const Recipes = () => {
 
   return (
     <div className="bg-app min-h-screen px-6 sm:px-8 py-5" style={{ fontFamily: 'Poppins, sans-serif' }}>
+      {/* READ-ONLY BANNER */}
+      <div className="mb-4 bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
+        <strong>Read-only</strong> — Recipe editing is managed in{" "}
+        <Link href="/recipe-management" className="text-emerald-600 underline">Recipe Management</Link>
+      </div>
+      
       <div className="flex items-baseline justify-between mb-4">
         <h1 className="text-[32px] font-extrabold tracking-tight text-[var(--heading)]">Menu Management</h1>
       </div>
