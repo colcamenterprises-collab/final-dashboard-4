@@ -395,7 +395,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
 
     // __stock_required_guard__
     const stockPayload = { rollsEnd, meatEnd, drinkStock };
-    const stockValidation = validateStockRequired(stockPayload);
+    const stockValidation = await validateStockRequired(stockPayload);
     if (!stockValidation.ok) {
       return res.status(422).json({ 
         ok: false, 

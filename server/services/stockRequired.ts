@@ -1,9 +1,6 @@
-import { foodCostings } from "../data/foodCostings.js";
+import { PrismaClient } from "@prisma/client";
 
-// Dynamically get all drink names from foodCostings database
-const REQUIRED_DRINKS: string[] = foodCostings
-  .filter(item => item.category === "Drinks")
-  .map(item => item.item);
+const prisma = new PrismaClient();
 
 const N = (v:any) => {
   if (v === null || v === undefined) return NaN;
@@ -16,9 +13,15 @@ export type StockErrors = {
   meatEnd?: string;
   drinkStock?: string;
   drinksMissing?: string[];
+  itemsMissingOrInactive?: string[];
 };
 
-export function validateStockRequired(payload:any): { ok: boolean; errors: StockErrors } {
+/**
+ * 🔐 PART 3: Hardened Form 2 Validation
+ * Validates that all mandatory stock items exist and are active in purchasing_items
+ * before allowing Form 2 submission.
+ */
+export async function validateStockRequired(payload:any): Promise<{ ok: boolean; errors: StockErrors }> {
   const errors: StockErrors = {};
   const rolls = N(payload?.rollsEnd ?? payload?.rolls_end);
   const meat  = N(payload?.meatEnd  ?? payload?.meat_end);
@@ -38,6 +41,17 @@ export function validateStockRequired(payload:any): { ok: boolean; errors: Stock
     errors.meatEnd = "Meat cannot be negative.";
   }
 
+  // Get required drinks from purchasing_items (active only, Drinks category)
+  const activeDrinkItems = await prisma.purchasingItem.findMany({
+    where: { 
+      active: true,
+      category: 'Drinks'
+    },
+    select: { item: true }
+  });
+  
+  const REQUIRED_DRINKS = activeDrinkItems.map(d => d.item);
+
   // Drinks: must be an object with all required keys (0 allowed)
   if (!drinks || typeof drinks !== "object" || Array.isArray(drinks)) {
     errors.drinkStock = "Drinks stock must be provided (0 allowed for each).";
@@ -54,4 +68,30 @@ export function validateStockRequired(payload:any): { ok: boolean; errors: Stock
   }
 
   return { ok: Object.keys(errors).length === 0, errors };
+}
+
+/**
+ * 🔐 PART 3: Pre-submission validation
+ * Check if all required drink items exist and are active in purchasing_items
+ * Returns helpful error if any are missing or inactive.
+ */
+export async function validateRequiredItemsExist(): Promise<{ ok: boolean; missingOrInactive: string[] }> {
+  // Get active drink items from purchasing_items
+  const activeDrinks = await prisma.purchasingItem.findMany({
+    where: { 
+      active: true,
+      category: 'Drinks'
+    },
+    select: { item: true }
+  });
+
+  // If no active drinks found, that's a problem
+  if (activeDrinks.length === 0) {
+    return { 
+      ok: false, 
+      missingOrInactive: ["No active drink items found in Purchasing List. Please contact manager."] 
+    };
+  }
+
+  return { ok: true, missingOrInactive: [] };
 }
