@@ -215,15 +215,6 @@ export default function RecipeManagement() {
     }
   };
 
-  const deleteRecipeMutation = useMutation({
-    mutationFn: (id: number) => apiRequest('DELETE', `/api/recipes/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
-      setSelectedRecipe(null);
-      toast({ title: "Recipe deleted successfully" });
-    },
-  });
-
   // Marketing content generation mutation
   const generateMarketingMutation = useMutation({
     mutationFn: async ({ recipeId, outputType, notes }: { recipeId: number, outputType: string, notes?: string }) => {
@@ -444,6 +435,7 @@ export default function RecipeManagement() {
       </div>
 
       {activeTab === 'recipes' && (
+        <>
         <div className="space-y-4">
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
@@ -1099,6 +1091,7 @@ export default function RecipeManagement() {
           </CardContent>
         </Card>
       </div>
+      </>
       )}
 
       {/* Ingredients Tab */}

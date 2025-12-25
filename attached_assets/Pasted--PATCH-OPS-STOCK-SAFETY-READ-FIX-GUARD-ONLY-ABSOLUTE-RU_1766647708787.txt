@@ -1,0 +1,71 @@
+🔐 PATCH-OPS-STOCK-SAFETY (READ / FIX / GUARD ONLY)
+🚫 ABSOLUTE RULES
+NO new features
+NO schema changes
+NO table deletions
+NO refactors
+NO UI redesigns
+Preserve all historical data
+🧨 ROOT PROBLEM (FACT)
+Form 2 submission was blocked because Water is a mandatory drink stock item but does not exist or is inactive in purchasing_items.
+Staff could not submit the shift despite correct input.
+PART 1 — EMERGENCY UNBLOCK (MANDATORY)
+Ensure “Water” exists and is active
+If Water exists but is inactive:
+Set active = true
+If Water does not exist: Create purchasing item:
+Copy code
+
+item: "Water"
+category: "Drinks"
+active: true
+is_ingredient: false
+Acceptance
+Water appears in Purchasing List
+Water appears in Form 2
+Form 2 can be successfully submitted
+PART 2 — FIX INACTIVE ITEM RECOVERY (GUARD)
+Problem
+Purchasing List defaults to Active Only, making inactive items impossible to reactivate.
+Fix
+In Purchasing List UI:
+Add filter dropdown:
+All
+Active
+Inactive
+Allow toggling active = true from inactive view
+⚠️ This is not a feature — it is a recovery guard.
+PART 3 — HARDEN FORM 2 VALIDATION (GUARD)
+Before Form 2 submission:
+Validate all mandatory stock items:
+Exist in purchasing_items
+Are active = true
+If any missing or inactive: Block submission with error:
+“Required stock item ‘Water’ is missing or inactive in Purchasing List. Please contact manager.”
+This prevents night-shift deadlocks permanently.
+PART 4 — DELETE SAFETY (DO NOT LOOSEN)
+Deletion rules must remain enforced:
+If item is referenced by:
+Daily Stock
+Purchasing Shift Items
+Recipes / Ingredients
+Then:
+❌ Delete = blocked
+✅ Deactivate = allowed
+✅ Unmark as ingredient = allowed
+Do NOT allow deletion of referenced items.
+PART 5 — VERIFICATION (REQUIRED)
+Agent must confirm ALL of the following:
+Water exists and is active
+Water selectable in Form 2
+Form 2 submits successfully
+Inactive purchasing items can be reactivated
+Referenced items cannot be deleted
+No historical data modified
+✅ EXPECTED OUTCOME
+Staff can finalize Form 2
+Purchasing list is recoverable
+Ingredients & recipes remain intact
+No data loss
+System operational for tonight’s shift
+END PATCH — DO NOT ADD SCOPE
