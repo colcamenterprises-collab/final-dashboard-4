@@ -1,0 +1,154 @@
+🔒 STABILISATION PATCH — DO NOT ADD FEATURES
+🚨 EXECUTION MODE (MANDATORY)
+This patch is STABILISATION ONLY.
+You are NOT allowed to:
+Add new pages
+Add new analytics
+Add new tables
+Add new UI components
+Add AI, alerts, or optimisations
+Rename concepts or refactor architecture
+You are ONLY allowed to:
+Fix data correctness
+Enforce canonical sources
+Remove ambiguity
+Add guards, banners, and hard blocks
+Align backend + frontend behaviour
+If unsure → STOP and DO NOTHING.
+🎯 OBJECTIVE
+Make one complete operational workflow work end-to-end:
+Copy code
+
+Purchasing Items
+→ Ingredients
+→ Recipes
+→ Form 2 (Daily Stock)
+→ Purchasing Shift Items
+→ Shopping List
+Every step must:
+Use the same source of truth
+Fail loudly and clearly
+Be impossible to “half-complete”
+🧱 CANONICAL DECLARATIONS (NON-NEGOTIABLE)
+✅ EDITABLE (CANONICAL)
+These are the ONLY places where edits are allowed:
+Purchasing List
+Table: purchasing_items
+Editable: name, category, unit_cost, active, is_ingredient
+Must support:
+Active / Inactive toggle
+Filter: All | Active | Inactive
+Reactivation of inactive items
+Ingredient Management
+Derived from: purchasing_items WHERE is_ingredient = true
+Editable:
+portion_unit
+portion_size
+yield
+Costs are READ-ONLY (from purchasing_items)
+Recipe Management
+Editable recipes + ingredients
+Cost is ALWAYS computed live from purchasing_items
+CRUD must work here and ONLY here
+Form 2 – Daily Stock
+Loads items ONLY from purchasing_items WHERE active = true
+Submits quantities ONLY
+Cannot submit partial or mismatched data
+🔒 READ-ONLY (LOCKED)
+All other recipe / menu / ingredient pages must:
+Show a READ-ONLY banner
+Disable all edits
+Link to the canonical page if relevant
+This includes:
+Menu Master V3
+Menu Admin
+Menu Recipes (all variants)
+Operations → Recipes
+Any legacy ingredient or recipe screens
+No exceptions.
+🧠 DATA RULES (STRICT)
+Purchasing Items
+Delete is blocked if:
+Used in recipes
+Used in shift records
+Deactivate is ALWAYS allowed
+Deactivated items:
+Must be hideable via filter
+Must be reactivatable
+Ingredients
+Ingredients are NOT a separate source
+They are a VIEW of purchasing_items
+Deleting ingredients = deactivating purchasing item
+Recipes
+Can only reference purchasing_items where is_ingredient = true
+Cost = SUM(quantity × unit_cost) — no caching
+If ingredient missing → block save
+🧾 FORM 2 FINALISATION SAFETY (CRITICAL)
+Backend
+On missing required stock:
+Return HTTP 400
+Response shape:
+Copy code
+Json
+{
+  "success": false,
+  "reason": "MISSING_REQUIRED_STOCK",
+  "missing": [
+    { "category": "Drinks", "item": "Bottled Water" }
+  ]
+}
+Frontend
+Detect reason === "MISSING_REQUIRED_STOCK"
+Block submission
+Show modal listing:
+Category
+Item name
+No silent failures
+No generic error messages
+🛒 SHOPPING LIST (READ-ONLY OUTPUT)
+Source: purchasing_shift_items
+Joined with: purchasing_items
+NO JSON fallbacks
+NO editing
+If empty:
+Show “No items submitted for this shift”
+NOT an error
+🧪 REQUIRED VERIFICATION (MUST PASS)
+The agent must manually verify ALL of the following:
+Purchasing List
+Deactivate item
+Reactivate item
+Filter works
+Ingredients
+Toggle is_ingredient in Purchasing
+Ingredient appears automatically
+Portion fields save
+Recipes
+Create recipe
+Add ingredient
+Cost updates correctly
+Form 2
+Missing drink → blocked with clear message
+Completed form → submits successfully
+Shopping List
+Reflects Form 2 submission
+Shows correct items and quantities
+If ANY step fails → PATCH IS NOT COMPLETE.
+🛑 STOP CONDITIONS
+If you encounter:
+Ambiguous data source
+Two pages editing same concept
+Missing table data
+Unclear legacy behaviour
+→ STOP → DO NOT PATCH AROUND IT → REPORT CLEARLY
+🏁 SUCCESS CRITERIA
+The system is considered STABLE when:
+Staff can complete Form 2 without workarounds
+Purchasing list is trusted and reversible
+Recipes have real costs
+Shopping list reflects reality
+No page contradicts another page
+DO NOT ADD FEATURES.
+DO NOT IMPROVISE.
+DO NOT OPTIMISE.
+Stabilise or stop.
