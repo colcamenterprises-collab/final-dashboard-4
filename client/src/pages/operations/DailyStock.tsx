@@ -423,21 +423,23 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
       });
       const data = await res.json();
 
-      if (!res.ok || data?.ok === false) {
-        // Show blocking modal for stock validation errors
-        if (data?.error === "STOCK_REQUIRED" && data?.details) {
+      if (!res.ok || data?.success === false) {
+        // Show blocking modal for stock validation errors (spec: reason === "MISSING_REQUIRED_STOCK")
+        if (data?.reason === "MISSING_REQUIRED_STOCK") {
           const details: { rolls?: string; meat?: string; drinks?: string[] } = {};
-          if (data.details.rollsEnd) details.rolls = data.details.rollsEnd;
-          if (data.details.meatEnd) details.meat = data.details.meatEnd;
-          if (data.details.drinksMissing && data.details.drinksMissing.length > 0) {
-            details.drinks = data.details.drinksMissing;
+          // Check details for rolls/meat errors
+          if (data.details?.rollsEnd) details.rolls = data.details.rollsEnd;
+          if (data.details?.meatEnd) details.meat = data.details.meatEnd;
+          // Extract drink names from missing array: { category, item }
+          if (data.missing && data.missing.length > 0) {
+            details.drinks = data.missing.map((m: { category: string; item: string }) => m.item);
           }
           setValidationDetails(details);
           setShowValidationDialog(true);
           setSubmitting(false);
           return; // Don't throw, show modal instead
         }
-        throw new Error(data?.error || "Unable to submit stock.");
+        throw new Error(data?.reason || data?.error || "Unable to submit stock.");
       }
 
       // Invalidate finance cache to refresh home page data

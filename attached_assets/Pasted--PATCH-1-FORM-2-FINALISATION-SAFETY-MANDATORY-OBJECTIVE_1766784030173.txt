@@ -1,0 +1,121 @@
+🔧 PATCH 1 — FORM 2 FINALISATION SAFETY (MANDATORY)
+🎯 OBJECTIVE
+Prevent staff from being blocked when submitting Form 2 (Daily Stock) by clearly surfacing what is missing before submit.
+🚫 HARD RULES
+DO NOT change database schema
+DO NOT add new validation rules
+DO NOT change required fields
+DO NOT modify purchasing logic
+ONLY expose existing validation results to the UI
+🧠 ROOT CAUSE (CONFIRMED)
+Form 2 fails silently when required stock items (e.g. Drinks) are missing.
+Validation already exists but errors are not user-visible.
+✅ REQUIRED CHANGES
+1️⃣ Backend – Return Structured Validation Errors
+File:
+server/validation/stockRequired.ts
+Change:
+Ensure validation returns a structured list of missing items:
+Copy code
+Ts
+{
+  valid: false,
+  missing: [
+    { category: 'Drinks', item: 'Bottled Water' },
+    { category: 'Drinks', item: 'Coke Can' }
+  ]
+}
+If already returned internally, do not change logic, only expose it.
+2️⃣ Backend – Pass Validation Errors Up
+File:
+server/forms/dailySalesV2.ts
+Change:
+When validation fails:
+Return HTTP 400
+Include missing[] payload in response JSON
+Example:
+Copy code
+Json
+{
+  "success": false,
+  "reason": "MISSING_REQUIRED_STOCK",
+  "missing": [...]
+}
+3️⃣ Frontend – Pre-Submit Blocking Modal
+File:
+client/src/pages/operations/DailyStockV2.tsx
+Change:
+On submit failure:
+Detect reason === 'MISSING_REQUIRED_STOCK'
+Show modal listing:
+Category
+Item name
+Block submit until resolved
+DO NOT
+Add new UI components
+Add new state management
+Change styling
+Simple modal or alert is sufficient.
+✅ ACCEPTANCE CRITERIA
+Staff sees exactly which items are missing
+No more “mystery failure”
+No change to business rules
+No regression to Form 2 submission
+🍔 PATCH 2 — RECIPE SYSTEM UNLOCK (MINIMUM VIABLE)
+🎯 OBJECTIVE
+Make ONE recipe system editable so costing and purchasing analysis can function.
+🚫 HARD RULES
+DO NOT create new recipe pages
+DO NOT delete existing pages
+DO NOT sync POS again
+DO NOT introduce modifiers yet
+DO NOT refactor recipe architecture
+🧠 DECISION (LOCKED)
+Canonical recipe surface:
+Copy code
+
+/menu-management/recipe-management
+All others become READ-ONLY.
+✅ REQUIRED CHANGES
+1️⃣ Backend – Enable Existing CRUD Routes
+File:
+server/routes/recipeAuthority.ts (or equivalent)
+Ensure enabled (no stubs):
+POST /api/recipe-authority
+PUT /api/recipe-authority/:id
+DELETE /api/recipe-authority/:id
+Ingredient add/remove routes already exist — DO NOT CHANGE LOGIC
+If disabled by guards → allow when PRODUCTION_LOCK !== 1
+2️⃣ Frontend – Unlock Editing UI
+File:
+client/src/pages/menu/RecipeManagement.tsx
+Enable:
+Add Recipe
+Edit Recipe
+Delete Recipe (guarded)
+Guard rules:
+Cannot delete recipe if mapped to POS item
+Show clear error message if blocked
+3️⃣ Lock All Other Recipe Views
+Files (examples):
+MenuMasterV3.tsx
+OnlineMenuAdmin.tsx
+Change:
+Add label:
+“Read-only — Recipe editing is managed in Recipe Management”
+Disable buttons if present
+DO NOT REMOVE routes
+✅ ACCEPTANCE CRITERIA
+You can:
+Create a recipe
+Assign ingredients (from purchasing_items where is_ingredient=true)
+See live cost update when ingredient price changes
+Only one place is editable
+No duplicate editing surfaces
+No breaking changes to POS or menu display
+🔒 FINAL NOTE TO AGENT
+This is a stability patch, not a feature release.
+If anything is unclear:
+STOP
+DO NOT GUESS
+ASK BEFORE IMPLEMENTING

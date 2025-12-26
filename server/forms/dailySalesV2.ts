@@ -397,10 +397,18 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     const stockPayload = { rollsEnd, meatEnd, drinkStock };
     const stockValidation = await validateStockRequired(stockPayload);
     if (!stockValidation.ok) {
-      return res.status(422).json({ 
-        ok: false, 
-        error: "STOCK_REQUIRED", 
-        details: stockValidation.errors 
+      // Build missing array per spec format: { category, item }
+      const missing: { category: string; item: string }[] = [];
+      if (stockValidation.errors.drinksMissing) {
+        for (const drink of stockValidation.errors.drinksMissing) {
+          missing.push({ category: 'Drinks', item: drink });
+        }
+      }
+      return res.status(400).json({ 
+        success: false, 
+        reason: "MISSING_REQUIRED_STOCK", 
+        missing,
+        details: stockValidation.errors // Keep details for rollsEnd/meatEnd errors
       });
     }
 
