@@ -2,7 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { Link } from "wouter";
 
 interface RecipeIngredient {
   ingredientId: string;
@@ -61,10 +63,22 @@ export default function Recipes() {
 
   return (
     <div className="p-4 space-y-4">
+      <Alert className="border-amber-500 bg-amber-50" data-testid="deprecation-banner">
+        <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <AlertTitle className="text-amber-800 font-medium">Read-Only View</AlertTitle>
+        <AlertDescription className="text-amber-700">
+          Recipe editing has moved to{" "}
+          <Link href="/recipe-management" className="underline font-medium hover:text-amber-900">
+            Recipe Management
+          </Link>.
+          This page is deprecated and will be removed.
+        </AlertDescription>
+      </Alert>
+
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-xl">Recipes</CardTitle>
-          <p className="text-xs text-slate-500">{recipes.length} recipes (read-only)</p>
+          <CardTitle className="text-xl">Recipes (Legacy View)</CardTitle>
+          <p className="text-xs text-slate-500">{recipes.length} recipes — read-only</p>
         </CardHeader>
         <CardContent>
           <div className="rounded border border-slate-200 overflow-hidden">

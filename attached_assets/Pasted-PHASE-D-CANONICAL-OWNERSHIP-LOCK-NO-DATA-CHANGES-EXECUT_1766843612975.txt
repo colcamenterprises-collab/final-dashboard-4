@@ -1,0 +1,102 @@
+PHASE D — CANONICAL OWNERSHIP LOCK (NO DATA CHANGES)
+🚨 EXECUTION MODE: READ / LOCK / LABEL ONLY
+DO NOT ADD FEATURES. DO NOT MODIFY DATA. DO NOT CHANGE SCHEMAS.
+This patch exists only to eliminate ambiguity, lock ownership, and stabilise mental + operational flow.
+🎯 OBJECTIVE
+Establish ONE canonical editing surface per domain and force all other surfaces into read-only or deprecated state, with explicit user-facing guidance.
+This patch must not:
+Change any database schema
+Alter Form 2 logic
+Touch purchasing sync, analytics, or backfills
+Introduce new APIs or UI functionality
+🧱 CANONICAL OWNERSHIP (NON-NEGOTIABLE)
+✅ Purchasing
+Canonical editor: /operations/purchasing
+Purchasing Items are the single source of truth for:
+Costs
+Active / inactive state
+Ingredient flag (is_ingredient)
+Ingredients are NOT a separate system — they are:
+Purchasing Items WHERE is_ingredient = true
+✅ Ingredients
+Derived view only
+Must be treated as a filtered view of Purchasing
+No standalone ownership language (“Ingredients Master” must not imply source of truth)
+✅ Recipes
+Canonical editor: /recipe-management
+Backed by RecipeAuthority (recipe table)
+Costs must remain computed live from purchasing items
+This is the only place recipes may be created, edited, or deleted
+❌ Legacy Recipe / Menu Surfaces (READ-ONLY)
+The following pages must be explicitly read-only with a banner:
+/menu/recipes
+/menu/cost-calculator
+Any other recipe/menu editing surface outside /recipe-management
+Each must display a blocking banner:
+Read-Only View
+Recipe editing has moved to Recipe Management.
+This page is deprecated and will be removed.
+No buttons. No mutations. No ambiguity.
+✅ Menu (Commercial Layer)
+Menu pages are NOT recipe editors
+They may show prices, availability, POS alignment
+Must not imply ingredient or cost ownership
+🧭 NAVIGATION RULES (LOCKED)
+Purchasing (Header Only — Not a Page)
+Copy code
+
+PURCHASING
+├── Purchasing List        (canonical editor)
+├── Purchasing Log         (formerly Shift Log)
+└── Shopping List          (read-only projection)
+Analysis
+Copy code
+
+ANALYSIS
+├── Daily Summary Reports
+├── F&B Analysis
+└── Sales & Shift Analysis
+Menu Management
+Copy code
+
+MENU MANAGEMENT
+├── Recipe Management     (ONLY editable recipe surface)
+└── Menu Manager          (commercial/menu layer)
+Remove or hide:
+“Ingredients Master” as a primary navigation item
+Any duplicate recipe/menu entry points
+Pages may still exist internally but must not appear as peers.
+🔐 LOCKDOWN REQUIREMENTS
+Read-only banners must be visually obvious and unskippable
+Any attempt to edit via non-canonical routes must:
+Be blocked
+Explain where to go instead
+No silent redirects without explanation
+No duplicate ownership language anywhere in UI
+🧪 VERIFICATION CHECKLIST (MANDATORY)
+The patch is complete only if all of the following pass:
+/recipe-management loads and allows full CRUD
+Legacy recipe/menu pages load read-only with warning banner
+Purchasing List clearly owns costs + ingredient flag
+Ingredients are visibly derived from Purchasing
+Sidebar matches the defined structure
+No new routes, APIs, or schema changes exist
+App boots with zero routing errors
+🚫 ABSOLUTE PROHIBITIONS
+The agent MUST NOT:
+Refactor schemas
+Rename database tables
+Change Form 2 validation or submission
+Modify purchasing sync logic
+Add analytics, modifiers, or POS mapping logic
+“Clean up” code unless required to enforce locks
+🧠 CONTEXT NOTE (DO NOT CODE AGAINST)
+This patch is about clarity, not capability.
+The system already works. This step makes it understandable and safe.
+✅ DELIVERY EXPECTATION
+Provide:
+Confirmation of each lock applied
+List of files touched
+Screenshot-level verification notes (textual)
+No speculative improvements
+END OF PATCH — EXECUTE EXACTLY AS WRITTEN

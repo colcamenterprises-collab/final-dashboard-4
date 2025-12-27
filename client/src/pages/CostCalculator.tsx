@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import PageShell from "@/layouts/PageShell";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
+import { Link } from "wouter";
 
 export default function CostCalculator() {
   const [recipeName, setRecipeName] = useState("");
@@ -12,35 +14,9 @@ export default function CostCalculator() {
   const [calculationResult, setCalculationResult] = useState<any>(null);
   
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const { data: ingredientsData } = useQuery({
     queryKey: ["/api/costing/ingredients"],
-  });
-
-  const saveRecipeMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("/api/costing/recipes", "POST", data),
-    onSuccess: () => {
-      toast({ title: "Success", description: "Recipe saved successfully" });
-      // Clear form
-      setRecipeName("");
-      setRecipeYield(1);
-      setTargetMargin(0.3);
-      setSelectedIngredients([]);
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
-  });
-
-  const calculateMutation = useMutation({
-    mutationFn: (name: string) => apiRequest(`/api/costing/recipes/${encodeURIComponent(name)}/calc`, "GET"),
-    onSuccess: (data) => {
-      setCalculationResult(data);
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
-    }
   });
 
   const ingredients = ingredientsData?.list || [];
@@ -59,38 +35,30 @@ export default function CostCalculator() {
     setSelectedIngredients(selectedIngredients.filter((_, i) => i !== index));
   };
 
-  const handleSaveRecipe = () => {
-    if (!recipeName.trim()) {
-      toast({ title: "Error", description: "Please enter a recipe name", variant: "destructive" });
-      return;
-    }
-
-    const validIngredients = selectedIngredients.filter(ing => ing.ingredientId && ing.qty > 0);
-    if (validIngredients.length === 0) {
-      toast({ title: "Error", description: "Please add at least one ingredient", variant: "destructive" });
-      return;
-    }
-
-    saveRecipeMutation.mutate({
-      name: recipeName,
-      yield: recipeYield,
-      targetMargin: targetMargin,
-      items: validIngredients
+  const handleBlockedAction = () => {
+    toast({ 
+      title: "Action Blocked", 
+      description: "Recipe editing has moved to Recipe Management. This page is deprecated.", 
+      variant: "destructive" 
     });
-  };
-
-  const handleCalculate = () => {
-    if (!recipeName.trim()) {
-      toast({ title: "Error", description: "Please enter a recipe name", variant: "destructive" });
-      return;
-    }
-    calculateMutation.mutate(recipeName);
   };
 
   return (
     <PageShell>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold">Cost Calculator</h1>
+        <Alert className="border-amber-500 bg-amber-50" data-testid="deprecation-banner">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800 font-medium">Read-Only View</AlertTitle>
+          <AlertDescription className="text-amber-700">
+            Recipe editing has moved to{" "}
+            <Link href="/recipe-management" className="underline font-medium hover:text-amber-900">
+              Recipe Management
+            </Link>.
+            This page is deprecated and will be removed.
+          </AlertDescription>
+        </Alert>
+
+        <h1 className="text-3xl font-bold">Cost Calculator (Legacy)</h1>
 
         {/* Recipe Form */}
         <div className="rounded-[4px] border border-slate-200 bg-white p-4">
@@ -178,21 +146,21 @@ export default function CostCalculator() {
             </div>
           </div>
 
-          {/* Actions */}
+          {/* Actions - BLOCKED (deprecated page) */}
           <div className="flex gap-3">
             <button
-              onClick={handleSaveRecipe}
-              disabled={saveRecipeMutation.isPending}
-              className="px-6 py-3 bg-emerald-600 text-white rounded-[4px] hover:bg-emerald-700 disabled:opacity-50 text-xs"
+              onClick={handleBlockedAction}
+              disabled
+              className="px-6 py-3 bg-slate-400 text-white rounded-[4px] cursor-not-allowed text-xs"
             >
-              {saveRecipeMutation.isPending ? "Saving..." : "Save Recipe"}
+              Save Recipe (Disabled)
             </button>
             <button
-              onClick={handleCalculate}
-              disabled={calculateMutation.isPending}
-              className="px-6 py-3 bg-blue-600 text-white rounded-[4px] hover:bg-blue-700 disabled:opacity-50 text-xs"
+              onClick={handleBlockedAction}
+              disabled
+              className="px-6 py-3 bg-slate-400 text-white rounded-[4px] cursor-not-allowed text-xs"
             >
-              {calculateMutation.isPending ? "Calculating..." : "Calculate Cost"}
+              Calculate Cost (Disabled)
             </button>
           </div>
         </div>
