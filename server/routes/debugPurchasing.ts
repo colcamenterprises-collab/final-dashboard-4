@@ -137,4 +137,50 @@ router.get('/incomplete-recipes', async (_req: Request, res: Response) => {
   }
 });
 
+/**
+ * 🔒 G: Ingredient Usage Summary
+ * GET /api/debug/ingredient-usage-summary?date=YYYY-MM-DD
+ * Returns derived ingredient usage statistics for a shift date
+ */
+import { getIngredientUsageSummary, deriveIngredientUsageForDate } from '../services/ingredientUsageDeriver';
+
+router.get('/ingredient-usage-summary', async (req: Request, res: Response) => {
+  try {
+    const date = (req.query.date as string) || new Date().toISOString().split('T')[0];
+    const summary = await getIngredientUsageSummary(date);
+    res.json(summary);
+  } catch (error) {
+    console.error('[DEBUG] Ingredient usage summary failed:', error);
+    // Never 500 - return empty stats
+    res.json({
+      shiftDate: req.query.date || new Date().toISOString().split('T')[0],
+      totalReceipts: 0,
+      totalRecipesUsed: 0,
+      totalIngredientsUsed: 0,
+      topIngredients: []
+    });
+  }
+});
+
+/**
+ * 🔒 G: Derive Ingredient Usage (manual trigger)
+ * POST /api/debug/derive-ingredient-usage?date=YYYY-MM-DD
+ * Derives ingredient usage for a specific date
+ */
+router.post('/derive-ingredient-usage', async (req: Request, res: Response) => {
+  try {
+    const date = (req.query.date as string) || (req.body.date as string) || new Date().toISOString().split('T')[0];
+    const result = await deriveIngredientUsageForDate(date);
+    res.json(result);
+  } catch (error: any) {
+    console.error('[DEBUG] Ingredient usage derivation failed:', error);
+    // Never 500 - return error info
+    res.json({
+      success: false,
+      count: 0,
+      errors: [error.message || 'Unknown error']
+    });
+  }
+});
+
 export default router;

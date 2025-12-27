@@ -1759,3 +1759,25 @@ export type RecipeIngredientV2 = typeof recipeIngredient.$inferSelect;
 export type InsertRecipeIngredientV2 = z.infer<typeof insertRecipeIngredientV2Schema>;
 export type PosItemRecipeMap = typeof posItemRecipeMap.$inferSelect;
 export type InsertPosItemRecipeMap = z.infer<typeof insertPosItemRecipeMapSchema>;
+
+// -----------------------------------------------------------------------------
+// 🔒 DERIVED DATA — INGREDIENT USAGE
+// DO NOT WRITE MANUALLY
+// DO NOT ADD UI
+// SOURCE: POS → RECIPES → PURCHASING
+// -----------------------------------------------------------------------------
+
+export const ingredientUsage = pgTable('ingredient_usage', {
+  id: serial('id').primaryKey(),
+  shiftDate: date('shift_date').notNull(),
+  receiptId: text('receipt_id').notNull(),
+  posItemId: text('pos_item_id').notNull(),
+  recipeId: integer('recipe_id').notNull(),
+  purchasingItemId: integer('purchasing_item_id').notNull(),
+  quantityUsed: decimal('quantity_used', { precision: 12, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export type IngredientUsage = typeof ingredientUsage.$inferSelect;
+export type InsertIngredientUsage = typeof ingredientUsage.$inferInsert;

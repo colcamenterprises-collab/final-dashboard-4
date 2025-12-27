@@ -1,0 +1,135 @@
+PHASE G — INGREDIENT USAGE PERSISTENCE (NO UI, NO FEATURES)
+⚠️ ABSOLUTE RULES (NON-NEGOTIABLE)
+DO NOT modify navigation, UI, sidebar, or pages
+DO NOT add new dashboards, charts, or screens
+DO NOT change purchasing, recipes, or forms
+DO NOT delete or rename existing tables
+READ / DERIVE / STORE ONLY
+Backend only
+Fail safe, never crash
+🎯 OBJECTIVE
+Persist actual ingredient usage derived from POS receipts + recipes, so the system can later:
+Review receipts meaningfully
+Detect stock anomalies
+Calculate real food cost
+Power purchasing intelligence
+Nothing visual yet. Just truth in the database.
+🧠 CANONICAL FLOW (LOCK THIS IN YOUR HEAD)
+Copy code
+
+POS receipt
+→ POS line item
+→ recipe mapping
+→ recipe ingredients
+→ purchasing_items (ingredients)
+→ INGREDIENT USAGE RECORD (NEW)
+🧱 NEW TABLE (ONLY ONE)
+ingredient_usage
+Create a new table ONLY IF IT DOES NOT EXIST.
+Copy code
+Sql
+ingredient_usage (
+  id UUID PK,
+  shift_date DATE NOT NULL,
+  receipt_id TEXT NOT NULL,
+  pos_item_id TEXT NOT NULL,
+  recipe_id UUID NOT NULL,
+  purchasing_item_id INT NOT NULL,
+
+  quantity_used NUMERIC NOT NULL,
+  unit TEXT NOT NULL,
+
+  created_at TIMESTAMP DEFAULT now()
+)
+Indexes:
+(shift_date)
+(purchasing_item_id)
+(receipt_id)
+⚠️ This table is DERIVED — never edited by humans.
+🔁 DERIVATION LOGIC (MANDATORY)
+Source tables (READ ONLY):
+lv_receipt
+lv_line_item
+pos_item_recipe_map
+recipe
+recipe_ingredient
+purchasing_items
+Rules:
+Skip POS items without recipe mapping
+Skip recipes that are incomplete
+Skip ingredients where:
+purchasing_items.is_ingredient = false
+purchasing_items.active = false
+Quantity used =
+Copy code
+
+receipt_line.quantity × recipe_ingredient.quantity
+🧩 SERVICE TO ADD
+server/services/ingredientUsageDeriver.ts
+Responsibilities:
+Accept shift_date
+Derive all ingredient usage for that day
+Idempotent:
+Delete existing ingredient_usage for that shift_date
+Rebuild cleanly
+Must NOT:
+Throw if mappings are missing
+Throw if recipes incomplete
+Block ingestion
+Log warnings only.
+🔧 ENTRY POINTS (BACKEND ONLY)
+1️⃣ Manual (for now)
+Copy code
+Ts
+deriveIngredientUsageForDate(shiftDate: string)
+2️⃣ Hook into existing flow
+After:
+POS shift ingestion
+OR Daily Summary generation
+⚠️ Do NOT block anything if this fails.
+🧪 SAFETY REQUIREMENTS
+Wrap everything in try/catch
+On failure:
+Log error
+Exit gracefully
+Zero 500s allowed
+🧠 DEBUG ENDPOINT (READ ONLY)
+Add:
+Copy code
+
+GET /api/debug/ingredient-usage-summary?date=YYYY-MM-DD
+Return:
+Copy code
+Json
+{
+  "shift_date": "2025-01-14",
+  "total_receipts": 128,
+  "total_recipes_used": 312,
+  "total_ingredients_used": 947,
+  "top_ingredients": [
+    { "item": "Burger Buns", "qty": 128 },
+    { "item": "Beef Patties", "qty": 256 }
+  ]
+}
+If table empty → return empty stats, never error.
+🔒 LOCKDOWN COMMENTS (REQUIRED)
+At top of:
+ingredientUsageDeriver.ts
+ingredient_usage model
+Add:
+Copy code
+Ts
+/**
+ * 🔒 DERIVED DATA — INGREDIENT USAGE
+ * DO NOT WRITE MANUALLY
+ * DO NOT ADD UI
+ * SOURCE: POS → RECIPES → PURCHASING
+ */
+✅ DEFINITION OF DONE
+Table exists
+Derivation runs without crashing
+Re-running does not duplicate data
+Missing mappings do NOT break execution
+All pages still load
+No new UI
+No regressions
