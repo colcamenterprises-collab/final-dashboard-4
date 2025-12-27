@@ -1,6 +1,9 @@
 /**
  * 🔒 CANONICAL PURCHASING FLOW (VISIBILITY)
- * purchasing_items → Form 2 → purchasing_shift_items → Shift Log
+ * purchasing_items → Form 2 → purchasing_shift_items → Purchasing Log
+ *
+ * Navigation cleanup — no logic changes
+ * Renamed: "Shift Log" → "Purchasing Log" for label consistency
  *
  * RULES:
  * - Shows ALL purchasing items as rows
@@ -90,7 +93,7 @@ export default function PurchasingShiftLog() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <CalendarDays className="h-6 w-6 text-emerald-600" />
-            Purchasing Shift Log
+            Purchasing Log
           </h1>
           <p className="text-xs text-slate-500 mt-1">
             What did we need, when, and why?

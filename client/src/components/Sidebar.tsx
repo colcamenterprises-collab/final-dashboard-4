@@ -6,14 +6,15 @@ type Group = {
   items: { to: string; icon?: JSX.Element; label: string }[];
 };
 
-// Replace items array:
-const menuItems = [
-  { label: 'Operations', path: '/operations' },
-  { label: 'Finance', path: '/finance' },
-  { label: 'Menu and Costing', path: '/menu' },
-  { label: 'Analysis', path: '/analysis' },
-  { label: 'Membership', path: '/membership' },
-]; // Simple, no dups—sub-pages via router
+/**
+ * Navigation cleanup — no logic changes
+ * 
+ * CANONICAL STRUCTURE:
+ * - Purchasing: Header only (not clickable), contains Purchasing List, Purchasing Log, Shopping List
+ * - Menu Management: Recipe Management (editable), Menu Manager only
+ * - Analysis: Includes Daily Summary Reports
+ * - Ingredients Master: Removed from sidebar (accessible via internal links only)
+ */
 
 const groups: Group[] = [
   {
@@ -26,16 +27,15 @@ const groups: Group[] = [
   {
     title: "Operations",
     items: [
-      { to: "/operations", label: "Operations" },
       { to: "/operations/health-safety-audit", label: "Health & Safety Audit" },
     ],
   },
   {
     title: "Purchasing",
     items: [
-      { to: "/operations/purchasing", label: "Shopping List" },
-      { to: "/operations/purchasing-mapping", label: "Field Mapping" },
-      { to: "/operations/purchasing-shift-log", label: "Shift Log" },
+      { to: "/operations/purchasing", label: "Purchasing List" },
+      { to: "/operations/purchasing-shift-log", label: "Purchasing Log" },
+      { to: "/operations/shopping-list", label: "Shopping List" },
     ],
   },
   {
@@ -45,18 +45,17 @@ const groups: Group[] = [
     ],
   },
   {
-    title: "Menu and Costing",
+    title: "Menu Management",
     items: [
-      { to: "/menu", label: "Menu and Costing" },
-      { to: "/menu/ingredients", label: "Ingredients (from Purchasing)" },
       { to: "/recipe-management", label: "Recipe Management" },
+      { to: "/menu/manager", label: "Menu Manager" },
     ],
   },
   {
     title: "Analysis",
     items: [
-      // { to: "/analysis/daily-shift", label: "Daily Shift Analysis" }, // Hidden - can be re-enabled
-      { to: "/analysis/shift-summary", label: "Shift Summary" }
+      { to: "/operations/daily-reports", label: "Daily Summary Reports" },
+      { to: "/operations/analysis/shift-items", label: "Shift Items" },
     ],
   },
   {
