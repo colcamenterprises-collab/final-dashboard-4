@@ -1197,6 +1197,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   const meatLedgerRouter = (await import('./routes/meatLedger.js')).default;
   app.use('/api/analysis/meat-ledger', meatLedgerRouter);
   
+  // PHASE I: Register ingredient reconciliation BEFORE catch-all :date route
+  app.use('/api/analysis/ingredient-reconciliation', ingredientReconciliationRouter);
+  
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
   app.use(freshnessRouter);
@@ -3257,7 +3260,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/system-health', systemHealthRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
-  app.use('/api/analysis/ingredient-reconciliation', ingredientReconciliationRouter);
+  // Note: ingredientReconciliationRouter is registered earlier at line ~1204
 
   // PATCH 5 — Canonical Menu Drift Report (Internal Admin)
   app.get('/api/admin/menu-canonical/status', async (req: Request, res: Response) => {
