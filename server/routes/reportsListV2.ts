@@ -32,7 +32,12 @@ router.get("/list", async (_req, res) => {
       .orderBy(sql`"date" DESC`);
 
     return res.json({ ok: true, reports: rows });
-  } catch (err) {
+  } catch (err: any) {
+    // Defensive: if table doesn't exist, return empty array
+    if (err?.message?.includes('does not exist')) {
+      console.warn("reports/list: daily_reports_v2 table not found, returning empty");
+      return res.json({ ok: true, reports: [] });
+    }
     console.error("reports/list error:", err);
     return res.status(500).json({ error: "Server error" });
   }
@@ -113,7 +118,10 @@ router.get("/search", async (req, res) => {
     );
     
     return res.json({ ok: true, reports: filtered });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.includes('does not exist')) {
+      return res.json({ ok: true, reports: [] });
+    }
     console.error("reports/search error:", err);
     return res.status(500).json({ error: "Server error" });
   }
@@ -145,7 +153,14 @@ router.get("/export-range", async (req, res) => {
     res.setHeader("Content-Type", "application/zip");
     res.setHeader("Content-Disposition", "attachment; filename=reports.zip");
     return res.send(content);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.includes('does not exist')) {
+      const zip = new JSZip();
+      const content = await zip.generateAsync({ type: "nodebuffer" });
+      res.setHeader("Content-Type", "application/zip");
+      res.setHeader("Content-Disposition", "attachment; filename=reports.zip");
+      return res.send(content);
+    }
     console.error("reports/export-range error:", err);
     return res.status(500).json({ error: "Server error" });
   }
