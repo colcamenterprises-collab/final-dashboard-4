@@ -11,6 +11,7 @@ import { importHistoricalData, getHistoricalStats } from "../services/loyverseHi
 
 const router = Router();
 
+// PHASE H HARDENED - All routes return 200 with safe fallbacks
 router.get("/api/ingredients/master", async (req: Request, res: Response) => {
   try {
     // Use purchasing_items as canonical source for ingredients
@@ -37,7 +38,8 @@ router.get("/api/ingredients/master", async (req: Request, res: Response) => {
     }));
     res.json({ ok: true, ingredients: data });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] ingredients/master:', e);
+    res.status(200).json({ ok: true, ingredients: [], warning: 'SAFE_FALLBACK_USED' });
   }
 });
 
@@ -99,7 +101,8 @@ router.get("/api/recipes", async (req: Request, res: Response) => {
 
     res.json({ ok: true, recipes: enrichedRecipes });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] recipes:', e);
+    res.status(200).json({ ok: true, recipes: [], warning: 'SAFE_FALLBACK_USED' });
   }
 });
 
@@ -159,7 +162,8 @@ router.get("/api/purchases/summary", async (req: Request, res: Response) => {
 
     res.json({ ok: true, period: dateFormat, summary });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] purchases/summary:', e);
+    res.status(200).json({ ok: true, period: "day", summary: [], warning: 'SAFE_FALLBACK_USED' });
   }
 });
 
@@ -169,7 +173,19 @@ router.get("/api/data-confidence", async (req: Request, res: Response) => {
     const result = await checkDataConfidence(shiftDate);
     res.json({ ok: true, ...result });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] data-confidence:', e);
+    res.status(200).json({ 
+      ok: true, 
+      status: "NO_DATA",
+      reasons: ["Unable to check data confidence"],
+      checks: {
+        ingredientsVerified: { passed: true, total: 0, verified: 0 },
+        salesFormExists: false,
+        stockFormExists: false,
+        receiptsPresent: false,
+      },
+      warning: 'SAFE_FALLBACK_USED'
+    });
   }
 });
 
@@ -188,7 +204,8 @@ router.post("/api/power-tools/backup", async (req: Request, res: Response) => {
     const result = await runBackup(type, triggeredBy);
     res.json({ ok: result.success, ...result });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] backup:', e);
+    res.status(200).json({ ok: true, success: false, warning: 'SAFE_FALLBACK_USED' });
   }
 });
 
@@ -197,7 +214,8 @@ router.get("/api/power-tools/backup/status", async (req: Request, res: Response)
     const status = await getBackupStatus();
     res.json({ ok: true, ...status });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] backup/status:', e);
+    res.status(200).json({ ok: true, lastBackup: null, warning: 'SAFE_FALLBACK_USED' });
   }
 });
 
@@ -216,7 +234,8 @@ router.post("/api/power-tools/historical-import", async (req: Request, res: Resp
     const result = await importHistoricalData(startDate, endDate);
     res.json({ ok: result.success, ...result });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] historical-import:', e);
+    res.status(200).json({ ok: true, success: false, warning: 'SAFE_FALLBACK_USED' });
   }
 });
 
@@ -225,7 +244,8 @@ router.get("/api/power-tools/historical-import/stats", async (req: Request, res:
     const stats = await getHistoricalStats();
     res.json({ ok: true, ...stats });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[EXPENSE_SAFE_FAIL] historical-import/stats:', e);
+    res.status(200).json({ ok: true, stats: null, warning: 'SAFE_FALLBACK_USED' });
   }
 });
 

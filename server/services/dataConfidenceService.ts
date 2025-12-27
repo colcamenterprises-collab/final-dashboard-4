@@ -1,6 +1,6 @@
 import { pool } from "../db";
 
-export type ConfidenceStatus = "GREEN" | "YELLOW" | "RED";
+export type ConfidenceStatus = "GREEN" | "YELLOW" | "RED" | "NO_DATA";
 
 export interface DataConfidenceResult {
   status: ConfidenceStatus;
@@ -13,6 +13,7 @@ export interface DataConfidenceResult {
   };
 }
 
+// PHASE H - Fully defensive data confidence check
 export async function checkDataConfidence(shiftDate?: string): Promise<DataConfidenceResult> {
   const dateToCheck = shiftDate || new Date().toISOString().split("T")[0];
   const reasons: string[] = [];
@@ -34,25 +35,44 @@ export async function checkDataConfidence(shiftDate?: string): Promise<DataConfi
     ingredientsVerified = true;
   }
 
-  const salesFormResult = await pool.query(
-    `SELECT COUNT(*) as count FROM daily_sales_v2 WHERE shift_date = $1::date`,
-    [dateToCheck]
-  );
-  const salesFormExists = parseInt(salesFormResult.rows[0]?.count || "0") > 0;
+  // H5: Defensive reads - wrap each in try/catch
+  let salesFormExists = false;
+  try {
+    const salesFormResult = await pool.query(
+      `SELECT COUNT(*) as count FROM daily_sales_v2 WHERE shift_date = $1::date`,
+      [dateToCheck]
+    );
+    salesFormExists = parseInt(salesFormResult.rows[0]?.count || "0") > 0;
+  } catch {
+    // Table may not exist - assume no data
+    salesFormExists = false;
+  }
 
-  const stockFormResult = await pool.query(
-    `SELECT COUNT(*) as count FROM daily_stock_v2 ds
-     JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
-     WHERE dsv.shift_date = $1::date`,
-    [dateToCheck]
-  );
-  const stockFormExists = parseInt(stockFormResult.rows[0]?.count || "0") > 0;
+  let stockFormExists = false;
+  try {
+    const stockFormResult = await pool.query(
+      `SELECT COUNT(*) as count FROM daily_stock_v2 ds
+       JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
+       WHERE dsv.shift_date = $1::date`,
+      [dateToCheck]
+    );
+    stockFormExists = parseInt(stockFormResult.rows[0]?.count || "0") > 0;
+  } catch {
+    // Table may not exist - assume no data
+    stockFormExists = false;
+  }
 
-  const receiptsResult = await pool.query(
-    `SELECT COUNT(*) as count FROM lv_receipt WHERE DATE(datetime_bkk) = $1::date`,
-    [dateToCheck]
-  );
-  const receiptsPresent = parseInt(receiptsResult.rows[0]?.count || "0") > 0;
+  let receiptsPresent = false;
+  try {
+    const receiptsResult = await pool.query(
+      `SELECT COUNT(*) as count FROM lv_receipt WHERE DATE(datetime_bkk) = $1::date`,
+      [dateToCheck]
+    );
+    receiptsPresent = parseInt(receiptsResult.rows[0]?.count || "0") > 0;
+  } catch {
+    // Table may not exist - assume no data
+    receiptsPresent = false;
+  }
 
   if (!ingredientsVerified) {
     reasons.push(`${totalCount - verifiedCount} of ${totalCount} ingredients unverified`);
