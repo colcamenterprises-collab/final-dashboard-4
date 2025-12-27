@@ -1,0 +1,142 @@
+🚨 PHASE F(+G+H) — SYSTEM RECOVERY PATCH
+“MAKE EVERYTHING WORK — NO NEW FEATURES”
+⚠️ ABSOLUTE RULES
+DO NOT add new pages
+DO NOT change navigation
+DO NOT redesign UI
+DO NOT invent data
+DO NOT refactor architecture
+ONLY fix errors, missing wiring, broken routes, null reads, guards blocking valid flows
+READ / FIX / BACKFILL / GUARD ONLY
+🎯 OBJECTIVE
+Bring the system to a state where:
+No page returns 500
+No page silently returns empty when data exists
+All operational pages load with real data
+Forms submit
+Lists populate
+Analytics read paths don’t crash
+✅ PHASE F — HARD REQUIREMENTS
+F1 — ELIMINATE ALL 500 ERRORS (GLOBAL)
+MANDATORY
+Scan server logs for every 500
+For each:
+Identify missing table / bad relation / null access / auth guard
+Fix at the source
+Replace silent failures with:
+Copy code
+Ts
+return res.status(200).json({ success: true, data: [] })
+where empty is valid
+🚫 No throwing unless truly fatal
+F2 — PURCHASING LIST (MASTER)
+Must work 100%
+Page loads
+Shows ALL purchasing_items
+Active / inactive toggle works
+Category grouping matches Form 2 categories
+Items can be reactivated (currently broken)
+No deletion allowed if:
+used in recipes
+referenced in shifts
+marked is_ingredient
+If deletion fails → return clear error message
+F3 — FORM 2 (DAILY STOCK & SALES)
+CRITICAL — STAFF BLOCKER
+Form must submit
+Stock validation must only reference purchasing_items
+Required drinks = category = 'Drinks' AND active = true
+If missing → return structured error:
+Copy code
+Json
+{
+  "success": false,
+  "reason": "MISSING_REQUIRED_STOCK",
+  "missing": [{ "category": "Drinks", "item": "Water" }]
+}
+🚫 NO reference to foodCostings
+🚫 NO hidden required items
+F4 — PURCHASING LOG (EX SHIFT LOG)
+Must always show data
+Reads from purchasing_shift_items
+Shows:
+All active purchasing items
+All shifts
+Zero quantities explicitly
+If no data → show empty table, NOT crash
+F5 — SHOPPING LIST
+NO 500s, EVER
+Read-only
+Derived from purchasing_shift_items
+Group by supplier if available
+If no shifts → return empty list
+Never query non-existent tables (shopping_list_v2, etc.)
+F6 — INGREDIENTS (DERIVED VIEW)
+DO NOT CREATE NEW SOURCE
+Ingredients = purchasing_items WHERE is_ingredient = true
+No separate ingredient DB writes
+Portion fields editable
+Cost always read-only
+If none exist → show empty state
+F7 — RECIPES
+STABILITY ONLY
+/recipe-management must:
+load
+list recipes
+not crash on incomplete recipes
+Cost calculation must:
+ignore incomplete recipes
+never throw
+Legacy recipe pages:
+stay read-only
+must not 500
+F8 — POS ↔ RECIPE MAPPING (READ PATH FIX)
+NO LOGIC CHANGE
+Debug endpoints must not crash:
+/api/debug/recipe-pos-parity
+/api/debug/unmapped-pos-items
+/api/debug/incomplete-recipes
+If nothing mapped → return empty arrays
+F9 — ANALYSIS PAGES
+READ PATH ONLY
+Pages:
+F&B Analysis
+Sales & Shift Analysis
+Daily Summary Reports
+Requirements:
+If data exists → show it
+If no data → empty state
+🚫 NO crashes due to null joins / missing relations
+F10 — GLOBAL DEFENSIVE FIXES
+Apply everywhere:
+Optional chaining on all DB reads
+Default empty arrays for joins
+Guard against undefined params
+Never assume:
+recipe exists
+ingredient exists
+shift exists
+🧪 REQUIRED VERIFICATION (DO NOT SKIP)
+After patch:
+Load every sidebar page
+Confirm:
+No 500
+No blank page with data present
+Submit Form 2 successfully
+Purchasing List:
+Reactivate an item
+Purchasing Log:
+Shows quantities
+Shopping List:
+Loads (even empty)
+🛑 STOP CONDITION
+If ANY page:
+crashes
+returns 500
+hides existing data
+👉 STOP and FIX before proceeding
+📌 DELIVERABLE
+One commit
+No feature additions
+No UI redesign
+System must be operationally usable

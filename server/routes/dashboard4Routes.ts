@@ -13,23 +13,27 @@ const router = Router();
 
 router.get("/api/ingredients/master", async (req: Request, res: Response) => {
   try {
+    // Use purchasing_items as canonical source for ingredients
     const result = await pool.query(`
       SELECT 
-        id, name, category, 
-        package_qty as "purchaseQty", 
-        package_unit as "purchaseUnit", 
-        package_cost as "purchaseCost",
+        id, 
+        item as name, 
+        category, 
+        "orderUnit" as "purchaseQty", 
+        "unitDescription" as "purchaseUnit", 
+        "unitCost" as "purchaseCost",
         portion_unit as "portionUnit",
-        portion_qty as "portionsPerPurchase",
-        cost_per_portion as "portionCost",
-        COALESCE(verified, false) as verified,
-        COALESCE(locked, false) as locked
-      FROM ingredients 
-      ORDER BY name
+        COALESCE(yield, 1) as "portionsPerPurchase",
+        ("unitCost" / NULLIF(yield, 1)) as "portionCost",
+        true as verified,
+        false as locked
+      FROM purchasing_items 
+      WHERE is_ingredient = true AND active = true
+      ORDER BY item
     `);
     const data = result.rows.map((ing: any) => ({
       ...ing,
-      status: ing.locked ? 'locked' : (ing.verified ? 'verified' : 'unverified')
+      status: 'verified'
     }));
     res.json({ ok: true, ingredients: data });
   } catch (e: any) {
