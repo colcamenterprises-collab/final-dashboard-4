@@ -1,0 +1,125 @@
+PHASE H — BUSINESS EXPENSE STABILITY PATCH
+⚠️ DO NOT ADD FEATURES • DO NOT CHANGE UI • DO NOT ADD ANALYTICS
+Objective: Make business expense lodging 100% reliable and crash-proof so the system can be used daily without errors.
+🔒 RULES (NON-NEGOTIABLE)
+Backend only
+NO UI changes
+NO schema redesign
+NO analytics / reporting
+NO new pages
+NO breaking changes
+If a table or column does not exist → fail safely with empty results
+All endpoints must return 200 or 400, never 500
+🎯 PRIMARY GOAL
+Staff and managers must be able to lodge business expenses reliably without causing:
+500 errors
+broken Finance pages
+broken Daily Summary pages
+broken P&L pages
+🧱 PHASE H TASKS (EXECUTE IN ORDER)
+H1 — HARDEN EXPENSE CREATION (WRITE PATH)
+Files to inspect:
+server/routes/expenses*.ts
+server/services/expense*.ts
+Actions:
+Wrap all DB writes in try/catch
+If optional fields are missing → store null, not crash
+Validate minimum required fields only:
+amount
+category
+payment_method (CASH | BANK)
+Return HTTP 400 with { success:false, reason } if invalid
+Never throw raw DB errors to client
+✅ Result: Expense submission can never crash the server
+H2 — DEFENSIVE READS FOR EXPENSE QUERIES
+Endpoints to harden:
+/api/expenses
+/api/finance/*
+/api/profit-loss
+Actions:
+If table does not exist → return []
+If column missing → omit field
+Use COALESCE for sums
+Never assume multi-tenant columns (e.g. restaurant_id)
+Always return:
+Copy code
+Json
+{ "success": true, "data": [] }
+✅ Result: Finance pages never 500 even if data is missing
+H3 — CASH vs BANK EXPENSE NORMALISATION
+Goal: Stop mixing shift cash expenses with business bank expenses.
+Actions:
+Enforce:
+payment_method = BANK → business expense
+payment_method = CASH → shift expense
+If missing → default to BANK
+Do not recalculate or infer totals
+✅ Result: Expenses are safely categorized for later analysis
+H4 — LEGACY TABLE SAFETY
+Known legacy risks:
+expensesLegacy
+daily_reports_v2
+old finance joins
+Actions:
+Wrap all legacy reads with:
+Copy code
+Ts
+if (!tableExists) return [];
+Never JOIN legacy tables blindly
+Never assume migration completeness
+✅ Result: Old systems can exist without breaking the app
+H5 — DATA CONFIDENCE & SUMMARY SAFETY
+Endpoints:
+/api/data-confidence
+/api/daily-summary
+/api/reports/*
+Actions:
+Remove assumptions about verified, approved, or locked columns
+Compute confidence purely from row existence
+If nothing exists → return:
+Copy code
+Json
+{ "status": "NO_DATA" }
+✅ Result: Daily Summary never crashes even on empty days
+H6 — GLOBAL FAIL-SAFE PATTERN
+Apply this pattern everywhere expenses are touched:
+Copy code
+Ts
+try {
+  // db logic
+} catch (err) {
+  console.error('[EXPENSE_SAFE_FAIL]', err);
+  return res.status(200).json({
+    success: true,
+    data: [],
+    warning: 'SAFE_FALLBACK_USED'
+  });
+}
+✅ Result: System degrades safely, never hard-fails
+🧪 REQUIRED VERIFICATION (MANDATORY)
+After patch:
+[ ] Create BANK expense → succeeds
+[ ] Create CASH expense → succeeds
+[ ] View Expenses page → loads
+[ ] View P&L page → loads
+[ ] View Daily Summary → loads
+[ ] No endpoint returns 500
+[ ] Empty DB still loads all pages
+🧠 IMPORTANT CONTEXT (DO NOT CHANGE)
+Ingredient usage logic (PHASE G) is authoritative
+Expense logic is input only, not analytical yet
+This patch exists purely to keep the business running
+✅ COMPLETION CONDITION
+PHASE H is complete only when:
+All expense-related endpoints return safely
+No Finance / Summary page crashes
+Business expenses can be lodged daily without risk
+🚨 DO NOT:
+Add charts
+Add calculations
+Add reconciliation
+Touch ingredient logic
+Touch purchasing logic
+Touch navigation
+Touch UI
+END OF PATCH — EXECUTE EXACTLY AS WRITTEN
