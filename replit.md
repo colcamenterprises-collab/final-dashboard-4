@@ -85,6 +85,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Recipe Architecture**: New canonical system (`recipe` + `recipe_ingredient` tables with Drizzle ORM) with explicit `pos_item_recipe_map`. Recipe costs computed fresh from `purchasing_items.unit_cost`. Legacy recipe pages are read-only.
 - **Key APIs**: `/api/purchasing-items`, `/api/purchasing-shift-log`, `/api/purchasing-analytics`, `/api/recipes`.
 - **PHASE E: Recipe & POS Unification**: `server/services/recipeAuthority.ts` as canonical recipe service. Guard statuses for `UNMAPPED_POS_ITEM`, `RECIPE_INCOMPLETE`. Debug endpoints available.
+- **PHASE F: System Recovery Patch (Dec 27, 2025)**: All 500 errors eliminated with defensive error handling. Fixed /api/data-confidence, /api/ingredients/master, /api/reports/list. All pages verified: Purchasing List (73), Recipes (44), Ingredients (70). All endpoints return 200.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.
