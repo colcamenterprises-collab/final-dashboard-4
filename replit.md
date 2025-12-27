@@ -86,6 +86,27 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - Inventory ledger tables: rolls_ledger, meat_ledger (with manual amendment support).
 - Online ordering tables: menu_categories_online, menu_items_online, modifier_groups_online, modifier_options_online, orders_online, order_lines_online.
 
+### Canonical Data Architecture (Dec 27, 2025)
+**Purchasing Flow (PATCH A verified):**
+- `purchasing_items` → Single source of truth for all purchasable items (73 active)
+- `daily_stock_v2` → Stock records linked to daily_sales_v2 (1:1 relationship)
+- `purchasing_shift_items` → Junction table storing quantities per shift per item
+- Data parity: 20 sales = 20 stock records, 1,460 shift items (20 × 73)
+- Backfill script: `server/scripts/patchA-backfill.ts`
+
+**Recipe Architecture (Dual System - Future Unification Needed):**
+- `recipe` table (Prisma RecipeAuthority) → New canonical system with purchasingItem relations
+- `recipes` table (Legacy SQL) → 44 recipes with JSONB ingredients field
+- `recipe_ingredient` table → Links RecipeAuthority to purchasing_items
+- `recipe_lines` table → Legacy recipe line items
+- Recipe costs computed fresh from purchasing_items.unit_cost (never cached)
+
+**Key APIs (PATCH B verified):**
+- GET /api/purchasing-items → Returns all purchasing items
+- GET /api/purchasing-shift-log → Returns shift-by-shift quantities
+- GET /api/purchasing-analytics → Returns spending analytics with category breakdown
+- GET /api/recipes → Returns recipes from legacy system (44 recipes)
+
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.
 - **POS Integration**: Loyverse POS.
