@@ -109,6 +109,7 @@ import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
 import healthSafetyPdf from "./routes/healthSafety/pdf";
 import recipeAuthorityRouter from "./routes/recipeAuthority";
+import ingredientReconciliationRouter from "./routes/ingredientReconciliation";
 // Email functionality will be added when needed
 
 
@@ -3256,6 +3257,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/system-health', systemHealthRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
+  app.use('/api/analysis/ingredient-reconciliation', ingredientReconciliationRouter);
 
   // PATCH 5 — Canonical Menu Drift Report (Internal Admin)
   app.get('/api/admin/menu-canonical/status', async (req: Request, res: Response) => {

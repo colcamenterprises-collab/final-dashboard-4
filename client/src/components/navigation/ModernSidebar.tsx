@@ -89,9 +89,10 @@ const navigationGroups: NavGroup[] = [
     title: "Analysis",
     defaultOpen: true,
     items: [
-      { to: "/operations/daily-reports", label: "Daily Summary Reports", icon: BarChart3, testId: "nav-daily-reports" },
+      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" },
       { to: "/operations/analysis/shift-items", label: "F&B Analysis", icon: BarChart3, testId: "nav-shift-analytics-mm" },
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" }
+      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
+      { to: "/operations/daily-reports", label: "Daily Summary Reports", icon: BarChart3, testId: "nav-daily-reports" }
     ]
   },
   {

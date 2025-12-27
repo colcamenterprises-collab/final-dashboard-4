@@ -1,0 +1,180 @@
+🚀 PHASE I + PHASE J — INGREDIENT RECONCILIATION + UI STABILISATION
+(ONE PUSH · DO NOT ADD STRATEGY · DO NOT REFACTOR CORE LOGIC)
+🔒 EXECUTION RULES (NON-NEGOTIABLE)
+READ / DERIVE / DISPLAY ONLY
+NO new business logic
+NO optimisation
+NO alerts
+NO schema refactors
+NO removal of existing pages
+NO breaking changes
+NO strategy decisions
+NO background jobs
+This patch is about VISIBILITY + TRUST, not intelligence.
+🎯 OBJECTIVE
+Make it visually obvious that the system understands:
+What was sold
+What ingredients were used
+What ingredients were purchased
+Where deltas exist
+AND ensure the UI feels:
+intentional
+stable
+understandable to a non-technical partner
+=========================
+🔹 PHASE I — INGREDIENT RECONCILIATION (VALUE CORE)
+=========================
+I-1️⃣ Ingredient Usage Derivation (BACKEND)
+Task
+Create a derived, read-only ingredient usage layer using existing data.
+Source of Truth
+POS receipts
+Recipe → ingredient mapping
+purchasing_items (ingredients only)
+Rules
+DO NOT store new authoritative data
+DO NOT change receipts
+DO NOT modify recipes
+DO NOT include modifiers yet
+Output Shape (Derived)
+Copy code
+
+ingredient_usage_by_day
+- date
+- ingredient_id
+- ingredient_name
+- quantity_used
+- unit
+- source = "POS_RECEIPTS"
+This can be:
+a SQL view
+or a derived service function
+or an in-memory aggregation
+👉 Choice is yours — NO schema migration unless strictly required.
+I-2️⃣ Purchasing vs Usage Reconciliation (BACKEND)
+Task
+Create a read-only reconciliation service.
+Inputs
+Ingredient usage (I-1)
+Purchasing data:
+purchasing_items
+purchasing_shift_items
+expenses (where category = ingredient)
+Output (per ingredient, per date range)
+Copy code
+
+{
+  ingredient,
+  unit,
+  used_quantity,
+  purchased_quantity,
+  delta
+}
+Rules
+No judgement
+No thresholds
+No alerts
+No blocking
+Missing data = 0, not error
+I-3️⃣ Ingredient Reconciliation Page (FRONTEND)
+New Page
+Copy code
+
+/analysis/ingredient-reconciliation
+UI Requirements
+Table view (clean, dense, readable)
+Columns:
+Ingredient
+Used
+Purchased
+Delta
+Unit
+Delta color:
+Green = positive
+Amber = zero / near
+Red = negative
+Date range selector
+Ingredient filter
+UX Rules
+No charts yet
+No exports
+No drilldowns
+Empty state must look intentional
+This page must load without errors even if data is empty.
+=========================
+🔹 PHASE J — UI STABILISATION & TRUST
+=========================
+J-1️⃣ Navigation FINALISATION (NO NEW PAGES)
+Enforce this structure only:
+Copy code
+
+PURCHASING
+- Purchasing List
+- Purchasing Log
+- Shopping List
+
+MENU
+- Recipe Management
+- Menu Manager
+
+ANALYSIS
+- Ingredient Reconciliation
+- F&B Analysis
+- Sales & Shift Analysis
+- Daily Summary Reports
+
+FINANCE
+- Expenses
+- Profit & Loss
+Rules
+Headers are not clickable pages
+No duplicate menu entries
+No legacy pages exposed
+No “Ingredients Master” in sidebar
+J-2️⃣ UI CONSISTENCY PASS (HIGH IMPACT)
+Apply to ALL touched pages:
+Proper page headers
+Consistent spacing
+Clean empty states
+No “broken” looking tables
+Skeleton loaders instead of raw “Loading…”
+DO NOT redesign. DO NOT change styling system. JUST make it feel intentional.
+J-3️⃣ Confidence Signals (SUBTLE, REQUIRED)
+On key pages only (Purchasing List, Ingredient Reconciliation, F&B Analysis):
+Display:
+Data source label (POS / Purchasing / Expenses)
+“Derived” vs “Manual”
+Last updated timestamp (best available)
+NO tooltips. NO popups. NO explanations.
+=========================
+🔍 VERIFICATION REQUIREMENTS
+=========================
+Agent must verify:
+Backend
+All new endpoints return 200
+No existing endpoints regress
+No new 500s introduced
+Frontend
+Ingredient Reconciliation page loads
+Navigation matches spec exactly
+No blank / broken pages
+Empty data looks deliberate
+Explicitly Confirm
+No schema refactors
+No strategy logic added
+No alerts or thresholds
+No optimisation work
+=========================
+📌 DELIVERY FORMAT
+=========================
+At completion, return ONLY:
+Patch summary
+Verification table
+List of touched files
+Screenshot confirmation (if possible)
+NO commentary. NO opinions. NO future strategy.
+🔥 PRIORITY STATEMENT
+This patch is about confidence, not intelligence.
+When a partner opens the dashboard, they should immediately feel:
+“This system understands our business.”
+👉 Proceed immediately.
