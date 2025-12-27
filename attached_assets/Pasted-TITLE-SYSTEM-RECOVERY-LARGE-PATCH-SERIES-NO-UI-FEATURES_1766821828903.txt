@@ -1,0 +1,106 @@
+TITLE: SYSTEM RECOVERY — LARGE PATCH SERIES (NO UI FEATURES)
+
+MODE: EXECUTION ONLY
+PRIORITY: BUSINESS BLOCKING
+DO NOT ASK QUESTIONS — FOLLOW STEPS
+
+=====================================
+PATCH A — DATA PARITY & WRITE GUARANTEE
+=====================================
+
+OBJECTIVE:
+Guarantee that Form 2 submissions fully populate all downstream operational tables.
+
+TASKS:
+1. DAILY STOCK WRITE FIX
+- Ensure Form 2 submission ALWAYS:
+  - writes to daily_stock_v2
+  - uses purchasing_items as the source of required stock + drinks
+- REMOVE all remaining references to foodCostings or legacy stock sources
+
+2. PURCHASING SHIFT SYNC (MANDATORY)
+- On Form 2 submit:
+  - Insert/Upsert ALL active purchasing_items into purchasing_shift_items
+  - Include zero-quantity items
+- purchasing_items is the ONLY master list
+
+3. VALIDATION ALIGNMENT
+- Validation MUST check:
+  purchasing_items WHERE active=true AND required=true
+- Error response format:
+  { success:false, reason:"MISSING_REQUIRED_STOCK", missing:[{item, category}] }
+
+4. BACKFILL
+- Backfill daily_stock_v2 from historical daily_sales_v2 payloads
+- Backfill purchasing_shift_items for all past shifts
+
+VERIFY:
+- daily_stock_v2 row count > 0
+- purchasing_shift_items rows = shifts × active purchasing_items
+
+STOP AFTER PATCH A VERIFICATION.
+
+=====================================
+PATCH B — READ PATH REPAIR
+=====================================
+
+OBJECTIVE:
+Make all pages load real data without errors.
+
+FOR EACH PAGE:
+- Identify queried tables
+- Replace legacy/dead sources
+- Ensure joins are valid
+- Add safe empty-state handling
+
+PAGES:
+- Purchasing List
+- Purchasing Log
+- Shopping List
+- F&B Analysis
+- Sales & Shift Analysis
+- Daily Summary Reports
+- Profit & Loss
+
+VERIFY:
+- No 401/500 on page load
+- Tables render (even if empty)
+- Data matches underlying tables
+
+STOP AFTER PATCH B VERIFICATION.
+
+=====================================
+PATCH C — RECIPE & MENU UNIFICATION
+=====================================
+
+OBJECTIVE:
+Recipes become the cost authority driven by purchasing_items.
+
+TASKS:
+1. INGREDIENT DERIVATION
+- Ingredients = purchasing_items WHERE is_ingredient=true
+- Remove standalone ingredient sources
+
+2. RECIPE COSTING
+- Cost computed live from purchasing_items.unit_cost
+- No cached cost fields
+
+3. MENU MAPPING
+- Menu items reference recipes
+- POS items map to recipes
+
+4. LOCK LEGACY PAGES
+- All non-canonical recipe/menu pages:
+  - read-only
+  - warning banner
+  - no write paths
+
+VERIFY:
+- Recipe Management CRUD works
+- Cost updates when purchasing cost changes
+- Legacy pages cannot modify data
+
+FINAL DELIVERABLE:
+SYSTEM OPERATIONAL WITHOUT ERRORS.
+
+END.

@@ -35,6 +35,15 @@ type NavGroup = {
   isStandalone?: boolean;
 };
 
+/**
+ * Navigation cleanup — no logic changes
+ * 
+ * CANONICAL STRUCTURE:
+ * - Purchasing: Header only, contains Purchasing List, Purchasing Log, Shopping List
+ * - Menu Management: Recipe Management (editable), Menu Manager only
+ * - Analysis: Includes Daily Summary Reports
+ * - Ingredients Master: Removed from sidebar (accessible via internal links only)
+ */
 const navigationGroups: NavGroup[] = [
   {
     title: "Dashboard Home",
@@ -63,31 +72,26 @@ const navigationGroups: NavGroup[] = [
           { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library" }
         ]
       },
-      { 
-        to: "/operations/purchasing", 
-        label: "Purchasing", 
-        icon: ShoppingCart, 
-        testId: "nav-purchasing",
-        subItems: [
-          { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
-          { to: "/operations/purchasing-shift-log", label: "Shift Log", icon: Package, testId: "nav-purchasing-shift-log" }
-        ]
-      },
-      { 
-        to: "/operations/analysis", 
-        label: "Analysis", 
-        icon: BarChart3, 
-        testId: "nav-analysis",
-        subItems: [
-          { to: "/operations/analysis/shift-items", label: "F&B Analysis", icon: BarChart3, testId: "nav-shift-analytics-mm" },
-          { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
-          // { to: "/operations/analysis/loyverse", label: "POS Reporting", icon: BarChart3, testId: "nav-pos-reporting" } // Hidden - can be re-enabled
-        ]
-      },
-      { to: "/operations/daily-reports", label: "Daily Summary Reports", icon: BarChart3, testId: "nav-daily-reports" },
       { to: "/operations/system-health", label: "System Health Test", icon: Settings, testId: "nav-system-health" },
-      { to: "/operations/health-safety-audit", label: "Health & Safety Audit", icon: Settings, testId: "nav-health-safety" },
-      { to: "/operations/ingredients-master", label: "Ingredients Master", icon: ChefHat, testId: "nav-ingredients-master" }
+      { to: "/operations/health-safety-audit", label: "Health & Safety Audit", icon: Settings, testId: "nav-health-safety" }
+    ]
+  },
+  {
+    title: "Purchasing",
+    defaultOpen: true,
+    items: [
+      { to: "/operations/purchasing", label: "Purchasing List", icon: ShoppingCart, testId: "nav-purchasing-list" },
+      { to: "/operations/purchasing-shift-log", label: "Purchasing Log", icon: Package, testId: "nav-purchasing-log" },
+      { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" }
+    ]
+  },
+  {
+    title: "Analysis",
+    defaultOpen: true,
+    items: [
+      { to: "/operations/daily-reports", label: "Daily Summary Reports", icon: BarChart3, testId: "nav-daily-reports" },
+      { to: "/operations/analysis/shift-items", label: "F&B Analysis", icon: BarChart3, testId: "nav-shift-analytics-mm" },
+      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" }
     ]
   },
   {
@@ -100,8 +104,7 @@ const navigationGroups: NavGroup[] = [
   {
     title: "Menu Management",
     items: [
-      { to: "/menu/recipes", label: "Recipe Management", icon: ChefHat, testId: "nav-recipes" },
-      { to: "/menu/ingredient-management", label: "Ingredient Mgmt", icon: Settings, testId: "nav-ingredients" },
+      { to: "/recipe-management", label: "Recipe Management", icon: ChefHat, testId: "nav-recipe-management" },
       { to: "/menu/manager", label: "Menu Manager", icon: ChefHat, testId: "nav-menu-manager" }
     ]
   },
