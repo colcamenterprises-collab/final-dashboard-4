@@ -537,7 +537,8 @@ model PurchasingShiftItem {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   
-  dailyStock       DailyStockV2 @relation(fields: [dailyStockId], references: [id], onDelete: Cascade)
+  dailyStock       DailyStockV2  @relation(fields: [dailyStockId], references: [id], onDelete: Cascade)
+  purchasingItem   PurchasingItem @relation(fields: [purchasingItemId], references: [id], onDelete: Cascade)
 
   @@unique([dailyStockId, purchasingItemId])
   @@index([dailyStockId])
@@ -1667,7 +1668,8 @@ model PurchasingItem {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  recipeIngredients RecipeIngredientAuthority[]
+  recipeIngredients      RecipeIngredientAuthority[]
+  purchasingShiftItems   PurchasingShiftItem[]
 
   @@map("purchasing_items")
 }

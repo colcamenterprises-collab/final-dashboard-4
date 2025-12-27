@@ -12,6 +12,7 @@ export const ROUTES = {
   PURCHASING: "/operations/purchasing",
   PURCHASING_MAPPING: "/operations/purchasing-mapping",
   PURCHASING_SHIFT_LOG: "/operations/purchasing-shift-log",
+  PURCHASING_ANALYTICS: "/operations/purchasing-analytics",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
   RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
