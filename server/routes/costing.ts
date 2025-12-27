@@ -155,6 +155,11 @@ costingRouter.get("/ingredients", async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * ⚠️ LEGACY RECIPE ROUTES - DO NOT USE FOR NEW DEVELOPMENT
+ * Canonical recipe system is at /api/recipe-authority
+ * See server/services/recipeAuthority.ts for authoritative implementation
+ */
 costingRouter.post("/recipes", async (req, res) => {
   const { name, yield: yl = 1, targetMargin = 0, items = [] } = req.body || {};
   const recipe = await prisma.recipeV2.upsert({

@@ -32,9 +32,13 @@ export interface RecipeWithCost extends RecipeV2 {
 }
 
 /**
+ * 🔒 CANONICAL COST AUTHORITY — DO NOT DUPLICATE
  * Calculate recipe cost from purchasing items (READ-ONLY, always fresh)
  * 
  * recipe_cost = SUM(recipe_ingredient.quantity × purchasing_items.unit_cost)
+ * 
+ * This is the ONLY authoritative cost calculation.
+ * All other cost calculations must delegate to this function.
  */
 export async function calculateRecipeCost(recipeId: number): Promise<number> {
   const ingredients = await db
