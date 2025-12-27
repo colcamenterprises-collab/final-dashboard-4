@@ -1,5 +1,6 @@
 /**
  * 🔒 FOUNDATION-02: RECIPE AUTHORITY SERVICE
+ * 🔒 CANONICAL COST AUTHORITY — DO NOT DUPLICATE
  * 
  * This service provides the canonical recipe layer for:
  * - Recipe CRUD operations
@@ -10,6 +11,10 @@
  * - Recipe cost is ALWAYS computed from purchasing_items.unit_cost
  * - No caching of costs
  * - Ingredients must have is_ingredient = true in purchasing_items
+ * 
+ * PHASE E ADDITIONS:
+ * - UNMAPPED_POS_ITEM flag for POS items without recipes
+ * - RECIPE_INCOMPLETE flag for recipes missing valid ingredients
  */
 
 import { db } from '../db';
@@ -347,4 +352,184 @@ export async function getAvailableIngredients() {
     .orderBy(purchasingItems.category, purchasingItems.item);
   
   return items;
+}
+
+// ========================================
+// PHASE E: POS → RECIPE MAPPING GUARDS
+// ========================================
+
+/**
+ * 🔒 E2: Check POS item mapping status
+ * Returns UNMAPPED_POS_ITEM if no recipe is mapped
+ */
+export async function getPosItemMappingStatus(posItemId: string): Promise<{
+  status: 'MAPPED' | 'UNMAPPED_POS_ITEM';
+  recipeId: number | null;
+}> {
+  const [mapping] = await db
+    .select()
+    .from(posItemRecipeMap)
+    .where(eq(posItemRecipeMap.posItemId, posItemId));
+
+  if (!mapping) {
+    console.log(`[RecipeAuthority] UNMAPPED_POS_ITEM: ${posItemId}`);
+    return { status: 'UNMAPPED_POS_ITEM', recipeId: null };
+  }
+
+  return { status: 'MAPPED', recipeId: mapping.recipeId };
+}
+
+/**
+ * 🔒 E2: Get all unmapped POS items (internal use only)
+ * Compares item_catalog SKUs against pos_item_recipe_map
+ */
+export async function getUnmappedPosItems(): Promise<string[]> {
+  // Get all mapped POS item IDs
+  const mappedItems = await db
+    .select({ posItemId: posItemRecipeMap.posItemId })
+    .from(posItemRecipeMap);
+  
+  const mappedSet = new Set(mappedItems.map(m => m.posItemId));
+  
+  // Get all SKUs from item_catalog via raw query
+  const catalogItems = await db.execute<{ sku: string }>(
+    `SELECT sku FROM item_catalog WHERE active = true`
+  );
+  
+  const unmapped: string[] = [];
+  for (const item of catalogItems.rows || []) {
+    if (!mappedSet.has(item.sku)) {
+      unmapped.push(item.sku);
+    }
+  }
+  
+  console.log(`[RecipeAuthority] Unmapped POS items: ${unmapped.length}`);
+  return unmapped;
+}
+
+// ========================================
+// PHASE E: RECIPE COMPLETENESS GUARD
+// ========================================
+
+export interface RecipeCompletenessResult {
+  recipeId: number;
+  recipeName: string;
+  status: 'COMPLETE' | 'RECIPE_INCOMPLETE';
+  reasons: string[];
+}
+
+/**
+ * 🔒 E3: Check recipe completeness
+ * A recipe is complete if all ingredients:
+ * - Exist in purchasing_items
+ * - Have is_ingredient = true
+ * - Have active = true
+ */
+export async function checkRecipeCompleteness(recipeId: number): Promise<RecipeCompletenessResult> {
+  const [r] = await db.select().from(recipe).where(eq(recipe.id, recipeId));
+  if (!r) {
+    return {
+      recipeId,
+      recipeName: 'Unknown',
+      status: 'RECIPE_INCOMPLETE',
+      reasons: ['Recipe not found']
+    };
+  }
+
+  const ingredients = await db
+    .select({
+      purchasingItemId: recipeIngredient.purchasingItemId,
+      itemName: purchasingItems.item,
+      isIngredient: purchasingItems.isIngredient,
+      active: purchasingItems.active,
+    })
+    .from(recipeIngredient)
+    .leftJoin(purchasingItems, eq(recipeIngredient.purchasingItemId, purchasingItems.id))
+    .where(eq(recipeIngredient.recipeId, recipeId));
+
+  const reasons: string[] = [];
+  
+  for (const ing of ingredients) {
+    if (!ing.itemName) {
+      reasons.push(`Ingredient ID ${ing.purchasingItemId} not found in purchasing_items`);
+    } else if (!ing.isIngredient) {
+      reasons.push(`${ing.itemName} is not marked as ingredient`);
+    } else if (!ing.active) {
+      reasons.push(`${ing.itemName} is not active`);
+    }
+  }
+
+  if (ingredients.length === 0) {
+    reasons.push('Recipe has no ingredients');
+  }
+
+  return {
+    recipeId: r.id,
+    recipeName: r.name,
+    status: reasons.length === 0 ? 'COMPLETE' : 'RECIPE_INCOMPLETE',
+    reasons
+  };
+}
+
+/**
+ * 🔒 E3: Get all incomplete recipes
+ */
+export async function getIncompleteRecipes(): Promise<RecipeCompletenessResult[]> {
+  const recipes = await db.select().from(recipe);
+  const results: RecipeCompletenessResult[] = [];
+  
+  for (const r of recipes) {
+    const result = await checkRecipeCompleteness(r.id);
+    if (result.status === 'RECIPE_INCOMPLETE') {
+      results.push(result);
+    }
+  }
+  
+  return results;
+}
+
+// ========================================
+// PHASE E: DEBUG & PARITY STATS
+// ========================================
+
+export interface RecipePosParityStats {
+  posItems: number;
+  mapped: number;
+  unmapped: number;
+  activeRecipes: number;
+  inactiveRecipes: number;
+  incompleteRecipes: number;
+}
+
+/**
+ * 🔒 E6: Get recipe/POS parity statistics (internal debug use)
+ */
+export async function getRecipePosParityStats(): Promise<RecipePosParityStats> {
+  // Count POS items from item_catalog
+  const posItemsResult = await db.execute<{ count: string }>(
+    `SELECT COUNT(*) as count FROM item_catalog WHERE active = true`
+  );
+  const posItems = parseInt(posItemsResult.rows?.[0]?.count || '0');
+  
+  // Count mapped items
+  const mappedResult = await db
+    .select({ posItemId: posItemRecipeMap.posItemId })
+    .from(posItemRecipeMap);
+  const mapped = mappedResult.length;
+  
+  // Active/inactive recipes
+  const activeRecipes = await db.select().from(recipe).where(eq(recipe.active, true));
+  const inactiveRecipes = await db.select().from(recipe).where(eq(recipe.active, false));
+  
+  // Incomplete recipes
+  const incompleteList = await getIncompleteRecipes();
+  
+  return {
+    posItems,
+    mapped,
+    unmapped: posItems - mapped,
+    activeRecipes: activeRecipes.length,
+    inactiveRecipes: inactiveRecipes.length,
+    incompleteRecipes: incompleteList.length
+  };
 }

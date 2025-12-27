@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import * as recipeService from '../services/recipeAuthority';
 
 const router = Router();
 
@@ -76,6 +77,63 @@ router.get('/ingredient-parity', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('[DEBUG] Ingredient parity check failed:', error);
     res.status(500).json({ error: 'Failed to check ingredient parity' });
+  }
+});
+
+// ========================================
+// PHASE E: RECIPE & POS PARITY CHECKS
+// ========================================
+
+/**
+ * 🔒 E6: Recipe-POS Parity Check
+ * GET /api/debug/recipe-pos-parity
+ * Returns parity stats between POS items and recipes
+ */
+router.get('/recipe-pos-parity', async (_req: Request, res: Response) => {
+  try {
+    const stats = await recipeService.getRecipePosParityStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('[DEBUG] Recipe-POS parity check failed:', error);
+    res.status(500).json({ error: 'Failed to fetch parity stats' });
+  }
+});
+
+/**
+ * 🔒 E2: Unmapped POS Items
+ * GET /api/debug/unmapped-pos-items
+ * Returns list of POS item SKUs without recipe mappings
+ */
+router.get('/unmapped-pos-items', async (_req: Request, res: Response) => {
+  try {
+    const unmapped = await recipeService.getUnmappedPosItems();
+    res.json({ 
+      count: unmapped.length, 
+      items: unmapped,
+      status: 'UNMAPPED_POS_ITEM'
+    });
+  } catch (error) {
+    console.error('[DEBUG] Unmapped POS items check failed:', error);
+    res.status(500).json({ error: 'Failed to fetch unmapped items' });
+  }
+});
+
+/**
+ * 🔒 E3: Incomplete Recipes
+ * GET /api/debug/incomplete-recipes
+ * Returns list of recipes with missing/invalid ingredients
+ */
+router.get('/incomplete-recipes', async (_req: Request, res: Response) => {
+  try {
+    const incomplete = await recipeService.getIncompleteRecipes();
+    res.json({
+      count: incomplete.length,
+      recipes: incomplete,
+      status: 'RECIPE_INCOMPLETE'
+    });
+  } catch (error) {
+    console.error('[DEBUG] Incomplete recipes check failed:', error);
+    res.status(500).json({ error: 'Failed to fetch incomplete recipes' });
   }
 });
 
