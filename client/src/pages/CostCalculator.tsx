@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import PageShell from "@/layouts/PageShell";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { Link } from "wouter";
@@ -44,25 +43,24 @@ export default function CostCalculator() {
   };
 
   return (
-    <PageShell>
-      <div className="space-y-6">
-        <Alert className="border-amber-500 bg-amber-50" data-testid="deprecation-banner">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-800 font-medium">Read-Only View</AlertTitle>
-          <AlertDescription className="text-amber-700">
-            Recipe editing has moved to{" "}
-            <Link href="/recipe-management" className="underline font-medium hover:text-amber-900">
-              Recipe Management
-            </Link>.
-            This page is deprecated and will be removed.
-          </AlertDescription>
-        </Alert>
+    <div className="p-4 space-y-6">
+      <Alert className="border-amber-500 bg-amber-50" data-testid="deprecation-banner">
+        <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <AlertTitle className="text-amber-800 font-medium">Read-Only View</AlertTitle>
+        <AlertDescription className="text-amber-700">
+          Recipe editing has moved to{" "}
+          <Link href="/recipe-management" className="underline font-medium hover:text-amber-900">
+            Recipe Management
+          </Link>.
+          This page is deprecated and will be removed.
+        </AlertDescription>
+      </Alert>
 
-        <h1 className="text-3xl font-bold">Cost Calculator (Legacy)</h1>
+      <h1 className="text-3xl font-bold">Cost Calculator (Legacy)</h1>
 
-        {/* Recipe Form */}
-        <div className="rounded-[4px] border border-slate-200 bg-white p-4">
-          <h2 className="text-sm font-medium mb-4">Recipe Details</h2>
+      {/* Recipe Form */}
+      <div className="rounded-[4px] border border-slate-200 bg-white p-4">
+        <h2 className="text-sm font-medium mb-4">Recipe Details</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div>
@@ -163,11 +161,11 @@ export default function CostCalculator() {
               Calculate Cost (Disabled)
             </button>
           </div>
-        </div>
+      </div>
 
-        {/* Calculation Results */}
-        {calculationResult && (
-          <div className="rounded-[4px] border border-slate-200 bg-white p-4">
+      {/* Calculation Results */}
+      {calculationResult && (
+        <div className="rounded-[4px] border border-slate-200 bg-white p-4">
             <h2 className="h2 mb-4">Cost Analysis</h2>
             
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -212,9 +210,8 @@ export default function CostCalculator() {
                 </tbody>
               </table>
             </div>
-          </div>
-        )}
-      </div>
-    </PageShell>
+        </div>
+      )}
+    </div>
   );
 }
