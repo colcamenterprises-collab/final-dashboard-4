@@ -1,0 +1,154 @@
+PHASE E — RECIPE & POS UNIFICATION (FOUNDATIONAL)
+⚠️ DO NOT ADD FEATURES | NO UI REDESIGN | NO NAVIGATION CHANGES
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Eliminate recipe ambiguity by establishing one canonical recipe system and explicit POS → Recipe ownership, without breaking live operations.
+This patch does not optimise, redesign, or extend functionality.
+It only unifies, locks, and labels existing systems so downstream analytics, costing, and purchasing can finally be trusted.
+🔒 RULES (ABSOLUTE)
+NO new pages
+NO analytics changes
+NO Form 2 changes
+NO purchasing changes
+NO modifier handling (explicitly deferred)
+NO deletion of legacy data
+NO silent migrations
+READ / MAP / LOCK / LABEL ONLY
+If a change violates these rules, DO NOT IMPLEMENT IT.
+📐 CANONICAL DECLARATIONS (ENFORCE IN CODE)
+1️⃣ Recipe Authority
+Canonical recipe system:
+server/services/recipeAuthority.ts
+Canonical table:
+recipe + recipe_ingredient
+All recipe costing must be derived live from:
+purchasing_items.unit_cost
+No cached costs anywhere
+2️⃣ POS vs Recipe Separation (CRITICAL)
+Define and enforce the following mental model in code:
+Concept
+Meaning
+POS Item
+What is sold
+Recipe
+How it is made
+Purchasing Item
+Cost input
+Menu
+Presentation layer only
+POS items are NOT recipes.
+Recipes are NOT menu items.
+🧱 PHASE E TASKS (EXECUTE IN ORDER)
+TASK E1 — Freeze Legacy Recipe Systems
+READ-ONLY ENFORCEMENT
+Identify all legacy recipe sources:
+recipes table (legacy)
+/menu/recipes
+/menu/cost-calculator
+Ensure:
+No POST / PUT / DELETE routes mutate legacy recipes
+UI actions are disabled
+Clear amber banner:
+“Read-Only — Recipes are now managed in Recipe Management”
+🚫 Do NOT delete legacy tables
+🚫 Do NOT migrate data yet
+TASK E2 — Introduce Explicit POS → Recipe Mapping
+NO AUTO-MATCHING
+Use existing table:
+pos_item_recipe_map
+Enforce rules:
+One POS item → zero or one recipe
+Mapping must be explicit (ID → ID)
+No name-based inference
+Add guard logic:
+If POS item has no recipe, flag as:
+UNMAPPED_POS_ITEM
+⚠️ Do NOT surface errors to staff yet
+⚠️ Logging + internal flags only
+TASK E3 — Recipe Completeness Guard
+DATA INTEGRITY ONLY
+A recipe may be marked active = true ONLY IF:
+All ingredients exist
+All ingredients reference:
+purchasing_items.is_ingredient = true
+purchasing_items.active = true
+If not:
+Recipe remains inactive
+Return reason code:
+Copy code
+
+RECIPE_INCOMPLETE
+🚫 Do NOT auto-fix
+🚫 Do NOT modify purchasing items
+TASK E4 — Cost Authority Lock
+SINGLE SOURCE OF TRUTH
+Remove / block any alternate cost calculations
+All recipe cost APIs must:
+Copy code
+
+SUM(
+  recipe_ingredient.quantity 
+  × purchasing_items.unit_cost
+)
+Verify no other services compute recipe costs
+Add inline comment headers:
+Copy code
+Ts
+// 🔒 CANONICAL COST AUTHORITY — DO NOT DUPLICATE
+TASK E5 — Visibility Labels (NO UI CHANGES)
+Add read-only labels only, no redesign:
+Legacy recipe pages:
+“Read-Only — Legacy Recipe View”
+Recipe Management:
+“Canonical Recipe Editor”
+POS items without recipes:
+Internal status flag only (not staff-facing)
+TASK E6 — Debug & Verification Endpoints
+INTERNAL USE ONLY
+Add:
+Copy code
+
+GET /api/debug/recipe-pos-parity
+Response shape:
+Copy code
+Json
+{
+  "posItems": 123,
+  "mapped": 87,
+  "unmapped": 36,
+  "activeRecipes": 42,
+  "inactiveRecipes": 3
+}
+🚫 No auth changes
+🚫 No frontend consumption yet
+🧪 VERIFICATION CHECKLIST (MANDATORY)
+Agent must confirm:
+✅ Only /recipe-management allows edits
+✅ Legacy recipe pages cannot mutate data
+✅ POS items no longer masquerade as recipes
+✅ Recipe cost changes when purchasing cost changes
+✅ No crashes if POS item has no recipe
+✅ App boots cleanly
+✅ No navigation changes
+🧯 FAILURE CONDITIONS (STOP IMMEDIATELY)
+If any of the following occur:
+A legacy recipe becomes editable
+Costs diverge between systems
+Purchasing logic is touched
+Form 2 logic is modified
+Navigation is altered
+→ STOP AND REPORT
+🧠 END STATE (WHAT SUCCESS LOOKS LIKE)
+After Phase E:
+There is exactly one recipe system
+POS items are explicitly mapped, not guessed
+Costs are always correct
+Purchasing → Ingredients → Recipes → POS is now a clean chain
+You can finally build:
+Modifier logic
+True food usage
+Reliable anomalies
+Prime cost
+Proceed immediately.
+No questions.
+No optimisations.
+No creativity.
