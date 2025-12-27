@@ -32,16 +32,8 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **State Management**: TanStack Query (React Query) for server state.
 - **Routing**: React Router for modern navigation.
 - **Forms**: React Hook Form with Zod validation.
-- **UI/UX Decisions**: Tablet-first design with 12px font sizes, 4px border radius, touch-optimized interactions, consistent button styling, responsive design, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
-- **Style Guide (Golden Standard)**: Reference `/finance/expenses-import` for canonical styling:
-  - Typography: `text-xs` (12px standard), `text-sm` (14px labels), `text-3xl` (page titles)
-  - Colors: `text-emerald-600` (primary icons/accents), `text-slate-600` (secondary text), `slate-50/100` (backgrounds), `border-slate-200` (borders)
-  - Border Radius: `rounded-[4px]` (4px standard for tablet optimization)
-  - Spacing: `p-4` (16px padding), `gap-3` (12px gaps), `space-y-4` (16px vertical spacing)
-  - Components: shadcn/ui Card, Button, Input, Table, Badge, Tabs
-  - Tables: `text-xs` for all table content, `font-medium` for headers, `border-slate-200` borders
-  - Buttons: `text-xs` sizing, emerald-600 primary, slate-200 borders for outlined
-  - Status Indicators: emerald-100/600 (success), red-100/600 (error), amber-100/600 (warning)
+- **UI/UX Decisions**: Tablet-first design, 12px font sizes, 4px border radius, touch-optimized interactions, consistent button styling, responsive design, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
+- **Style Guide (Golden Standard)**: Reference `/finance/expenses-import` for canonical styling: Typography (`text-xs`, `text-sm`, `text-3xl`), Colors (`text-emerald-600`, `text-slate-600`, `slate-50/100`, `border-slate-200`), Border Radius (`rounded-[4px]`), Spacing (`p-4`, `gap-3`, `space-y-4`), Components (shadcn/ui Card, Button, Input, Table, Badge, Tabs), Table styles, Button styles, Status Indicators.
 
 ### Backend Architecture
 - **Runtime**: Node.js with Express.js.
@@ -51,10 +43,10 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Session Management**: PostgreSQL-based sessions with connect-pg-simple.
 - **Shift Logic**: Handles 5 PM to 3 AM Bangkok timezone shift window.
 
-### Key Features
+### Feature Specifications
 - **Daily Shift Form**: Comprehensive form for sales, expenses, cash management, and inventory.
-- **AI-Powered Features**: Multi-agent system leveraging GPT-4o for receipt analysis, anomaly detection, ingredient calculation, stock recommendations, financial variance analysis, and marketing content generation.
-- **Loyverse POS Integration**: Automated daily receipt sync, shift reports, and webhook handling, with normalized receipt architecture and dynamic catalog-based SKU management. PERMANENT FIX (Nov 19, 2025): Timezone handling verified - Loyverse API provides UTC timestamps, PostgreSQL timestamptz stores UTC internally, shift window queries use Bangkok timezone parameters for correct conversion. System auto-syncs every 15 minutes + full daily sync at 3am Bangkok time.
+- **AI-Powered Features**: Multi-agent system for receipt analysis, anomaly detection, ingredient calculation, stock recommendations, financial variance analysis, and marketing content generation.
+- **Loyverse POS Integration**: Automated daily receipt sync, shift reports, and webhook handling with timezone-aware processing.
 - **Recipe Management**: System for ingredient portion selection, cost calculation, and PDF generation.
 - **Inventory Management**: Tracking supplier items, stock levels, and automated shopping list generation.
 - **Sales Heatmap**: Visual analytics for hourly sales patterns.
@@ -68,13 +60,13 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Source-Based Expense Management**: System for categorizing expenses as direct or shift-related.
 - **Data-Driven Dashboard**: Real-time analytics display showing snapshot data, purchases-aware variance, authentic payment data, and top-selling items.
 - **Purchases + Audit Fields System**: Implementation with expense types and line items for stock accountability.
-- **Banking Reconciliation System**: Real-time balance checking with ±30 THB tolerance, visual indicators, and automated calculations.
-- **Enhanced Email Reporting**: Daily management emails with colored balance status badges, sales breakdowns, expense tracking, and shopping list generation.
+- **Banking Reconciliation System**: Real-time balance checking with visual indicators and automated calculations.
+- **Enhanced Email Reporting**: Daily management emails with detailed breakdowns.
 - **Manager Checklist System**: Standalone modal with database, API, and React component for shift closing procedures.
-- **Online Ordering System**: VEV replica design with centered headings, tight margins, category tabs, modifier support, cart management, and database-driven menu. Admin menu management at `/marketing/menu-admin` inside dashboard for full CRUD operations. Public ordering page at `/order` (standalone route without dashboard layout). Features database persistence via Prisma, API-driven menu loading, real-time price calculations, localStorage cart, and mobile-optimized checkout flow. Menu data flows: Admin UI → Prisma DB → Public API → Customer ordering page.
-- **Membership System**: Complete customer membership platform at `/membership` with digital card generation, barcode support (JsBarcode), spend tracking, and optional Loyverse Customers API integration. Features include two-view interface (Admin Dashboard and Registration Form), member list table, add spend modal, and branded digital cards with barcodes. Backend API provides registration, spend tracking, and member listing with in-memory storage and best-effort Loyverse customer sync.
-- **F&B Analysis Enhanced Metrics**: Shift analytics page displays receipt count, payment type breakdown (Cash/Grab/QR/Other), and top 5 items by category including burgers, sides, modifiers, and all product categories. Real-time data from Loyverse POS with automatic payment classification.
-- **Rolls & Meat Ledger System**: Integrated audit trail for inventory tracking at `/operations/analysis/shift-items`. Rolls Ledger tracks burger rolls (start, purchased, burgers sold, estimated end, actual end, variance). Meat Ledger tracks meat inventory (140g per patty calculation, start, purchased, patties sold, estimated end, actual end, variance). Both support manual amendments with notes, asterisk indicators for overrides, and status badges (PENDING/OK/ALERT). Features rebuild functionality for 14-day historical data, edit capability with pencil icons, and amber highlighting for manual overrides.
+- **Online Ordering System**: VEV replica design with centered headings, tight margins, category tabs, modifier support, cart management, and database-driven menu (CRUD via `/marketing/menu-admin`, public at `/order`).
+- **Membership System**: Complete customer membership platform at `/membership` with digital card generation, barcode support, spend tracking, and optional Loyverse Customers API integration.
+- **F&B Analysis Enhanced Metrics**: Shift analytics page displays receipt count, payment type breakdown, and top 5 items by category.
+- **Rolls & Meat Ledger System**: Integrated audit trail for inventory tracking at `/operations/analysis/shift-items` with manual amendment support and historical data rebuild.
 
 ### Database Schema (Core Tables)
 - Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
@@ -83,29 +75,16 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - Normalized POS tables: lv_receipt, lv_line_item, lv_modifier.
 - Item catalog and analytics cache tables: item_catalog, analytics_shift_item, analytics_shift_category_summary.
 - Manager checklist tables: cleaning_tasks, manager_checklists.
-- Inventory ledger tables: rolls_ledger, meat_ledger (with manual amendment support).
+- Inventory ledger tables: rolls_ledger, meat_ledger.
 - Online ordering tables: menu_categories_online, menu_items_online, modifier_groups_online, modifier_options_online, orders_online, order_lines_online.
+- Purchasing flow tables: `purchasing_items`, `daily_stock_v2`, `purchasing_shift_items`.
+- Recipe tables: `recipe`, `recipe_ingredient`, `pos_item_recipe_map`.
 
-### Canonical Data Architecture (Dec 27, 2025)
-**Purchasing Flow (PATCH A verified):**
-- `purchasing_items` → Single source of truth for all purchasable items (73 active)
-- `daily_stock_v2` → Stock records linked to daily_sales_v2 (1:1 relationship)
-- `purchasing_shift_items` → Junction table storing quantities per shift per item
-- Data parity: 20 sales = 20 stock records, 1,460 shift items (20 × 73)
-- Backfill script: `server/scripts/patchA-backfill.ts`
-
-**Recipe Architecture (Dual System - Future Unification Needed):**
-- `recipe` table (Prisma RecipeAuthority) → New canonical system with purchasingItem relations
-- `recipes` table (Legacy SQL) → 44 recipes with JSONB ingredients field
-- `recipe_ingredient` table → Links RecipeAuthority to purchasing_items
-- `recipe_lines` table → Legacy recipe line items
-- Recipe costs computed fresh from purchasing_items.unit_cost (never cached)
-
-**Key APIs (PATCH B verified):**
-- GET /api/purchasing-items → Returns all purchasing items
-- GET /api/purchasing-shift-log → Returns shift-by-shift quantities
-- GET /api/purchasing-analytics → Returns spending analytics with category breakdown
-- GET /api/recipes → Returns recipes from legacy system (44 recipes)
+### Canonical Data Architecture
+- **Purchasing Flow**: `purchasing_items` as single source of truth for all purchasable items, linked to `daily_stock_v2` and `purchasing_shift_items`.
+- **Recipe Architecture**: New canonical system (`recipe` + `recipe_ingredient` tables with Drizzle ORM) with explicit `pos_item_recipe_map`. Recipe costs computed fresh from `purchasing_items.unit_cost`. Legacy recipe pages are read-only.
+- **Key APIs**: `/api/purchasing-items`, `/api/purchasing-shift-log`, `/api/purchasing-analytics`, `/api/recipes`.
+- **PHASE E: Recipe & POS Unification**: `server/services/recipeAuthority.ts` as canonical recipe service. Guard statuses for `UNMAPPED_POS_ITEM`, `RECIPE_INCOMPLETE`. Debug endpoints available.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.
