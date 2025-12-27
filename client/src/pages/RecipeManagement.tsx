@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,30 +73,55 @@ const recipeIngredientFormSchema = z.object({
 export default function RecipeManagement() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeAuthority | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isAddIngredientDialogOpen, setIsAddIngredientDialogOpen] = useState(false);
   const [editingIngredient, setEditingIngredient] = useState<RecipeIngredientAuthority | null>(null);
+  const [isMarketingDialogOpen, setIsMarketingDialogOpen] = useState(false);
+  const [marketingOutputType, setMarketingOutputType] = useState<'delivery' | 'advertising' | 'social'>('delivery');
+  const [ingredientSearchTerm, setIngredientSearchTerm] = useState('');
+  const [ingredientCategoryFilter, setIngredientCategoryFilter] = useState('all');
+  const [isIngredientFormOpen, setIsIngredientFormOpen] = useState(false);
+  const [editingIngredientItem, setEditingIngredientItem] = useState<any>(null);
+  const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'recipes' | 'ingredients'>('recipes');
   
   // Recipe Authority API - canonical source
-  const { data: recipesData, isLoading: recipesLoading } = useQuery<{ ok: boolean; recipes: RecipeAuthority[] }>({
+  const { data: recipesData, isLoading: recipesLoading, isError: recipesError } = useQuery<{ ok: boolean; recipes: RecipeAuthority[] }>({
     queryKey: ['/api/recipe-authority'],
     queryFn: async () => {
       const res = await fetch('/api/recipe-authority/');
+      if (!res.ok) throw new Error('Failed to load recipes');
       return res.json();
     },
+    retry: 1,
   });
   const recipes = recipesData?.recipes || [];
 
   // Available ingredients from purchasing items (is_ingredient = true)
-  const { data: ingredientsData, isLoading: ingredientsLoading } = useQuery<{ ok: boolean; ingredients: AvailableIngredient[] }>({
+  const { data: ingredientsData, isLoading: ingredientsLoading, isError: ingredientsError } = useQuery<{ ok: boolean; ingredients: AvailableIngredient[] }>({
     queryKey: ['/api/recipe-authority/available-ingredients'],
     queryFn: async () => {
       const res = await fetch('/api/recipe-authority/available-ingredients');
+      if (!res.ok) throw new Error('Failed to load ingredients');
       return res.json();
     },
+    retry: 1,
   });
   const ingredients = ingredientsData?.ingredients || [];
+
+  // Fallback redirect: if both API calls fail, redirect to Purchasing with warning
+  useEffect(() => {
+    if (recipesError && ingredientsError) {
+      toast({
+        title: "Recipe Management unavailable",
+        description: "Redirecting to Purchasing List. Please check server logs.",
+        variant: "destructive",
+      });
+      navigate('/operations/purchasing?warning=recipe-api-failed');
+    }
+  }, [recipesError, ingredientsError, navigate, toast]);
 
   // Forms
   const recipeForm = useForm({

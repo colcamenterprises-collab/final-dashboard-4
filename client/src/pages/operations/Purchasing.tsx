@@ -8,14 +8,16 @@
  * - Editing unit cost updates Shopping List estimates and analytics
  * - NO duplicates, NO missing fields
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { queryClient } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
   Table, 
   TableBody, 
@@ -59,6 +61,7 @@ const thb = (v: unknown): string => {
 };
 
 export default function PurchasingPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
@@ -67,6 +70,16 @@ export default function PurchasingPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showCostWarning, setShowCostWarning] = useState(false);
   const [pendingCostUpdate, setPendingCostUpdate] = useState<{ id: number; oldCost: number | null; newCost: number } | null>(null);
+  const [apiWarning, setApiWarning] = useState<string | null>(null);
+
+  // Handle warning from recipe-management redirect
+  useEffect(() => {
+    const warning = searchParams.get('warning');
+    if (warning === 'recipe-api-failed') {
+      setApiWarning('Recipe Management API unavailable. Please check server logs or try again later.');
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const { data, isLoading } = useQuery({
     queryKey: ['purchasing-items'],
@@ -244,6 +257,23 @@ export default function PurchasingPage() {
 
   return (
     <div className="p-4">
+      {apiWarning && (
+        <Alert variant="destructive" className="mb-4 rounded-[4px]" data-testid="alert-api-warning">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertTitle>Recipe Management Unavailable</AlertTitle>
+          <AlertDescription className="flex justify-between items-center">
+            <span>{apiWarning}</span>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setApiWarning(null)}
+              className="text-xs"
+            >
+              Dismiss
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
       <div className="mb-4">
         <h1 className="text-3xl font-bold text-slate-900 mb-1">Purchasing List</h1>
         <p className="text-xs text-slate-600">Master control panel for all items. Changes here affect Form 2, Shopping List, and Analytics.</p>
