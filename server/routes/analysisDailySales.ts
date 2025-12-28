@@ -31,10 +31,10 @@ router.get("/", async (req: Request, res: Response) => {
     
     let result;
     if (month && /^\d{4}-\d{2}$/.test(month)) {
-      // Filter by month (YYYY-MM)
-      const startDate = `${month}-01`;
-      const [year, mon] = month.split('-').map(Number);
-      const endDate = new Date(year, mon, 0).toISOString().split('T')[0]; // Last day of month
+      // K-4.4: Filter by month (YYYY-MM)
+      // shiftDate is TEXT column with ISO format - use prefix matching
+      const monthPrefix = `${month}%`;  // e.g., "2025-11%"
+      console.log(`[K-4.4] Filtering daily-sales by month: ${month}, prefix: ${monthPrefix}`);
       
       result = await pool.query(`
         SELECT 
@@ -43,9 +43,9 @@ router.get("/", async (req: Request, res: Response) => {
           "completedBy" as completed_by,
           payload
         FROM daily_sales_v2
-        WHERE "shiftDate" >= $1 AND "shiftDate" <= $2
+        WHERE "shiftDate" LIKE $1
         ORDER BY "shiftDate" DESC
-      `, [startDate, endDate]);
+      `, [monthPrefix]);
     } else {
       // Return all data (backwards compatible)
       result = await pool.query(`

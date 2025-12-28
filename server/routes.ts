@@ -1048,19 +1048,28 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   // Daily Sales Analysis - Pull data from daily_sales_v2
+  // K-4.4: Accept month parameter to filter by selected month
   app.get("/api/analysis/daily-sales", async (req, res) => {
     try {
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
       
+      // K-4.4: Filter by month if provided
+      const month = req.query.month as string | undefined;
+      let whereClause: any = { deletedAt: null };
+      
+      if (month && /^\d{4}-\d{2}$/.test(month)) {
+        // shiftDate is TEXT in ISO format, use startsWith for prefix matching
+        whereClause.shiftDate = { startsWith: month };
+        console.log(`[K-4.4] Filtering daily-sales by month: ${month}`);
+      }
+      
       const forms = await prisma.dailySalesV2.findMany({
-        where: {
-          deletedAt: null
-        },
+        where: whereClause,
         orderBy: {
           createdAt: 'desc'
         },
-        take: 50
+        take: month ? undefined : 50  // No limit when filtering by month
       });
 
       const rows = forms.map((f: any) => {
