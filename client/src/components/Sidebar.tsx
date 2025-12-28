@@ -7,13 +7,13 @@ type Group = {
 };
 
 /**
- * Navigation cleanup — no logic changes
+ * PHASE L — Navigation & Ownership Reset (Legacy Sidebar)
  * 
- * CANONICAL STRUCTURE:
- * - Purchasing: Header only (not clickable), contains Purchasing List, Purchasing Log, Shopping List
- * - Menu Management: Recipe Management (editable), Menu Manager only
- * - Analysis: Includes Daily Summary Reports
- * - Ingredients Master: Removed from sidebar (accessible via internal links only)
+ * CANONICAL OWNERSHIP:
+ * - PURCHASING = items & stock (Purchasing List, Purchasing Log, Manual Stock Purchase)
+ * - FINANCE = money only (Expenses, Profit & Loss)
+ * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
+ * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
  */
 
 const groups: Group[] = [
@@ -35,13 +35,14 @@ const groups: Group[] = [
     items: [
       { to: "/operations/purchasing", label: "Purchasing List" },
       { to: "/operations/purchasing-shift-log", label: "Purchasing Log" },
-      { to: "/operations/shopping-list", label: "Shopping List" },
+      { to: "/operations/manual-stock-purchase", label: "Manual Stock Purchase" },
     ],
   },
   {
     title: "Finance", 
     items: [
-      { to: "/finance", label: "Finance" },
+      { to: "/finance/expenses", label: "Expenses" },
+      { to: "/finance/profit-loss", label: "Profit & Loss" },
     ],
   },
   {
@@ -54,8 +55,8 @@ const groups: Group[] = [
   {
     title: "Analysis",
     items: [
-      { to: "/operations/daily-reports", label: "Daily Summary Reports" },
-      { to: "/operations/analysis/shift-items", label: "Shift Items" },
+      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation" },
+      { to: "/analysis/daily-review", label: "Sales & Shift Analysis" },
     ],
   },
   {
@@ -68,7 +69,7 @@ const groups: Group[] = [
   {
     title: "Customer Ordering",
     items: [
-      { to: "/marketing/online-ordering", label: "Online Ordering" },
+      { to: "/order", label: "Online Ordering" },
     ],
   },
 ];

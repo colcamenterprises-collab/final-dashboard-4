@@ -22,10 +22,10 @@ const navItems = [
     testId: "nav-operations"
   },
   {
-    to: "/operations/shopping-list",
+    to: "/operations/purchasing",
     icon: ShoppingCart,
-    label: "Shopping",
-    testId: "nav-shopping"
+    label: "Purchasing",
+    testId: "nav-purchasing"
   },
   {
     to: "/menu/recipes",
