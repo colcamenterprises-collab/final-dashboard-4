@@ -1,0 +1,87 @@
+🔐 PHASE K-4 — RECEIPT EVIDENCE LAYER (MANDATORY)
+🎯 Objective
+Make receipt count the primary evidence in Sales & Shift Analysis so managers can immediately verify cashier integrity before reviewing money, stock, or reconciliation.
+Receipts are the evidence.
+Everything else is secondary.
+🚫 Scope Restrictions
+❌ No UI redesign
+❌ No schema changes
+❌ No strategy refactor
+❌ No blocking modals
+✅ Backend + minimal frontend only
+✅ Read-only evidence layer
+🧱 CORE RULE (NON-NEGOTIABLE)
+If receipt counts don’t match, nothing else is trusted.
+✅ REQUIRED IMPLEMENTATION
+1️⃣ Backend — Receipt Evidence Derivation
+Add receipt evidence fields to the daily reconciliation response:
+Copy code
+Ts
+{
+  posReceiptCount: number | null,
+  cashierReceiptCount: number | null,
+  receiptDifference: number | null
+}
+Sources:
+POS receipts
+COUNT(pos_receipts) within business window (17:00 → 03:00)
+Cashier receipts
+daily_sales_v2.receipt_count
+Logic:
+If either source exists → date is VALID
+Only show “Missing both sources” if both counts are null
+receiptDifference = pos - cashier (if both exist)
+⚠️ Do NOT throw errors
+⚠️ Always return HTTP 200
+⚠️ Log [SAFE_FALLBACK_USED] if either source missing
+2️⃣ Backend — Status Mapping
+Derive receipt status before money or stock logic:
+Condition
+Status
+POS = Cashier
+EVIDENCE_MATCH
+POS > Cashier
+MISSING_RECEIPTS
+POS < Cashier
+PHANTOM_RECEIPTS
+POS missing
+POS_UNAVAILABLE
+Cashier missing
+FORM_MISSING
+Both missing
+NO_EVIDENCE
+Expose this as receiptStatus.
+3️⃣ Frontend — Evidence Summary (TOP OF PAGE)
+Add a non-blocking Evidence Summary at the top of Sales & Shift Analysis, above reconciliation.
+Display:
+POS Receipts: X
+Cashier Declared: Y
+Difference: X − Y
+Visual rules:
+Difference = 0 → green
+Difference ≠ 0 → red
+Missing source → amber
+Always visible
+Dismissible (optional)
+⚠️ No modals
+⚠️ No disabling the page
+4️⃣ UI Copy (Exact Language)
+“Receipts are the primary evidence for this shift”
+“Receipt mismatch detected — investigate cashier activity”
+“Receipt counts match — proceed with reconciliation”
+5️⃣ Acceptance Criteria (Must All Pass)
+Any date with POS receipts shows receipt count
+Any date with Daily Sales shows cashier receipt count
+Dates no longer show “Missing both forms” incorrectly
+Managers can audit cashier behavior without scrolling
+Page remains usable regardless of mismatch
+No 500 errors under any condition
+🧠 Why This Is Canonical
+Matches real-world audit behavior
+Restores trust immediately
+Turns disputes into facts
+Makes POS a witness, not a crutch
+Makes the system defensible to partners
+🚀 Execute Immediately
+Proceed with PHASE K-4 exactly as written.
+No deviations. No redesign. No extras.

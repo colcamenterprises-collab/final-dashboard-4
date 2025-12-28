@@ -1,7 +1,28 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
-import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, XCircle, Receipt } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+
+// K-4.1: Receipt evidence types
+type ReceiptStatus = 
+  | "EVIDENCE_MATCH"
+  | "MISSING_RECEIPTS"
+  | "PHANTOM_RECEIPTS"
+  | "POS_UNAVAILABLE"
+  | "FORM_MISSING"
+  | "NO_EVIDENCE";
+
+interface ReceiptEvidence {
+  posReceiptCount: number | null;
+  cashierReceiptCount: number | null;
+  receiptDifference: number | null;
+  receiptStatus: ReceiptStatus;
+}
+
+// Extended type with receipt evidence
+interface DailyComparisonWithEvidence extends DailyComparisonResponse {
+  receiptEvidence?: ReceiptEvidence;
+}
 
 interface DailySalesRow {
   id: string;
@@ -76,11 +97,90 @@ function DayPill({
   );
 }
 
+// K-4.3: Evidence Summary component (non-blocking, at top of page)
+function EvidenceSummary({ evidence }: { evidence: ReceiptEvidence | undefined }) {
+  if (!evidence) return null;
+  
+  const { posReceiptCount, cashierReceiptCount, receiptDifference, receiptStatus } = evidence;
+  
+  // Determine visual state
+  let bgColor = "bg-amber-50 border-amber-200";
+  let textColor = "text-amber-800";
+  let message = "";
+  
+  switch (receiptStatus) {
+    case "EVIDENCE_MATCH":
+      bgColor = "bg-green-50 border-green-200";
+      textColor = "text-green-800";
+      message = "Receipt counts match — proceed with reconciliation";
+      break;
+    case "MISSING_RECEIPTS":
+      bgColor = "bg-red-50 border-red-200";
+      textColor = "text-red-800";
+      message = "Receipt mismatch detected — investigate cashier activity";
+      break;
+    case "PHANTOM_RECEIPTS":
+      bgColor = "bg-red-50 border-red-200";
+      textColor = "text-red-800";
+      message = "Receipt mismatch detected — investigate cashier activity";
+      break;
+    case "POS_UNAVAILABLE":
+      message = "POS receipts not available for this shift";
+      break;
+    case "FORM_MISSING":
+      message = "Cashier receipt count not submitted";
+      break;
+    case "NO_EVIDENCE":
+      message = "No receipt data available";
+      break;
+  }
+  
+  return (
+    <div className={`rounded-lg border p-4 ${bgColor}`} data-testid="evidence-summary">
+      <div className="flex items-start gap-3">
+        <Receipt className={`w-5 h-5 mt-0.5 ${textColor}`} />
+        <div className="flex-1">
+          <div className="text-xs font-semibold text-gray-600 mb-2">
+            Receipts are the primary evidence for this shift
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-sm mb-2">
+            <div>
+              <div className="text-xs text-gray-500">POS Receipts</div>
+              <div className={`font-bold text-lg ${textColor}`}>
+                {posReceiptCount !== null ? posReceiptCount : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Cashier Declared</div>
+              <div className={`font-bold text-lg ${textColor}`}>
+                {cashierReceiptCount !== null ? cashierReceiptCount : "—"}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-gray-500">Difference</div>
+              <div className={`font-bold text-lg ${
+                receiptDifference === null ? "text-gray-400" 
+                : receiptDifference === 0 ? "text-green-700" 
+                : "text-red-700"
+              }`}>
+                {receiptDifference !== null ? (receiptDifference > 0 ? `+${receiptDifference}` : receiptDifference) : "—"}
+              </div>
+            </div>
+          </div>
+          <div className={`text-sm font-medium ${textColor}`}>
+            {message}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DailyReview() {
   const [month, setMonth] = useState(thisMonth());
-  const [all, setAll] = useState<DailyComparisonResponse[]>([]);
+  const [all, setAll] = useState<DailyComparisonWithEvidence[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [current, setCurrent] = useState<DailyComparisonResponse | null>(null);
+  const [current, setCurrent] = useState<DailyComparisonWithEvidence | null>(null);
   const [loading, setLoading] = useState(false);
   const [comment, setComment] = useState("");
   const [actualAmountBanked, setActualAmountBanked] = useState("");
@@ -326,6 +426,9 @@ export default function DailyReview() {
 
       {!loading && current && (
         <>
+          {/* K-4.3: Evidence Summary - TOP OF PAGE, above reconciliation */}
+          <EvidenceSummary evidence={current.receiptEvidence} />
+          
           <div className="rounded border p-3 bg-gray-50">
             <div className="text-sm">
               <span className="font-semibold">Business date:</span> {current.date} (17:00→03:00, POS = source of truth)

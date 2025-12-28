@@ -2,6 +2,7 @@ import { Router } from "express";
 import { prisma } from "../../lib/prisma";
 import { ingestPosForBusinessDate } from "../services/loyverseIngest";
 import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expenseTotals";
+import { shiftWindow } from "../services/time/shiftWindow";
 import type {
   DailyComparisonResponse,
   DailySource,
@@ -13,6 +14,110 @@ import type {
 export const analysisDailyReviewRouter = Router();
 
 const THB = (n: number) => Number((n ?? 0).toFixed(2));
+
+// K-4.2: Receipt status types
+type ReceiptStatus = 
+  | "EVIDENCE_MATCH"      // POS = Cashier
+  | "MISSING_RECEIPTS"    // POS > Cashier
+  | "PHANTOM_RECEIPTS"    // POS < Cashier
+  | "POS_UNAVAILABLE"     // POS missing
+  | "FORM_MISSING"        // Cashier missing
+  | "NO_EVIDENCE";        // Both missing
+
+interface ReceiptEvidence {
+  posReceiptCount: number | null;
+  cashierReceiptCount: number | null;
+  receiptDifference: number | null;
+  receiptStatus: ReceiptStatus;
+}
+
+// K-4.1: Fetch POS receipt count from lv_receipt within shift window
+async function fetchPosReceiptCount(businessDate: string): Promise<number | null> {
+  try {
+    const { fromISO, toISO } = shiftWindow(businessDate);
+    const result = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint as count 
+      FROM lv_receipt 
+      WHERE datetime_bkk >= ${fromISO}::timestamptz 
+        AND datetime_bkk < ${toISO}::timestamptz`;
+    
+    const count = Number(result[0]?.count ?? 0);
+    if (count === 0) {
+      console.log(`[SAFE_FALLBACK_USED] No POS receipts found for ${businessDate}`);
+      return null;
+    }
+    return count;
+  } catch (error: any) {
+    console.error(`[SAFE_FALLBACK_USED] Error fetching POS receipt count for ${businessDate}:`, error.message);
+    return null;
+  }
+}
+
+// K-4.1: Fetch cashier receipt count from daily_sales_v2
+async function fetchCashierReceiptCount(businessDate: string): Promise<number | null> {
+  try {
+    const { start, end } = dayRange(businessDate);
+    const row = await prisma.dailySalesV2.findFirst({
+      where: { 
+        shift_date: { gte: start, lt: end },
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    
+    if (!row) {
+      console.log(`[SAFE_FALLBACK_USED] No Daily Sales form found for ${businessDate}`);
+      return null;
+    }
+    
+    // Check payload for receipt_count or receiptCount
+    const payload = row.payload as any;
+    const receiptCount = payload?.receipt_count ?? payload?.receiptCount ?? (row as any).receipt_count ?? null;
+    
+    // If no explicit receipt count, derive from POS receipt count in form if available
+    if (receiptCount === null || receiptCount === undefined) {
+      console.log(`[SAFE_FALLBACK_USED] No receipt count field in Daily Sales for ${businessDate}`);
+      return null;
+    }
+    
+    return Number(receiptCount);
+  } catch (error: any) {
+    console.error(`[SAFE_FALLBACK_USED] Error fetching cashier receipt count for ${businessDate}:`, error.message);
+    return null;
+  }
+}
+
+// K-4.2: Derive receipt status from counts
+function deriveReceiptStatus(posCount: number | null, cashierCount: number | null): ReceiptStatus {
+  if (posCount === null && cashierCount === null) return "NO_EVIDENCE";
+  if (posCount === null) return "POS_UNAVAILABLE";
+  if (cashierCount === null) return "FORM_MISSING";
+  
+  const diff = posCount - cashierCount;
+  if (diff === 0) return "EVIDENCE_MATCH";
+  if (diff > 0) return "MISSING_RECEIPTS";  // POS has more than cashier declared
+  return "PHANTOM_RECEIPTS";  // Cashier declared more than POS shows
+}
+
+// K-4.1: Build receipt evidence object
+async function buildReceiptEvidence(businessDate: string): Promise<ReceiptEvidence> {
+  const [posCount, cashierCount] = await Promise.all([
+    fetchPosReceiptCount(businessDate),
+    fetchCashierReceiptCount(businessDate)
+  ]);
+  
+  const status = deriveReceiptStatus(posCount, cashierCount);
+  const diff = (posCount !== null && cashierCount !== null) 
+    ? posCount - cashierCount 
+    : null;
+  
+  return {
+    posReceiptCount: posCount,
+    cashierReceiptCount: cashierCount,
+    receiptDifference: diff,
+    receiptStatus: status
+  };
+}
 
 // Helper to build [date, date+1) UTC range safely for DATE columns
 function dayRange(businessDate: string) {
@@ -152,13 +257,21 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
   const date = String(req.query.date || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
 
-  const [pos, form] = await Promise.all([fetchPOSFromDB(date), fetchForm1FromDB(date)]);
+  // K-4.1: Fetch all data including receipt evidence in parallel
+  const [pos, form, receiptEvidence] = await Promise.all([
+    fetchPOSFromDB(date), 
+    fetchForm1FromDB(date),
+    buildReceiptEvidence(date)
+  ]);
   const availability = availabilityOf(pos, form);
 
-  const payload: DailyComparisonResponse = { date, availability };
+  const payload: DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence } = { date, availability };
   if (pos) payload.pos = pos;
   if (form) payload.form = form;
   if (availability === "ok") payload.variance = buildVariance(pos!, form!);
+  
+  // K-4.1: Always include receipt evidence
+  payload.receiptEvidence = receiptEvidence;
 
   res.json(payload);
 });
@@ -170,16 +283,24 @@ analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
   const [Y, M] = month.split("-").map((x) => parseInt(x, 10));
   const daysInMonth = new Date(Y, M, 0).getDate();
 
-  const out: DailyComparisonResponse[] = [];
+  const out: (DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence })[] = [];
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${month}-${String(d).padStart(2, "0")}`;
-    const [pos, form] = await Promise.all([fetchPOSFromDB(ds), fetchForm1FromDB(ds)]);
+    // K-4.1: Fetch receipt evidence in parallel with other data
+    const [pos, form, receiptEvidence] = await Promise.all([
+      fetchPOSFromDB(ds), 
+      fetchForm1FromDB(ds),
+      buildReceiptEvidence(ds)
+    ]);
     const availability = availabilityOf(pos, form);
 
-    const entry: DailyComparisonResponse = { date: ds, availability };
+    const entry: DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence } = { date: ds, availability };
     if (pos) entry.pos = pos;
     if (form) entry.form = form;
     if (availability === "ok") entry.variance = buildVariance(pos!, form!);
+    
+    // K-4.1: Always include receipt evidence
+    entry.receiptEvidence = receiptEvidence;
 
     out.push(entry);
   }
