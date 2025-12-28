@@ -50,13 +50,34 @@ export default function PurchasingShiftLog() {
   const shifts = data?.shifts || [];
   const dateRange = data?.dateRange;
 
+  // K3: Category sort order - Rolls > Meat > Food > Packaging > Drinks (last)
+  const categorySortOrder: Record<string, number> = {
+    'BREAD': 1,        // Rolls/Burger Buns
+    'Fresh Food': 2,   // Meat and fresh ingredients
+    'DAIRY': 3,
+    'Packaging': 4,
+    'Drinks': 99,      // Always last
+  };
+
+  const getCategorySortWeight = (category: string | null): number => {
+    if (!category) return 50;
+    return categorySortOrder[category] ?? 50;
+  };
+
   const categories = useMemo(() => {
-    return Array.from(new Set(items.map(i => i.category).filter(Boolean)));
+    const cats = Array.from(new Set(items.map(i => i.category).filter(Boolean)));
+    // Sort categories by weight
+    return cats.sort((a, b) => getCategorySortWeight(a) - getCategorySortWeight(b));
   }, [items]);
 
   const filteredItems = useMemo(() => {
-    if (!categoryFilter) return items;
-    return items.filter(i => i.category === categoryFilter);
+    let result = categoryFilter ? items.filter(i => i.category === categoryFilter) : items;
+    // K3: Sort by category weight, then by item name
+    return result.sort((a, b) => {
+      const weightDiff = getCategorySortWeight(a.category) - getCategorySortWeight(b.category);
+      if (weightDiff !== 0) return weightDiff;
+      return a.itemName.localeCompare(b.itemName);
+    });
   }, [items, categoryFilter]);
 
   const formatDate = (dateStr: string) => {

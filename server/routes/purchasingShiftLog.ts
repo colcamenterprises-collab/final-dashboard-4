@@ -55,6 +55,8 @@ router.post('/purchasing-shift-backfill', async (req: Request, res: Response) =>
 /**
  * GET /api/purchasing-shift-log
  * Returns all items with quantities across shifts for the Shift Log page
+ * K1: Derives data from purchasingJson when purchasing_shift_items missing
+ * K2: Properly handles date range
  */
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -64,7 +66,7 @@ router.get('/', async (req: Request, res: Response) => {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // Get all shifts in date range
+    // Get all shifts in date range with purchasingJson for derivation
     const shifts = await prisma.dailyStockV2.findMany({
       where: {
         createdAt: {
@@ -77,6 +79,7 @@ router.get('/', async (req: Request, res: Response) => {
         id: true,
         createdAt: true,
         salesId: true,
+        purchasingJson: true,
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -95,16 +98,28 @@ router.get('/', async (req: Request, res: Response) => {
     
     const salesDateMap = new Map(salesRecords.map(s => [s.id, s.shiftDate]));
     
-    const shiftData = shifts.map(s => ({
-      id: s.id,
-      date: (s.salesId && salesDateMap.get(s.salesId)) || s.createdAt.toISOString().split('T')[0],
-    }));
+    // K2: Format date as YYYY-MM-DD only
+    const shiftData = shifts.map(s => {
+      const salesDate = s.salesId && salesDateMap.get(s.salesId);
+      let dateStr = s.createdAt.toISOString().split('T')[0];
+      if (salesDate && typeof salesDate === 'string') {
+        // Extract just date portion if it's an ISO string
+        dateStr = salesDate.includes('T') ? salesDate.split('T')[0] : salesDate;
+      }
+      return { id: s.id, date: dateStr };
+    });
 
     // Get all active purchasing items
     const items = await prisma.purchasingItem.findMany({
       where: { active: true },
       orderBy: [{ category: 'asc' }, { item: 'asc' }],
     });
+
+    // Build item name to ID lookup for derivation
+    const itemNameToId = new Map<string, number>();
+    for (const item of items) {
+      itemNameToId.set(item.item.toLowerCase(), item.id);
+    }
 
     // Get all shift item quantities
     const shiftItemsRaw = await prisma.purchasingShiftItem.findMany({
@@ -119,7 +134,29 @@ router.get('/', async (req: Request, res: Response) => {
       if (!qtyMap.has(si.purchasingItemId)) {
         qtyMap.set(si.purchasingItemId, new Map());
       }
-      qtyMap.get(si.purchasingItemId)!.set(si.dailyStockId, si.quantity);
+      // K1: Parse quantity as number to avoid string concatenation
+      const qty = typeof si.quantity === 'string' ? parseFloat(si.quantity) : Number(si.quantity);
+      qtyMap.get(si.purchasingItemId)!.set(si.dailyStockId, isNaN(qty) ? 0 : qty);
+    }
+
+    // K1: For shifts without purchasing_shift_items, derive from purchasingJson
+    const shiftsWithData = new Set(shiftItemsRaw.map(si => si.dailyStockId));
+    for (const shift of shifts) {
+      if (!shiftsWithData.has(shift.id) && shift.purchasingJson) {
+        // Derive from purchasingJson
+        const pJson = shift.purchasingJson as Record<string, number>;
+        for (const [itemName, qty] of Object.entries(pJson)) {
+          const itemId = itemNameToId.get(itemName.toLowerCase());
+          if (itemId) {
+            if (!qtyMap.has(itemId)) {
+              qtyMap.set(itemId, new Map());
+            }
+            const numQty = typeof qty === 'string' ? parseFloat(qty) : Number(qty);
+            qtyMap.get(itemId)!.set(shift.id, isNaN(numQty) ? 0 : numQty);
+          }
+        }
+        console.log(`[SAFE_FALLBACK_USED] Derived purchasing data for shift ${shift.id} from purchasingJson`);
+      }
     }
 
     // Build response with all items and their quantities per shift

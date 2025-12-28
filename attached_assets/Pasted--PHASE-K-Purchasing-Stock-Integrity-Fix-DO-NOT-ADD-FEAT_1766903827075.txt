@@ -1,0 +1,155 @@
+🔧 PHASE K — Purchasing & Stock Integrity Fix
+DO NOT ADD FEATURES · FIX BROKEN FUNCTIONALITY ONLY
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Restore trustworthy purchasing, stock, and expense behaviour so:
+Purchasing Shift Log reflects real data for all dates
+Date filters actually work
+Stock purchases are treated as Purchasing, not Finance
+Drinks, rolls, and meat can be logged efficiently
+UI becomes usable before any visual polish
+This patch is functional recovery only.
+No styling, no animations, no redesigns.
+🚫 ABSOLUTE PROHIBITIONS
+The agent MUST NOT:
+Add new analytics
+Change schemas unless explicitly stated
+Add strategy logic
+Touch recipes, POS logic, or costing formulas
+Perform UI polish or visual redesign
+Rename tables or break existing APIs
+🧱 PATCH K — REQUIRED WORK
+K1 — FIX PURCHASING SHIFT LOG (DATA IS WRONG)
+❌ Problem
+Date selector does nothing
+Data stops at ~16 Dec
+Missing shifts show no data
+Log depends on purchasing_shift_items existing
+✅ Required Behaviour
+The Purchasing Shift Log must be derived when data is missing.
+🔨 Implementation
+Source of Truth (already exists):
+daily_sales_v2
+daily_stock_v2
+For each date in selected range:
+Query purchasing_shift_items
+If rows exist → use them
+If rows do not exist:
+Derive quantities from daily_stock_v2
+Create rows in purchasing_shift_items
+Set:
+derived = true
+source = 'daily_stock_v2'
+Required derived items:
+Rolls
+Meat (grams)
+Drinks (each item)
+All other purchasing items → quantity = 0
+Result:
+Date picker works
+Historical gaps are filled
+Log becomes reliable and defendable
+⚠️ This must run on read, not manually.
+K2 — FIX DATE RANGE FILTER (FRONTEND + BACKEND)
+❌ Problem
+Changing timeframe does not update table columns
+API ignores requested date range
+🔨 Required Fix
+Ensure frontend date selector passes { startDate, endDate }
+Backend must query exact range
+Table headers must reflect selected dates
+No caching hacks.
+No hardcoded ranges.
+K3 — REORDER QUANTITY HISTORY (USABILITY FIX)
+❌ Problem
+Drinks dominate the view and reduce signal value.
+✅ Required Order (TOP → BOTTOM)
+Rolls
+Meat
+Food ingredients
+Packaging
+Drinks (LAST)
+🔨 Implementation
+Frontend-only category sort weight
+No schema changes
+No API changes
+K4 — REMOVE STOCK PURCHASES FROM FINANCE
+❌ Current (WRONG)
+Rolls / Meat / Drinks logged under Finance
+“Lodge Stock Purchase” lives in Expenses
+✅ Correct Model (LOCK THIS)
+Finance = money
+Purchasing = items
+🔨 Required Changes
+A. Finance
+Remove / hide Lodge Stock Purchase
+Finance handles ONLY:
+Rent
+Utilities
+Wages
+Misc business expenses
+Bank uploads
+B. Purchasing
+Create / move:
+Copy code
+
+Purchasing
+ ├── Purchasing List
+ ├── Purchasing Log
+ ├── Shopping List
+ └── Manual Stock Purchase
+No schema changes required.
+K5 — FIX MANUAL STOCK PURCHASE UX (CRITICAL)
+❌ Problem
+Dropdown
+Only 2 drinks per submission
+Reopen modal repeatedly
+✅ Required Behaviour
+Table-based multi-entry
+Drinks tab:
+Drink
+Quantity
+Coke
+[  ]
+Coke Zero
+[  ]
+Water
+[  ]
+Fanta
+[  ]
+Zero allowed
+One submit
+All items logged at once
+Rolls & Meat:
+Same modal
+Quantity + amount
+Writes to purchasing_shift_items
+Finance link:
+IF Paid = true
+Create expense entry (derived)
+Otherwise
+No finance record
+⚠️ Purchasing is primary.
+Finance is secondary/derived.
+K6 — SAFETY & VERIFICATION
+Must Pass:
+Purchasing Shift Log shows all dates
+Date selector updates table
+No more blank gaps post-16 Dec
+Manual stock purchase works in one submit
+Finance expenses still work
+Zero new 500 errors
+Logging:
+If fallback derivation used → log "SAFE_FALLBACK_USED"
+✅ COMPLETION CRITERIA
+Patch is complete ONLY when:
+Purchasing data is trustworthy
+Staff can log stock without friction
+Finance is clean and numerical
+No pages crash
+No misleading data remains
+🔚 FINAL NOTE TO AGENT
+This patch is about integrity, not elegance.
+Do not refactor.
+Do not redesign.
+Do not invent.
+Fix what is broken. Stop.
