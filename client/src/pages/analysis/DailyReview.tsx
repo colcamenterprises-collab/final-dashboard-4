@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, XCircle } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 interface DailySalesRow {
@@ -88,18 +87,14 @@ export default function DailyReview() {
   const [savingComment, setSavingComment] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [exportDate, setExportDate] = useState("");
-  const [syncDialog, setSyncDialog] = useState<{
-    open: boolean;
-    success: boolean;
+  // K-2.5: Inline banner instead of blocking dialog
+  const [syncBanner, setSyncBanner] = useState<{
+    show: boolean;
+    status: "success" | "warning" | "error";
     message: string;
     date?: string;
     sales?: number;
-    expenses?: number;
-  }>({
-    open: false,
-    success: false,
-    message: "",
-  });
+  } | null>(null);
 
   // Query for Daily Sales table data
   const { data: dailySalesRows = [], isLoading: isDailySalesLoading } = useQuery<DailySalesRow[]>({
@@ -112,38 +107,55 @@ export default function DailyReview() {
     return r.json();
   }
 
+  // K-2.1: Sync is now optional recovery action, not a dependency
   async function manualSync(dateStr: string) {
     try {
       setSyncing(true);
+      setSyncBanner(null);
+      
       const result = await fetchJSON(
         `/api/analysis/sync-pos-for-date?date=${dateStr}`,
         { method: "POST" }
       );
-      if (result.ok) {
-        setSyncDialog({
-          open: true,
-          success: true,
-          message: result.message || "POS data synced successfully! The page data will refresh automatically.",
+      
+      // K-2.4: Backend always returns 200 with status field
+      if (result.status === "OK" && result.reconciled) {
+        setSyncBanner({
+          show: true,
+          status: "success",
+          message: result.message || "Data synced and reconciled successfully.",
           date: result.date,
           sales: result.sales,
-          expenses: result.expenses,
         });
-        
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
+        // Reload to refresh data
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        window.location.reload();
+      } else if (result.status === "PARTIAL_DATA") {
+        // K-2.5: Show warning banner, page remains usable
+        setSyncBanner({
+          show: true,
+          status: "warning",
+          message: result.message || "Partial data available.",
+          date: result.date,
+          sales: result.sales,
+        });
+        // Reload to show whatever data is available
+        await new Promise(resolve => setTimeout(resolve, 1500));
         window.location.reload();
       } else {
-        setSyncDialog({
-          open: true,
-          success: false,
-          message: result.message || "Failed to sync POS data. Please try again.",
+        // Error or SYNC_ERROR status
+        setSyncBanner({
+          show: true,
+          status: "error",
+          message: result.message || result.reason || "Could not sync. Please try again.",
         });
       }
     } catch (err: any) {
-      setSyncDialog({
-        open: true,
-        success: false,
-        message: `Error: ${err.message || "Unknown error occurred"}`,
+      // K-2.4: Never block on errors
+      setSyncBanner({
+        show: true,
+        status: "error",
+        message: `Connection error: ${err.message || "Please check network"}`,
       });
     } finally {
       setSyncing(false);
@@ -255,14 +267,47 @@ export default function DailyReview() {
             <button
               onClick={() => manualSync(selectedDate)}
               disabled={syncing}
-              className="px-3 py-1 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-sm bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
               data-testid="button-manual-sync"
+              title="Optional: Retry fetching POS data from Loyverse"
             >
-              {syncing ? "Syncing..." : "Sync POS"}
+              {syncing ? "Syncing..." : "Retry POS"}
             </button>
           )}
         </div>
       </header>
+
+      {/* K-2.5: Inline sync status banner (not blocking modal) */}
+      {syncBanner?.show && (
+        <div 
+          className={`rounded-lg p-3 flex items-center justify-between ${
+            syncBanner.status === "success" 
+              ? "bg-green-50 border border-green-200 text-green-800" 
+              : syncBanner.status === "warning"
+              ? "bg-amber-50 border border-amber-200 text-amber-800"
+              : "bg-red-50 border border-red-200 text-red-800"
+          }`}
+          data-testid="sync-banner"
+        >
+          <div className="flex items-center gap-2">
+            {syncBanner.status === "success" && <CheckCircle2 className="w-4 h-4" />}
+            {syncBanner.status === "warning" && <AlertTriangle className="w-4 h-4" />}
+            {syncBanner.status === "error" && <XCircle className="w-4 h-4" />}
+            <span className="text-sm">{syncBanner.message}</span>
+            {syncBanner.sales !== undefined && (
+              <span className="text-sm font-semibold ml-2">
+                Sales: ฿{syncBanner.sales.toLocaleString()}
+              </span>
+            )}
+          </div>
+          <button 
+            onClick={() => setSyncBanner(null)} 
+            className="text-xs underline hover:no-underline"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-2 flex-wrap">
         {all.map((d) => (
@@ -500,83 +545,6 @@ export default function DailyReview() {
         )}
       </section>
 
-      {/* Sync Success/Error Dialog */}
-      <Dialog open={syncDialog.open} onOpenChange={(open) => setSyncDialog({ ...syncDialog, open })}>
-        <DialogContent className="sm:max-w-md" data-testid="sync-result-dialog">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              {syncDialog.success ? (
-                <>
-                  <CheckCircle2 className="w-6 h-6 text-emerald-500" />
-                  <span className="text-emerald-700">Sync Successful</span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="w-6 h-6 text-red-500" />
-                  <span className="text-red-700">Sync Failed</span>
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {syncDialog.success ? (
-              <>
-                <p className="text-sm text-gray-600">{syncDialog.message}</p>
-                
-                {syncDialog.date && (
-                  <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Date</span>
-                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-                        {new Date(syncDialog.date).toLocaleDateString('en-GB')}
-                      </span>
-                    </div>
-                    
-                    {syncDialog.sales !== undefined && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sales Total</span>
-                        <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                          ฿{syncDialog.sales.toLocaleString('en-US', { minimumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {syncDialog.expenses !== undefined && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Expenses Total</span>
-                        <span className="text-lg font-bold text-red-600 dark:text-red-400">
-                          ฿{syncDialog.expenses.toLocaleString('en-US', { minimumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                )}
-                
-                <button
-                  onClick={() => setSyncDialog({ ...syncDialog, open: false })}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
-                  data-testid="btn-close-success"
-                >
-                  Got it!
-                </button>
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-red-600 whitespace-pre-wrap">{syncDialog.message}</p>
-                
-                <button
-                  onClick={() => setSyncDialog({ ...syncDialog, open: false })}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 px-4 rounded-lg transition-colors"
-                  data-testid="btn-close-error"
-                >
-                  Close
-                </button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

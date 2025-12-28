@@ -199,15 +199,20 @@ analysisDailyReviewRouter.get("/diag/day", async (req, res) => {
 });
 
 // Manual sync endpoint for Daily Review page
+// K-2.4: SAFE - Always returns HTTP 200 with status field
 analysisDailyReviewRouter.post("/sync-pos-for-date", async (req, res) => {
-  try {
-    const date = String(req.query.date || "").trim();
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      return res.status(400).json({ ok: false, error: "Provide date=YYYY-MM-DD" });
-    }
+  const date = String(req.query.date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.json({ 
+      ok: false, 
+      status: "INVALID_DATE",
+      reason: "Invalid date format. Use YYYY-MM-DD"
+    });
+  }
 
-    console.log(`📊 Manual sync requested for ${date}`);
-    
+  console.log(`📊 [SAFE_FALLBACK_USED] Manual sync requested for ${date}`);
+  
+  try {
     // Get store ID from environment or default to Smash Brothers Burgers store
     const storeId = process.env.LOYVERSE_STORE_ID || '0c87cebd-e5e5-45b6-b57a-6764b869f38e';
     
@@ -216,26 +221,57 @@ analysisDailyReviewRouter.post("/sync-pos-for-date", async (req, res) => {
     
     // Fetch the synced data to return to frontend
     const pos = await fetchPOSFromDB(date);
+    const form = await fetchForm1FromDB(date);
     
-    if (!pos) {
-      return res.json({ 
-        ok: false, 
-        error: "Sync completed but no POS data found. The shift may not have opened yet." 
+    // K-2.3: Decision table - always return 200 with appropriate status
+    if (pos && form) {
+      return res.json({
+        ok: true,
+        status: "OK",
+        reconciled: true,
+        message: `Successfully synced and reconciled data for ${date}`,
+        date,
+        sales: pos.sales.total,
+        expenses: pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal,
       });
     }
-
-    res.json({
+    
+    if (!pos && form) {
+      return res.json({ 
+        ok: true,
+        status: "PARTIAL_DATA",
+        reason: "POS_MISSING",
+        message: "Daily Sales form found, but no POS data available for this shift."
+      });
+    }
+    
+    if (pos && !form) {
+      return res.json({ 
+        ok: true,
+        status: "PARTIAL_DATA",
+        reason: "DAILY_SALES_MISSING",
+        message: "POS data synced, but no Daily Sales form submitted for this date.",
+        date,
+        sales: pos.sales.total,
+      });
+    }
+    
+    // Neither POS nor form
+    return res.json({ 
       ok: true,
-      message: `Successfully synced POS data for ${date}`,
-      date: date,
-      sales: pos.sales.total,
-      expenses: pos.expenses.shoppingTotal + pos.expenses.wageTotal + pos.expenses.otherTotal,
+      status: "PARTIAL_DATA",
+      reason: "BOTH_MISSING",
+      message: "No data found. The shift may not have opened yet or forms not submitted."
     });
+    
   } catch (error: any) {
-    console.error("❌ Sync error:", error);
-    res.status(500).json({ 
+    // K-2.4: Never throw 500 - always return 200 with error info
+    console.error(`❌ [SAFE_FALLBACK_USED] Sync error for ${date}:`, error.message);
+    return res.json({ 
       ok: false, 
-      error: error.message || "Failed to sync POS data" 
+      status: "SYNC_ERROR",
+      reason: error.message || "Failed to sync POS data",
+      message: "Could not sync with POS system. Data shown may be from cache."
     });
   }
 });

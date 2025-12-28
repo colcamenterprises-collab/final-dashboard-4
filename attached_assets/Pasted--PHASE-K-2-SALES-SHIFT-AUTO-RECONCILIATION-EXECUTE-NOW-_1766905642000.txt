@@ -1,0 +1,111 @@
+🔧 PHASE K-2 — SALES & SHIFT AUTO-RECONCILIATION (EXECUTE NOW)
+STATUS: 🔴 CRITICAL
+GOAL: Make Sales & Shift Analysis correct, automatic, and trustworthy
+SCOPE: Backend logic + minimal UI behaviour only
+NO DESIGN CHANGES
+🎯 CORE OBJECTIVE (NON-NEGOTIABLE)
+Sales & Shift Analysis MUST auto-reconcile when a date is selected.
+Manual “Sync POS” must never be required to see correct data.
+🚫 ABSOLUTE PROHIBITIONS
+Agent MUST NOT:
+Add new tables
+Change schemas
+Add analytics or charts
+Block pages with modals
+Throw 500 errors for missing data
+Require manual sync for normal operation
+🧱 REQUIRED FIXES (EXECUTE IN ORDER)
+K-2.1 REMOVE MANUAL SYNC AS A DEPENDENCY
+UI Behaviour
+Keep Sync POS button
+Change meaning to:
+“Retry POS import” (optional recovery action)
+REQUIRED:
+Page load must not depend on clicking Sync POS
+Selecting a date must immediately attempt reconciliation
+K-2.2 AUTO-RECONCILE ON DATE SELECTION
+When a date is selected in Sales & Shift Analysis:
+Determine business date window (17:00 → 03:00)
+Load:
+POS receipts for that date
+Daily Sales V2 for that date
+Run reconciliation logic automatically
+⚠️ NO user action
+⚠️ NO modal
+⚠️ NO sync click
+K-2.3 SAFE RECONCILIATION LOGIC (MANDATORY)
+Implement this exact decision table:
+POS
+Daily Sales
+Result
+✅
+✅
+Reconcile + show variance
+❌
+✅
+Show Daily Sales + warning
+✅
+❌
+Show POS + warning
+❌
+❌
+Empty state + warning
+IMPORTANT
+Never throw
+Never return 500
+Always return HTTP 200
+K-2.4 FIX SYNC ENDPOINT (STOP 500 ERRORS)
+Wrap POS sync endpoint in full defensive logic:
+If POS data missing → return:
+Copy code
+Json
+{
+  "status": "PARTIAL_DATA",
+  "reason": "POS_MISSING"
+}
+If Daily Sales missing → return:
+Copy code
+Json
+{
+  "status": "PARTIAL_DATA",
+  "reason": "DAILY_SALES_MISSING"
+}
+If both present → return:
+Copy code
+Json
+{
+  "status": "OK",
+  "reconciled": true
+}
+⚠️ DO NOT THROW ⚠️ Log SAFE_FALLBACK_USED
+K-2.5 UI STATUS (NO REDESIGN)
+Replace blocking error modal with inline banner text:
+✅ Reconciled
+⚠️ Missing POS receipts
+⚠️ Daily Sales form not submitted
+❌ Variance detected (amount mismatch)
+Page must remain usable in ALL cases
+K-2.6 DATA CONSISTENCY CHECK
+Ensure:
+Bottom table = Daily Sales V2 (already correct)
+Top comparison = derived reconciliation
+If reconciliation missing → derive on read
+❌ No “Sync required” message
+❌ No hidden state
+✅ COMPLETION CRITERIA (DO NOT STOP EARLY)
+This patch is ONLY complete when:
+Selecting a date always shows data
+Sync button is optional, not required
+No 500 errors anywhere
+Warnings explain missing data clearly
+Daily Sales totals and POS totals visibly reconcile
+Page never blocks the user
+🔒 FINAL LOCK STATEMENT
+Sales & Shift Analysis is financial infrastructure, not a feature.
+It must be:
+Automatic
+Defensive
+Predictable
+Boring
+Fix the contract.
+Then we polish UI.
