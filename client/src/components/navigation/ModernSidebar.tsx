@@ -36,13 +36,16 @@ type NavGroup = {
 };
 
 /**
- * Navigation cleanup — no logic changes
+ * PHASE L — Navigation & Ownership Reset
  * 
- * CANONICAL STRUCTURE:
- * - Purchasing: Header only, contains Purchasing List, Purchasing Log, Shopping List
- * - Menu Management: Recipe Management (editable), Menu Manager only
- * - Analysis: Includes Daily Summary Reports
- * - Ingredients Master: Removed from sidebar (accessible via internal links only)
+ * CANONICAL OWNERSHIP:
+ * - PURCHASING = items & stock (Purchasing List, Purchasing Log, Manual Stock Purchase)
+ * - FINANCE = money only (Expenses, Profit & Loss)
+ * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
+ * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
+ * 
+ * HIDDEN from sidebar (routes still accessible directly with read-only banner):
+ * - F&B Analysis, Shopping List, Menu Master V3, Menu Admin, Daily Summary Reports
  */
 const navigationGroups: NavGroup[] = [
   {
@@ -82,7 +85,6 @@ const navigationGroups: NavGroup[] = [
     items: [
       { to: "/operations/purchasing", label: "Purchasing List", icon: ShoppingCart, testId: "nav-purchasing-list" },
       { to: "/operations/purchasing-shift-log", label: "Purchasing Log", icon: Package, testId: "nav-purchasing-log" },
-      { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
       { to: "/operations/manual-stock-purchase", label: "Manual Stock Purchase", icon: Package, testId: "nav-manual-stock-purchase" }
     ]
   },
@@ -91,16 +93,14 @@ const navigationGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" },
-      { to: "/operations/analysis/shift-items", label: "F&B Analysis", icon: BarChart3, testId: "nav-shift-analytics-mm" },
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
-      { to: "/operations/daily-reports", label: "Daily Summary Reports", icon: BarChart3, testId: "nav-daily-reports" }
+      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" }
     ]
   },
   {
     title: "Finance",
     items: [
-      { to: "/finance/profit-loss", label: "Profit & Loss", icon: Calculator, testId: "nav-profit-loss" },
-      { to: "/finance/expenses", label: "Expenses", icon: Calculator, testId: "nav-expenses" }
+      { to: "/finance/expenses", label: "Expenses", icon: Calculator, testId: "nav-expenses" },
+      { to: "/finance/profit-loss", label: "Profit & Loss", icon: Calculator, testId: "nav-profit-loss" }
     ]
   },
   {
@@ -110,28 +110,19 @@ const navigationGroups: NavGroup[] = [
       { to: "/menu/manager", label: "Menu Manager", icon: ChefHat, testId: "nav-menu-manager" }
     ]
   },
-  // {
-  //   title: "AI Assistants",
-  //   items: [
-  //     { to: "/ai/jussi-ops", label: "Jussi (Operations)", icon: Bot, testId: "nav-jussi" },
-  //     { to: "/ai/jane-accounts", label: "Jane (Accounting)", icon: Bot, testId: "nav-jane" }
-  //   ]
-  // },
   {
     title: "POS & Kitchen",
     defaultOpen: true,
     items: [
       { to: "/pos", label: "POS Terminal", icon: Receipt, testId: "nav-pos" },
-      { to: "/kds", label: "Kitchen Display", icon: ChefHat, testId: "nav-kds" },
-      { to: "/menu-v3", label: "Menu Master V3", icon: Settings, testId: "nav-menu-v3" }
+      { to: "/kds", label: "Kitchen Display", icon: ChefHat, testId: "nav-kds" }
     ]
   },
   {
     title: "Sales & Ordering",
     defaultOpen: true,
     items: [
-      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" },
-      { to: "/marketing/menu-admin", label: "Menu Admin", icon: Settings, testId: "nav-menu-admin" }
+      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" }
     ]
   },
   {

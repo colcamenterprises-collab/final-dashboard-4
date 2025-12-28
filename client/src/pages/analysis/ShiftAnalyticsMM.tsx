@@ -1,7 +1,27 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { formatDateDDMMYYYY } from '@/lib/format';
-import { Pencil, Save, X } from 'lucide-react';
+import { Pencil, Save, X, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
+
+// PHASE L: Read-only deprecation banner for hidden pages
+function DeprecationBanner() {
+  return (
+    <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
+      <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+      <div>
+        <p className="text-amber-800 font-medium">This page has been moved</p>
+        <p className="text-amber-700 text-sm mt-1">
+          F&B Analysis is now available under{' '}
+          <Link to="/analysis/ingredient-reconciliation" className="text-blue-600 underline hover:text-blue-800">
+            Ingredient Reconciliation
+          </Link>
+          {' '}in the Analysis section.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 type ShiftItem = {
   sku: string | null;
@@ -301,6 +321,7 @@ export default function ShiftAnalyticsMM() {
 
   return (
     <div className="p-4">
+      <DeprecationBanner />
       <h1 className="text-3xl font-extrabold">F&B Analysis</h1>
       <div className="text-sm text-slate-600">Window: 5 PM → 3 AM (Bangkok)
         <span className="ml-2 inline-block rounded bg-emerald-100 text-emerald-800 px-2 py-0.5">

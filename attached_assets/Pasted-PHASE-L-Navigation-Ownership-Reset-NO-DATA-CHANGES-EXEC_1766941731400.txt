@@ -1,0 +1,93 @@
+PHASE L — Navigation & Ownership Reset (NO DATA CHANGES)
+EXECUTION MODE: READ / HIDE / REDIRECT ONLY
+ABSOLUTE RULES
+❌ DO NOT change schemas
+❌ DO NOT change data, calculations, or analysis logic
+❌ DO NOT add features
+❌ DO NOT delete routes or files
+✅ ONLY update sidebar navigation, labels, visibility, and redirects
+✅ HIDE ≠ DELETE (routes must remain accessible if directly visited)
+🎯 OBJECTIVE
+Restore clarity, ownership, and trust in the UI by enforcing one clear home per responsibility.
+The system already has repaired truth (K-phases).
+Phase L fixes how humans experience the system.
+🧭 CANONICAL OWNERSHIP (LOCK THIS IN)
+PURCHASING = items & stock
+Purchasing List
+Purchasing Log
+Manual Stock Purchase
+FINANCE = money only
+Expenses (financial only)
+Profit & Loss
+ANALYSIS = insight
+Ingredient Reconciliation
+Sales & Shift Analysis
+MENU MANAGEMENT = sellables
+Recipe Management
+Menu Manager
+🧹 SIDEBAR CHANGES (MANDATORY)
+1️⃣ PURCHASING (header only)
+Visible pages
+/operations/purchasing → Purchasing List
+/operations/purchasing-log → Purchasing Log
+/operations/manual-stock-purchase → Manual Stock Purchase
+REMOVE from Finance
+❌ “Lodge Stock Purchase”
+❌ Any stock / item-based modals or links
+2️⃣ FINANCE
+Visible pages
+/finance/expenses → Expenses (money only)
+/finance/pnl → Profit & Loss
+HIDE
+❌ Any item-based purchasing flows
+❌ Any stock quantity entry
+Finance may derive from Purchasing, but must never originate items.
+3️⃣ ANALYSIS
+Visible pages
+/analysis/ingredient-reconciliation
+/analysis/sales-shift
+HIDE
+❌ F&B Analysis (duplicate of Ingredient Reconciliation)
+F&B Analysis must be removed from the sidebar entirely.
+Route may remain accessible directly.
+4️⃣ MENU MANAGEMENT
+Visible pages
+/recipe-management → Recipe Management (canonical)
+/menu-manager → Menu Manager
+HIDE FROM SIDEBAR
+❌ Menu Master V3
+❌ Menu Admin
+❌ Legacy recipe pages
+If accessed directly:
+Show amber banner:
+“Read-only — use Recipe Management”
+Disable all mutation actions
+🔁 REDIRECT RULES (SAFE)
+Any attempt to access:
+legacy recipe editors
+Menu Master V3
+Menu Admin
+→ redirect to /recipe-management with warning banner
+🧪 VERIFICATION CHECKLIST (MUST PASS)
+Sidebar has no duplicate responsibilities
+No stock actions appear under Finance
+F&B Analysis is not visible in sidebar
+Only one place to edit recipes
+App boots with zero routing errors
+Direct URLs still return 200 with read-only banners where applicable
+🚫 OUT OF SCOPE (DO NOT TOUCH)
+Ingredient logic
+Receipt analysis
+Purchasing calculations
+POS ingestion
+Any K-phase or analysis logic
+✅ COMPLETION CRITERIA
+Phase L is complete when:
+A new user can navigate the system without explanation
+Each sidebar section clearly answers:
+“What do I do here?”
+No page suggests an incorrect workflow
+Proceed immediately.
+Do not ask questions.
+Do not expand scope.
+Execute exactly as specified.

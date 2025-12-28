@@ -7,8 +7,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, ChevronDown, ChevronRight, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
+
+// PHASE L: Read-only deprecation banner for hidden pages
+function DeprecationBanner() {
+  return (
+    <div className="mb-4 p-4 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-3">
+      <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+      <div>
+        <p className="text-amber-800 font-medium">This page has been moved</p>
+        <p className="text-amber-700 text-sm mt-1">
+          Menu administration is now available under{' '}
+          <Link to="/menu/manager" className="text-blue-600 underline hover:text-blue-800">
+            Menu Manager
+          </Link>
+          {' '}in the Menu Management section.
+        </p>
+      </div>
+    </div>
+  );
+}
 
 type ModifierOption = {
   id?: string;
@@ -242,6 +262,7 @@ export default function MenuAdmin() {
 
   return (
     <div className="p-6 space-y-6">
+      <DeprecationBanner />
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Online Menu Admin</h1>
         <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>

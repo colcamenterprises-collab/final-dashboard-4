@@ -1,0 +1,117 @@
+🔒 PHASE L — NAVIGATION & OWNERSHIP LOCKDOWN
+DO NOT ADD FEATURES. DO NOT TOUCH BUSINESS LOGIC. DO NOT MODIFY DATABASE SCHEMA.
+This patch is UI + routing only.
+Goal: Make the UI tell the truth about the system.
+🎯 OBJECTIVE
+Eliminate confusion by enforcing canonical ownership in the sidebar and navigation.
+After this patch:
+Every visible menu item has one clear owner
+Legacy / duplicate systems are hidden, not deleted
+Users can tell where to go without prior knowledge
+🚫 ABSOLUTE RULES
+The agent MUST NOT:
+Add new pages
+Add new logic
+Change backend behavior
+Change APIs or schemas
+Re-architect anything
+This is REMOVE / HIDE / RENAME / LOCK ONLY.
+✅ REQUIRED OUTCOMES (NON-NEGOTIABLE)
+1️⃣ PURCHASING OWNS ALL STOCK (VISUALLY)
+REMOVE from Finance
+❌ “Lodge Stock Purchase”
+❌ Any UI text implying items/quantities belong to Finance
+Finance = numbers only
+ENSURE under Purchasing
+✅ Purchasing List
+✅ Manual Stock Purchase
+✅ Purchasing Log (rename from “Shift Log” if still present)
+✅ Shopping List
+Action
+Update sidebar config (ModernSidebar.tsx, Sidebar.tsx)
+Remove stock-related navigation from Finance
+Ensure Purchasing section contains all stock workflows
+2️⃣ REMOVE F&B ANALYSIS FROM NAVIGATION
+Context
+F&B Analysis duplicates Ingredient Reconciliation
+Ingredient Reconciliation is the truth view
+Actions
+❌ Remove “F&B Analysis” from sidebar navigation
+❌ Remove any submenu references
+DO NOT delete the page
+Page may remain accessible by direct URL
+This is a visibility lock, not a deletion
+3️⃣ DECLARE ONE MENU AUTHORITY
+CANONICAL (VISIBLE)
+✅ Recipe Management
+✅ Menu Manager (only if still actively used)
+LEGACY (HIDDEN FROM SIDEBAR)
+❌ Menu Master V3
+❌ Menu Admin
+Actions
+Remove legacy menu tools from sidebar
+If accessed directly:
+Show read-only banner (already exists)
+Do NOT block access
+Sidebar must show one menu entry point only
+4️⃣ REMOVE INGREDIENT MASTER FROM SIDEBAR
+Rule
+Ingredients are derived from Purchasing, not a standalone system.
+Actions
+❌ Remove “Ingredient Master / Ingredient Mgmt” from sidebar
+Ingredients remain accessible only via:
+Purchasing List
+Recipe Management flows
+5️⃣ FINAL SIDEBAR STRUCTURE (MUST MATCH EXACTLY)
+After this patch, the sidebar must read:
+Copy code
+
+OPERATIONS
+- Daily Sales & Stock
+- System Health Test
+- Health & Safety Audit
+
+PURCHASING
+- Purchasing List
+- Manual Stock Purchase
+- Purchasing Log
+- Shopping List
+
+ANALYSIS
+- Sales & Shift Analysis
+- Ingredient Reconciliation
+- Daily Summary Reports
+
+FINANCE
+- Profit & Loss
+- Expenses
+
+MENU
+- Recipe Management
+- Menu Manager
+No additional items.
+No duplicates.
+No legacy tools visible.
+6️⃣ GUARD & ROUTING CONSISTENCY CHECK
+Ensure all visible routes:
+Exist in RouteRegistry
+Pass Guard validation
+Hidden routes may remain registered
+No 404s introduced by this patch
+🧪 VERIFICATION CHECKLIST (AGENT MUST CONFIRM)
+Before marking complete, verify:
+Sidebar matches structure exactly
+No stock actions appear under Finance
+No F&B Analysis visible in navigation
+Only one menu management area visible
+App boots cleanly
+No API or data changes detected
+🧾 COMMIT MESSAGE
+Copy code
+
+PHASE L — Navigation & Ownership Lockdown (UI only)
+🛑 STOP CONDITION
+Once complete:
+STOP
+Do NOT continue to Phase M or UI polish
+Await next task
