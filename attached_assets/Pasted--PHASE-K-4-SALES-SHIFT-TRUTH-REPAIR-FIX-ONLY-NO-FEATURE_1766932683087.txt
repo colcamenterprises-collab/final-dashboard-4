@@ -1,0 +1,117 @@
+🔧 PHASE K-4 — SALES & SHIFT TRUTH REPAIR
+(FIX ONLY — NO FEATURES, NO REDESIGN)
+🎯 Objective
+Make Sales & Shift Analysis truthful and usable by fixing write paths, POS receipt evidence, availability logic, and date binding.
+After this patch, selecting a date shows real data, not false “missing” states.
+🚫 ABSOLUTE RULES
+❌ No new UI features
+❌ No schema redesign
+❌ No analytics additions
+❌ No strategy changes
+✅ Fix correctness only
+✅ Preserve existing UX
+✅ REQUIRED FIXES (ALL MUST BE DONE)
+K-4.1 — WRITE shift_date ON DAILY SALES V2 (CRITICAL)
+Problem:
+daily_sales_v2.shift_date is NULL → analysis cannot see form data.
+Fix:
+When creating Daily Sales V2, always populate shift_date (DATE).
+Rules:
+Derive from business window 17:00 → 03:00
+Same logic used everywhere else
+Use DATE type (not string)
+Files to update:
+server/forms/dailySalesV2.ts
+Result:
+Sales & Shift Analysis can finally “see” Daily Sales
+False “missing form” states eliminated
+K-4.2 — FIX POS RECEIPT COUNT (EVIDENCE)
+Problem:
+pos_shift_report.receiptCount is hardcoded to 0.
+Fix:
+Derive receipt count from pos_receipt table per business date and store it.
+Rules:
+Count receipts by business date window
+Persist real count to pos_shift_report.receiptCount
+Do NOT infer from sales totals
+Files to update:
+server/services/loyverseIngest.ts
+Result:
+POS becomes a verifiable witness
+Receipt evidence exists
+K-4.3 — USE RECEIPT COUNT IN AVAILABILITY LOGIC
+Problem:
+Availability ignores receipts entirely.
+Fix:
+Availability logic must consider:
+POS exists if receiptCount > 0
+Form exists if daily_sales_v2.shift_date exists
+Truth Table (MANDATORY):
+POS Receipts
+Daily Sales
+Status
+✅
+✅
+OK
+✅
+❌
+Missing Form
+❌
+✅
+Missing POS
+❌
+❌
+Missing Both
+Files to update:
+server/routes/analysisDailyReview.ts
+Result:
+“Missing” now means something real
+No more false accusations
+K-4.4 — BIND BOTTOM TABLE TO DATE SELECTION
+Problem:
+“All Shifts Data” ignores selected date/month.
+Fix:
+Refetch /api/analysis/daily-sales whenever:
+selected date changes
+selected month changes
+Rules:
+No UI redesign
+No pagination changes
+Just bind query to date/month
+Files to update:
+client/src/pages/analysis/DailyReview.tsx
+Result:
+Dates actually change data
+Managers trust what they see
+K-4.5 — DEFENSIVE GUARANTEE
+Rules:
+No endpoint may return 500
+Return { status, message, data }
+Log [SAFE_FALLBACK_USED] if data missing
+Files to verify:
+analysisDailyReview.ts
+dailySalesV2.ts
+POS ingest services
+🧪 VERIFICATION (MANDATORY)
+After patch:
+Pick a date with known data
+→ Sales & Shift Analysis shows values
+Receipts > 0 + Daily Sales exists
+→ Status = OK
+Bottom table changes when date changes
+No “missing both” when data exists
+No 500s anywhere
+🛑 DO NOT
+Do NOT add buttons
+Do NOT add charts
+Do NOT rename fields
+Do NOT touch navigation
+Do NOT touch Purchasing or Ingredients
+✅ SUCCESS CRITERIA
+One date → one truth
+Receipts are visible to logic
+Cashier audits become possible
+Trust restored
+Proceed immediately.
+No questions.
+Deliver as one patch.

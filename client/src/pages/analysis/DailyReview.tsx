@@ -196,9 +196,14 @@ export default function DailyReview() {
     sales?: number;
   } | null>(null);
 
-  // Query for Daily Sales table data
+  // K-4.4: Query for Daily Sales table data - binds to selected month
   const { data: dailySalesRows = [], isLoading: isDailySalesLoading } = useQuery<DailySalesRow[]>({
-    queryKey: ['/api/analysis/daily-sales'],
+    queryKey: ['/api/analysis/daily-sales', month],
+    queryFn: async () => {
+      const r = await fetch(`/api/analysis/daily-sales?month=${month}`);
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    },
   });
 
   async function fetchJSON(url: string, init?: RequestInit) {

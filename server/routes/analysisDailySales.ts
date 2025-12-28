@@ -26,15 +26,38 @@ interface DailySalesRow {
 
 router.get("/", async (req: Request, res: Response) => {
   try {
-    const result = await pool.query(`
-      SELECT 
-        id,
-        "shiftDate" as shift_date,
-        "completedBy" as completed_by,
-        payload
-      FROM daily_sales_v2
-      ORDER BY "shiftDate" DESC
-    `);
+    // K-4.4: Accept month parameter to filter by selected month
+    const month = req.query.month as string | undefined;
+    
+    let result;
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+      // Filter by month (YYYY-MM)
+      const startDate = `${month}-01`;
+      const [year, mon] = month.split('-').map(Number);
+      const endDate = new Date(year, mon, 0).toISOString().split('T')[0]; // Last day of month
+      
+      result = await pool.query(`
+        SELECT 
+          id,
+          "shiftDate" as shift_date,
+          "completedBy" as completed_by,
+          payload
+        FROM daily_sales_v2
+        WHERE "shiftDate" >= $1 AND "shiftDate" <= $2
+        ORDER BY "shiftDate" DESC
+      `, [startDate, endDate]);
+    } else {
+      // Return all data (backwards compatible)
+      result = await pool.query(`
+        SELECT 
+          id,
+          "shiftDate" as shift_date,
+          "completedBy" as completed_by,
+          payload
+        FROM daily_sales_v2
+        ORDER BY "shiftDate" DESC
+      `);
+    }
 
     const rows: DailySalesRow[] = result.rows.map((row: any) => {
       const p = row.payload || {};

@@ -269,6 +269,23 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
   }
   console.log(`   Expenses: Shopping=${expenses.shopping}, Wages=${expenses.wages}, Other=${expenses.other}`);
 
+  // K-4.2: Count receipts from lv_receipt table for this shift window
+  // Bangkok shift: 17:00 → 03:00+1 = UTC 10:00 → 20:00
+  let receiptCount = 0;
+  try {
+    const fromDate = new Date(startUtc);
+    const toDate = new Date(endUtc);
+    const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint as count 
+      FROM lv_receipt 
+      WHERE datetime_bkk >= ${fromDate}::timestamptz 
+        AND datetime_bkk < ${toDate}::timestamptz`;
+    receiptCount = Number(countResult[0]?.count ?? 0);
+    console.log(`   🧾 Receipt count from lv_receipt: ${receiptCount}`);
+  } catch (err: any) {
+    console.warn(`   ⚠️  Could not count receipts: ${err.message}`);
+  }
+
   const businessDateObj = new Date(businessDate + 'T00:00:00Z');
   const batchId = `LOYVERSE_${businessDate}_${storeId}`;
 
@@ -298,7 +315,7 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       cashSales: totals.cash,
       qrSales: totals.qr,
       otherSales: totals.other,
-      receiptCount: 0,
+      receiptCount,  // K-4.2: Real count from lv_receipt
       openedAt: new Date(shift.opened_at),
       closedAt: shift.closed_at ? new Date(shift.closed_at) : new Date(endUtc),
       shoppingTotal: expenses.shopping,
@@ -325,7 +342,7 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
       cashSales: totals.cash,
       qrSales: totals.qr,
       otherSales: totals.other,
-      receiptCount: 0,
+      receiptCount,  // K-4.2: Real count from lv_receipt
       openedAt: new Date(shift.opened_at),
       closedAt: shift.closed_at ? new Date(shift.closed_at) : new Date(endUtc),
     },
