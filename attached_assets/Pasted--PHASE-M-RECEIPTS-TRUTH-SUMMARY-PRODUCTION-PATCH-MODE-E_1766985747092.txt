@@ -1,0 +1,150 @@
+🔴 PHASE M — RECEIPTS TRUTH SUMMARY (PRODUCTION PATCH)
+MODE: EXECUTE IMMEDIATELY
+PRIORITY: CRITICAL
+SCOPE: BACKEND + MINIMAL UI (NEW PAGE ONLY)
+GOAL: Receipts are the truth. This page proves it.
+🎯 OBJECTIVE
+Create a Receipts Summary system that:
+Summarises every receipt for a business date
+Shows exactly what was sold
+Stores a locked daily batch summary
+Feeds all analysis, reconciliation, and audits
+Makes missing data visible immediately
+If numbers are wrong anywhere else, this page is where the error lives.
+🚫 ABSOLUTE RULES
+❌ Do NOT modify Daily Sales, Purchasing, Recipes, POS ingestion
+❌ Do NOT infer, estimate, or “fix” data
+❌ Do NOT hide missing data
+❌ Do NOT change existing pages
+✅ ADD new tables
+✅ ADD new services
+✅ ADD new API routes
+✅ ADD one new Analysis page
+🧱 PHASE M1 — DATABASE (ADD ONLY)
+1️⃣ receipt_batch_summary
+Copy code
+Sql
+CREATE TABLE receipt_batch_summary (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_date DATE NOT NULL UNIQUE,
+  shift_start TIMESTAMP NOT NULL,
+  shift_end TIMESTAMP NOT NULL,
+
+  receipt_count INTEGER NOT NULL,
+  line_item_count INTEGER NOT NULL,
+
+  gross_sales NUMERIC NOT NULL,
+  net_sales NUMERIC NOT NULL,
+
+  created_at TIMESTAMP DEFAULT now()
+);
+2️⃣ receipt_batch_items
+Copy code
+Sql
+CREATE TABLE receipt_batch_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  batch_id UUID REFERENCES receipt_batch_summary(id) ON DELETE CASCADE,
+
+  category TEXT,
+  sku TEXT,
+  item_name TEXT,
+  modifiers TEXT,
+
+  quantity NUMERIC NOT NULL,
+  gross_sales NUMERIC NOT NULL,
+  net_sales NUMERIC NOT NULL
+);
+⚙️ PHASE M2 — BACKEND SERVICE
+Create:
+Copy code
+
+server/services/receiptBatchSummary.ts
+Execution logic (STRICT):
+Resolve business date → 18:00 → 03:00
+Query lv_receipt + receipt line items
+If 0 receipts → THROW ERROR
+Aggregate:
+Total receipts
+Total line items
+Gross / net sales
+Item + modifier rollups
+Delete existing batch for that date
+Insert fresh batch + items
+Return summary
+❗ NO fallback. NO silent success.
+🌐 PHASE M3 — API ROUTES
+Add:
+🔁 Rebuild batch
+Copy code
+
+POST /api/analysis/receipts/rebuild
+Body: { business_date: "YYYY-MM-DD" }
+Deletes existing batch
+Recomputes from receipts
+Fails loudly if receipts missing
+📊 Get batch summary
+Copy code
+
+GET /api/analysis/receipts/summary?date=YYYY-MM-DD
+Returns:
+Copy code
+Json
+{
+  "business_date": "2025-12-13",
+  "receipt_count": 87,
+  "line_item_count": 143,
+  "gross_sales": 15420,
+  "net_sales": 14890,
+  "items": [
+    {
+      "category": "Smash Burgers",
+      "item": "Single Smash Burger",
+      "modifiers": "No Pickles, Extra Cheese",
+      "quantity": 19,
+      "gross_sales": 3230
+    }
+  ]
+}
+🧩 PHASE M4 — UI PAGE (MINIMAL, READ-ONLY)
+Route
+Copy code
+
+/analysis/receipts
+Sidebar
+Add under ANALYSIS:
+Copy code
+
+Receipts (Truth)
+Page Layout (NO DESIGN EXPERIMENTS)
+Header
+Business Date selector
+Receipt count
+Gross / Net sales
+“Rebuild from Receipts” button
+Table
+Category
+Item
+Modifiers
+Quantity
+Gross sales
+Banner Logic
+❌ If no batch → RED banner:
+“NO RECEIPT BATCH — TRUTH MISSING”
+❌ If rebuild fails → RED banner with error
+✅ If exists → GREEN:
+“Receipt truth confirmed”
+🔐 PHASE M5 — OWNERSHIP RULE
+Add inline note (top of page):
+Receipts are the single source of truth.
+All sales, stock, and ingredient analysis must reconcile to this page.
+✅ ACCEPTANCE CRITERIA (NON-NEGOTIABLE)
+[ ] Batch rebuild works for historical dates
+[ ] Receipt count matches Loyverse export (like the file Cam provided)
+[ ] Item quantities match raw receipt data
+[ ] Missing receipts are visible immediately
+[ ] No other system modified
+[ ] No UI regressions
+🧠 FINAL NOTE TO AGENT
+If receipt numbers do not match POS exports, STOP and report.
+Do not “fix” downstream systems.
+Truth lives here.

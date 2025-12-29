@@ -1781,3 +1781,41 @@ export const ingredientUsage = pgTable('ingredient_usage', {
 
 export type IngredientUsage = typeof ingredientUsage.$inferSelect;
 export type InsertIngredientUsage = typeof ingredientUsage.$inferInsert;
+
+// -----------------------------------------------------------------------------
+// 🔒 PHASE M — RECEIPT BATCH SUMMARY (TRUTH SOURCE)
+// Receipts are the single source of truth for all sales data.
+// All analysis, reconciliation, and audits must reconcile to this.
+// -----------------------------------------------------------------------------
+
+export const receiptBatchSummary = pgTable('receipt_batch_summary', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  businessDate: date('business_date').notNull().unique(),
+  shiftStart: timestamp('shift_start').notNull(),
+  shiftEnd: timestamp('shift_end').notNull(),
+  receiptCount: integer('receipt_count').notNull(),
+  lineItemCount: integer('line_item_count').notNull(),
+  grossSales: decimal('gross_sales', { precision: 12, scale: 2 }).notNull(),
+  netSales: decimal('net_sales', { precision: 12, scale: 2 }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const receiptBatchItems = pgTable('receipt_batch_items', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  batchId: uuid('batch_id').notNull().references(() => receiptBatchSummary.id, { onDelete: 'cascade' }),
+  category: text('category'),
+  sku: text('sku'),
+  itemName: text('item_name'),
+  modifiers: text('modifiers'),
+  quantity: decimal('quantity', { precision: 10, scale: 2 }).notNull(),
+  grossSales: decimal('gross_sales', { precision: 12, scale: 2 }).notNull(),
+  netSales: decimal('net_sales', { precision: 12, scale: 2 }).notNull(),
+});
+
+export const insertReceiptBatchSummarySchema = createInsertSchema(receiptBatchSummary).omit({ id: true, createdAt: true });
+export const insertReceiptBatchItemsSchema = createInsertSchema(receiptBatchItems).omit({ id: true });
+
+export type ReceiptBatchSummary = typeof receiptBatchSummary.$inferSelect;
+export type InsertReceiptBatchSummary = z.infer<typeof insertReceiptBatchSummarySchema>;
+export type ReceiptBatchItems = typeof receiptBatchItems.$inferSelect;
+export type InsertReceiptBatchItems = z.infer<typeof insertReceiptBatchItemsSchema>;
