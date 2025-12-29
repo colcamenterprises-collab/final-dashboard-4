@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RefreshCw, AlertTriangle, CheckCircle2, Info, Receipt } from "lucide-react";
+import { RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface BatchItem {
@@ -76,29 +76,23 @@ export default function ReceiptsTruth() {
 
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
-      <div className="flex items-center gap-3">
-        <Receipt className="h-8 w-8 text-emerald-600" />
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Receipts (Truth)
-        </h1>
-      </div>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+        Receipts
+      </h1>
 
-      <Card className="border-slate-200 dark:border-slate-700 rounded-[4px]">
+      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-[4px]">
         <CardContent className="p-4">
-          <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-slate-600 dark:text-slate-300">
-              <strong className="text-gray-900 dark:text-white">Receipts are the single source of truth.</strong>
-              <br />
-              All sales, stock, and ingredient analysis must reconcile to this page.
-              <br />
-              <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 17:00-03:00 Bangkok</span>
-            </div>
+          <div className="text-sm text-slate-600 dark:text-slate-300">
+            <strong className="text-gray-900 dark:text-white">Receipts are the single source of truth.</strong>
+            <br />
+            All sales, stock, and ingredient analysis must reconcile to this page.
+            <br />
+            <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 17:00-03:00 Bangkok</span>
           </div>
         </CardContent>
       </Card>
 
-      <Card className="rounded-[4px]">
+      <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-gray-900 dark:text-white">
             Batch Summary
@@ -171,7 +165,7 @@ export default function ReceiptsTruth() {
       {hasBatch && data && (
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-            <Card className="rounded-[4px]">
+            <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">All Receipts</div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-all-receipts">
@@ -179,7 +173,7 @@ export default function ReceiptsTruth() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="rounded-[4px]">
+            <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Sales</div>
                 <div className="text-2xl font-bold text-emerald-600" data-testid="text-sales-count">
@@ -187,7 +181,7 @@ export default function ReceiptsTruth() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="rounded-[4px]">
+            <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Refunds</div>
                 <div className="text-2xl font-bold text-red-600" data-testid="text-refund-count">
@@ -195,7 +189,7 @@ export default function ReceiptsTruth() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="rounded-[4px]">
+            <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Gross Sales</div>
                 <div className="text-2xl font-bold text-emerald-600" data-testid="text-gross-sales">
@@ -204,7 +198,7 @@ export default function ReceiptsTruth() {
                 <div className="text-xs text-slate-500">raw_json.total_money</div>
               </CardContent>
             </Card>
-            <Card className="rounded-[4px]">
+            <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Discounts</div>
                 <div className="text-2xl font-bold text-amber-600" data-testid="text-discounts">
@@ -213,7 +207,7 @@ export default function ReceiptsTruth() {
                 <div className="text-xs text-slate-500">raw_json.total_discount</div>
               </CardContent>
             </Card>
-            <Card className="rounded-[4px]">
+            <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Refund Amount</div>
                 <div className="text-2xl font-bold text-red-600" data-testid="text-refund-amount">
@@ -222,7 +216,7 @@ export default function ReceiptsTruth() {
                 <div className="text-xs text-slate-500">raw_json.total_money (refunds)</div>
               </CardContent>
             </Card>
-            <Card className="rounded-[4px]">
+            <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Net Sales</div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-net-sales">
@@ -233,7 +227,7 @@ export default function ReceiptsTruth() {
             </Card>
           </div>
 
-          <Card className="rounded-[4px]">
+          <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg text-gray-900 dark:text-white">
                 Items Sold ({data.lineItemCount} line items)
