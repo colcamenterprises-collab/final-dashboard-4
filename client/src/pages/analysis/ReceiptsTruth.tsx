@@ -90,7 +90,7 @@ export default function ReceiptsTruth() {
               <br />
               All sales, stock, and ingredient analysis must reconcile to this page.
               <br />
-              <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 18:00-03:00 Bangkok</span>
+              <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 17:00-03:00 Bangkok</span>
             </div>
           </div>
         </CardContent>

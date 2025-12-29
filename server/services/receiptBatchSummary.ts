@@ -29,9 +29,9 @@ interface BatchSummaryResult {
 function getShiftWindow(businessDate: string): { start: Date; end: Date } {
   const [year, month, day] = businessDate.split('-').map(Number);
   // Bangkok is UTC+7
-  // 18:00 Bangkok = 11:00 UTC same day
+  // 17:00 Bangkok = 10:00 UTC same day
   // 03:00 Bangkok next day = 20:00 UTC same day
-  const start = new Date(Date.UTC(year, month - 1, day, 11, 0, 0));
+  const start = new Date(Date.UTC(year, month - 1, day, 10, 0, 0));
   const end = new Date(Date.UTC(year, month - 1, day, 20, 0, 0));
   return { start, end };
 }
@@ -43,7 +43,7 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
 
   const { start, end } = getShiftWindow(businessDate);
   console.log(`[ReceiptBatch] Rebuilding for ${businessDate}`);
-  console.log(`[ReceiptBatch] Shift window: ${start.toISOString()} to ${end.toISOString()} (18:00-03:00 Bangkok)`);
+  console.log(`[ReceiptBatch] Shift window: ${start.toISOString()} to ${end.toISOString()} (17:00-03:00 Bangkok)`);
 
   // Step 1: Get receipt-level totals from raw_json (THE SOURCE OF TRUTH)
   const receiptTotalsResult = await db.execute(sql`
