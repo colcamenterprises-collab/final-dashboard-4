@@ -16,18 +16,19 @@ interface BatchItem {
   quantity: number;
   grossSales: number;
   netSales: number;
+  isRefund?: boolean;
 }
 
 interface BatchSummary {
   ok: boolean;
   hasBatch: boolean;
   businessDate: string;
-  receiptCount: number;
+  allReceipts: number;
+  salesCount: number;
   refundCount: number;
   lineItemCount: number;
   grossSales: number;
-  totalDiscounts: number;
-  totalRefunds: number;
+  discounts: number;
   netSales: number;
   items: BatchItem[];
   error?: string;
@@ -90,7 +91,7 @@ export default function ReceiptsTruth() {
               <br />
               All sales, stock, and ingredient analysis must reconcile to this page.
               <br />
-              <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 17:00-03:00 Bangkok</span>
+              <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 18:00-03:00 Bangkok</span>
             </div>
           </div>
         </CardContent>
@@ -168,20 +169,28 @@ export default function ReceiptsTruth() {
 
       {hasBatch && data && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-xs text-slate-600 dark:text-slate-400">Sales Receipts</div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-receipt-count">
-                  {data.receiptCount}
+                <div className="text-xs text-slate-600 dark:text-slate-400">All Receipts</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-all-receipts">
+                  {data.allReceipts}
                 </div>
               </CardContent>
             </Card>
             <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-xs text-slate-600 dark:text-slate-400">Refund Receipts</div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">Sales</div>
+                <div className="text-2xl font-bold text-emerald-600" data-testid="text-sales-count">
+                  {data.salesCount}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="rounded-[4px]">
+              <CardContent className="p-4">
+                <div className="text-xs text-slate-600 dark:text-slate-400">Refunds</div>
                 <div className="text-2xl font-bold text-red-600" data-testid="text-refund-count">
-                  {data.refundCount || 0}
+                  {data.refundCount}
                 </div>
               </CardContent>
             </Card>
@@ -191,22 +200,16 @@ export default function ReceiptsTruth() {
                 <div className="text-2xl font-bold text-emerald-600" data-testid="text-gross-sales">
                   {formatCurrency(Number(data.grossSales))}
                 </div>
+                <div className="text-xs text-slate-500">raw_json.total_money</div>
               </CardContent>
             </Card>
             <Card className="rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Discounts</div>
                 <div className="text-2xl font-bold text-amber-600" data-testid="text-discounts">
-                  {formatCurrency(Number(data.totalDiscounts || 0))}
+                  {formatCurrency(Number(data.discounts))}
                 </div>
-              </CardContent>
-            </Card>
-            <Card className="rounded-[4px]">
-              <CardContent className="p-4">
-                <div className="text-xs text-slate-600 dark:text-slate-400">Refunds</div>
-                <div className="text-2xl font-bold text-red-600" data-testid="text-refunds">
-                  {formatCurrency(Number(data.totalRefunds || 0))}
-                </div>
+                <div className="text-xs text-slate-500">raw_json.total_discount</div>
               </CardContent>
             </Card>
             <Card className="rounded-[4px]">
@@ -215,6 +218,7 @@ export default function ReceiptsTruth() {
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-net-sales">
                   {formatCurrency(Number(data.netSales))}
                 </div>
+                <div className="text-xs text-slate-500">calculated</div>
               </CardContent>
             </Card>
           </div>

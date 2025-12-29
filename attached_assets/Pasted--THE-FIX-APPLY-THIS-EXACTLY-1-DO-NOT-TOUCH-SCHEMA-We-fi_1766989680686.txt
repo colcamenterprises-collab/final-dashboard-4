@@ -1,0 +1,87 @@
+🩹 THE FIX (APPLY THIS EXACTLY)
+1️⃣ DO NOT TOUCH SCHEMA
+We fix logic only.
+2️⃣ Replace Receipt Summary Query (BACKEND)
+File:
+server/services/receiptBatchService.ts
+(or wherever Phase M summary is built)
+🔴 DELETE any line-item-derived totals
+✅ USE THIS QUERY (COPY–PASTE)
+Copy code
+Sql
+WITH receipts AS (
+  SELECT
+    id,
+    receipt_id,
+    datetime_bkk,
+    raw_json,
+    (raw_json->>'refund_for') IS NOT NULL AS is_refund,
+    (raw_json->>'total_money')::numeric AS total_money,
+    COALESCE((raw_json->>'total_discount')::numeric, 0) AS total_discount
+  FROM lv_receipt
+  WHERE datetime_bkk >= $1
+    AND datetime_bkk < $2
+)
+
+SELECT
+  COUNT(*)                                     AS all_receipts,
+  COUNT(*) FILTER (WHERE NOT is_refund)        AS sales_count,
+  COUNT(*) FILTER (WHERE is_refund)            AS refund_count,
+
+  SUM(total_money) FILTER (WHERE NOT is_refund) AS gross_sales,
+  SUM(total_discount)                           AS discounts,
+
+  SUM(total_money) FILTER (WHERE NOT is_refund)
+    - SUM(total_discount)                       AS net_sales
+FROM receipts;
+3️⃣ Shift Window (LOCK THIS IN)
+Bangkok business day = 18:00 → 03:00
+Copy code
+Ts
+// server/utils/shiftWindow.ts
+export function getShiftWindow(date: string) {
+  return {
+    start: `${date} 18:00:00+07`,
+    end:   `${date} 27:00:00+07` // == 03:00 next day
+  }
+}
+🚫 No UI date math
+🚫 No local browser timezone
+🚫 No guessing
+4️⃣ Expose ALL Receipt Counts (UI DATA CONTRACT)
+Your Receipts page MUST show:
+Field
+Source
+All Receipts
+COUNT(*)
+Sales
+refund_for IS NULL
+Refunds
+refund_for IS NOT NULL
+Gross Sales
+raw_json.total_money
+Discounts
+raw_json.total_discount
+Net Sales
+calculated
+If any other page disagrees → this page is law
+5️⃣ Refund Visibility (SECURITY REQUIREMENT)
+Refund receipts:
+❌ NOT deleted
+❌ NOT hidden
+❌ NOT merged
+✅ Listed separately
+✅ Counted
+✅ Auditable
+Add this flag to the item table:
+Copy code
+Sql
+(raw_json->>'refund_for') IS NOT NULL AS is_refund
+6️⃣ Hard Guardrail (FAIL LOUD)
+If this happens:
+Copy code
+Ts
+if (allReceipts === 0) {
+  throw new Error('[RECEIPTS_TRUTH] No receipts found for shift window')
+}
+No silent greens. No “looks fine”.

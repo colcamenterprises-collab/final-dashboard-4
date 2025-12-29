@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { receiptBatchSummary, receiptBatchItems } from '@shared/schema';
 import { eq, sql } from 'drizzle-orm';
+import { getShiftWindowUTC } from '../utils/shiftWindow';
 
 interface BatchItem {
   category: string | null;
@@ -10,30 +11,21 @@ interface BatchItem {
   quantity: number;
   grossSales: number;
   netSales: number;
+  isRefund: boolean;
 }
 
 interface BatchSummaryResult {
   businessDate: string;
   shiftStart: Date;
   shiftEnd: Date;
-  receiptCount: number;
+  allReceipts: number;
+  salesCount: number;
   refundCount: number;
   lineItemCount: number;
   grossSales: number;
-  totalDiscounts: number;
-  totalRefunds: number;
+  discounts: number;
   netSales: number;
   items: BatchItem[];
-}
-
-function getShiftWindow(businessDate: string): { start: Date; end: Date } {
-  const [year, month, day] = businessDate.split('-').map(Number);
-  // Bangkok is UTC+7
-  // 17:00 Bangkok = 10:00 UTC same day
-  // 03:00 Bangkok next day = 20:00 UTC same day
-  const start = new Date(Date.UTC(year, month - 1, day, 10, 0, 0));
-  const end = new Date(Date.UTC(year, month - 1, day, 20, 0, 0));
-  return { start, end };
 }
 
 export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSummaryResult> {
@@ -41,55 +33,62 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
     throw new Error('Invalid date format. Use YYYY-MM-DD');
   }
 
-  const { start, end } = getShiftWindow(businessDate);
+  const { start, end } = getShiftWindowUTC(businessDate);
   console.log(`[ReceiptBatch] Rebuilding for ${businessDate}`);
-  console.log(`[ReceiptBatch] Shift window: ${start.toISOString()} to ${end.toISOString()} (17:00-03:00 Bangkok)`);
+  console.log(`[ReceiptBatch] Shift window: ${start.toISOString()} to ${end.toISOString()} (18:00-03:00 Bangkok)`);
 
-  // Step 1: Get receipt-level totals from raw_json (THE SOURCE OF TRUTH)
-  const receiptTotalsResult = await db.execute(sql`
-    SELECT 
-      receipt_id,
-      datetime_bkk,
-      (raw_json->>'total_money')::numeric as gross_total,
-      COALESCE((raw_json->>'total_discount')::numeric, 0) as discount,
-      raw_json->>'refund_for' as refund_for,
-      raw_json->>'receipt_type' as receipt_type
+  const summaryResult = await db.execute(sql`
+    WITH receipts AS (
+      SELECT
+        receipt_id,
+        datetime_bkk,
+        raw_json,
+        (raw_json->>'refund_for') IS NOT NULL AS is_refund,
+        (raw_json->>'total_money')::numeric AS total_money,
+        COALESCE((raw_json->>'total_discount')::numeric, 0) AS total_discount
+      FROM lv_receipt
+      WHERE datetime_bkk >= ${start.toISOString()}::timestamptz
+        AND datetime_bkk < ${end.toISOString()}::timestamptz
+    )
+    SELECT
+      COUNT(*)::int                                      AS all_receipts,
+      COUNT(*) FILTER (WHERE NOT is_refund)::int         AS sales_count,
+      COUNT(*) FILTER (WHERE is_refund)::int             AS refund_count,
+      COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0) AS gross_sales,
+      COALESCE(SUM(total_discount), 0)                   AS discounts,
+      COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0)
+        - COALESCE(SUM(total_discount), 0)               AS net_sales
+    FROM receipts
+  `);
+
+  const summary = summaryResult.rows[0] as any;
+  const allReceipts = Number(summary?.all_receipts || 0);
+  const salesCount = Number(summary?.sales_count || 0);
+  const refundCount = Number(summary?.refund_count || 0);
+  const grossSales = Number(summary?.gross_sales || 0);
+  const discounts = Number(summary?.discounts || 0);
+  const netSales = Number(summary?.net_sales || 0);
+
+  if (allReceipts === 0) {
+    throw new Error(`[RECEIPTS_TRUTH] No receipts found for shift window ${businessDate} (${start.toISOString()} to ${end.toISOString()})`);
+  }
+
+  console.log(`[ReceiptBatch] All: ${allReceipts}, Sales: ${salesCount}, Refunds: ${refundCount}`);
+  console.log(`[ReceiptBatch] Gross: ${grossSales}, Discounts: ${discounts}, Net: ${netSales}`);
+
+  const salesReceiptsResult = await db.execute(sql`
+    SELECT receipt_id
     FROM lv_receipt
     WHERE datetime_bkk >= ${start.toISOString()}::timestamptz
       AND datetime_bkk < ${end.toISOString()}::timestamptz
-    ORDER BY datetime_bkk
+      AND (raw_json->>'refund_for') IS NULL
   `);
+  const salesReceiptIds = (salesReceiptsResult.rows as any[]).map(r => r.receipt_id);
 
-  const allReceipts = receiptTotalsResult.rows as any[];
-
-  if (allReceipts.length === 0) {
-    throw new Error(`NO RECEIPTS FOUND for ${businessDate} (${start.toISOString()} to ${end.toISOString()}). Cannot build truth batch.`);
-  }
-
-  // Separate sales from refunds
-  const salesReceipts = allReceipts.filter(r => !r.refund_for);
-  const refundReceipts = allReceipts.filter(r => r.refund_for);
-
-  const receiptCount = salesReceipts.length;
-  const refundCount = refundReceipts.length;
-
-  // Calculate totals from POS data
-  const grossSales = salesReceipts.reduce((sum, r) => sum + Number(r.gross_total || 0), 0);
-  const totalDiscounts = salesReceipts.reduce((sum, r) => sum + Number(r.discount || 0), 0);
-  const totalRefunds = refundReceipts.reduce((sum, r) => sum + Math.abs(Number(r.gross_total || 0)), 0);
-  const netSales = grossSales - totalDiscounts - totalRefunds;
-
-  console.log(`[ReceiptBatch] Receipts: ${receiptCount} sales, ${refundCount} refunds`);
-  console.log(`[ReceiptBatch] Gross: ${grossSales}, Discounts: ${totalDiscounts}, Refunds: ${totalRefunds}, Net: ${netSales}`);
-
-  // Step 2: Get line item breakdown for the items table
-  const salesReceiptIds = salesReceipts.map(r => r.receipt_id);
-  
   let items: BatchItem[] = [];
   let lineItemCount = 0;
 
   if (salesReceiptIds.length > 0) {
-    // Convert array to PostgreSQL array literal
     const idsLiteral = '{' + salesReceiptIds.map((id: string) => `"${id}"`).join(',') + '}';
     
     const lineItemsResult = await db.execute(sql`
@@ -112,7 +111,6 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
     const lineItems = lineItemsResult.rows as any[];
     lineItemCount = lineItems.length;
 
-    // Aggregate by item + modifiers
     const itemAggregates = new Map<string, BatchItem>();
 
     for (const row of lineItems) {
@@ -133,6 +131,7 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
           quantity: Number(row.qty),
           grossSales: lineTotal,
           netSales: lineTotal,
+          isRefund: false,
         });
       }
     }
@@ -142,14 +141,13 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
 
   console.log(`[ReceiptBatch] ${lineItemCount} line items, ${items.length} unique item variants`);
 
-  // Step 3: Store the batch
   await db.delete(receiptBatchSummary).where(eq(receiptBatchSummary.businessDate, businessDate));
 
   const [inserted] = await db.insert(receiptBatchSummary).values({
     businessDate,
     shiftStart: start,
     shiftEnd: end,
-    receiptCount,
+    receiptCount: salesCount,
     lineItemCount,
     grossSales: grossSales.toFixed(2),
     netSales: netSales.toFixed(2),
@@ -174,12 +172,12 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
     businessDate,
     shiftStart: start,
     shiftEnd: end,
-    receiptCount,
+    allReceipts,
+    salesCount,
     refundCount,
     lineItemCount,
     grossSales,
-    totalDiscounts,
-    totalRefunds,
+    discounts,
     netSales,
     items,
   };
@@ -197,35 +195,46 @@ export async function getReceiptBatchSummary(businessDate: string): Promise<Batc
     return null;
   }
 
-  const items = await db.select().from(receiptBatchItems)
-    .where(eq(receiptBatchItems.batchId, batch.id));
+  const { start, end } = getShiftWindowUTC(businessDate);
 
-  // Re-calculate refunds and discounts from raw data for display
-  const { start, end } = getShiftWindow(businessDate);
-  
-  const statsResult = await db.execute(sql`
-    SELECT 
-      COUNT(*) FILTER (WHERE raw_json->>'refund_for' IS NOT NULL) as refund_count,
-      COALESCE(SUM((raw_json->>'total_discount')::numeric) FILTER (WHERE raw_json->>'refund_for' IS NULL), 0) as total_discounts,
-      COALESCE(SUM(ABS((raw_json->>'total_money')::numeric)) FILTER (WHERE raw_json->>'refund_for' IS NOT NULL), 0) as total_refunds
-    FROM lv_receipt
-    WHERE datetime_bkk >= ${start.toISOString()}::timestamptz
-      AND datetime_bkk < ${end.toISOString()}::timestamptz
+  const summaryResult = await db.execute(sql`
+    WITH receipts AS (
+      SELECT
+        receipt_id,
+        (raw_json->>'refund_for') IS NOT NULL AS is_refund,
+        (raw_json->>'total_money')::numeric AS total_money,
+        COALESCE((raw_json->>'total_discount')::numeric, 0) AS total_discount
+      FROM lv_receipt
+      WHERE datetime_bkk >= ${start.toISOString()}::timestamptz
+        AND datetime_bkk < ${end.toISOString()}::timestamptz
+    )
+    SELECT
+      COUNT(*)::int                                      AS all_receipts,
+      COUNT(*) FILTER (WHERE NOT is_refund)::int         AS sales_count,
+      COUNT(*) FILTER (WHERE is_refund)::int             AS refund_count,
+      COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0) AS gross_sales,
+      COALESCE(SUM(total_discount), 0)                   AS discounts,
+      COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0)
+        - COALESCE(SUM(total_discount), 0)               AS net_sales
+    FROM receipts
   `);
 
-  const stats = statsResult.rows[0] as any;
+  const summary = summaryResult.rows[0] as any;
+
+  const items = await db.select().from(receiptBatchItems)
+    .where(eq(receiptBatchItems.batchId, batch.id));
 
   return {
     businessDate: batch.businessDate,
     shiftStart: batch.shiftStart,
     shiftEnd: batch.shiftEnd,
-    receiptCount: batch.receiptCount,
-    refundCount: Number(stats?.refund_count || 0),
+    allReceipts: Number(summary?.all_receipts || 0),
+    salesCount: Number(summary?.sales_count || 0),
+    refundCount: Number(summary?.refund_count || 0),
     lineItemCount: batch.lineItemCount,
-    grossSales: Number(batch.grossSales),
-    totalDiscounts: Number(stats?.total_discounts || 0),
-    totalRefunds: Number(stats?.total_refunds || 0),
-    netSales: Number(batch.netSales),
+    grossSales: Number(summary?.gross_sales || 0),
+    discounts: Number(summary?.discounts || 0),
+    netSales: Number(summary?.net_sales || 0),
     items: items.map(i => ({
       category: i.category,
       sku: i.sku,
@@ -234,6 +243,7 @@ export async function getReceiptBatchSummary(businessDate: string): Promise<Batc
       quantity: Number(i.quantity),
       grossSales: Number(i.grossSales),
       netSales: Number(i.netSales),
+      isRefund: false,
     })),
   };
 }
