@@ -24,6 +24,7 @@ interface BatchSummaryResult {
   lineItemCount: number;
   grossSales: number;
   discounts: number;
+  refundAmount: number;
   netSales: number;
   items: BatchItem[];
 }
@@ -55,9 +56,11 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
       COUNT(*) FILTER (WHERE NOT is_refund)::int         AS sales_count,
       COUNT(*) FILTER (WHERE is_refund)::int             AS refund_count,
       COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0) AS gross_sales,
-      COALESCE(SUM(total_discount), 0)                   AS discounts,
+      COALESCE(SUM(total_discount) FILTER (WHERE NOT is_refund), 0) AS discounts,
+      COALESCE(SUM(total_money) FILTER (WHERE is_refund), 0) AS refund_amount,
       COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0)
-        - COALESCE(SUM(total_discount), 0)               AS net_sales
+        - COALESCE(SUM(total_discount) FILTER (WHERE NOT is_refund), 0)
+        - COALESCE(SUM(total_money) FILTER (WHERE is_refund), 0) AS net_sales
     FROM receipts
   `);
 
@@ -67,6 +70,7 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
   const refundCount = Number(summary?.refund_count || 0);
   const grossSales = Number(summary?.gross_sales || 0);
   const discounts = Number(summary?.discounts || 0);
+  const refundAmount = Number(summary?.refund_amount || 0);
   const netSales = Number(summary?.net_sales || 0);
 
   if (allReceipts === 0) {
@@ -74,7 +78,7 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
   }
 
   console.log(`[ReceiptBatch] All: ${allReceipts}, Sales: ${salesCount}, Refunds: ${refundCount}`);
-  console.log(`[ReceiptBatch] Gross: ${grossSales}, Discounts: ${discounts}, Net: ${netSales}`);
+  console.log(`[ReceiptBatch] Gross: ${grossSales}, Discounts: ${discounts}, Refunds: ${refundAmount}, Net: ${netSales}`);
 
   const salesReceiptsResult = await db.execute(sql`
     SELECT receipt_id
@@ -178,6 +182,7 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
     lineItemCount,
     grossSales,
     discounts,
+    refundAmount,
     netSales,
     items,
   };
@@ -213,9 +218,11 @@ export async function getReceiptBatchSummary(businessDate: string): Promise<Batc
       COUNT(*) FILTER (WHERE NOT is_refund)::int         AS sales_count,
       COUNT(*) FILTER (WHERE is_refund)::int             AS refund_count,
       COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0) AS gross_sales,
-      COALESCE(SUM(total_discount), 0)                   AS discounts,
+      COALESCE(SUM(total_discount) FILTER (WHERE NOT is_refund), 0) AS discounts,
+      COALESCE(SUM(total_money) FILTER (WHERE is_refund), 0) AS refund_amount,
       COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0)
-        - COALESCE(SUM(total_discount), 0)               AS net_sales
+        - COALESCE(SUM(total_discount) FILTER (WHERE NOT is_refund), 0)
+        - COALESCE(SUM(total_money) FILTER (WHERE is_refund), 0) AS net_sales
     FROM receipts
   `);
 
@@ -234,6 +241,7 @@ export async function getReceiptBatchSummary(businessDate: string): Promise<Batc
     lineItemCount: batch.lineItemCount,
     grossSales: Number(summary?.gross_sales || 0),
     discounts: Number(summary?.discounts || 0),
+    refundAmount: Number(summary?.refund_amount || 0),
     netSales: Number(summary?.net_sales || 0),
     items: items.map(i => ({
       category: i.category,

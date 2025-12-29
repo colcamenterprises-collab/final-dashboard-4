@@ -29,6 +29,7 @@ interface BatchSummary {
   lineItemCount: number;
   grossSales: number;
   discounts: number;
+  refundAmount: number;
   netSales: number;
   items: BatchItem[];
   error?: string;
@@ -169,7 +170,7 @@ export default function ReceiptsTruth() {
 
       {hasBatch && data && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
             <Card className="rounded-[4px]">
               <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">All Receipts</div>
@@ -214,11 +215,20 @@ export default function ReceiptsTruth() {
             </Card>
             <Card className="rounded-[4px]">
               <CardContent className="p-4">
+                <div className="text-xs text-slate-600 dark:text-slate-400">Refund Amount</div>
+                <div className="text-2xl font-bold text-red-600" data-testid="text-refund-amount">
+                  {formatCurrency(Number(data.refundAmount))}
+                </div>
+                <div className="text-xs text-slate-500">raw_json.total_money (refunds)</div>
+              </CardContent>
+            </Card>
+            <Card className="rounded-[4px]">
+              <CardContent className="p-4">
                 <div className="text-xs text-slate-600 dark:text-slate-400">Net Sales</div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-net-sales">
                   {formatCurrency(Number(data.netSales))}
                 </div>
-                <div className="text-xs text-slate-500">calculated</div>
+                <div className="text-xs text-slate-500">gross - discounts - refunds</div>
               </CardContent>
             </Card>
           </div>
