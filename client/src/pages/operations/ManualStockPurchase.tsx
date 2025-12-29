@@ -152,8 +152,7 @@ export default function ManualStockPurchase() {
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Package className="h-6 w-6 text-emerald-600" />
+          <h1 className="text-2xl font-bold text-slate-900">
             Manual Stock Purchase
           </h1>
           <p className="text-xs text-slate-500 mt-1">

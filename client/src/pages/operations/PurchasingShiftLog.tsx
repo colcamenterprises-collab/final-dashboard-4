@@ -112,8 +112,7 @@ export default function PurchasingShiftLog() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <CalendarDays className="h-6 w-6 text-emerald-600" />
+          <h1 className="text-2xl font-bold text-slate-900">
             Purchasing Log
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -181,10 +180,9 @@ export default function PurchasingShiftLog() {
       {/* Shift Log Table */}
       <Card className="rounded-[4px] border-slate-200 overflow-hidden">
         <CardHeader className="py-3 px-4 bg-slate-50 border-b border-slate-200">
-          <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-            <Package className="h-4 w-4 text-emerald-600" />
+          <CardTitle className="text-sm font-semibold text-slate-900">
             Quantity History
-            <span className="text-xs font-normal text-slate-500">
+            <span className="text-xs font-normal text-slate-500 ml-2">
               ({filteredItems.length} items, {shifts.length} shifts)
             </span>
           </CardTitle>

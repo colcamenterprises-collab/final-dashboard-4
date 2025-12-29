@@ -309,12 +309,10 @@ export default function RecipeIngredientManagement() {
 
       <Tabs defaultValue="recipes" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="recipes" className="flex items-center gap-2">
-            <ChefHat className="h-4 w-4" />
+          <TabsTrigger value="recipes">
             Recipe Management
           </TabsTrigger>
-          <TabsTrigger value="ingredients" className="flex items-center gap-2">
-            <Package className="h-4 w-4" />
+          <TabsTrigger value="ingredients">
             Ingredient Management
           </TabsTrigger>
         </TabsList>
