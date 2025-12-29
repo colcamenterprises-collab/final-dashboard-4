@@ -482,7 +482,7 @@ export default function DailySales() {
           <button
             type="button"
             onClick={() => window.history.back()}
-            className="h-10 rounded-lg border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50"
+            className="h-10 rounded-[4px] border border-gray-300 px-4 text-sm font-semibold hover:bg-gray-50"
           >
             {L.back}
           </button>
@@ -495,8 +495,8 @@ export default function DailySales() {
           {/* EXACT error display from consolidated patch */}
           {errors.length > 0 && <p className="text-red-500 text-sm">{L.validationError}</p>}
           
-          <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">{L.shiftInfo}</h3>
+          <section className="rounded-[4px] border bg-white p-5">
+            <h3 className="mb-4 text-sm font-semibold">{L.shiftInfo}</h3>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{L.shiftDate}</label>
@@ -505,14 +505,14 @@ export default function DailySales() {
                     type="date"
                     value={shiftDate}
                     onChange={(e) => setShiftDate(e.target.value)}
-                    className="w-full border rounded-xl px-3 py-2.5 h-10 text-base" 
+                    className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                   />
                 ) : (
                   <input 
                     type="text"
                     value={new Date().toLocaleDateString()}
                     readOnly
-                    className="w-full border rounded-xl px-3 py-2.5 h-10 bg-gray-50" 
+                    className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-gray-50" 
                   />
                 )}
               </div>
@@ -522,7 +522,7 @@ export default function DailySales() {
                   placeholder={labels[lang].completedBy}
                   value={completedBy} 
                   onChange={e=>setCompletedBy(e.target.value)} 
-                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('completedBy') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('completedBy') ? 'border-red-500' : ''}`}
                   required
                 />
               </div>
@@ -534,15 +534,15 @@ export default function DailySales() {
                   placeholder={labels[lang].startingCash}
                   value={cashStart} 
                   onChange={e=>setCashStart(+e.target.value||0)} 
-                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('startingCash') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('startingCash') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
             <p className="mt-2 text-xs text-gray-500">{L.autoTimestamp}: {new Date().toISOString()}</p>
           </section>
 
-          <section className="rounded-2xl border bg-white p-5">
-            <h2 className="text-lg font-bold mb-4">{L.salesInfo}</h2>
+          <section className="rounded-[4px] border bg-white p-5">
+            <h2 className="text-sm font-bold mb-4">{L.salesInfo}</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
@@ -552,7 +552,7 @@ export default function DailySales() {
                   placeholder={labels[lang].cashSales}
                   value={cash} 
                   onChange={e=>setCash(+e.target.value||0)} 
-                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -563,7 +563,7 @@ export default function DailySales() {
                   placeholder={labels[lang].qrSales}
                   value={qr} 
                   onChange={e=>setQr(+e.target.value||0)} 
-                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -574,7 +574,7 @@ export default function DailySales() {
                   placeholder={labels[lang].grabSales}
                   value={grab} 
                   onChange={e=>setGrab(+e.target.value||0)} 
-                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -585,7 +585,7 @@ export default function DailySales() {
                   placeholder={labels[lang].otherSales}
                   value={aroi} 
                   onChange={e=>setAroi(+e.target.value||0)} 
-                  className={`w-full border rounded-xl px-3 py-2.5 h-10 text-base ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
@@ -593,12 +593,12 @@ export default function DailySales() {
           </section>
 
           {/* Expenses Section */}
-          <section className="rounded-xl border bg-white p-6 mt-6">
-            <h3 className="mb-4 text-[14px] font-semibold">{L.expenses}</h3>
+          <section className="rounded-[4px] border bg-white p-6 mt-6">
+            <h3 className="mb-4 text-sm font-semibold">{L.expenses}</h3>
             
             {/* Shift Expenses */}
             <div className="mb-8">
-              <h4 className="mb-1 text-[14px] font-semibold">{L.shiftExpenses}</h4>
+              <h4 className="mb-1 text-sm font-semibold">{L.shiftExpenses}</h4>
               <p className="mb-3 text-xs text-slate-500">{L.shiftExpensesHint}</p>
               <div className="space-y-4">
                 {shiftExpenses.map((row) => (
@@ -606,7 +606,7 @@ export default function DailySales() {
                     <div>
                       <label className="text-sm text-gray-600 block mb-1">{L.item}</label>
                       <input 
-                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                         value={row.item} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, item: e.target.value } : r))}
                         placeholder="eg: 2 Gas Bottles, 1kg french Fries" 
@@ -616,7 +616,7 @@ export default function DailySales() {
                       <label className="text-sm text-gray-600 block mb-1">{L.cost} (฿)</label>
                       <input 
                         type="number" 
-                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                         value={row.cost} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, cost: Number(e.target.value) } : r))} 
                       />
@@ -624,7 +624,7 @@ export default function DailySales() {
                     <div>
                       <label className="text-sm text-gray-600 block mb-1">{L.shopName}</label>
                       <input 
-                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                         value={row.shop} 
                         onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, shop: e.target.value } : r))}
                         placeholder="Makro / Lotus" 
@@ -634,7 +634,7 @@ export default function DailySales() {
                       <button
                         type="button"
                         onClick={() => setShiftExpenses(prev => prev.filter(r => r.id !== row.id))}
-                        className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                        className="h-9 rounded-[4px] border border-red-200 bg-red-50 px-3 text-sm text-red-700 hover:bg-red-100"
                       >
                         {L.delete}
                       </button>
@@ -645,7 +645,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
+                  className="h-9 px-3 border rounded-[4px] text-sm hover:bg-gray-50" 
                   onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "" }])}
                 >
                   {L.addRow}
@@ -656,14 +656,14 @@ export default function DailySales() {
 
             {/* Staff Wages */}
             <div>
-              <h4 className="mb-3 text-[14px] font-semibold">{L.staffWages}</h4>
+              <h4 className="mb-3 text-sm font-semibold">{L.staffWages}</h4>
               <div className="space-y-4">
                 {staffWages.map((row) => (
                   <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
                       <label className="text-sm text-gray-600 block mb-1">{L.staffName}</label>
                       <input 
-                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                         value={row.staff} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, staff: e.target.value } : r))}
                         placeholder={L.staffName} 
@@ -673,7 +673,7 @@ export default function DailySales() {
                       <label className="text-sm text-gray-600 block mb-1">{L.amount} (฿)</label>
                       <input 
                         type="number" 
-                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                         value={row.amount} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, amount: Number(e.target.value) } : r))} 
                       />
@@ -681,7 +681,7 @@ export default function DailySales() {
                     <div>
                       <label className="text-sm text-gray-600 block mb-1">{L.type}</label>
                       <select 
-                        className="w-full border rounded-xl px-3 py-2.5 h-10" 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                         value={row.type} 
                         onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, type: e.target.value as any } : r))}
                       >
@@ -695,7 +695,7 @@ export default function DailySales() {
                       <button
                         type="button"
                         onClick={() => setStaffWages(prev => prev.filter(r => r.id !== row.id))}
-                        className="h-10 rounded-lg border border-red-200 bg-red-50 px-3 text-red-700 hover:bg-red-100"
+                        className="h-9 rounded-[4px] border border-red-200 bg-red-50 px-3 text-sm text-red-700 hover:bg-red-100"
                       >
                         {L.delete}
                       </button>
@@ -706,7 +706,7 @@ export default function DailySales() {
               <div className="mt-3 flex items-center justify-between">
                 <button 
                   type="button"
-                  className="h-10 px-3 border rounded-xl hover:bg-gray-50" 
+                  className="h-9 px-3 border rounded-[4px] text-sm hover:bg-gray-50" 
                   onClick={() => setStaffWages(prev => [...prev, { id: uid(), staff: "", amount: 0, type: "WAGES" }])}
                 >
                   {L.addRow}
@@ -715,14 +715,14 @@ export default function DailySales() {
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t text-[14px] text-right font-bold">
+            <div className="mt-6 pt-4 border-t text-sm text-right font-bold">
               {L.totalExpenses}: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
             </div>
           </section>
 
           {/* Banking Section */}
-          <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">{L.cashBanking}</h3>
+          <section className="rounded-[4px] border bg-white p-5">
+            <h3 className="mb-4 text-sm font-semibold">{L.cashBanking}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{L.closingCash} (฿)</label>
@@ -730,12 +730,12 @@ export default function DailySales() {
                   type="number" 
                   value={closingCash} 
                   onChange={e=>setClosingCash(+e.target.value||0)} 
-                  className="w-full border rounded-xl px-3 py-2.5 h-10"
+                  className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm"
                 />
                 <p className="text-xs text-gray-500 mt-1">{L.closingCashHint}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-lg">
+            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-[4px]">
               <div className="text-xs text-gray-500">{L.expectedCashToBank}</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
@@ -755,8 +755,8 @@ export default function DailySales() {
           </section>
 
           {/* Summary Section */}
-          <section className="rounded-xl border bg-white p-5">
-            <h3 className="mb-4 text-lg font-semibold">{L.summary}</h3>
+          <section className="rounded-[4px] border bg-white p-5">
+            <h3 className="mb-4 text-sm font-semibold">{L.summary}</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between font-medium">
                 <span>{L.totalSales}:</span>
@@ -805,7 +805,7 @@ export default function DailySales() {
           </section>
 
           {error && (
-            <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mb-3 rounded-[4px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </div>
           )}
@@ -815,14 +815,14 @@ export default function DailySales() {
             <button
               type="button"
               onClick={handleSaveDraft}
-              className="h-10 rounded-lg border border-gray-300 px-4 text-[14px] font-medium text-gray-700 hover:bg-gray-50"
+              className="h-9 rounded-[4px] border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               {L.saveDraft}
             </button>
             <button
               type="button"
               onClick={() => submit()}
-              className="h-10 rounded-lg bg-emerald-600 px-5 text-[14px] font-semibold text-white hover:bg-emerald-700"
+              className="h-9 rounded-[4px] bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-700"
               disabled={submitting}
             >
               {submitting ? L.saving : (isEditMode ? L.updateForm : L.next)}
