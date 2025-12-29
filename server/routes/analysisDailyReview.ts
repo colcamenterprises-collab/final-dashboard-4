@@ -246,10 +246,14 @@ function buildVariance(pos: DailySource, form: DailySource): DailyComparisonResp
   };
 }
 
-function availabilityOf(pos: DailySource | null, form: DailySource | null): Availability {
-  if (!pos && !form) return "missing_both";
-  if (!pos) return "missing_pos";
-  if (!form) return "missing_form";
+// PATCH B: Use receipts as truth for POS availability, not pos_shift_report
+function availabilityOf(pos: DailySource | null, form: DailySource | null, hasReceipts?: boolean): Availability {
+  const hasPOS = hasReceipts ?? (pos !== null);
+  const hasForm = form !== null;
+  
+  if (!hasPOS && !hasForm) return "missing_both";
+  if (!hasPOS) return "missing_pos";
+  if (!hasForm) return "missing_form";
   return "ok";
 }
 
@@ -263,7 +267,21 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
     fetchForm1FromDB(date),
     buildReceiptEvidence(date)
   ]);
-  const availability = availabilityOf(pos, form);
+  
+  // PATCH B: Use receipt count as truth for POS availability
+  const hasReceipts = (receiptEvidence.posReceiptCount ?? 0) > 0;
+  const availability = availabilityOf(pos, form, hasReceipts);
+  
+  // PATCH E: Log missing data for debugging
+  if (availability !== "ok") {
+    console.error('[ANALYSIS_MISSING_DATA]', {
+      businessDate: date,
+      hasReceipts,
+      hasDailySales: form !== null,
+      posReceiptCount: receiptEvidence.posReceiptCount,
+      availability
+    });
+  }
 
   const payload: DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence } = { date, availability };
   if (pos) payload.pos = pos;
@@ -292,7 +310,10 @@ analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
       fetchForm1FromDB(ds),
       buildReceiptEvidence(ds)
     ]);
-    const availability = availabilityOf(pos, form);
+    
+    // PATCH B: Use receipt count as truth for POS availability
+    const hasReceipts = (receiptEvidence.posReceiptCount ?? 0) > 0;
+    const availability = availabilityOf(pos, form, hasReceipts);
 
     const entry: DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence } = { date: ds, availability };
     if (pos) entry.pos = pos;

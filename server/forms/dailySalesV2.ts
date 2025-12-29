@@ -194,15 +194,18 @@ export async function createDailySalesV2(req: Request, res: Response) {
     });
     payload.bankingAuto = __bankingAuto;
 
+    // PATCH A: Write BOTH shiftDate (TEXT for legacy) AND shift_date (DATE for analysis queries)
+    const shiftDateAsDate = new Date(shiftDate);
+    
     await pool.query(
       `INSERT INTO daily_sales_v2 (
-        id, "shiftDate", "completedBy", "createdAt", "submittedAtISO", payload,
+        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO", payload,
         "q1CashInRegister", "q2ExpensesMirrorReport", "q3CorrectDescriptions",
         "q4RegisterBalances", "q5AmountToBanked", "q6ManagerName"
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
       [
-        id, shiftDate, completedBy, createdAt, createdAt, payload,
+        id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt, payload,
         q1CashInRegister, q2ExpensesMirrorReport, q3CorrectDescriptions,
         q4RegisterBalances, q5AmountToBanked, q6ManagerName
       ]
