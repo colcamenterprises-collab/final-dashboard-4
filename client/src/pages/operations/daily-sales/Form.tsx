@@ -27,6 +27,7 @@ const labels = {
     grabSales: 'Grab Sales',
     otherSales: 'Other Sales',
     totalSales: 'Total Sales',
+    totalReceiptCount: 'Total Receipt Count',
     expenses: 'Expenses',
     shiftExpenses: 'Shift Expenses',
     shiftExpensesHint: 'Do not group together items - Enter each expense separately',
@@ -85,6 +86,7 @@ const labels = {
     grabSales: 'ยอดขาย Grab',
     otherSales: 'ยอดขายอื่นๆ',
     totalSales: 'ยอดขายรวม',
+    totalReceiptCount: 'จำนวนใบเสร็จทั้งหมด',
     expenses: 'ค่าใช้จ่าย',
     shiftExpenses: 'ค่าใช้จ่ายกะ',
     shiftExpensesHint: 'ห้ามรวมรายการ - กรอกค่าใช้จ่ายแต่ละรายการแยกกัน',
@@ -205,6 +207,7 @@ export default function DailySales() {
   
   const [completedBy, setCompletedBy] = useState("");
   const [cashStart, setCashStart] = useState(0);
+  const [receiptCount, setReceiptCount] = useState(0);
   const [cash, setCash] = useState(0);
   const [qr, setQr] = useState(0);
   const [grab, setGrab] = useState(0);
@@ -512,7 +515,7 @@ export default function DailySales() {
                     type="text"
                     value={new Date().toLocaleDateString()}
                     readOnly
-                    className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-gray-50" 
+                    className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-white" 
                   />
                 )}
               </div>
@@ -543,6 +546,17 @@ export default function DailySales() {
 
           <section className="rounded-[4px] border bg-white p-5">
             <h2 className="text-sm font-bold mb-4">{L.salesInfo}</h2>
+            <div className="mb-4">
+              <label className="text-sm text-gray-600 block mb-1">{labels[lang].totalReceiptCount}</label>
+              <input 
+                type="number" 
+                min="0"
+                placeholder={labels[lang].totalReceiptCount}
+                value={receiptCount} 
+                onChange={e=>setReceiptCount(+e.target.value||0)} 
+                className="w-full md:w-48 border rounded-[4px] px-3 py-2 h-9 text-sm"
+              />
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
@@ -735,7 +749,7 @@ export default function DailySales() {
                 <p className="text-xs text-gray-500 mt-1">{L.closingCashHint}</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4 bg-gray-50 p-3 rounded-[4px]">
+            <div className="grid grid-cols-2 gap-2 mt-4 bg-white border border-slate-200 p-3 rounded-[4px]">
               <div className="text-xs text-gray-500">{L.expectedCashToBank}</div>
               <div className="text-right font-semibold">฿{(() => {
                 const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);

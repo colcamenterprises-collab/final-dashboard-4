@@ -33,6 +33,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Routing**: React Router for modern navigation.
 - **Forms**: React Hook Form with Zod validation.
 - **UI/UX Decisions**: Tablet-first design, 12px font sizes, 4px border radius, touch-optimized interactions, consistent button styling, responsive design, dark theme, expanded sidebar default, consolidated navigation with tabbed interfaces.
+- **BANNED COLORS**: Light blue backgrounds (bg-blue-50, bg-slate-50 for backgrounds, bg-gray-50 for backgrounds) are STRICTLY FORBIDDEN. Use bg-white for all card and section backgrounds. This is a permanent rule - never use pale/light blue tinted backgrounds.
 - **Style Guide (Golden Standard)**: Reference `/finance/expenses-import` for canonical styling: Typography (`text-xs`, `text-sm`, `text-3xl`), Colors (`text-emerald-600`, `text-slate-600`, `slate-50/100`, `border-slate-200`), Border Radius (`rounded-[4px]`), Spacing (`p-4`, `gap-3`, `space-y-4`), Components (shadcn/ui Card, Button, Input, Table, Badge, Tabs), Table styles, Button styles, Status Indicators.
 
 ### Backend Architecture
