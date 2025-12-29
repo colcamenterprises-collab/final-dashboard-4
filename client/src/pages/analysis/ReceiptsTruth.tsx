@@ -80,18 +80,6 @@ export default function ReceiptsTruth() {
         Receipts
       </h1>
 
-      <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 rounded-[4px]">
-        <CardContent className="p-4">
-          <div className="text-sm text-slate-600 dark:text-slate-300">
-            <strong className="text-gray-900 dark:text-white">Receipts are the single source of truth.</strong>
-            <br />
-            All sales, stock, and ingredient analysis must reconcile to this page.
-            <br />
-            <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 17:00-03:00 Bangkok</span>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-gray-900 dark:text-white">
