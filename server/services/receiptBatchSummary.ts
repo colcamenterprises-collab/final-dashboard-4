@@ -35,7 +35,7 @@ export async function rebuildReceiptBatch(businessDate: string): Promise<BatchSu
 
   const { start, end } = getShiftWindowUTC(businessDate);
   console.log(`[ReceiptBatch] Rebuilding for ${businessDate}`);
-  console.log(`[ReceiptBatch] Shift window: ${start.toISOString()} to ${end.toISOString()} (18:00-03:00 Bangkok)`);
+  console.log(`[ReceiptBatch] Shift window: ${start.toISOString()} to ${end.toISOString()} (17:00-03:00 Bangkok)`);
 
   const summaryResult = await db.execute(sql`
     WITH receipts AS (
