@@ -461,7 +461,7 @@ export default function DailySales() {
 
   if (loading) {
     return (
-      <div className="container mx-auto p-4 max-w-4xl">
+      <div className="container mx-auto p-4 max-w-4xl bg-white min-h-screen">
         <div className="bg-white rounded-[4px] shadow p-4 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
           <p className="text-xs text-slate-600">{L.loading}</p>
@@ -472,7 +472,7 @@ export default function DailySales() {
 
   return (
     <>
-      <div className="max-w-5xl mx-auto p-4">
+      <div className="max-w-5xl mx-auto p-4 bg-white min-h-screen">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-3xl font-semibold">
