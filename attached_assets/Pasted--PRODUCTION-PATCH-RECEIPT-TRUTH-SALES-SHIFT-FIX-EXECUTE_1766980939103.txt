@@ -1,0 +1,133 @@
+🔧 PRODUCTION PATCH — RECEIPT TRUTH + SALES & SHIFT FIX (EXECUTE NOW)
+OBJECTIVE (NON-NEGOTIABLE)
+Fix the system so Sales & Shift Analysis shows real data for selected dates by:
+Correctly detecting POS receipts
+Correctly detecting Daily Sales V2 submissions
+Binding analysis to actual receipt evidence
+Eliminating false “missing both forms” states
+This is a FIX, not architecture work.
+ROOT CAUSES TO FIX (CONFIRMED)
+daily_sales_v2.shift_date is NULL, so analysis queries never find the form
+POS availability incorrectly depends on pos_shift_report, not actual receipts
+Receipt counts exist in pos_receipt but are ignored
+Analysis UI reports “missing” even when receipts + form exist
+PATCH SCOPE (STRICT)
+✅ Backend only
+✅ Modify existing services
+❌ No new tables
+❌ No UI redesign
+❌ No sidebar changes
+PATCH A — FIX DAILY SALES WRITE (CRITICAL)
+File
+Copy code
+
+server/forms/dailySalesV2.ts
+CHANGE
+When creating Daily Sales V2, write shift_date properly.
+ADD:
+Copy code
+Ts
+shift_date: new Date(payload.shiftDate),
+RESULT
+Sales & Shift Analysis can now FIND Daily Sales V2 rows.
+PATCH B — FIX POS AVAILABILITY (RECEIPTS = TRUTH)
+File
+Copy code
+
+server/routes/analysisDailyReview.ts
+CHANGE 1 — POS PRESENCE CHECK
+Replace any logic that checks:
+Copy code
+Ts
+if (!posRow) ...
+WITH:
+Copy code
+Ts
+const receiptCount = await db
+  .select({ count: sql<number>`count(*)` })
+  .from(pos_receipt)
+  .where(
+    and(
+      gte(pos_receipt.createdAt, shiftStart),
+      lte(pos_receipt.createdAt, shiftEnd)
+    )
+  );
+
+const hasPOS = receiptCount[0].count > 0;
+CHANGE 2 — AVAILABILITY LOGIC
+Update availability decision table to:
+POS Receipts
+Daily Sales
+Status
+✅
+✅
+OK
+❌
+✅
+missing_pos
+✅
+❌
+missing_form
+❌
+❌
+missing_both
+🚫 Do NOT use pos_shift_report for availability
+PATCH C — FIX RECEIPT COUNT SOURCE
+File
+Copy code
+
+server/services/loyverseIngest.ts
+CHANGE
+Replace:
+Copy code
+Ts
+receiptCount: 0
+WITH:
+Copy code
+Ts
+receiptCount: actualReceiptCount
+Where actualReceiptCount is derived from lv_receipt rows for the shift window.
+PATCH D — BIND ANALYSIS TO DATE SELECTION
+File
+Copy code
+
+server/routes/analysisDailySales.ts
+CHANGE
+Ensure /api/analysis/daily-sales accepts:
+Copy code
+
+?month=YYYY-MM
+QUERY MUST:
+Filter by:
+Copy code
+Sql
+WHERE shiftDate LIKE 'YYYY-MM%'
+🚫 No unfiltered “latest 50” logic allowed in analysis views.
+PATCH E — FAIL LOUD, NOT SILENT
+File
+Copy code
+
+server/routes/analysisDailyReview.ts
+ADD LOGGING:
+Copy code
+Ts
+console.error('[ANALYSIS_MISSING_DATA]', {
+  businessDate,
+  hasReceipts,
+  hasDailySales,
+});
+🚫 No silent fallback.
+ACCEPTANCE CHECKLIST (MANDATORY)
+Replit MUST confirm all of the following:
+[ ] Selecting a date with receipts + Daily Sales shows data
+[ ] Receipt count > 0 enables POS presence
+[ ] Daily Sales V2 detected via shift_date
+[ ] No false “missing both forms”
+[ ] No 500 errors
+[ ] No UI changes made
+THIS PATCH ENDS TODAY’S BLOCKER
+Once this is applied:
+Sales & Shift Analysis becomes trustworthy
+Receipts become evidence
+Cashier review becomes possible
+Further truth work can proceed safely
