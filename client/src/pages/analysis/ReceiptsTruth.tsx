@@ -3,9 +3,10 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { RefreshCw, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { RefreshCw, AlertTriangle, CheckCircle2, Info, Receipt } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface BatchItem {
@@ -38,7 +39,7 @@ export default function ReceiptsTruth() {
   
   const [selectedDate, setSelectedDate] = useState(defaultDate);
 
-  const { data, isLoading, error, refetch } = useQuery<BatchSummary>({
+  const { data, isLoading } = useQuery<BatchSummary>({
     queryKey: ['/api/analysis/receipts/summary', selectedDate],
     queryFn: async () => {
       const res = await fetch(`/api/analysis/receipts/summary?date=${selectedDate}`);
@@ -61,44 +62,61 @@ export default function ReceiptsTruth() {
   });
 
   const hasBatch = data?.hasBatch === true;
-  const hasError = data?.ok === false || rebuildMutation.isError;
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('th-TH', {
+      style: 'currency',
+      currency: 'THB',
+    }).format(amount);
+  };
 
   return (
-    <div className="p-4 space-y-4 max-w-6xl mx-auto">
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 mb-4">
-        <div className="flex items-start gap-2">
-          <Info className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-          <div className="text-sm text-slate-300">
-            <strong className="text-white">Receipts are the single source of truth.</strong>
-            <br />
-            All sales, stock, and ingredient analysis must reconcile to this page.
-          </div>
-        </div>
+    <div className="container mx-auto p-6 max-w-7xl space-y-6">
+      <div className="flex items-center gap-3">
+        <Receipt className="h-8 w-8 text-emerald-600" />
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          Receipts (Truth)
+        </h1>
       </div>
 
-      <Card className="bg-slate-900 border-slate-700">
+      <Card className="border-slate-200 dark:border-slate-700 rounded-[4px]">
+        <CardContent className="p-4">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-slate-600 dark:text-slate-300">
+              <strong className="text-gray-900 dark:text-white">Receipts are the single source of truth.</strong>
+              <br />
+              All sales, stock, and ingredient analysis must reconcile to this page.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-[4px]">
         <CardHeader className="pb-2">
-          <CardTitle className="text-xl text-white flex items-center gap-2">
-            Receipts Truth Summary
+          <CardTitle className="text-lg text-gray-900 dark:text-white">
+            Batch Summary
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-4 items-end">
             <div>
-              <label className="text-sm text-slate-400 block mb-1">Business Date</label>
+              <Label htmlFor="businessDate" className="text-sm text-slate-600 dark:text-slate-400">
+                Business Date
+              </Label>
               <Input
+                id="businessDate"
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-48 bg-slate-800 border-slate-600 text-white"
+                className="w-48 rounded-[4px]"
                 data-testid="input-business-date"
               />
             </div>
             <Button
               onClick={() => rebuildMutation.mutate()}
               disabled={rebuildMutation.isPending || !selectedDate}
-              variant="outline"
-              className="border-emerald-600 text-emerald-400 hover:bg-emerald-900/30"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-[4px]"
               data-testid="button-rebuild"
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${rebuildMutation.isPending ? 'animate-spin' : ''}`} />
@@ -107,99 +125,105 @@ export default function ReceiptsTruth() {
           </div>
 
           {!hasBatch && !isLoading && (
-            <Alert variant="destructive" className="bg-red-900/30 border-red-700">
-              <AlertTriangle className="w-5 h-5" />
-              <AlertTitle className="text-red-300">NO RECEIPT BATCH — TRUTH MISSING</AlertTitle>
-              <AlertDescription className="text-red-400">
-                {data?.error || `No batch exists for ${selectedDate}. Click "Rebuild from Receipts" to create one.`}
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[4px]">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+              <div>
+                <div className="font-semibold text-red-800 dark:text-red-300">NO RECEIPT BATCH — TRUTH MISSING</div>
+                <div className="text-sm text-red-600 dark:text-red-400">
+                  {data?.error || `No batch exists for ${selectedDate}. Click "Rebuild from Receipts" to create one.`}
+                </div>
+              </div>
+            </div>
           )}
 
           {rebuildMutation.isError && (
-            <Alert variant="destructive" className="bg-red-900/30 border-red-700">
-              <AlertTriangle className="w-5 h-5" />
-              <AlertTitle className="text-red-300">Rebuild Failed</AlertTitle>
-              <AlertDescription className="text-red-400">
-                {(rebuildMutation.error as any)?.message || 'Failed to rebuild receipt batch'}
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[4px]">
+              <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
+              <div>
+                <div className="font-semibold text-red-800 dark:text-red-300">Rebuild Failed</div>
+                <div className="text-sm text-red-600 dark:text-red-400">
+                  {(rebuildMutation.error as any)?.message || 'Failed to rebuild receipt batch'}
+                </div>
+              </div>
+            </div>
           )}
 
           {hasBatch && (
-            <Alert className="bg-emerald-900/30 border-emerald-700">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              <AlertTitle className="text-emerald-300">Receipt truth confirmed</AlertTitle>
-              <AlertDescription className="text-emerald-400">
-                Batch for {data.businessDate} is locked and verified.
-              </AlertDescription>
-            </Alert>
+            <div className="flex items-start gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-[4px]">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+              <div>
+                <div className="font-semibold text-emerald-800 dark:text-emerald-300">Receipt truth confirmed</div>
+                <div className="text-sm text-emerald-600 dark:text-emerald-400">
+                  Batch for {data.businessDate} is locked and verified.
+                </div>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
 
       {hasBatch && data && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-slate-800 border-slate-700">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-sm text-slate-400">Receipts</div>
-                <div className="text-2xl font-bold text-white" data-testid="text-receipt-count">
+                <div className="text-xs text-slate-600 dark:text-slate-400">Receipts</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-receipt-count">
                   {data.receiptCount}
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-slate-800 border-slate-700">
+            <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-sm text-slate-400">Line Items</div>
-                <div className="text-2xl font-bold text-white" data-testid="text-line-item-count">
+                <div className="text-xs text-slate-600 dark:text-slate-400">Line Items</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-line-item-count">
                   {data.lineItemCount}
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-slate-800 border-slate-700">
+            <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-sm text-slate-400">Gross Sales</div>
-                <div className="text-2xl font-bold text-emerald-400" data-testid="text-gross-sales">
-                  ฿{Number(data.grossSales).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <div className="text-xs text-slate-600 dark:text-slate-400">Gross Sales</div>
+                <div className="text-2xl font-bold text-emerald-600" data-testid="text-gross-sales">
+                  {formatCurrency(Number(data.grossSales))}
                 </div>
               </CardContent>
             </Card>
-            <Card className="bg-slate-800 border-slate-700">
+            <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-sm text-slate-400">Net Sales</div>
-                <div className="text-2xl font-bold text-white" data-testid="text-net-sales">
-                  ฿{Number(data.netSales).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                <div className="text-xs text-slate-600 dark:text-slate-400">Net Sales</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-net-sales">
+                  {formatCurrency(Number(data.netSales))}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <Card className="bg-slate-900 border-slate-700">
+          <Card className="rounded-[4px]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg text-white">Items Sold</CardTitle>
+              <CardTitle className="text-lg text-gray-900 dark:text-white">Items Sold</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-700">
-                      <TableHead className="text-slate-400">Category</TableHead>
-                      <TableHead className="text-slate-400">Item</TableHead>
-                      <TableHead className="text-slate-400">Modifiers</TableHead>
-                      <TableHead className="text-slate-400 text-right">Qty</TableHead>
-                      <TableHead className="text-slate-400 text-right">Gross Sales</TableHead>
+                    <TableRow className="border-slate-200 dark:border-slate-700">
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Category</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Item</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Modifiers</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400 text-right">Qty</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400 text-right">Gross Sales</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.items.map((item, idx) => (
-                      <TableRow key={idx} className="border-slate-700" data-testid={`row-item-${idx}`}>
-                        <TableCell className="text-slate-300">{item.category || '-'}</TableCell>
-                        <TableCell className="text-white font-medium">{item.itemName}</TableCell>
-                        <TableCell className="text-slate-400 text-sm">{item.modifiers || '-'}</TableCell>
-                        <TableCell className="text-white text-right">{item.quantity}</TableCell>
-                        <TableCell className="text-emerald-400 text-right">
-                          ฿{Number(item.grossSales).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                      <TableRow key={idx} className="border-slate-200 dark:border-slate-700" data-testid={`row-item-${idx}`}>
+                        <TableCell className="text-sm text-slate-600 dark:text-slate-300">{item.category || '-'}</TableCell>
+                        <TableCell className="text-sm font-medium text-gray-900 dark:text-white">{item.itemName}</TableCell>
+                        <TableCell className="text-xs text-slate-500 dark:text-slate-400">{item.modifiers || '-'}</TableCell>
+                        <TableCell className="text-sm text-gray-900 dark:text-white text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-sm text-emerald-600 text-right">
+                          {formatCurrency(Number(item.grossSales))}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -212,7 +236,7 @@ export default function ReceiptsTruth() {
       )}
 
       {isLoading && (
-        <div className="text-center py-8 text-slate-400">
+        <div className="text-center py-8 text-slate-600 dark:text-slate-400">
           Loading batch summary...
         </div>
       )}
