@@ -286,7 +286,8 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
   const payload: DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence } = { date, availability };
   if (pos) payload.pos = pos;
   if (form) payload.form = form;
-  if (availability === "ok") payload.variance = buildVariance(pos!, form!);
+  // Variance requires BOTH pos summary AND form - pos summary may not exist even when receipts do
+  if (pos && form) payload.variance = buildVariance(pos, form);
   
   // K-4.1: Always include receipt evidence
   payload.receiptEvidence = receiptEvidence;
@@ -318,7 +319,8 @@ analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {
     const entry: DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence } = { date: ds, availability };
     if (pos) entry.pos = pos;
     if (form) entry.form = form;
-    if (availability === "ok") entry.variance = buildVariance(pos!, form!);
+    // Variance requires BOTH pos summary AND form
+    if (pos && form) entry.variance = buildVariance(pos, form);
     
     // K-4.1: Always include receipt evidence
     entry.receiptEvidence = receiptEvidence;
