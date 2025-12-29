@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RefreshCw, AlertTriangle, CheckCircle2, Info, Receipt } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -24,8 +23,11 @@ interface BatchSummary {
   hasBatch: boolean;
   businessDate: string;
   receiptCount: number;
+  refundCount: number;
   lineItemCount: number;
   grossSales: number;
+  totalDiscounts: number;
+  totalRefunds: number;
   netSales: number;
   items: BatchItem[];
   error?: string;
@@ -87,6 +89,8 @@ export default function ReceiptsTruth() {
               <strong className="text-gray-900 dark:text-white">Receipts are the single source of truth.</strong>
               <br />
               All sales, stock, and ingredient analysis must reconcile to this page.
+              <br />
+              <span className="text-xs">Data source: POS raw_json.total_money | Shift window: 18:00-03:00 Bangkok</span>
             </div>
           </div>
         </CardContent>
@@ -164,10 +168,10 @@ export default function ReceiptsTruth() {
 
       {hasBatch && data && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-xs text-slate-600 dark:text-slate-400">Receipts</div>
+                <div className="text-xs text-slate-600 dark:text-slate-400">Sales Receipts</div>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-receipt-count">
                   {data.receiptCount}
                 </div>
@@ -175,9 +179,9 @@ export default function ReceiptsTruth() {
             </Card>
             <Card className="rounded-[4px]">
               <CardContent className="p-4">
-                <div className="text-xs text-slate-600 dark:text-slate-400">Line Items</div>
-                <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-line-item-count">
-                  {data.lineItemCount}
+                <div className="text-xs text-slate-600 dark:text-slate-400">Refund Receipts</div>
+                <div className="text-2xl font-bold text-red-600" data-testid="text-refund-count">
+                  {data.refundCount || 0}
                 </div>
               </CardContent>
             </Card>
@@ -186,6 +190,22 @@ export default function ReceiptsTruth() {
                 <div className="text-xs text-slate-600 dark:text-slate-400">Gross Sales</div>
                 <div className="text-2xl font-bold text-emerald-600" data-testid="text-gross-sales">
                   {formatCurrency(Number(data.grossSales))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="rounded-[4px]">
+              <CardContent className="p-4">
+                <div className="text-xs text-slate-600 dark:text-slate-400">Discounts</div>
+                <div className="text-2xl font-bold text-amber-600" data-testid="text-discounts">
+                  {formatCurrency(Number(data.totalDiscounts || 0))}
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="rounded-[4px]">
+              <CardContent className="p-4">
+                <div className="text-xs text-slate-600 dark:text-slate-400">Refunds</div>
+                <div className="text-2xl font-bold text-red-600" data-testid="text-refunds">
+                  {formatCurrency(Number(data.totalRefunds || 0))}
                 </div>
               </CardContent>
             </Card>
@@ -201,7 +221,9 @@ export default function ReceiptsTruth() {
 
           <Card className="rounded-[4px]">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg text-gray-900 dark:text-white">Items Sold</CardTitle>
+              <CardTitle className="text-lg text-gray-900 dark:text-white">
+                Items Sold ({data.lineItemCount} line items)
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -212,7 +234,7 @@ export default function ReceiptsTruth() {
                       <TableHead className="text-xs text-slate-600 dark:text-slate-400">Item</TableHead>
                       <TableHead className="text-xs text-slate-600 dark:text-slate-400">Modifiers</TableHead>
                       <TableHead className="text-xs text-slate-600 dark:text-slate-400 text-right">Qty</TableHead>
-                      <TableHead className="text-xs text-slate-600 dark:text-slate-400 text-right">Gross Sales</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400 text-right">Line Total</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -229,6 +251,10 @@ export default function ReceiptsTruth() {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+              <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                Note: Line totals are calculated from qty × unit_price. Modifier prices may not be included in line totals.
+                The Gross/Net Sales cards above use the POS receipt totals which include all modifiers.
               </div>
             </CardContent>
           </Card>
