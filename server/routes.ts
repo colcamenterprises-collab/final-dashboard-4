@@ -110,6 +110,7 @@ import healthSafetyAudits from "./routes/healthSafety/audits";
 import healthSafetyPdf from "./routes/healthSafety/pdf";
 import recipeAuthorityRouter from "./routes/recipeAuthority";
 import ingredientReconciliationRouter from "./routes/ingredientReconciliation";
+import receiptBatchRoutes from "./routes/receiptBatchRoutes";
 // Email functionality will be added when needed
 
 
@@ -1208,6 +1209,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   
   // PHASE I: Register ingredient reconciliation BEFORE catch-all :date route
   app.use('/api/analysis/ingredient-reconciliation', ingredientReconciliationRouter);
+  
+  // PHASE M: Register receipt batch truth routes BEFORE catch-all :date route
+  app.use('/api/analysis', receiptBatchRoutes);
   
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
