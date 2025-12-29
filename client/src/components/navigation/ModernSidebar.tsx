@@ -92,6 +92,7 @@ const navigationGroups: NavGroup[] = [
     title: "Analysis",
     defaultOpen: true,
     items: [
+      { to: "/analysis/receipts", label: "Receipts (Truth)", icon: Receipt, testId: "nav-receipts-truth" },
       { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" },
       { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" }
     ]
