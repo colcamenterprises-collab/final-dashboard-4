@@ -1,0 +1,158 @@
+PATCH 6 — RECIPE & INGREDIENT SYSTEM STABILISATION (PRODUCTION BLOCKER FIX)
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Restore basic, reliable recipe and ingredient functionality so that:
+Recipes can be created and saved
+Ingredients tab does not crash
+Ingredients flow correctly into recipes
+Modifier analysis can safely re-attach later
+No schema drift
+No hidden logic
+No silent failures
+If recipes don’t save, everything else is irrelevant.
+🚫 ABSOLUTE PROHIBITIONS
+Agent MUST NOT:
+Delete any tables
+Rename existing columns
+Introduce new “truth engines”
+Add derived logic
+Touch receipt logic
+Touch POS logic
+Touch analytics tables
+“Refactor for cleanliness”
+This patch is stabilisation only.
+✅ PATCH 6 — REQUIRED FIXES (IN ORDER)
+6.1 FIX: INGREDIENTS TAB CRASH
+Error:
+Copy code
+
+ReferenceError: INGREDIENT_CATEGORIES is not defined
+Root Cause:
+Frontend references a constant that no longer exists after prior refactors.
+REQUIRED ACTION:
+Replace static constant usage with DB-driven categories.
+Implementation:
+Remove all references to:
+Copy code
+Ts
+INGREDIENT_CATEGORIES
+Ingredient categories must be:
+Copy code
+Ts
+SELECT DISTINCT category FROM ingredient WHERE deleted_at IS NULL;
+Frontend dropdown must:
+Render dynamically
+Fallback to "Uncategorised" if null
+NEVER import constants
+🛑 If ingredient list fails to load → page must still render empty, not crash
+6.2 FIX: RECIPE CREATE FAILING
+Error:
+“Failed to create recipe”
+Root Causes (Confirmed Pattern):
+Backend expects fields frontend does not send
+Validation rejects empty optional fields
+Silent catch block swallowing actual DB error
+REQUIRED BACKEND CONTRACT (LOCK THIS):
+POST /api/recipes
+Accepted payload (ONLY these fields):
+Copy code
+Json
+{
+  "name": "Single Smash Burger",
+  "category": "Smash Burgers",
+  "description": "optional",
+  "serves": 1,
+  "active": true
+}
+Rules:
+description → optional
+category → nullable
+serves → default to 1
+active → default true
+🚫 DO NOT require:
+ingredients
+costs
+photos
+mappings
+Backend Fixes:
+Remove any validation that requires ingredients on creation
+Log actual DB error
+Return real error message to frontend (no generic toast)
+6.3 FIX: RECIPE LIST NOT UPDATING
+Symptom:
+Recipe saves (sometimes)
+UI still shows old count
+REQUIRED FIX:
+After successful create:
+Force refetch:
+Copy code
+Ts
+invalidateQuery(['recipes'])
+OR
+Copy code
+Ts
+mutate → refetchRecipes()
+No optimistic UI. No caching. No debounce.
+6.4 FIX: INGREDIENT ↔ RECIPE FLOW
+Current Problem:
+Ingredients exist but cannot be attached meaningfully.
+REQUIRED STATE (FOUNDATIONAL):
+Ingredients are standalone truth
+Recipes reference ingredients via join table
+No auto-injection
+No defaults
+Minimum Viable Flow:
+Recipe can exist without ingredients
+Ingredients can exist without recipes
+User can later attach ingredients manually
+This aligns with your zero-guess policy.
+6.5 RESTORE MODIFIER DATA (READ-ONLY)
+The agent removed modifiers instead of fixing them — unacceptable.
+REQUIRED:
+Restore modifier tab under Receipt Analysis
+Source must be:
+Copy code
+Sql
+lv_modifier
+or
+Copy code
+Json
+receipt.raw_json.modifiers
+Rules:
+Display exactly as POS shows
+Group by modifier name
+Show:
+Count
+Total price impact
+No aggregation tricks
+No hiding zero-value modifiers
+If modifier parsing fails → show error banner, not removal.
+6.6 UI CLEANUP (NO REDESIGN YET)
+You are right: styling needs a rebuild — NOT IN THIS PATCH.
+Only allowed UI changes:
+Fix broken buttons
+Fix crashing components
+Ensure forms submit
+Ensure errors display clearly
+🚫 No layout redesign
+🚫 No new components
+🚫 No spacing polish
+🧪 ACCEPTANCE CRITERIA (MANDATORY)
+Patch is FAILED if any of these are false:
+✅ Ingredients tab loads without crash
+✅ Can create recipe and see it instantly in list
+✅ No red React error screens
+✅ Backend returns real errors
+✅ Modifier data visible again
+✅ No DB schema changes
+✅ No receipt logic touched
+📦 DELIVERABLE FORMAT
+Agent must provide:
+Files changed (list)
+Confirmation checklist against acceptance criteria
+Zero commentary beyond results
+🔒 STATUS AFTER PATCH 6
+Once this lands:
+Recipes are trustworthy
+Ingredients are stable
+Modifier data is visible
+PATCH 7 (Recipe ↔ POS mapping) becomes safe
