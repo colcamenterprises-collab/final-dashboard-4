@@ -323,7 +323,7 @@ export default function RecipeManagement() {
     if (!selectedRecipe) return;
     
     const ingredientId = parseInt(data.ingredientId);
-    const selectedIngredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ingredientId);
+    const selectedIngredient = ingredients.find((ing) => ing.id === ingredientId);
     if (!selectedIngredient) {
       toast({ title: "Please select an ingredient", variant: "destructive" });
       return;
@@ -340,62 +340,44 @@ export default function RecipeManagement() {
       recipeId: selectedRecipe.id,
       ingredientId: ingredientId.toString(),
       quantity: data.quantity,
-      unit: selectedIngredient.unit,
+      unit: selectedIngredient.portionUnit || selectedIngredient.orderUnit || 'unit',
     });
   };
 
   const onUpdateIngredient = (data: any) => {
     if (!editingIngredient) return;
     
-    const selectedIngredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === editingIngredient.ingredientId);
-    if (!selectedIngredient) return;
-
-    // Calculate cost for this ingredient
-    const unitPrice = parseFloat(selectedIngredient.unitPrice);
-    const packageSize = parseFloat(selectedIngredient.packageSize);
-    const quantity = parseFloat(data.quantity);
-    const costPerUnit = unitPrice / packageSize;
-    const totalCost = costPerUnit * quantity;
-
     updateIngredientMutation.mutate({
       id: editingIngredient.id,
       data: { 
         ...data, 
         quantity: data.quantity,
-        cost: totalCost.toFixed(2)
       }
     });
   };
 
   const calculateRecipeCost = () => {
-    let totalCost = 0;
-    (recipeIngredients as RecipeIngredient[]).forEach((ri: RecipeIngredient) => {
-      const ingredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ri.ingredientId);
-      if (ingredient) {
-        const unitPrice = parseFloat(ingredient.unitPrice);
-        const packageSize = parseFloat(ingredient.packageSize);
-        const quantity = parseFloat(ri.quantity);
-        const costPerUnit = unitPrice / packageSize;
-        totalCost += costPerUnit * quantity;
-      }
-    });
-    return totalCost.toFixed(2);
+    if (selectedRecipe?.totalCost) {
+      return selectedRecipe.totalCost.toFixed(2);
+    }
+    if (selectedRecipe?.ingredients) {
+      return selectedRecipe.ingredients.reduce((sum, ing) => sum + (ing.lineCost || 0), 0).toFixed(2);
+    }
+    return '0.00';
   };
 
   const getIngredientName = (ingredientId: number) => {
-    const ingredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ingredientId);
-    return ingredient ? ingredient.name : "Unknown";
+    const ingredient = ingredients.find((ing) => ing.id === ingredientId);
+    return ingredient ? ingredient.item : "Unknown";
   };
 
   const getIngredientCost = (ingredientId: number, quantity: string) => {
-    const ingredient = (ingredients as Ingredient[]).find((ing: Ingredient) => ing.id === ingredientId);
+    const ingredient = ingredients.find((ing) => ing.id === ingredientId);
     if (!ingredient) return "0.00";
     
-    const unitPrice = parseFloat(ingredient.unitPrice);
-    const packageSize = parseFloat(ingredient.packageSize);
+    const unitCost = ingredient.unitCost || 0;
     const qty = parseFloat(quantity);
-    const costPerUnit = unitPrice / packageSize;
-    return (costPerUnit * qty).toFixed(2);
+    return (unitCost * qty).toFixed(2);
   };
 
   // Ingredient Management handlers
@@ -416,12 +398,9 @@ export default function RecipeManagement() {
   };
 
   // Filter ingredients for search and category
-  const filteredIngredients = (ingredients as Ingredient[]).filter((ingredient: Ingredient) => {
+  const filteredIngredients = ingredients.filter((ingredient) => {
     const matchesSearch = !ingredientSearchTerm || 
-                         ingredient.name.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
-                         ingredient.supplier?.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
-                         ingredient.brand?.toLowerCase().includes(ingredientSearchTerm.toLowerCase()) ||
-                         ingredient.notes?.toLowerCase().includes(ingredientSearchTerm.toLowerCase());
+                         ingredient.item.toLowerCase().includes(ingredientSearchTerm.toLowerCase());
     
     const matchesCategory = ingredientCategoryFilter === 'all' || ingredient.category === ingredientCategoryFilter;
     
@@ -432,7 +411,6 @@ export default function RecipeManagement() {
     return (
       <div className="container mx-auto p-2 sm:p-4 lg:p-6 max-w-7xl">
         <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-          <ChefHat className="h-5 w-5 sm:h-6 sm:w-6" />
           <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe Management</h1>
         </div>
         <div className="animate-pulse">
@@ -449,7 +427,6 @@ export default function RecipeManagement() {
     <div className="container mx-auto p-2 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 max-w-7xl">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-2">
-          <ChefHat className="h-5 w-5 sm:h-6 sm:w-6" />
           <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe & Ingredient Management</h1>
         </div>
         
@@ -457,17 +434,15 @@ export default function RecipeManagement() {
           <Button
             variant={activeTab === 'recipes' ? 'default' : 'outline'}
             onClick={() => setActiveTab('recipes')}
-            className="flex-1 sm:flex-none"
+            className={`flex-1 sm:flex-none ${activeTab === 'recipes' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300'}`}
           >
-            <ChefHat className="h-4 w-4 mr-2" />
             Recipes
           </Button>
           <Button
             variant={activeTab === 'ingredients' ? 'default' : 'outline'}
             onClick={() => setActiveTab('ingredients')}
-            className="flex-1 sm:flex-none"
+            className={`flex-1 sm:flex-none ${activeTab === 'ingredients' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300'}`}
           >
-            <Package className="h-4 w-4 mr-2" />
             Ingredients
           </Button>
         </div>
@@ -610,46 +585,48 @@ export default function RecipeManagement() {
         {/* Recipes List */}
         <Card>
           <CardHeader>
-            <CardTitle>Recipes ({(recipes as Recipe[]).length})</CardTitle>
+            <CardTitle>Recipes ({recipes.length})</CardTitle>
             <CardDescription>
               Manage your restaurant's recipes and their costs
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {(recipes as Recipe[]).map((recipe: Recipe) => (
+              {recipes.map((recipe) => (
                 <div
                   key={recipe.id}
                   className={`p-3 rounded-lg border cursor-pointer transition-colors ${
                     selectedRecipe?.id === recipe.id 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' 
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                   }`}
                   onClick={() => setSelectedRecipe(recipe)}
                 >
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-medium">{recipe.name}</h3>
-                      <p className="text-sm text-gray-600">{recipe.category}</p>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">{recipe.category}</p>
                       <div className="flex items-center space-x-4 mt-1">
-                        <span className="text-sm text-gray-500">
-                          Cost: ฿{recipe.totalCost}
+                        <span className="text-sm text-slate-500">
+                          Cost: ฿{recipe.totalCost?.toFixed(2) || '0.00'}
                         </span>
-                        <span className="text-sm text-gray-500">
-                          Serves: {recipe.servingSize}
+                        <span className="text-sm text-slate-500">
+                          Serves: {recipe.yieldUnits || '-'}
                         </span>
                       </div>
                     </div>
-                    <Badge variant={recipe.isActive ? "default" : "secondary"}>
-                      {recipe.isActive ? "Active" : "Inactive"}
+                    <Badge 
+                      variant={recipe.active ? "default" : "secondary"}
+                      className={recipe.active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}
+                    >
+                      {recipe.active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </div>
               ))}
               
-              {(recipes as Recipe[]).length === 0 && (
-                <div className="text-center py-8 text-gray-500">
-                  <ChefHat className="h-12 w-12 mx-auto mb-2 opacity-50" />
+              {recipes.length === 0 && (
+                <div className="text-center py-8 text-slate-500">
                   <p>No recipes yet. Create your first recipe!</p>
                 </div>
               )}
@@ -718,7 +695,7 @@ export default function RecipeManagement() {
                 {/* Ingredients Section */}
                 <div>
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Ingredients ({(recipeIngredients as RecipeIngredient[]).length})</h3>
+                    <h3 className="font-medium">Ingredients ({selectedRecipe?.ingredients?.length || 0})</h3>
                     <Dialog open={isAddIngredientDialogOpen} onOpenChange={setIsAddIngredientDialogOpen}>
                       <DialogTrigger asChild>
                         <Button size="sm">
@@ -748,9 +725,9 @@ export default function RecipeManagement() {
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
-                                      {(ingredients as Ingredient[]).map((ingredient: Ingredient) => (
+                                      {ingredients.map((ingredient) => (
                                         <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                                          {ingredient.name} (฿{ingredient.unitPrice}/{ingredient.unit})
+                                          {ingredient.item} (฿{ingredient.unitCost?.toFixed(2) || '0.00'}/{ingredient.portionUnit || ingredient.orderUnit || 'unit'})
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -794,34 +771,22 @@ export default function RecipeManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    {(recipeIngredients as RecipeIngredient[]).map((ri: RecipeIngredient) => (
+                    {(selectedRecipe?.ingredients || []).map((ri) => (
                       <div key={ri.id} className="flex items-center justify-between p-2 border rounded">
                         <div className="flex-1">
-                          <span className="font-medium">{getIngredientName(ri.ingredientId)}</span>
+                          <span className="font-medium">{ri.itemName || 'Unknown'}</span>
                           <span className="text-sm text-gray-600 ml-2">
                             {ri.quantity} {ri.unit}
                           </span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className="text-sm font-medium text-green-600">
-                            ฿{getIngredientCost(ri.ingredientId, ri.quantity)}
+                            ฿{(ri.lineCost || 0).toFixed(2)}
                           </span>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => setEditingIngredient(ri)}
-                            className="w-8"
-                          >
-                            <Edit3 className="h-3 w-3" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to remove ${getIngredientName(ri.ingredientId)} from this recipe?`)) {
-                                removeIngredientMutation.mutate(ri.id);
-                              }
-                            }}
+                            onClick={() => removeIngredientMutation.mutate(ri.id)}
                             disabled={removeIngredientMutation.isPending}
                             className="w-8"
                           >
@@ -831,7 +796,7 @@ export default function RecipeManagement() {
                       </div>
                     ))}
 
-                    {(recipeIngredients as RecipeIngredient[]).length === 0 && (
+                    {(!selectedRecipe?.ingredients || selectedRecipe.ingredients.length === 0) && (
                       <div className="text-center py-4 text-gray-500">
                         <Calculator className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         <p className="text-sm">No ingredients added yet</p>
@@ -839,16 +804,13 @@ export default function RecipeManagement() {
                     )}
                   </div>
 
-                  {(recipeIngredients as RecipeIngredient[]).length > 0 && (
-                    <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                  {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-emerald-900/20 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="font-medium">Total Recipe Cost:</span>
-                        <span className="text-lg font-bold text-green-600">
+                        <span className="text-lg font-bold text-green-600 dark:text-emerald-400">
                           ฿{calculateRecipeCost()}
                         </span>
-                      </div>
-                      <div className="text-sm text-gray-600 mt-1">
-                        Cost per serving: ฿{(parseFloat(calculateRecipeCost()) / selectedRecipe.servingSize).toFixed(2)}
                       </div>
                     </div>
                   )}
