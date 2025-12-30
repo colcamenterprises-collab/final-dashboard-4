@@ -1318,6 +1318,75 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.status(500).json({ error: e.message || String(e) });
     }
   });
+
+  // 🔒 RECEIPT TRUTH — STEP 4: Aggregation endpoints (PATCH 4)
+  const { 
+    rebuildAggregates, 
+    getAggregates, 
+    getCategoryMappings, 
+    upsertCategoryMapping 
+  } = await import('./services/receiptTruthAggregateService');
+
+  app.post('/api/analysis/receipts-truth/aggregates/rebuild', async (req, res) => {
+    const { date } = req.body;
+    if (!date) {
+      return res.status(400).json({ error: 'date required in body (YYYY-MM-DD)' });
+    }
+    try {
+      const result = await rebuildAggregates(date);
+      res.json(result);
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/analysis/receipts-truth/aggregates', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const result = await getAggregates(date);
+      if (!result) {
+        return res.status(404).json({ 
+          error: 'AGGREGATES_NOT_BUILT', 
+          message: `No aggregates found for ${date}. Use POST /api/analysis/receipts-truth/aggregates/rebuild to build.` 
+        });
+      }
+      res.json(result);
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/analysis/receipts-truth/category-mappings', async (_req, res) => {
+    try {
+      const mappings = await getCategoryMappings();
+      res.json({ mappings });
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.post('/api/analysis/receipts-truth/category-mappings', async (req, res) => {
+    const { posCategoryName, canonicalCategory } = req.body;
+    if (!posCategoryName || !canonicalCategory) {
+      return res.status(400).json({ error: 'posCategoryName and canonicalCategory required' });
+    }
+    if (!['BURGERS', 'SIDES', 'DRINKS', 'MEAL_DEALS', 'OTHER'].includes(canonicalCategory)) {
+      return res.status(400).json({ error: 'canonicalCategory must be BURGERS, SIDES, DRINKS, MEAL_DEALS, or OTHER' });
+    }
+    try {
+      await upsertCategoryMapping(posCategoryName, canonicalCategory);
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
   
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
