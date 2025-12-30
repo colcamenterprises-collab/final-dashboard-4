@@ -1230,7 +1230,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   // PHASE M: Receipt Truth endpoints (Loyverse API as source)
-  const { rebuildReceiptTruth, getReceiptTruth } = await import('./services/receiptTruthSummary');
+  const { rebuildReceiptTruth, getReceiptTruth, getReceiptTruthLines } = await import('./services/receiptTruthSummary');
   
   app.post('/api/analysis/receipts-truth/rebuild', async (req, res) => {
     const { business_date } = req.body;
@@ -1257,6 +1257,25 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         return res.status(404).json({ error: 'TRUTH_NOT_BUILT', message: `No receipt truth found for ${date}. Use POST /api/analysis/receipts-truth/rebuild to build.` });
       }
       res.json(summary);
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  // 🔒 RECEIPT TRUTH — STEP 2: Line-level truth endpoint
+  app.get('/api/analysis/receipts-truth/lines', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const lines = await getReceiptTruthLines(date);
+      res.json({ 
+        date, 
+        lineCount: lines.length,
+        lines 
+      });
     } catch (e: any) {
       console.error('[RECEIPT_TRUTH_FAIL]', e);
       res.status(500).json({ error: e.message || String(e) });
