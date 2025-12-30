@@ -1,0 +1,158 @@
+PATCH 3 — RECEIPT → INGREDIENT EXPANSION (TRUTH CHAIN CONTINUATION)
+STATUS
+PRODUCTION-CRITICAL
+BACKEND ONLY
+ADDITIVE ONLY
+NO UI CHANGES
+NO SCHEMA MODIFICATIONS TO EXISTING TABLES
+NO FALLBACKS
+NO HEURISTICS
+NO DATABASE-DERIVED SALES TOTALS
+OBJECTIVE
+Extend the locked receipt truth pipeline so that every receipt line item is deterministically expanded into ingredient usage, based strictly on existing recipes and mappings.
+If an item cannot be expanded → it must be explicitly flagged.
+Silence is forbidden.
+Receipts → Line Items → Modifiers → Recipes → Ingredients
+This is the only allowed chain.
+NON-NEGOTIABLE RULES
+Receipts remain the only source of sales truth
+No ingredient usage may exist without a receipt
+No guessing (no defaults, no averages, no inferred ingredients)
+If mapping is missing → mark it, do not compensate
+System must be rebuildable per date
+Agent MUST NOT read totals from any database sales tables
+SCOPE — YOU MAY
+Add new tables (additive only)
+Add backend services
+Add /api/analysis/receipts-truth/* routes
+Read existing tables:
+pos_item_recipe_map
+recipe_ingredient
+purchasing_items
+YOU MUST NOT
+Modify Daily Sales
+Modify Purchasing logic
+Modify POS ingestion
+Modify UI or sidebar
+Introduce caching
+Recalculate prices
+“Fix” missing mappings automatically
+PATCH 3 — DATABASE (ADD ONLY)
+1️⃣ receipt_truth_ingredient
+Copy code
+
+id (uuid, pk)
+receipt_date (date)
+receipt_id (string)
+pos_item_name (string)
+recipe_id (string, nullable)
+ingredient_id (string)
+ingredient_name (string)
+quantity_used (numeric)
+unit (string)
+confidence (int 0–100)
+2️⃣ receipt_truth_flags
+Copy code
+
+id (uuid, pk)
+receipt_date (date)
+receipt_id (string)
+pos_item_name (string)
+issue_type (
+  UNMAPPED_POS_ITEM |
+  RECIPE_INCOMPLETE |
+  INGREDIENT_INACTIVE
+)
+details (text)
+PATCH 3 — DERIVATION LOGIC
+Execution Order (MANDATORY)
+Step 1 — Load receipt truth lines
+Source:
+Copy code
+
+receipt_truth_line
+receipt_truth_modifier
+Filter:
+receipt_date = ?
+receipt_type = SALE
+Exclude refunds (already locked in Patch 1)
+Step 2 — POS → Recipe mapping
+Source:
+Copy code
+
+pos_item_recipe_map
+Rules:
+One POS item → one recipe
+If no mapping:
+Insert row into receipt_truth_flags
+Skip ingredient expansion for that item
+Step 3 — Recipe → Ingredient expansion
+Source:
+Copy code
+
+recipe_ingredient
+purchasing_items
+Rules:
+Only ingredients where:
+purchasing_items.is_ingredient = true
+purchasing_items.active = true
+Quantity formula:
+Copy code
+
+ingredient_used =
+  receipt_quantity × recipe_ingredient.quantity
+If missing ingredient or inactive:
+Insert RECIPE_INCOMPLETE or INGREDIENT_INACTIVE
+Do NOT guess
+Do NOT partially expand
+Step 4 — Confidence scoring (per row)
+Copy code
+
+100 = fully mapped + active ingredient
+70  = mapped recipe but ingredient inactive
+0   = unmapped POS item
+PATCH 3 — API ROUTES
+POST
+Copy code
+
+POST /api/analysis/receipts-truth/ingredients/rebuild
+Body: { date: YYYY-MM-DD }
+Behavior:
+Deletes existing ingredient + flag rows for date
+Rebuilds deterministically from receipt truth lines
+Fails loudly if:
+No receipt truth exists
+No line items exist
+GET
+Copy code
+
+GET /api/analysis/receipts-truth/ingredients?date=YYYY-MM-DD
+Returns:
+Copy code
+
+{
+  totalReceipts,
+  totalLineItems,
+  totalIngredientsUsed,
+  flaggedItemsCount,
+  ingredients: [...],
+  flags: [...]
+}
+ACCEPTANCE CRITERIA
+Ingredient quantities match receipt volumes
+Every ingredient row traces back to a receipt
+Unmapped items are visible and blocking
+Rebuild produces identical results every run
+Zero database-derived sales totals used
+No existing system behavior changes
+LOGGING
+[RECEIPT_TRUTH_FAIL] — missing receipts
+[RECEIPT_TRUTH_FLAG] — unmapped or incomplete items
+[RECEIPT_TRUTH_REBUILD_OK] — successful rebuild
+STOP CONDITIONS
+If any rule above conflicts with current code: STOP. REPORT. DO NOT WORK AROUND.
+DELIVERABLE
+SQL migration (additive only)
+Service: receiptTruthIngredientService.ts
+Routes under /api/analysis/receipts-truth/ingredients
+Inline comments explaining zero-guess policy
