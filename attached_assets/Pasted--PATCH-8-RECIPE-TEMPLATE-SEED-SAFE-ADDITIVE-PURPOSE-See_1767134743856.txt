@@ -1,0 +1,118 @@
+🔒 PATCH 8 — RECIPE TEMPLATE SEED (SAFE, ADDITIVE)
+PURPOSE
+Seed Recipe Management with real, editable recipe cards for every sellable menu item so Cameron can complete ingredients, photos, and costs manually.
+This patch ONLY seeds recipes.
+No receipts. No analytics. No truth engine. No deletions.
+ABSOLUTE RULES (NON-NEGOTIABLE)
+❌ Do NOT delete any data
+❌ Do NOT modify receipts, truth tables, or analysis
+❌ Do NOT infer ingredients
+❌ Do NOT auto-map to POS
+❌ Do NOT change UI behavior
+✅ ADDITIVE ONLY
+✅ Idempotent (safe to re-run)
+SCOPE
+You MAY
+Insert rows into recipes
+Insert rows into recipe_metadata (if exists)
+Add a one-time seed script or migration
+Use names only (no ingredients)
+You MUST NOT
+Touch recipe_ingredient
+Touch pos_item_recipe_map
+Touch receipts / truth tables
+Touch costing logic
+SOURCE OF TRUTH FOR RECIPE NAMES
+Use current sellable items from Loyverse receipts, deduplicated by item name.
+If already extracted, reuse the list from:
+Copy code
+
+receipt_truth_item_aggregate
+If not, derive once from:
+Copy code
+
+lv_line_item.name
+⚠️ NO GUESSING
+Exact spelling
+Exact casing
+Emojis preserved
+TARGET RECIPES TO CREATE (EXAMPLE SET)
+Seed at least the following (expand if more exist in data):
+BURGERS
+Single Smash Burger
+Double Smash Burger
+Super Double Bacon and Cheese
+Ultimate Double
+Big Rooster Sriracha Chicken
+MEAL DEALS
+Single Smash Set (Meal Deal)
+Double Smash Set (Meal Deal)
+Super Double Set (Meal Deal)
+SIDES
+French Fries
+Cajun Fries
+Cheesy Bacon Fries
+DRINKS
+Coke
+Coke Zero
+Sprite
+Bottle Water
+(Agent must confirm against data and include all sold items, ~20–30 total)
+DATABASE INSERT RULES
+For each recipe:
+Copy code
+
+recipes
+- id              uuid
+- name            TEXT (exact POS name)
+- status          'DRAFT'
+- yield           1
+- notes           'Seeded from POS – ingredients pending'
+- created_at
+- updated_at
+Optional metadata (if table exists):
+Copy code
+
+recipe_metadata
+- recipe_id
+- photo_url       NULL
+- prep_notes      NULL
+- allergen_notes  NULL
+IDEMPOTENCY REQUIREMENT
+Before insert:
+Check recipes.name
+If exists → SKIP
+If missing → INSERT
+No duplicates. Ever.
+NO UI CHANGES REQUIRED
+Recipe Management page must:
+Show seeded recipes immediately
+Allow:
+Editing
+Adding ingredients
+Uploading photos (existing functionality)
+No styling changes in this patch
+ACCEPTANCE CRITERIA (MANDATORY)
+✅ All sellable items appear as recipes
+✅ Recipes persist after refresh
+✅ No React errors
+✅ No receipt / analysis numbers change
+✅ Cameron can open a recipe and add ingredients manually
+✅ Patch can be re-run safely
+DELIVERABLE FORMAT (STRICT)
+Agent must deliver:
+One seed script or migration
+Exact file paths
+Clear RUN ONCE instruction
+Confirmation output:
+Copy code
+
+Seeded: 23 recipes
+Skipped (already existed): X
+WHAT THIS UNBLOCKS (IMPORTANT)
+Once this is in:
+Patch 9 = POS → Recipe mapping (manual, controlled)
+Patch 10 = Ingredient truth coverage rises
+No more “0 mapped items”
+No more fake gaps
+This is the missing bridge.
