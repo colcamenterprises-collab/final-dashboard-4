@@ -110,13 +110,13 @@ export default function ReceiptsTruth() {
     <div className="min-h-screen bg-white dark:bg-slate-950">
       <div className="p-4 md:p-6 space-y-4">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
-          Receipts (Truth)
+          Receipts Analysis
         </h1>
 
         <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
           <CardHeader className="p-4 pb-2">
             <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
-              Receipt Truth Summary
+              Summary
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-2 space-y-4">
@@ -166,7 +166,7 @@ export default function ReceiptsTruth() {
 
             {hasTruth && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-[4px]">
-                <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Receipt truth confirmed</div>
+                <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Data confirmed</div>
                 <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
                   Data rebuilt from {summary.source} at {new Date(summary.builtAt).toLocaleString()}
                 </div>

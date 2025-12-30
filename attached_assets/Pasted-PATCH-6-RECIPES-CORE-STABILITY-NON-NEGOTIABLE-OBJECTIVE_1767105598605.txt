@@ -1,0 +1,129 @@
+PATCH 6 — RECIPES CORE STABILITY (NON-NEGOTIABLE)
+OBJECTIVE
+Make Recipe Management:
+Save correctly
+Not crash React
+Be structurally sound
+Ready to link into Receipt → Ingredient truth
+Still editable (this is NOT read-only)
+No analytics. No truth engine changes.
+This patch only stabilises Recipes.
+PROBLEMS CONFIRMED (ROOT CAUSES)
+1. Recipes not saving
+Cause
+UI updates local state
+Backend mutation succeeds OR fails silently
+List is not refetched
+Optimistic update never reconciles
+Result: “Recipe created successfully” → list still shows 1 item.
+2. React crash: INGREDIENT_CATEGORIES is not defined
+Cause
+Constant referenced in UI
+File deleted / renamed during previous refactor
+No fallback guard
+This is a hard frontend bug, not data-related.
+3. Ingredients tab crashes
+Cause
+Ingredients view assumes:
+Categories exist
+Ingredients array is non-null
+Neither is guaranteed right now
+4. Styling is inconsistent / legacy
+Cause
+Page predates Golden Standard
+Mixed layout systems
+Old components reused
+5. No photo support
+Cause
+No image field in recipe model
+No upload pipeline
+No preview logic
+PATCH 6 — REQUIRED CHANGES
+A. FIX RECIPE SAVE FLOW (CRITICAL)
+Frontend
+After POST /api/recipes:
+Hard refetch recipe list
+Do NOT rely on optimistic state
+Disable save button while saving
+If backend returns ID → append safely
+Backend
+Ensure POST /api/recipes returns:
+Copy code
+Json
+{
+  "id": "...",
+  "name": "...",
+  "status": "ACTIVE"
+}
+If mutation fails → return non-200.
+B. FIX INGREDIENT_CATEGORIES CRASH (BLOCKER)
+Immediate fix (no refactor):
+Create single source of truth:
+client/src/constants/ingredientCategories.ts
+Copy code
+Ts
+export const INGREDIENT_CATEGORIES = [
+  "MEAT",
+  "BREAD",
+  "DAIRY",
+  "SAUCE",
+  "VEGETABLE",
+  "DRY_GOODS",
+  "PACKAGING",
+  "OTHER"
+] as const;
+Replace all references to inline or missing constants.
+Add defensive guard:
+Copy code
+Ts
+const categories = INGREDIENT_CATEGORIES ?? [];
+No component should crash if empty.
+C. INGREDIENTS TAB — MAKE IT SAFE
+Rules
+No assumptions
+No undefined access
+Empty state > crash
+UI requirements
+If ingredients.length === 0:
+Show “No ingredients yet”
+Do NOT assume categories exist
+Do NOT compute derived totals on undefined arrays
+D. RECIPE PAGE STRUCTURE (MINIMAL REBUILD)
+Layout
+Follow Golden Standard
+Same shell as:
+Receipts (Truth)
+Ingredients (Truth)
+Tabs
+Recipes (default)
+Ingredients (editor)
+Photos (new – see below)
+No analytics. No truth flags here.
+E. ADD PHOTO SUPPORT (FOUNDATIONAL)
+Backend
+Add nullable column:
+Copy code
+Ts
+recipe.image_url TEXT NULL
+Frontend
+Image upload (simple):
+Accept JPG / PNG
+Upload to existing storage (same as menu images)
+Store URL on recipe
+Show thumbnail in recipe list
+Optional full preview on recipe detail
+No cropping. No AI. Just upload + display.
+ACCEPTANCE CRITERIA (MUST ALL PASS)
+✅ Create recipe → appears instantly in list
+✅ Page refresh → recipe still exists
+✅ Ingredients tab does NOT crash
+✅ No INGREDIENT_CATEGORIES error anywhere
+✅ Styling matches Receipts / Ingredients pages
+✅ Recipe image uploads and displays
+✅ No changes to truth / receipts / analytics
+DO NOT DO
+❌ Do NOT touch receipt truth
+❌ Do NOT touch ingredient truth logic
+❌ Do NOT add mappings
+❌ Do NOT “auto-fix” ingredients
+❌ Do NOT infer categories
