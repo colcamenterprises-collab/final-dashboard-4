@@ -26,9 +26,9 @@ interface LoyverseLineModifier {
 }
 
 interface LoyverseLineItem {
+  item_id?: string;
   item_name: string;
   sku?: string;
-  category_name?: string;
   quantity: number;
   price?: number;
   total_money?: number;
@@ -43,6 +43,17 @@ interface LoyverseReceipt {
   total_discount?: number;
   refund_for?: string | null;
   line_items?: LoyverseLineItem[];
+}
+
+interface LoyverseCategory {
+  id: string;
+  name: string;
+}
+
+interface LoyverseItem {
+  id: string;
+  item_name: string;
+  category_id?: string;
 }
 
 export interface ReceiptTruthLine {
@@ -67,6 +78,72 @@ function getShiftWindowUTC(businessDate: string): { start: string; end: string }
     start: startBangkok.toISOString(),
     end: endBangkok.toISOString(),
   };
+}
+
+// Fetch all categories from Loyverse API
+async function fetchCategoriesFromLoyverse(): Promise<Map<string, string>> {
+  if (!LOYVERSE_TOKEN) {
+    throw new Error('[RECEIPT_TRUTH_FAIL] LOYVERSE_TOKEN not configured');
+  }
+
+  const categoryMap = new Map<string, string>();
+  let cursor: string | undefined;
+
+  do {
+    const params = new URLSearchParams();
+    params.append('limit', '250');
+    if (cursor) params.append('cursor', cursor);
+
+    const url = `${LOYVERSE_API}/categories?${params.toString()}`;
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${LOYVERSE_TOKEN}` },
+      timeout: 30000,
+    });
+
+    const data = response.data;
+    if (Array.isArray(data?.categories)) {
+      for (const cat of data.categories as LoyverseCategory[]) {
+        categoryMap.set(cat.id, cat.name);
+      }
+    }
+    cursor = data?.cursor;
+  } while (cursor);
+
+  console.log(`[RECEIPT_TRUTH] Loaded ${categoryMap.size} categories from Loyverse`);
+  return categoryMap;
+}
+
+// Fetch all items from Loyverse API to get item_id → category_id mapping
+async function fetchItemsFromLoyverse(): Promise<Map<string, string | null>> {
+  if (!LOYVERSE_TOKEN) {
+    throw new Error('[RECEIPT_TRUTH_FAIL] LOYVERSE_TOKEN not configured');
+  }
+
+  const itemToCategoryMap = new Map<string, string | null>();
+  let cursor: string | undefined;
+
+  do {
+    const params = new URLSearchParams();
+    params.append('limit', '250');
+    if (cursor) params.append('cursor', cursor);
+
+    const url = `${LOYVERSE_API}/items?${params.toString()}`;
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${LOYVERSE_TOKEN}` },
+      timeout: 30000,
+    });
+
+    const data = response.data;
+    if (Array.isArray(data?.items)) {
+      for (const item of data.items as LoyverseItem[]) {
+        itemToCategoryMap.set(item.id, item.category_id || null);
+      }
+    }
+    cursor = data?.cursor;
+  } while (cursor);
+
+  console.log(`[RECEIPT_TRUTH] Loaded ${itemToCategoryMap.size} items from Loyverse`);
+  return itemToCategoryMap;
 }
 
 async function fetchReceiptsFromLoyverse(startISO: string, endISO: string): Promise<LoyverseReceipt[]> {
@@ -130,7 +207,13 @@ export async function rebuildReceiptTruth(businessDate: string): Promise<Receipt
   const { start, end } = getShiftWindowUTC(businessDate);
   console.log(`[RECEIPT_TRUTH] Shift window UTC: ${start} to ${end}`);
 
-  const rawReceipts = await fetchReceiptsFromLoyverse(start, end);
+  // Fetch categories and items for category lookup
+  const [categoryMap, itemToCategoryMap, rawReceipts] = await Promise.all([
+    fetchCategoriesFromLoyverse(),
+    fetchItemsFromLoyverse(),
+    fetchReceiptsFromLoyverse(start, end),
+  ]);
+
   const receipts = filterToShiftWindow(rawReceipts, start, end);
 
   if (receipts.length === 0) {
@@ -191,12 +274,19 @@ export async function rebuildReceiptTruth(businessDate: string): Promise<Receipt
       const discountAmount = Number(line.total_discount || 0);
       const netAmount = grossAmount - discountAmount;
 
+      // Lookup category: item_id → category_id → category_name
+      const itemId = line.item_id;
+      const categoryId = itemId ? itemToCategoryMap.get(itemId) : null;
+      const categoryName = categoryId ? categoryMap.get(categoryId) : null;
+      const posCategoryName = categoryName || 'UNCATEGORIZED (POS)';
+      const posCategoryId = categoryId || null;
+
       await db.execute(sql`
         INSERT INTO receipt_truth_line 
-          (receipt_date, receipt_id, receipt_type, sku, item_name, category, quantity, gross_amount, discount_amount, net_amount)
+          (receipt_date, receipt_id, receipt_type, sku, item_name, category, pos_category_name, pos_category_id, quantity, gross_amount, discount_amount, net_amount)
         VALUES 
           (${businessDate}::date, ${receipt.receipt_number}, ${receiptType}, ${line.sku || null}, 
-           ${line.item_name || 'UNKNOWN'}, ${line.category_name || null}, ${Number(line.quantity || 0)},
+           ${line.item_name || 'UNKNOWN'}, ${posCategoryName}, ${posCategoryName}, ${posCategoryId}, ${Number(line.quantity || 0)},
            ${grossAmount}, ${discountAmount}, ${netAmount})
       `);
       lineCount++;

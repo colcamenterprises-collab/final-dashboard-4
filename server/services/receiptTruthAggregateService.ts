@@ -1,33 +1,24 @@
 /**
- * 🔒 RECEIPT TRUTH — AGGREGATION SERVICE (PATCH 4)
+ * 🔒 RECEIPT TRUTH — AGGREGATION SERVICE (PATCH 4 FIXED)
  * 
  * READ-ONLY SOURCES:
- * - receipt_truth_line
+ * - receipt_truth_line (with pos_category_name verbatim from Loyverse)
  * - receipt_truth_modifier
- * - receipt_truth_category_map
- * 
- * NO DERIVATION FROM:
- * - lv_receipt, lv_line_item, or any analytics table
  * 
  * RULES:
- * - Category comes from POS category, not item name
- * - If unmapped → OTHER
+ * - NO canonical category mapping
+ * - Use exact POS category from Loyverse verbatim
+ * - If category missing → "UNCATEGORIZED (POS)"
  * - Modifiers are never collapsed into items
- * - Refund receipts already excluded by PATCH 1
+ * - Refund receipts excluded
  */
 
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 
-export interface CategoryMapping {
-  id: string;
-  posCategoryName: string;
-  canonicalCategory: 'BURGERS' | 'SIDES' | 'DRINKS' | 'MEAL_DEALS' | 'OTHER';
-}
-
 export interface ItemAggregate {
   businessDate: string;
-  canonicalCategory: string;
+  posCategory: string;
   itemName: string;
   totalQuantity: number;
   grossAmount: number;
@@ -39,65 +30,30 @@ export interface ModifierAggregate {
   totalQuantity: number;
 }
 
+export interface CategoryTotal {
+  category: string;
+  itemCount: number;
+  totalQuantity: number;
+  grossAmount: number;
+}
+
 export interface AggregateRebuildResult {
   ok: boolean;
   date: string;
   itemsAggregated: number;
   modifiersAggregated: number;
-  unmappedCategories: string[];
+  categories: string[];
 }
 
 export interface AggregateQueryResult {
   date: string;
   itemsByCategory: Record<string, ItemAggregate[]>;
   modifiers: ModifierAggregate[];
-  categoryTotals: Record<string, { count: number; gross: number }>;
-  unmappedCategories: string[];
+  categoryTotals: CategoryTotal[];
+  categories: string[];
 }
 
-// Get all category mappings
-export async function getCategoryMappings(): Promise<CategoryMapping[]> {
-  const result = await db.execute(sql`
-    SELECT id, pos_category_name, canonical_category
-    FROM receipt_truth_category_map
-    ORDER BY canonical_category, pos_category_name
-  `);
-  return (result.rows as any[]).map(row => ({
-    id: row.id,
-    posCategoryName: row.pos_category_name,
-    canonicalCategory: row.canonical_category,
-  }));
-}
-
-// Add or update a category mapping
-export async function upsertCategoryMapping(
-  posCategoryName: string,
-  canonicalCategory: 'BURGERS' | 'SIDES' | 'DRINKS' | 'MEAL_DEALS' | 'OTHER'
-): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO receipt_truth_category_map (pos_category_name, canonical_category)
-    VALUES (${posCategoryName}, ${canonicalCategory})
-    ON CONFLICT (pos_category_name) 
-    DO UPDATE SET canonical_category = ${canonicalCategory}
-  `);
-}
-
-// Get unmapped POS categories for a date
-async function getUnmappedCategories(businessDate: string): Promise<string[]> {
-  const result = await db.execute(sql`
-    SELECT DISTINCT l.category
-    FROM receipt_truth_line l
-    WHERE l.receipt_date = ${businessDate}::date
-      AND l.receipt_type = 'SALE'
-      AND l.category IS NOT NULL
-      AND l.category NOT IN (
-        SELECT pos_category_name FROM receipt_truth_category_map
-      )
-  `);
-  return (result.rows as any[]).map(row => row.category).filter(Boolean);
-}
-
-// 🔒 REBUILD: Aggregate items and modifiers for a date
+// 🔒 REBUILD: Aggregate items and modifiers for a date (NO MAPPING)
 export async function rebuildAggregates(businessDate: string): Promise<AggregateRebuildResult> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
     throw new Error('[RECEIPT_TRUTH_FAIL] Invalid date format. Use YYYY-MM-DD');
@@ -115,46 +71,33 @@ export async function rebuildAggregates(businessDate: string): Promise<Aggregate
   await db.execute(sql`DELETE FROM receipt_truth_item_aggregate WHERE business_date = ${businessDate}::date`);
   await db.execute(sql`DELETE FROM receipt_truth_modifier_aggregate WHERE business_date = ${businessDate}::date`);
 
-  // Load category mappings
-  const mappingsResult = await db.execute(sql`
-    SELECT pos_category_name, canonical_category FROM receipt_truth_category_map
-  `);
-  const categoryMap = new Map<string, string>();
-  for (const row of mappingsResult.rows as any[]) {
-    categoryMap.set(row.pos_category_name, row.canonical_category);
-  }
-
-  // Aggregate items from receipt_truth_line (SALE only)
+  // Aggregate items by POS category directly (NO MAPPING)
   const itemsResult = await db.execute(sql`
     SELECT 
-      category,
+      COALESCE(pos_category_name, 'UNCATEGORIZED (POS)') as pos_category,
       item_name,
       SUM(quantity) as total_quantity,
       SUM(gross_amount) as gross_amount
     FROM receipt_truth_line
     WHERE receipt_date = ${businessDate}::date
       AND receipt_type = 'SALE'
-    GROUP BY category, item_name
-    ORDER BY category, item_name
+    GROUP BY COALESCE(pos_category_name, 'UNCATEGORIZED (POS)'), item_name
+    ORDER BY pos_category, item_name
   `);
 
-  const unmappedCategories = new Set<string>();
+  const categoriesSet = new Set<string>();
   let itemsAggregated = 0;
 
   for (const row of itemsResult.rows as any[]) {
-    const posCategory = row.category || '';
-    const canonicalCategory = categoryMap.get(posCategory) || 'OTHER';
-    
-    if (!categoryMap.has(posCategory) && posCategory) {
-      unmappedCategories.add(posCategory);
-    }
+    const posCategory = row.pos_category;
+    categoriesSet.add(posCategory);
 
     await db.execute(sql`
       INSERT INTO receipt_truth_item_aggregate 
       (business_date, canonical_category, item_name, total_quantity, gross_amount)
       VALUES (
         ${businessDate}::date,
-        ${canonicalCategory},
+        ${posCategory},
         ${row.item_name},
         ${Number(row.total_quantity)},
         ${Number(row.gross_amount)}
@@ -163,7 +106,7 @@ export async function rebuildAggregates(businessDate: string): Promise<Aggregate
     itemsAggregated++;
   }
 
-  // Aggregate modifiers from receipt_truth_modifier
+  // Aggregate modifiers
   const modifiersResult = await db.execute(sql`
     SELECT 
       m.modifier_name,
@@ -191,18 +134,19 @@ export async function rebuildAggregates(businessDate: string): Promise<Aggregate
     modifiersAggregated++;
   }
 
-  console.log(`[RECEIPT_TRUTH_REBUILD_OK] Aggregates for ${businessDate}: ${itemsAggregated} items, ${modifiersAggregated} modifiers`);
+  const categories = Array.from(categoriesSet).sort();
+  console.log(`[RECEIPT_TRUTH_REBUILD_OK] Aggregates for ${businessDate}: ${itemsAggregated} items, ${modifiersAggregated} modifiers, Categories: ${categories.join(', ')}`);
 
   return {
     ok: true,
     date: businessDate,
     itemsAggregated,
     modifiersAggregated,
-    unmappedCategories: Array.from(unmappedCategories),
+    categories,
   };
 }
 
-// 🔒 GET: Query aggregates for a date
+// 🔒 GET: Query aggregates for a date (NO MAPPING)
 export async function getAggregates(businessDate: string): Promise<AggregateQueryResult | null> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
     throw new Error('[RECEIPT_TRUTH_FAIL] Invalid date format. Use YYYY-MM-DD');
@@ -217,34 +161,24 @@ export async function getAggregates(businessDate: string): Promise<AggregateQuer
     return null;
   }
 
-  // Get items grouped by category
+  // Get items grouped by POS category
   const itemsResult = await db.execute(sql`
-    SELECT business_date, canonical_category, item_name, total_quantity, gross_amount
+    SELECT business_date, canonical_category as pos_category, item_name, total_quantity, gross_amount
     FROM receipt_truth_item_aggregate
     WHERE business_date = ${businessDate}::date
     ORDER BY canonical_category, total_quantity DESC, item_name
   `);
 
-  const itemsByCategory: Record<string, ItemAggregate[]> = {
-    BURGERS: [],
-    SIDES: [],
-    DRINKS: [],
-    MEAL_DEALS: [],
-    OTHER: [],
-  };
-
-  const categoryTotals: Record<string, { count: number; gross: number }> = {
-    BURGERS: { count: 0, gross: 0 },
-    SIDES: { count: 0, gross: 0 },
-    DRINKS: { count: 0, gross: 0 },
-    MEAL_DEALS: { count: 0, gross: 0 },
-    OTHER: { count: 0, gross: 0 },
-  };
+  const itemsByCategory: Record<string, ItemAggregate[]> = {};
+  const categoryTotalsMap: Record<string, { itemCount: number; totalQuantity: number; grossAmount: number }> = {};
+  const categoriesSet = new Set<string>();
 
   for (const row of itemsResult.rows as any[]) {
-    const cat = row.canonical_category as string;
+    const cat = row.pos_category as string;
     const qty = Number(row.total_quantity);
     const gross = Number(row.gross_amount);
+    
+    categoriesSet.add(cat);
     
     if (!itemsByCategory[cat]) {
       itemsByCategory[cat] = [];
@@ -252,17 +186,18 @@ export async function getAggregates(businessDate: string): Promise<AggregateQuer
     
     itemsByCategory[cat].push({
       businessDate: row.business_date,
-      canonicalCategory: cat,
+      posCategory: cat,
       itemName: row.item_name,
       totalQuantity: qty,
       grossAmount: gross,
     });
 
-    if (!categoryTotals[cat]) {
-      categoryTotals[cat] = { count: 0, gross: 0 };
+    if (!categoryTotalsMap[cat]) {
+      categoryTotalsMap[cat] = { itemCount: 0, totalQuantity: 0, grossAmount: 0 };
     }
-    categoryTotals[cat].count += qty;
-    categoryTotals[cat].gross += gross;
+    categoryTotalsMap[cat].itemCount++;
+    categoryTotalsMap[cat].totalQuantity += qty;
+    categoryTotalsMap[cat].grossAmount += gross;
   }
 
   // Get modifiers
@@ -279,14 +214,21 @@ export async function getAggregates(businessDate: string): Promise<AggregateQuer
     totalQuantity: Number(row.total_quantity),
   }));
 
-  // Get unmapped categories
-  const unmappedCategories = await getUnmappedCategories(businessDate);
+  // Build category totals sorted by gross amount
+  const categoryTotals: CategoryTotal[] = Array.from(categoriesSet)
+    .map(cat => ({
+      category: cat,
+      itemCount: categoryTotalsMap[cat]?.itemCount || 0,
+      totalQuantity: categoryTotalsMap[cat]?.totalQuantity || 0,
+      grossAmount: categoryTotalsMap[cat]?.grossAmount || 0,
+    }))
+    .sort((a, b) => b.grossAmount - a.grossAmount);
 
   return {
     date: businessDate,
     itemsByCategory,
     modifiers,
     categoryTotals,
-    unmappedCategories,
+    categories: Array.from(categoriesSet).sort(),
   };
 }

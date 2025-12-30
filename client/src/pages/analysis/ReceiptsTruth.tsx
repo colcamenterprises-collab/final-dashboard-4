@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, AlertTriangle, CheckCircle2, Package, UtensilsCrossed, GlassWater, Salad } from "lucide-react";
+import { RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface ReceiptTruthSummary {
@@ -23,7 +23,7 @@ interface ReceiptTruthSummary {
 
 interface ItemAggregate {
   businessDate: string;
-  canonicalCategory: string;
+  posCategory: string;
   itemName: string;
   totalQuantity: number;
   grossAmount: number;
@@ -35,29 +35,20 @@ interface ModifierAggregate {
   totalQuantity: number;
 }
 
+interface CategoryTotal {
+  category: string;
+  itemCount: number;
+  totalQuantity: number;
+  grossAmount: number;
+}
+
 interface AggregateData {
   date: string;
   itemsByCategory: Record<string, ItemAggregate[]>;
   modifiers: ModifierAggregate[];
-  categoryTotals: Record<string, { count: number; gross: number }>;
-  unmappedCategories: string[];
+  categoryTotals: CategoryTotal[];
+  categories: string[];
 }
-
-const CATEGORY_ICONS: Record<string, JSX.Element> = {
-  BURGERS: <UtensilsCrossed className="w-4 h-4" />,
-  SIDES: <Salad className="w-4 h-4" />,
-  DRINKS: <GlassWater className="w-4 h-4" />,
-  MEAL_DEALS: <Package className="w-4 h-4" />,
-  OTHER: <Package className="w-4 h-4" />,
-};
-
-const CATEGORY_LABELS: Record<string, string> = {
-  BURGERS: "Burgers",
-  SIDES: "Sides",
-  DRINKS: "Drinks",
-  MEAL_DEALS: "Meal Deals",
-  OTHER: "Other",
-};
 
 export default function ReceiptsTruth() {
   const today = new Date();
@@ -271,35 +262,28 @@ export default function ReceiptsTruth() {
                 </TabsList>
 
                 <TabsContent value="items" className="mt-4 space-y-4">
-                  {aggregates.unmappedCategories.length > 0 && (
-                    <div className="flex items-start gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-[4px]">
-                      <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                      <div>
-                        <div className="font-semibold text-amber-800 dark:text-amber-300">Unmapped Categories</div>
-                        <div className="text-sm text-amber-600 dark:text-amber-400">
-                          The following POS categories are not mapped: {aggregates.unmappedCategories.join(', ')}
-                        </div>
-                      </div>
+                  {aggregates.categories.length === 0 && (
+                    <div className="text-sm text-slate-500 text-center py-8">
+                      No items recorded for this date.
                     </div>
                   )}
 
-                  {['BURGERS', 'SIDES', 'DRINKS', 'MEAL_DEALS', 'OTHER'].map(cat => {
+                  {aggregates.categories.map(cat => {
                     const items = aggregates.itemsByCategory[cat] || [];
                     if (items.length === 0) return null;
                     
                     return (
                       <Card key={cat} className="bg-white dark:bg-slate-900 rounded-[4px]">
                         <CardHeader className="pb-2">
-                          <CardTitle className="flex items-center gap-2 text-lg text-gray-900 dark:text-white">
-                            {CATEGORY_ICONS[cat]}
-                            {CATEGORY_LABELS[cat]}
+                          <CardTitle className="text-lg text-gray-900 dark:text-white">
+                            {cat}
                             <Badge variant="secondary" className="ml-2">{items.length} items</Badge>
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
                           <div className="space-y-2">
                             {items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0" data-testid={`item-${cat}-${idx}`}>
+                              <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0" data-testid={`item-${cat.replace(/\s+/g, '-')}-${idx}`}>
                                 <span className="text-sm font-medium text-gray-900 dark:text-white">{item.itemName}</span>
                                 <div className="flex items-center gap-4">
                                   <span className="text-sm text-slate-600 dark:text-slate-400">×{item.totalQuantity}</span>
@@ -343,26 +327,27 @@ export default function ReceiptsTruth() {
                   <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-lg text-gray-900 dark:text-white">
-                        Category Totals
+                        Category Totals (POS Categories)
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                        {['BURGERS', 'SIDES', 'DRINKS', 'MEAL_DEALS', 'OTHER'].map(cat => {
-                          const totals = aggregates.categoryTotals[cat] || { count: 0, gross: 0 };
-                          return (
-                            <div key={cat} className="p-4 bg-slate-50 dark:bg-slate-800 rounded-[4px]" data-testid={`total-${cat}`}>
-                              <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                {CATEGORY_ICONS[cat]}
-                                {CATEGORY_LABELS[cat]}
+                      {aggregates.categoryTotals.length === 0 ? (
+                        <div className="text-sm text-slate-500">No categories recorded for this date.</div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {aggregates.categoryTotals.map((cat, idx) => (
+                            <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800 rounded-[4px]" data-testid={`total-${cat.category.replace(/\s+/g, '-')}`}>
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                {cat.category}
                               </div>
-                              <div className="text-2xl font-bold text-emerald-600">{totals.count}</div>
+                              <div className="text-2xl font-bold text-emerald-600">{cat.totalQuantity}</div>
                               <div className="text-xs text-slate-500">items sold</div>
-                              <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(totals.gross)}</div>
+                              <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(cat.grossAmount)}</div>
+                              <div className="text-xs text-slate-500">{cat.itemCount} unique items</div>
                             </div>
-                          );
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
