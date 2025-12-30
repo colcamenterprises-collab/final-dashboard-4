@@ -410,14 +410,14 @@ export default function RecipeManagement() {
 
   if (recipesLoading || ingredientsLoading) {
     return (
-      <div className="container mx-auto p-2 sm:p-4 lg:p-6 max-w-7xl">
-        <div className="flex items-center space-x-2 mb-4 sm:mb-6">
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe Management</h1>
+      <div className="w-full px-3 sm:px-4 lg:px-6 py-4 max-w-7xl mx-auto">
+        <div className="mb-4">
+          <h1 className="text-sm sm:text-base font-semibold text-slate-900 dark:text-white">Recipe Management</h1>
         </div>
         <div className="animate-pulse">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <div className="h-96 bg-gray-200 rounded-lg"></div>
-            <div className="h-96 bg-gray-200 rounded-lg"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="h-80 bg-slate-100 dark:bg-slate-800 rounded-[4px]"></div>
+            <div className="h-80 bg-slate-100 dark:bg-slate-800 rounded-[4px]"></div>
           </div>
         </div>
       </div>
@@ -425,24 +425,26 @@ export default function RecipeManagement() {
   }
 
   return (
-    <div className="container mx-auto p-2 sm:p-4 lg:p-6 space-y-4 sm:space-y-6 max-w-7xl">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center space-x-2">
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-bold">Recipe & Ingredient Management</h1>
-        </div>
+    <div className="w-full px-3 sm:px-4 lg:px-6 py-4 space-y-4 max-w-7xl mx-auto font-sans">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-sm sm:text-base lg:text-lg font-semibold text-slate-900 dark:text-white">
+          Recipe & Ingredient Management
+        </h1>
         
-        <div className="flex space-x-2 w-full sm:w-auto">
+        <div className="flex gap-2 w-full sm:w-auto">
           <Button
             variant={activeTab === 'recipes' ? 'default' : 'outline'}
             onClick={() => setActiveTab('recipes')}
-            className={`flex-1 sm:flex-none ${activeTab === 'recipes' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300'}`}
+            size="sm"
+            className={`flex-1 sm:flex-none text-xs rounded-[4px] ${activeTab === 'recipes' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}
           >
             Recipes
           </Button>
           <Button
             variant={activeTab === 'ingredients' ? 'default' : 'outline'}
             onClick={() => setActiveTab('ingredients')}
-            className={`flex-1 sm:flex-none ${activeTab === 'ingredients' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300'}`}
+            size="sm"
+            className={`flex-1 sm:flex-none text-xs rounded-[4px] ${activeTab === 'ingredients' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300'}`}
           >
             Ingredients
           </Button>
@@ -451,11 +453,11 @@ export default function RecipeManagement() {
 
       {activeTab === 'recipes' && (
         <>
-        <div className="space-y-4">
+        <div className="space-y-3">
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
+              <Button size="sm" className="text-xs rounded-[4px] bg-emerald-600 hover:bg-emerald-700">
+                <Plus className="h-3 w-3 mr-1" />
                 Create Recipe
               </Button>
             </DialogTrigger>
@@ -582,43 +584,43 @@ export default function RecipeManagement() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         {/* Recipes List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recipes ({recipes.length})</CardTitle>
-            <CardDescription>
+        <Card className="rounded-[4px] border-slate-200 dark:border-slate-700">
+          <CardHeader className="p-3 sm:p-4 pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">Recipes ({recipes.length})</CardTitle>
+            <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
               Manage your restaurant's recipes and their costs
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
+          <CardContent className="p-3 sm:p-4 pt-0 max-h-[60vh] overflow-y-auto">
+            <div className="space-y-2">
               {recipes.map((recipe) => (
                 <div
                   key={recipe.id}
-                  className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                  className={`p-3 rounded-[4px] border cursor-pointer transition-colors touch-manipulation ${
                     selectedRecipe?.id === recipe.id 
                       ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20' 
-                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 active:bg-slate-50 dark:active:bg-slate-800'
                   }`}
                   onClick={() => setSelectedRecipe(recipe)}
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-medium">{recipe.name}</h3>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">{recipe.category}</p>
-                      <div className="flex items-center space-x-4 mt-1">
-                        <span className="text-sm text-slate-500">
-                          Cost: ฿{recipe.totalCost?.toFixed(2) || '0.00'}
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-xs font-medium text-slate-900 dark:text-white truncate">{recipe.name}</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{recipe.category || 'Uncategorized'}</p>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
+                        <span className="text-xs text-slate-500">
+                          ฿{recipe.totalCost?.toFixed(2) || '0.00'}
                         </span>
-                        <span className="text-sm text-slate-500">
+                        <span className="text-xs text-slate-500">
                           Serves: {recipe.yieldUnits || '-'}
                         </span>
                       </div>
                     </div>
                     <Badge 
                       variant={recipe.active ? "default" : "secondary"}
-                      className={recipe.active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}
+                      className={`text-[10px] px-1.5 py-0.5 rounded-[4px] shrink-0 ${recipe.active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300' : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}
                     >
                       {recipe.active ? "Active" : "Inactive"}
                     </Badge>
@@ -628,7 +630,7 @@ export default function RecipeManagement() {
               
               {recipes.length === 0 && (
                 <div className="text-center py-8 text-slate-500">
-                  <p>No recipes yet. Create your first recipe!</p>
+                  <p className="text-xs">No recipes yet. Create your first recipe!</p>
                 </div>
               )}
             </div>
@@ -636,71 +638,66 @@ export default function RecipeManagement() {
         </Card>
 
         {/* Recipe Details */}
-        <Card>
-          <CardHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <CardTitle>
+        <Card className="rounded-[4px] border-slate-200 dark:border-slate-700">
+          <CardHeader className="p-3 sm:p-4 pb-2">
+            <div className="flex justify-between items-start gap-2">
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white truncate">
                   {selectedRecipe ? selectedRecipe.name : "Select a Recipe"}
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
                   {selectedRecipe ? "Recipe details and cost breakdown" : "Choose a recipe to view details"}
                 </CardDescription>
               </div>
               {selectedRecipe && (
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteRecipeMutation.mutate(selectedRecipe.id)}
-                    disabled={deleteRecipeMutation.isPending}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => deleteRecipeMutation.mutate(selectedRecipe.id)}
+                  disabled={deleteRecipeMutation.isPending}
+                  className="shrink-0 h-8 w-8 p-0 rounded-[4px]"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-3 sm:p-4 pt-0 max-h-[60vh] overflow-y-auto">
             {selectedRecipe ? (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {/* Recipe Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Category</Label>
-                    <p>{selectedRecipe.category}</p>
+                    <Label className="text-xs font-medium text-slate-500 dark:text-slate-400">Category</Label>
+                    <p className="text-xs text-slate-900 dark:text-white">{selectedRecipe.category || 'Uncategorized'}</p>
                   </div>
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Serving Size</Label>
-                    <p>{selectedRecipe.servingSize}</p>
+                    <Label className="text-xs font-medium text-slate-500 dark:text-slate-400">Serves</Label>
+                    <p className="text-xs text-slate-900 dark:text-white">{selectedRecipe.yieldUnits || '1'}</p>
                   </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Prep Time</Label>
-                    <p>{selectedRecipe.preparationTime} minutes</p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-600">Total Cost</Label>
-                    <p className="font-semibold text-green-600">฿{calculateRecipeCost()}</p>
+                  <div className="col-span-2">
+                    <Label className="text-xs font-medium text-slate-500 dark:text-slate-400">Total Cost</Label>
+                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">฿{calculateRecipeCost()}</p>
                   </div>
                 </div>
 
                 {selectedRecipe.description && (
                   <div>
-                    <Label className="text-sm font-medium text-gray-600">Description</Label>
-                    <p className="text-sm">{selectedRecipe.description}</p>
+                    <Label className="text-xs font-medium text-slate-500 dark:text-slate-400">Description</Label>
+                    <p className="text-xs text-slate-700 dark:text-slate-300">{selectedRecipe.description}</p>
                   </div>
                 )}
 
-                <Separator />
+                <Separator className="my-3" />
 
                 {/* Ingredients Section */}
                 <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-medium">Ingredients ({selectedRecipe?.ingredients?.length || 0})</h3>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-xs font-medium text-slate-900 dark:text-white">Ingredients ({selectedRecipe?.ingredients?.length || 0})</h3>
                     <Dialog open={isAddIngredientDialogOpen} onOpenChange={setIsAddIngredientDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button size="sm">
-                          <Plus className="h-4 w-4 mr-1" />
+                        <Button size="sm" className="h-7 text-xs rounded-[4px]">
+                          <Plus className="h-3 w-3 mr-1" />
                           Add
                         </Button>
                       </DialogTrigger>
@@ -728,7 +725,7 @@ export default function RecipeManagement() {
                                     <SelectContent>
                                       {ingredients.map((ingredient) => (
                                         <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                                          {ingredient.item} (฿{ingredient.unitCost?.toFixed(2) || '0.00'}/{ingredient.portionUnit || ingredient.orderUnit || 'unit'})
+                                          {ingredient.item} (฿{Number(ingredient.unitCost || 0).toFixed(2)}/{ingredient.portionUnit || ingredient.orderUnit || 'unit'})
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -1098,37 +1095,38 @@ export default function RecipeManagement() {
 
       {/* Ingredients Tab */}
       {activeTab === 'ingredients' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div className="flex items-center space-x-2">
-              <Package className="h-5 w-5" />
-              <h2 className="text-lg font-semibold">Ingredient Management</h2>
+        <div className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
+            <div className="flex items-center gap-2">
+              <Package className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Ingredient Management</h2>
             </div>
             <Button
               onClick={() => {
                 setEditingIngredientItem(null);
                 setIsIngredientFormOpen(true);
               }}
-              className="w-full sm:w-auto"
+              size="sm"
+              className="w-full sm:w-auto text-xs rounded-[4px] bg-emerald-600 hover:bg-emerald-700"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-3 w-3 mr-1" />
               Add Ingredient
             </Button>
           </div>
 
           {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <Input
-                placeholder="Search ingredients, suppliers, or brands..."
+                placeholder="Search ingredients..."
                 value={ingredientSearchTerm}
                 onChange={(e) => setIngredientSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-9 h-9 text-xs rounded-[4px] border-slate-200 dark:border-slate-700"
               />
             </div>
             <Select value={ingredientCategoryFilter} onValueChange={setIngredientCategoryFilter}>
-              <SelectTrigger className="w-full sm:w-48">
+              <SelectTrigger className="w-full sm:w-40 h-9 text-xs rounded-[4px] border-slate-200 dark:border-slate-700">
                 <SelectValue placeholder="Filter by category" />
               </SelectTrigger>
               <SelectContent>
@@ -1143,18 +1141,18 @@ export default function RecipeManagement() {
           </div>
 
           {/* Ingredient List */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {filteredIngredients.map((ingredient) => (
-              <Card key={ingredient.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <CardTitle className="text-sm font-medium">{ingredient.name}</CardTitle>
-                      <CardDescription className="text-xs">
-                        {ingredient.supplier || 'Unknown Supplier'} • {ingredient.category}
+              <Card key={ingredient.id} className="rounded-[4px] border-slate-200 dark:border-slate-700 hover:shadow-sm transition-shadow touch-manipulation">
+                <CardHeader className="p-3 pb-2">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-xs font-medium text-slate-900 dark:text-white truncate">{ingredient.item}</CardTitle>
+                      <CardDescription className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+                        {ingredient.category || 'Uncategorized'}
                       </CardDescription>
                     </div>
-                    <div className="flex space-x-1">
+                    <div className="flex gap-1 shrink-0">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1162,7 +1160,7 @@ export default function RecipeManagement() {
                           setEditingIngredientItem(ingredient);
                           setIsIngredientFormOpen(true);
                         }}
-                        className="h-8 w-8 p-0"
+                        className="h-7 w-7 p-0 rounded-[4px]"
                       >
                         <Edit3 className="h-3 w-3" />
                       </Button>
@@ -1170,45 +1168,23 @@ export default function RecipeManagement() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDeleteIngredient(ingredient.id)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        className="h-7 w-7 p-0 rounded-[4px] text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                       >
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="space-y-2 text-xs">
+                <CardContent className="p-3 pt-0">
+                  <div className="space-y-1 text-[11px]">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Cost per item:</span>
-                      <span className="font-medium">฿{ingredient.costPerItem || ingredient.unitPrice}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Unit Cost:</span>
+                      <span className="font-medium text-slate-900 dark:text-white">฿{Number(ingredient.unitCost || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Package:</span>
-                      <span>{ingredient.packageQty || ingredient.packageSize}</span>
+                      <span className="text-slate-500 dark:text-slate-400">Unit:</span>
+                      <span className="text-slate-700 dark:text-slate-300">{ingredient.portionUnit || ingredient.orderUnit || '-'}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Measurement:</span>
-                      <span>{ingredient.measurement || ingredient.unit}</span>
-                    </div>
-                    {ingredient.brand && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Brand:</span>
-                        <span>{ingredient.brand}</span>
-                      </div>
-                    )}
-                    {ingredient.minimumStockAmount && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Min Stock:</span>
-                        <span>{ingredient.minimumStockAmount}</span>
-                      </div>
-                    )}
-                    {ingredient.notes && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Notes:</span>
-                        <span className="text-right">{ingredient.notes}</span>
-                      </div>
-                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -1217,11 +1193,11 @@ export default function RecipeManagement() {
 
           {filteredIngredients.length === 0 && (
             <div className="text-center py-8">
-              <Package className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-              <p className="text-gray-500">No ingredients found</p>
-              <p className="text-sm text-gray-400">
+              <Package className="h-10 w-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+              <p className="text-xs text-slate-500 dark:text-slate-400">No ingredients found</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                 {ingredientSearchTerm || ingredientCategoryFilter !== 'all' 
-                  ? 'Try adjusting your search or filter criteria'
+                  ? 'Try adjusting your search or filter'
                   : 'Add your first ingredient to get started'}
               </p>
             </div>
