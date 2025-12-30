@@ -1,0 +1,184 @@
+🔒 PATCH 1 — RECEIPTS TRUTH LOCK (STEP 1 ONLY)
+OBJECTIVE (NON-NEGOTIABLE)
+Lock down receipt truth so the system:
+NEVER derives receipt numbers from the database alone
+ONLY uses Loyverse POS API as the source of receipt truth
+POPULATES the new Receipts Truth page with canonical numbers
+CANNOT delete or mutate receipt data
+CANNOT silently fall back
+CANNOT be “helpful”
+This patch does NOT do breakdowns yet.
+This patch does NOT touch UI styling.
+This patch does NOT refactor anything else.
+This patch LOCKS STEP 1.
+🔐 HARD RULES FOR AGENT (READ THIS FIRST)
+ABSOLUTE PROHIBITIONS
+❌ Do NOT delete any data
+❌ Do NOT truncate tables
+❌ Do NOT infer or estimate
+❌ Do NOT read aggregated numbers from analytics tables
+❌ Do NOT change existing receipt ingestion
+❌ Do NOT add “fallback” logic
+❌ Do NOT touch Daily Sales, Purchasing, Recipes, Stock, or UI
+ALLOWED
+✅ Read from Loyverse API
+✅ Persist raw receipt payloads
+✅ Persist summary results
+✅ Add additive code only
+✅ Fail loudly if POS data is unavailable
+If any conflict exists → STOP AND REPORT
+🧱 STEP 1 — CANONICAL RECEIPT SUMMARY (LOCKED)
+Source of Truth (ONLY)
+Copy code
+
+Loyverse POS API
+GET https://api.loyverse.com/v1.0/receipts
+Shift Window (LOCKED)
+Copy code
+
+Bangkok Time
+Start: 17:00
+End:   03:00 (next day)
+📊 REQUIRED METRICS (NO MORE, NO LESS)
+For a given business_date:
+Metric
+Definition
+allReceipts
+COUNT(all receipts returned by POS in shift window)
+salesReceipts
+COUNT(receipts where refund_for IS NULL)
+refundReceipts
+COUNT(receipts where refund_for IS NOT NULL)
+grossSales
+SUM(total_money) of SALES receipts
+discounts
+SUM(total_discount) of SALES receipts
+refunds
+SUM(total_money) of REFUND receipts
+netSales
+grossSales − discounts − refunds
+⚠️ Important
+One receipt = one sale
+Refund receipts reduce totals
+Modifiers are already included in total_money
+Do NOT recompute line items
+Do NOT sum lv_receipt.total_amount
+Use raw POS values only
+🗄️ DATABASE (ADDITIVE ONLY)
+Table (if not already present)
+Copy code
+Sql
+CREATE TABLE IF NOT EXISTS receipt_truth_summary (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_date DATE NOT NULL UNIQUE,
+
+  all_receipts INTEGER NOT NULL,
+  sales_receipts INTEGER NOT NULL,
+  refund_receipts INTEGER NOT NULL,
+
+  gross_sales NUMERIC NOT NULL,
+  discounts NUMERIC NOT NULL,
+  refunds NUMERIC NOT NULL,
+  net_sales NUMERIC NOT NULL,
+
+  source TEXT NOT NULL DEFAULT 'LOYVERSE_API',
+  built_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+🚫 No updates
+🚫 No deletes
+🚫 Rebuild = overwrite by date only
+⚙️ BACKEND SERVICE (NEW FILE)
+File
+Copy code
+
+server/services/receiptTruthSummary.ts
+Rules
+Must fetch from Loyverse API directly
+Must NOT read analytics tables
+Must NOT read Daily Sales
+Must NOT infer missing data
+Pseudo-logic (STRICT)
+Copy code
+Ts
+fetch receipts from Loyverse API
+filter receipts to shift window (17:00–03:00 BKK)
+
+if receipts.length === 0:
+  throw TRUTH_ERROR("NO_POS_RECEIPTS")
+
+classify receipts:
+  sales = refund_for == null
+  refunds = refund_for != null
+
+compute:
+  allReceipts = receipts.length
+  salesReceipts = sales.length
+  refundReceipts = refunds.length
+
+  grossSales = sum(sales.total_money)
+  discounts = sum(sales.total_discount)
+  refundsAmount = sum(refunds.total_money)
+  netSales = grossSales - discounts - refundsAmount
+
+persist result for business_date
+return result
+🌐 API (NEW, LOCKED)
+Rebuild (explicit action only)
+Copy code
+
+POST /api/analysis/receipts-truth/rebuild
+BODY: { business_date: "YYYY-MM-DD" }
+Fetches from Loyverse API
+Recomputes summary
+Overwrites that date only
+Errors if POS unavailable
+Read (used by Receipts page)
+Copy code
+
+GET /api/analysis/receipts-truth?date=YYYY-MM-DD
+Returns:
+Copy code
+Json
+{
+  "allReceipts": 54,
+  "salesReceipts": 54,
+  "refundReceipts": 0,
+  "grossSales": 23764,
+  "discounts": 89,
+  "refunds": 0,
+  "netSales": 23675,
+  "source": "LOYVERSE_API"
+}
+If missing → explicit error:
+Copy code
+
+TRUTH_NOT_BUILT
+🛑 FAILURE BEHAVIOUR (MANDATORY)
+No receipts → ERROR
+No API token → ERROR
+Partial data → ERROR
+Never return zeros silently
+Never fabricate data
+Log tag:
+Copy code
+
+[RECEIPT_TRUTH_FAIL]
+✅ ACCEPTANCE CRITERIA (STEP 1 LOCKED)
+[ ] Numbers match Loyverse Sales Summary exactly
+[ ] Refunds visible and explicit
+[ ] Discounts explicit
+[ ] Net sales math correct
+[ ] No database-only derivation
+[ ] No silent fallbacks
+[ ] Agent cannot “fix” numbers
+🚫 WHAT COMES NEXT (NOT THIS PATCH)
+Step 2: Item + modifier breakdown
+Step 3: Ingredient usage
+Step 4: Reconciliation feeds
+DO NOT IMPLEMENT YET
+📌 FINAL INSTRUCTION TO REPLIT AGENT
+Implement PATCH 1 exactly as written.
+Do not extend scope.
+Do not refactor.
+Do not “improve”.
+If blocked, STOP and REPORT.
