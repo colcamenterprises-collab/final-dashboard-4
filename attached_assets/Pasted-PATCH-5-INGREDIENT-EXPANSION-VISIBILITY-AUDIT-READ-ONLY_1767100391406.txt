@@ -1,0 +1,126 @@
+PATCH 5 — INGREDIENT EXPANSION VISIBILITY & AUDIT (READ-ONLY UI)
+Purpose
+Expose exactly what the engine knows and does not know about ingredients — visibly, per date, backdated to July 1.
+No guessing. No fixing here. This is inspection only.
+🔒 NON-NEGOTIABLE RULES (LOCKED)
+READ-ONLY UI
+NO database deletes
+NO automatic mappings
+NO fallback logic
+NO edits to receipts, categories, or recipes
+This page does not fix problems — it shows them
+1️⃣ NEW ANALYSIS PAGE (UI)
+Route
+Copy code
+
+/analysis/ingredients-truth
+Sidebar
+Copy code
+
+Analysis
+ ├─ Receipts (Truth)
+ ├─ Ingredients (Truth)   ← NEW
+ ├─ Ingredient Reconciliation (legacy – leave)
+2️⃣ DATA SOURCES (STRICT)
+Data
+Source
+Receipts
+Loyverse API (already locked)
+Line items
+receipt_truth_line
+Modifiers
+receipt_truth_modifier
+Ingredient expansion
+receipt_truth_ingredient
+Flags
+receipt_truth_flags
+Recipes
+recipe
+Ingredients
+ingredient
+⚠️ NO joins to Daily Sales, Purchasing, or Analytics
+3️⃣ PAGE STRUCTURE (EXACT)
+🔹 Header
+Copy code
+
+Ingredients (Truth)
+Date Picker [YYYY-MM-DD]
+Shift Window: 17:00 → 03:00 (BKK)
+🔹 Status Banner
+Condition
+Banner
+No receipt rebuild
+🔴 NO RECEIPT TRUTH
+Ingredient rebuild not run
+🟠 INGREDIENT EXPANSION NOT RUN
+Flags exist
+🔴 ACTION REQUIRED
+Clean
+🟢 INGREDIENT TRUTH CONFIRMED
+4️⃣ TABS (MANDATORY)
+TAB 1 — INGREDIENT USAGE (TRUTH)
+Grouped by ingredient:
+Copy code
+
+Ingredient | Qty Used | Unit | Source Items | Confidence
+---------------------------------------------------------
+Beef Patty | 9.81     | kg   | 109          | 100
+Cheese     | 3.27     | kg   | 87           | 100
+Bacon      | 1.14     | kg   | 29           | 100
+Rules:
+Quantity = Σ receipt_qty × recipe_qty
+Unit from ingredient table
+Confidence = min confidence of source items
+TAB 2 — UNMAPPED ITEMS
+Directly from receipt_truth_flags
+Copy code
+
+POS Category | Item Name | SKU | Issue
+------------------------------------------------
+Smash Burgers | Big Rooster Sriracha | 10068 | UNMAPPED_POS_ITEM
+No hiding.
+No collapsing.
+This is the problem list.
+TAB 3 — RECIPE COVERAGE
+Coverage report:
+Copy code
+
+Total POS Items Sold: 109
+Mapped to Recipes:    64
+Unmapped:             45
+Coverage:             58.7%
+Table:
+Copy code
+
+Recipe | POS Items Using | Ingredients Complete | Status
+---------------------------------------------------------
+Single Smash | 32 | Yes | OK
+Ultimate Double | 21 | Yes | OK
+Big Rooster | 0 | No | BLOCKED
+TAB 4 — AUDIT LOG
+Per rebuild:
+Copy code
+
+Date | Receipts | Line Items | Ingredients | Flags | Confidence
+----------------------------------------------------------------
+2025-12-29 | 54 | 109 | 37 | 45 | 72
+5️⃣ API ENDPOINTS (ADD ONLY)
+Ingredient summary
+Copy code
+
+GET /api/analysis/ingredients-truth?date=YYYY-MM-DD
+Ingredient rebuild (already exists)
+Copy code
+
+POST /api/analysis/receipts-truth/ingredients/rebuild
+Flags
+Copy code
+
+GET /api/analysis/ingredients-truth/flags?date=
+6️⃣ ACCEPTANCE CRITERIA (NO EXCEPTIONS)
+✔ Backdating works to 2024-07-01
+✔ Every ingredient quantity traceable to receipts
+✔ Every missing mapping visible
+✔ Zero guessed ingredients
+✔ No writes outside truth tables
+✔ Page can be used by non-technical ops staff

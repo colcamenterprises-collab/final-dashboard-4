@@ -1319,6 +1319,87 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  // 🔒 PATCH 5: Ingredients Truth Summary endpoint (aggregated view)
+  app.get('/api/analysis/ingredients-truth', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const result = await getIngredientTruth(date);
+      if (!result) {
+        return res.status(404).json({ 
+          error: 'INGREDIENTS_NOT_BUILT', 
+          message: `No ingredient truth found for ${date}. Rebuild receipts first, then ingredients.` 
+        });
+      }
+      
+      // Aggregate ingredients by name
+      const ingredientMap = new Map<string, { totalQty: number; unit: string; sourceItems: Set<string>; minConfidence: number }>();
+      for (const ing of result.ingredients) {
+        const key = ing.ingredientName;
+        if (!ingredientMap.has(key)) {
+          ingredientMap.set(key, { totalQty: 0, unit: ing.unit, sourceItems: new Set(), minConfidence: 100 });
+        }
+        const agg = ingredientMap.get(key)!;
+        agg.totalQty += ing.quantityUsed;
+        agg.sourceItems.add(ing.posItemName);
+        agg.minConfidence = Math.min(agg.minConfidence, ing.confidence);
+      }
+      
+      const aggregatedIngredients = Array.from(ingredientMap.entries()).map(([name, data]) => ({
+        ingredientName: name,
+        totalQuantity: Math.round(data.totalQty * 1000) / 1000,
+        unit: data.unit,
+        sourceItemCount: data.sourceItems.size,
+        confidence: data.minConfidence,
+      })).sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+      // Aggregate flags by issue type
+      const flagsByType = new Map<string, { items: Set<string>; count: number }>();
+      for (const flag of result.flags) {
+        const key = flag.issueType;
+        if (!flagsByType.has(key)) {
+          flagsByType.set(key, { items: new Set(), count: 0 });
+        }
+        flagsByType.get(key)!.items.add(flag.posItemName);
+        flagsByType.get(key)!.count++;
+      }
+      
+      const flagSummary = Array.from(flagsByType.entries()).map(([type, data]) => ({
+        issueType: type,
+        uniqueItems: data.items.size,
+        occurrences: data.count,
+      }));
+
+      // Calculate coverage stats
+      const totalLineItems = result.totalLineItems;
+      const unmappedCount = result.flags.filter(f => f.issueType === 'UNMAPPED_POS_ITEM').length;
+      const mappedCount = totalLineItems - unmappedCount;
+      const coverage = totalLineItems > 0 ? Math.round((mappedCount / totalLineItems) * 1000) / 10 : 0;
+
+      res.json({
+        date: result.date,
+        status: result.flaggedItemsCount > 0 ? 'ACTION_REQUIRED' : 'CONFIRMED',
+        stats: {
+          totalReceipts: result.totalReceipts,
+          totalLineItems: result.totalLineItems,
+          totalIngredientsExpanded: result.totalIngredientsUsed,
+          flaggedItemsCount: result.flaggedItemsCount,
+          mappedItems: mappedCount,
+          unmappedItems: unmappedCount,
+          coverage,
+        },
+        ingredients: aggregatedIngredients,
+        flagSummary,
+        flags: result.flags,
+      });
+    } catch (e: any) {
+      console.error('[INGREDIENTS_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
   // 🔒 RECEIPT TRUTH — STEP 4: Aggregation endpoints (PATCH 4)
   const { 
     rebuildAggregates, 
