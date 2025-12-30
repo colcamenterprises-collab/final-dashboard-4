@@ -1,0 +1,107 @@
+PATCH 2 — RECEIPT ITEM & MODIFIER EXPANSION (LOCKED TRUTH INPUT)
+Purpose
+Extend the locked receipt truth foundation so we can see exactly what was sold, line-by-line, including items, quantities, modifiers, refunds, and discounts, derived only from Loyverse receipts.
+This patch feeds all downstream analysis later.
+No UI polish. No guessing. No aggregation shortcuts.
+NON-NEGOTIABLE RULES (REPEAT FOR AGENT)
+READ FROM LOYVERSE API ONLY
+NO database-only derivation
+NO deletion of existing data
+NO schema changes outside this patch
+NO inference, NO fallback
+Refunds must be visible, not hidden
+1 receipt = 1 receipt (sales vs refund is explicit)
+WHAT THIS PATCH DOES (ONLY THIS)
+1️⃣ Add Canonical Receipt Line Tables (Additive Only)
+Create additive tables:
+receipt_truth_line
+id (uuid, pk)
+receipt_date (date, BKK business date)
+receipt_id (string, Loyverse)
+receipt_type (SALE | REFUND)
+sku
+item_name
+category
+quantity
+gross_amount
+discount_amount
+net_amount
+receipt_truth_modifier
+id (uuid, pk)
+receipt_id
+line_sku
+modifier_name
+quantity
+price_impact
+These tables are WRITE-ONCE per rebuild.
+2️⃣ Extend Receipt Truth Rebuild (Step 1 → Step 2)
+Update existing service:
+Copy code
+
+receiptTruthSummary.ts
+During:
+Copy code
+
+POST /api/analysis/receipts-truth/rebuild
+After summary is calculated:
+Explode every receipt
+Explode every line item
+Explode every modifier
+Write exact POS values from Loyverse JSON:
+total_money
+total_discount
+refund_for
+line_items[].price
+line_items[].modifiers[]
+🚫 Do NOT recompute money from quantities
+🚫 Do NOT infer modifier pricing
+🚫 Do NOT merge items
+3️⃣ Refund Handling (Explicit)
+From Loyverse:
+refund_for != null → receipt_type = REFUND
+Refund receipts:
+Counted in All Receipts
+Removed from Sales Receipts
+Included in Refund Count
+Refund amounts stored explicitly
+NO netting silently. Ever.
+4️⃣ Read-Only API for Verification (NO UI YET)
+Add read-only endpoints:
+Summary (already exists – untouched)
+Copy code
+
+GET /api/analysis/receipts-truth?date=YYYY-MM-DD
+Line-level truth
+Copy code
+
+GET /api/analysis/receipts-truth/lines?date=YYYY-MM-DD
+Returns:
+All receipt lines
+Modifiers nested or joined
+Receipt type visible per row
+This endpoint exists only so numbers can be checked externally.
+ACCEPTANCE TEST (MANDATORY)
+For a known date (e.g. Dec 29):
+allReceipts === Loyverse dashboard
+salesReceipts + refundReceipts = allReceipts
+Line item count matches exported CSV
+Modifier counts match receipt export
+Net sales = POS net sales (exact)
+If any mismatch → FAIL THE PATCH.
+FILES AGENT IS ALLOWED TO TOUCH
+receiptTruthSummary.ts
+routes/analysis/receiptsTruth.ts (or equivalent)
+NEW migration file
+NEW service file if needed
+🚫 No UI files
+🚫 No sidebar
+🚫 No analytics pages
+🚫 No deletions
+PATCH DELIVERY FORMAT
+One migration
+One service update
+One route update
+Clear comments:
+Copy code
+
+// 🔒 RECEIPT TRUTH — STEP 2 (LOCKED)
