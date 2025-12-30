@@ -76,6 +76,7 @@ import IngredientUsage from "./pages/analysis/IngredientUsage";
 import StockVariance from "./pages/analysis/StockVariance";
 import IngredientReconciliation from "./pages/analysis/IngredientReconciliation";
 import ReceiptsTruth from "./pages/analysis/ReceiptsTruth";
+import IngredientsTruth from "./pages/analysis/IngredientsTruth";
 import SaaSAdmin from "./pages/saas/SaaSAdmin";
 import Login from "./pages/auth/Login";
 import TenantSwitcher from "./pages/settings/TenantSwitcher";
@@ -213,6 +214,7 @@ export default function App() {
                 <Route path="/analysis/stock-variance" element={<StockVariance />} />
                 <Route path="/analysis/ingredient-reconciliation" element={<IngredientReconciliation />} />
                 <Route path="/analysis/receipts" element={<ReceiptsTruth />} />
+                <Route path="/analysis/ingredients" element={<IngredientsTruth />} />
 
                 <Route path="/saas" element={<SaaSAdmin />} />
                 <Route path="/settings/tenant" element={<TenantSwitcher />} />
