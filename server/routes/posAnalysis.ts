@@ -1,7 +1,24 @@
 import express from 'express';
 import { analyzeShift } from '../services/shiftAnalysisService';
+import { buildReceiptSummary } from '../services/receiptSummary';
 
 const router = express.Router();
+
+// GET /api/analysis/receipts-summary?date=YYYY-MM-DD - Canonical receipt truth summary
+router.get('/receipts-summary', async (req, res) => {
+  const { date } = req.query;
+  if (!date || typeof date !== 'string') {
+    return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+  }
+
+  try {
+    const summary = await buildReceiptSummary(date);
+    res.json(summary);
+  } catch (e) {
+    console.error('[ReceiptSummary] Error:', e);
+    res.status(500).json({ error: String(e) });
+  }
+});
 
 // GET /api/pos/analysis/shift?batchId=xxx - Get shift reconciliation analysis
 router.get('/analysis/shift', async (req, res) => {

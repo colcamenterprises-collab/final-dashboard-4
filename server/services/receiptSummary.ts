@@ -1,81 +1,98 @@
-import { db } from "../db";
-import {
-  loyverseReceipts,
-  dailyShiftReceiptSummary,
-  insertDailyReceiptSummarySchema,
-} from "@shared/schema";
-import { between } from "drizzle-orm";
+import { db } from '../db';
+import { sql } from 'drizzle-orm';
+import { getShiftWindowUTC } from '../utils/shiftWindow';
+import { dailyShiftReceiptSummary, insertDailyReceiptSummarySchema } from '@shared/schema';
 
-/** Helper: return [shiftStartUTC, shiftEndUTC] for any Bangkok-date (yyyy-mm-dd). */
-export function getShiftWindow(dateStr: string): [Date, Date] {
-  // 5 PM Bangkok
-  const start = new Date(`${dateStr}T10:00:00Z`);       // 17:00 +07 == 10:00Z
-  const end = new Date(`${dateStr}T20:00:00Z`);         // 03:00 +07 next day == 20:00Z
-  end.setUTCDate(end.getUTCDate() + 1);
-  return [start, end];
+export interface ReceiptSummary {
+  allReceipts: number;
+  salesReceipts: number;
+  refundReceipts: number;
+  grossSales: number;
+  discounts: number;
+  refunds: number;
+  netSales: number;
 }
 
-/** Categorisation rules */
-const categoryOf = (name = "") => {
-  const n = name.toLowerCase();
-  if (n.includes("burger")) return "BURGERS";
-  if (n.includes("fries") || n.includes("side")) return "SIDE ORDERS";
-  if (n.includes("add") || n.includes("extra")) return "BURGER EXTRAS";
-  if (n.includes("coke") || n.includes("water") || n.includes("drink"))
-    return "DRINKS";
-  return "OTHER";
-};
+export async function buildReceiptSummary(businessDate: string): Promise<ReceiptSummary> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+    throw new Error('[RECEIPTS_FAIL] Invalid date format. Use YYYY-MM-DD');
+  }
 
-/** Build + save summary for a given Bangkok date (yyyy-mm-dd). */
+  const { start, end } = getShiftWindowUTC(businessDate);
+  console.log(`[ReceiptSummary] Building for ${businessDate}, window: ${start.toISOString()} to ${end.toISOString()}`);
+
+  const result = await db.execute(sql`
+    WITH receipts AS (
+      SELECT
+        raw_json,
+        (raw_json->>'refund_for') IS NOT NULL AS is_refund,
+        (raw_json->>'total_money')::numeric AS total_money,
+        COALESCE((raw_json->>'total_discount')::numeric, 0) AS total_discount
+      FROM lv_receipt
+      WHERE datetime_bkk >= ${start.toISOString()}::timestamptz
+        AND datetime_bkk < ${end.toISOString()}::timestamptz
+    )
+    SELECT
+      COUNT(*)::int AS all_receipts,
+      COUNT(*) FILTER (WHERE NOT is_refund)::int AS sales_receipts,
+      COUNT(*) FILTER (WHERE is_refund)::int AS refund_receipts,
+      COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0) AS gross_sales,
+      COALESCE(SUM(total_discount) FILTER (WHERE NOT is_refund), 0) AS discounts,
+      COALESCE(SUM(total_money) FILTER (WHERE is_refund), 0) AS refund_value,
+      COALESCE(SUM(total_money) FILTER (WHERE NOT is_refund), 0)
+        - COALESCE(SUM(total_discount) FILTER (WHERE NOT is_refund), 0)
+        - COALESCE(SUM(total_money) FILTER (WHERE is_refund), 0) AS net_sales
+    FROM receipts
+  `);
+
+  const row = result.rows[0] as any;
+  
+  const allReceipts = Number(row?.all_receipts || 0);
+  const salesReceipts = Number(row?.sales_receipts || 0);
+  const refundReceipts = Number(row?.refund_receipts || 0);
+  const grossSales = Number(row?.gross_sales || 0);
+  const discounts = Number(row?.discounts || 0);
+  const refunds = Number(row?.refund_value || 0);
+  const netSales = Number(row?.net_sales || 0);
+
+  if (allReceipts === 0) {
+    throw new Error(`[RECEIPTS_FAIL] No receipts found for shift ${businessDate}`);
+  }
+
+  if (allReceipts !== salesReceipts + refundReceipts) {
+    throw new Error(`[RECEIPTS_FAIL] Receipt count mismatch: ${allReceipts} != ${salesReceipts} + ${refundReceipts}`);
+  }
+
+  console.log(`[ReceiptSummary] All: ${allReceipts}, Sales: ${salesReceipts}, Refunds: ${refundReceipts}`);
+  console.log(`[ReceiptSummary] Gross: ${grossSales}, Discounts: ${discounts}, RefundValue: ${refunds}, Net: ${netSales}`);
+
+  return {
+    allReceipts,
+    salesReceipts,
+    refundReceipts,
+    grossSales,
+    discounts,
+    refunds,
+    netSales,
+  };
+}
+
+/** Legacy: Build + save summary for a given Bangkok date (yyyy-mm-dd). Used by scheduler. */
 export async function buildShiftSummary(dateStr: string) {
-  const [start, end] = getShiftWindow(dateStr);
-
-  // grab all receipts in range
-  const receipts = await db
-    .select()
-    .from(loyverseReceipts)
-    .where(between(loyverseReceipts.receiptDate, start, end));
-
-  const itemsMap: Record<string, { qty: number; sales: number }> = {};
-  const modsMap: Record<string, { qty: number; sales: number }> = {};
-  let burgersSold = 0;
-  let drinksSold = 0;
-
-  receipts.forEach((r) => {
-    (r.items ?? []).forEach((it: any) => {
-      const key = it.item_name ?? "unknown";
-      const cat = categoryOf(key);
-      const qty = it.quantity ?? 1;
-      const sales = parseFloat(it.total_money ?? it.line_total ?? 0);
-
-      itemsMap[cat] ??= { qty: 0, sales: 0 };
-      itemsMap[cat].qty += qty;
-      itemsMap[cat].sales += sales;
-
-      if (cat === "BURGERS") burgersSold += qty;
-      if (cat === "DRINKS") drinksSold += qty;
-
-      // modifiers
-      (it.line_modifiers ?? []).forEach((m: any) => {
-        const mkey = m.name ?? "modifier";
-        modsMap[mkey] ??= { qty: 0, sales: 0 };
-        modsMap[mkey].qty += 1;
-        modsMap[mkey].sales += parseFloat(m.money_amount ?? 0);
-      });
-    });
-  });
-
+  const summary = await buildReceiptSummary(dateStr);
+  
   const data = insertDailyReceiptSummarySchema.parse({
     shiftDate: dateStr,
-    burgersSold,
-    drinksSold,
-    itemsBreakdown: itemsMap,
-    modifiersSummary: modsMap,
+    burgersSold: 0,
+    drinksSold: 0,
+    itemsBreakdown: {},
+    modifiersSummary: {},
   });
 
   await db
     .insert(dailyShiftReceiptSummary)
     .values(data)
     .onConflictDoUpdate({ target: dailyShiftReceiptSummary.shiftDate, set: data });
+  
   return data;
 }

@@ -1,0 +1,162 @@
+🔥 RECEIPTS LOADING — FINAL PATCH (SINGLE DELIVERY)
+Objective (non-negotiable):
+Restore accurate, auditable receipt truth exactly as Loyverse reports it, using the same logic that worked in F&B Analysis, with explicit visibility of Sales vs Refunds and correct time window (17:00 → 03:00 BKK).
+Everything else becomes downstream.
+✅ WHAT THIS PATCH DOES (ONLY)
+Re-establish canonical receipt loading
+Fix shift window (17:00 → 03:00, Bangkok time)
+Correctly classify receipts
+ALL receipts
+SALES receipts
+REFUND receipts
+Use Loyverse-authoritative fields
+raw_json.total_money
+raw_json.total_discount
+raw_json.refund_for
+Reproduce the same counts F&B Analysis previously had
+Fail loudly if data is missing
+NO schema drift
+NO UI changes
+NO new logic layers
+ONE PATCH
+🧱 SOURCE OF TRUTH (LOCKED)
+Table: lv_receipt
+Field: raw_json (FULL Loyverse payload)
+We DO NOT:
+derive totals from line items
+divide by 100
+guess refunds
+infer missing data
+🕔 SHIFT WINDOW (FINAL, CORRECT)
+Copy code
+Ts
+// Bangkok local time
+SHIFT_START = 17:00
+SHIFT_END   = 03:00 (next day)
+SQL window logic:
+Copy code
+Sql
+(datetime_bkk >= date + interval '17 hours')
+OR
+(datetime_bkk <  date + interval '27 hours')
+📊 RECEIPT CLASSIFICATION (EXACT)
+From raw_json:
+Type
+Condition
+ALL RECEIPTS
+every row in window
+SALE
+refund_for IS NULL
+REFUND
+refund_for IS NOT NULL
+Counts must satisfy:
+Copy code
+
+ALL = SALES + REFUNDS
+If not → FAIL
+💰 SALES NUMBERS (EXACT)
+Metric
+Source
+Gross Sales
+SUM(raw_json.total_money) (sales only)
+Discounts
+SUM(raw_json.total_discount)
+Refund Value
+SUM(raw_json.total_money) (refund receipts)
+Net Sales
+Gross - Discounts - Refunds
+🧩 SINGLE BACKEND PATCH (COPY-PASTE FOR REPLIT)
+File 1 — FIX RECEIPT AGGREGATION
+server/services/receiptSummary.ts
+Copy code
+Ts
+import { db } from "@/db";
+
+export async function buildReceiptSummary(businessDate: string) {
+  const rows = await db.query(`
+    SELECT
+      raw_json
+    FROM lv_receipt
+    WHERE
+      datetime_bkk >= (DATE $1 + interval '17 hours')
+      AND datetime_bkk <  (DATE $1 + interval '27 hours')
+  `, [businessDate]);
+
+  if (rows.length === 0) {
+    throw new Error("[RECEIPTS_FAIL] No receipts found for shift");
+  }
+
+  let all = 0;
+  let sales = 0;
+  let refunds = 0;
+  let gross = 0;
+  let discount = 0;
+  let refundValue = 0;
+
+  for (const r of rows) {
+    const j = r.raw_json;
+    all++;
+
+    if (j.refund_for) {
+      refunds++;
+      refundValue += Number(j.total_money || 0);
+    } else {
+      sales++;
+      gross += Number(j.total_money || 0);
+      discount += Number(j.total_discount || 0);
+    }
+  }
+
+  if (all !== sales + refunds) {
+    throw new Error("[RECEIPTS_FAIL] Receipt count mismatch");
+  }
+
+  return {
+    allReceipts: all,
+    salesReceipts: sales,
+    refundReceipts: refunds,
+    grossSales: gross,
+    discounts: discount,
+    refunds: refundValue,
+    netSales: gross - discount - refundValue,
+  };
+}
+File 2 — HARDEN EXISTING API
+server/routes/analysisReceipts.ts
+Copy code
+Ts
+import { buildReceiptSummary } from "@/services/receiptSummary";
+
+router.get("/analysis/receipts-summary", async (req, res) => {
+  const { date } = req.query;
+  if (!date) return res.status(400).json({ error: "date required" });
+
+  try {
+    const summary = await buildReceiptSummary(date);
+    res.json(summary);
+  } catch (e) {
+    res.status(500).json({ error: String(e) });
+  }
+});
+🚨 EXPLICIT FAIL CONDITIONS
+The API MUST ERROR if:
+0 receipts exist
+counts don’t reconcile
+raw_json missing expected fields
+No silent fallbacks.
+No “best effort”.
+🧪 HOW YOU VERIFY (2 MIN)
+Pick a known date (e.g. 13th)
+Run /analysis/receipts-summary?date=YYYY-MM-DD
+Compare with Loyverse Sales Summary
+Numbers must match exactly:
+ALL receipts
+SALES receipts
+REFUNDS
+Gross / Discount / Net
+If wrong → bug is isolated here
+🧠 WHY THIS ENDS THE CHAOS
+This restores exactly what used to work
+No new abstractions
+No competing “truth engines”
+Everything else consumes this or shuts up

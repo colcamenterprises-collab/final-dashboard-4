@@ -1213,6 +1213,22 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // PHASE M: Register receipt batch truth routes BEFORE catch-all :date route
   app.use('/api/analysis', receiptBatchRoutes);
   
+  // PHASE M: Canonical receipts-summary endpoint
+  const { buildReceiptSummary } = await import('./services/receiptSummary');
+  app.get('/api/analysis/receipts-summary', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const summary = await buildReceiptSummary(date);
+      res.json(summary);
+    } catch (e: any) {
+      console.error('[ReceiptSummary] Error:', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+  
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
   app.use(freshnessRouter);
