@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
 interface ReceiptTruthSummary {
@@ -114,22 +114,22 @@ export default function ReceiptsTruth() {
   const isLoading = summaryLoading || aggLoading;
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="container mx-auto p-6 max-w-7xl space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+    <div className="min-h-screen bg-white dark:bg-slate-950">
+      <div className="p-4 md:p-6 space-y-4">
+        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
           Receipts (Truth)
         </h1>
 
-        <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg text-gray-900 dark:text-white">
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
               Receipt Truth Summary
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-4 items-end">
-              <div>
-                <Label htmlFor="businessDate" className="text-sm text-slate-600 dark:text-slate-400">
+          <CardContent className="p-4 pt-2 space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div className="flex-1 sm:flex-none">
+                <Label htmlFor="businessDate" className="text-xs text-slate-600 dark:text-slate-400">
                   Business Date (≥ 2024-07-01)
                 </Label>
                 <Input
@@ -138,53 +138,44 @@ export default function ReceiptsTruth() {
                   value={selectedDate}
                   min="2024-07-01"
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-48 rounded-[4px]"
+                  className="w-full sm:w-48 rounded-[4px] text-sm"
                   data-testid="input-business-date"
                 />
               </div>
               <Button
                 onClick={() => rebuildMutation.mutate()}
                 disabled={rebuildMutation.isPending || !selectedDate}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-[4px]"
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-[4px] text-xs"
                 data-testid="button-rebuild"
               >
-                <RefreshCw className={`w-4 h-4 mr-2 ${rebuildMutation.isPending ? 'animate-spin' : ''}`} />
-                {rebuildMutation.isPending ? 'Rebuilding...' : 'Rebuild from Loyverse API'}
+                <RefreshCw className={`w-3 h-3 mr-2 ${rebuildMutation.isPending ? 'animate-spin' : ''}`} />
+                {rebuildMutation.isPending ? 'Rebuilding...' : 'Rebuild from Loyverse'}
               </Button>
             </div>
 
             {!hasTruth && !isLoading && (
-              <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[4px]">
-                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-                <div>
-                  <div className="font-semibold text-red-800 dark:text-red-300">NO RECEIPT TRUTH — DATA MISSING</div>
-                  <div className="text-sm text-red-600 dark:text-red-400">
-                    No truth exists for {selectedDate}. Click "Rebuild from Loyverse API" to fetch receipts.
-                  </div>
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[4px]">
+                <div className="text-xs font-semibold text-red-800 dark:text-red-300">NO RECEIPT TRUTH — DATA MISSING</div>
+                <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  No truth exists for {selectedDate}. Click "Rebuild from Loyverse" to fetch receipts.
                 </div>
               </div>
             )}
 
             {rebuildMutation.isError && (
-              <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[4px]">
-                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" />
-                <div>
-                  <div className="font-semibold text-red-800 dark:text-red-300">Rebuild Failed</div>
-                  <div className="text-sm text-red-600 dark:text-red-400">
-                    {(rebuildMutation.error as any)?.message || 'Failed to rebuild receipt truth'}
-                  </div>
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[4px]">
+                <div className="text-xs font-semibold text-red-800 dark:text-red-300">Rebuild Failed</div>
+                <div className="text-xs text-red-600 dark:text-red-400 mt-1">
+                  {(rebuildMutation.error as any)?.message || 'Failed to rebuild receipt truth'}
                 </div>
               </div>
             )}
 
             {hasTruth && (
-              <div className="flex items-start gap-3 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-[4px]">
-                <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-                <div>
-                  <div className="font-semibold text-emerald-800 dark:text-emerald-300">Receipt truth confirmed</div>
-                  <div className="text-sm text-emerald-600 dark:text-emerald-400">
-                    Data rebuilt from {summary.source} for {selectedDate} at {new Date(summary.builtAt).toLocaleString()}
-                  </div>
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-[4px]">
+                <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Receipt truth confirmed</div>
+                <div className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                  Data rebuilt from {summary.source} at {new Date(summary.builtAt).toLocaleString()}
                 </div>
               </div>
             )}
@@ -193,77 +184,76 @@ export default function ReceiptsTruth() {
 
         {hasTruth && summary && (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-              <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                <CardContent className="p-4">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">All Receipts</div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-all-receipts">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3 xl:grid-cols-7">
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardContent className="p-3">
+                  <div className="text-xs text-slate-600 dark:text-slate-400">Receipts</div>
+                  <div className="text-lg md:text-xl font-bold text-slate-900 dark:text-white" data-testid="text-all-receipts">
                     {summary.allReceipts}
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                <CardContent className="p-4">
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardContent className="p-3">
                   <div className="text-xs text-slate-600 dark:text-slate-400">Sales</div>
-                  <div className="text-2xl font-bold text-emerald-600" data-testid="text-sales-count">
+                  <div className="text-lg md:text-xl font-bold text-emerald-600" data-testid="text-sales-count">
                     {summary.salesReceipts}
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                <CardContent className="p-4">
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardContent className="p-3">
                   <div className="text-xs text-slate-600 dark:text-slate-400">Refunds</div>
-                  <div className="text-2xl font-bold text-red-600" data-testid="text-refund-count">
+                  <div className="text-lg md:text-xl font-bold text-red-600" data-testid="text-refund-count">
                     {summary.refundReceipts}
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                <CardContent className="p-4">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Gross Sales</div>
-                  <div className="text-2xl font-bold text-emerald-600" data-testid="text-gross-sales">
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardContent className="p-3">
+                  <div className="text-xs text-slate-600 dark:text-slate-400">Gross</div>
+                  <div className="text-lg md:text-xl font-bold text-emerald-600 truncate" data-testid="text-gross-sales">
                     {formatCurrency(Number(summary.grossSales))}
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                <CardContent className="p-4">
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardContent className="p-3">
                   <div className="text-xs text-slate-600 dark:text-slate-400">Discounts</div>
-                  <div className="text-2xl font-bold text-amber-600" data-testid="text-discounts">
+                  <div className="text-lg md:text-xl font-bold text-amber-600 truncate" data-testid="text-discounts">
                     {formatCurrency(Number(summary.discounts))}
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                <CardContent className="p-4">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Refund Amount</div>
-                  <div className="text-2xl font-bold text-red-600" data-testid="text-refund-amount">
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardContent className="p-3">
+                  <div className="text-xs text-slate-600 dark:text-slate-400">Refund Amt</div>
+                  <div className="text-lg md:text-xl font-bold text-red-600 truncate" data-testid="text-refund-amount">
                     {formatCurrency(Number(summary.refunds))}
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                <CardContent className="p-4">
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px] col-span-2 md:col-span-1">
+                <CardContent className="p-3">
                   <div className="text-xs text-slate-600 dark:text-slate-400">Net Sales</div>
-                  <div className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="text-net-sales">
+                  <div className="text-lg md:text-xl font-bold text-slate-900 dark:text-white truncate" data-testid="text-net-sales">
                     {formatCurrency(Number(summary.netSales))}
                   </div>
-                  <div className="text-xs text-slate-500">gross - discounts - refunds</div>
                 </CardContent>
               </Card>
             </div>
 
             {aggregates && (
               <Tabs defaultValue="items" className="w-full">
-                <TabsList className="bg-slate-100 dark:bg-slate-800 rounded-[4px]">
-                  <TabsTrigger value="items" className="rounded-[4px]" data-testid="tab-items">Items by Category</TabsTrigger>
-                  <TabsTrigger value="modifiers" className="rounded-[4px]" data-testid="tab-modifiers">Modifiers</TabsTrigger>
-                  <TabsTrigger value="totals" className="rounded-[4px]" data-testid="tab-totals">Category Totals</TabsTrigger>
+                <TabsList className="w-full md:w-auto bg-slate-100 dark:bg-slate-800 rounded-[4px] grid grid-cols-3 md:inline-flex">
+                  <TabsTrigger value="items" className="rounded-[4px] text-xs" data-testid="tab-items">Items</TabsTrigger>
+                  <TabsTrigger value="modifiers" className="rounded-[4px] text-xs" data-testid="tab-modifiers">Modifiers</TabsTrigger>
+                  <TabsTrigger value="totals" className="rounded-[4px] text-xs" data-testid="tab-totals">Totals</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="items" className="mt-4 space-y-4">
+                <TabsContent value="items" className="mt-4 space-y-3">
                   {aggregates.categories.length === 0 && (
-                    <div className="text-sm text-slate-500 text-center py-8">
+                    <div className="text-xs text-slate-500 text-center py-8">
                       No items recorded for this date.
                     </div>
                   )}
@@ -273,21 +263,21 @@ export default function ReceiptsTruth() {
                     if (items.length === 0) return null;
                     
                     return (
-                      <Card key={cat} className="bg-white dark:bg-slate-900 rounded-[4px]">
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-lg text-gray-900 dark:text-white">
-                            {cat}
-                            <Badge variant="secondary" className="ml-2">{items.length} items</Badge>
+                      <Card key={cat} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                        <CardHeader className="p-3 pb-2">
+                          <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between flex-wrap gap-2">
+                            <span className="truncate">{cat}</span>
+                            <Badge variant="secondary" className="text-xs shrink-0">{items.length} items</Badge>
                           </CardTitle>
                         </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2">
+                        <CardContent className="p-3 pt-0">
+                          <div className="space-y-1">
                             {items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0" data-testid={`item-${cat.replace(/\s+/g, '-')}-${idx}`}>
-                                <span className="text-sm font-medium text-gray-900 dark:text-white">{item.itemName}</span>
-                                <div className="flex items-center gap-4">
-                                  <span className="text-sm text-slate-600 dark:text-slate-400">×{item.totalQuantity}</span>
-                                  <span className="text-sm font-semibold text-emerald-600">{formatCurrency(item.grossAmount)}</span>
+                              <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 gap-2" data-testid={`item-${cat.replace(/\s+/g, '-')}-${idx}`}>
+                                <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{item.itemName}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className="text-xs text-slate-600 dark:text-slate-400">×{item.totalQuantity}</span>
+                                  <span className="text-xs font-semibold text-emerald-600">{formatCurrency(item.grossAmount)}</span>
                                 </div>
                               </div>
                             ))}
@@ -299,22 +289,22 @@ export default function ReceiptsTruth() {
                 </TabsContent>
 
                 <TabsContent value="modifiers" className="mt-4">
-                  <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg text-gray-900 dark:text-white">
-                        Modifiers
-                        <Badge variant="secondary" className="ml-2">{aggregates.modifiers.length} types</Badge>
+                  <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                    <CardHeader className="p-3 pb-2">
+                      <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between flex-wrap gap-2">
+                        <span>Modifiers</span>
+                        <Badge variant="secondary" className="text-xs">{aggregates.modifiers.length} types</Badge>
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-3 pt-0">
                       {aggregates.modifiers.length === 0 ? (
-                        <div className="text-sm text-slate-500">No modifiers recorded for this date.</div>
+                        <div className="text-xs text-slate-500">No modifiers recorded for this date.</div>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="space-y-1">
                           {aggregates.modifiers.map((mod, idx) => (
-                            <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0" data-testid={`modifier-${idx}`}>
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">{mod.modifierName}</span>
-                              <span className="text-sm text-slate-600 dark:text-slate-400">×{mod.totalQuantity}</span>
+                            <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 gap-2" data-testid={`modifier-${idx}`}>
+                              <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{mod.modifierName}</span>
+                              <span className="text-xs text-slate-600 dark:text-slate-400 shrink-0">×{mod.totalQuantity}</span>
                             </div>
                           ))}
                         </div>
@@ -324,25 +314,25 @@ export default function ReceiptsTruth() {
                 </TabsContent>
 
                 <TabsContent value="totals" className="mt-4">
-                  <Card className="bg-white dark:bg-slate-900 rounded-[4px]">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-lg text-gray-900 dark:text-white">
-                        Category Totals (POS Categories)
+                  <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                    <CardHeader className="p-3 pb-2">
+                      <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Category Totals
                       </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-3 pt-0">
                       {aggregates.categoryTotals.length === 0 ? (
-                        <div className="text-sm text-slate-500">No categories recorded for this date.</div>
+                        <div className="text-xs text-slate-500">No categories recorded for this date.</div>
                       ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                           {aggregates.categoryTotals.map((cat, idx) => (
-                            <div key={idx} className="p-4 bg-slate-50 dark:bg-slate-800 rounded-[4px]" data-testid={`total-${cat.category.replace(/\s+/g, '-')}`}>
-                              <div className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                            <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]" data-testid={`total-${cat.category.replace(/\s+/g, '-')}`}>
+                              <div className="text-xs font-semibold text-slate-900 dark:text-white mb-2 truncate">
                                 {cat.category}
                               </div>
-                              <div className="text-2xl font-bold text-emerald-600">{cat.totalQuantity}</div>
+                              <div className="text-xl font-bold text-emerald-600">{cat.totalQuantity}</div>
                               <div className="text-xs text-slate-500">items sold</div>
-                              <div className="text-sm font-semibold text-gray-900 dark:text-white mt-1">{formatCurrency(cat.grossAmount)}</div>
+                              <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{formatCurrency(cat.grossAmount)}</div>
                               <div className="text-xs text-slate-500">{cat.itemCount} unique items</div>
                             </div>
                           ))}
@@ -355,15 +345,15 @@ export default function ReceiptsTruth() {
             )}
 
             {!aggregates && !aggLoading && (
-              <div className="text-center py-8 text-slate-500">
-                Aggregates not built for this date. Click "Rebuild from Loyverse API" to generate.
+              <div className="text-center py-8 text-xs text-slate-500">
+                Aggregates not built for this date. Click "Rebuild from Loyverse" to generate.
               </div>
             )}
           </>
         )}
 
         {isLoading && (
-          <div className="text-center py-8 text-slate-600 dark:text-slate-400">
+          <div className="text-center py-8 text-xs text-slate-600 dark:text-slate-400">
             Loading receipt truth...
           </div>
         )}
