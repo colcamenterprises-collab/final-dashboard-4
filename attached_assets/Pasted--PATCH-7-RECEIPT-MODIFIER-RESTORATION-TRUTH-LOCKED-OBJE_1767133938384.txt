@@ -1,0 +1,113 @@
+🔒 PATCH 7 — RECEIPT MODIFIER RESTORATION (TRUTH-LOCKED)
+OBJECTIVE
+Restore modifier visibility in Receipt Analysis using real Loyverse data, not guesses.
+Modifiers must:
+Come only from the Loyverse API
+Be visible per item and aggregated
+Never be removed because they’re “inconvenient”
+Backdate correctly (≥ 2024-07-01)
+This patch restores what F&B Analysis had, without touching receipts, sales totals, or ingredients logic.
+NON-NEGOTIABLE RULES
+❌ NO database deletes
+❌ NO fake modifiers
+❌ NO hiding sections if data is incomplete
+❌ NO receipt math changes
+✅ READ-ONLY truth inspection
+✅ Loyverse API is source of truth
+DATA SOURCE (LOCKED)
+Loyverse receipt payload:
+Copy code
+Json
+receipt.line_items[].modifiers[]
+Fields used:
+name
+price
+quantity
+line_item_id
+receipt_id
+PATCH CONTENTS
+1️⃣ BACKEND — MODIFIER INGEST & STORAGE (ADD ONLY)
+Add table (additive only)
+Copy code
+Sql
+receipt_truth_modifier
+- id (uuid, pk)
+- business_date (date)
+- receipt_id (string)
+- line_item_id (string)
+- modifier_name (text)
+- quantity (numeric)
+- price (numeric)
+2️⃣ BACKEND — SERVICE UPDATE
+File:
+server/services/receiptTruthSummary.ts
+ADD after line item expansion:
+Copy code
+Ts
+for (const modifier of line.modifiers ?? []) {
+  await db.insert(receipt_truth_modifier).values({
+    business_date,
+    receipt_id: receipt.id,
+    line_item_id: line.id,
+    modifier_name: modifier.name,
+    quantity: modifier.quantity ?? 1,
+    price: modifier.price ?? 0,
+  });
+}
+🚫 Do NOT transform
+🚫 Do NOT map
+🚫 Do NOT infer
+3️⃣ BACKEND — AGGREGATION ENDPOINT
+NEW endpoint
+Copy code
+
+GET /api/analysis/receipts-truth/modifiers?date=YYYY-MM-DD
+Returns:
+Copy code
+Json
+{
+  "totalModifiers": 62,
+  "modifiers": [
+    {
+      "name": "🥓 Crispy Bacon",
+      "count": 18,
+      "gross": 540
+    },
+    {
+      "name": "❌ NO PICKLES",
+      "count": 12,
+      "gross": 0
+    }
+  ]
+}
+Rules:
+Count = number of modifier instances
+Gross = sum(price × quantity)
+Zero-price modifiers must appear
+4️⃣ FRONTEND — RECEIPT ANALYSIS UI (RESTORE SECTION)
+File:
+client/src/pages/ReceiptAnalysis.tsx
+ADD TAB: Modifiers
+Display:
+Modifier
+Count
+Gross Impact
+Rules:
+Show even if price = 0
+Sorted by count desc
+No hiding
+No fallback text
+If empty → show:
+“No modifiers present in POS data for this date”
+5️⃣ SAFETY LOCKS
+If no modifiers found → UI still renders section
+If Loyverse returns empty modifiers → display empty state
+If rebuild not run → banner: “Receipt truth not built for this date”
+ACCEPTANCE CRITERIA (MANDATORY)
+✅ Modifiers visible per date
+✅ Matches Loyverse receipt modifiers
+✅ Zero-price modifiers shown
+✅ Backdated dates work
+✅ No receipt totals change
+✅ No ingredient logic touched
+✅ No UI sections silently removed
