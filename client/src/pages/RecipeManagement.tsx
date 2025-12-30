@@ -19,6 +19,7 @@ import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, File
 import { IngredientForm } from "@/components/IngredientForm";
 import { z } from "zod";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { INGREDIENT_CATEGORIES } from "@/constants/ingredientCategories";
 
 const recipeFormSchema = z.object({
   name: z.string().min(1, "Recipe name is required"),
@@ -152,13 +153,25 @@ export default function RecipeManagement() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Failed to create recipe' }));
+        throw new Error(err.error || 'Failed to create recipe');
+      }
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
+      await queryClient.refetchQueries({ queryKey: ['/api/recipe-authority'] });
       setIsCreateDialogOpen(false);
       recipeForm.reset();
       toast({ title: "Recipe created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: "Failed to create recipe", 
+        description: error.message || 'An error occurred',
+        variant: "destructive" 
+      });
     },
   });
 

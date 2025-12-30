@@ -1,0 +1,124 @@
+PATCH 6 — RECEIPT MODIFIER TRUTH (RESTORE & LOCK)
+Objective
+Restore Modifiers to Receipts (Truth) using Loyverse API only, with:
+Full visibility
+Correct counts
+Correct price impact
+Traceability to receipt + line item
+Zero guessing
+No hiding. No derivation. No DB shortcuts.
+🔒 NON-NEGOTIABLE RULES (FOR REPLIT AGENT)
+SOURCE OF TRUTH
+Modifiers MUST come from lv_receipt.raw_json.line_items[].modifiers[]
+OR directly from live Loyverse API payload
+❌ Never inferred
+❌ Never recalculated
+NO DELETIONS
+Do NOT delete existing tables, endpoints, or UI
+Only add missing functionality
+FAIL LOUD
+If modifiers missing → show NO MODIFIER DATA FOUND
+Do NOT suppress or hide sections
+1️⃣ BACKEND — MODIFIER TRUTH TABLE
+Table (Additive Only)
+Copy code
+Sql
+receipt_truth_modifier
+----------------------
+id UUID PK
+business_date DATE
+receipt_id TEXT
+line_item_id TEXT
+modifier_name TEXT
+modifier_qty NUMERIC
+modifier_price NUMERIC
+modifier_total NUMERIC
+source TEXT DEFAULT 'LOYVERSE_API'
+created_at TIMESTAMPTZ
+2️⃣ BACKEND — MODIFIER EXTRACTION LOGIC
+Source
+From each receipt:
+Copy code
+Json
+line_items[].modifiers[]
+Extraction Rules
+For every modifier:
+modifier_name → exact string from Loyverse
+modifier_qty → default 1 if missing
+modifier_price → from Loyverse (0 allowed)
+modifier_total = qty × price
+Linked to:
+receipt_id
+line_item_id
+business_date
+🚫 If no modifiers on an item → do nothing
+🚫 If modifier array missing → log warning
+3️⃣ API ENDPOINTS (ADD ONLY)
+Rebuild Modifiers (API-Only)
+Copy code
+
+POST /api/analysis/receipts-truth/modifiers/rebuild
+Pulls fresh data from Loyverse API
+Rebuilds per business date
+Writes to receipt_truth_modifier
+Read Modifiers
+Copy code
+
+GET /api/analysis/receipts-truth/modifiers?date=YYYY-MM-DD
+Returns:
+Copy code
+Json
+{
+  "totalModifiers": 62,
+  "uniqueModifiers": 23,
+  "modifiers": [
+    {
+      "name": "❌ NO PICKLES",
+      "count": 6,
+      "totalValue": 0
+    },
+    {
+      "name": "🥓 Crispy Bacon",
+      "count": 6,
+      "totalValue": 180
+    }
+  ]
+}
+4️⃣ UI — RECEIPTS (TRUTH) PAGE (RESTORE SECTION)
+Restore Modifiers Tab
+Placed next to Items / Categories
+Display:
+Modifier name
+Count used
+Total price impact
+Linked receipt count
+Example:
+Copy code
+
+Modifiers (62 total)
+
+🥓 Crispy Bacon        ×6     ฿180
+❌ NO PICKLES         ×6     ฿0
+🐄 Animal Style       ×5     ฿0
+Coke Zero             ×6     ฿240
+Status Banner Logic
+🟢 MODIFIER TRUTH CONFIRMED
+🔴 NO MODIFIERS FOUND (if none)
+🟠 MODIFIERS NOT BUILT (if rebuild not run)
+5️⃣ ACCEPTANCE CRITERIA (YOU VERIFY WITH YOUR EYES)
+For Dec 29:
+Modifier counts match Loyverse receipt exports
+Free modifiers (NO PICKLES etc.) show qty but 0 value
+Paid modifiers (bacon, cheese, drinks in meals) show value
+Totals reconcile with Gross Sales
+If numbers are wrong → error is visible on this page, nowhere else.
+WHY THIS FIX IS CORRECT
+The agent removed the modifier section because they couldn’t reconcile it
+That was the wrong move
+Modifiers are first-class POS truth
+They affect:
+Food usage
+Margin
+Fraud detection
+Ingredient reconciliation
+We restore them exactly as sold, not as guessed.
