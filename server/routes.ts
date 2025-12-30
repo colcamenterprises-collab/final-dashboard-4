@@ -1213,7 +1213,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // PHASE M: Register receipt batch truth routes BEFORE catch-all :date route
   app.use('/api/analysis', receiptBatchRoutes);
   
-  // PHASE M: Canonical receipts-summary endpoint
+  // PHASE M: Canonical receipts-summary endpoint (legacy - reads from DB)
   const { buildReceiptSummary } = await import('./services/receiptSummary');
   app.get('/api/analysis/receipts-summary', async (req, res) => {
     const date = req.query.date as string;
@@ -1225,6 +1225,40 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.json(summary);
     } catch (e: any) {
       console.error('[ReceiptSummary] Error:', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  // PHASE M: Receipt Truth endpoints (Loyverse API as source)
+  const { rebuildReceiptTruth, getReceiptTruth } = await import('./services/receiptTruthSummary');
+  
+  app.post('/api/analysis/receipts-truth/rebuild', async (req, res) => {
+    const { business_date } = req.body;
+    if (!business_date) {
+      return res.status(400).json({ error: 'business_date required (YYYY-MM-DD)' });
+    }
+    try {
+      const summary = await rebuildReceiptTruth(business_date);
+      res.json({ ok: true, ...summary });
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/analysis/receipts-truth', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const summary = await getReceiptTruth(date);
+      if (!summary) {
+        return res.status(404).json({ error: 'TRUTH_NOT_BUILT', message: `No receipt truth found for ${date}. Use POST /api/analysis/receipts-truth/rebuild to build.` });
+      }
+      res.json(summary);
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
       res.status(500).json({ error: e.message || String(e) });
     }
   });
