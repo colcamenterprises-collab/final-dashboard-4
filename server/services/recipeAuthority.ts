@@ -163,9 +163,14 @@ export async function getRecipeWithCost(recipeId: number): Promise<RecipeWithCos
  * Create a new recipe
  */
 export async function createRecipe(data: InsertRecipeV2): Promise<RecipeV2> {
+  // Coerce empty strings to null for numeric fields
+  const yieldUnits = data.yieldUnits === '' || data.yieldUnits === null || data.yieldUnits === undefined
+    ? null 
+    : Number(data.yieldUnits) || null;
+    
   const [newRecipe] = await db.insert(recipe).values({
     name: data.name,
-    yieldUnits: data.yieldUnits,
+    yieldUnits,
     active: data.active ?? true,
   }).returning();
   
@@ -176,11 +181,16 @@ export async function createRecipe(data: InsertRecipeV2): Promise<RecipeV2> {
  * Update a recipe
  */
 export async function updateRecipe(id: number, data: Partial<InsertRecipeV2>): Promise<RecipeV2 | null> {
+  // Coerce empty strings to null for numeric fields
+  const yieldUnits = data.yieldUnits === '' || data.yieldUnits === null || data.yieldUnits === undefined
+    ? null 
+    : Number(data.yieldUnits) || null;
+    
   const [updated] = await db
     .update(recipe)
     .set({
       name: data.name,
-      yieldUnits: data.yieldUnits,
+      yieldUnits,
       active: data.active,
     })
     .where(eq(recipe.id, id))
