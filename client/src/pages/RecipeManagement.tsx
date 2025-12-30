@@ -607,7 +607,7 @@ export default function RecipeManagement() {
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-xs font-medium text-slate-900 dark:text-white truncate">{recipe.name}</h3>
+                      <h3 className="text-[11px] font-medium text-slate-900 dark:text-white truncate">{recipe.name}</h3>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{recipe.category || 'Uncategorized'}</p>
                       <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
                         <span className="text-xs text-slate-500">
