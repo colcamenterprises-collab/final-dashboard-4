@@ -806,7 +806,7 @@ export default function RecipeManagement() {
                     <div className="mt-4 p-3 bg-green-50 dark:bg-emerald-900/20 rounded-lg">
                       <div className="flex justify-between items-center">
                         <span className="font-medium">Total Recipe Cost:</span>
-                        <span className="text-lg font-bold text-green-600 dark:text-emerald-400">
+                        <span className="text-sm font-bold text-green-600 dark:text-emerald-400">
                           ฿{calculateRecipeCost()}
                         </span>
                       </div>
@@ -819,8 +819,8 @@ export default function RecipeManagement() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-lg font-semibold flex items-center">
-                        <Sparkles className="h-5 w-5 mr-2 text-purple-600" />
+                      <h3 className="text-sm font-semibold flex items-center">
+                        <Sparkles className="h-4 w-4 mr-2 text-purple-600" />
                         AI Marketing Content
                       </h3>
                       <p className="text-sm text-gray-600">Generate descriptions, headlines, and ad copy for delivery partners</p>
