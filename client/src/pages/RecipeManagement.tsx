@@ -86,6 +86,7 @@ export default function RecipeManagement() {
   const [isIngredientFormOpen, setIsIngredientFormOpen] = useState(false);
   const [editingIngredientItem, setEditingIngredientItem] = useState<any>(null);
   const [generatedContent, setGeneratedContent] = useState<any>(null);
+  const [marketingNotes, setMarketingNotes] = useState('');
   const [activeTab, setActiveTab] = useState<'recipes' | 'ingredients'>('recipes');
   
   // Recipe Authority API - canonical source
