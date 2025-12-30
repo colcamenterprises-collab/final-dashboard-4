@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RefreshCw } from "lucide-react";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 
@@ -29,12 +28,6 @@ interface ItemAggregate {
   grossAmount: number;
 }
 
-interface ModifierAggregate {
-  businessDate: string;
-  modifierName: string;
-  totalQuantity: number;
-}
-
 interface CategoryTotal {
   category: string;
   itemCount: number;
@@ -45,7 +38,6 @@ interface CategoryTotal {
 interface AggregateData {
   date: string;
   itemsByCategory: Record<string, ItemAggregate[]>;
-  modifiers: ModifierAggregate[];
   categoryTotals: CategoryTotal[];
   categories: string[];
 }
@@ -57,6 +49,7 @@ export default function ReceiptsTruth() {
   const defaultDate = yesterday.toISOString().split('T')[0];
   
   const [selectedDate, setSelectedDate] = useState(defaultDate);
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const { data: summary, isLoading: summaryLoading } = useQuery<ReceiptTruthSummary>({
     queryKey: ['/api/analysis/receipts-truth', selectedDate],
@@ -243,105 +236,65 @@ export default function ReceiptsTruth() {
               </Card>
             </div>
 
-            {aggregates && (
-              <Tabs defaultValue="items" className="w-full">
-                <TabsList className="w-full md:w-auto bg-slate-100 dark:bg-slate-800 rounded-[4px] grid grid-cols-3 md:inline-flex">
-                  <TabsTrigger value="items" className="rounded-[4px] text-xs" data-testid="tab-items">Items</TabsTrigger>
-                  <TabsTrigger value="modifiers" className="rounded-[4px] text-xs" data-testid="tab-modifiers">Modifiers</TabsTrigger>
-                  <TabsTrigger value="totals" className="rounded-[4px] text-xs" data-testid="tab-totals">Totals</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="items" className="mt-4 space-y-3">
-                  {aggregates.categories.length === 0 && (
-                    <div className="text-xs text-slate-500 text-center py-8">
-                      No items recorded for this date.
-                    </div>
-                  )}
-
-                  {aggregates.categories.map(cat => {
-                    const items = aggregates.itemsByCategory[cat] || [];
-                    if (items.length === 0) return null;
-                    
-                    return (
-                      <Card key={cat} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                        <CardHeader className="p-3 pb-2">
-                          <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between flex-wrap gap-2">
-                            <span className="truncate">{cat}</span>
-                            <Badge variant="secondary" className="text-xs shrink-0">{items.length} items</Badge>
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-3 pt-0">
-                          <div className="space-y-1">
-                            {items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 gap-2" data-testid={`item-${cat.replace(/\s+/g, '-')}-${idx}`}>
-                                <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{item.itemName}</span>
-                                <div className="flex items-center gap-2 shrink-0">
-                                  <span className="text-xs text-slate-600 dark:text-slate-400">×{item.totalQuantity}</span>
-                                  <span className="text-xs font-semibold text-emerald-600">{formatCurrency(item.grossAmount)}</span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })}
-                </TabsContent>
-
-                <TabsContent value="modifiers" className="mt-4">
-                  <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                    <CardHeader className="p-3 pb-2">
-                      <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between flex-wrap gap-2">
-                        <span>Modifiers</span>
-                        <Badge variant="secondary" className="text-xs">{aggregates.modifiers.length} types</Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      {aggregates.modifiers.length === 0 ? (
-                        <div className="text-xs text-slate-500">No modifiers recorded for this date.</div>
-                      ) : (
-                        <div className="space-y-1">
-                          {aggregates.modifiers.map((mod, idx) => (
-                            <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 gap-2" data-testid={`modifier-${idx}`}>
-                              <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{mod.modifierName}</span>
-                              <span className="text-xs text-slate-600 dark:text-slate-400 shrink-0">×{mod.totalQuantity}</span>
-                            </div>
-                          ))}
+            {aggregates && aggregates.categoryTotals.length > 0 && (
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Category Totals
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                    {aggregates.categoryTotals.map((cat, idx) => (
+                      <div 
+                        key={idx} 
+                        className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px] cursor-pointer hover:border-emerald-400 transition-colors"
+                        onClick={() => setExpandedCategory(expandedCategory === cat.category ? null : cat.category)}
+                        data-testid={`total-${cat.category.replace(/\s+/g, '-')}`}
+                      >
+                        <div className="text-xs font-semibold text-slate-900 dark:text-white mb-1 truncate">
+                          {cat.category}
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                        <div className="text-lg font-bold text-emerald-600">{cat.totalQuantity}</div>
+                        <div className="text-xs text-slate-500">items sold</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{formatCurrency(cat.grossAmount)}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-                <TabsContent value="totals" className="mt-4">
-                  <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                    <CardHeader className="p-3 pb-2">
-                      <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
-                        Category Totals
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      {aggregates.categoryTotals.length === 0 ? (
-                        <div className="text-xs text-slate-500">No categories recorded for this date.</div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {aggregates.categoryTotals.map((cat, idx) => (
-                            <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]" data-testid={`total-${cat.category.replace(/\s+/g, '-')}`}>
-                              <div className="text-xs font-semibold text-slate-900 dark:text-white mb-2 truncate">
-                                {cat.category}
-                              </div>
-                              <div className="text-xl font-bold text-emerald-600">{cat.totalQuantity}</div>
-                              <div className="text-xs text-slate-500">items sold</div>
-                              <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{formatCurrency(cat.grossAmount)}</div>
-                              <div className="text-xs text-slate-500">{cat.itemCount} unique items</div>
-                            </div>
-                          ))}
+            {aggregates && expandedCategory && aggregates.itemsByCategory[expandedCategory] && (
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between">
+                    <span>{expandedCategory}</span>
+                    <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-[4px]">
+                      {aggregates.itemsByCategory[expandedCategory].length} items
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                    {aggregates.itemsByCategory[expandedCategory].map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 gap-2" data-testid={`item-${expandedCategory.replace(/\s+/g, '-')}-${idx}`}>
+                        <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{item.itemName}</span>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-slate-600 dark:text-slate-400">×{item.totalQuantity}</span>
+                          <span className="text-xs font-semibold text-emerald-600">{formatCurrency(item.grossAmount)}</span>
                         </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {aggregates && !expandedCategory && aggregates.categories.length > 0 && (
+              <div className="text-center py-4 text-xs text-slate-500">
+                Click a category above to view items
+              </div>
             )}
 
             {!aggregates && !aggLoading && (
