@@ -118,7 +118,7 @@ export async function rebuildIngredientTruth(businessDate: string): Promise<Ingr
 
   // Verify receipt truth exists
   const summaryCheck = await db.execute(sql`
-    SELECT all_receipts FROM receipt_truth_summary WHERE receipt_date = ${businessDate}::date
+    SELECT all_receipts FROM receipt_truth_summary WHERE business_date = ${businessDate}::date
   `);
   if (!summaryCheck.rows || summaryCheck.rows.length === 0) {
     throw new Error(`[RECEIPT_TRUTH_FAIL] No receipt truth found for ${businessDate}. Run receipts-truth/rebuild first.`);
@@ -295,7 +295,7 @@ export async function getIngredientTruth(businessDate: string): Promise<Ingredie
 
   // Get summary stats
   const summaryResult = await db.execute(sql`
-    SELECT all_receipts FROM receipt_truth_summary WHERE receipt_date = ${businessDate}::date
+    SELECT all_receipts FROM receipt_truth_summary WHERE business_date = ${businessDate}::date
   `);
   
   const lineCountResult = await db.execute(sql`

@@ -1281,6 +1281,43 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.status(500).json({ error: e.message || String(e) });
     }
   });
+
+  // 🔒 RECEIPT TRUTH — STEP 3: Ingredient expansion endpoints
+  const { rebuildIngredientTruth, getIngredientTruth } = await import('./services/receiptTruthIngredientService');
+
+  app.post('/api/analysis/receipts-truth/ingredients/rebuild', async (req, res) => {
+    const { date } = req.body;
+    if (!date) {
+      return res.status(400).json({ error: 'date required in body (YYYY-MM-DD)' });
+    }
+    try {
+      const result = await rebuildIngredientTruth(date);
+      res.json(result);
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/analysis/receipts-truth/ingredients', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const result = await getIngredientTruth(date);
+      if (!result) {
+        return res.status(404).json({ 
+          error: 'INGREDIENTS_NOT_BUILT', 
+          message: `No ingredient truth found for ${date}. Use POST /api/analysis/receipts-truth/ingredients/rebuild to build.` 
+        });
+      }
+      res.json(result);
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
   
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
