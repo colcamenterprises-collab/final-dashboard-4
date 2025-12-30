@@ -1282,6 +1282,50 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  // 🔒 PATCH 6: Modifier truth endpoint
+  app.get('/api/analysis/receipts-truth/modifiers', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const modifiersResult = await db.execute(sql`
+        SELECT 
+          m.modifier_name,
+          SUM(m.quantity) as total_count,
+          SUM(m.price_impact * m.quantity) as total_value,
+          COUNT(DISTINCT m.receipt_id) as receipt_count
+        FROM receipt_truth_modifier m
+        WHERE m.receipt_id IN (
+          SELECT DISTINCT receipt_id FROM receipt_truth_line WHERE receipt_date = ${date}::date
+        )
+        GROUP BY m.modifier_name
+        ORDER BY total_count DESC
+      `);
+
+      const modifiers = (modifiersResult.rows as any[]).map(row => ({
+        name: row.modifier_name,
+        count: Number(row.total_count),
+        totalValue: Number(row.total_value),
+        receiptCount: Number(row.receipt_count),
+      }));
+
+      const totalModifiers = modifiers.reduce((sum, m) => sum + m.count, 0);
+      const uniqueModifiers = modifiers.length;
+
+      res.json({
+        date,
+        totalModifiers,
+        uniqueModifiers,
+        modifiers,
+        status: modifiers.length > 0 ? 'CONFIRMED' : 'NO_MODIFIERS',
+      });
+    } catch (e: any) {
+      console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
   // 🔒 RECEIPT TRUTH — STEP 3: Ingredient expansion endpoints
   const { rebuildIngredientTruth, getIngredientTruth } = await import('./services/receiptTruthIngredientService');
 

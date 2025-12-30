@@ -42,6 +42,21 @@ interface AggregateData {
   categories: string[];
 }
 
+interface ModifierData {
+  name: string;
+  count: number;
+  totalValue: number;
+  receiptCount: number;
+}
+
+interface ModifiersResponse {
+  date: string;
+  totalModifiers: number;
+  uniqueModifiers: number;
+  modifiers: ModifierData[];
+  status: 'CONFIRMED' | 'NO_MODIFIERS';
+}
+
 export default function ReceiptsTruth() {
   const today = new Date();
   const yesterday = new Date(today);
@@ -76,6 +91,17 @@ export default function ReceiptsTruth() {
     retry: false,
   });
 
+  const { data: modifiersData, isLoading: modLoading } = useQuery<ModifiersResponse>({
+    queryKey: ['/api/analysis/receipts-truth/modifiers', selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/analysis/receipts-truth/modifiers?date=${selectedDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!selectedDate && !!summary,
+    retry: false,
+  });
+
   const rebuildMutation = useMutation({
     mutationFn: async () => {
       await apiRequest('/api/analysis/receipts-truth/rebuild', {
@@ -92,6 +118,7 @@ export default function ReceiptsTruth() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth', selectedDate] });
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/aggregates', selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/modifiers', selectedDate] });
     },
   });
 
@@ -294,6 +321,49 @@ export default function ReceiptsTruth() {
             {aggregates && !expandedCategory && aggregates.categories.length > 0 && (
               <div className="text-center py-4 text-xs text-slate-500">
                 Click a category above to view items
+              </div>
+            )}
+
+            {modifiersData && (
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between">
+                    <span>Modifiers</span>
+                    <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-[4px]">
+                      {modifiersData.totalModifiers} total
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-2">
+                  {modifiersData.status === 'NO_MODIFIERS' ? (
+                    <div className="text-xs text-slate-500 text-center py-4">
+                      No modifiers recorded for this date.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
+                      {modifiersData.modifiers.map((mod, idx) => (
+                        <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 gap-2" data-testid={`modifier-${idx}`}>
+                          <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{mod.name}</span>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="text-xs text-slate-600 dark:text-slate-400">×{mod.count}</span>
+                            <span className={`text-xs font-semibold ${mod.totalValue > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {mod.totalValue > 0 ? formatCurrency(mod.totalValue) : '฿0'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {!modifiersData && !modLoading && summary && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-[4px]">
+                <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">MODIFIERS NOT BUILT</div>
+                <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Click "Rebuild from Loyverse" to load modifier data.
+                </div>
               </div>
             )}
 
