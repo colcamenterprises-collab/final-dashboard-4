@@ -1819,3 +1819,38 @@ export type ReceiptBatchSummary = typeof receiptBatchSummary.$inferSelect;
 export type InsertReceiptBatchSummary = z.infer<typeof insertReceiptBatchSummarySchema>;
 export type ReceiptBatchItems = typeof receiptBatchItems.$inferSelect;
 export type InsertReceiptBatchItems = z.infer<typeof insertReceiptBatchItemsSchema>;
+
+// -----------------------------------------------------------------------------
+// 🔒 PATCH: SOLD ITEM → RECIPE → INGREDIENT CASCADE
+// These tables are DERIVED — only the cascade engine may write here
+// DO NOT write from UI — read-only derivation only
+// -----------------------------------------------------------------------------
+
+export const soldItemRecipe = pgTable('sold_item_recipe', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  soldItemId: text('sold_item_id').notNull(),
+  recipeId: integer('recipe_id').notNull().references(() => recipe.id),
+  quantity: integer('quantity').notNull().default(1),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  soldItemIdx: index('sold_item_recipe_sold_item_idx').on(table.soldItemId),
+  recipeIdx: index('sold_item_recipe_recipe_idx').on(table.recipeId),
+}));
+
+export const soldItemIngredient = pgTable('sold_item_ingredient', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  soldItemId: text('sold_item_id').notNull(),
+  ingredient: text('ingredient').notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  shiftId: text('shift_id').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  soldItemIdx: index('sold_item_ingredient_sold_item_idx').on(table.soldItemId),
+  shiftIdx: index('sold_item_ingredient_shift_idx').on(table.shiftId),
+}));
+
+export type SoldItemRecipe = typeof soldItemRecipe.$inferSelect;
+export type InsertSoldItemRecipe = typeof soldItemRecipe.$inferInsert;
+export type SoldItemIngredient = typeof soldItemIngredient.$inferSelect;
+export type InsertSoldItemIngredient = typeof soldItemIngredient.$inferInsert;

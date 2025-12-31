@@ -1,0 +1,175 @@
+🔐 PATCH — SOLD ITEM → RECIPE → INGREDIENT CASCADE
+(Read-only derivation, zero UI changes)
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+For every POS receipt item:
+Resolve → Recipe
+Expand → Recipe Ingredients
+If ingredient is a PREP recipe → explode again
+Store atomic ingredient usage per shift
+This enables:
+True COGS
+Sauce + prep burn-down
+Theft / over-portion detection
+Purchasing sanity checks
+🧱 SCOPE (STRICT)
+✅ ADD new derived tables
+✅ ADD resolver service
+❌ NO UI changes
+❌ NO edits to POS ingestion
+❌ NO edits to recipes or ingredients
+❌ NO deletes
+1️⃣ DATABASE — NEW DERIVED TABLES
+📄 prisma/schema.prisma
+ADD ONLY — do not touch existing models
+Copy code
+Prisma
+model SoldItemRecipe {
+  id         String   @id @default(uuid())
+  soldItemId String   @index
+  recipeId   String   @index
+  quantity   Int
+  createdAt DateTime @default(now())
+}
+
+model SoldItemIngredient {
+  id         String   @id @default(uuid())
+  soldItemId String   @index
+  ingredient String
+  quantity   Float
+  unit       String
+  shiftId    String   @index
+  createdAt DateTime @default(now())
+}
+⚠️ WARNING TO AGENT
+These tables are DERIVED
+They must never be written by UI
+Only the cascade engine may write here
+2️⃣ RECIPE RESOLVER MAP (CANONICAL)
+📄 server/services/recipeResolver.ts
+Copy code
+Ts
+/**
+ * 🔒 CANONICAL RECIPE RESOLVER
+ * ---------------------------
+ * Single source of truth for POS → Recipe mapping
+ */
+
+export const RECIPE_MAP: Record<string, string> = {
+  "Single Smash Burger": "Single Smash Burger",
+  "Double Smash Burger": "Double Smash Burger",
+  "Triple Smash Burger": "Triple Smash Burger",
+  "Loaded Fries": "Loaded Fries",
+  "Dirty Fries": "Dirty Fries",
+  "Cheesy Bacon Fries": "Cheesy Bacon Fries",
+  "Chicken Fillet Burger": "Chicken Fillet Burger",
+  "El-Smasho Chicken Burger": "El-Smasho Chicken Burger",
+  "Karaage Chicken Burger": "Karaage Chicken Burger",
+};
+⚠️ DO NOT auto-fuzzy-match
+⚠️ DO NOT infer quantities here
+⚠️ POS naming mismatches are surfaced, not hidden
+3️⃣ CORE ENGINE — INGREDIENT CASCADE
+📄 server/services/ingredientCascade.ts
+Copy code
+Ts
+/**
+ * 🔒 INGREDIENT CASCADE ENGINE
+ * ---------------------------
+ * SoldItem → Recipe → Ingredient → Prep Explosion
+ */
+
+import { prisma } from "../prisma";
+import { RECIPE_MAP } from "./recipeResolver";
+
+export async function explodeSoldItem(soldItemId: string) {
+  const soldItem = await prisma.soldItem.findUnique({
+    where: { id: soldItemId },
+  });
+
+  if (!soldItem) return;
+
+  const recipeName = RECIPE_MAP[soldItem.name];
+  if (!recipeName) return;
+
+  const recipe = await prisma.recipe.findUnique({
+    where: { name: recipeName },
+    include: { ingredients: true },
+  });
+
+  if (!recipe) return;
+
+  await prisma.soldItemRecipe.create({
+    data: {
+      soldItemId,
+      recipeId: recipe.id,
+      quantity: 1,
+    },
+  });
+
+  for (const ing of recipe.ingredients) {
+    await explodeIngredient(
+      soldItemId,
+      soldItem.shiftId,
+      ing.ingredientName,
+      ing.quantity,
+      ing.unit
+    );
+  }
+}
+
+async function explodeIngredient(
+  soldItemId: string,
+  shiftId: string,
+  ingredientName: string,
+  qty: number,
+  unit: string
+) {
+  const prepRecipe = await prisma.recipe.findUnique({
+    where: { name: ingredientName },
+    include: { ingredients: true },
+  });
+
+  // BASE INGREDIENT
+  if (!prepRecipe || prepRecipe.category !== "PREP") {
+    await prisma.soldItemIngredient.create({
+      data: {
+        soldItemId,
+        shiftId,
+        ingredient: ingredientName,
+        quantity: qty,
+        unit,
+      },
+    });
+    return;
+  }
+
+  // PREP EXPLOSION
+  for (const sub of prepRecipe.ingredients) {
+    await prisma.soldItemIngredient.create({
+      data: {
+        soldItemId,
+        shiftId,
+        ingredient: sub.ingredientName,
+        quantity: sub.quantity * qty,
+        unit: sub.unit,
+      },
+    });
+  }
+}
+4️⃣ EXECUTION HOOK (SAFE)
+📄 server/workers/postReceiptProcessor.ts
+Copy code
+Ts
+/**
+ * 🔒 POST-RECEIPT DERIVATION ONLY
+ */
+
+import { explodeSoldItem } from "../services/ingredientCascade";
+
+export async function processSoldItems(soldItemIds: string[]) {
+  for (const id of soldItemIds) {
+    await explodeSoldItem(id);
+  }
+}
+⚠️ DO NOT attach this to UI
+⚠️ Trigger only after receipts are fully ingested
