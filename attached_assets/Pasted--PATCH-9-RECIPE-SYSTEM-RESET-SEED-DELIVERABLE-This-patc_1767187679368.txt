@@ -1,0 +1,130 @@
+🔐 PATCH 9 — RECIPE SYSTEM RESET & SEED (DELIVERABLE)
+This patch does NOT touch receipts, ingredients truth, shopping list, or analytics.
+This patch does one thing only:
+Make Recipe Management usable, predictable, and editable — and preload all sellable items as recipe cards so you can finish them.
+🎯 PATCH 9 OBJECTIVE (LOCKED)
+Fix recipe persistence
+Fix ingredient → recipe binding
+Move recipe editing into a modal
+Seed recipe templates for every sold item
+Remove UI clutter — focus on edit flow
+Zero analytics / receipt logic touched
+🧱 SCOPE (STRICT — AGENT MUST FOLLOW)
+✅ ALLOWED
+recipes tables
+recipe_ingredients binding logic
+Recipe Management UI only
+Seed script / migration for recipe rows
+🚫 ABSOLUTELY FORBIDDEN
+Receipt Truth tables
+Ingredient Truth engine
+Shopping list logic
+POS ingestion
+Any schema not explicitly listed below
+1️⃣ CORE FIX — WHY RECIPES ARE “NOT STICKING”
+Root cause (confirmed):
+Ingredients are added client-side only
+Save action does not persist recipe_ingredients
+Leaving edit view wipes state
+PATCH 9 FIX
+Recipe editing moves to modal
+Modal has explicit SAVE
+Save triggers atomic transaction:
+Update recipe
+Replace recipe_ingredients
+On success → refetch recipe
+2️⃣ UI CHANGE — MODAL-BASED EDITING (NON-NEGOTIABLE)
+New flow
+Copy code
+
+Recipe List
+  → Click Recipe
+    → Modal Opens
+        - Name
+        - Description
+        - Status
+        - Ingredients (add/remove/qty)
+        - SAVE / CANCEL
+Why
+No state loss
+No half-edits
+Clear commit point
+3️⃣ DATABASE (NO NEW TABLES)
+Uses existing tables ONLY
+recipes
+recipe_ingredients
+ingredients
+Save Logic (MANDATORY)
+Copy code
+Ts
+BEGIN TRANSACTION
+DELETE FROM recipe_ingredients WHERE recipe_id = ?
+INSERT recipe_ingredients (...)
+COMMIT
+No partial updates. No guessing.
+4️⃣ RECIPE SEED — THIS IS THE BIG WIN FOR YOU
+Seed ALL SELLABLE ITEMS as empty recipes
+Source:
+Distinct POS item names already captured in:
+receipt_truth_line
+filtered to SALE
+Seed creates:
+Recipe Name
+Category (from POS category)
+Status: DRAFT
+Description: empty
+No ingredients yet
+Example Seed Output
+Copy code
+
+Single Smash Burger
+Double Smash Burger
+Ultimate Double
+Triple Smash Burger
+Cheesy Bacon Fries
+French Fries
+Cajun Fries
+Coke
+Coke Zero
+Bottle Water
+Smash Burger Set (Meal Deal)
+...
+(~20–30 total)
+You then:
+Open each recipe
+Add ingredients
+Done
+5️⃣ REMOVE CLUTTER FROM RECIPE PAGE
+DELETE / HIDE
+Inline editing
+Live ingredient cost previews
+Multi-panel layout
+KEEP
+Recipe list
+Edit modal
+Ingredient selector
+Quantity input
+This page is for data entry, not analysis.
+6️⃣ ACCEPTANCE CRITERIA (AGENT MUST TEST)
+Requirement
+PASS
+Recipe saves
+✅
+Ingredients persist after reload
+✅
+Edit modal works
+✅
+No React errors
+✅
+20+ recipes preloaded
+✅
+No receipt code touched
+✅
+📦 FILES EXPECTED TO CHANGE
+Copy code
+
+client/src/pages/RecipeManagement.tsx
+client/src/components/RecipeEditModal.tsx (NEW)
+server/routes/recipes.ts
+server/services/recipeService.ts
+scripts/seedRecipesFromReceipts.ts (ONE-TIME)
