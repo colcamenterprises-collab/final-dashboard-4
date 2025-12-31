@@ -258,6 +258,79 @@ export async function removeIngredientFromRecipe(ingredientId: number): Promise<
 }
 
 /**
+ * PATCH 8: Full recipe update with atomic ingredient replacement
+ * Replaces all ingredients transactionally
+ */
+export async function updateRecipeWithIngredients(
+  id: number,
+  data: {
+    name?: string;
+    yieldUnits?: string | number | null;
+    active?: boolean;
+    ingredients?: Array<{
+      purchasingItemId: number;
+      quantity: string;
+      unit: string;
+    }>;
+  }
+): Promise<RecipeWithCost | null> {
+  // Coerce empty strings to null for numeric fields
+  const yieldUnits = data.yieldUnits === '' || data.yieldUnits === null || data.yieldUnits === undefined
+    ? null 
+    : Number(data.yieldUnits) || null;
+
+  // Update recipe metadata
+  const [updated] = await db
+    .update(recipe)
+    .set({
+      name: data.name,
+      yieldUnits,
+      active: data.active,
+    })
+    .where(eq(recipe.id, id))
+    .returning();
+
+  if (!updated) return null;
+
+  // If ingredients array provided, replace all ingredients atomically
+  if (data.ingredients !== undefined) {
+    // Delete all existing ingredients for this recipe
+    await db.delete(recipeIngredient).where(eq(recipeIngredient.recipeId, id));
+
+    // Insert new ingredients
+    if (data.ingredients.length > 0) {
+      // Validate all purchasing items exist and are ingredients
+      for (const ing of data.ingredients) {
+        const [item] = await db
+          .select()
+          .from(purchasingItems)
+          .where(and(
+            eq(purchasingItems.id, ing.purchasingItemId),
+            eq(purchasingItems.isIngredient, true)
+          ));
+
+        if (!item) {
+          throw new Error(`Purchasing item ${ing.purchasingItemId} not found or is not marked as ingredient`);
+        }
+      }
+
+      // Insert all ingredients
+      await db.insert(recipeIngredient).values(
+        data.ingredients.map(ing => ({
+          recipeId: id,
+          purchasingItemId: ing.purchasingItemId,
+          quantity: ing.quantity,
+          unit: ing.unit,
+        }))
+      );
+    }
+  }
+
+  // Return fresh recipe with cost
+  return getRecipeWithCost(id);
+}
+
+/**
  * Map POS item to recipe
  */
 export async function mapPosItemToRecipe(posItemId: string, recipeId: number): Promise<PosItemRecipeMap> {

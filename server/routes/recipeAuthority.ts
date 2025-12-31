@@ -166,7 +166,8 @@ router.post('/', async (req: Request, res: Response) => {
 
 /**
  * PUT /api/recipe-authority/:id
- * Update a recipe
+ * PATCH 8: Full recipe update with atomic ingredient replacement
+ * Accepts { name, yieldUnits, active, ingredients: [...] }
  */
 router.put('/:id', async (req: Request, res: Response) => {
   try {
@@ -175,7 +176,8 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, error: 'Invalid recipe ID' });
     }
 
-    const recipe = await recipeService.updateRecipe(id, req.body);
+    // Use the new atomic update function that handles ingredients
+    const recipe = await recipeService.updateRecipeWithIngredients(id, req.body);
     if (!recipe) {
       return res.status(404).json({ ok: false, error: 'Recipe not found' });
     }
@@ -184,6 +186,9 @@ router.put('/:id', async (req: Request, res: Response) => {
   } catch (error: any) {
     if (error.code === '23505') {
       return res.status(409).json({ ok: false, error: 'Recipe with this name already exists' });
+    }
+    if (error.message?.includes('not found or is not marked as ingredient')) {
+      return res.status(400).json({ ok: false, error: error.message });
     }
     console.error('[RecipeAuthority] Error updating recipe:', error);
     res.status(500).json({ ok: false, error: 'Failed to update recipe' });

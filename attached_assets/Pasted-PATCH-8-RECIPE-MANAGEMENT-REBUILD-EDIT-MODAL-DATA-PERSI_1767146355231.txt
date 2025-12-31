@@ -1,0 +1,139 @@
+PATCH 8 — RECIPE MANAGEMENT REBUILD (EDIT MODAL + DATA PERSISTENCE)
+Objective
+Fix Recipe Management so:
+Recipes save correctly
+Ingredients stick to recipes
+Editing is isolated, focused, and safe
+UI is simple, usable, non-chaotic
+No side effects to receipts, analysis, or ingredients truth
+NON-NEGOTIABLE RULES (LOCK THIS)
+❌ Do NOT touch receipt logic, truth tables, or analysis
+❌ No schema changes unless explicitly listed below
+❌ No auto-saving guesses
+❌ No inline editing
+✅ All edits happen in modal only
+✅ Save is explicit (Save / Cancel)
+WHAT IS BROKEN (CONFIRMED)
+Ingredients added to recipe do not persist
+Editing happens inline → state loss on navigation
+Page is overloaded and error-prone
+No clear edit lifecycle (open → edit → save → exit)
+Users cannot trust what they’re seeing
+PATCH 8 — DELIVERABLES
+1️⃣ Modal-Only Recipe Editing (MANDATORY)
+UI Changes
+Clicking Edit Recipe opens a full-screen modal
+Background page is locked
+Modal contains:
+Recipe Name
+SKU (read-only)
+Category
+Active / Inactive toggle
+Ingredient table
+Save / Cancel buttons
+Explicit Behavior
+Cancel → discard all changes
+Save → persist everything atomically
+Closing modal without save = no mutation
+2️⃣ Fix Ingredient Persistence (CORE BUG)
+Root Cause (what must be fixed)
+Ingredients are currently:
+Stored in local state
+Lost on unmount
+Not rehydrated correctly
+Required Fix
+On modal open:
+Fetch recipe with ingredients
+On save:
+POST full ingredient list
+Backend replaces recipe ingredients transactionally
+Backend Contract (LOCK THIS)
+Copy code
+
+PUT /api/recipes/:id
+{
+  name,
+  category,
+  isActive,
+  ingredients: [
+    {
+      ingredientId,
+      quantity,
+      unit
+    }
+  ]
+}
+No partial updates
+No silent failures
+Backend returns full saved recipe
+3️⃣ Ingredient Editor (Inside Modal Only)
+Ingredient Table
+Ingredient (dropdown from Ingredients Master)
+Quantity
+Unit (read-only from ingredient)
+Remove button
+Add Ingredient
+“+ Add Ingredient” button
+Cannot add duplicate ingredient twice
+Validation:
+quantity > 0
+ingredient required
+4️⃣ Remove Inline Editing Completely
+Delete / Disable
+Inline ingredient editing
+Any “edit in place” behavior
+Any auto-save logic
+Single source of truth = modal state
+5️⃣ Visual Reset (Minimal, Clean)
+Style Rules
+No icons
+No clutter
+Table-based layout
+One action per row
+Neutral colors only
+This is an operations tool, not marketing.
+6️⃣ Seed Recipe Templates (Your Request)
+Add seed script / static list for:
+Single Smash Burger
+Double Smash Burger
+Triple Smash Burger
+Super Double Bacon & Cheese
+Ultimate Double
+Kids Cheeseburger
+Crispy Chicken Burger
+Big Rooster Sriracha Chicken
+French Fries
+Cajun Fries
+Cheesy Bacon Fries
+Sweet Potato Fries
+Onion Rings
+Nuggets (6)
+Nuggets (12)
+Coke
+Coke Zero
+Sprite
+Fanta
+Water
+Rules
+Name + Category only
+No ingredients prefilled
+You will complete ingredients manually
+7️⃣ Acceptance Criteria (FAIL IF ANY MISS)
+✅ Can open recipe in modal
+✅ Add ingredients → save → reopen → still there
+✅ Cancel discards changes
+✅ No React errors
+✅ No data loss on navigation
+✅ No changes to receipts, truth, analysis
+✅ No inline editing exists
+FILES EXPECTED TO CHANGE
+client/src/pages/RecipeManagement.tsx
+client/src/components/RecipeEditModal.tsx (new)
+server/routes/recipes.ts
+server/services/recipeService.ts
+DO NOT
+Re-architect
+Add “smart” logic
+Guess mappings
+Touch receipts or truth tables
+Improve things beyond scope
