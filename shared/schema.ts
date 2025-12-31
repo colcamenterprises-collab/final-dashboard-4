@@ -1854,3 +1854,39 @@ export type SoldItemRecipe = typeof soldItemRecipe.$inferSelect;
 export type InsertSoldItemRecipe = typeof soldItemRecipe.$inferInsert;
 export type SoldItemIngredient = typeof soldItemIngredient.$inferSelect;
 export type InsertSoldItemIngredient = typeof soldItemIngredient.$inferInsert;
+
+// -----------------------------------------------------------------------------
+// 🔒 PATCH: INGREDIENT VARIANCE ENGINE
+// These tables are DERIVED — only the variance engine may write here
+// DO NOT write from UI — read-only derivation only
+// -----------------------------------------------------------------------------
+
+export const ingredientExpectedUsage = pgTable('ingredient_expected_usage', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  shiftId: text('shift_id').notNull(),
+  ingredient: text('ingredient').notNull(),
+  quantity: decimal('quantity', { precision: 12, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  shiftIdx: index('ingredient_expected_usage_shift_idx').on(table.shiftId),
+}));
+
+export const ingredientVariance = pgTable('ingredient_variance', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  shiftId: text('shift_id').notNull(),
+  ingredient: text('ingredient').notNull(),
+  expectedQty: decimal('expected_qty', { precision: 12, scale: 4 }).notNull(),
+  actualQty: decimal('actual_qty', { precision: 12, scale: 4 }).notNull(),
+  varianceQty: decimal('variance_qty', { precision: 12, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  status: varchar('status', { length: 20 }).notNull(), // OK | WARNING | CRITICAL
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+}, (table) => ({
+  shiftIdx: index('ingredient_variance_shift_idx').on(table.shiftId),
+}));
+
+export type IngredientExpectedUsage = typeof ingredientExpectedUsage.$inferSelect;
+export type InsertIngredientExpectedUsage = typeof ingredientExpectedUsage.$inferInsert;
+export type IngredientVariance = typeof ingredientVariance.$inferSelect;
+export type InsertIngredientVariance = typeof ingredientVariance.$inferInsert;
