@@ -299,18 +299,15 @@ export async function updateRecipeWithIngredients(
 
     // Insert new ingredients
     if (data.ingredients.length > 0) {
-      // Validate all purchasing items exist and are ingredients
+      // Validate all purchasing items exist (don't require is_ingredient flag for existing recipe ingredients)
       for (const ing of data.ingredients) {
         const [item] = await db
           .select()
           .from(purchasingItems)
-          .where(and(
-            eq(purchasingItems.id, ing.purchasingItemId),
-            eq(purchasingItems.isIngredient, true)
-          ));
+          .where(eq(purchasingItems.id, ing.purchasingItemId));
 
         if (!item) {
-          throw new Error(`Purchasing item ${ing.purchasingItemId} not found or is not marked as ingredient`);
+          throw new Error(`Purchasing item ${ing.purchasingItemId} not found`);
         }
       }
 
