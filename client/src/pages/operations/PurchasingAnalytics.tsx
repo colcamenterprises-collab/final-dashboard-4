@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RefreshCw, TrendingUp, Package, Truck, Layers, DollarSign, BarChart3 } from "lucide-react";
+import { RefreshCw, TrendingUp, Package, Truck, Layers, DollarSign } from "lucide-react";
 
 type TopItem = {
   itemId: number;
@@ -93,8 +93,7 @@ export default function PurchasingAnalytics() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <BarChart3 className="h-6 w-6 text-emerald-600" />
+          <h1 className="text-2xl font-bold text-slate-900">
             Purchasing Analytics
           </h1>
           <p className="text-xs text-slate-500 mt-1">

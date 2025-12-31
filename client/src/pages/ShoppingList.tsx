@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, ShoppingBag, Package, RefreshCw, Calendar, Truck } from "lucide-react";
+import { Download, Package, RefreshCw, Calendar, Truck } from "lucide-react";
 
 type ShoppingListLine = {
   fieldKey: string;
@@ -122,8 +122,7 @@ export default function ShoppingList() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <ShoppingBag className="h-6 w-6 text-emerald-600" />
+          <h1 className="text-2xl font-bold text-slate-900">
             Shopping List
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -188,7 +187,7 @@ export default function ShoppingList() {
       {/* Shopping List by Supplier */}
       {itemCount === 0 ? (
         <Card className="rounded-[4px] border-slate-200 p-8 text-center">
-          <ShoppingBag className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+          <Package className="h-12 w-12 text-slate-300 mx-auto mb-3" />
           <p className="text-sm text-slate-500">No items in shopping list</p>
           <p className="text-xs text-slate-400 mt-1">
             Submit Form 2 (Daily Stock) with purchase quantities to generate a shopping list
