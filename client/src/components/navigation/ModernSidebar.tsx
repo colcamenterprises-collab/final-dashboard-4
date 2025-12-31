@@ -84,6 +84,7 @@ const navigationGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { to: "/operations/purchasing", label: "Purchasing List", icon: ShoppingCart, testId: "nav-purchasing-list" },
+      { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
       { to: "/operations/purchasing-shift-log", label: "Purchasing Log", icon: Package, testId: "nav-purchasing-log" },
       { to: "/operations/manual-stock-purchase", label: "Manual Stock Purchase", icon: Package, testId: "nav-manual-stock-purchase" }
     ]
