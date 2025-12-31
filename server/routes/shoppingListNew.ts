@@ -196,46 +196,67 @@ async function buildShoppingListFromSales(salesId: string) {
  * 🔒 CANONICAL: GET /api/purchasing-list/latest
  * Returns shopping list from the most recent shift that has purchasing_shift_items
  * Reads from purchasing_shift_items table (NOT from JSON)
+ * 
+ * Query params:
+ * - date: Optional YYYY-MM-DD business date to filter by
+ * 
+ * PATCH 8: Fixed to use shiftDate ordering, removed fallback to legacy JSON
  */
 router.get('/latest', async (req: Request, res: Response) => {
   try {
-    // Find most recent daily_stock_v2 that has purchasing_shift_items
-    const latestResult = await db.execute(sql`
-      SELECT DISTINCT ON (ds.id) ds.id as stock_id
-      FROM daily_stock_v2 ds
-      JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
-      JOIN purchasing_shift_items psi ON psi."dailyStockId" = ds.id
-      WHERE dsv."deletedAt" IS NULL
-        AND ds."deletedAt" IS NULL
-      ORDER BY ds.id, ds."createdAt" DESC
-      LIMIT 1
-    `);
-
-    if (latestResult.rows.length === 0) {
-      // Fallback to legacy JSON approach if no purchasing_shift_items found
-      const legacyResult = await db.execute(sql`
-        SELECT id FROM daily_sales_v2 
-        WHERE payload->'purchasingJson' IS NOT NULL 
-          AND payload->>'purchasingJson' != '{}'
-          AND payload->>'purchasingJson' != 'null'
-          AND "deletedAt" IS NULL
-        ORDER BY "createdAt" DESC 
+    const requestedDate = req.query.date as string | undefined;
+    
+    let latestResult;
+    
+    if (requestedDate) {
+      // Filter by specific business date
+      // Match records where shiftDate starts with the requested date
+      latestResult = await db.execute(sql`
+        SELECT ds.id as stock_id, dsv."shiftDate"
+        FROM daily_stock_v2 ds
+        JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
+        JOIN purchasing_shift_items psi ON psi."dailyStockId" = ds.id
+        WHERE dsv."deletedAt" IS NULL
+          AND ds."deletedAt" IS NULL
+          AND dsv."shiftDate"::date = ${requestedDate}::date
+          AND psi.quantity > 0
+        GROUP BY ds.id, dsv."shiftDate"
+        ORDER BY dsv."shiftDate" DESC
         LIMIT 1
       `);
+    } else {
+      // Get most recent shift by shiftDate (not createdAt)
+      latestResult = await db.execute(sql`
+        SELECT ds.id as stock_id, dsv."shiftDate"
+        FROM daily_stock_v2 ds
+        JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
+        JOIN purchasing_shift_items psi ON psi."dailyStockId" = ds.id
+        WHERE dsv."deletedAt" IS NULL
+          AND ds."deletedAt" IS NULL
+          AND psi.quantity > 0
+        GROUP BY ds.id, dsv."shiftDate"
+        ORDER BY dsv."shiftDate" DESC
+        LIMIT 1
+      `);
+    }
+
+    if (latestResult.rows.length === 0) {
+      // NO FALLBACK - return clear message
+      const noDataMessage = requestedDate 
+        ? `NO PURCHASING DATA FOR ${requestedDate}` 
+        : 'No purchasing data found';
       
-      if (legacyResult.rows.length === 0) {
-        return res.json({ 
-          salesId: null, 
-          lines: [], 
-          grandTotal: 0, 
-          itemCount: 0,
-          message: 'No purchasing data found'
-        });
-      }
-      
-      const salesId = (legacyResult.rows[0] as any).id;
-      const result = await buildShoppingListFromSales(salesId);
-      return res.json({ ...result, source: 'legacy_json' });
+      return res.json({ 
+        salesId: null, 
+        stockId: null,
+        shiftDate: requestedDate || null,
+        lines: [], 
+        grandTotal: 0, 
+        itemCount: 0,
+        message: noDataMessage,
+        noData: true,
+        source: 'purchasing_shift_items'
+      });
     }
 
     const stockId = (latestResult.rows[0] as any).stock_id;

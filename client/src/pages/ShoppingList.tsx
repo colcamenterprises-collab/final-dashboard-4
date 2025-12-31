@@ -37,14 +37,25 @@ type ShoppingListResponse = {
   itemCount: number;
   message?: string;
   source?: string;
+  noData?: boolean;
 };
 
 export default function ShoppingList() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
 
+  // Build query URL with optional date parameter
+  const queryUrl = selectedDate 
+    ? `/api/purchasing-list/latest?date=${selectedDate}` 
+    : "/api/purchasing-list/latest";
+
   const { data, isLoading, refetch, isFetching } = useQuery<ShoppingListResponse>({
-    queryKey: ["/api/purchasing-list/latest"],
+    queryKey: ["/api/purchasing-list/latest", selectedDate],
+    queryFn: async () => {
+      const response = await fetch(queryUrl);
+      if (!response.ok) throw new Error('Failed to fetch shopping list');
+      return response.json();
+    },
   });
 
   const lines = data?.lines || [];
@@ -52,6 +63,8 @@ export default function ShoppingList() {
   const itemCount = data?.itemCount || 0;
   const shiftDate = data?.shiftDate;
   const source = data?.source;
+  const noData = data?.noData;
+  const message = data?.message;
 
   const handleDownloadCSV = async () => {
     setIsDownloading(true);
@@ -184,8 +197,18 @@ export default function ShoppingList() {
         </Card>
       </div>
 
+      {/* No Data Banner - PATCH 8 */}
+      {noData && (
+        <div className="bg-amber-50 border border-amber-300 rounded-[4px] p-4 text-center" data-testid="banner-no-data">
+          <p className="text-sm font-semibold text-amber-800">{message || 'NO PURCHASING DATA FOR THIS DATE'}</p>
+          <p className="text-xs text-amber-600 mt-1">
+            No purchasing data has been submitted for this date. Submit Daily Stock form to generate a shopping list.
+          </p>
+        </div>
+      )}
+
       {/* Shopping List by Supplier */}
-      {itemCount === 0 ? (
+      {itemCount === 0 && !noData ? (
         <Card className="rounded-[4px] border-slate-200 p-8 text-center">
           <Package className="h-12 w-12 text-slate-300 mx-auto mb-3" />
           <p className="text-sm text-slate-500">No items in shopping list</p>
@@ -193,7 +216,7 @@ export default function ShoppingList() {
             Submit Form 2 (Daily Stock) with purchase quantities to generate a shopping list
           </p>
         </Card>
-      ) : (
+      ) : itemCount > 0 ? (
         <div className="space-y-4">
           {sortedSuppliers.map((supplier) => {
             const items = groupedBySupplier[supplier];
@@ -268,7 +291,7 @@ export default function ShoppingList() {
             </div>
           </Card>
         </div>
-      )}
+      ) : null}
 
       {/* Info Note */}
       <div className="text-xs text-slate-500 bg-slate-50 p-3 rounded-[4px] border border-slate-200">
