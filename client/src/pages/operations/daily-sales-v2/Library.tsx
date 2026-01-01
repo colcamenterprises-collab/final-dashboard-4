@@ -520,17 +520,17 @@ export default function DailySalesV2Library() {
                 
                 <div className="bg-red-50 p-3 rounded text-xs">
                   <h4 className="text-xs font-semibold mb-2">Basic Info</h4>
-                  <p><strong>Date:</strong> {new Date(selected.date).toLocaleDateString()}</p>
-                  <p><strong>Completed By:</strong> {selected.staff}</p>
+                  <p className="text-xs"><strong>Date:</strong> {new Date(selected.date).toLocaleDateString()}</p>
+                  <p className="text-xs"><strong>Completed By:</strong> {selected.staff}</p>
                 </div>
 
                 <div className="bg-red-50 p-3 rounded text-xs">
                   <h4 className="text-xs font-semibold mb-2">Sales Breakdown</h4>
-                  <p><strong>Cash Sales:</strong> ฿{selected.sales.cash.toLocaleString()}</p>
-                  <p><strong>QR Sales:</strong> ฿{selected.sales.qr.toLocaleString()}</p>
-                  <p><strong>Grab Sales:</strong> ฿{selected.sales.grab.toLocaleString()}</p>
-                  <p><strong>Other Sales:</strong> ฿{selected.sales.other.toLocaleString()}</p>
-                  <p className="font-bold border-t pt-2 mt-1"><strong>Total Sales:</strong> ฿{selected.sales.total.toLocaleString()}</p>
+                  <p className="text-xs"><strong>Cash Sales:</strong> ฿{selected.sales.cash.toLocaleString()}</p>
+                  <p className="text-xs"><strong>QR Sales:</strong> ฿{selected.sales.qr.toLocaleString()}</p>
+                  <p className="text-xs"><strong>Grab Sales:</strong> ฿{selected.sales.grab.toLocaleString()}</p>
+                  <p className="text-xs"><strong>Other Sales:</strong> ฿{selected.sales.other.toLocaleString()}</p>
+                  <p className="text-xs font-bold border-t pt-2 mt-1"><strong>Total Sales:</strong> ฿{selected.sales.total.toLocaleString()}</p>
                 </div>
 
                 <div className="bg-red-50 p-3 rounded text-xs">
@@ -579,10 +579,10 @@ export default function DailySalesV2Library() {
 
                 <div className="bg-red-50 p-3 rounded text-xs">
                   <h4 className="text-xs font-semibold mb-2">Banking & Cash</h4>
-                  <p><strong>Starting Cash:</strong> ฿{selected.banking.startingCash.toLocaleString()}</p>
-                  <p><strong>Closing Cash:</strong> ฿{selected.banking.closingCash.toLocaleString()}</p>
-                  <p><strong>Cash Banked:</strong> ฿{selected.banking.cashBanked.toLocaleString()}</p>
-                  <p><strong>QR Transfer:</strong> ฿{selected.banking.qrTransfer.toLocaleString()}</p>
+                  <p className="text-xs"><strong>Starting Cash:</strong> ฿{selected.banking.startingCash.toLocaleString()}</p>
+                  <p className="text-xs"><strong>Closing Cash:</strong> ฿{selected.banking.closingCash.toLocaleString()}</p>
+                  <p className="text-xs"><strong>Cash Banked:</strong> ฿{selected.banking.cashBanked.toLocaleString()}</p>
+                  <p className="text-xs"><strong>QR Transfer:</strong> ฿{selected.banking.qrTransfer.toLocaleString()}</p>
                   
                   {(() => {
                     const startingCash = selected.banking.startingCash;
@@ -599,11 +599,11 @@ export default function DailySalesV2Library() {
                     return (
                       <div className="border-t pt-2 mt-2">
                         <h5 className="text-xs font-medium mb-2">Balance Check</h5>
-                        <div className="space-y-1">
-                          <p>Expected: ฿{startingCash.toLocaleString()} + ฿{cashSales.toLocaleString()} - ฿{totalExpenses.toLocaleString()} - ฿{totalWages.toLocaleString()} - ฿{cashBanked.toLocaleString()}</p>
-                          <p><strong>Expected Closing:</strong> ฿{expectedClosing.toLocaleString()}</p>
-                          <p><strong>Actual Closing:</strong> ฿{closingCash.toLocaleString()}</p>
-                          <p className={`font-bold ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
+                        <div className="space-y-1 text-xs">
+                          <p className="text-xs">Expected: ฿{startingCash.toLocaleString()} + ฿{cashSales.toLocaleString()} - ฿{totalExpenses.toLocaleString()} - ฿{totalWages.toLocaleString()} - ฿{cashBanked.toLocaleString()}</p>
+                          <p className="text-xs"><strong>Expected Closing:</strong> ฿{expectedClosing.toLocaleString()}</p>
+                          <p className="text-xs"><strong>Actual Closing:</strong> ฿{closingCash.toLocaleString()}</p>
+                          <p className={`text-xs font-bold ${isBalanced ? 'text-green-600' : 'text-red-600'}`}>
                             <strong>Difference:</strong> ฿{difference.toLocaleString()} 
                             {isBalanced ? ' BALANCED' : ' NOT BALANCED'}
                           </p>
@@ -620,30 +620,30 @@ export default function DailySalesV2Library() {
                 
                 <div className="bg-red-50 p-3 rounded text-xs">
                   <h4 className="text-xs font-semibold mb-2">End Count</h4>
-                  <p><strong>Rolls:</strong> {selected.stock.rolls ?? 0} pcs</p>
-                  <p><strong>Meat:</strong> {selected.stock.meat ?? 0} grams</p>
+                  <p className="text-xs"><strong>Rolls:</strong> {selected.stock.rolls ?? 0} pcs</p>
+                  <p className="text-xs"><strong>Meat:</strong> {selected.stock.meat ?? 0} grams</p>
                 </div>
 
                 {/* Drinks Stock Section - ALWAYS SHOW ALL DRINKS EVEN IF 0 */}
                 <div className="bg-red-50 p-3 rounded text-xs">
                   <h4 className="text-xs font-semibold mb-2">Drinks Count</h4>
                   {selected.stock.drinks && selected.stock.drinks.length > 0 ? (
-                    <div className="space-y-1">
+                    <div className="space-y-1 text-xs">
                       {selected.stock.drinks.map((drink, idx) => (
-                        <p key={idx}>
+                        <p key={idx} className="text-xs">
                           <strong>{drink.name}:</strong> {drink.quantity ?? 0} {drink.unit}
                         </p>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-gray-500">No drinks recorded</p>
+                    <p className="text-xs text-gray-500">No drinks recorded</p>
                   )}
                 </div>
 
                 <div className="bg-red-50 p-3 rounded text-xs">
                   <h4 className="text-xs font-semibold mb-2">Shopping List / Requisition</h4>
                   {selected.shoppingList.length === 0 ? (
-                    <p className="text-gray-500">No items to purchase</p>
+                    <p className="text-xs text-gray-500">No items to purchase</p>
                   ) : (
                     <div className="space-y-1">
                       {selected.shoppingList.map((item, idx) => (
