@@ -784,7 +784,7 @@ export class MemStorage implements IStorage {
         ${expense.supplier || 'Unknown'},
         ${expense.category || expense.expenseType || 'Shopping'},
         ${JSON.stringify(expense.notes ? { notes: expense.notes } : {})},
-        ${'BUSINESS'}
+        ${'DIRECT'}
       )
       RETURNING 
         id,
