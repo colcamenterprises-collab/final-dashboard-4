@@ -2480,6 +2480,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.post("/api/expensesV2", async (req: Request, res: Response) => {
     try {
       const expenseData = req.body;
+      console.log("[EXPENSE DEBUG] Received expense data:", JSON.stringify(expenseData));
       
       // Validate required fields
       const amount = Number(expenseData.amount);
@@ -2515,10 +2516,14 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       // Ensure amount is a number
       expenseData.amount = amount;
       
+      console.log("[EXPENSE DEBUG] About to call storage.createExpense with:", JSON.stringify(expenseData));
       const expense = await storage.createExpense(expenseData);
+      console.log("[EXPENSE DEBUG] Expense created successfully:", JSON.stringify(expense));
       res.json(expense);
     } catch (error: any) {
-      console.error("Error creating expense:", error);
+      console.error("[EXPENSE ERROR] Full error:", error);
+      console.error("[EXPENSE ERROR] Error message:", error?.message);
+      console.error("[EXPENSE ERROR] Error stack:", error?.stack);
       res.status(500).json({ 
         error: "Failed to create expense",
         detail: error?.message || String(error)
