@@ -10,6 +10,7 @@ import { db } from '../db';
 import { ingredientExpectedUsage, ingredientVariance } from '@shared/schema';
 import { eq } from 'drizzle-orm';
 import { getThreshold } from '../config/ingredientThresholds';
+import { getActualUsage } from './actualUsageResolver';
 
 type VarianceStatus = 'OK' | 'WARNING' | 'CRITICAL';
 
@@ -31,6 +32,12 @@ export async function runIngredientVariance(shiftId: string): Promise<void> {
 
   for (const exp of expected) {
     const actual = await getActualUsage(shiftId, exp.ingredient, exp.unit);
+    
+    if (actual === null) {
+      console.log(`[VarianceEngine] Skipping ${exp.ingredient} - no stock tracking data`);
+      continue;
+    }
+    
     const expectedQty = parseFloat(exp.quantity);
     const variance = actual - expectedQty;
     const status = determineStatus(exp.ingredient, variance);
@@ -70,32 +77,6 @@ function determineStatus(ingredient: string, variance: number): VarianceStatus {
   }
   
   return 'OK';
-}
-
-/**
- * ACTUAL USAGE SOURCE
- * 
- * This function retrieves the actual ingredient usage for a shift.
- * Currently returns 0 as a placeholder — to be implemented with:
- * - End-of-shift stock counts
- * - Opening balances
- * - Purchases during shift
- * 
- * Formula: Actual = Opening + Purchases - Closing
- */
-async function getActualUsage(
-  shiftId: string,
-  ingredient: string,
-  unit: string
-): Promise<number> {
-  // TODO: Implement actual usage calculation
-  // This should pull from:
-  // 1. Opening stock count for the shift
-  // 2. Purchases received during shift
-  // 3. Closing stock count for the shift
-  // 
-  // For now, return 0 to avoid false positives
-  return 0;
 }
 
 /**
