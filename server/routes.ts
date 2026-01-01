@@ -2481,6 +2481,24 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const expenseData = req.body;
       
+      // Validate required fields
+      const amount = Number(expenseData.amount);
+      if (isNaN(amount) || amount <= 0) {
+        return res.status(400).json({ error: "Invalid amount - must be a positive number" });
+      }
+      
+      if (!expenseData.date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+      
+      if (!expenseData.category) {
+        return res.status(400).json({ error: "Category is required" });
+      }
+      
+      if (!expenseData.supplier) {
+        return res.status(400).json({ error: "Supplier is required" });
+      }
+      
       // Auto-populate P&L category based on expense type
       if (expenseData.typeOfExpense) {
         const pnlCategory = expenseTypeToPnLCategory[expenseData.typeOfExpense as ExpenseType];
@@ -2494,11 +2512,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         expenseData.pnlCategory = mapping.pnlCategory;
       }
       
+      // Ensure amount is a number
+      expenseData.amount = amount;
+      
       const expense = await storage.createExpense(expenseData);
       res.json(expense);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating expense:", error);
-      res.status(500).json({ error: "Failed to create expense" });
+      res.status(500).json({ 
+        error: "Failed to create expense",
+        detail: error?.message || String(error)
+      });
     }
   });
 

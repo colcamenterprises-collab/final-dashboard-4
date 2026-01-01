@@ -1,0 +1,101 @@
+🔧 PATCH 11 — EXPENSES WRITE PATH FIX (CRITICAL)
+🎯 Objective
+Fix the 500 error when lodging Business Expenses so this workflow works end-to-end:
+Expenses Modal → Expenses Table → P&L → Home Dashboard
+No side effects. No receipt logic touched.
+🚨 Confirmed Problem
+UI submits expense correctly
+Backend returns:
+500 {"error":"Failed to create expense"}
+Result:
+Expense NOT saved
+Expenses table NOT updated
+P&L NOT updated
+Home dashboard shows zero / stale data
+This is a broken write path, not a UI issue.
+🔒 Rules (Non-Negotiable)
+❌ Do NOT touch receipts
+❌ Do NOT touch recipes
+❌ Do NOT touch ingredients
+❌ Do NOT modify schema unless explicitly listed
+✅ Fix ONLY expense creation + propagation
+🧱 Root Cause (What’s Actually Broken)
+One or more of the following (agent must verify, not guess):
+Amount parsing bug
+Frontend sends "501.30" (string)
+Backend expects number
+Prisma / SQL rejects it
+Missing required field
+Common offenders:
+businessDate
+category
+supplier
+source = BUSINESS
+Transaction not committed
+Expense insert succeeds
+P&L derivation never runs
+✅ Required Fixes (MANDATORY)
+1️⃣ Backend: Expense Create Endpoint
+File: server/routes/expenses.ts (or equivalent)
+Enforce strict input handling:
+Copy code
+Ts
+const amount = Number(req.body.amount);
+if (isNaN(amount)) {
+  return res.status(400).json({ error: "Invalid amount" });
+}
+Ensure required fields exist:
+Copy code
+Ts
+if (!req.body.date || !req.body.category || !req.body.supplier) {
+  return res.status(400).json({ error: "Missing required fields" });
+}
+2️⃣ Ensure Expense Is Written Correctly
+Expense must insert into:
+expenses (or business_expenses)
+Required fields:
+date
+amount
+category
+supplier
+description
+source = 'BUSINESS'
+No silent defaults.
+3️⃣ Trigger P&L Update (CRITICAL)
+Immediately after expense insert:
+Either:
+Call existing P&L rebuild function
+OR
+Insert into derived P&L table if that’s the architecture
+⚠️ If this step is skipped, the Home page will NEVER update.
+4️⃣ Frontend: Modal Submission Safety
+File: client/src/components/ExpenseModal.tsx (or similar)
+Before POST:
+Copy code
+Ts
+amount: Number(amount)
+Do not send strings.
+5️⃣ Error Transparency
+If insert fails:
+Backend must return real Prisma / SQL error
+Frontend must display it (not generic “Failed to create expense”)
+🧪 Acceptance Tests (Agent MUST Verify)
+✅ Create Business Expense → Success toast
+✅ Expense appears in Expenses table immediately
+✅ P&L updates (MTD / YTD not zero)
+✅ Home dashboard reflects updated P&L
+✅ No 500 errors
+✅ No console errors
+✅ Reload page → data persists
+🚫 Explicitly Out of Scope
+Receipts
+Shopping list
+Recipes
+Ingredients
+Modifiers
+UI redesign
+📦 Deliverable
+One patch
+Minimal diff
+No refactors
+No assumptions

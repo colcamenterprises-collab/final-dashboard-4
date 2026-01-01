@@ -777,14 +777,14 @@ export class MemStorage implements IStorage {
       INSERT INTO expenses (id, "restaurantId", "shiftDate", item, "costCents", supplier, "expenseType", meta, source)
       VALUES (
         ${expenseId},
-        ${'cmes916fj0000pio20tvofd44'},
+        ${'cmixfople0000la9o74c5cpcj'},
         COALESCE(${expenseDate}::timestamp, NOW()),
         ${expense.description || expense.item || 'Unknown Item'},
-        ${Math.round(parseFloat(expense.amount) || 0)},
+        ${Math.round(Number(expense.amount) || 0)},
         ${expense.supplier || 'Unknown'},
         ${expense.category || expense.expenseType || 'Shopping'},
         ${JSON.stringify(expense.notes ? { notes: expense.notes } : {})},
-        ${'DIRECT'}
+        ${'BUSINESS'}
       )
       RETURNING 
         id,
