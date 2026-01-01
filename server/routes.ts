@@ -2476,54 +2476,41 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
-  // Create new expense with enum validation and P&L mapping
+  // PATCH 12: Create new expense with strict validation (NO side effects, NO P&L writes)
   app.post("/api/expensesV2", async (req: Request, res: Response) => {
     try {
-      const expenseData = req.body;
-      console.log("[EXPENSE DEBUG] Received expense data:", JSON.stringify(expenseData));
+      const { date, supplier, category, description, amount } = req.body;
       
-      // Validate required fields
-      const amount = Number(expenseData.amount);
-      if (isNaN(amount) || amount <= 0) {
+      // PATCH 12: Enforce required fields
+      if (!date || !supplier || !category || !amount) {
+        return res.status(400).json({ 
+          error: "Missing required expense fields",
+          required: ["date", "supplier", "category", "amount"],
+          received: { date: !!date, supplier: !!supplier, category: !!category, amount: !!amount }
+        });
+      }
+      
+      // PATCH 12: Normalize amount (critical)
+      const normalizedAmount = Number(amount);
+      if (Number.isNaN(normalizedAmount) || normalizedAmount <= 0) {
         return res.status(400).json({ error: "Invalid amount - must be a positive number" });
       }
       
-      if (!expenseData.date) {
-        return res.status(400).json({ error: "Date is required" });
-      }
+      // PATCH 12: Write expense (NO side effects)
+      const expenseData = {
+        date,
+        supplier,
+        category,
+        description: description ?? null,
+        amount: normalizedAmount,
+      };
       
-      if (!expenseData.category) {
-        return res.status(400).json({ error: "Category is required" });
-      }
-      
-      if (!expenseData.supplier) {
-        return res.status(400).json({ error: "Supplier is required" });
-      }
-      
-      // Auto-populate P&L category based on expense type
-      if (expenseData.typeOfExpense) {
-        const pnlCategory = expenseTypeToPnLCategory[expenseData.typeOfExpense as ExpenseType];
-        expenseData.pnlCategory = pnlCategory;
-      }
-      
-      // If shopName is provided but no typeOfExpense, auto-suggest from mapping
-      if (expenseData.shopName && !expenseData.typeOfExpense) {
-        const mapping = getExpenseMapping(expenseData.shopName);
-        expenseData.typeOfExpense = mapping.expenseType;
-        expenseData.pnlCategory = mapping.pnlCategory;
-      }
-      
-      // Ensure amount is a number
-      expenseData.amount = amount;
-      
-      console.log("[EXPENSE DEBUG] About to call storage.createExpense with:", JSON.stringify(expenseData));
       const expense = await storage.createExpense(expenseData);
-      console.log("[EXPENSE DEBUG] Expense created successfully:", JSON.stringify(expense));
-      res.json(expense);
+      
+      // PATCH 12: Return created record
+      return res.json({ success: true, expense });
     } catch (error: any) {
-      console.error("[EXPENSE ERROR] Full error:", error);
-      console.error("[EXPENSE ERROR] Error message:", error?.message);
-      console.error("[EXPENSE ERROR] Error stack:", error?.stack);
+      console.error("[EXPENSE ERROR]", error?.message || error);
       res.status(500).json({ 
         error: "Failed to create expense",
         detail: error?.message || String(error)

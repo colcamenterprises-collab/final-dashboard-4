@@ -127,39 +127,68 @@ export function ExpenseLodgmentModal({
   // Create/Update expense mutation
   const expenseMutation = useMutation({
     mutationFn: async (data: ExpenseLodgmentForm) => {
+      // PATCH 12: Normalize amount to number (data.amount is already a number from Zod)
+      const normalizedAmount = Number(data.amount);
+      if (Number.isNaN(normalizedAmount) || normalizedAmount <= 0) {
+        throw new Error("Invalid amount - must be a positive number");
+      }
+      
       // Transform data to match the backend API format
       const payload = {
         date: data.date,
         supplier: data.supplier,
         category: data.category,
         description: data.description,
-        amount: parseFloat(data.amount), // Send as full THB
-        createdAt: new Date().toISOString(),
+        amount: normalizedAmount,
       };
 
       const url = isEditMode ? `/api/expensesV2/${expenseId}` : "/api/expensesV2";
       const method = isEditMode ? "PUT" : "POST";
 
-      return apiRequest(url, {
+      const response = await apiRequest(url, {
         method: method,
         body: JSON.stringify(payload),
       });
+      
+      // PATCH 12: Handle response - check for success or throw
+      if (response.error) {
+        throw new Error(response.error);
+      }
+      
+      return response.expense || response;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+      // PATCH 12: Close modal and reset form FIRST
+      setIsOpen(false);
+      form.reset({
+        date: new Date().toISOString().split('T')[0],
+        supplier: "",
+        category: "",
+        description: "",
+        amount: 0,
+      });
+      
+      // Show success toast
       toast({
         title: "Success",
         description: isEditMode ? "Expense updated successfully" : "Business expense logged successfully",
       });
-      setIsOpen(false);
-      form.reset();
+      
+      // Callback
       onSuccess?.();
+      
+      // PATCH 12: Invalidate all relevant queries for P&L updates (after modal closes)
+      queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/expenses-v2/summary"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/pnl"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/summary/today"] });
+      queryClient.invalidateQueries({ queryKey: ["expenseTotals"] });
     },
     onError: (error: any) => {
       console.error(`Failed to ${isEditMode ? 'update' : 'create'} expense:`, error);
       toast({
         title: "Error",
-        description: error.message || `Failed to ${isEditMode ? 'update' : 'log'} expense`,
+        description: error?.message || error?.error || `Failed to ${isEditMode ? 'update' : 'log'} expense`,
         variant: "destructive",
       });
     },

@@ -1,0 +1,97 @@
+PATCH 12 — IMPLEMENTATION (COPY-PASTE FOR REPLIT AGENT)
+1️⃣ BACKEND — FIX EXPENSE CREATE (SOURCE OF TRUTH)
+File: server/routes/businessExpenses.ts
+ENFORCE REQUIRED FIELDS
+Copy code
+Ts
+if (!amount || !date || !category || !supplier) {
+  return res.status(400).json({
+    error: "Missing required expense fields"
+  });
+}
+NORMALIZE AMOUNT (CRITICAL)
+Copy code
+Ts
+const normalizedAmount = Number(amount);
+if (Number.isNaN(normalizedAmount)) {
+  return res.status(400).json({ error: "Invalid amount" });
+}
+WRITE EXPENSE (NO SIDE EFFECTS)
+Copy code
+Ts
+const expense = await db.businessExpense.create({
+  data: {
+    date,
+    supplier,
+    category,
+    description: description ?? null,
+    amount: normalizedAmount,
+    source: "MANUAL",
+    createdAt: new Date()
+  }
+});
+RETURN CREATED RECORD
+Copy code
+Ts
+return res.json({ success: true, expense });
+🚫 DO NOT write to P&L here
+🚫 DO NOT mutate other tables
+2️⃣ BACKEND — P&L DERIVATION (READ-ONLY, DETERMINISTIC)
+File: server/services/pnlService.ts
+P&L MUST DERIVE FROM:
+Sales → receipt truth tables
+Expenses → businessExpense
+Wages → shift wages table
+Copy code
+Ts
+totalExpenses =
+  SUM(businessExpense.amount)
++ SUM(shiftExpenses.amount)
++ SUM(wages.amount);
+NO UI CALCULATIONS ALLOWED
+3️⃣ FRONTEND — EXPENSE MODAL FIX
+File: client/src/components/ExpenseModal.tsx
+ENSURE PAYLOAD MATCHES BACKEND
+Copy code
+Ts
+{
+  date,
+  supplier,
+  category,
+  description,
+  amount: Number(amount)
+}
+ON SUCCESS
+Copy code
+Ts
+onSuccess();
+invalidateQuery(["expenses"]);
+invalidateQuery(["pnl"]);
+ON ERROR
+Copy code
+Ts
+toast.error(response.error ?? "Failed to save expense");
+4️⃣ FRONTEND — HOME PAGE (P&L ONLY)
+File: client/src/pages/Home.tsx
+🚫 REMOVE any:
+direct expense queries
+cached totals
+client-side math
+✅ ONLY:
+Copy code
+Ts
+GET /api/pnl/summary
+Home page must never calculate money.
+5️⃣ GUARARDS (LOCK IT DOWN)
+ADD ASSERTIONS
+Expense modal cannot submit without required fields
+Backend rejects malformed payloads loudly
+P&L endpoint throws if source tables empty
+ACCEPTANCE CRITERIA (ALL MUST PASS)
+✅ Expense modal submits without 500
+✅ Expense appears in Expenses table immediately
+✅ P&L updates automatically (no refresh hacks)
+✅ Home dashboard reflects new totals
+✅ No receipt logic touched
+✅ No schema drift
+✅ No silent fallback paths
