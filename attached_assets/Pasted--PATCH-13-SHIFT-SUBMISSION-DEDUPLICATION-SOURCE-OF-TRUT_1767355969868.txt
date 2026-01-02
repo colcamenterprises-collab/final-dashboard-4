@@ -1,0 +1,132 @@
+🔒 PATCH 13 — SHIFT SUBMISSION DEDUPLICATION & SOURCE-OF-TRUTH LOCK
+🚨 The Problem (Root Cause)
+You’re seeing:
+Daily Sales & Stock V2 Form 1 submitted twice
+Library shows two records
+Shift expenses duplicated
+P&L inflated
+Shopping list & cost signals corrupted
+This means the system currently allows multiple authoritative submissions for the same shift.
+That is unacceptable for an accounting / ops system.
+🎯 PATCH 13 OBJECTIVE (NON-NEGOTIABLE)
+For any given business day + shift window, there must be ONE and ONLY ONE authoritative Form 1 submission.
+Everything else must be:
+Rejected, or
+Explicitly treated as a revision, never a duplicate
+🧱 WHAT PATCH 13 WILL DO (EXACTLY)
+1️⃣ Define a Shift Identity
+We formally define a shift as:
+Copy code
+
+restaurant_id
++ shift_date (YYYY-MM-DD)
++ shift_type ('DAILY_SALES_V2')
+This becomes immutable truth.
+2️⃣ Database-Level Protection (Critical)
+We add a UNIQUE CONSTRAINT so duplicates are physically impossible.
+Why this matters
+UI bugs
+Double clicks
+Network retries
+Agent misfires
+Zapier retries
+None of these can ever create duplicates again.
+3️⃣ Backend Enforcement Logic
+When Form 1 is submitted:
+If NO shift exists
+✅ Create new record
+✅ Mark as authoritative = true
+If shift already exists
+❌ Reject with 409 Conflict ➡️ Clear message:
+“Daily Sales already submitted for this shift.”
+(No silent overwrites. No second rows.)
+4️⃣ Expense Deduplication Safety
+Shift expenses are currently being:
+Inserted per submission
+Without checking shift ownership
+Patch 13 will:
+Attach expenses to the shift ID
+Prevent re-insertion if shift already finalized
+This stops:
+Double wages
+Double shopping
+Inflated P&L
+5️⃣ Library Cleanup (UI Truth)
+In the Form Library:
+Only the authoritative submission is shown
+Any legacy duplicates are:
+Marked superseded
+Hidden from totals
+Still auditable (nothing deleted)
+6️⃣ Forward Compatibility (Important)
+This patch sets the foundation for:
+PATCH 14: Shift ingredient usage truth
+PATCH 15: Variance detection
+PATCH 16: Theft / leakage alerts
+Without this, none of those can be trusted.
+🧠 WHY THIS IS MARKET-LEADING
+Most POS / restaurant systems:
+Allow silent duplicates
+“Hope” the staff doesn’t double-submit
+Fix it manually later
+This system:
+Prevents the error
+Explains the rejection
+Locks financial truth at the source
+That’s enterprise-grade ops.
+📦 REPLIT AGENT — SINGLE DROP-IN PATCH INSTRUCTION
+Below is exactly what you asked for.
+🔐 REPLIT AGENT PATCH — PATCH 13
+PATCH NAME:
+PATCH_13_SHIFT_DEDUPLICATION_LOCK
+OBJECTIVE:
+Ensure only one authoritative Daily Sales & Stock V2 (Form 1) submission exists per shift. Prevent duplicate expenses, duplicate P&L impact, and duplicate library entries.
+🔒 DATABASE (REQUIRED)
+Add a unique constraint to the Daily Sales table:
+Copy code
+Sql
+CREATE UNIQUE INDEX IF NOT EXISTS unique_daily_sales_shift
+ON daily_sales
+(restaurant_id, shift_date, shift_type);
+🔧 BACKEND — FORM 1 SUBMIT HANDLER
+Before creating a new Daily Sales record:
+Query by (restaurant_id, shift_date, shift_type)
+If record exists:
+Return HTTP 409 Conflict
+Message: "Daily Sales already submitted for this shift"
+If no record exists:
+Create record
+Set:
+authoritative = true
+submitted_at = now()
+💰 SHIFT EXPENSE HANDLING
+When inserting shift expenses:
+Require shift_id
+If shift already has expenses:
+Do NOT insert again
+Log warning
+Return success without duplication
+📚 FORM LIBRARY
+Only show:
+authoritative = true
+superseded = false
+Any legacy duplicates:
+Mark superseded = true
+Exclude from totals, P&L, shopping list
+🚫 ABSOLUTE PROHIBITIONS
+❌ Do NOT delete historical records
+❌ Do NOT auto-merge duplicates
+❌ Do NOT touch receipt ingestion
+❌ Do NOT touch ingredient logic
+✅ ACCEPTANCE CRITERIA
+Submitting Form 1 twice for same date → blocked
+Expenses appear once
+P&L correct
+Library shows one entry per shift
+System remains auditable
+Cam — once PATCH 13 is in:
+You’ve locked financial truth
+PATCH 14 (Sold Items → Ingredient Usage) becomes safe to execute
+Variance detection becomes real, not theoretical
+When you’re ready, I’ll design PATCH 14 at the same level — deterministic, auditable, zero fluff.
+You’re doing this the right way now.

@@ -197,6 +197,26 @@ export async function createDailySalesV2(req: Request, res: Response) {
     // PATCH A: Write BOTH shiftDate (TEXT for legacy) AND shift_date (DATE for analysis queries)
     const shiftDateAsDate = new Date(shiftDate);
     
+    // PATCH 13: SHIFT DEDUPLICATION — Check for existing submission before insert
+    const existingCheck = await pool.query(
+      `SELECT id, "completedBy", "createdAt" FROM daily_sales_v2 
+       WHERE shift_date = $1 AND "deletedAt" IS NULL 
+       LIMIT 1`,
+      [shiftDateAsDate]
+    );
+    
+    if (existingCheck.rows.length > 0) {
+      const existing = existingCheck.rows[0];
+      console.log(`[PATCH_13_DEDUP] Blocked duplicate submission for ${shiftDate}. Existing ID: ${existing.id}`);
+      return res.status(409).json({ 
+        ok: false, 
+        error: `Daily Sales already submitted for this shift (${shiftDate}). Only one authoritative submission is allowed per shift.`,
+        existingId: existing.id,
+        existingSubmittedBy: existing.completedBy,
+        existingSubmittedAt: existing.createdAt
+      });
+    }
+    
     await pool.query(
       `INSERT INTO daily_sales_v2 (
         id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO", payload,
