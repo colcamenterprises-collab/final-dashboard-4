@@ -1514,6 +1514,37 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  // PATCH 14: Modifier Effective Count (Truth Lock)
+  app.post('/api/analysis/receipts-truth/modifiers-effective/rebuild', async (req, res) => {
+    const { date } = req.body;
+    if (!date) {
+      return res.status(400).json({ error: 'date required in body (YYYY-MM-DD)' });
+    }
+    try {
+      const { rebuildModifierEffective } = await import('./services/receiptTruthModifierEffective');
+      const result = await rebuildModifierEffective(date);
+      res.json(result);
+    } catch (e: any) {
+      console.error('[MODIFIER_EFFECTIVE_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/analysis/receipts-truth/modifiers-effective', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const { getModifierEffectiveSummary } = await import('./services/receiptTruthModifierEffective');
+      const result = await getModifierEffectiveSummary(date);
+      res.json({ date, modifiers: result });
+    } catch (e: any) {
+      console.error('[MODIFIER_EFFECTIVE_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
   // PATCH 13: Enhanced Ingredient Usage Engine (with modifier math)
   app.post('/api/analysis/ingredient-usage/rebuild', async (req, res) => {
     const { date } = req.body;

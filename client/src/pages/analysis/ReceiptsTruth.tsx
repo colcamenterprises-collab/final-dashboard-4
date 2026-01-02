@@ -43,18 +43,14 @@ interface AggregateData {
 }
 
 interface ModifierData {
-  name: string;
+  modifierName: string;
   count: number;
-  totalValue: number;
-  receiptCount: number;
+  totalRevenue: number;
 }
 
 interface ModifiersResponse {
   date: string;
-  totalModifiers: number;
-  uniqueModifiers: number;
   modifiers: ModifierData[];
-  status: 'CONFIRMED' | 'NO_MODIFIERS';
 }
 
 export default function ReceiptsTruth() {
@@ -91,10 +87,11 @@ export default function ReceiptsTruth() {
     retry: false,
   });
 
+  // PATCH 14: Use modifiers-effective endpoint for accurate modifier counts
   const { data: modifiersData, isLoading: modLoading } = useQuery<ModifiersResponse>({
-    queryKey: ['/api/analysis/receipts-truth/modifiers', selectedDate],
+    queryKey: ['/api/analysis/receipts-truth/modifiers-effective', selectedDate],
     queryFn: async () => {
-      const res = await fetch(`/api/analysis/receipts-truth/modifiers?date=${selectedDate}`);
+      const res = await fetch(`/api/analysis/receipts-truth/modifiers-effective?date=${selectedDate}`);
       if (!res.ok) return null;
       return res.json();
     },
@@ -114,11 +111,17 @@ export default function ReceiptsTruth() {
         body: JSON.stringify({ date: selectedDate }),
         headers: { 'Content-Type': 'application/json' },
       });
+      // PATCH 14: Rebuild modifiers-effective
+      await apiRequest('/api/analysis/receipts-truth/modifiers-effective/rebuild', {
+        method: 'POST',
+        body: JSON.stringify({ date: selectedDate }),
+        headers: { 'Content-Type': 'application/json' },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth', selectedDate] });
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/aggregates', selectedDate] });
-      queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/modifiers', selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/modifiers-effective', selectedDate] });
     },
   });
 
@@ -328,14 +331,14 @@ export default function ReceiptsTruth() {
               <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
                 <CardHeader className="p-4 pb-2">
                   <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between">
-                    <span>Modifiers</span>
+                    <span>Modifiers (Effective Count)</span>
                     <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-[4px]">
-                      {modifiersData.totalModifiers} total
+                      {modifiersData.modifiers.length} unique
                     </Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-2">
-                  {modifiersData.status === 'NO_MODIFIERS' ? (
+                  {modifiersData.modifiers.length === 0 ? (
                     <div className="text-xs text-slate-500 text-center py-4">
                       No modifiers recorded for this date.
                     </div>
@@ -343,11 +346,11 @@ export default function ReceiptsTruth() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
                       {modifiersData.modifiers.map((mod, idx) => (
                         <div key={idx} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-slate-800 last:border-0 gap-2" data-testid={`modifier-${idx}`}>
-                          <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{mod.name}</span>
+                          <span className="text-xs font-medium text-slate-900 dark:text-white truncate flex-1">{mod.modifierName}</span>
                           <div className="flex items-center gap-3 shrink-0">
                             <span className="text-xs text-slate-600 dark:text-slate-400">×{mod.count}</span>
-                            <span className={`text-xs font-semibold ${mod.totalValue > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
-                              {mod.totalValue > 0 ? formatCurrency(mod.totalValue) : '฿0'}
+                            <span className={`text-xs font-semibold ${mod.totalRevenue > 0 ? 'text-emerald-600' : 'text-slate-400'}`}>
+                              {mod.totalRevenue > 0 ? formatCurrency(mod.totalRevenue) : '฿0'}
                             </span>
                           </div>
                         </div>
