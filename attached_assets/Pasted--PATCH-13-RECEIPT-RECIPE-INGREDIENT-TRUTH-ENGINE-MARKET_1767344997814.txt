@@ -1,0 +1,163 @@
+🔒 PATCH 13 — RECEIPT → RECIPE → INGREDIENT TRUTH ENGINE (MARKET-LEADING)
+STATUS: PRODUCTION-CRITICAL
+SCOPE: Backend + Analysis UI (read-only)
+PRIORITY: Highest
+GOAL:
+For any shift, deterministically show exact ingredient usage derived from receipts, fully accounting for recipes + modifiers, with zero guessing and full auditability.
+This is the patch that turns your system into a real restaurant intelligence platform.
+🧠 WHAT THIS PATCH DELIVERS (EXACTLY)
+1️⃣ Canonical Ingredient Usage per Shift (Receipt-Driven)
+For any business date:
+Receipts → Items → Recipes → Ingredients
+Output:
+Ingredient name
+Quantity used
+Unit (g / ml / unit)
+Source count (how many sold items contributed)
+No fallback
+No estimation
+No manual entry
+Example output:
+Copy code
+
+Burger Bun        52 units
+Beef Patty        4,680 g
+Cheddar Slice     52 units
+Burger Sauce      1,040 g
+Salt                84 g
+2️⃣ Modifier-Aware Ingredient Math (NON-NEGOTIABLE)
+Modifiers MUST affect ingredient usage.
+Examples:
+❌ NO CHEESE → subtract cheese
+➕ EXTRA CHEESE → add cheese
+🥓 ADD BACON → add bacon ingredients
+🐄 Animal Style → add sauce + onions
+Rules:
+Modifier → recipe override layer
+Stored explicitly
+Applied arithmetically
+Logged per receipt line
+3️⃣ Deterministic Engine (Rebuildable, Auditable)
+Rebuild any date from July 1 onward
+Same input = same output
+Deletes prior truth run before rebuild
+Emits:
+SUCCESS / PARTIAL / FAILED
+Confidence score
+Flag list
+4️⃣ Market-Leading Analysis UI (Read-Only, Beautiful)
+New Analysis page:
+/analysis/ingredient-usage
+Sections:
+🔢 Summary cards (Receipts, Items, Ingredients, Coverage %)
+📦 Ingredient Usage Table
+🧩 Modifier Impact Breakdown
+🚩 Flags & Gaps (what’s blocking 100%)
+🧾 Receipt Trace (click ingredient → see receipts)
+Design rules:
+Clean
+Minimal
+No editing
+Truth inspection only
+🧱 DATABASE (ADD-ONLY — DO NOT TOUCH EXISTING)
+Tables to ADD:
+receipt_truth_run
+Copy code
+Sql
+id
+business_date
+started_at
+completed_at
+status
+receipt_count
+line_item_count
+confidence_score
+notes
+receipt_truth_ingredient_usage
+Copy code
+Sql
+id
+truth_run_id
+ingredient_id
+ingredient_name
+quantity_used
+unit
+source_item_count
+confidence
+receipt_truth_modifier_effect
+Copy code
+Sql
+id
+truth_run_id
+receipt_id
+pos_item_name
+modifier_name
+ingredient_id
+quantity_delta
+receipt_truth_flags
+Copy code
+Sql
+id
+truth_run_id
+type
+message
+entity_ref
+⚙️ BACKEND — ENGINE (MANDATORY FLOW)
+File:
+server/services/receiptIngredientTruthEngine.ts
+Execution Order (DO NOT CHANGE):
+Resolve shift window
+17:00 → 03:00 (BKK)
+Load receipts
+Source: Loyverse API ONLY
+Expand receipt line items
+Include modifiers
+Resolve POS item → Recipe
+If missing → FLAG
+Resolve Recipe → Ingredients
+If missing → FLAG
+Apply modifier overrides
+Add / subtract ingredient deltas
+Aggregate ingredient usage
+Score confidence
+Persist truth tables
+🌐 API ROUTES (NEW ONLY)
+Copy code
+Http
+POST /api/analysis/ingredient-usage/rebuild
+GET  /api/analysis/ingredient-usage?date=YYYY-MM-DD
+Responses MUST include:
+ingredient_usage[]
+modifier_effects[]
+flags[]
+confidence_score
+🚫 ABSOLUTE PROHIBITIONS
+The agent MUST NOT:
+Guess ingredient quantities
+Infer recipes
+Auto-map modifiers
+Touch receipts ingestion
+Touch shopping list logic
+Touch P&L
+Touch expenses
+Touch existing schemas
+Cache results
+Hide missing data
+If data is missing → FLAG IT
+✅ ACCEPTANCE CRITERIA (ALL REQUIRED)
+[ ] Single Smash Burger ×15 → exact bun, patty, cheese, sauce usage
+[ ] Modifier “NO CHEESE” reduces cheese count
+[ ] Modifier “EXTRA BACON” increases bacon usage
+[ ] Rebuild July 1 → Today
+[ ] Same rebuild = identical numbers
+[ ] UI shows ingredient totals + traceability
+[ ] Flags visible for unmapped items
+[ ] Confidence score < 100 explained
+🧾 DELIVERY FORMAT (STRICT)
+SQL migration(s)
+receiptIngredientTruthEngine.ts
+Routes file
+UI page
+No unrelated file changes
+One execution only
+If blocked → STOP and REPORT
