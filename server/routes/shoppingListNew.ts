@@ -270,6 +270,29 @@ router.get('/latest', async (req: Request, res: Response) => {
 });
 
 /**
+ * PATCH 15: GET /api/purchasing-list/system-purchases
+ * Returns system-generated purchase items (meat & rolls) based on stock form
+ * Query params:
+ * - date: Required YYYY-MM-DD business date
+ * 
+ * IMPORTANT: This route MUST be before /:salesId to avoid route conflict
+ */
+router.get('/system-purchases', async (req: Request, res: Response) => {
+  try {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required' });
+    }
+
+    const result = await calculateSystemPurchases(date);
+    return res.json(result);
+  } catch (err: any) {
+    console.error('Error calculating system purchases:', err);
+    return res.status(500).json({ error: err.message || 'Failed to calculate system purchases' });
+  }
+});
+
+/**
  * GET /api/purchasing-list/:salesId
  * Returns shopping list for a specific Daily Sales V2 record
  */
@@ -416,27 +439,6 @@ router.get('/latest/csv', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Error exporting latest shopping list CSV:', err);
     return res.status(500).json({ error: err.message || 'Failed to export shopping list CSV' });
-  }
-});
-
-/**
- * PATCH 15: GET /api/purchasing-list/system-purchases
- * Returns system-generated purchase items (meat & rolls) based on stock form
- * Query params:
- * - date: Required YYYY-MM-DD business date
- */
-router.get('/system-purchases', async (req: Request, res: Response) => {
-  try {
-    const date = req.query.date as string;
-    if (!date) {
-      return res.status(400).json({ error: 'date query parameter required' });
-    }
-
-    const result = await calculateSystemPurchases(date);
-    return res.json(result);
-  } catch (err: any) {
-    console.error('Error calculating system purchases:', err);
-    return res.status(500).json({ error: err.message || 'Failed to calculate system purchases' });
   }
 });
 

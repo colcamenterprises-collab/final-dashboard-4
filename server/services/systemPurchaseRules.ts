@@ -30,17 +30,24 @@ export interface SystemPurchaseResult {
 /**
  * Calculate system-generated purchase items for a given shift date
  * Reads from daily_stock_v2 to determine current stock levels
+ * 
+ * Column mapping:
+ * - burgerBuns = end-of-shift buns count
+ * - meatWeightG = end-of-shift meat in GRAMS (convert to kg for calculations)
  */
 export async function calculateSystemPurchases(shiftDate: string): Promise<SystemPurchaseResult> {
   // Find the stock form for this shift date
+  // Note: shiftDate in DB may be stored as timestamp, so we compare dates
   const stockResult = await db.execute(sql`
     SELECT 
       ds.id,
-      ds."rollsEnd",
-      ds."meatEndKg"
+      ds."burgerBuns",
+      ds."meatWeightG"
     FROM daily_stock_v2 ds
     JOIN daily_sales_v2 dsv ON ds."salesId" = dsv.id
-    WHERE dsv."shiftDate" = ${shiftDate}
+    WHERE dsv."shiftDate"::date = ${shiftDate}::date
+      AND dsv."deletedAt" IS NULL
+      AND ds."deletedAt" IS NULL
     LIMIT 1
   `);
 
@@ -55,8 +62,9 @@ export async function calculateSystemPurchases(shiftDate: string): Promise<Syste
   }
 
   const stock = stockResult.rows[0] as any;
-  const rollsEnd = Number(stock.rollsEnd) || 0;
-  const meatEndKg = Number(stock.meatEndKg) || 0;
+  const rollsEnd = Number(stock.burgerBuns) || 0;
+  // Convert grams to kg for comparison with targets
+  const meatEndKg = (Number(stock.meatWeightG) || 0) / 1000;
 
   // Get purchasing item details
   const itemsResult = await db.execute(sql`
