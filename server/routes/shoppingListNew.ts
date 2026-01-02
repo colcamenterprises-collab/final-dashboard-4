@@ -10,6 +10,7 @@
 import { Router, Request, Response } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
+import { calculateSystemPurchases } from '../services/systemPurchaseRules';
 
 const router = Router();
 
@@ -415,6 +416,27 @@ router.get('/latest/csv', async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error('Error exporting latest shopping list CSV:', err);
     return res.status(500).json({ error: err.message || 'Failed to export shopping list CSV' });
+  }
+});
+
+/**
+ * PATCH 15: GET /api/purchasing-list/system-purchases
+ * Returns system-generated purchase items (meat & rolls) based on stock form
+ * Query params:
+ * - date: Required YYYY-MM-DD business date
+ */
+router.get('/system-purchases', async (req: Request, res: Response) => {
+  try {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required' });
+    }
+
+    const result = await calculateSystemPurchases(date);
+    return res.json(result);
+  } catch (err: any) {
+    console.error('Error calculating system purchases:', err);
+    return res.status(500).json({ error: err.message || 'Failed to calculate system purchases' });
   }
 });
 

@@ -1,0 +1,133 @@
+🔒 Rule 4 — Shopping List Injection
+Meat & Rolls do NOT come from manual shopping inputs
+They are system-generated rows
+Tagged as:
+source = SYSTEM_RULE
+rule = SHIFT_STOCK_TARGET
+Displayed at the top of the Shopping List
+Locked (read-only in UI)
+🔒 Rule 5 — Visibility & Audit
+Shopping List will clearly show:
+Target
+End-of-shift amount
+Calculated purchase amount
+Unit (kg / rolls)
+Supplier
+Price per unit
+Total cost
+If Form 2 missing → banner:
+⚠️ “Cannot calculate meat / rolls purchase — stock form not submitted”
+3. PATCH 15 — REPLIT AGENT DROP-IN (Single Instruction)
+Copy everything below and give it to the Replit agent.
+🔧 PATCH 15 — RULE-BASED MEAT & ROLL PURCHASE CALCULATION
+OBJECTIVE
+Automatically calculate meat and roll purchase requirements per shift based on Daily Sales & Stock V2 Form 2, and inject them into the Shopping List.
+🔒 HARD RULES
+DO NOT modify receipt logic
+DO NOT infer from sales
+DO NOT allow staff input for meat/roll purchase
+DO NOT delete existing purchasing logic
+ADDITIVE ONLY
+🧱 BACKEND CHANGES
+1. Add Rule Constants
+Create file:
+Copy code
+
+server/config/purchaseTargets.ts
+Copy code
+Ts
+export const PURCHASE_TARGETS = {
+  MEAT_KG_PER_SHIFT: 16,
+  ROLLS_PER_SHIFT: 140 // confirm later, system-ready
+};
+2. Extend Shopping List Build Logic
+File:
+Copy code
+
+server/services/shoppingListBuilder.ts
+Add before manual items aggregation:
+Copy code
+Ts
+import { PURCHASE_TARGETS } from "../config/purchaseTargets";
+
+async function applySystemPurchaseRules(shiftDate: string) {
+  const stock = await db.daily_stock.findFirst({
+    where: { shift_date: shiftDate }
+  });
+
+  if (!stock) {
+    return {
+      error: "STOCK_FORM_MISSING"
+    };
+  }
+
+  const rules = [];
+
+  // MEAT
+  const meatToBuy = Math.max(
+    0,
+    PURCHASE_TARGETS.MEAT_KG_PER_SHIFT - stock.meat_kg
+  );
+
+  if (meatToBuy > 0) {
+    rules.push({
+      itemKey: "TOPSIDE_BEEF",
+      quantity: meatToBuy,
+      unit: "kg",
+      source: "SYSTEM_RULE",
+      rule: "SHIFT_STOCK_TARGET"
+    });
+  }
+
+  // ROLLS
+  const rollsToBuy = Math.max(
+    0,
+    PURCHASE_TARGETS.ROLLS_PER_SHIFT - stock.rolls_remaining
+  );
+
+  if (rollsToBuy > 0) {
+    rules.push({
+      itemKey: "BURGER_ROLLS",
+      quantity: rollsToBuy,
+      unit: "each",
+      source: "SYSTEM_RULE",
+      rule: "SHIFT_STOCK_TARGET"
+    });
+  }
+
+  return rules;
+}
+Inject results into final Shopping List payload before manual items.
+3. Pricing Resolution
+When rendering shopping list rows:
+Lookup price from purchasing_items
+Supplier = Makro
+Lock unit price display
+🧱 FRONTEND CHANGES
+Shopping List UI
+Display SYSTEM GENERATED badge
+Disable edit/delete on these rows
+Show:
+Target
+End shift amount
+Calculated purchase
+🚨 ERROR HANDLING
+If Form 2 missing:
+Shopping List still loads
+Banner shown:
+Copy code
+
+⚠️ Meat & Rolls not calculated — Daily Stock Form missing
+✅ ACCEPTANCE CRITERIA
+Meat auto-calculates correctly
+Rolls auto-calculates correctly
+Appears same day
+No manual override possible
+No receipt logic touched
+Works historically (backdating)
+What happens next (when you’re ready)
+After Patch 15:
+Patch 16 → Ingredient cost vs actual usage delta
+Patch 17 → Meat yield variance (fat loss reality)
+Patch 18 → Predictive ordering (rolling 7-day avg)
+But we stop here until you confirm meat & roll targets are correct.
