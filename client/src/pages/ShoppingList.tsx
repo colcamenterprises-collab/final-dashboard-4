@@ -7,13 +7,38 @@
  * - Grouped by Supplier for easy purchasing
  * - NO ordering actions, NO mutations
  * - Export CSV is supplier-friendly
+ * 
+ * PATCH 15: Added system-generated purchases (meat & rolls)
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Download, Package, RefreshCw, Calendar, Truck } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Download, Package, RefreshCw, Calendar, Truck, Lock, AlertTriangle } from "lucide-react";
+
+// PATCH 15: System purchase types
+interface SystemPurchaseItem {
+  purchasingItemId: number;
+  item: string;
+  quantity: number;
+  unit: string;
+  target: number;
+  endOfShift: number;
+  unitCost: number;
+  lineTotal: number;
+  supplier: string;
+  source: 'SYSTEM_RULE';
+  rule: 'SHIFT_STOCK_TARGET';
+}
+
+interface SystemPurchaseResult {
+  shiftDate: string;
+  stockFormMissing: boolean;
+  items: SystemPurchaseItem[];
+  totalCost: number;
+}
 
 type ShoppingListLine = {
   fieldKey: string;
@@ -56,6 +81,18 @@ export default function ShoppingList() {
       if (!response.ok) throw new Error('Failed to fetch shopping list');
       return response.json();
     },
+  });
+
+  // PATCH 15: Fetch system-generated purchases (meat & rolls)
+  const { data: systemData, isLoading: systemLoading } = useQuery<SystemPurchaseResult>({
+    queryKey: ["/api/purchasing-list/system-purchases", selectedDate],
+    queryFn: async () => {
+      if (!selectedDate) return null;
+      const response = await fetch(`/api/purchasing-list/system-purchases?date=${selectedDate}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!selectedDate,
   });
 
   const lines = data?.lines || [];
@@ -204,6 +241,79 @@ export default function ShoppingList() {
           <p className="text-xs text-amber-600 mt-1">
             No purchasing data has been submitted for this date. Submit Daily Stock form to generate a shopping list.
           </p>
+        </div>
+      )}
+
+      {/* PATCH 15: Stock Form Missing Banner */}
+      {selectedDate && systemData?.stockFormMissing && (
+        <div className="bg-amber-50 border border-amber-300 rounded-[4px] p-4 flex items-start gap-3" data-testid="banner-stock-missing">
+          <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-800">Meat & Rolls Not Calculated</p>
+            <p className="text-xs text-amber-600 mt-1">
+              Daily Stock Form not submitted for {selectedDate}. System-generated purchases for meat and rolls are unavailable.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* PATCH 15: System-Generated Purchases Section */}
+      {selectedDate && systemData && !systemData.stockFormMissing && systemData.items.length > 0 && (
+        <Card className="rounded-[4px] border-2 border-emerald-500 overflow-hidden" data-testid="card-system-purchases">
+          <CardHeader className="py-3 px-4 bg-emerald-50 border-b border-emerald-200">
+            <div className="flex justify-between items-center">
+              <CardTitle className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                <Lock className="h-4 w-4 text-emerald-600" />
+                System-Generated Purchases
+                <Badge className="bg-emerald-100 text-emerald-800 text-xs rounded-[4px]">LOCKED</Badge>
+              </CardTitle>
+              <div className="text-right">
+                <span className="text-xs text-slate-500 mr-2">System Total:</span>
+                <span className="text-sm font-bold text-emerald-600">{formatCurrency(systemData.totalCost)}</span>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-xs" data-testid="table-system-purchases">
+                <thead className="bg-emerald-50 border-b border-emerald-100">
+                  <tr>
+                    <th className="px-4 py-2 text-left font-medium text-slate-600">Item</th>
+                    <th className="px-4 py-2 text-left font-medium text-slate-600">Supplier</th>
+                    <th className="px-4 py-2 text-center font-medium text-slate-600">Target</th>
+                    <th className="px-4 py-2 text-center font-medium text-slate-600">End of Shift</th>
+                    <th className="px-4 py-2 text-center font-medium text-emerald-700">To Buy</th>
+                    <th className="px-4 py-2 text-right font-medium text-slate-600">Unit Cost</th>
+                    <th className="px-4 py-2 text-right font-medium text-slate-600">Line Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {systemData.items.map((item, idx) => (
+                    <tr 
+                      key={idx} 
+                      className="border-b border-emerald-50 bg-emerald-50/30"
+                      data-testid={`row-system-${item.item.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
+                      <td className="px-4 py-2 font-medium text-slate-900">{item.item}</td>
+                      <td className="px-4 py-2 text-slate-600">{item.supplier}</td>
+                      <td className="px-4 py-2 text-center text-slate-600">{item.target} {item.unit}</td>
+                      <td className="px-4 py-2 text-center text-slate-600">{item.endOfShift.toFixed(2)} {item.unit}</td>
+                      <td className="px-4 py-2 text-center font-bold text-emerald-700">{item.quantity.toFixed(2)} {item.unit}</td>
+                      <td className="px-4 py-2 text-right text-slate-600">{formatCurrency(item.unitCost)}</td>
+                      <td className="px-4 py-2 text-right font-semibold text-emerald-600">{formatCurrency(item.lineTotal)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PATCH 15: All stock targets met */}
+      {selectedDate && systemData && !systemData.stockFormMissing && systemData.items.length === 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-[4px] p-3 text-center text-xs text-slate-500" data-testid="banner-stock-met">
+          Stock levels meet targets. No system purchases needed for meat or rolls.
         </div>
       )}
 
