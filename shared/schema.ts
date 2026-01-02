@@ -1890,3 +1890,61 @@ export type IngredientExpectedUsage = typeof ingredientExpectedUsage.$inferSelec
 export type InsertIngredientExpectedUsage = typeof ingredientExpectedUsage.$inferInsert;
 export type IngredientVariance = typeof ingredientVariance.$inferSelect;
 export type InsertIngredientVariance = typeof ingredientVariance.$inferInsert;
+
+// -----------------------------------------------------------------------------
+// 🔒 PATCH 13: RECEIPT → RECIPE → INGREDIENT TRUTH ENGINE
+// Deterministic ingredient usage from receipts with modifier math
+// DO NOT WRITE FROM UI — engine-only derivation
+// -----------------------------------------------------------------------------
+
+export const modifierIngredientRules = pgTable('modifier_ingredient_rules', {
+  id: serial('id').primaryKey(),
+  modifierPattern: varchar('modifier_pattern', { length: 255 }).notNull(),
+  purchasingItemId: integer('purchasing_item_id').notNull().references(() => purchasingItems.id),
+  quantityDelta: decimal('quantity_delta', { precision: 10, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  notes: text('notes'),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const receiptTruthRun = pgTable('receipt_truth_run', {
+  id: serial('id').primaryKey(),
+  businessDate: date('business_date').notNull().unique(),
+  startedAt: timestamp('started_at').notNull().defaultNow(),
+  completedAt: timestamp('completed_at'),
+  status: varchar('status', { length: 20 }).notNull().default('RUNNING'),
+  receiptCount: integer('receipt_count').notNull().default(0),
+  lineItemCount: integer('line_item_count').notNull().default(0),
+  confidenceScore: integer('confidence_score'),
+  notes: text('notes'),
+});
+
+export const receiptTruthIngredientUsage = pgTable('receipt_truth_ingredient_usage', {
+  id: serial('id').primaryKey(),
+  runId: integer('run_id').notNull().references(() => receiptTruthRun.id, { onDelete: 'cascade' }),
+  ingredientId: integer('ingredient_id').notNull(),
+  ingredientName: varchar('ingredient_name', { length: 255 }).notNull(),
+  quantityUsed: decimal('quantity_used', { precision: 12, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+  sourceItemCount: integer('source_item_count').notNull().default(0),
+  confidence: integer('confidence').notNull().default(100),
+});
+
+export const receiptTruthModifierEffect = pgTable('receipt_truth_modifier_effect', {
+  id: serial('id').primaryKey(),
+  runId: integer('run_id').notNull().references(() => receiptTruthRun.id, { onDelete: 'cascade' }),
+  receiptId: text('receipt_id').notNull(),
+  posItemName: varchar('pos_item_name', { length: 255 }).notNull(),
+  modifierName: varchar('modifier_name', { length: 255 }).notNull(),
+  ingredientId: integer('ingredient_id').notNull(),
+  ingredientName: varchar('ingredient_name', { length: 255 }).notNull(),
+  quantityDelta: decimal('quantity_delta', { precision: 10, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+});
+
+export type ModifierIngredientRule = typeof modifierIngredientRules.$inferSelect;
+export type InsertModifierIngredientRule = typeof modifierIngredientRules.$inferInsert;
+export type ReceiptTruthRun = typeof receiptTruthRun.$inferSelect;
+export type ReceiptTruthIngredientUsage = typeof receiptTruthIngredientUsage.$inferSelect;
+export type ReceiptTruthModifierEffect = typeof receiptTruthModifierEffect.$inferSelect;

@@ -70,6 +70,7 @@ import { importPosBundle } from "../src/server/pos/uploadBundle";
 import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
+import { rebuildIngredientTruth as rebuildIngredientTruthV2, getIngredientUsage } from "./services/receiptIngredientTruthEngine";
 import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
 import { dailyReviewCommentsRouter } from "./routes/dailyReviewComments";
 import stockReviewManual from "./routes/stockReviewManual";
@@ -1509,6 +1510,74 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.json({ ok: true });
     } catch (e: any) {
       console.error('[RECEIPT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  // PATCH 13: Enhanced Ingredient Usage Engine (with modifier math)
+  app.post('/api/analysis/ingredient-usage/rebuild', async (req, res) => {
+    const { date } = req.body;
+    if (!date) {
+      return res.status(400).json({ error: 'date required in body (YYYY-MM-DD)' });
+    }
+    try {
+      const result = await rebuildIngredientTruthV2(date);
+      res.json(result);
+    } catch (e: any) {
+      console.error('[INGREDIENT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/analysis/ingredient-usage', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const result = await getIngredientUsage(date);
+      if (!result) {
+        return res.status(404).json({ 
+          error: 'INGREDIENT_USAGE_NOT_BUILT', 
+          message: `No ingredient usage found for ${date}. Use POST /api/analysis/ingredient-usage/rebuild to build.` 
+        });
+      }
+      res.json(result);
+    } catch (e: any) {
+      console.error('[INGREDIENT_TRUTH_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  // Modifier ingredient rules management
+  app.get('/api/analysis/modifier-rules', async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT mir.*, pi.item as ingredient_name
+        FROM modifier_ingredient_rules mir
+        JOIN purchasing_items pi ON pi.id = mir.purchasing_item_id
+        ORDER BY mir.modifier_pattern
+      `);
+      res.json({ rules: result.rows });
+    } catch (e: any) {
+      console.error('[MODIFIER_RULES_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.post('/api/analysis/modifier-rules', async (req, res) => {
+    const { modifierPattern, purchasingItemId, quantityDelta, unit, notes } = req.body;
+    if (!modifierPattern || !purchasingItemId || quantityDelta === undefined || !unit) {
+      return res.status(400).json({ error: 'modifierPattern, purchasingItemId, quantityDelta, and unit required' });
+    }
+    try {
+      await db.execute(sql`
+        INSERT INTO modifier_ingredient_rules (modifier_pattern, purchasing_item_id, quantity_delta, unit, notes)
+        VALUES (${modifierPattern}, ${purchasingItemId}, ${quantityDelta}, ${unit}, ${notes || null})
+      `);
+      res.json({ ok: true });
+    } catch (e: any) {
+      console.error('[MODIFIER_RULES_FAIL]', e);
       res.status(500).json({ error: e.message || String(e) });
     }
   });
