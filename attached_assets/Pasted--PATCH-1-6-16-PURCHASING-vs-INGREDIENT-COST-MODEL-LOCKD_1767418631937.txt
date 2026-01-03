@@ -1,0 +1,145 @@
+🔒 PATCH 1.6.16 — PURCHASING vs INGREDIENT COST MODEL (LOCKDOWN)
+🎯 OBJECTIVE (NON-NEGOTIABLE)
+Fix the core economic model of the system:
+Purchasing List = how items are bought (packs, cartons, kg, boxes)
+Ingredients / Recipes = how items are consumed (grams, units, portions)
+NO portion math is allowed in Purchasing
+ALL portion math lives in Ingredients / Recipes ONLY
+This patch corrects pricing, units, and logic across:
+Purchasing List
+Shopping List
+Ingredient Costing
+Recipe Cost Totals
+🚫 ABSOLUTE PROHIBITIONS (AGENT MUST FOLLOW)
+❌ DO NOT add portion sizes to Purchasing
+❌ DO NOT calculate per-gram / per-ml costs in Purchasing
+❌ DO NOT infer units automatically
+❌ DO NOT modify receipt logic
+❌ DO NOT touch sales, modifiers, or shift truth logic
+❌ DO NOT change schema unless explicitly stated below
+🧱 CANONICAL MODEL (LOCK THIS IN)
+1️⃣ PURCHASING ITEMS (SOURCE OF TRUTH)
+Each purchasing item represents exactly what is bought from a supplier.
+Required fields (existing or enforced):
+Copy code
+
+purchasing_items
+- id
+- name
+- supplier
+- sku
+- purchase_unit_label   (e.g. "1kg bag", "Box of 50", "24-pack")
+- purchase_unit_qty     (numeric, e.g. 1, 50, 24)
+- unit_cost             (TOTAL cost of that pack)
+✅ unit_cost = price of the whole pack ❌ Not price per gram ❌ Not price per portion
+Examples:
+Fries: 100 baht → 2kg bag
+Coke: 300 baht → 24 cans
+Burger buns: 8 baht → 1 bun
+2️⃣ SHOPPING LIST LOGIC (FIX + LOCK)
+The Shopping List must:
+Use ONLY purchasing_items.unit_cost
+Multiply:
+Copy code
+
+line_total = qty * unit_cost
+Where:
+qty = number of packs / cartons / kg to buy
+NEVER portions
+NEVER grams
+🛑 REMOVE any use of:
+grams
+ml
+recipe quantities
+ingredient yields
+3️⃣ SYSTEM-GENERATED ITEMS (MEAT + ROLLS)
+MEAT RULE (LOCKED)
+Target stock per shift: 16kg
+Source: Daily Stock Form V2 → end_meat_kg
+Formula:
+Copy code
+
+to_buy_kg = max(0, 16 - end_meat_kg)
+Shopping List entry:
+Copy code
+
+Item: Topside Beef
+Purchase Unit: 1kg
+Qty: to_buy_kg
+Unit Cost: price per 1kg (from purchasing_items)
+❌ NO averaging
+❌ NO freezing logic
+❌ NO portion logic
+ROLLS RULE (LOCKED)
+Target stock: 140 buns
+Source: Daily Stock Form V2 → end_roll_count
+Formula:
+Copy code
+
+to_buy_buns = max(0, 140 - end_roll_count)
+Shopping List entry:
+Copy code
+
+Item: Burger Bun
+Purchase Unit: 1 bun
+Qty: to_buy_buns
+Unit Cost: 8 baht
+4️⃣ INGREDIENT COSTING (WHERE PORTIONS BELONG)
+Ingredients MUST reference purchasing items and perform portion math here only.
+Ingredient fields (already present — enforce usage):
+Copy code
+
+ingredients
+- id
+- purchasing_item_id
+- portion_qty        (e.g. 150)
+- portion_unit       (g, ml, unit)
+Cost calculation:
+Copy code
+
+ingredient_unit_cost = purchasing.unit_cost / purchasing.purchase_unit_qty
+ingredient_cost = ingredient_unit_cost * portion_qty
+Examples:
+Fries:
+Purchase: 2kg bag = 100 baht
+Portion: 150g
+Cost: (100 / 2000) * 150 = 7.5 baht
+5️⃣ RECIPE MODAL FIX (MANDATORY)
+UI Change (Recipe Edit Modal)
+Rename:
+❌ “Qty”
+✅ “Portion Size”
+Display:
+Portion Unit (g / ml / unit)
+Portion Cost (calculated, read-only)
+Total Recipe Cost
+Sum of ingredient_cost
+NEVER derived from Purchasing directly
+6️⃣ FILES TO TOUCH (ONLY THESE)
+Backend
+server/services/shoppingListService.ts
+server/services/ingredientCostService.ts (if exists)
+server/services/recipeCostService.ts
+Frontend
+client/src/pages/ShoppingList.tsx
+client/src/components/RecipeEditModal.tsx
+7️⃣ ACCEPTANCE CRITERIA (MUST PASS)
+✅ Shopping List shows:
+Only pack-based prices
+Correct totals
+No grams / ml anywhere
+✅ Recipe cost:
+Cajun Fries ≠ ฿19,350
+Cajun Fries ≈ portion-based cost
+✅ Ingredients persist correctly
+✅ No schema corruption
+✅ No sales / receipt changes
+✅ No modifier impact
+🔐 FINAL NOTE TO AGENT
+This patch defines the economic spine of the platform.
+Once applied:
+Purchasing = Buying Reality
+Ingredients = Consumption Reality
+Recipes = Cost Truth
+Shopping List = Actionable Procurement
+No future patch is allowed to blur these boundaries.

@@ -1594,6 +1594,10 @@ export const purchasingItems = pgTable("purchasing_items", {
   portionUnit: varchar("portion_unit"),
   portionSize: decimal("portion_size", { precision: 10, scale: 3 }),
   yield: decimal("yield", { precision: 5, scale: 2 }),
+  // PATCH 1.6.16: Purchase unit quantity - how many base units in one pack (e.g., 2000 for 2kg bag)
+  purchaseUnitQty: decimal("purchase_unit_qty", { precision: 10, scale: 2 }),
+  // PATCH 1.6.16: Purchase unit label - human-readable pack description
+  purchaseUnitLabel: varchar("purchase_unit_label"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
 });

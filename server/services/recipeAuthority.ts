@@ -33,9 +33,18 @@ export interface RecipeWithCost extends RecipeV2 {
 
 /**
  * 🔒 CANONICAL COST AUTHORITY — DO NOT DUPLICATE
+ * 🔒 PATCH 1.6.16: PURCHASING vs INGREDIENT COST MODEL
+ * 
  * Calculate recipe cost from purchasing items (READ-ONLY, always fresh)
  * 
- * recipe_cost = SUM(recipe_ingredient.quantity × purchasing_items.unit_cost)
+ * CORRECT FORMULA:
+ * - per_unit_cost = purchasing.unit_cost / purchasing.purchase_unit_qty
+ * - line_cost = portion_qty × per_unit_cost
+ * - recipe_cost = SUM(line_cost)
+ * 
+ * Example: Fries (2kg bag = ฿129)
+ * - per_unit_cost = 129 / 2000 = ฿0.0645 per gram
+ * - 150g portion = 150 × 0.0645 = ฿9.68
  * 
  * This is the ONLY authoritative cost calculation.
  * All other cost calculations must delegate to this function.
@@ -45,6 +54,7 @@ export async function calculateRecipeCost(recipeId: number): Promise<number> {
     .select({
       quantity: recipeIngredient.quantity,
       unitCost: purchasingItems.unitCost,
+      purchaseUnitQty: purchasingItems.purchaseUnitQty,
     })
     .from(recipeIngredient)
     .innerJoin(purchasingItems, eq(recipeIngredient.purchasingItemId, purchasingItems.id))
@@ -52,9 +62,13 @@ export async function calculateRecipeCost(recipeId: number): Promise<number> {
 
   let totalCost = 0;
   for (const ing of ingredients) {
-    const qty = parseFloat(ing.quantity?.toString() || '0');
-    const cost = parseFloat(ing.unitCost?.toString() || '0');
-    totalCost += qty * cost;
+    const portionQty = parseFloat(ing.quantity?.toString() || '0');
+    const packCost = parseFloat(ing.unitCost?.toString() || '0');
+    const packQty = parseFloat(ing.purchaseUnitQty?.toString() || '1'); // Default to 1 to avoid division by zero
+    
+    // PATCH 1.6.16: Calculate per-unit cost then multiply by portion
+    const perUnitCost = packQty > 0 ? packCost / packQty : 0;
+    totalCost += portionQty * perUnitCost;
   }
   
   return totalCost;
@@ -62,6 +76,7 @@ export async function calculateRecipeCost(recipeId: number): Promise<number> {
 
 /**
  * Get all recipes with their ingredients and calculated costs
+ * 🔒 PATCH 1.6.16: Uses correct portion-based cost calculation
  */
 export async function getAllRecipesWithCost(): Promise<RecipeWithCost[]> {
   const recipes = await db.select().from(recipe).where(eq(recipe.active, true));
@@ -77,7 +92,8 @@ export async function getAllRecipesWithCost(): Promise<RecipeWithCost[]> {
         quantity: recipeIngredient.quantity,
         unit: recipeIngredient.unit,
         ingredientName: purchasingItems.item,
-        ingredientCost: purchasingItems.unitCost,
+        packCost: purchasingItems.unitCost,
+        purchaseUnitQty: purchasingItems.purchaseUnitQty,
       })
       .from(recipeIngredient)
       .innerJoin(purchasingItems, eq(recipeIngredient.purchasingItemId, purchasingItems.id))
@@ -85,9 +101,13 @@ export async function getAllRecipesWithCost(): Promise<RecipeWithCost[]> {
 
     let totalCost = 0;
     const ingredientsWithCost = ingredients.map(ing => {
-      const qty = parseFloat(ing.quantity?.toString() || '0');
-      const cost = parseFloat(ing.ingredientCost?.toString() || '0');
-      const lineCost = qty * cost;
+      const portionQty = parseFloat(ing.quantity?.toString() || '0');
+      const packCost = parseFloat(ing.packCost?.toString() || '0');
+      const packQty = parseFloat(ing.purchaseUnitQty?.toString() || '1');
+      
+      // PATCH 1.6.16: Calculate per-unit cost then multiply by portion
+      const perUnitCost = packQty > 0 ? packCost / packQty : 0;
+      const lineCost = portionQty * perUnitCost;
       totalCost += lineCost;
       
       return {
@@ -97,7 +117,7 @@ export async function getAllRecipesWithCost(): Promise<RecipeWithCost[]> {
         quantity: ing.quantity,
         unit: ing.unit,
         ingredientName: ing.ingredientName,
-        ingredientCost: cost || null,
+        ingredientCost: perUnitCost || null, // Cost per base unit
         lineCost: lineCost || null,
       };
     });
@@ -114,6 +134,7 @@ export async function getAllRecipesWithCost(): Promise<RecipeWithCost[]> {
 
 /**
  * Get single recipe with cost
+ * 🔒 PATCH 1.6.16: Uses correct portion-based cost calculation
  */
 export async function getRecipeWithCost(recipeId: number): Promise<RecipeWithCost | null> {
   const [r] = await db.select().from(recipe).where(eq(recipe.id, recipeId));
@@ -127,7 +148,8 @@ export async function getRecipeWithCost(recipeId: number): Promise<RecipeWithCos
       quantity: recipeIngredient.quantity,
       unit: recipeIngredient.unit,
       ingredientName: purchasingItems.item,
-      ingredientCost: purchasingItems.unitCost,
+      packCost: purchasingItems.unitCost,
+      purchaseUnitQty: purchasingItems.purchaseUnitQty,
     })
     .from(recipeIngredient)
     .innerJoin(purchasingItems, eq(recipeIngredient.purchasingItemId, purchasingItems.id))
@@ -135,9 +157,13 @@ export async function getRecipeWithCost(recipeId: number): Promise<RecipeWithCos
 
   let totalCost = 0;
   const ingredientsWithCost = ingredients.map(ing => {
-    const qty = parseFloat(ing.quantity?.toString() || '0');
-    const cost = parseFloat(ing.ingredientCost?.toString() || '0');
-    const lineCost = qty * cost;
+    const portionQty = parseFloat(ing.quantity?.toString() || '0');
+    const packCost = parseFloat(ing.packCost?.toString() || '0');
+    const packQty = parseFloat(ing.purchaseUnitQty?.toString() || '1');
+    
+    // PATCH 1.6.16: Calculate per-unit cost then multiply by portion
+    const perUnitCost = packQty > 0 ? packCost / packQty : 0;
+    const lineCost = portionQty * perUnitCost;
     totalCost += lineCost;
     
     return {
@@ -147,7 +173,7 @@ export async function getRecipeWithCost(recipeId: number): Promise<RecipeWithCos
       quantity: ing.quantity,
       unit: ing.unit,
       ingredientName: ing.ingredientName,
-      ingredientCost: cost || null,
+      ingredientCost: perUnitCost || null, // Cost per base unit
       lineCost: lineCost || null,
     };
   });
