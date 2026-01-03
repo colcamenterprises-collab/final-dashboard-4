@@ -83,22 +83,25 @@ export default function ShoppingList() {
     },
   });
 
-  // PATCH 15: Fetch system-generated purchases (meat & rolls)
-  const { data: systemData, isLoading: systemLoading } = useQuery<SystemPurchaseResult>({
-    queryKey: ["/api/purchasing-list/system-purchases", selectedDate],
-    queryFn: async () => {
-      if (!selectedDate) return null;
-      const response = await fetch(`/api/purchasing-list/system-purchases?date=${selectedDate}`);
-      if (!response.ok) return null;
-      return response.json();
-    },
-    enabled: !!selectedDate,
-  });
-
   const lines = data?.lines || [];
   const grandTotal = data?.grandTotal || 0;
   const itemCount = data?.itemCount || 0;
   const shiftDate = data?.shiftDate;
+
+  // PATCH 15: Use either selected date or the shift date from the response
+  const effectiveDate = selectedDate || shiftDate;
+
+  // PATCH 15: Fetch system-generated purchases (meat & rolls)
+  const { data: systemData, isLoading: systemLoading } = useQuery<SystemPurchaseResult>({
+    queryKey: ["/api/purchasing-list/system-purchases", effectiveDate],
+    queryFn: async () => {
+      if (!effectiveDate) return null;
+      const response = await fetch(`/api/purchasing-list/system-purchases?date=${effectiveDate}`);
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!effectiveDate,
+  });
   const source = data?.source;
   const noData = data?.noData;
   const message = data?.message;
@@ -245,20 +248,20 @@ export default function ShoppingList() {
       )}
 
       {/* PATCH 15: Stock Form Missing Banner */}
-      {selectedDate && systemData?.stockFormMissing && (
+      {effectiveDate && systemData?.stockFormMissing && (
         <div className="bg-amber-50 border border-amber-300 rounded-[4px] p-4 flex items-start gap-3" data-testid="banner-stock-missing">
           <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
           <div>
             <p className="text-sm font-semibold text-amber-800">Meat & Rolls Not Calculated</p>
             <p className="text-xs text-amber-600 mt-1">
-              Daily Stock Form not submitted for {selectedDate}. System-generated purchases for meat and rolls are unavailable.
+              Daily Stock Form not submitted for {effectiveDate}. System-generated purchases for meat and rolls are unavailable.
             </p>
           </div>
         </div>
       )}
 
       {/* PATCH 15: System-Generated Purchases Section */}
-      {selectedDate && systemData && !systemData.stockFormMissing && systemData.items.length > 0 && (
+      {effectiveDate && systemData && !systemData.stockFormMissing && systemData.items.length > 0 && (
         <Card className="rounded-[4px] border-2 border-emerald-500 overflow-hidden" data-testid="card-system-purchases">
           <CardHeader className="py-3 px-4 bg-emerald-50 border-b border-emerald-200">
             <div className="flex justify-between items-center">
@@ -311,7 +314,7 @@ export default function ShoppingList() {
       )}
 
       {/* PATCH 15: All stock targets met */}
-      {selectedDate && systemData && !systemData.stockFormMissing && systemData.items.length === 0 && (
+      {effectiveDate && systemData && !systemData.stockFormMissing && systemData.items.length === 0 && (
         <div className="bg-slate-50 border border-slate-200 rounded-[4px] p-3 text-center text-xs text-slate-500" data-testid="banner-stock-met">
           Stock levels meet targets. No system purchases needed for meat or rolls.
         </div>
