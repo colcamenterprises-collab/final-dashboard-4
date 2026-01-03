@@ -196,6 +196,29 @@ router.put('/:id', async (req: Request, res: Response) => {
 });
 
 /**
+ * DELETE /api/recipe-authority/:id
+ * Delete a recipe and all its ingredients
+ */
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ ok: false, error: 'Invalid recipe ID' });
+    }
+
+    const deleted = await recipeService.deleteRecipe(id);
+    if (!deleted) {
+      return res.status(404).json({ ok: false, error: 'Recipe not found' });
+    }
+
+    res.json({ ok: true, message: 'Recipe deleted' });
+  } catch (error) {
+    console.error('[RecipeAuthority] Error deleting recipe:', error);
+    res.status(500).json({ ok: false, error: 'Failed to delete recipe' });
+  }
+});
+
+/**
  * POST /api/recipe-authority/:id/ingredients
  * Add ingredient to recipe
  */

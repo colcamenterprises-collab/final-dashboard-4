@@ -226,6 +226,25 @@ export async function updateRecipe(id: number, data: Partial<InsertRecipeV2>): P
 }
 
 /**
+ * Delete a recipe and all its ingredients
+ */
+export async function deleteRecipe(id: number): Promise<boolean> {
+  // First delete all ingredients for this recipe
+  await db.delete(recipeIngredient).where(eq(recipeIngredient.recipeId, id));
+  
+  // Then delete any POS mappings
+  await db.delete(posItemRecipeMap).where(eq(posItemRecipeMap.recipeId, id));
+  
+  // Finally delete the recipe
+  const [deleted] = await db
+    .delete(recipe)
+    .where(eq(recipe.id, id))
+    .returning();
+  
+  return !!deleted;
+}
+
+/**
  * Add ingredient to recipe (must be a purchasing item with is_ingredient = true)
  */
 export async function addIngredientToRecipe(
