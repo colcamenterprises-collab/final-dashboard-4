@@ -84,7 +84,7 @@ export default function ShoppingList() {
   });
 
   const lines = data?.lines || [];
-  const grandTotal = data?.grandTotal || 0;
+  const manualTotal = data?.grandTotal || 0;
   const itemCount = data?.itemCount || 0;
   const shiftDate = data?.shiftDate;
 
@@ -102,6 +102,11 @@ export default function ShoppingList() {
     },
     enabled: !!effectiveDate,
   });
+
+  // PATCH 15: Combined grand total (manual purchases + system purchases)
+  const systemTotal = systemData?.totalCost || 0;
+  const grandTotal = manualTotal + systemTotal;
+
   const source = data?.source;
   const noData = data?.noData;
   const message = data?.message;
