@@ -63,39 +63,74 @@ router.post("/api/ingredients/:id/toggle-locked", async (req: Request, res: Resp
   }
 });
 
+/**
+ * 🔒 PATCH 1.6.16: Uses canonical recipeAuthority for live cost calculation
+ * Cost = SUM((unitCost / purchaseUnitQty) * portionQty) - portion-based pricing
+ */
 router.get("/api/recipes", async (req: Request, res: Response) => {
   try {
+    // Use canonical recipe_ingredient + purchasing_items for accurate costs
     const recipesResult = await pool.query(`
-      SELECT id, name, category, totals_json, updated_at, yield_quantity 
-      FROM recipes 
-      ORDER BY name
+      SELECT r.id, r.name, r.yield_units, r.active
+      FROM recipe r
+      WHERE r.active = true
+      ORDER BY r.name
     `);
-    const ingredientsResult = await pool.query(`SELECT id, name, portion_unit FROM ingredients`);
+    
+    // Get ingredients with correct portion-based cost calculation
+    const ingredientsResult = await pool.query(`
+      SELECT 
+        ri.recipe_id,
+        ri.id as ingredient_id,
+        ri.quantity,
+        ri.unit,
+        pi.item as ingredient_name,
+        pi."unitCost" as pack_cost,
+        pi.purchase_unit_qty,
+        CASE 
+          WHEN COALESCE(pi.purchase_unit_qty, 1) > 0 
+          THEN (COALESCE(pi."unitCost", 0)::numeric / COALESCE(pi.purchase_unit_qty, 1)::numeric) * COALESCE(ri.quantity, 0)::numeric
+          ELSE 0
+        END as line_cost
+      FROM recipe_ingredient ri
+      LEFT JOIN purchasing_items pi ON ri.purchasing_item_id = pi.id
+    `);
 
-    const ingMap = new Map(ingredientsResult.rows.map((i: any) => [String(i.id), i]));
+    // Group ingredients by recipe
+    const ingByRecipe = new Map<number, any[]>();
+    let recipeCosts = new Map<number, number>();
+    
+    for (const ing of ingredientsResult.rows) {
+      const recipeId = ing.recipe_id;
+      if (!ingByRecipe.has(recipeId)) {
+        ingByRecipe.set(recipeId, []);
+        recipeCosts.set(recipeId, 0);
+      }
+      ingByRecipe.get(recipeId)!.push({
+        ingredientId: ing.ingredient_id,
+        ingredientName: ing.ingredient_name || 'Unknown',
+        portion: parseFloat(ing.quantity) || 0,
+        unit: ing.unit || '',
+        cost: parseFloat(ing.line_cost) || 0,
+      });
+      recipeCosts.set(recipeId, (recipeCosts.get(recipeId) || 0) + (parseFloat(ing.line_cost) || 0));
+    }
 
     const enrichedRecipes = recipesResult.rows.map((recipe: any) => {
-      const recipeIngredients = (recipe.totals_json?.ingredients as any[] || []).map((ri: any) => {
-        const ing = ingMap.get(String(ri.ingredientId));
-        return {
-          ingredientId: ri.ingredientId,
-          ingredientName: ing?.name || ri.name || "Unknown",
-          portion: ri.portion || ri.qty || 0,
-          unit: ri.unit || ing?.portion_unit || "",
-          cost: ri.cost || 0,
-        };
-      });
-
+      const recipeId = parseInt(recipe.id);
+      const totalCost = recipeCosts.get(recipeId) || 0;
+      const yieldQty = parseFloat(recipe.yield_units) || 1;
+      
       return {
         id: recipe.id,
         name: recipe.name,
-        category: recipe.category,
-        ingredients: recipeIngredients,
-        totalCost: recipe.totals_json?.total || "0",
-        costPerServing: recipe.totals_json?.perServing || "0",
-        yieldQuantity: recipe.yield_quantity,
+        category: null, // Legacy field, not in new schema
+        ingredients: ingByRecipe.get(recipeId) || [],
+        totalCost: totalCost.toFixed(2),
+        costPerServing: (totalCost / yieldQty).toFixed(2),
+        yieldQuantity: yieldQty,
         yieldUnit: "servings",
-        updatedAt: recipe.updated_at,
+        updatedAt: new Date().toISOString(),
       };
     });
 
