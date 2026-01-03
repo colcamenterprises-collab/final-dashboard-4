@@ -698,9 +698,9 @@ export default function RecipeIngredientManagement() {
                                     name="quantity"
                                     render={({ field }) => (
                                       <FormItem>
-                                        <FormLabel>Quantity</FormLabel>
+                                        <FormLabel>Portion Size</FormLabel>
                                         <FormControl>
-                                          <Input placeholder="2" {...field} />
+                                          <Input placeholder="e.g. 150" {...field} />
                                         </FormControl>
                                         <FormMessage />
                                       </FormItem>

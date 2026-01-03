@@ -235,7 +235,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 font-medium">Ingredient</th>
-                  <th className="text-left py-2 font-medium w-20">Qty</th>
+                  <th className="text-left py-2 font-medium w-20">Portion</th>
                   <th className="text-left py-2 font-medium w-16">Unit</th>
                   <th className="w-10"></th>
                 </tr>
@@ -290,7 +290,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
               <Input
                 value={newQuantity}
                 onChange={(e) => setNewQuantity(e.target.value)}
-                placeholder="Qty"
+                placeholder="Portion"
                 className="w-20 h-8 text-xs rounded-[4px]"
                 data-testid="input-new-quantity"
               />
