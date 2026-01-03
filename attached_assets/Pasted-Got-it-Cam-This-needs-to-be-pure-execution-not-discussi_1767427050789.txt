@@ -1,0 +1,158 @@
+Got it, Cam. This needs to be pure execution, not discussion. Below is exactly what you asked for:
+PATCH 1.6.16 — Recipe Completion via Canonical Ingredient Model
+Purpose (non-negotiable):
+Fully populate recipes using the corrected economic model:
+Purchasing = packs / cartons / kg / boxes (unit cost lives here)
+Recipes = portions consumed per item (grams, pieces, spoons)
+NO purchasing prices or pack sizes inside recipes
+Recipe cost = derived ONLY via ingredient → purchasing linkage
+This patch only adds recipes + ingredients.
+No schema changes. No pricing logic changes.
+✅ CANONICAL RULES (LOCKED)
+Recipe quantities = portion usage only
+Units allowed in recipes
+grams
+pieces
+slices
+spoons (treated as grams via ingredient config)
+Do NOT enter pack sizes in recipes
+Do NOT enter costs in recipes
+All ingredients must already exist in ingredients
+All ingredients must already be linked to purchasing_items
+📦 RECIPES TO CREATE / COMPLETE
+Below is clean extracted data from the recipe cards you provided.
+1️⃣ DOUBLE SMASH BURGER
+Recipe Name: Double Smash Burger
+Serves: 1
+Ingredients
+Burger Bun — 1 piece
+Burger Sauce — 1 portion
+Pickles — 5 pieces
+Lettuce — 1 portion
+Tomato — 2 slices
+Raw Onion — 3 rings
+Beef Patty — 2 × 95 grams
+Cheese Slice — 2 slices
+2️⃣ TRIPLE SMASH BURGER
+Recipe Name: Triple Smash Burger
+Serves: 1
+Ingredients
+Burger Bun — 1 piece
+Burger Sauce — 1 portion
+Pickles — 5 pieces
+Lettuce — 1 portion
+Tomato — 2 slices
+Raw Onion — 3 rings
+Beef Patty — 3 × 95 grams
+Cheese Slice — 3 slices
+3️⃣ CHICKEN FILLET BURGER
+Recipe Name: Chicken Fillet Burger
+Serves: 1
+Ingredients
+Burger Bun — 1 piece
+Burger Sauce — 1 portion
+Lettuce — 1 portion
+Tomato — 2 slices
+Chicken Fillet — 3 pieces
+Cheese Slice — 1 slice
+Mayonnaise — 1 portion
+4️⃣ EL-SMASHO CHICKEN BURGER
+Recipe Name: El-Smasho Chicken Burger
+Serves: 1
+Ingredients
+Burger Bun — 1 piece
+Chipotle Mayo — 1 portion
+Chicken Fillet — 3 pieces
+Cheese Slice — 1 slice
+Coleslaw — 1 portion
+Jalapeños — 5 pieces
+5️⃣ KARAAGE CHICKEN BURGER
+Recipe Name: Karaage Chicken Burger
+Serves: 1
+Ingredients
+Burger Bun — 1 piece
+Burger Sauce — 1 portion
+Dill Pickles — 1 portion
+Karaage Chicken — 5 pieces
+Japanese Chili Powder — 1 portion
+Coleslaw (Dry) — 1 portion
+6️⃣ CHEESY BACON FRIES
+Recipe Name: Cheesy Bacon Fries
+Serves: 1
+Ingredients
+French Fries — 150 grams
+Cheese Sauce — 1 spoon
+Smoked Bacon Bits — 1 spoon
+Crispy Fried Onions — 1 portion
+7️⃣ LOADED FRIES
+Recipe Name: Loaded Fries
+Serves: 1
+Ingredients
+French Fries — 150 grams
+Cheese Sauce — 2 spoons
+Smoked Bacon Bits — 1 spoon
+Crispy Fried Onions — 1 portion
+🧠 IMPORTANT INGREDIENT ASSUMPTIONS (DO NOT GUESS)
+If any ingredient does not exist, the agent must:
+STOP
+Log missing ingredient name
+NOT create placeholders
+NOT invent units
+🤖 REPLIT AGENT — DROP-IN INSTRUCTION
+Paste exactly the following into the Replit Agent:
+Copy code
+
+PATCH 1.6.16 — RECIPE COMPLETION (LOCKED)
+
+Objective:
+Populate missing recipes using canonical ingredient consumption rules.
+
+Rules:
+- Recipes use portion quantities ONLY
+- No pack sizes
+- No pricing
+- No purchasing logic
+- Ingredients must already exist
+- Do not create new ingredients
+- Do not modify schema
+- Do not modify purchasing_items
+- Do not modify cost formulas
+
+Steps:
+1. Open Recipe Management
+2. For each recipe listed below:
+   - Create or update recipe
+   - Set Serves = 1
+   - Add ingredients exactly as specified
+   - Use grams / pieces / slices / spoons only
+3. Save recipe
+4. Verify recipe cost recalculates automatically
+5. If any ingredient is missing:
+   - Stop execution
+   - Report missing ingredient names only
+
+Recipes:
+[PASTE RECIPES 1–7 EXACTLY AS PROVIDED ABOVE]
+
+Verification:
+- Cajun Fries ≈ ฿9–10
+- Burgers show realistic food cost
+- No recipe shows absurd totals (e.g. ฿19,000)
+
+Do NOT:
+- Add unit prices
+- Add pack quantities
+- Modify purchasing logic
+- Modify recipeAuthority.ts
+✅ WHAT THIS UNBLOCKS IMMEDIATELY
+Accurate COGS
+Accurate prime cost
+Correct ingredient depletion
+Correct meat + bun forecasting
+Safe expansion & delegation
+This is now aligned with how real restaurants operate.
+If you want next:
+auto-generation of double / triple variants
+modifier → ingredient deltas
+waste buffer modelling
+Say the word.
