@@ -1,0 +1,128 @@
+🔐 REPLIT AGENT PATCH — PATCH 1.6.17
+Canonical Recipe Population (Portion-Based Consumption)
+🎯 OBJECTIVE (LOCKED)
+Populate all Smash Brothers Burgers recipes using the canonical recipe model:
+Recipes consume ingredient portions
+Purchasing remains pack-based
+Costs derive automatically via
+(unit_cost / purchase_unit_qty) × portion_qty
+This patch ONLY inserts recipes + ingredients.
+No pricing hacks. No UI changes. No purchasing edits.
+🚫 ABSOLUTE RULES
+❌ DO NOT add portion sizes to purchasing items
+❌ DO NOT hardcode costs
+❌ DO NOT modify purchasing logic
+❌ DO NOT touch Daily Sales / Stock forms
+❌ DO NOT infer new ingredients — use existing ones only
+✅ PRECONDITIONS (ASSUMED TRUE)
+These ingredients already exist in purchasing_items and ingredient master:
+Burger Bun
+Beef Patty (95g unit defined via purchase_unit_qty)
+Chicken Fillet
+Karaage Chicken
+Cheese Slice
+American Cheese Sauce
+Burger Sauce
+Chipotle Mayo
+Mayonnaise
+Pickles
+Tomatoes
+Salad (Iceberg)
+Raw Onion
+Jalapeños
+French Fries 7mm
+Smoked Bacon Bits
+Crunchy Fried Onions
+Coleslaw
+Japanese Chili Powder
+If any are missing → log and skip, do NOT create new ones.
+🧱 EXECUTION STEPS
+1️⃣ DELETE EXISTING RECIPES (CLEAN SLATE)
+Call:
+Copy code
+
+DELETE /api/recipe-authority/:id
+for all existing Smash Brothers recipes to avoid duplicates.
+2️⃣ INSERT RECIPES (ONE BY ONE)
+For each recipe:
+Create recipe in recipe_authority
+Insert ingredients into recipe_ingredient
+qty = portion consumption only
+Units are logical, not purchasing-based
+🍔 RECIPE DEFINITIONS (SOURCE OF TRUTH)
+🟨 SINGLE SMASH BURGER
+Burger Bun ×1
+Beef Patty ×1 (95g)
+Cheese Slice ×1
+Pickles ×5
+Raw Onion Rings ×3
+Burger Sauce ×2 servings
+🟨 DOUBLE SMASH BURGER
+Burger Bun ×1
+Beef Patty ×2 (95g each)
+Cheese Slice ×2
+Pickles ×5
+Raw Onion Rings ×3
+Salad ×1
+Tomato Slices ×2
+Burger Sauce ×2 servings
+🟨 TRIPLE SMASH BURGER
+Burger Bun ×1
+Beef Patty ×3 (95g each)
+Cheese Slice ×3
+Pickles ×5
+Raw Onion Rings ×3
+Salad ×1
+Tomato Slices ×2
+Burger Sauce ×2 servings
+🍟 LOADED FRIES
+French Fries 7mm ×150g
+Burger Sauce ×1 serving
+Pickles ×5
+Raw Onion Rings ×3
+Cheese Slice ×1
+🧀 CHEESY BACON FRIES
+French Fries 7mm ×150g
+American Cheese Sauce ×2 servings
+Smoked Bacon Bits ×1 serving
+Crunchy Fried Onions ×1 serving
+🍗 CHICKEN FILLET BURGER
+Burger Bun ×1
+Chicken Fillet ×3 pieces
+Cheese Slice ×1
+Salad ×1
+Tomato Slices ×2
+Mayonnaise ×1 serving
+Burger Sauce ×1 serving
+🌶️ EL-SMASHO CHICKEN BURGER
+Burger Bun ×1
+Chicken Fillet ×3 pieces
+Cheese Slice ×1
+Coleslaw ×1
+Jalapeños ×5
+Chipotle Mayo ×2 servings
+🍗 KARAAGE CHICKEN BURGER
+Burger Bun ×1
+Karaage Chicken ×5 pieces
+Pickles ×5
+Coleslaw (dry) ×1
+Burger Sauce ×2 servings
+Japanese Chili Powder ×1 light dusting
+🧮 COST CALCULATION (DO NOT IMPLEMENT — ALREADY EXISTS)
+Recipe cost must resolve automatically via:
+Copy code
+
+(unitCost / purchase_unit_qty) × portion_qty
+No overrides. No rounding hacks.
+✅ SUCCESS CRITERIA
+Cajun Fries ≈ ฿9–10
+Smash burgers show sane, low per-unit food cost
+No recipe exceeds pack price
+/api/recipes reflects live calculated costs
+No grams / ml appear in Purchasing UI
+🧠 FINAL NOTE TO AGENT
+This is a data population patch, not a systems patch.
+If something is unclear:
+Log it
+Skip it
+Do NOT invent logic
