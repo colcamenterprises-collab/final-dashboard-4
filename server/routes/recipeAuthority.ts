@@ -44,6 +44,21 @@ router.get('/available-ingredients', async (_req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/recipe-authority/cost-flags
+ * PATCH 1.6.18: Get all flagged recipe cost issues
+ */
+router.get('/cost-flags', async (_req: Request, res: Response) => {
+  try {
+    const { getRecipeCostFlags } = await import('../services/recipeCost.service');
+    const flags = await getRecipeCostFlags();
+    res.json({ ok: true, flags });
+  } catch (error) {
+    console.error('[RecipeAuthority] Error fetching cost flags:', error);
+    res.status(500).json({ ok: false, error: 'Failed to fetch cost flags' });
+  }
+});
+
+/**
  * GET /api/recipe-authority/pos-mappings
  * Get all POS item to recipe mappings
  */

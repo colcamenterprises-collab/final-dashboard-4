@@ -265,6 +265,15 @@ export async function addIngredientToRecipe(
     throw new Error('Purchasing item not found or is not marked as ingredient');
   }
 
+  // PATCH 1.6.18: Ingredient save guards
+  if (!item.purchaseUnitQty || Number(item.purchaseUnitQty) <= 0) {
+    throw new Error(`Cannot add ingredient "${item.item}": purchase_unit_qty must be greater than zero. Current value: ${item.purchaseUnitQty}`);
+  }
+
+  if (Number(item.unitCost) < 0) {
+    throw new Error(`Cannot add ingredient "${item.item}": unit_cost cannot be negative. Current value: ${item.unitCost}`);
+  }
+
   const [newIngredient] = await db
     .insert(recipeIngredient)
     .values({
