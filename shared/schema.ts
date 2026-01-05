@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum, unique } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum, unique, numeric } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1952,3 +1952,35 @@ export type InsertModifierIngredientRule = typeof modifierIngredientRules.$infer
 export type ReceiptTruthRun = typeof receiptTruthRun.$inferSelect;
 export type ReceiptTruthIngredientUsage = typeof receiptTruthIngredientUsage.$inferSelect;
 export type ReceiptTruthModifierEffect = typeof receiptTruthModifierEffect.$inferSelect;
+
+// -----------------------------------------------------------------------------
+// 🔐 PATCH 1.6.18: P&L READ MODEL
+// Single source of truth for Profit & Loss calculations
+// One row per day — deterministic rebuild from source data
+// DO NOT WRITE FROM UI — rebuild service only
+// -----------------------------------------------------------------------------
+
+export const pnlReadModel = pgTable("pnl_read_model", {
+  date: date("date").primaryKey(),
+
+  grossSales: numeric("gross_sales"),
+  discounts: numeric("discounts"),
+  refunds: numeric("refunds"),
+  netSales: numeric("net_sales"),
+
+  shiftExpenses: numeric("shift_expenses"),
+  businessExpenses: numeric("business_expenses"),
+  totalExpenses: numeric("total_expenses"),
+
+  grossProfit: numeric("gross_profit"),
+
+  grabGross: numeric("grab_gross"),
+  grabNet: numeric("grab_net"),
+  grabVariance: numeric("grab_variance"),
+
+  dataStatus: text("data_status"), // OK | PARTIAL | MISSING
+  rebuiltAt: timestamp("rebuilt_at").defaultNow(),
+});
+
+export type PnlReadModel = typeof pnlReadModel.$inferSelect;
+export type InsertPnlReadModel = typeof pnlReadModel.$inferInsert;

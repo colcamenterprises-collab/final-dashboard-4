@@ -112,6 +112,7 @@ import healthSafetyPdf from "./routes/healthSafety/pdf";
 import recipeAuthorityRouter from "./routes/recipeAuthority";
 import ingredientReconciliationRouter from "./routes/ingredientReconciliation";
 import receiptBatchRoutes from "./routes/receiptBatchRoutes";
+import pnlReadModelRoutes from "./routes/pnlReadModel";
 // Email functionality will be added when needed
 
 
@@ -3666,6 +3667,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/purchasing-analytics', purchasingAnalyticsRouter); // Purchasing analytics metrics
   app.use('/api/debug', debugPurchasingRouter); // PATCH A: Purchasing parity check
   app.use('/api/recipe-authority', recipeAuthorityRouter); // FOUNDATION-02: Recipe Authority
+  app.use('/api/pnl', pnlReadModelRoutes); // PATCH 1.6.18: P&L Read Model
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
   app.use('/api/expenses-v2', expensesV2Routes);

@@ -1,0 +1,95 @@
+🔐 REPLIT PATCH — P&L READ MODEL BOOTSTRAP (FOUNDATIONAL)
+Objective
+Bring the Codex-designed P&L system live by creating the missing backend primitives so the existing Profit & Loss UI works.
+This patch is backend-first, deterministic, and additive.
+SCOPE (STRICT)
+YOU MUST:
+Create pnl_read_model table
+Create rebuild service
+Create API route /api/pnl
+Wire rebuild script
+Do NOT touch purchasing, recipes, receipts, or UI
+YOU MUST NOT:
+Modify Daily Sales & Stock logic
+Modify Expenses logic
+Modify receipt ingestion
+Modify existing UI files
+Add guesses or inferred data
+STEP 1 — DATABASE (Drizzle schema)
+Create table pnl_read_model with one row per day:
+Copy code
+Ts
+export const pnlReadModel = pgTable("pnl_read_model", {
+  date: date("date").primaryKey(),
+
+  grossSales: numeric("gross_sales"),
+  discounts: numeric("discounts"),
+  refunds: numeric("refunds"),
+  netSales: numeric("net_sales"),
+
+  shiftExpenses: numeric("shift_expenses"),
+  businessExpenses: numeric("business_expenses"),
+  totalExpenses: numeric("total_expenses"),
+
+  grossProfit: numeric("gross_profit"),
+
+  grabGross: numeric("grab_gross"),
+  grabNet: numeric("grab_net"),
+  grabVariance: numeric("grab_variance"),
+
+  dataStatus: text("data_status"), // OK | PARTIAL | MISSING
+  rebuiltAt: timestamp("rebuilt_at").defaultNow(),
+});
+Add migration.
+STEP 2 — REBUILD SERVICE
+Create:
+Copy code
+
+server/services/pnlReadModelService.ts
+This service must:
+For a given date:
+Read sales from:
+Daily Sales & Stock V2 (staff-entered)
+Loyverse receipts (already synced)
+Read expenses from:
+Shift expenses (from form payload)
+Business expenses table
+Compute:
+grossSales
+discounts
+refunds
+netSales
+totalExpenses
+grossProfit
+Write one deterministic row into pnl_read_model
+DELETE existing row for date before insert (idempotent)
+NO caching
+NO UI logic
+NO heuristics
+STEP 3 — API ROUTE
+Create file:
+Copy code
+
+server/routes/pnlReadModel.ts
+Routes:
+Copy code
+Ts
+GET  /api/pnl?from=YYYY-MM-DD&to=YYYY-MM-DD
+POST /api/pnl/rebuild?date=YYYY-MM-DD
+Rules:
+GET = read-only from pnl_read_model
+POST = rebuild single date only
+Fail loudly if source data missing
+STEP 4 — ROUTE REGISTRATION
+Register the route in server/routes.ts.
+DO NOT remove /api/profit-loss yet.
+We will deprecate later.
+STEP 5 — SAFETY CHECKS
+Enforce lower bound date: 2026-01-01
+If data missing → dataStatus = PARTIAL
+Never return fabricated values
+ACCEPTANCE CRITERIA
+/analysis/profit-loss loads without error
+Numbers come from pnl_read_model
+Rebuild produces same result every time
+No other systems are affected
