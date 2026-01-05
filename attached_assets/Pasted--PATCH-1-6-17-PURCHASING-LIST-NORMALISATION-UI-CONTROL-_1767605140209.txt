@@ -1,0 +1,98 @@
+🔐 PATCH 1.6.17 — PURCHASING LIST NORMALISATION & UI CONTROL
+🎯 Objective (Short)
+Fix Purchasing List category sprawl, bad modal input, and broken search/filter UX so Purchasing, Daily Sales & Stock V2, and Shopping List all stay aligned and sane.
+✅ THIS PATCH WILL FIX
+1️⃣ Lock Purchasing Categories to 6 Canonical Values
+There must be ONLY these categories system-wide:
+Fresh Food
+Shelf Items
+Frozen Food
+Kitchen Supplies
+Packaging
+Drinks
+What changes:
+Existing non-canonical categories (e.g. Vegetables, Chicken, Sauces, Seasonings) are mapped to one of the 6 above.
+No data loss. Just normalization.
+2️⃣ Fix “Add / Edit Purchasing Item” Modal
+The modal is currently breaking the system by allowing free-text categories.
+What changes:
+❌ Remove free-text category input
+✅ Replace with dropdown selector (the 6 categories only)
+Required field, no overrides
+This immediately fixes:
+Extra sections appearing in Daily Sales & Stock V2
+Broken grouping in Shopping List
+Long-term category pollution
+3️⃣ Fix Purchasing List Search & Filters (UX + Logic)
+Search Input
+Placeholder text becomes:
+Copy code
+
+Search purchasing
+Search auto-filters on type (no submit button)
+Filters
+Replace current mess with explicit toggles:
+Active
+Inactive
+All
+Ingredients only
+No more “can’t find inactive items” problem.
+🚫 THIS PATCH WILL NOT
+❌ Touch recipe costing
+❌ Touch Shopping List maths
+❌ Touch Daily Sales & Stock form logic
+❌ Change database schemas beyond category normalisation
+❌ Add new features or reports
+This is control + hygiene only.
+🧱 TECHNICAL SCOPE (FILES TO CHANGE)
+Frontend
+client/src/pages/PurchasingList.tsx
+client/src/components/modals/EditPurchasingItemModal.tsx
+client/src/components/filters/PurchasingFilters.tsx (if exists)
+Backend
+server/routes/purchasingItems.ts
+Optional one-off migration / normaliser:
+server/scripts/normalizePurchasingCategories.ts
+🗺️ CATEGORY MAPPING RULE (ONE-TIME)
+Existing Category
+Mapped To
+Vegetables
+Fresh Food
+Chicken
+Fresh Food
+Meat
+Fresh Food
+Sauces
+Shelf Items
+Seasonings
+Shelf Items
+Oils
+Shelf Items
+Cleaning
+Kitchen Supplies
+Mapping is deterministic and logged.
+🧪 Acceptance Criteria (Non-Negotiable)
+[ ] Cannot create or edit an item outside the 6 categories
+[ ] Daily Sales & Stock V2 shows exactly 6 sections
+[ ] Shopping List groups only by those 6 categories
+[ ] Inactive items are visible when toggled
+[ ] Search works without submit button
+[ ] No regressions to cost math or recipes
+⚠️ WARNINGS FOR REPLIT AGENT
+DO NOT:
+Rename category labels after this patch
+Add “custom category” logic later
+Auto-create categories from free text
+Touch recipe or ingredient tables
+THIS PATCH ASSUMES:
+purchasing_items.category is a string enum-like field
+Daily Sales & Stock V2 reads categories dynamically (already true)
+🚀 HOW TO APPLY (REPLIT)
+Paste full patch into Replit agent as one execution
+Run category normaliser once
+Restart app
+Manually verify:
+Add item modal
+Inactive toggle
+Daily Sales & Stock sections
+Shopping List grouping

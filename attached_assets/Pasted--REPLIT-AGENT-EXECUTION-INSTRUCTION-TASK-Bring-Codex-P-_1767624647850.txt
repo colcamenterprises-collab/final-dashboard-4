@@ -1,0 +1,71 @@
+🔐 REPLIT AGENT — EXECUTION INSTRUCTION
+TASK: Bring Codex P&L Read Model Live
+CONTEXT (DO NOT DEVIATE)
+Codex has already produced the authoritative P&L architecture + code changes
+The work is correct and approved
+The blocker is purely mechanical: missing file / not yet present in Replit
+This task is NOT to redesign, rethink, or “improve” anything
+🎯 OBJECTIVE
+Get the Codex P&L implementation running in Replit exactly as specified, with no functional changes.
+🚫 ABSOLUTE RULES
+DO NOT redesign P&L logic
+DO NOT change schema, calculations, or categories
+DO NOT refactor or “optimize”
+DO NOT touch Purchasing, Recipes, Receipts, or Sales logic
+DO NOT invent new endpoints
+DO NOT delete existing financial data
+DO NOT guess missing files — follow instructions exactly
+✅ REQUIRED ACTIONS (IN ORDER)
+1️⃣ CREATE MISSING FILE (BLOCKER FIX)
+Create the file exactly at this path:
+Copy code
+
+server/routes/pnlReadModel.ts
+Populate it exactly as per Codex output:
+Read-only routes for /api/pnl
+Optional rebuild endpoint (if included by Codex)
+Must read exclusively from pnl_read_model
+Must not compute totals on the fly
+This file is the ONLY reason Codex halted. Nothing else.
+2️⃣ VERIFY ROUTE REGISTRATION
+Confirm that server/routes.ts properly registers:
+Copy code
+Ts
+import pnlReadModelRoutes from "./routes/pnlReadModel";
+app.use("/api/pnl", pnlReadModelRoutes);
+If missing → add it
+If present → leave untouched
+3️⃣ VERIFY FRONTEND ROUTING (NO CHANGES)
+Confirm the following already exist (DO NOT MODIFY unless missing):
+Route: /analysis/profit-loss
+Redirect from legacy /finance/profit-loss
+Page file: client/src/pages/ProfitLoss.tsx
+Sidebar entry points to /analysis/profit-loss
+If present → do nothing
+If missing → wire exactly, no redesign
+4️⃣ START SERVER & VALIDATE
+Run:
+Copy code
+
+npm run dev
+Confirm:
+App boots
+/analysis/profit-loss loads
+P&L page calls /api/pnl
+Data Integrity panel renders
+No runtime crashes
+DO NOT seed, rebuild, or backfill data unless explicitly required to prevent crash
+🧪 ACCEPTANCE CRITERIA (BINARY)
+This task is complete when:
+[ ] App starts without error
+[ ] /api/pnl responds
+[ ] Profit & Loss page loads
+[ ] No financial logic changed
+[ ] No unrelated files touched
+🛑 IF YOU HIT AN ISSUE
+STOP immediately and report:
+File path
+Exact error message
+What you were attempting
+Do not workaround. Do not improvise.
+This is a mechanical unblock, not a thinking task.
