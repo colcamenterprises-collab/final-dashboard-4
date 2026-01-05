@@ -66,6 +66,63 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/pnl/year
+ * Legacy-compatible endpoint for year-based P&L data (matches frontend expectations)
+ * Query param: year (YYYY)
+ */
+router.get('/year', async (req: Request, res: Response) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const from = `${year}-01-01`;
+    const to = `${year}-12-31`;
+
+    const data = await pnlService.getRange(from, to);
+    
+    // Aggregate by month for legacy format
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const monthlyData: Record<string, { sales: number; cogs: number; grossProfit: number; expenses: number; netProfit: number }> = {};
+    
+    months.forEach(month => {
+      monthlyData[month] = { sales: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0 };
+    });
+
+    data.forEach(day => {
+      const monthIndex = new Date(day.date).getMonth();
+      const monthName = months[monthIndex];
+      if (monthName) {
+        monthlyData[monthName].sales += day.netSales;
+        monthlyData[monthName].expenses += day.totalExpenses;
+        monthlyData[monthName].grossProfit += day.grossProfit;
+        monthlyData[monthName].netProfit += day.grossProfit; // Same as grossProfit without COGS
+      }
+    });
+
+    const ytdTotals = {
+      sales: data.reduce((sum, d) => sum + d.netSales, 0),
+      cogs: 0,
+      grossProfit: data.reduce((sum, d) => sum + d.grossProfit, 0),
+      expenses: data.reduce((sum, d) => sum + d.totalExpenses, 0),
+      netProfit: data.reduce((sum, d) => sum + d.grossProfit, 0),
+    };
+
+    res.json({
+      success: true,
+      year,
+      monthlyData,
+      ytdTotals,
+      dataSource: {
+        salesRecords: data.filter(d => d.dataStatus !== 'MISSING').length,
+        loyverseRecords: data.filter(d => d.dataStatus === 'OK').length,
+        expenseRecords: data.length,
+      },
+    });
+  } catch (error: any) {
+    console.error('[PnlReadModel] Error fetching year P&L data:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch P&L data' });
+  }
+});
+
+/**
  * POST /api/pnl/rebuild
  * Rebuild P&L data for a single date.
  * Query param: date (YYYY-MM-DD)

@@ -1,0 +1,82 @@
+🔐 REPLIT AGENT — EXECUTE PATCH: P&L READ MODEL LIVE
+🚨 ABSOLUTE RULES
+DO NOT refactor, rename, or “improve” anything
+DO NOT touch Daily Sales V2, Expenses, Purchasing, or POS ingestion logic
+DO NOT delete or modify existing tables
+ADD ONLY what is missing
+If a file already exists → LEAVE IT
+If something fails → STOP AND REPORT
+✅ OBJECTIVE
+Make the authoritative P&L system live using the pnl_read_model, with deterministic rebuilds and a working UI.
+1️⃣ DATABASE — CREATE READ MODEL TABLE (IF MISSING)
+Run once. If table exists, SKIP.
+Copy code
+Sql
+CREATE TABLE IF NOT EXISTS pnl_read_model (
+  date DATE PRIMARY KEY,
+
+  gross_sales NUMERIC NOT NULL DEFAULT 0,
+  discounts NUMERIC NOT NULL DEFAULT 0,
+  refunds NUMERIC NOT NULL DEFAULT 0,
+  net_sales NUMERIC NOT NULL DEFAULT 0,
+
+  shift_expenses NUMERIC NOT NULL DEFAULT 0,
+  business_expenses NUMERIC NOT NULL DEFAULT 0,
+  total_expenses NUMERIC NOT NULL DEFAULT 0,
+
+  profit NUMERIC NOT NULL DEFAULT 0,
+
+  data_status TEXT NOT NULL CHECK (data_status IN ('OK','PARTIAL','MISSING')),
+  notes TEXT,
+
+  rebuilt_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+2️⃣ BACKEND — ENSURE ROUTES EXIST
+Verify these files exist exactly:
+Copy code
+
+server/services/pnlReadModelService.ts
+server/routes/pnlReadModel.ts
+If missing, create them from Codex output already approved.
+3️⃣ REGISTER ROUTES (ONLY IF NOT PRESENT)
+In server/routes.ts:
+Copy code
+Ts
+import pnlReadModelRoutes from "./routes/pnlReadModel";
+
+app.use("/api/pnl", pnlReadModelRoutes);
+⚠️ If /api/pnl is already registered → DO NOTHING
+4️⃣ REBUILD P&L DATA (AUTHORITATIVE STEP)
+Run in Replit shell:
+Copy code
+Bash
+npm run ts-node server/scripts/rebuildPnlReadModel.ts -- --from=2026-01-01 --to=TODAY
+Expected:
+No crashes
+Deterministic rebuild
+No fabricated data
+5️⃣ FRONTEND — USE READ MODEL ONLY
+Confirm Profit & Loss page is loading data from:
+Copy code
+
+GET /api/pnl
+and NOT:
+legacy aggregations
+inline calculations
+mixed sources
+If client/src/pages/ProfitLoss.tsx already does this → DO NOTHING
+6️⃣ FINAL VERIFICATION (MANDATORY)
+Confirm manually:
+/analysis/profit-loss loads
+Dates return rows
+Profit = Net Sales − Total Expenses
+Data status shows OK / PARTIAL / MISSING
+No numbers appear without a source
+🛑 STOP CONDITION
+If any of the following occur:
+Missing table
+Missing route
+Build error
+Runtime exception
+👉 STOP IMMEDIATELY AND REPORT EXACT ERROR
+✅ END OF INSTRUCTION

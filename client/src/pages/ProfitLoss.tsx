@@ -27,11 +27,11 @@ export default function ProfitLoss() {
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   
-  // Fetch P&L data
+  // Fetch P&L data from read model
   const { data: plData, isLoading, error } = useQuery<PLResponse>({
-    queryKey: ['/api/profit-loss', selectedYear],
+    queryKey: ['/api/pnl/year', selectedYear],
     queryFn: async () => {
-      return await apiRequest(`/api/profit-loss?year=${selectedYear}`);
+      return await apiRequest(`/api/pnl/year?year=${selectedYear}`);
     }
   });
 
