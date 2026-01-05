@@ -1,0 +1,104 @@
+Alright. Here is ONE single, locked, Replit-agent-ready patch.
+No theory. No options. No back-and-forth. This is the exact execution to get P&L fully live for January.
+🔐 PATCH — P&L JANUARY GO-LIVE (SINGLE EXECUTION)
+Objective
+Bring Profit & Loss fully live for January 2026, using the canonical P&L read model, with:
+Correct expenses
+Correct profit math
+Working UI
+Deterministic rebuild
+Zero legacy aggregation paths
+Backdating explicitly excluded from this patch.
+🚫 ABSOLUTE RULES (NON-NEGOTIABLE)
+DO NOT touch Daily Sales & Stock V2 logic
+DO NOT touch receipt ingestion
+DO NOT invent sales
+DO NOT modify expenses logic
+DO NOT create alternative P&L calculations
+READ MODEL ONLY
+✅ STEP 1 — VERIFY STRUCTURE (NO CHANGES)
+Confirm these already exist.
+If any are missing → STOP and report.
+Database
+pnl_read_model table exists
+Columns include (minimum):
+date
+gross_sales
+net_sales
+total_expenses
+profit
+data_status
+Backend
+server/services/pnlReadModelService.ts
+server/routes/pnlReadModel.ts
+Routes registered in server/routes.ts
+Frontend
+client/src/pages/ProfitLoss.tsx
+Page calls only /api/pnl
+✅ STEP 2 — FORCE JANUARY REBUILD (AUTHORITATIVE)
+Run exactly this, nothing else:
+Copy code
+Bash
+npm run ts-node server/scripts/rebuildPnlReadModel.ts -- --from=2026-01-01 --to=2026-01-31
+Expected Result
+31 rows inserted into pnl_read_model
+No NULL values
+profit = net_sales - total_expenses
+Expenses populated
+Sales = 0 (until POS ingest lands)
+✅ STEP 3 — API VERIFICATION (MANDATORY)
+Hit:
+Copy code
+
+GET /api/pnl?from=2026-01-01&to=2026-01-31
+Must return:
+31 entries
+Each day includes:
+total_expenses
+profit
+data_status = MISSING
+If any aggregation logic runs outside read model → FAIL.
+✅ STEP 4 — UI HARD SWITCH (NO LEGACY FALLBACK)
+Ensure ONLY THIS is true:
+Profit & Loss page
+Path: /finance/profit-loss
+API used: /api/pnl
+NO /api/profit-loss
+NO inline calculations
+NO joining tables client-side
+UI Must Show
+January totals
+Daily breakdown
+Data Integrity panel
+Status = MISSING for each day (correct)
+✅ STEP 5 — LOCK IT
+After verification:
+❌ Disable any writes to pnl_read_model except rebuild service
+❌ Do not allow UI to trigger rebuild
+✅ Rebuilds are manual / script only
+🎯 ACCEPTANCE CRITERIA (ALL MUST PASS)
+[ ] January loads in UI
+[ ] Expenses total = ฿568.71
+[ ] Profit = -฿568.71
+[ ] No duplicated expenses
+[ ] No fabricated sales
+[ ] No legacy aggregation executed
+[ ] Rebuild is idempotent
+🧱 WHAT THIS PATCH DELIBERATELY DOES NOT DO
+❌ Backdating
+❌ Grab reconciliation
+❌ POS sales ingestion
+❌ Category breakdowns
+❌ Forecasting
+Those come after January is signed off.
+✅ END STATE
+You now have:
+A real P&L
+Deterministic numbers
+Visual clarity
+A financial foundation that won’t rot
+When you’re ready, next patches are:
+POS sales ingest → P&L
+Grab delta reconciliation
+Backdate to July 1st
+Say the word and we move.

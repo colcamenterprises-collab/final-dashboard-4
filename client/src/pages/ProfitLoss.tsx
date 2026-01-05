@@ -117,7 +117,7 @@ export default function ProfitLoss() {
             className="px-3 py-1 border border-gray-300 rounded-md text-sm"
             data-testid="year-selector"
           >
-            {[2023, 2024, 2025].map(year => (
+            {[2024, 2025, 2026].map(year => (
               <option key={year} value={year}>{year}</option>
             ))}
           </select>
