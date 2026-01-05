@@ -1,0 +1,70 @@
+🔐 REPLIT AGENT — EXECUTION PATCH
+PATCH: January P&L Rebuild + UI Verification (AUTHORITATIVE)
+🎯 Objective
+Rebuild January (current year) into the P&L read model, confirm data flows end-to-end, and ensure the Profit & Loss UI is live, accurate, and stable.
+Backdating is explicitly excluded from this patch.
+🚫 NON-NEGOTIABLE RULES
+❌ Do not touch purchasing, recipes, receipts, or modifiers
+❌ Do not backdate prior to January
+❌ Do not invent or infer missing data
+❌ Do not modify legacy /api/profit-loss
+❌ Do not change schema beyond what already exists
+✅ EXECUTION STEPS (IN ORDER — NO DEVIATION)
+1️⃣ Rebuild January P&L Read Model
+Run exactly this script command in Replit Shell:
+Copy code
+Bash
+npm run ts-node server/scripts/rebuildPnlReadModel.ts -- --from=2026-01-01 --to=2026-01-31
+Expected behavior
+Deletes existing January rows in pnl_read_model
+Rebuilds day-by-day using canonical sources
+Writes rows with data_status = OK | PARTIAL | MISSING
+No crashes, no silent failures
+2️⃣ Verify Data Exists (DB Check)
+Run:
+Copy code
+Sql
+SELECT date, net_sales, total_expenses, profit, data_status
+FROM pnl_read_model
+WHERE date BETWEEN '2026-01-01' AND '2026-01-31'
+ORDER BY date;
+Acceptance
+Rows exist for January dates
+Profit = net_sales − total_expenses
+No NULL numeric fields
+3️⃣ Verify API (Read Model Only)
+Hit in browser or curl:
+Copy code
+Http
+GET /api/pnl?from=2026-01-01&to=2026-01-31
+Acceptance
+Data returned matches DB
+data_status visible per day
+No fallback to legacy logic
+4️⃣ Verify Frontend UI
+Navigate to:
+Copy code
+
+/analysis/profit-loss
+UI must show
+January totals
+Sectioned layout (Sales / Expenses / Profit)
+Data Integrity panel (OK / PARTIAL / MISSING)
+No console errors
+No loading loops
+No “fake” numbers
+5️⃣ Lock It
+Once verified:
+❌ Do NOT auto-rebuild
+❌ Do NOT backdate
+❌ Do NOT modify logic
+✅ Report completion only
+📦 DELIVERABLE (MANDATORY)
+Respond with only:
+Copy code
+
+January P&L rebuilt and verified.
+- DB: OK
+- API: OK
+- UI: OK
+If any step fails, stop immediately and report the exact failure.
