@@ -114,6 +114,7 @@ import ingredientReconciliationRouter from "./routes/ingredientReconciliation";
 import receiptBatchRoutes from "./routes/receiptBatchRoutes";
 import pnlReadModelRoutes from "./routes/pnlReadModel";
 import pnlSnapshotRoutes from "./routes/pnlSnapshot.route";
+import { menuManagementRouter } from "./routes/menuManagement";
 // Email functionality will be added when needed
 
 
@@ -3670,6 +3671,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/recipe-authority', recipeAuthorityRouter); // FOUNDATION-02: Recipe Authority
   app.use('/api/pnl', pnlReadModelRoutes); // PATCH 1.6.18: P&L Read Model
   app.use('/api/pnl/snapshot', pnlSnapshotRoutes); // PATCH 1: P&L Snapshot with checksums
+  app.use('/api/menu-management', menuManagementRouter); // PATCH 2.1: Menu Management Foundation
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
   app.use('/api/expenses-v2', expensesV2Routes);

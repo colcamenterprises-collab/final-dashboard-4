@@ -26,6 +26,7 @@ import Expenses from "./pages/Expenses";
 import ExpensesImport from "./pages/finance/ExpensesImport";
 import ExpensesV2 from "./pages/expenses/ExpensesV2";
 import MenuManager from "./pages/menu/MenuManager";
+import MenuManagement from "./pages/menu/MenuManagement";
 import MenuImport from "./pages/menu/MenuImport";
 import DescriptionTool from "./pages/menu/DescriptionTool";
 import IngredientEdit from "./pages/menu/IngredientEdit";
@@ -201,6 +202,7 @@ export default function App() {
                 <Route path="/kds/history" element={<KDSHistory />} />
 
                 <Route path="/menu-v3" element={<MenuAdminV3 />} />
+                <Route path="/menu-management" element={<Guard><MenuManagement /></Guard>} />
 
                 <Route path="/pos-login" element={<POSLogin />} />
                 <Route path="/pos" element={<POS />} />

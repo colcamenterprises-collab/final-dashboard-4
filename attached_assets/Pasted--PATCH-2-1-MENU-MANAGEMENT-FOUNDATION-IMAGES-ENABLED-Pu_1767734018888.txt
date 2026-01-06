@@ -1,0 +1,187 @@
+🔐 PATCH 2.1 — MENU MANAGEMENT FOUNDATION (IMAGES ENABLED)
+Purpose
+Make Menu Management the single source of truth for Online Ordering
+Allow:
+recipe → menu item linking
+price control
+availability toggle
+image upload (NOW, not later)
+Scope
+✅ New Menu Management data layer
+✅ Menu Management page populated
+✅ Image upload enabled
+❌ Recipes untouched
+❌ Online Ordering logic untouched (reads later)
+⚠️ AGENT RULES
+❌ DO NOT modify recipes
+❌ DO NOT calculate cost here
+❌ DO NOT duplicate recipe logic
+✅ Menu items reference recipes only
+✅ Images stored per menu item
+1️⃣ DATABASE — MENU ITEMS (NEW TABLE)
+File: server/db/schema/menuItem.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { pgTable, text, numeric, uuid, boolean } from "drizzle-orm/pg-core";
+
+export const menuItem = pgTable("menu_item", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  name: text("name").notNull(),
+  category: text("category").notNull(), // burgers | sides | drinks | deals
+
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+
+  isActive: boolean("is_active").default(true).notNull(),
+  isOnlineEnabled: boolean("is_online_enabled").default(false).notNull(),
+
+  imageUrl: text("image_url"), // stored path / CDN URL
+
+  createdAt: text("created_at").defaultNow(),
+});
+2️⃣ DATABASE — MENU ITEM ↔ RECIPE LINK
+File: server/db/schema/menuItemRecipe.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { pgTable, uuid } from "drizzle-orm/pg-core";
+
+export const menuItemRecipe = pgTable("menu_item_recipe", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  menuItemId: uuid("menu_item_id").notNull(),
+  recipeId: uuid("recipe_id").notNull(),
+});
+Allows:
+1 recipe → many menu items
+1 menu item → many recipes (meals)
+3️⃣ API — MENU MANAGEMENT CRUD
+File: server/routes/menuManagement.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { db } from "@/db";
+import { menuItem } from "@/db/schema/menuItem";
+import { menuItemRecipe } from "@/db/schema/menuItemRecipe";
+import { eq } from "drizzle-orm";
+
+export async function listMenuItems() {
+  return db.select().from(menuItem);
+}
+
+export async function createMenuItem(input: {
+  name: string;
+  category: string;
+  price: number;
+  recipeIds: string[];
+  imageUrl?: string;
+}) {
+  const [item] = await db
+    .insert(menuItem)
+    .values({
+      name: input.name,
+      category: input.category,
+      price: input.price,
+      imageUrl: input.imageUrl,
+    })
+    .returning();
+
+  for (const recipeId of input.recipeIds) {
+    await db.insert(menuItemRecipe).values({
+      menuItemId: item.id,
+      recipeId,
+    });
+  }
+
+  return item;
+}
+
+export async function toggleOnline(menuItemId: string, enabled: boolean) {
+  await db
+    .update(menuItem)
+    .set({ isOnlineEnabled: enabled })
+    .where(eq(menuItem.id, menuItemId));
+}
+4️⃣ IMAGE UPLOAD (SIMPLE, SAFE)
+Decision
+Store images in /public/menu/
+Save relative path to DB
+File: server/routes/uploadMenuImage.ts
+👉 CREATE FILE
+Copy code
+Ts
+import fs from "fs";
+import path from "path";
+
+export async function uploadMenuImage(file: File) {
+  const uploadDir = path.join(process.cwd(), "public/menu");
+
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+  }
+
+  const filename = `${Date.now()}-${file.name}`;
+  const filepath = path.join(uploadDir, filename);
+
+  await fs.promises.writeFile(filepath, Buffer.from(await file.arrayBuffer()));
+
+  return `/menu/${filename}`;
+}
+5️⃣ UI — MENU MANAGEMENT PAGE (UNBLANK IT)
+File: client/src/pages/menu/MenuManagement.tsx
+👉 REPLACE CONTENT
+Copy code
+Tsx
+import { useEffect, useState } from "react";
+
+export default function MenuManagement() {
+  const [items, setItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch("/api/menu")
+      .then((r) => r.json())
+      .then(setItems);
+  }, []);
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Menu Management</h1>
+
+      <table className="w-full border">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Online</th>
+            <th>Image</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((i) => (
+            <tr key={i.id}>
+              <td>{i.name}</td>
+              <td>{i.category}</td>
+              <td>฿{i.price}</td>
+              <td>{i.isOnlineEnabled ? "ON" : "OFF"}</td>
+              <td>
+                {i.imageUrl ? (
+                  <img src={i.imageUrl} className="h-12" />
+                ) : (
+                  "—"
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+6️⃣ ONLINE ORDERING RULE (ENFORCED)
+Online Ordering must:
+Read menu_item
+Filter isOnlineEnabled = true
+Never read recipes directly
+(No change yet — this is enforced later)

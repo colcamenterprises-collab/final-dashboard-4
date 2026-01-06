@@ -2011,3 +2011,45 @@ export const pnlSnapshot = pgTable("pnl_snapshot", {
 
 export type PnlSnapshot = typeof pnlSnapshot.$inferSelect;
 export type InsertPnlSnapshot = typeof pnlSnapshot.$inferInsert;
+
+// -----------------------------------------------------------------------------
+// MENU MANAGEMENT — Single Source of Truth for Online Ordering
+// Links recipes to menu items with price control and image support
+// -----------------------------------------------------------------------------
+
+export const menuItemV3 = pgTable("menu_item_v3", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  
+  name: text("name").notNull(),
+  category: text("category").notNull(), // burgers | sides | drinks | deals
+  
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+  
+  isActive: boolean("is_active").default(true).notNull(),
+  isOnlineEnabled: boolean("is_online_enabled").default(false).notNull(),
+  
+  imageUrl: text("image_url"), // stored path / CDN URL
+  description: text("description"),
+  
+  displayOrder: integer("display_order").default(0),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const menuItemRecipe = pgTable("menu_item_recipe", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  
+  menuItemId: uuid("menu_item_id").notNull().references(() => menuItemV3.id, { onDelete: "cascade" }),
+  recipeId: integer("recipe_id").notNull().references(() => recipe.id, { onDelete: "cascade" }),
+  
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertMenuItemV3Schema = createInsertSchema(menuItemV3).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertMenuItemRecipeSchema = createInsertSchema(menuItemRecipe).omit({ id: true, createdAt: true });
+
+export type MenuItemV3 = typeof menuItemV3.$inferSelect;
+export type InsertMenuItemV3 = z.infer<typeof insertMenuItemV3Schema>;
+export type MenuItemRecipe = typeof menuItemRecipe.$inferSelect;
+export type InsertMenuItemRecipe = z.infer<typeof insertMenuItemRecipeSchema>;
