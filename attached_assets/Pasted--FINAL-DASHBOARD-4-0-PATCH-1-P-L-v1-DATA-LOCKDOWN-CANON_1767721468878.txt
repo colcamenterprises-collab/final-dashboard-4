@@ -1,0 +1,208 @@
+🔐 FINAL DASHBOARD 4.0
+PATCH 1 — P&L v1 DATA LOCKDOWN (CANONICALITY + SAFETY)
+🎯 Patch Objective (hard)
+Make P&L v1 100% reproducible
+Prevent double counting
+Prevent silent drift
+Ensure POS is the only revenue authority
+Make mismatches impossible to ignore
+🔒 WHAT THIS PATCH DOES (NO MORE, NO LESS)
+Freezes P&L inputs at the database level
+Introduces a canonical P&L snapshot table
+Adds hard constraints that block bad data
+Adds a reconciliation checksum
+Makes P&L rebuilds deterministic
+❌ No UI changes
+❌ No logic guesses
+❌ No Grab logic
+❌ No edits to existing ingestion
+📦 PATCH CONTENTS (COPY–PASTE ONLY)
+1️⃣ DATABASE — CANONICAL SNAPSHOT TABLE
+File: prisma/migrations/XXXX_add_pnl_snapshot.sql
+(Apply via Prisma migrate or raw SQL – do not modify existing tables)
+Copy code
+Sql
+-- P&L CANONICAL SNAPSHOT TABLE
+-- READ ONLY — DERIVED — NEVER WRITTEN BY UI
+
+CREATE TABLE pnl_snapshot (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  period_start DATE NOT NULL,
+  period_end DATE NOT NULL,
+
+  revenue_total NUMERIC(12,2) NOT NULL CHECK (revenue_total >= 0),
+  expense_total NUMERIC(12,2) NOT NULL CHECK (expense_total >= 0),
+  profit_total NUMERIC(12,2) NOT NULL,
+
+  pos_receipt_count INTEGER NOT NULL CHECK (pos_receipt_count >= 0),
+
+  revenue_checksum TEXT NOT NULL,
+  expense_checksum TEXT NOT NULL,
+
+  built_at TIMESTAMP NOT NULL DEFAULT now(),
+
+  UNIQUE (period_start, period_end)
+);
+
+COMMENT ON TABLE pnl_snapshot IS
+'Canonical, deterministic P&L snapshot derived only from POS + expense sources';
+2️⃣ DATABASE — HARD CONSTRAINTS (STOP BAD DATA)
+File: prisma/migrations/XXXX_lock_pnl_sources.sql
+Copy code
+Sql
+-- PREVENT NEGATIVE OR NULL FINANCIAL DATA
+ALTER TABLE receipts
+  ADD CONSTRAINT chk_receipt_total_non_negative
+  CHECK (total_amount >= 0);
+
+ALTER TABLE business_expenses
+  ADD CONSTRAINT chk_business_expense_non_negative
+  CHECK (amount >= 0);
+
+ALTER TABLE shift_expenses
+  ADD CONSTRAINT chk_shift_expense_non_negative
+  CHECK (amount >= 0);
+If any of these fail → data is already corrupt (that’s the point)
+3️⃣ SERVICE — DETERMINISTIC P&L BUILDER
+File: server/services/pnlSnapshot.service.ts
+Copy code
+Ts
+import { db } from "../db";
+import { sql } from "drizzle-orm";
+import crypto from "crypto";
+
+function checksum(rows: any[]): string {
+  return crypto
+    .createHash("sha256")
+    .update(JSON.stringify(rows))
+    .digest("hex");
+}
+
+export async function buildPnLSnapshot(
+  start: string,
+  end: string
+) {
+  // POS REVENUE — SINGLE SOURCE OF TRUTH
+  const revenueRows = await db.execute(sql`
+    SELECT
+      id,
+      total_amount
+    FROM receipts
+    WHERE sold_at::date BETWEEN ${start} AND ${end}
+  `);
+
+  const revenueTotal = revenueRows.reduce(
+    (sum, r) => sum + Number(r.total_amount),
+    0
+  );
+
+  const revenueHash = checksum(revenueRows);
+
+  // EXPENSES — BUSINESS + SHIFT
+  const expenseRows = await db.execute(sql`
+    SELECT id, amount FROM business_expenses
+    WHERE expense_date BETWEEN ${start} AND ${end}
+
+    UNION ALL
+
+    SELECT id, amount FROM shift_expenses
+    WHERE expense_date BETWEEN ${start} AND ${end}
+  `);
+
+  const expenseTotal = expenseRows.reduce(
+    (sum, r) => sum + Number(r.amount),
+    0
+  );
+
+  const expenseHash = checksum(expenseRows);
+
+  const profit = revenueTotal - expenseTotal;
+
+  const receiptCount = revenueRows.length;
+
+  // UPSERT SNAPSHOT (IDEMPOTENT)
+  await db.execute(sql`
+    INSERT INTO pnl_snapshot (
+      period_start,
+      period_end,
+      revenue_total,
+      expense_total,
+      profit_total,
+      pos_receipt_count,
+      revenue_checksum,
+      expense_checksum
+    )
+    VALUES (
+      ${start},
+      ${end},
+      ${revenueTotal},
+      ${expenseTotal},
+      ${profit},
+      ${receiptCount},
+      ${revenueHash},
+      ${expenseHash}
+    )
+    ON CONFLICT (period_start, period_end)
+    DO UPDATE SET
+      revenue_total = EXCLUDED.revenue_total,
+      expense_total = EXCLUDED.expense_total,
+      profit_total = EXCLUDED.profit_total,
+      pos_receipt_count = EXCLUDED.pos_receipt_count,
+      revenue_checksum = EXCLUDED.revenue_checksum,
+      expense_checksum = EXCLUDED.expense_checksum,
+      built_at = now();
+  `);
+}
+4️⃣ API — REBUILD ENDPOINT (LOCKED)
+File: server/routes/pnlSnapshot.route.ts
+Copy code
+Ts
+import { Router } from "express";
+import { buildPnLSnapshot } from "../services/pnlSnapshot.service";
+
+const router = Router();
+
+/**
+ * INTERNAL ONLY
+ * Deterministic rebuild
+ */
+router.post("/rebuild", async (req, res) => {
+  const { start, end } = req.body;
+
+  if (!start || !end) {
+    return res.status(400).json({ error: "start and end required" });
+  }
+
+  await buildPnLSnapshot(start, end);
+
+  res.json({ status: "ok", start, end });
+});
+
+export default router;
+🧪 VERIFICATION (MANDATORY)
+After deploy:
+Copy code
+Sql
+SELECT * FROM pnl_snapshot ORDER BY built_at DESC;
+Then:
+Rebuild same date range twice
+Confirm:
+revenue_total identical
+expense_total identical
+profit_total identical
+checksums identical
+If anything changes → data upstream is unstable (not P&L).
+🔐 STATUS AFTER PATCH 1
+Area
+State
+P&L inputs
+Locked
+POS authority
+Enforced
+Double counting
+Impossible
+Rebuild drift
+Impossible
+UI trust level
+Accountant-safe

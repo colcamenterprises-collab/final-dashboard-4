@@ -1984,3 +1984,30 @@ export const pnlReadModel = pgTable("pnl_read_model", {
 
 export type PnlReadModel = typeof pnlReadModel.$inferSelect;
 export type InsertPnlReadModel = typeof pnlReadModel.$inferInsert;
+
+// -----------------------------------------------------------------------------
+// P&L SNAPSHOT — Canonical Period Summaries with Integrity Checksums
+// READ ONLY — DERIVED — NEVER WRITTEN BY UI
+// For audit trail and reconciliation
+// -----------------------------------------------------------------------------
+
+export const pnlSnapshot = pgTable("pnl_snapshot", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  
+  periodStart: date("period_start").notNull(),
+  periodEnd: date("period_end").notNull(),
+  
+  revenueTotal: numeric("revenue_total", { precision: 12, scale: 2 }).notNull(),
+  expenseTotal: numeric("expense_total", { precision: 12, scale: 2 }).notNull(),
+  profitTotal: numeric("profit_total", { precision: 12, scale: 2 }).notNull(),
+  
+  posReceiptCount: integer("pos_receipt_count").notNull(),
+  
+  revenueChecksum: text("revenue_checksum").notNull(),
+  expenseChecksum: text("expense_checksum").notNull(),
+  
+  builtAt: timestamp("built_at").defaultNow().notNull(),
+});
+
+export type PnlSnapshot = typeof pnlSnapshot.$inferSelect;
+export type InsertPnlSnapshot = typeof pnlSnapshot.$inferInsert;
