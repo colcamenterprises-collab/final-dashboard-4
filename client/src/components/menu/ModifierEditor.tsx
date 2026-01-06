@@ -70,7 +70,7 @@ export default function ModifierEditor({ menuItemId, menuItemName }: ModifierEdi
   const [deltaUnit, setDeltaUnit] = useState("grams");
 
   const { data: groupsData, isLoading } = useQuery<{ ok: boolean; groups: ModifierGroup[] }>({
-    queryKey: ["/api/modifiers/menu-item", menuItemId],
+    queryKey: [`/api/modifiers/menu-item/${menuItemId}`],
   });
 
   const { data: purchasingData } = useQuery<{ ok: boolean; items: PurchasingItem[] }>({
@@ -78,56 +78,74 @@ export default function ModifierEditor({ menuItemId, menuItemName }: ModifierEdi
   });
 
   const createGroupMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/modifiers/groups", data),
+    mutationFn: (data: any) => apiRequest("/api/modifiers/groups", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modifiers/menu-item", menuItemId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modifiers/menu-item/${menuItemId}`] });
       toast({ title: "Modifier group created" });
       setShowAddGroupModal(false);
       resetGroupForm();
     },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteGroupMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/modifiers/groups/${id}`),
+    mutationFn: (id: string) => apiRequest(`/api/modifiers/groups/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modifiers/menu-item", menuItemId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modifiers/menu-item/${menuItemId}`] });
       toast({ title: "Modifier group deleted" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
   const createModifierMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/modifiers/modifiers", data),
+    mutationFn: (data: any) => apiRequest("/api/modifiers/modifiers", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modifiers/menu-item", menuItemId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modifiers/menu-item/${menuItemId}`] });
       toast({ title: "Modifier created" });
       setShowAddModifierModal(null);
       resetModifierForm();
     },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteModifierMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/modifiers/modifiers/${id}`),
+    mutationFn: (id: string) => apiRequest(`/api/modifiers/modifiers/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modifiers/menu-item", menuItemId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modifiers/menu-item/${menuItemId}`] });
       toast({ title: "Modifier deleted" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
   const addIngredientMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/modifiers/ingredients", data),
+    mutationFn: (data: any) => apiRequest("/api/modifiers/ingredients", { method: "POST", body: JSON.stringify(data) }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modifiers/menu-item", menuItemId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modifiers/menu-item/${menuItemId}`] });
       toast({ title: "Ingredient delta added" });
       setShowAddIngredientModal(null);
       resetIngredientForm();
     },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
   });
 
   const deleteIngredientMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/modifiers/ingredients/${id}`),
+    mutationFn: (id: string) => apiRequest(`/api/modifiers/ingredients/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/modifiers/menu-item", menuItemId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/modifiers/menu-item/${menuItemId}`] });
       toast({ title: "Ingredient delta removed" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     },
   });
 
