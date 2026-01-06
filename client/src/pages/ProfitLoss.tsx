@@ -93,7 +93,7 @@ export default function ProfitLoss() {
   };
 
   const SectionHeader = ({ title }: { title: string }) => (
-    <tr className="bg-slate-100">
+    <tr className="bg-white border-t-2 border-slate-300">
       <td colSpan={14} className="p-2 font-semibold text-xs text-slate-700 uppercase tracking-wide">
         {title}
       </td>
@@ -113,7 +113,7 @@ export default function ProfitLoss() {
     isTotal?: boolean;
     isSummary?: boolean;
   }) => (
-    <tr className={`border-t border-slate-100 ${isTotal ? 'bg-slate-50' : ''} ${isSummary ? 'bg-slate-100' : ''}`}>
+    <tr className={`border-t border-slate-200 ${isTotal ? 'bg-white border-t-2' : ''} ${isSummary ? 'bg-white border-t-2 border-slate-400' : ''}`}>
       <td className={`p-2 text-xs ${indent ? 'pl-6' : ''} ${isTotal || isSummary ? 'font-semibold' : ''}`}>
         {label}
       </td>
@@ -255,7 +255,7 @@ export default function ProfitLoss() {
 
               <DataRow label="Income Tax" dataKey="incomeTax" isTotal />
 
-              <tr className="border-t-2 border-slate-300 bg-slate-100">
+              <tr className="border-t-2 border-slate-300 bg-white">
                 <td className="p-3 font-bold text-sm">Net Income</td>
                 {months.map(m => {
                   const value = getValue(plData?.monthlyData?.[m], 'netIncome');
