@@ -1,0 +1,191 @@
+🔐 PATCH 1.1 — FIX RECIPE INGREDIENT UNITS & VALIDATION
+Stack chosen: Drizzle + Postgres
+Scope: DB + API + Recipe UI only
+Do NOT change anything outside listed files
+⚠️ AGENT RULES (READ FIRST)
+❌ Do NOT touch P&L
+❌ Do NOT touch purchasing logic
+❌ Do NOT infer units anywhere
+❌ Do NOT add defaults
+✅ Block invalid saves hard
+✅ Exact code only
+1️⃣ DATABASE — ENFORCE PORTION UNITS
+File: server/db/schema/recipeIngredient.ts
+👉 REPLACE FILE CONTENT ENTIRELY
+Copy code
+Ts
+import { pgTable, text, numeric, uuid, check } from "drizzle-orm/pg-core";
+
+export const recipeIngredient = pgTable(
+  "recipe_ingredient",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+
+    recipeId: uuid("recipe_id").notNull(),
+    purchasingItemId: uuid("purchasing_item_id").notNull(),
+
+    portionQty: numeric("portion_qty", { precision: 10, scale: 4 }).notNull(),
+    portionUnit: text("portion_unit").notNull(), // grams | ml | each | serving
+  },
+  (t) => ({
+    portionQtyPositive: check(
+      "chk_recipe_portion_qty_positive",
+      t.portionQty.gt(0)
+    ),
+
+    portionUnitValid: check(
+      "chk_recipe_portion_unit_valid",
+      `
+      portion_unit IN ('grams', 'ml', 'each', 'serving')
+      `
+    ),
+  })
+);
+2️⃣ API — HARD VALIDATION (BLOCK SAVE)
+File: server/routes/recipes.ts
+👉 ADD / REPLACE ingredient create & update logic
+Copy code
+Ts
+import { db } from "@/db";
+import { recipeIngredient } from "@/db/schema/recipeIngredient";
+import { purchasingItem } from "@/db/schema/purchasingItem";
+import { eq } from "drizzle-orm";
+
+function assertCompatibleUnits(
+  purchaseUnit: string,
+  portionUnit: string
+) {
+  if (purchaseUnit === portionUnit) return;
+
+  const mass = ["grams"];
+  const volume = ["ml"];
+  const count = ["each", "serving"];
+
+  const group = (u: string) =>
+    mass.includes(u) ? "mass" :
+    volume.includes(u) ? "volume" :
+    count.includes(u) ? "count" : "invalid";
+
+  if (group(purchaseUnit) !== group(portionUnit)) {
+    throw new Error(
+      `Unit mismatch: purchase unit '${purchaseUnit}' vs portion unit '${portionUnit}'`
+    );
+  }
+}
+
+export async function upsertRecipeIngredient(input: {
+  recipeId: string;
+  purchasingItemId: string;
+  portionQty: number;
+  portionUnit: string;
+}) {
+  if (!input.portionQty || input.portionQty <= 0) {
+    throw new Error("Portion quantity must be greater than 0");
+  }
+
+  if (!input.portionUnit) {
+    throw new Error("Portion unit is required");
+  }
+
+  const item = await db
+    .select()
+    .from(purchasingItem)
+    .where(eq(purchasingItem.id, input.purchasingItemId))
+    .then((r) => r[0]);
+
+  if (!item) throw new Error("Purchasing item not found");
+
+  if (!item.purchaseUnitQty || item.purchaseUnitQty <= 0) {
+    throw new Error("Purchasing item has no valid unit size");
+  }
+
+  assertCompatibleUnits(item.purchaseUnit, input.portionUnit);
+
+  await db.insert(recipeIngredient).values({
+    recipeId: input.recipeId,
+    purchasingItemId: input.purchasingItemId,
+    portionQty: input.portionQty,
+    portionUnit: input.portionUnit,
+  });
+}
+3️⃣ COST CALC — SINGLE SOURCE (NO GUESSING)
+File: server/services/recipeCost.service.ts
+👉 REPLACE ingredient cost calculation ONLY
+Copy code
+Ts
+const cost =
+  (Number(item.unitCost) / Number(item.purchaseUnitQty)) *
+  Number(ingredient.portionQty);
+❌ Remove any logic that multiplies by packs
+❌ Remove fallback to serving
+4️⃣ UI — RECIPE INGREDIENT EDITOR FIX
+File: client/src/components/recipes/RecipeIngredientRow.tsx
+👉 REPLACE FILE CONTENT ENTIRELY
+Copy code
+Tsx
+type PortionUnit = "grams" | "ml" | "each" | "serving";
+
+export function RecipeIngredientRow({
+  ingredient,
+  onChange,
+}: {
+  ingredient: any;
+  onChange: (next: any) => void;
+}) {
+  return (
+    <div className="grid grid-cols-5 gap-2 items-center">
+      <div>{ingredient.name}</div>
+
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={ingredient.portionQty}
+        onChange={(e) =>
+          onChange({ ...ingredient, portionQty: Number(e.target.value) })
+        }
+      />
+
+      <select
+        value={ingredient.portionUnit}
+        onChange={(e) =>
+          onChange({ ...ingredient, portionUnit: e.target.value })
+        }
+        required
+      >
+        <option value="">Unit</option>
+        <option value="grams">grams</option>
+        <option value="ml">ml</option>
+        <option value="each">each</option>
+        <option value="serving">serving</option>
+      </select>
+
+      <div className="text-xs text-gray-500">
+        Purchase: {ingredient.purchaseUnitQty} {ingredient.purchaseUnit}
+      </div>
+
+      <div className="text-right font-mono">
+        ฿{ingredient.calculatedCost?.toFixed(2)}
+      </div>
+    </div>
+  );
+}
+5️⃣ UI — BLOCK SAVE IF INVALID
+File: client/src/components/recipes/RecipeEditor.tsx
+👉 ADD BEFORE SAVE
+Copy code
+Ts
+for (const ing of ingredients) {
+  if (!ing.portionQty || ing.portionQty <= 0) {
+    throw new Error("All ingredients must have a portion quantity");
+  }
+  if (!ing.portionUnit) {
+    throw new Error("All ingredients must have a portion unit");
+  }
+}
+6️⃣ REQUIRED TESTS (DO THESE)
+Fries: 2000g @ ฿129 → 150g ≈ ฿9.68
+Onions: 1kg @ ฿40 → 20g ≈ ฿0.80
+Coleslaw must NOT exceed tens of baht
+Saving without unit → ❌ blocked
+grams ↔ each → ❌ blocked

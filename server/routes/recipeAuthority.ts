@@ -11,6 +11,29 @@ import { insertRecipeV2Schema, insertRecipeIngredientV2Schema, insertPosItemReci
 
 const router = Router();
 
+const VALID_PORTION_UNITS = ['grams', 'ml', 'each', 'serving'] as const;
+type PortionUnit = typeof VALID_PORTION_UNITS[number];
+
+function validatePortionUnit(unit: string): unit is PortionUnit {
+  return VALID_PORTION_UNITS.includes(unit as PortionUnit);
+}
+
+function validateIngredients(ingredients: { purchasingItemId: number; quantity: string; unit: string }[]): string | null {
+  for (const ing of ingredients) {
+    const qty = parseFloat(ing.quantity);
+    if (!ing.quantity || isNaN(qty) || qty <= 0) {
+      return `Ingredient ${ing.purchasingItemId}: quantity must be greater than 0`;
+    }
+    if (!ing.unit) {
+      return `Ingredient ${ing.purchasingItemId}: unit is required`;
+    }
+    if (!validatePortionUnit(ing.unit)) {
+      return `Ingredient ${ing.purchasingItemId}: unit '${ing.unit}' is invalid. Valid units: ${VALID_PORTION_UNITS.join(', ')}`;
+    }
+  }
+  return null;
+}
+
 // ========================================
 // STATIC ROUTES (must come before parameterized routes)
 // ========================================
@@ -182,6 +205,7 @@ router.post('/', async (req: Request, res: Response) => {
 /**
  * PUT /api/recipe-authority/:id
  * PATCH 8: Full recipe update with atomic ingredient replacement
+ * PATCH 1.1: Added portion unit validation (grams, ml, each, serving only)
  * Accepts { name, yieldUnits, active, ingredients: [...] }
  */
 router.put('/:id', async (req: Request, res: Response) => {
@@ -191,7 +215,13 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, error: 'Invalid recipe ID' });
     }
 
-    // Use the new atomic update function that handles ingredients
+    if (req.body.ingredients && Array.isArray(req.body.ingredients)) {
+      const validationError = validateIngredients(req.body.ingredients);
+      if (validationError) {
+        return res.status(400).json({ ok: false, error: validationError });
+      }
+    }
+
     const recipe = await recipeService.updateRecipeWithIngredients(id, req.body);
     if (!recipe) {
       return res.status(404).json({ ok: false, error: 'Recipe not found' });
@@ -236,6 +266,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 /**
  * POST /api/recipe-authority/:id/ingredients
  * Add ingredient to recipe
+ * PATCH 1.1: Added portion unit validation
  */
 router.post('/:id/ingredients', async (req: Request, res: Response) => {
   try {
@@ -247,6 +278,15 @@ router.post('/:id/ingredients', async (req: Request, res: Response) => {
     const { purchasingItemId, quantity, unit } = req.body;
     if (!purchasingItemId || !quantity || !unit) {
       return res.status(400).json({ ok: false, error: 'Missing required fields: purchasingItemId, quantity, unit' });
+    }
+
+    const qty = parseFloat(quantity);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ ok: false, error: 'Quantity must be greater than 0' });
+    }
+
+    if (!validatePortionUnit(unit)) {
+      return res.status(400).json({ ok: false, error: `Unit '${unit}' is invalid. Valid units: ${VALID_PORTION_UNITS.join(', ')}` });
     }
 
     const ingredient = await recipeService.addIngredientToRecipe(

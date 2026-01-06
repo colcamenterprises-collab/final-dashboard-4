@@ -46,6 +46,8 @@ type ModalIngredient = {
   ingredientName?: string;
 };
 
+const VALID_PORTION_UNITS = ['grams', 'ml', 'each', 'serving'] as const;
+
 interface RecipeEditModalProps {
   recipe: RecipeAuthority | null;
   isOpen: boolean;
@@ -63,6 +65,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
   const [modalIngredients, setModalIngredients] = useState<ModalIngredient[]>([]);
   const [newIngredientId, setNewIngredientId] = useState("");
   const [newQuantity, setNewQuantity] = useState("");
+  const [newUnit, setNewUnit] = useState<string>("grams");
 
   const { data: ingredientsData } = useQuery<{ ok: boolean; ingredients: AvailableIngredient[] }>({
     queryKey: ['/api/recipe-authority/available-ingredients'],
@@ -135,6 +138,10 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
       toast({ title: "Invalid quantity", description: "Quantity must be a positive number", variant: "destructive" });
       return;
     }
+    if (!newUnit || !VALID_PORTION_UNITS.includes(newUnit as any)) {
+      toast({ title: "Invalid unit", description: "Please select a valid unit", variant: "destructive" });
+      return;
+    }
     const id = parseInt(newIngredientId);
     if (modalIngredients.some((i) => i.purchasingItemId === id)) {
       toast({ title: "Duplicate", description: "This ingredient is already added", variant: "destructive" });
@@ -148,12 +155,13 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
       {
         purchasingItemId: id,
         quantity: newQuantity,
-        unit: found.portionUnit || found.orderUnit || "unit",
+        unit: newUnit,
         ingredientName: found.item,
       },
     ]);
     setNewIngredientId("");
     setNewQuantity("");
+    setNewUnit("grams");
   };
 
   const handleRemoveIngredient = (purchasingItemId: number) => {
@@ -168,6 +176,17 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
     if (!name.trim()) {
       toast({ title: "Name required", description: "Please enter a recipe name", variant: "destructive" });
       return;
+    }
+    for (const ing of modalIngredients) {
+      const qty = parseFloat(ing.quantity);
+      if (!ing.quantity || isNaN(qty) || qty <= 0) {
+        toast({ title: "Invalid quantity", description: `${ing.ingredientName}: quantity must be > 0`, variant: "destructive" });
+        return;
+      }
+      if (!ing.unit || !VALID_PORTION_UNITS.includes(ing.unit as any)) {
+        toast({ title: "Invalid unit", description: `${ing.ingredientName}: unit must be grams, ml, each, or serving`, variant: "destructive" });
+        return;
+      }
     }
     saveMutation.mutate();
   };
@@ -290,10 +309,24 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
               <Input
                 value={newQuantity}
                 onChange={(e) => setNewQuantity(e.target.value)}
-                placeholder="Portion"
-                className="w-20 h-8 text-xs rounded-[4px]"
+                placeholder="Qty"
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-16 h-8 text-xs rounded-[4px]"
                 data-testid="input-new-quantity"
               />
+              <Select value={newUnit} onValueChange={setNewUnit}>
+                <SelectTrigger className="w-24 h-8 text-xs rounded-[4px]" data-testid="select-new-unit">
+                  <SelectValue placeholder="Unit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="grams">grams</SelectItem>
+                  <SelectItem value="ml">ml</SelectItem>
+                  <SelectItem value="each">each</SelectItem>
+                  <SelectItem value="serving">serving</SelectItem>
+                </SelectContent>
+              </Select>
               <Button
                 size="sm"
                 onClick={handleAddIngredient}
