@@ -81,7 +81,7 @@ router.get('/', async (req: Request, res: Response) => {
 
 /**
  * GET /api/pnl/year
- * Legacy-compatible endpoint for year-based P&L data (matches frontend expectations)
+ * Enterprise P&L endpoint with structured sections
  * Query param: year (YYYY)
  */
 router.get('/year', async (req: Request, res: Response) => {
@@ -92,32 +92,125 @@ router.get('/year', async (req: Request, res: Response) => {
 
     const data = await pnlService.getRange(from, to);
     
-    // Aggregate by month for legacy format
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const monthlyData: Record<string, { sales: number; cogs: number; grossProfit: number; expenses: number; netProfit: number }> = {};
     
+    interface PLMonthData {
+      posCash: number;
+      posQr: number;
+      posOther: number;
+      grabGross: number;
+      onlineOrdering: number;
+      totalRevenue: number;
+      foodCogs: number;
+      packagingCogs: number;
+      totalCogs: number;
+      grossProfit: number;
+      grabCommission: number;
+      grabAds: number;
+      shiftWages: number;
+      overtime: number;
+      bonuses: number;
+      rent: number;
+      utilities: number;
+      maintenance: number;
+      cleaning: number;
+      otherBusiness: number;
+      totalOpex: number;
+      operatingIncome: number;
+      bankFees: number;
+      interest: number;
+      adjustments: number;
+      incomeTax: number;
+      netIncome: number;
+    }
+
+    const createEmptyMonth = (): PLMonthData => ({
+      posCash: 0,
+      posQr: 0,
+      posOther: 0,
+      grabGross: 0,
+      onlineOrdering: 0,
+      totalRevenue: 0,
+      foodCogs: 0,
+      packagingCogs: 0,
+      totalCogs: 0,
+      grossProfit: 0,
+      grabCommission: 0,
+      grabAds: 0,
+      shiftWages: 0,
+      overtime: 0,
+      bonuses: 0,
+      rent: 0,
+      utilities: 0,
+      maintenance: 0,
+      cleaning: 0,
+      otherBusiness: 0,
+      totalOpex: 0,
+      operatingIncome: 0,
+      bankFees: 0,
+      interest: 0,
+      adjustments: 0,
+      incomeTax: 0,
+      netIncome: 0,
+    });
+
+    const monthlyData: Record<string, PLMonthData> = {};
     months.forEach(month => {
-      monthlyData[month] = { sales: 0, cogs: 0, grossProfit: 0, expenses: 0, netProfit: 0 };
+      monthlyData[month] = createEmptyMonth();
     });
 
     data.forEach(day => {
       const monthIndex = new Date(day.date).getMonth();
       const monthName = months[monthIndex];
-      if (monthName) {
-        monthlyData[monthName].sales += day.netSales;
-        monthlyData[monthName].expenses += day.totalExpenses;
-        monthlyData[monthName].grossProfit += day.grossProfit;
-        monthlyData[monthName].netProfit += day.grossProfit; // Same as grossProfit without COGS
-      }
+      if (!monthName) return;
+
+      const m = monthlyData[monthName];
+      
+      m.posCash += day.netSales - day.grabGross;
+      m.grabGross += day.grabGross;
+      m.totalRevenue += day.netSales;
+      
+      m.shiftWages += day.shiftExpenses;
+      m.otherBusiness += day.businessExpenses;
+      m.totalOpex += day.totalExpenses;
+      
+      m.grossProfit = m.totalRevenue - m.totalCogs;
+      m.operatingIncome = m.grossProfit - m.totalOpex;
+      m.netIncome = m.operatingIncome - m.incomeTax;
     });
 
-    const ytdTotals = {
-      sales: data.reduce((sum, d) => sum + d.netSales, 0),
-      cogs: 0,
-      grossProfit: data.reduce((sum, d) => sum + d.grossProfit, 0),
-      expenses: data.reduce((sum, d) => sum + d.totalExpenses, 0),
-      netProfit: data.reduce((sum, d) => sum + d.grossProfit, 0),
-    };
+    const ytdTotals = createEmptyMonth();
+    months.forEach(month => {
+      const m = monthlyData[month];
+      ytdTotals.posCash += m.posCash;
+      ytdTotals.posQr += m.posQr;
+      ytdTotals.posOther += m.posOther;
+      ytdTotals.grabGross += m.grabGross;
+      ytdTotals.onlineOrdering += m.onlineOrdering;
+      ytdTotals.totalRevenue += m.totalRevenue;
+      ytdTotals.foodCogs += m.foodCogs;
+      ytdTotals.packagingCogs += m.packagingCogs;
+      ytdTotals.totalCogs += m.totalCogs;
+      ytdTotals.grabCommission += m.grabCommission;
+      ytdTotals.grabAds += m.grabAds;
+      ytdTotals.shiftWages += m.shiftWages;
+      ytdTotals.overtime += m.overtime;
+      ytdTotals.bonuses += m.bonuses;
+      ytdTotals.rent += m.rent;
+      ytdTotals.utilities += m.utilities;
+      ytdTotals.maintenance += m.maintenance;
+      ytdTotals.cleaning += m.cleaning;
+      ytdTotals.otherBusiness += m.otherBusiness;
+      ytdTotals.totalOpex += m.totalOpex;
+      ytdTotals.bankFees += m.bankFees;
+      ytdTotals.interest += m.interest;
+      ytdTotals.adjustments += m.adjustments;
+      ytdTotals.incomeTax += m.incomeTax;
+    });
+    
+    ytdTotals.grossProfit = ytdTotals.totalRevenue - ytdTotals.totalCogs;
+    ytdTotals.operatingIncome = ytdTotals.grossProfit - ytdTotals.totalOpex;
+    ytdTotals.netIncome = ytdTotals.operatingIncome - ytdTotals.incomeTax;
 
     res.json({
       success: true,
