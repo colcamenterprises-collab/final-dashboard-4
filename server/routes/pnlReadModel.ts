@@ -10,6 +10,20 @@ import * as pnlService from '../services/pnlReadModelService';
 const router = Router();
 
 /**
+ * GET /api/pnl/years
+ * Get distinct years that have P&L data in the read model.
+ */
+router.get('/years', async (req: Request, res: Response) => {
+  try {
+    const years = await pnlService.getDistinctYears();
+    res.json({ ok: true, years });
+  } catch (error: any) {
+    console.error('[PnlReadModel] Error fetching years:', error);
+    res.status(500).json({ ok: false, error: error.message || 'Failed to fetch years' });
+  }
+});
+
+/**
  * GET /api/pnl
  * Read P&L data for a date range.
  * Query params: from (YYYY-MM-DD), to (YYYY-MM-DD)

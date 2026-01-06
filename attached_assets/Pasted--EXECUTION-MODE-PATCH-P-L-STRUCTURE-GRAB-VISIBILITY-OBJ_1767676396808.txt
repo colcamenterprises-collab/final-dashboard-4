@@ -1,0 +1,108 @@
+🔐 EXECUTION MODE — PATCH: P&L STRUCTURE + GRAB VISIBILITY
+
+OBJECTIVE
+Upgrade the Profit & Loss page to a proper enterprise-grade P&L with:
+- Correct year handling
+- Explicit Grab breakdown
+- Shift-level visibility
+- Accountant-standard sectioning
+- Clean finance UI
+
+SCOPE (ALLOWED)
+- client/src/pages/ProfitLoss.tsx
+- server/routes/pnlReadModel.ts
+- server/services/pnlReadModelService.ts
+- shared enums/constants if required
+
+DO NOT
+- Change purchasing logic
+- Touch recipe costing
+- Modify Daily Sales & Stock forms
+- Invent or estimate data
+
+REQUIRED CHANGES
+
+1️⃣ YEAR SELECTOR
+- Remove hardcoded year list
+- Query distinct years from pnl_read_model
+- Default to latest available year
+- Header year must match selected year
+
+2️⃣ P&L SECTION STRUCTURE
+Replace flat rows with these sections:
+
+Revenue
+- POS Cash
+- POS QR
+- POS Other
+- Grab Gross Sales
+- Online Ordering (future-safe)
+Total Revenue
+
+COGS
+- Food COGS
+- Packaging COGS
+Total COGS
+
+Gross Profit
+
+Operating Expenses
+Platform & Sales
+- Grab Commission
+- Grab Advertising
+
+Staff & Shifts
+- Shift Wages
+- Overtime
+- Bonuses
+
+Store Operations
+- Rent
+- Utilities
+- Maintenance
+- Cleaning
+- Other Business Expenses
+
+Total Operating Expenses
+
+Operating Income (EBIT)
+
+Non-Operating Items
+- Bank Fees
+- Interest
+- Adjustments
+
+Income Tax (explicit row, default 0)
+
+Net Income
+
+3️⃣ GRAB HANDLING
+- Treat Grab as a revenue channel, not just POS
+- Grab commission and ads must reduce operating income, not revenue
+- Use expense categories:
+  - GRAB_COMMISSION
+  - GRAB_ADS
+
+4️⃣ SHIFT VISIBILITY
+- Aggregate shift income and expenses into P&L
+- Allow expandable breakdown by shift totals
+
+5️⃣ UI CLEANUP
+- Remove icon from P&L page header
+- Finance page must be text-only, professional
+- Negative numbers red, positive green
+
+6️⃣ DATA INTEGRITY
+- Read ONLY from pnl_read_model
+- No legacy aggregation
+- No fabricated values
+- If data missing, show 0 with clear labeling
+
+DELIVERABLE
+- P&L page that an accountant would accept
+- Grab clearly visible and understandable
+- Year selector correct
+- UI clean and serious
+
+STOP WHEN COMPLETE
+Do not continue beyond this patch.

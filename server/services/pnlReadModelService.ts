@@ -271,3 +271,25 @@ export async function rebuildRange(from: string, to: string): Promise<{ rebuilt:
 
   return { rebuilt, errors };
 }
+
+/**
+ * Get distinct years that have P&L data.
+ */
+export async function getDistinctYears(): Promise<number[]> {
+  const result = await db
+    .select({
+      year: sql<number>`DISTINCT EXTRACT(YEAR FROM date)::integer`.as('year'),
+    })
+    .from(pnlReadModel)
+    .orderBy(sql`1 DESC`);
+
+  const years = result.map(r => r.year).filter(y => y != null);
+  
+  // Always include current year even if no data
+  const currentYear = new Date().getFullYear();
+  if (!years.includes(currentYear)) {
+    years.unshift(currentYear);
+  }
+  
+  return years.sort((a, b) => b - a);
+}
