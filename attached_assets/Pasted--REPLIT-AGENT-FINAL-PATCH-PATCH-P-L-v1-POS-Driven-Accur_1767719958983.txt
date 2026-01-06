@@ -1,0 +1,134 @@
+🔐 REPLIT AGENT — FINAL PATCH
+PATCH: P&L v1 (POS-Driven, Accurate, Locked)
+GOAL
+Make the Profit & Loss page numerically correct, POS-driven, and production-safe.
+This patch fixes data accuracy, removes the header icon, and locks P&L v1 so downstream work (recipes, receipts, online ordering) can proceed safely.
+🚫 ABSOLUTE RULES (DO NOT VIOLATE)
+❌ Do NOT modify Daily Sales & Stock V2
+❌ Do NOT modify Purchasing / Recipes
+❌ Do NOT infer or estimate values
+❌ Do NOT add Grab-specific logic yet
+❌ Do NOT fabricate zeros
+❌ Do NOT touch unrelated schemas
+✅ PATCH SCOPE (WHAT TO CHANGE)
+1️⃣ BACKEND — MAKE DATA ACCURATE
+A. Sales (SOURCE OF TRUTH)
+Sales must come only from POS / Loyverse.
+If no POS data exists for a day →
+gross_sales = 0
+net_sales = 0
+data_status = 'MISSING'
+NO fallback aggregation unless explicitly defined.
+B. Expenses
+Expenses must be real entries only:
+Shift Expenses → Daily Sales & Stock V2
+Business Expenses → expenses table
+❌ No grouping by guess
+❌ No default values
+❌ No legacy aggregation
+C. COGS
+COGS rules (v1):
+If recipe + sold items exist → calculate
+If recipe missing → cogs = 0, data_status = 'PARTIAL'
+Never infer food cost
+D. pnl_read_model (AUTHORITATIVE)
+For each date, write exactly one row:
+Copy code
+
+date
+gross_sales
+net_sales
+cogs
+gross_profit
+operating_expenses
+operating_income
+non_operating_items
+tax
+net_income
+data_status  // OK | PARTIAL | MISSING
+Rebuild must be:
+Deterministic
+Idempotent
+DELETE → INSERT per date
+2️⃣ API — LOCK READ PATH
+Required Endpoints
+Copy code
+Http
+GET  /api/pnl/year?year=YYYY        // read-only
+POST /api/pnl/rebuild-range         // admin only
+Forbidden
+❌ Any legacy aggregation in controllers
+❌ Any inline calculation in routes
+All logic lives in pnlReadModelService.
+3️⃣ FRONTEND — DISPLAY REALITY ONLY
+A. Data Source
+Profit & Loss page must read ONLY:
+Copy code
+
+/api/pnl/year
+❌ No /api/profit-loss
+❌ No client-side math
+B. Header (FIX THIS NOW)
+REMOVE THE ICON COMPLETELY
+Change header from:
+Copy code
+
+📈 Profit & Loss
+To:
+Copy code
+
+Profit & Loss Statement
+Text only. No icons. No emojis.
+C. Year Selector
+Query years from DB (/api/pnl/years)
+Default = latest available year
+Must include 2026
+D. Section Layout (DISPLAY ONLY WHAT EXISTS)
+Copy code
+
+REVENUE
+  - POS Sales
+
+COGS
+  - Food COGS (if available)
+
+GROSS PROFIT
+
+OPERATING EXPENSES
+  - Shift Expenses
+  - Business Expenses
+
+OPERATING INCOME
+
+NET INCOME
+If a section has no data, show — (not 0).
+E. Data Integrity Panel (MANDATORY)
+Display:
+Data Status
+POS rows found
+Expense rows found
+COGS completeness
+4️⃣ FINAL VERIFICATION (AGENT MUST CONFIRM)
+Agent must explicitly verify:
+✅ January loads
+✅ Numbers match DB rows
+✅ No duplicated expenses
+✅ No fabricated sales
+✅ Rebuild run twice = identical result
+✅ UI shows negative values in red
+✅ Header icon removed
+📦 DELIVERABLE
+One clean patch
+App builds
+P&L numbers are boringly correct
+No TODOs
+No placeholders
+No guesses
+🔒 STATUS AFTER THIS PATCH
+P&L v1 is LOCKED
+POS = single source of truth
+Ready for:
+Receipt ingestion
+Recipe / food cost accuracy
+Online ordering
+Grab reconciliation later (v2)
