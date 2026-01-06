@@ -1,0 +1,129 @@
+🔐 PATCH 1.2 — RECIPE UI CLARITY (FINAL FOR RECIPES)
+Purpose:
+Make it impossible for staff (or you) to misunderstand:
+portion vs purchase
+cost source
+what is editable vs locked
+No math changes. No DB changes. No API changes.
+⚠️ AGENT RULES
+❌ DO NOT touch costing logic
+❌ DO NOT touch DB
+❌ DO NOT touch purchasing
+✅ UI clarity only
+✅ Read-only where appropriate
+1️⃣ RECIPE INGREDIENT TABLE — VISUAL SEPARATION
+File:
+client/src/components/recipes/RecipeIngredientRow.tsx
+👉 REPLACE ENTIRE FILE
+Copy code
+Tsx
+type PortionUnit = "grams" | "ml" | "each" | "serving";
+
+export function RecipeIngredientRow({
+  ingredient,
+  onChange,
+  readOnly = false,
+}: {
+  ingredient: any;
+  onChange: (next: any) => void;
+  readOnly?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-6 gap-2 items-center border-b py-2">
+
+      {/* Ingredient */}
+      <div className="font-medium">
+        {ingredient.name}
+      </div>
+
+      {/* Portion Qty */}
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        disabled={readOnly}
+        value={ingredient.portionQty}
+        onChange={(e) =>
+          onChange({ ...ingredient, portionQty: Number(e.target.value) })
+        }
+        className="border px-2 py-1"
+      />
+
+      {/* Portion Unit */}
+      <select
+        disabled={readOnly}
+        value={ingredient.portionUnit}
+        onChange={(e) =>
+          onChange({ ...ingredient, portionUnit: e.target.value })
+        }
+        className="border px-2 py-1"
+      >
+        <option value="">unit</option>
+        <option value="grams">grams</option>
+        <option value="ml">ml</option>
+        <option value="each">each</option>
+        <option value="serving">serving</option>
+      </select>
+
+      {/* Purchase Info (READ ONLY) */}
+      <div className="text-xs text-gray-500 leading-tight">
+        <div>
+          Purchase unit:
+          <strong>
+            {" "}
+            {ingredient.purchaseUnitQty} {ingredient.purchaseUnit}
+          </strong>
+        </div>
+        <div>
+          Pack cost:
+          <strong> ฿{ingredient.unitCost}</strong>
+        </div>
+      </div>
+
+      {/* Cost */}
+      <div className="text-right font-mono">
+        ฿{ingredient.calculatedCost?.toFixed(2)}
+      </div>
+
+      {/* Remove */}
+      {!readOnly && (
+        <button
+          onClick={() => onChange({ ...ingredient, _remove: true })}
+          className="text-red-600 text-sm"
+        >
+          Remove
+        </button>
+      )}
+    </div>
+  );
+}
+2️⃣ RECIPE EDITOR — CLEAR SECTION LABELS
+File:
+client/src/components/recipes/RecipeEditor.tsx
+👉 ADD these headings (NO logic changes)
+Copy code
+Tsx
+<h3 className="text-lg font-semibold mt-6">
+  Ingredients (Consumed Per Serving)
+</h3>
+
+<p className="text-sm text-gray-500 mb-2">
+  Enter how much of each ingredient is used per recipe.
+  Purchase size and cost are shown for reference only.
+</p>
+3️⃣ REMOVE PACK LANGUAGE (CRITICAL)
+Search & remove ANY UI text containing:
+“pack”
+“bag”
+“carton”
+“purchase qty” (as editable language)
+Purchase size must only appear as READ-ONLY helper text.
+4️⃣ FINAL UX RULES (ENFORCED BY DESIGN)
+After Patch 1.2:
+Users only edit portion qty + unit
+Purchase size cannot be changed
+Cost cannot be edited
+Cost updates live as portions change
+This prevents:
+Onion / coleslaw disasters
+Staff misunderstand
