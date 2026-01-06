@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import PageShell from "@/layouts/PageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -47,7 +46,7 @@ export default function MenuManagement() {
   });
 
   const { data: recipesData } = useQuery<{ recipes: Recipe[] }>({
-    queryKey: ["/api/recipe-authority/recipes"],
+    queryKey: ["/api/recipe-authority"],
   });
 
   const createMutation = useMutation({
@@ -181,7 +180,6 @@ export default function MenuManagement() {
   }, {} as Record<string, MenuItem[]>);
 
   return (
-    <PageShell>
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
@@ -409,6 +407,5 @@ export default function MenuManagement() {
           </DialogContent>
         </Dialog>
       </div>
-    </PageShell>
   );
 }

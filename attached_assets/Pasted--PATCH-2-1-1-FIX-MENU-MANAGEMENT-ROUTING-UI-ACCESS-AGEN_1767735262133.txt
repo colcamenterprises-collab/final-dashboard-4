@@ -1,0 +1,104 @@
+🔐 PATCH 2.1.1 — FIX MENU MANAGEMENT ROUTING + UI ACCESS
+⚠️ AGENT RULES
+❌ Do NOT change DB
+❌ Do NOT change API
+❌ Do NOT touch recipes
+✅ Routing + UI only
+✅ Exact code
+1️⃣ ROUTE REGISTRATION (404 FIX)
+File: client/src/router/RouteRegistry.tsx
+👉 ADD THIS ROUTE (do not duplicate)
+Copy code
+Tsx
+import MenuManagement from "@/pages/menu/MenuManagement";
+
+export const routes = [
+  // existing routes ABOVE
+
+  {
+    path: "/menu-management",
+    element: <MenuManagement />,
+  },
+
+  // existing routes BELOW
+];
+2️⃣ APP ROUTER WRAP (CRITICAL)
+File: client/src/App.tsx
+👉 ENSURE RouteRegistry is wrapped like Recipes
+Copy code
+Tsx
+import { Routes, Route } from "react-router-dom";
+import { routes } from "./router/RouteRegistry";
+import PageShell from "@/components/layout/PageShell";
+
+function App() {
+  return (
+    <Routes>
+      {routes.map((route) => (
+        <Route
+          key={route.path}
+          path={route.path}
+          element={<PageShell>{route.element}</PageShell>}
+        />
+      ))}
+    </Routes>
+  );
+}
+
+export default App;
+❌ If /menu-management is outside PageShell → sidebar breaks → clicks blocked
+3️⃣ SIDEBAR CLICK BLOCK FIX
+File: client/src/components/layout/Sidebar.tsx
+👉 ADD / ENSURE
+Copy code
+Tsx
+<div
+  className="sidebar"
+  style={{
+    position: "relative",
+    zIndex: 10,
+    pointerEvents: "auto",
+  }}
+>
+File: client/src/components/layout/PageShell.tsx
+👉 ENSURE MAIN CONTENT IS ABOVE SIDEBAR
+Copy code
+Tsx
+<div
+  className="flex-1"
+  style={{
+    position: "relative",
+    zIndex: 20,
+  }}
+>
+  {children}
+</div>
+4️⃣ ADD MENU ITEM BUTTON (MISSING CONTROL)
+File: client/src/pages/menu/MenuManagement.tsx
+👉 REPLACE HEADER BLOCK
+Copy code
+Tsx
+<div className="flex justify-between items-center mb-6">
+  <h1 className="text-2xl font-bold">Menu Management</h1>
+
+  <button
+    className="bg-green-600 text-white px-4 py-2 rounded"
+    onClick={() => setShowModal(true)}
+  >
+    + Add Menu Item
+  </button>
+</div>
+5️⃣ EMPTY STATE MUST NOT BLOCK UI
+File: MenuManagement.tsx
+👉 REMOVE ANY EARLY RETURN LIKE THIS
+Copy code
+Tsx
+if (!items.length) return null;
+❌ DELETE IT if present.
+✅ REQUIRED RESULT AFTER PATCH
+/menu-management loads
+No 404
+Sidebar does not block clicks
+Add Menu Item button visible
+Modal opens
+Items can be created + edited
