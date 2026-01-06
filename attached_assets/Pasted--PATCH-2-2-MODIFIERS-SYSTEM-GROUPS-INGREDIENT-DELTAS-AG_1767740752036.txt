@@ -1,0 +1,180 @@
+🔐 PATCH 2.2 — MODIFIERS SYSTEM (GROUPS + INGREDIENT DELTAS)
+⚠️ AGENT RULES
+❌ DO NOT modify recipes
+❌ DO NOT modify menu item pricing logic
+❌ DO NOT infer ingredients
+✅ Modifiers only apply via ingredient deltas
+✅ Online Ordering will consume this later (no UI coupling)
+1️⃣ DATABASE — MODIFIER GROUPS
+File: server/db/schema/modifierGroup.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { pgTable, text, uuid, boolean, integer } from "drizzle-orm/pg-core";
+
+export const modifierGroup = pgTable("modifier_group", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(), // e.g. "Burger Extras"
+  menuItemId: uuid("menu_item_id").notNull(),
+
+  isRequired: boolean("is_required").default(false).notNull(),
+  minSelect: integer("min_select").default(0).notNull(),
+  maxSelect: integer("max_select").default(1).notNull(),
+
+  displayOrder: integer("display_order").default(0).notNull(),
+});
+2️⃣ DATABASE — MODIFIERS
+File: server/db/schema/modifier.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { pgTable, text, uuid, numeric, integer } from "drizzle-orm/pg-core";
+
+export const modifier = pgTable("modifier", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  modifierGroupId: uuid("modifier_group_id").notNull(),
+  name: text("name").notNull(), // e.g. "Extra Cheese"
+  priceDelta: numeric("price_delta", { precision: 10, scale: 2 })
+    .default("0")
+    .notNull(),
+
+  displayOrder: integer("display_order").default(0).notNull(),
+});
+3️⃣ DATABASE — MODIFIER INGREDIENT DELTAS (CORE)
+File: server/db/schema/modifierIngredient.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { pgTable, uuid, numeric, text } from "drizzle-orm/pg-core";
+
+export const modifierIngredient = pgTable("modifier_ingredient", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  modifierId: uuid("modifier_id").notNull(),
+  purchasingItemId: uuid("purchasing_item_id").notNull(),
+
+  deltaQty: numeric("delta_qty", { precision: 10, scale: 4 }).notNull(),
+  deltaUnit: text("delta_unit").notNull(), // grams | ml | each
+});
+4️⃣ API — MODIFIER CRUD
+File: server/routes/modifiers.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { db } from "@/db";
+import { modifierGroup } from "@/db/schema/modifierGroup";
+import { modifier } from "@/db/schema/modifier";
+import { modifierIngredient } from "@/db/schema/modifierIngredient";
+import { eq } from "drizzle-orm";
+
+export async function createModifierGroup(input: {
+  menuItemId: string;
+  name: string;
+  isRequired: boolean;
+  minSelect: number;
+  maxSelect: number;
+}) {
+  return db.insert(modifierGroup).values(input).returning();
+}
+
+export async function createModifier(input: {
+  modifierGroupId: string;
+  name: string;
+  priceDelta: number;
+}) {
+  return db.insert(modifier).values(input).returning();
+}
+
+export async function addModifierIngredientDelta(input: {
+  modifierId: string;
+  purchasingItemId: string;
+  deltaQty: number;
+  deltaUnit: string;
+}) {
+  if (input.deltaQty <= 0) {
+    throw new Error("Delta quantity must be > 0");
+  }
+
+  return db.insert(modifierIngredient).values(input);
+}
+
+export async function listMenuItemModifiers(menuItemId: string) {
+  return db
+    .select()
+    .from(modifierGroup)
+    .where(eq(modifierGroup.menuItemId, menuItemId));
+}
+5️⃣ SERVICE — APPLY MODIFIERS TO INGREDIENT USAGE
+File: server/services/ingredientResolution.service.ts
+👉 ADD FUNCTION
+Copy code
+Ts
+export function applyModifierDeltas(
+  baseIngredients: {
+    purchasingItemId: string;
+    qty: number;
+    unit: string;
+  }[],
+  modifierDeltas: {
+    purchasingItemId: string;
+    deltaQty: number;
+    deltaUnit: string;
+  }[]
+) {
+  const result = [...baseIngredients];
+
+  for (const delta of modifierDeltas) {
+    const existing = result.find(
+      (r) => r.purchasingItemId === delta.purchasingItemId
+    );
+
+    if (!existing) {
+      result.push({
+        purchasingItemId: delta.purchasingItemId,
+        qty: Number(delta.deltaQty),
+        unit: delta.deltaUnit,
+      });
+    } else {
+      if (existing.unit !== delta.deltaUnit) {
+        throw new Error("Modifier unit mismatch");
+      }
+      existing.qty += Number(delta.deltaQty);
+    }
+  }
+
+  return result;
+}
+6️⃣ UI — MENU MANAGEMENT → MODIFIERS TAB
+File: client/src/pages/menu/MenuManagement.tsx
+👉 ADD TAB (NO STYLING CHANGES)
+Copy code
+Tsx
+<button
+  className="px-3 py-1 border rounded"
+  onClick={() => setActiveTab("modifiers")}
+>
+  Modifiers
+</button>
+7️⃣ UI — MODIFIER EDITOR (MINIMAL)
+File: client/src/components/menu/ModifierEditor.tsx
+👉 CREATE FILE
+Copy code
+Tsx
+export default function ModifierEditor() {
+  return (
+    <div>
+      <h3 className="font-semibold mb-2">Modifiers</h3>
+      <p className="text-sm text-gray-500">
+        Modifiers add or remove ingredients from the base recipe.
+      </p>
+      {/* CRUD wired via API */}
+    </div>
+  );
+}
+8️⃣ HARD RULES (ENFORCED BY DESIGN)
+Modifiers never edit recipes
+Modifiers only add deltas
+Double patty = +1 patty ingredient
+Extra cheese = +cheese grams
+Price delta optional, ingredient delta mandatory

@@ -2053,3 +2053,51 @@ export type MenuItemV3 = typeof menuItemV3.$inferSelect;
 export type InsertMenuItemV3 = z.infer<typeof insertMenuItemV3Schema>;
 export type MenuItemRecipe = typeof menuItemRecipe.$inferSelect;
 export type InsertMenuItemRecipe = z.infer<typeof insertMenuItemRecipeSchema>;
+
+// -----------------------------------------------------------------------------
+// MODIFIERS SYSTEM — Groups + Ingredient Deltas
+// Modifiers only apply via ingredient deltas, never edit recipes
+// -----------------------------------------------------------------------------
+
+export const modifierGroup = pgTable("modifier_group", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(), // e.g. "Burger Extras"
+  menuItemId: uuid("menu_item_id").notNull().references(() => menuItemV3.id, { onDelete: "cascade" }),
+  
+  isRequired: boolean("is_required").default(false).notNull(),
+  minSelect: integer("min_select").default(0).notNull(),
+  maxSelect: integer("max_select").default(1).notNull(),
+  
+  displayOrder: integer("display_order").default(0).notNull(),
+});
+
+export const modifier = pgTable("modifier", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  
+  modifierGroupId: uuid("modifier_group_id").notNull().references(() => modifierGroup.id, { onDelete: "cascade" }),
+  name: text("name").notNull(), // e.g. "Extra Cheese"
+  priceDelta: numeric("price_delta", { precision: 10, scale: 2 }).default("0").notNull(),
+  
+  displayOrder: integer("display_order").default(0).notNull(),
+});
+
+export const modifierIngredient = pgTable("modifier_ingredient", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  
+  modifierId: uuid("modifier_id").notNull().references(() => modifier.id, { onDelete: "cascade" }),
+  purchasingItemId: uuid("purchasing_item_id").notNull(),
+  
+  deltaQty: numeric("delta_qty", { precision: 10, scale: 4 }).notNull(),
+  deltaUnit: text("delta_unit").notNull(), // grams | ml | each
+});
+
+export const insertModifierGroupSchema = createInsertSchema(modifierGroup).omit({ id: true });
+export const insertModifierSchema = createInsertSchema(modifier).omit({ id: true });
+export const insertModifierIngredientSchema = createInsertSchema(modifierIngredient).omit({ id: true });
+
+export type ModifierGroup = typeof modifierGroup.$inferSelect;
+export type InsertModifierGroup = z.infer<typeof insertModifierGroupSchema>;
+export type Modifier = typeof modifier.$inferSelect;
+export type InsertModifier = z.infer<typeof insertModifierSchema>;
+export type ModifierIngredient = typeof modifierIngredient.$inferSelect;
+export type InsertModifierIngredient = z.infer<typeof insertModifierIngredientSchema>;
