@@ -245,29 +245,43 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
           </div>
 
           <div className="border-t pt-4">
-            <div className="flex justify-between items-center mb-3">
-              <Label className="text-xs font-medium">Ingredients ({modalIngredients.length})</Label>
-              <span className="text-xs text-emerald-600 font-medium">Total: ฿{totalCost.toFixed(2)}</span>
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-slate-900">Ingredients (Per Serving)</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                Enter how much of each ingredient is used per recipe. Purchase info shown for reference only.
+              </p>
+            </div>
+            <div className="flex justify-between items-center mb-2">
+              <Label className="text-xs font-medium">{modalIngredients.length} ingredient(s)</Label>
+              <span className="text-xs text-emerald-600 font-semibold">Recipe Cost: ฿{totalCost.toFixed(2)}</span>
             </div>
 
             <table className="w-full text-xs border-collapse">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 font-medium">Ingredient</th>
-                  <th className="text-left py-2 font-medium w-20">Portion</th>
-                  <th className="text-left py-2 font-medium w-16">Unit</th>
-                  <th className="w-10"></th>
+                <tr className="border-b bg-slate-50">
+                  <th className="text-left py-2 px-1 font-medium">Ingredient</th>
+                  <th className="text-left py-2 px-1 font-medium w-16">Portion</th>
+                  <th className="text-left py-2 px-1 font-medium w-20">Unit</th>
+                  <th className="text-left py-2 px-1 font-medium text-slate-400 w-28">Purchase (ref)</th>
+                  <th className="text-right py-2 px-1 font-medium w-16">Cost</th>
+                  <th className="w-8"></th>
                 </tr>
               </thead>
               <tbody>
                 {modalIngredients.map((ing) => {
                   const found = availableIngredients.find((a) => a.id === ing.purchasingItemId);
+                  const purchaseQty = found?.orderUnit ? `${found.orderUnit}` : '-';
+                  const unitCost = Number(found?.unitCost || 0);
+                  const qty = parseFloat(ing.quantity || "0");
+                  const lineCost = unitCost * qty;
                   return (
-                    <tr key={ing.purchasingItemId} className="border-b">
-                      <td className="py-2">{ing.ingredientName || found?.item || `Item #${ing.purchasingItemId}`}</td>
-                      <td className="py-2">{ing.quantity}</td>
-                      <td className="py-2">{ing.unit}</td>
-                      <td className="py-2">
+                    <tr key={ing.purchasingItemId} className="border-b hover:bg-slate-50">
+                      <td className="py-2 px-1 font-medium">{ing.ingredientName || found?.item || `Item #${ing.purchasingItemId}`}</td>
+                      <td className="py-2 px-1">{ing.quantity}</td>
+                      <td className="py-2 px-1">{ing.unit}</td>
+                      <td className="py-2 px-1 text-slate-400 text-xs">{purchaseQty} @ ฿{unitCost.toFixed(0)}</td>
+                      <td className="py-2 px-1 text-right font-mono">฿{lineCost.toFixed(2)}</td>
+                      <td className="py-2 px-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -283,7 +297,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                 })}
                 {modalIngredients.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-4 text-center text-slate-400">
+                    <td colSpan={6} className="py-4 text-center text-slate-400">
                       No ingredients added yet
                     </td>
                   </tr>
@@ -291,51 +305,56 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
               </tbody>
             </table>
 
-            <div className="flex gap-2 mt-3">
-              <Select value={newIngredientId} onValueChange={setNewIngredientId}>
-                <SelectTrigger className="flex-1 h-8 text-xs rounded-[4px]" data-testid="select-new-ingredient">
-                  <SelectValue placeholder="Select ingredient" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableIngredients
-                    .filter((i) => !modalIngredients.some((m) => m.purchasingItemId === i.id))
-                    .map((ing) => (
-                      <SelectItem key={ing.id} value={ing.id.toString()}>
-                        {ing.item}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <Input
-                value={newQuantity}
-                onChange={(e) => setNewQuantity(e.target.value)}
-                placeholder="Qty"
-                type="number"
-                min="0"
-                step="0.01"
-                className="w-16 h-8 text-xs rounded-[4px]"
-                data-testid="input-new-quantity"
-              />
-              <Select value={newUnit} onValueChange={setNewUnit}>
-                <SelectTrigger className="w-24 h-8 text-xs rounded-[4px]" data-testid="select-new-unit">
-                  <SelectValue placeholder="Unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="grams">grams</SelectItem>
-                  <SelectItem value="ml">ml</SelectItem>
-                  <SelectItem value="each">each</SelectItem>
-                  <SelectItem value="serving">serving</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                onClick={handleAddIngredient}
-                className="h-8 text-xs rounded-[4px]"
-                data-testid="button-add-ingredient"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add
-              </Button>
+            <div className="mt-4 p-3 bg-slate-50 rounded-[4px] border border-slate-200">
+              <Label className="text-xs font-medium text-slate-600 mb-2 block">Add New Ingredient</Label>
+              <div className="flex gap-2">
+                <Select value={newIngredientId} onValueChange={setNewIngredientId}>
+                  <SelectTrigger className="flex-1 h-8 text-xs rounded-[4px] bg-white" data-testid="select-new-ingredient">
+                    <SelectValue placeholder="Select ingredient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableIngredients
+                      .filter((i) => !modalIngredients.some((m) => m.purchasingItemId === i.id))
+                      .map((ing) => (
+                        <SelectItem key={ing.id} value={ing.id.toString()}>
+                          {ing.item}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <div className="flex flex-col">
+                  <Input
+                    value={newQuantity}
+                    onChange={(e) => setNewQuantity(e.target.value)}
+                    placeholder="Portion qty"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="w-20 h-8 text-xs rounded-[4px] bg-white"
+                    data-testid="input-new-quantity"
+                  />
+                </div>
+                <Select value={newUnit} onValueChange={setNewUnit}>
+                  <SelectTrigger className="w-24 h-8 text-xs rounded-[4px] bg-white" data-testid="select-new-unit">
+                    <SelectValue placeholder="Unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="grams">grams</SelectItem>
+                    <SelectItem value="ml">ml</SelectItem>
+                    <SelectItem value="each">each</SelectItem>
+                    <SelectItem value="serving">serving</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  onClick={handleAddIngredient}
+                  className="h-8 text-xs rounded-[4px] bg-emerald-600 hover:bg-emerald-700"
+                  data-testid="button-add-ingredient"
+                >
+                  <Plus className="h-3 w-3 mr-1" />
+                  Add
+                </Button>
+              </div>
             </div>
           </div>
         </div>
