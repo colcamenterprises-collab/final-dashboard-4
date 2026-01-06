@@ -10,8 +10,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Pencil, Trash2, Image, Upload, Globe } from "lucide-react";
+import { Plus, Pencil, Trash2, Image, Upload, Globe, Settings2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import ModifierEditor from "@/components/menu/ModifierEditor";
 
 type Recipe = { id: number; name: string; totalCost: number };
 type MenuItem = {
@@ -32,6 +33,7 @@ export default function MenuManagement() {
   const { toast } = useToast();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [modifierItem, setModifierItem] = useState<MenuItem | null>(null);
   
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -253,6 +255,9 @@ export default function MenuManagement() {
                                 <Button variant="ghost" size="sm" onClick={() => openEditModal(item)} className="h-8 w-8 p-0" data-testid={`button-edit-${item.id}`}>
                                   <Pencil className="h-4 w-4" />
                                 </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setModifierItem(item)} className="h-8 w-8 p-0 text-emerald-600" data-testid={`button-modifiers-${item.id}`} title="Modifiers">
+                                  <Settings2 className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate(item.id)} className="h-8 w-8 p-0 text-red-500" data-testid={`button-delete-${item.id}`}>
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -402,6 +407,26 @@ export default function MenuManagement() {
               </Button>
               <Button onClick={handleSave} disabled={createMutation.isPending || updateMutation.isPending} className="rounded-[4px]" data-testid="button-save-menu-item">
                 {editingItem ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modifiers Dialog */}
+        <Dialog open={!!modifierItem} onOpenChange={() => setModifierItem(null)}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Manage Modifiers</DialogTitle>
+            </DialogHeader>
+            {modifierItem && (
+              <ModifierEditor 
+                menuItemId={modifierItem.id} 
+                menuItemName={modifierItem.name} 
+              />
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setModifierItem(null)} className="rounded-[4px]">
+                Close
               </Button>
             </DialogFooter>
           </DialogContent>
