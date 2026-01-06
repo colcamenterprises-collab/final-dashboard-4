@@ -13,11 +13,11 @@ function checksum(rows: any[]): string {
 export async function buildPnLSnapshot(start: string, end: string) {
   const revenueRows = await db.execute(sql`
     SELECT
-      date,
+      business_date,
       net_sales
     FROM receipt_truth_summary
-    WHERE date BETWEEN ${start} AND ${end}
-    ORDER BY date
+    WHERE business_date BETWEEN ${start} AND ${end}
+    ORDER BY business_date
   `);
 
   const revenueTotal = revenueRows.rows.reduce(
@@ -28,13 +28,13 @@ export async function buildPnLSnapshot(start: string, end: string) {
   const revenueHash = checksum(revenueRows.rows);
 
   const expenseRows = await db.execute(sql`
-    SELECT id, amount, expense_date FROM expenses
-    WHERE expense_date BETWEEN ${start} AND ${end}
-    ORDER BY expense_date, id
+    SELECT id, "costCents", "shiftDate" FROM expenses
+    WHERE "shiftDate" BETWEEN ${start} AND ${end}
+    ORDER BY "shiftDate", id
   `);
 
   const expenseTotal = expenseRows.rows.reduce(
-    (sum: number, r: any) => sum + Number(r.amount || 0),
+    (sum: number, r: any) => sum + Number(r.costCents || 0) / 100,
     0
   );
 
