@@ -1,3 +1,14 @@
+/**
+ * 🔒 PATCH R1.1: RECIPE EDIT MODAL - CANONICAL INGREDIENTS ONLY
+ * 
+ * RULES:
+ * - Recipes use canonical ingredients ONLY
+ * - Cost = unitCostPerBase × portionQty
+ * - NO purchasing table references
+ * - NO runtime unit conversions
+ * - Shows: Ingredient name, Portion qty, Base unit, Cost
+ */
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,55 +33,34 @@ type RecipeAuthority = {
 type RecipeIngredientAuthority = {
   id: number;
   recipeId: number;
-  purchasingItemId: number;
-  quantity: string;
-  unit: string;
+  ingredientId?: number;
+  purchasingItemId?: number;
+  quantity?: string;
+  portionQty?: string;
+  unit?: string;
   ingredientName?: string;
   ingredientCost?: number;
   lineCost?: number;
+  baseUnit?: string;
+  unitCostPerBase?: number;
 };
 
-type AvailableIngredient = {
+type CanonicalIngredient = {
   id: number;
-  item: string;
+  name: string;
   category: string | null;
-  unitCost: number | null;
-  orderUnit: string | null;
-  portionUnit: string | null;
-  purchaseUnitQty: number | null;
-  purchaseUnit: string | null;
+  baseUnit: string;
+  unitCostPerBase: string;
+  sourcePurchasingItemId: number | null;
 };
 
 type ModalIngredient = {
-  purchasingItemId: number;
-  quantity: string;
-  unit: string;
-  ingredientName?: string;
+  ingredientId: number;
+  portionQty: string;
+  ingredientName: string;
+  baseUnit: string;
+  unitCostPerBase: number;
 };
-
-const VALID_PORTION_UNITS = ['grams', 'ml', 'each', 'serving'] as const;
-
-function normalizePurchaseUnitQty(qty: number, unit: string | null): number {
-  if (!unit) return qty;
-  if (unit === 'grams' || unit === 'ml') return qty;
-  if (unit === 'kg' || unit === 'l') return qty * 1000;
-  return qty;
-}
-
-function calculateIngredientCost(
-  unitCost: number,
-  purchaseUnitQty: number,
-  purchaseUnit: string | null,
-  portionQty: number
-): number {
-  const normalizedQty = normalizePurchaseUnitQty(purchaseUnitQty, purchaseUnit);
-  if (!normalizedQty || normalizedQty <= 0) return 0;
-  const cost = (unitCost / normalizedQty) * portionQty;
-  if (cost > unitCost) {
-    console.warn('Ingredient cost exceeds pack cost — possible unit mismatch');
-  }
-  return cost;
-}
 
 interface RecipeEditModalProps {
   recipe: RecipeAuthority | null;
@@ -89,34 +79,37 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
   const [modalIngredients, setModalIngredients] = useState<ModalIngredient[]>([]);
   const [newIngredientId, setNewIngredientId] = useState("");
   const [newQuantity, setNewQuantity] = useState("");
-  const [newUnit, setNewUnit] = useState<string>("grams");
 
-  const { data: ingredientsData } = useQuery<{ ok: boolean; ingredients: AvailableIngredient[] }>({
-    queryKey: ['/api/recipe-authority/available-ingredients'],
-    queryFn: async () => {
-      const res = await fetch('/api/recipe-authority/available-ingredients');
-      if (!res.ok) throw new Error('Failed to load ingredients');
-      return res.json();
-    },
+  const { data: ingredientsData } = useQuery<{ items: CanonicalIngredient[]; count: number }>({
+    queryKey: ['/api/ingredients/canonical'],
     enabled: isOpen,
   });
-  const availableIngredients = ingredientsData?.ingredients || [];
+  const availableIngredients = ingredientsData?.items || [];
 
   useEffect(() => {
     if (recipe && isOpen) {
       setName(recipe.name);
       setYieldUnits(recipe.yieldUnits?.toString() || "");
       setActive(recipe.active);
-      setModalIngredients(
-        recipe.ingredients.map((ing) => ({
-          purchasingItemId: ing.purchasingItemId,
-          quantity: ing.quantity,
-          unit: ing.unit,
-          ingredientName: ing.ingredientName,
-        }))
-      );
+      
+      const mapped = recipe.ingredients.map((ing) => {
+        const found = availableIngredients.find((a) => 
+          a.id === ing.ingredientId || 
+          a.sourcePurchasingItemId === ing.purchasingItemId
+        );
+        
+        return {
+          ingredientId: ing.ingredientId || found?.id || 0,
+          portionQty: ing.portionQty || ing.quantity || "0",
+          ingredientName: ing.ingredientName || found?.name || "Unknown",
+          baseUnit: ing.baseUnit || found?.baseUnit || "each",
+          unitCostPerBase: ing.unitCostPerBase || Number(found?.unitCostPerBase) || 0,
+        };
+      }).filter(ing => ing.ingredientId > 0);
+      
+      setModalIngredients(mapped);
     }
-  }, [recipe, isOpen]);
+  }, [recipe, isOpen, availableIngredients]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -129,9 +122,8 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
           yieldUnits: yieldUnits || null,
           active,
           ingredients: modalIngredients.map((ing) => ({
-            purchasingItemId: ing.purchasingItemId,
-            quantity: ing.quantity,
-            unit: ing.unit,
+            ingredientId: ing.ingredientId,
+            portionQty: ing.portionQty,
           })),
         }),
       });
@@ -162,12 +154,8 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
       toast({ title: "Invalid quantity", description: "Quantity must be a positive number", variant: "destructive" });
       return;
     }
-    if (!newUnit || !VALID_PORTION_UNITS.includes(newUnit as any)) {
-      toast({ title: "Invalid unit", description: "Please select a valid unit", variant: "destructive" });
-      return;
-    }
     const id = parseInt(newIngredientId);
-    if (modalIngredients.some((i) => i.purchasingItemId === id)) {
+    if (modalIngredients.some((i) => i.ingredientId === id)) {
       toast({ title: "Duplicate", description: "This ingredient is already added", variant: "destructive" });
       return;
     }
@@ -177,25 +165,25 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
     setModalIngredients([
       ...modalIngredients,
       {
-        purchasingItemId: id,
-        quantity: newQuantity,
-        unit: newUnit,
-        ingredientName: found.item,
+        ingredientId: id,
+        portionQty: newQuantity,
+        ingredientName: found.name,
+        baseUnit: found.baseUnit,
+        unitCostPerBase: Number(found.unitCostPerBase),
       },
     ]);
     setNewIngredientId("");
     setNewQuantity("");
-    setNewUnit("grams");
   };
 
-  const handleRemoveIngredient = (purchasingItemId: number) => {
-    setModalIngredients(modalIngredients.filter((i) => i.purchasingItemId !== purchasingItemId));
+  const handleRemoveIngredient = (ingredientId: number) => {
+    setModalIngredients(modalIngredients.filter((i) => i.ingredientId !== ingredientId));
   };
 
-  const updateIngredient = (purchasingItemId: number, updates: Partial<ModalIngredient>) => {
+  const updateIngredient = (ingredientId: number, updates: Partial<ModalIngredient>) => {
     setModalIngredients((prev) =>
       prev.map((ing) =>
-        ing.purchasingItemId === purchasingItemId ? { ...ing, ...updates } : ing
+        ing.ingredientId === ingredientId ? { ...ing, ...updates } : ing
       )
     );
   };
@@ -210,13 +198,9 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
       return;
     }
     for (const ing of modalIngredients) {
-      const qty = parseFloat(ing.quantity);
-      if (!ing.quantity || isNaN(qty) || qty <= 0) {
+      const qty = parseFloat(ing.portionQty);
+      if (!ing.portionQty || isNaN(qty) || qty <= 0) {
         toast({ title: "Invalid quantity", description: `${ing.ingredientName}: quantity must be > 0`, variant: "destructive" });
-        return;
-      }
-      if (!ing.unit || !VALID_PORTION_UNITS.includes(ing.unit as any)) {
-        toast({ title: "Invalid unit", description: `${ing.ingredientName}: unit must be grams, ml, each, or serving`, variant: "destructive" });
         return;
       }
     }
@@ -224,14 +208,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
   };
 
   const totalCost = modalIngredients.reduce((sum, ing) => {
-    const found = availableIngredients.find((a) => a.id === ing.purchasingItemId);
-    if (!found) return sum;
-    const lineCost = calculateIngredientCost(
-      Number(found.unitCost || 0),
-      Number(found.purchaseUnitQty || 1),
-      found.purchaseUnit,
-      parseFloat(ing.quantity || "0")
-    );
+    const lineCost = ing.unitCostPerBase * parseFloat(ing.portionQty || "0");
     return sum + lineCost;
   }, 0);
 
@@ -286,7 +263,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-slate-900">Ingredients (Per Serving)</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Enter how much of each ingredient is used per recipe. Purchase info shown for reference only.
+                Canonical ingredients with base units. Cost = unit cost × portion qty.
               </p>
             </div>
             <div className="flex justify-between items-center mb-2">
@@ -298,60 +275,39 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
               <thead>
                 <tr className="border-b bg-slate-50">
                   <th className="text-left py-2 px-1 font-medium">Ingredient</th>
-                  <th className="text-left py-2 px-1 font-medium w-16">Portion</th>
-                  <th className="text-left py-2 px-1 font-medium w-20">Unit</th>
-                  <th className="text-left py-2 px-1 font-medium text-slate-400 w-28">Purchase (ref)</th>
+                  <th className="text-left py-2 px-1 font-medium w-20">Portion</th>
+                  <th className="text-left py-2 px-1 font-medium w-16">Unit</th>
                   <th className="text-right py-2 px-1 font-medium w-16">Cost</th>
                   <th className="w-8"></th>
                 </tr>
               </thead>
               <tbody>
                 {modalIngredients.map((ing) => {
-                  const found = availableIngredients.find((a) => a.id === ing.purchasingItemId);
-                  const purchaseQty = found?.purchaseUnitQty ? `${found.purchaseUnitQty} ${found.orderUnit || ''}` : found?.orderUnit || '-';
-                  const unitCost = Number(found?.unitCost || 0);
-                  const qty = parseFloat(ing.quantity || "0");
-                  const lineCost = calculateIngredientCost(
-                    unitCost,
-                    Number(found?.purchaseUnitQty || 1),
-                    found?.purchaseUnit || null,
-                    qty
-                  );
+                  const qty = parseFloat(ing.portionQty || "0");
+                  const lineCost = ing.unitCostPerBase * qty;
                   return (
-                    <tr key={ing.purchasingItemId} className="border-b hover:bg-slate-50">
-                      <td className="py-2 px-1 font-medium">{ing.ingredientName || found?.item || `Item #${ing.purchasingItemId}`}</td>
+                    <tr key={ing.ingredientId} className="border-b hover:bg-slate-50">
+                      <td className="py-2 px-1 font-medium">{ing.ingredientName}</td>
                       <td className="py-2 px-1">
                         <Input
                           type="number"
-                          value={ing.quantity}
-                          onChange={(e) => updateIngredient(ing.purchasingItemId, { quantity: e.target.value })}
-                          className="h-7 w-16 text-xs px-1 rounded-[4px]"
+                          value={ing.portionQty}
+                          onChange={(e) => updateIngredient(ing.ingredientId, { portionQty: e.target.value })}
+                          className="h-7 w-20 text-xs px-1 rounded-[4px]"
                           step="0.01"
                           min="0.01"
-                          data-testid={`input-quantity-${ing.purchasingItemId}`}
+                          data-testid={`input-quantity-${ing.ingredientId}`}
                         />
                       </td>
-                      <td className="py-2 px-1">
-                        <Select value={ing.unit} onValueChange={(val) => updateIngredient(ing.purchasingItemId, { unit: val })}>
-                          <SelectTrigger className="h-7 w-20 text-xs rounded-[4px]" data-testid={`select-unit-${ing.purchasingItemId}`}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {VALID_PORTION_UNITS.map((u) => (
-                              <SelectItem key={u} value={u}>{u}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="py-2 px-1 text-slate-400 text-xs">{purchaseQty} @ ฿{unitCost.toFixed(0)}</td>
+                      <td className="py-2 px-1 text-slate-500">{ing.baseUnit}</td>
                       <td className="py-2 px-1 text-right font-mono">฿{lineCost.toFixed(2)}</td>
                       <td className="py-2 px-1">
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleRemoveIngredient(ing.purchasingItemId)}
+                          onClick={() => handleRemoveIngredient(ing.ingredientId)}
                           className="h-6 w-6 p-0"
-                          data-testid={`button-remove-ingredient-${ing.purchasingItemId}`}
+                          data-testid={`button-remove-ingredient-${ing.ingredientId}`}
                         >
                           <Trash2 className="h-3 w-3 text-red-500" />
                         </Button>
@@ -361,7 +317,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                 })}
                 {modalIngredients.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-4 text-center text-slate-400">
+                    <td colSpan={5} className="py-4 text-center text-slate-400">
                       No ingredients added yet
                     </td>
                   </tr>
@@ -378,10 +334,10 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                   </SelectTrigger>
                   <SelectContent>
                     {availableIngredients
-                      .filter((i) => !modalIngredients.some((m) => m.purchasingItemId === i.id))
+                      .filter((i) => !modalIngredients.some((m) => m.ingredientId === i.id))
                       .map((ing) => (
                         <SelectItem key={ing.id} value={ing.id.toString()}>
-                          {ing.item}
+                          {ing.name} ({ing.baseUnit})
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -390,7 +346,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                   <Input
                     value={newQuantity}
                     onChange={(e) => setNewQuantity(e.target.value)}
-                    placeholder="Portion qty"
+                    placeholder="Qty"
                     type="number"
                     min="0"
                     step="0.01"
@@ -398,17 +354,6 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                     data-testid="input-new-quantity"
                   />
                 </div>
-                <Select value={newUnit} onValueChange={setNewUnit}>
-                  <SelectTrigger className="w-24 h-8 text-xs rounded-[4px] bg-white" data-testid="select-new-unit">
-                    <SelectValue placeholder="Unit" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="grams">grams</SelectItem>
-                    <SelectItem value="ml">ml</SelectItem>
-                    <SelectItem value="each">each</SelectItem>
-                    <SelectItem value="serving">serving</SelectItem>
-                  </SelectContent>
-                </Select>
                 <Button
                   size="sm"
                   onClick={handleAddIngredient}

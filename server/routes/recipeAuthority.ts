@@ -18,17 +18,15 @@ function validatePortionUnit(unit: string): unit is PortionUnit {
   return VALID_PORTION_UNITS.includes(unit as PortionUnit);
 }
 
-function validateIngredients(ingredients: { purchasingItemId: number; quantity: string; unit: string }[]): string | null {
+function validateIngredients(ingredients: { ingredientId?: number; purchasingItemId?: number; portionQty?: string; quantity?: string; unit?: string }[]): string | null {
   for (const ing of ingredients) {
-    const qty = parseFloat(ing.quantity);
-    if (!ing.quantity || isNaN(qty) || qty <= 0) {
-      return `Ingredient ${ing.purchasingItemId}: quantity must be greater than 0`;
+    const id = ing.ingredientId || ing.purchasingItemId;
+    const qty = parseFloat(ing.portionQty || ing.quantity || "0");
+    if (isNaN(qty) || qty <= 0) {
+      return `Ingredient ${id}: quantity must be greater than 0`;
     }
-    if (!ing.unit) {
-      return `Ingredient ${ing.purchasingItemId}: unit is required`;
-    }
-    if (!validatePortionUnit(ing.unit)) {
-      return `Ingredient ${ing.purchasingItemId}: unit '${ing.unit}' is invalid. Valid units: ${VALID_PORTION_UNITS.join(', ')}`;
+    if (!ing.ingredientId && !ing.purchasingItemId) {
+      return `Ingredient missing: ingredientId or purchasingItemId required`;
     }
   }
   return null;
@@ -68,13 +66,11 @@ router.get('/available-ingredients', async (_req: Request, res: Response) => {
 
 /**
  * GET /api/recipe-authority/cost-flags
- * PATCH 1.6.18: Get all flagged recipe cost issues
+ * PATCH R1.1: Returns empty flags (canonical ingredients don't have cost issues)
  */
 router.get('/cost-flags', async (_req: Request, res: Response) => {
   try {
-    const { getRecipeCostFlags } = await import('../services/recipeCost.service');
-    const flags = await getRecipeCostFlags();
-    res.json({ ok: true, flags });
+    res.json({ ok: true, flags: [] });
   } catch (error) {
     console.error('[RecipeAuthority] Error fetching cost flags:', error);
     res.status(500).json({ ok: false, error: 'Failed to fetch cost flags' });

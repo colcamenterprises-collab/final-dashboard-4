@@ -313,6 +313,7 @@ export async function removeIngredientFromRecipe(ingredientId: number): Promise<
 
 /**
  * PATCH 8: Full recipe update with atomic ingredient replacement
+ * PATCH R1.1: Supports both canonical ingredientId and legacy purchasingItemId
  * Replaces all ingredients transactionally
  */
 export async function updateRecipeWithIngredients(
@@ -322,9 +323,11 @@ export async function updateRecipeWithIngredients(
     yieldUnits?: string | number | null;
     active?: boolean;
     ingredients?: Array<{
-      purchasingItemId: number;
-      quantity: string;
-      unit: string;
+      ingredientId?: number;
+      portionQty?: string;
+      purchasingItemId?: number;
+      quantity?: string;
+      unit?: string;
     }>;
   }
 ): Promise<RecipeWithCost | null> {
@@ -353,27 +356,37 @@ export async function updateRecipeWithIngredients(
 
     // Insert new ingredients
     if (data.ingredients.length > 0) {
-      // Validate all purchasing items exist (don't require is_ingredient flag for existing recipe ingredients)
+      const ingredientValues = [];
+      
       for (const ing of data.ingredients) {
-        const [item] = await db
-          .select()
-          .from(purchasingItems)
-          .where(eq(purchasingItems.id, ing.purchasingItemId));
+        if (ing.ingredientId) {
+          ingredientValues.push({
+            recipeId: id,
+            ingredientId: ing.ingredientId,
+            portionQty: ing.portionQty || ing.quantity,
+          });
+        } else if (ing.purchasingItemId) {
+          const [item] = await db
+            .select()
+            .from(purchasingItems)
+            .where(eq(purchasingItems.id, ing.purchasingItemId));
 
-        if (!item) {
-          throw new Error(`Purchasing item ${ing.purchasingItemId} not found`);
+          if (!item) {
+            throw new Error(`Purchasing item ${ing.purchasingItemId} not found`);
+          }
+          
+          ingredientValues.push({
+            recipeId: id,
+            purchasingItemId: ing.purchasingItemId,
+            quantity: ing.quantity,
+            unit: ing.unit,
+          });
         }
       }
 
-      // Insert all ingredients
-      await db.insert(recipeIngredient).values(
-        data.ingredients.map(ing => ({
-          recipeId: id,
-          purchasingItemId: ing.purchasingItemId,
-          quantity: ing.quantity,
-          unit: ing.unit,
-        }))
-      );
+      if (ingredientValues.length > 0) {
+        await db.insert(recipeIngredient).values(ingredientValues);
+      }
     }
   }
 

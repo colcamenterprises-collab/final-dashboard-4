@@ -1,0 +1,154 @@
+🔐 PATCH R1.1 — RECIPE CUTOVER TO CANONICAL INGREDIENTS
+Finalise decoupling. Fix recipe screen & maths permanently.
+⚠️ AGENT RULES
+❌ DO NOT query purchasing tables in recipes
+❌ DO NOT display purchase info in recipe UI
+❌ DO NOT convert units at runtime
+✅ Recipes use canonical ingredients ONLY
+✅ Cost = unit_cost_per_base × portion_qty
+1️⃣ BACKEND — RECIPE COST (FINAL)
+File: server/services/recipeCost.service.ts
+👉 REPLACE ENTIRE COST RESOLUTION
+Copy code
+Ts
+import { db } from "@/db";
+import { recipeIngredient, ingredient } from "@/shared/schema";
+import { eq } from "drizzle-orm";
+
+export async function calculateRecipeCost(recipeId: string) {
+  const rows = await db
+    .select({
+      qty: recipeIngredient.portionQty,
+      unitCost: ingredient.unitCostPerBase,
+    })
+    .from(recipeIngredient)
+    .innerJoin(
+      ingredient,
+      eq(recipeIngredient.ingredientId, ingredient.id)
+    )
+    .where(eq(recipeIngredient.recipeId, recipeId));
+
+  let total = 0;
+
+  for (const row of rows) {
+    const line = Number(row.qty) * Number(row.unitCost);
+
+    if (!Number.isFinite(line) || line < 0) {
+      throw new Error("Invalid canonical ingredient cost");
+    }
+
+    total += line;
+  }
+
+  return Number(total.toFixed(2));
+}
+2️⃣ BACKEND — REMOVE LEGACY JOINS
+File: server/routes/recipes.ts
+👉 REMOVE ANY OF THE FOLLOWING IF PRESENT
+Copy code
+Ts
+purchasingItem
+purchaseUnit
+purchaseUnitQty
+unitPrice
+supplier
+Recipes must not reference purchasing in this file.
+3️⃣ SCHEMA — ENSURE RECIPE INGREDIENT IS CLEAN
+File: shared/schema.ts
+👉 CONFIRM / ADJUST recipe_ingredient
+Copy code
+Ts
+export const recipeIngredient = pgTable("recipe_ingredient", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  recipeId: uuid("recipe_id").notNull(),
+  ingredientId: uuid("ingredient_id").notNull(),
+
+  portionQty: numeric("portion_qty", {
+    precision: 10,
+    scale: 4,
+  }).notNull(),
+});
+❌ NO purchasing references
+❌ NO portion units
+4️⃣ UI — RECIPE INGREDIENT LIST (HARD CUT)
+File: client/src/components/recipes/RecipeEditModal.tsx
+👉 REPLACE INGREDIENT ROW RENDER
+Copy code
+Tsx
+<tr>
+  <td>{ing.name}</td>
+
+  <td>
+    <input
+      type="number"
+      value={ing.portionQty}
+      min={0}
+      step={0.01}
+      onChange={(e) =>
+        updateIngredient(index, {
+          portionQty: Number(e.target.value),
+        })
+      }
+    />
+  </td>
+
+  <td className="text-sm text-gray-500">
+    {ing.baseUnit}
+  </td>
+
+  <td className="text-right">
+    ฿{(ing.unitCostPerBase * ing.portionQty).toFixed(2)}
+  </td>
+
+  <td>
+    <button onClick={() => removeIngredient(index)}>🗑</button>
+  </td>
+</tr>
+5️⃣ UI — REMOVE PURCHASE DISPLAY (CRITICAL)
+File: RecipeEditModal.tsx
+👉 DELETE ANY UI THAT SHOWS
+pack
+bag
+jar
+servings
+purchase
+supplier
+unit price from purchasing
+The recipe screen must show:
+Ingredient name
+Portion qty
+Base unit
+Cost
+Nothing else.
+6️⃣ API — INGREDIENT PICKER (CANONICAL)
+File: client/src/components/recipes/AddIngredientRow.tsx
+👉 ENSURE INGREDIENT LIST COMES FROM
+Copy code
+Ts
+GET /api/ingredients/canonical
+And NOT purchasing endpoints.
+7️⃣ REQUIRED RETEST (MANDATORY)
+After this patch:
+Bacon Scrap
+unit_cost_per_base = 0.35
+qty = 20
+cost = ฿7.00
+Crispy Fried Onions
+unit_cost_per_base ≈ 0.158
+qty = 20
+cost ≈ ฿3.16
+Cheese Sauce
+must be grams OR ml
+no servings anywhere
+If any recipe shows a cost greater than pack cost → STOP.
+🔒 PATCH R1.1 COMPLETE
+This fully ends:
+purchasing bleed-through
+unit confusion
+runtime conversions
+random numbers
+Recipes are now:
+deterministic
+auditable
+safe for online ordering
