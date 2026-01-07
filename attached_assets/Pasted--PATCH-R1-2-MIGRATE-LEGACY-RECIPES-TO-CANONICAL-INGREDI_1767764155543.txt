@@ -1,0 +1,118 @@
+🔐 PATCH R1.2 — MIGRATE LEGACY RECIPES TO CANONICAL INGREDIENTS
+⚠️ AGENT RULES
+❌ DO NOT change purchasing
+❌ DO NOT change ingredient costs
+❌ DO NOT change recipe math
+✅ One-time data migration only
+✅ Idempotent (safe to re-run)
+1️⃣ DATABASE — ADD TEMP SAFETY INDEX (OPTIONAL BUT SAFE)
+File: shared/schema.ts
+👉 ADD (if not present)
+Copy code
+Ts
+import { index } from "drizzle-orm/pg-core";
+
+index("idx_recipe_ingredient_purchasing")
+  .on(recipeIngredient.purchasingItemId);
+2️⃣ MIGRATION SCRIPT (CORE)
+File: server/scripts/migrateLegacyRecipeIngredients.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { db } from "@/db";
+import {
+  recipeIngredient,
+  ingredient,
+} from "@/shared/schema";
+import { eq, isNull } from "drizzle-orm";
+
+/**
+ * Migrates legacy recipe ingredients that reference purchasingItemId
+ * to canonical ingredientId.
+ *
+ * SAFE TO RE-RUN.
+ */
+async function migrate() {
+  const legacyRows = await db
+    .select()
+    .from(recipeIngredient)
+    .where(isNull(recipeIngredient.ingredientId));
+
+  console.log(`Found ${legacyRows.length} legacy recipe ingredients`);
+
+  for (const row of legacyRows) {
+    if (!row.purchasingItemId) continue;
+
+    const ing = await db
+      .select()
+      .from(ingredient)
+      .where(
+        eq(
+          ingredient.sourcePurchasingItemId,
+          row.purchasingItemId
+        )
+      )
+      .then((r) => r[0]);
+
+    if (!ing) {
+      console.warn(
+        `No canonical ingredient for purchasingItemId ${row.purchasingItemId}`
+      );
+      continue;
+    }
+
+    await db
+      .update(recipeIngredient)
+      .set({
+        ingredientId: ing.id,
+      })
+      .where(eq(recipeIngredient.id, row.id));
+  }
+
+  console.log("Legacy recipe migration complete");
+}
+
+migrate()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+3️⃣ RUN MIGRATION (ONE-TIME)
+Command
+Copy code
+
+npx ts-node server/scripts/migrateLegacyRecipeIngredients.ts
+Expected output:
+Copy code
+
+Found XX legacy recipe ingredients
+Legacy recipe migration complete
+4️⃣ POST-MIGRATION VERIFICATION (MANDATORY)
+SQL CHECK
+Copy code
+Sql
+SELECT COUNT(*) 
+FROM recipe_ingredient
+WHERE ingredient_id IS NULL;
+Expected:
+Copy code
+
+0
+5️⃣ LOCK LEGACY PATH (AFTER CONFIRMATION)
+File: shared/schema.ts
+👉 MAKE ingredientId REQUIRED
+Copy code
+Ts
+ingredientId: uuid("ingredient_id").notNull(),
+File: server/services/recipeAuthority.ts
+👉 REMOVE legacy fallback
+❌ Remove purchasingItemId handling
+❌ Remove dual-format support
+(Do not do this until verification passes.)
+6️⃣ REQUIRED FINAL RETEST
+Edit existing recipes
+Change portion qty
+Cost updates correctly
+No references to purchasing anywhere
+No unit confusion
