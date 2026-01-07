@@ -43,6 +43,7 @@ import DailyStock from "./pages/operations/DailyStock";
 import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import PurchasingPage from "./pages/operations/Purchasing";
 import StockReview from "./pages/analysis/StockReview";
+import StockReconciliation from "./pages/analysis/StockReconciliation";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
@@ -148,6 +149,9 @@ export default function App() {
                   <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                   <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
                 </Route>
+                
+                {/* PATCH S2: Stock Reconciliation & Security Analysis */}
+                <Route path="/analysis/stock-reconciliation" element={<Guard><StockReconciliation /></Guard>} />
                 
                 <Route path="upload" element={<UploadStatements />} />
                 <Route path="receipts" element={<Receipts />} />

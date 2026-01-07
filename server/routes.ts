@@ -1024,6 +1024,19 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     res.json({ ok: true, rows });
   });
 
+  // PATCH S2: Stock Reconciliation API
+  app.get("/api/analysis/stock-reconciliation", async (req, res) => {
+    try {
+      const { getStockReconciliation } = await import("./routes/analysis/stockReconciliation.js");
+      const { date } = req.query;
+      const data = await getStockReconciliation(date as string);
+      res.json({ ok: true, data });
+    } catch (e: any) {
+      console.error("[STOCK_RECONCILIATION_FAIL]", e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
   app.get('/api/analysis/list', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
