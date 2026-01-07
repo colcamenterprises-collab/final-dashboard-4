@@ -1,0 +1,95 @@
+🔐 PATCH 1.1.1 — FIX RECIPE COST NORMALISATION + EDITING
+This is a real patch. Copy/paste only.
+⚠️ AGENT RULES
+❌ Do NOT touch purchasing
+❌ Do NOT touch modifiers
+❌ Do NOT change schema
+✅ Fix cost maths
+✅ Fix ingredient editing
+✅ No summaries
+1️⃣ FIX COST CALCULATION (CRITICAL)
+File:
+server/services/recipeCost.service.ts
+👉 REPLACE THE INGREDIENT COST LOGIC ENTIRELY
+Copy code
+Ts
+function normalisePurchaseUnitQty(
+  qty: number,
+  unit: string
+): number {
+  if (unit === "grams" || unit === "ml") return qty;
+  if (unit === "kg" || unit === "l") return qty * 1000;
+  return qty; // each / serving
+}
+
+const purchaseQtyNormalised = normalisePurchaseUnitQty(
+  Number(item.purchaseUnitQty),
+  item.purchaseUnit
+);
+
+if (!purchaseQtyNormalised || purchaseQtyNormalised <= 0) {
+  throw new Error(
+    `Invalid purchase unit qty for item ${item.name}`
+  );
+}
+
+const ingredientCost =
+  (Number(item.unitCost) / purchaseQtyNormalised) *
+  Number(ingredient.portionQty);
+❌ REMOVE any previous calculation
+❌ NO fallbacks
+❌ NO rounding hacks
+2️⃣ BLOCK INVALID COSTS (SAFETY)
+Still in recipeCost.service.ts, ADD:
+Copy code
+Ts
+if (ingredientCost > Number(item.unitCost)) {
+  throw new Error(
+    `Ingredient cost exceeds pack cost — unit mismatch`
+  );
+}
+This guarantees ฿7,000 can never happen again.
+3️⃣ FIX INGREDIENT EDITING (UI STATE BUG)
+File:
+client/src/components/recipes/RecipeEditModal.tsx
+👉 FIND ingredient update handler and REPLACE
+Copy code
+Ts
+const updateIngredient = (index: number, updates: any) => {
+  setIngredients((prev) =>
+    prev.map((ing, i) =>
+      i === index ? { ...ing, ...updates } : ing
+    )
+  );
+};
+Ensure inputs call it properly:
+Copy code
+Tsx
+<input
+  type="number"
+  value={ingredient.portionQty}
+  onChange={(e) =>
+    updateIngredient(index, {
+      portionQty: Number(e.target.value),
+    })
+  }
+/>
+
+<select
+  value={ingredient.portionUnit}
+  onChange={(e) =>
+    updateIngredient(index, {
+      portionUnit: e.target.value,
+    })
+  }
+>
+❌ Do NOT lock fields once added
+❌ Editing must be live
+4️⃣ REQUIRED RETEST (MANDATORY)
+After patch:
+Bacon scrap
+1 kg @ ฿350
+20 g → ฿7.00 ✅
+Change 20 → 40 → cost updates live
+Change grams → each → blocked
+Editing works without delete/re-add

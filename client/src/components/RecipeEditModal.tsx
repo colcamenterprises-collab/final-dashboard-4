@@ -37,6 +37,8 @@ type AvailableIngredient = {
   unitCost: number | null;
   orderUnit: string | null;
   portionUnit: string | null;
+  purchaseUnitQty: number | null;
+  purchaseUnit: string | null;
 };
 
 type ModalIngredient = {
@@ -47,6 +49,28 @@ type ModalIngredient = {
 };
 
 const VALID_PORTION_UNITS = ['grams', 'ml', 'each', 'serving'] as const;
+
+function normalizePurchaseUnitQty(qty: number, unit: string | null): number {
+  if (!unit) return qty;
+  if (unit === 'grams' || unit === 'ml') return qty;
+  if (unit === 'kg' || unit === 'l') return qty * 1000;
+  return qty;
+}
+
+function calculateIngredientCost(
+  unitCost: number,
+  purchaseUnitQty: number,
+  purchaseUnit: string | null,
+  portionQty: number
+): number {
+  const normalizedQty = normalizePurchaseUnitQty(purchaseUnitQty, purchaseUnit);
+  if (!normalizedQty || normalizedQty <= 0) return 0;
+  const cost = (unitCost / normalizedQty) * portionQty;
+  if (cost > unitCost) {
+    console.warn('Ingredient cost exceeds pack cost — possible unit mismatch');
+  }
+  return cost;
+}
 
 interface RecipeEditModalProps {
   recipe: RecipeAuthority | null;
@@ -168,6 +192,14 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
     setModalIngredients(modalIngredients.filter((i) => i.purchasingItemId !== purchasingItemId));
   };
 
+  const updateIngredient = (purchasingItemId: number, updates: Partial<ModalIngredient>) => {
+    setModalIngredients((prev) =>
+      prev.map((ing) =>
+        ing.purchasingItemId === purchasingItemId ? { ...ing, ...updates } : ing
+      )
+    );
+  };
+
   const handleCancel = () => {
     onClose();
   };
@@ -193,8 +225,14 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
 
   const totalCost = modalIngredients.reduce((sum, ing) => {
     const found = availableIngredients.find((a) => a.id === ing.purchasingItemId);
-    const cost = Number(found?.unitCost || 0) * parseFloat(ing.quantity || "0");
-    return sum + cost;
+    if (!found) return sum;
+    const lineCost = calculateIngredientCost(
+      Number(found.unitCost || 0),
+      Number(found.purchaseUnitQty || 1),
+      found.purchaseUnit,
+      parseFloat(ing.quantity || "0")
+    );
+    return sum + lineCost;
   }, 0);
 
   if (!recipe) return null;
@@ -270,15 +308,41 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
               <tbody>
                 {modalIngredients.map((ing) => {
                   const found = availableIngredients.find((a) => a.id === ing.purchasingItemId);
-                  const purchaseQty = found?.orderUnit ? `${found.orderUnit}` : '-';
+                  const purchaseQty = found?.purchaseUnitQty ? `${found.purchaseUnitQty} ${found.orderUnit || ''}` : found?.orderUnit || '-';
                   const unitCost = Number(found?.unitCost || 0);
                   const qty = parseFloat(ing.quantity || "0");
-                  const lineCost = unitCost * qty;
+                  const lineCost = calculateIngredientCost(
+                    unitCost,
+                    Number(found?.purchaseUnitQty || 1),
+                    found?.purchaseUnit || null,
+                    qty
+                  );
                   return (
                     <tr key={ing.purchasingItemId} className="border-b hover:bg-slate-50">
                       <td className="py-2 px-1 font-medium">{ing.ingredientName || found?.item || `Item #${ing.purchasingItemId}`}</td>
-                      <td className="py-2 px-1">{ing.quantity}</td>
-                      <td className="py-2 px-1">{ing.unit}</td>
+                      <td className="py-2 px-1">
+                        <Input
+                          type="number"
+                          value={ing.quantity}
+                          onChange={(e) => updateIngredient(ing.purchasingItemId, { quantity: e.target.value })}
+                          className="h-7 w-16 text-xs px-1 rounded-[4px]"
+                          step="0.01"
+                          min="0.01"
+                          data-testid={`input-quantity-${ing.purchasingItemId}`}
+                        />
+                      </td>
+                      <td className="py-2 px-1">
+                        <Select value={ing.unit} onValueChange={(val) => updateIngredient(ing.purchasingItemId, { unit: val })}>
+                          <SelectTrigger className="h-7 w-20 text-xs rounded-[4px]" data-testid={`select-unit-${ing.purchasingItemId}`}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {VALID_PORTION_UNITS.map((u) => (
+                              <SelectItem key={u} value={u}>{u}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
                       <td className="py-2 px-1 text-slate-400 text-xs">{purchaseQty} @ ฿{unitCost.toFixed(0)}</td>
                       <td className="py-2 px-1 text-right font-mono">฿{lineCost.toFixed(2)}</td>
                       <td className="py-2 px-1">

@@ -479,6 +479,8 @@ export async function getAvailableIngredients() {
       orderUnit: purchasingItems.orderUnit,
       portionUnit: purchasingItems.portionUnit,
       portionSize: purchasingItems.portionSize,
+      purchaseUnitQty: purchasingItems.purchaseUnitQty,
+      purchaseUnit: purchasingItems.orderUnit,
     })
     .from(purchasingItems)
     .where(
