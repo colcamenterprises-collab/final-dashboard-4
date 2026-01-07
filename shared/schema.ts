@@ -423,12 +423,20 @@ export const loyverseShiftReports = pgTable("loyverse_shift_reports", {
 });
 
 // Ingredients table - Enhanced with Full Ingredient Master Patch
+// 🔒 PATCH R1: CANONICAL INGREDIENT LAYER
+// Recipes calculate ONLY from ingredients (baseUnit + unitCostPerBase)
+// Purchasing feeds ingredients ONE-WAY via sync
 export const ingredients = pgTable("ingredients", {
   id: serial("id").primaryKey(), // Keep existing serial ID for database safety
   name: text("name").notNull(),
   category: text("category"),
   supplier: text("supplier"),
   brand: text("brand"),
+
+  // 🔒 CANONICAL FIELDS (PATCH R1) - Used for recipe cost calculation
+  baseUnit: text("base_unit"), // grams | ml | each (canonical unit for recipes)
+  unitCostPerBase: decimal("unit_cost_per_base", { precision: 10, scale: 6 }), // cost PER baseUnit (e.g. ฿0.35/gram)
+  sourcePurchasingItemId: integer("source_purchasing_item_id"), // link to purchasing_items for sync
 
   // Purchase (bulk side) - nullable to match DB during backfill
   purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }),
@@ -1736,14 +1744,16 @@ export const recipe = pgTable('recipe', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
+// 🔒 PATCH R1: Recipe ingredients reference canonical ingredients layer
+// NO unit column - baseUnit comes from ingredient
+// NO purchasing references - ingredients are the source
 export const recipeIngredient = pgTable('recipe_ingredient', {
   id: serial('id').primaryKey(),
   recipeId: integer('recipe_id').notNull().references(() => recipe.id, { onDelete: 'cascade' }),
-  purchasingItemId: integer('purchasing_item_id').notNull().references(() => purchasingItems.id),
-  quantity: decimal('quantity', { precision: 10, scale: 4 }).notNull(),
-  unit: varchar('unit', { length: 50 }).notNull(),
+  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id),
+  portionQty: decimal('portion_qty', { precision: 10, scale: 4 }).notNull(), // quantity in ingredient's baseUnit
 }, (table) => ({
-  uniqueRecipeIngredient: unique().on(table.recipeId, table.purchasingItemId),
+  uniqueRecipeIngredient: unique().on(table.recipeId, table.ingredientId),
 }));
 
 export const posItemRecipeMap = pgTable('pos_item_recipe_map', {

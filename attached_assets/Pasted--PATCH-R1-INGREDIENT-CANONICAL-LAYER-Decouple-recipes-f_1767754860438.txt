@@ -1,0 +1,135 @@
+🔐 PATCH R1 — INGREDIENT CANONICAL LAYER
+Decouple recipes from purchasing (PERMANENT FIX)
+⚠️ AGENT RULES
+❌ DO NOT calculate recipe costs from purchasing items
+❌ DO NOT use purchase_unit_qty in recipes
+❌ DO NOT allow “servings” in recipes
+✅ Recipes calculate ONLY from ingredients
+✅ Purchasing feeds ingredients ONE-WAY
+1️⃣ DATABASE — INGREDIENTS (CANONICAL)
+File: shared/schema.ts
+👉 ADD TABLE
+Copy code
+Ts
+import { pgTable, uuid, text, numeric } from "drizzle-orm/pg-core";
+
+export const ingredient = pgTable("ingredient", {
+  id: uuid("id").defaultRandom().primaryKey(),
+
+  name: text("name").notNull(),
+
+  baseUnit: text("base_unit").notNull(), // grams | ml | each
+  unitCost: numeric("unit_cost", { precision: 10, scale: 4 }).notNull(), 
+  // cost PER baseUnit
+
+  sourcePurchasingItemId: uuid("source_purchasing_item_id"),
+
+  updatedAt: text("updated_at").defaultNow(),
+});
+2️⃣ ONE-WAY SYNC — PURCHASING → INGREDIENT
+File: server/services/ingredientSync.service.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { db } from "@/db";
+import { ingredient } from "@/shared/schema";
+import { purchasingItem } from "@/shared/schema";
+import { eq } from "drizzle-orm";
+
+function deriveUnitCost(
+  unitCost: number,
+  purchaseQty: number,
+  purchaseUnit: string
+) {
+  if (purchaseUnit === "kg") return unitCost / (purchaseQty * 1000);
+  if (purchaseUnit === "l") return unitCost / (purchaseQty * 1000);
+  return unitCost / purchaseQty; // grams / ml / each
+}
+
+export async function syncIngredientFromPurchasing(purchasingItemId: string) {
+  const item = await db
+    .select()
+    .from(purchasingItem)
+    .where(eq(purchasingItem.id, purchasingItemId))
+    .then((r) => r[0]);
+
+  if (!item) throw new Error("Purchasing item not found");
+
+  const baseUnit =
+    item.purchaseUnit === "kg"
+      ? "grams"
+      : item.purchaseUnit === "l"
+      ? "ml"
+      : item.purchaseUnit;
+
+  const costPerBaseUnit = deriveUnitCost(
+    Number(item.unitCost),
+    Number(item.purchaseUnitQty),
+    item.purchaseUnit
+  );
+
+  await db.insert(ingredient).values({
+    name: item.name,
+    baseUnit,
+    unitCost: costPerBaseUnit,
+    sourcePurchasingItemId: item.id,
+  });
+}
+3️⃣ RECIPE INGREDIENTS — REWIRE TO INGREDIENTS
+File: shared/schema.ts
+👉 MODIFY EXISTING recipe_ingredient
+Copy code
+Ts
+ingredientId: uuid("ingredient_id").notNull(),
+portionQty: numeric("portion_qty", { precision: 10, scale: 4 }).notNull(),
+❌ REMOVE:
+purchasing_item_id
+portion_unit
+ANY purchase references
+4️⃣ RECIPE COST — FINAL LOGIC (NO CONVERSIONS)
+File: server/services/recipeCost.service.ts
+👉 REPLACE ENTIRE INGREDIENT COST BLOCK
+Copy code
+Ts
+const ingredientCost =
+  Number(ingredient.unitCost) * Number(recipeIngredient.portionQty);
+
+if (ingredientCost < 0 || !Number.isFinite(ingredientCost)) {
+  throw new Error("Invalid ingredient cost calculation");
+}
+That’s it.
+No unit checks. No conversions. No guessing.
+5️⃣ UI — RECIPE INGREDIENT INPUT (SIMPLIFY)
+File: client/src/components/recipes/RecipeEditModal.tsx
+👉 CHANGE INPUT MODEL
+Portion unit dropdown ❌ REMOVE
+Portion qty = always base unit
+Display base unit read-only
+Copy code
+Tsx
+<div className="text-xs text-gray-500">
+  Base unit: {ingredient.baseUnit}
+</div>
+6️⃣ DATA MIGRATION (ONE-TIME)
+Manual step (REQUIRED)
+For each existing recipe ingredient:
+Find linked purchasing item
+Create ingredient via sync
+Replace purchasing_item_id → ingredient_id
+Keep portionQty numeric only
+This is mechanical and safe.
+7️⃣ HARD BLOCKERS (ENFORCED)
+❌ Recipes cannot reference purchasing
+❌ “serving” unit eliminated from recipes
+❌ Runtime conversions removed
+✅ Ingredient cost = unitCost × qty
+✅ REQUIRED RETEST (NON-NEGOTIABLE)
+Bacon Scrap
+Ingredient unit cost = ฿0.35 / gram
+20 → ฿7.00
+Crispy Onions
+500g @ ฿79 → ฿0.158/g
+20 → ฿3.16
+Cheese Sauce
+Must be defined in grams OR ml only
+If any number deviates → stop.
