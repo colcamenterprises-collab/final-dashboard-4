@@ -28,7 +28,7 @@ const navItems = [
     testId: "nav-purchasing"
   },
   {
-    to: "/menu/recipes",
+    to: "/recipe-management",
     icon: Settings,
     label: "Menu",
     testId: "nav-menu"
