@@ -163,4 +163,130 @@ router.post("/manual-purchase", async (req, res) => {
   }
 });
 
+/**
+ * 🔒 PATCH S1: Separate stock logging routes
+ * - /rolls: qty + optional expense
+ * - /meat: type + weight (NO expense)
+ * - /drinks: qty only (NO expense, NO SKU)
+ * 
+ * Uses raw SQL to log to analysis tables
+ */
+
+router.post("/rolls", async (req, res) => {
+  try {
+    const prisma = db();
+    const { qty, paid } = req.body;
+
+    if (!qty || qty <= 0) {
+      return res.status(400).json({ error: "Quantity must be positive" });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+
+    await prisma.$executeRaw`
+      INSERT INTO stock_received_log (shift_date, item_type, item_name, qty, source, paid, created_at)
+      VALUES (${new Date(today)}, 'rolls', 'Burger Buns', ${qty}, 'stock_modal', ${paid || false}, NOW())
+    `;
+
+    let expenseCreated = false;
+    if (paid) {
+      const rollsItem = await prisma.purchasingItem.findFirst({
+        where: {
+          OR: [
+            { item: { contains: "Burger Bun", mode: "insensitive" } },
+            { item: { contains: "Rolls", mode: "insensitive" } },
+          ],
+          active: true,
+        },
+      });
+      
+      const rollsCost = (rollsItem?.unitCost || 25) * qty;
+      await prisma.expenses.create({
+        data: {
+          date: new Date(today),
+          description: `Burger Buns/Rolls - ${qty} packs`,
+          amount: rollsCost,
+          category: "Stock Purchase",
+          source: "stock_modal",
+        },
+      });
+      expenseCreated = true;
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Logged ${qty} rolls`,
+      expenseCreated,
+    });
+  } catch (error: any) {
+    console.error("[STOCK] Rolls log error:", error);
+    res.status(500).json({ error: error.message || "Failed to log rolls" });
+  }
+});
+
+router.post("/meat", async (req, res) => {
+  try {
+    const prisma = db();
+    const { type, weightKg } = req.body;
+
+    if (!type) {
+      return res.status(400).json({ error: "Meat type is required" });
+    }
+    if (!weightKg || weightKg <= 0) {
+      return res.status(400).json({ error: "Weight must be positive" });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const weightG = Math.round(weightKg * 1000);
+
+    await prisma.$executeRaw`
+      INSERT INTO stock_received_log (shift_date, item_type, item_name, qty, weight_g, source, paid, created_at)
+      VALUES (${new Date(today)}, 'meat', ${type}, 1, ${weightG}, 'stock_modal', false, NOW())
+    `;
+
+    res.json({ 
+      success: true, 
+      message: `Logged ${weightKg}kg ${type}`,
+    });
+  } catch (error: any) {
+    console.error("[STOCK] Meat log error:", error);
+    res.status(500).json({ error: error.message || "Failed to log meat" });
+  }
+});
+
+router.post("/drinks", async (req, res) => {
+  try {
+    const prisma = db();
+    const { counts } = req.body;
+
+    if (!counts || typeof counts !== 'object') {
+      return res.status(400).json({ error: "Drink counts object is required" });
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const results: { drink: string; qty: number }[] = [];
+
+    for (const [drinkName, qty] of Object.entries(counts)) {
+      if (typeof qty === 'number' && qty > 0) {
+        await prisma.$executeRaw`
+          INSERT INTO stock_received_log (shift_date, item_type, item_name, qty, source, paid, created_at)
+          VALUES (${new Date(today)}, 'drinks', ${drinkName}, ${qty}, 'stock_modal', false, NOW())
+        `;
+        results.push({ drink: drinkName, qty });
+      }
+    }
+
+    const totalDrinks = results.reduce((sum, r) => sum + r.qty, 0);
+
+    res.json({ 
+      success: true, 
+      message: `Logged ${totalDrinks} drinks`,
+      items: results,
+    });
+  } catch (error: any) {
+    console.error("[STOCK] Drinks log error:", error);
+    res.status(500).json({ error: error.message || "Failed to log drinks" });
+  }
+});
+
 export default router;

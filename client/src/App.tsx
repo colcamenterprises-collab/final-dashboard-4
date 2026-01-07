@@ -121,7 +121,8 @@ export default function App() {
                 <Route path="/operations/purchasing-mapping" element={<Guard><PurchasingFieldMapping /></Guard>} />
                 <Route path="/operations/purchasing-shift-log" element={<Guard><PurchasingShiftLog /></Guard>} />
                 <Route path="/operations/purchasing-analytics" element={<Guard><PurchasingAnalytics /></Guard>} />
-                <Route path="/operations/manual-stock-purchase" element={<Guard><ManualStockPurchase /></Guard>} />
+                {/* PATCH S1: Disabled - stock logging moved to Shopping List modal */}
+                {/* <Route path="/operations/manual-stock-purchase" element={<Guard><ManualStockPurchase /></Guard>} /> */}
                 
                 <Route path="/operations/daily-sales" element={<DailySalesForm />} />
                 <Route path="/operations/daily-sales/edit/:id" element={<DailySalesForm />} />

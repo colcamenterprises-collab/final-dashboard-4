@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Download, Package, RefreshCw, Calendar, Truck, Lock, AlertTriangle } from "lucide-react";
+import { Download, Package, RefreshCw, Calendar, Truck, Lock, AlertTriangle, ClipboardList } from "lucide-react";
+import { StockReceivedModal } from "@/components/purchasing/StockReceivedModal";
 
 // PATCH 15: System purchase types
 interface SystemPurchaseItem {
@@ -68,6 +69,7 @@ type ShoppingListResponse = {
 export default function ShoppingList() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [showStockModal, setShowStockModal] = useState(false);
 
   // Build query URL with optional date parameter
   const queryUrl = selectedDate 
@@ -221,8 +223,19 @@ export default function ShoppingList() {
             <Download className="h-4 w-4 mr-1" />
             {isDownloading ? 'Exporting...' : 'Export CSV'}
           </Button>
+          <Button
+            size="sm"
+            onClick={() => setShowStockModal(true)}
+            className="bg-slate-700 hover:bg-slate-800 text-white text-xs"
+            data-testid="button-log-stock"
+          >
+            <ClipboardList className="h-4 w-4 mr-1" />
+            Log Stock Received
+          </Button>
         </div>
       </div>
+
+      <StockReceivedModal isOpen={showStockModal} onClose={() => setShowStockModal(false)} />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

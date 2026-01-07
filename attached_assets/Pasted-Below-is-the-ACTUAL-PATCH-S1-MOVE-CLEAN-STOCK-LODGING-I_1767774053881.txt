@@ -1,0 +1,216 @@
+Below is the ACTUAL PATCH S1 — MOVE & CLEAN STOCK LODGING INTO SHOPPING LIST.
+Copy / paste only. No summaries.
+🔐 PATCH S1 — UNIFY STOCK LODGING IN SHOPPING LIST
+(Rolls hybrid · Meat & Drinks qty-only · Analysis-first)
+⚠️ AGENT RULES
+❌ DO NOT create a second entry point
+❌ DO NOT touch recipe logic
+❌ DO NOT add SKUs for drinks
+❌ DO NOT add cost for meat/drinks
+✅ Rolls keep optional expense toggle
+✅ Meat & drinks are quantity-only
+✅ All data feeds analysis tables
+1️⃣ REMOVE / DISABLE MANUAL STOCK PURCHASE PAGE
+File: client/src/router/RouteRegistry.tsx
+👉 REMOVE ROUTE
+Copy code
+Ts
+// REMOVE
+{
+  path: "/operations/manual-stock-purchase",
+  element: <ManualStockPurchase />,
+}
+2️⃣ SHOPPING LIST — ADD ACTION BUTTON
+File: client/src/pages/purchasing/ShoppingList.tsx
+👉 ADD BUTTON
+Copy code
+Tsx
+<button
+  className="btn-secondary"
+  onClick={() => setShowStockModal(true)}
+>
+  Log Stock Received
+</button>
+3️⃣ STOCK RECEIVED MODAL (ROLLS / MEAT / DRINKS)
+File:
+client/src/components/purchasing/StockReceivedModal.tsx
+👉 CREATE FILE
+Copy code
+Tsx
+import { useState } from "react";
+
+export default function StockReceivedModal({ onClose }) {
+  const [tab, setTab] = useState<"rolls" | "meat" | "drinks">("rolls");
+
+  return (
+    <div className="modal">
+      <div className="tabs">
+        {["rolls", "meat", "drinks"].map((t) => (
+          <button key={t} onClick={() => setTab(t as any)}>
+            {t.toUpperCase()}
+          </button>
+        ))}
+      </div>
+
+      {tab === "rolls" && <RollsTab />}
+      {tab === "meat" && <MeatTab />}
+      {tab === "drinks" && <DrinksTab />}
+
+      <button onClick={onClose}>Close</button>
+    </div>
+  );
+}
+4️⃣ ROLLS TAB — HYBRID (KEEP EXPENSE OPTION)
+Copy code
+Tsx
+function RollsTab() {
+  const [qty, setQty] = useState(0);
+  const [paid, setPaid] = useState(false);
+
+  async function submit() {
+    await fetch("/api/stock/rolls", {
+      method: "POST",
+      body: JSON.stringify({ qty, paid }),
+    });
+  }
+
+  return (
+    <>
+      <input
+        type="number"
+        value={qty}
+        onChange={(e) => setQty(Number(e.target.value))}
+        placeholder="Rolls purchased"
+      />
+
+      <label>
+        <input
+          type="checkbox"
+          checked={paid}
+          onChange={() => setPaid(!paid)}
+        />
+        Paid at purchase (create expense)
+      </label>
+
+      <button onClick={submit}>Log Rolls</button>
+    </>
+  );
+}
+5️⃣ MEAT TAB — QTY ONLY (NO EXPENSE)
+Copy code
+Tsx
+function MeatTab() {
+  const [type, setType] = useState("");
+  const [weightKg, setWeightKg] = useState(0);
+
+  async function submit() {
+    await fetch("/api/stock/meat", {
+      method: "POST",
+      body: JSON.stringify({ type, weightKg }),
+    });
+  }
+
+  return (
+    <>
+      <select onChange={(e) => setType(e.target.value)}>
+        <option value="">Select meat type</option>
+        <option>Topside</option>
+        <option>Chuck</option>
+        <option>Brisket</option>
+        <option>Rump</option>
+        <option>Outside</option>
+        <option>Mixed</option>
+      </select>
+
+      <input
+        type="number"
+        value={weightKg}
+        onChange={(e) => setWeightKg(Number(e.target.value))}
+        placeholder="Weight (kg)"
+      />
+
+      <button onClick={submit}>Log Meat</button>
+    </>
+  );
+}
+6️⃣ DRINKS TAB — TABLE INPUT (NO SKU, NO COST)
+Copy code
+Tsx
+const DRINKS = [
+  "Coke",
+  "Coke Zero",
+  "Sprite",
+  "Fanta Orange",
+  "Fanta Strawberry",
+  "Soda Water",
+  "Bottled Water",
+  "Kids Juice (Apple)",
+  "Kids Juice (Orange)",
+];
+
+function DrinksTab() {
+  const [counts, setCounts] = useState(
+    Object.fromEntries(DRINKS.map((d) => [d, 0]))
+  );
+
+  async function submit() {
+    await fetch("/api/stock/drinks", {
+      method: "POST",
+      body: JSON.stringify({ counts }),
+    });
+  }
+
+  return (
+    <>
+      {DRINKS.map((d) => (
+        <div key={d}>
+          <label>{d}</label>
+          <input
+            type="number"
+            value={counts[d]}
+            onChange={(e) =>
+              setCounts({ ...counts, [d]: Number(e.target.value) })
+            }
+          />
+        </div>
+      ))}
+
+      <button onClick={submit}>Log Drinks</button>
+    </>
+  );
+}
+7️⃣ BACKEND ROUTES — ANALYSIS-ONLY STORAGE
+File: server/routes/stock.ts
+👉 CREATE / CONFIRM
+Copy code
+Ts
+POST /api/stock/rolls
+- always log qty
+- if paid === true → create business expense
+
+POST /api/stock/meat
+- log meat type + weight
+- NO expense
+
+POST /api/stock/drinks
+- log drink name + quantity
+- NO expense
+8️⃣ HARD GUARANTEES (ENFORCED)
+❌ No SKUs for drinks
+❌ No cost fields for meat/drinks
+❌ No duplicate entry points
+✅ Rolls only item touching Expenses
+✅ All entries timestamped
+✅ All feeds analysis tables
+🔒 PATCH S1 COMPLETE
+After this:
+One place to log stock received
+Data clean for reconciliation
+No accounting pollution
+Ready for security analysis
+NEXT STEP (ONLY AFTER CONFIRMATION)
+Reply exactly:
+Copy code
+
+Stock lodging unified — proceed to reconciliation
+That unlocks PATCH S2 — Stock Reconciliation & Security View.
