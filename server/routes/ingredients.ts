@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { toBase } from '../lib/uom';
+import { syncIngredientFromPurchasing, syncAllIngredientsFromPurchasing } from '../services/ingredientSync.service';
 
 const router = Router();
 
@@ -62,6 +63,77 @@ router.get('/', async (req, res) => {
     res.json({ items: enriched, count: enriched.length });
   } catch (e: any) {
     console.error('ingredients.list error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * GET /api/ingredients/canonical
+ * Returns ingredients with canonical fields (baseUnit, unitCostPerBase)
+ * Used by RecipeEditModal for PATCH R1 cost calculation
+ */
+router.get('/canonical', async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        id,
+        name,
+        category,
+        base_unit AS "baseUnit",
+        unit_cost_per_base AS "unitCostPerBase",
+        source_purchasing_item_id AS "sourcePurchasingItemId"
+      FROM ingredients
+      WHERE base_unit IS NOT NULL AND unit_cost_per_base IS NOT NULL
+      ORDER BY name ASC
+      LIMIT 500;
+    `);
+    
+    const rows = result.rows || result;
+    res.json({ items: rows, count: rows.length });
+  } catch (e: any) {
+    console.error('ingredients.canonical error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/ingredients/sync/:purchasingItemId
+ * Sync a single purchasing item to the canonical ingredients layer
+ */
+router.post('/sync/:purchasingItemId', async (req, res) => {
+  try {
+    const purchasingItemId = parseInt(req.params.purchasingItemId);
+    if (isNaN(purchasingItemId)) {
+      return res.status(400).json({ error: 'Invalid purchasing item ID' });
+    }
+    
+    const result = await syncIngredientFromPurchasing(purchasingItemId);
+    
+    if (result.success) {
+      res.json({ success: true, ingredientId: result.ingredientId });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (e: any) {
+    console.error('ingredients.sync error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/ingredients/sync-all
+ * Sync all purchasing items marked as ingredients
+ */
+router.post('/sync-all', async (req, res) => {
+  try {
+    const result = await syncAllIngredientsFromPurchasing();
+    res.json({ 
+      success: true, 
+      synced: result.synced, 
+      errors: result.errors 
+    });
+  } catch (e: any) {
+    console.error('ingredients.sync-all error', e);
     res.status(500).json({ error: 'Server error' });
   }
 });

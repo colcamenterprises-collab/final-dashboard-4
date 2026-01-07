@@ -87,6 +87,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Key APIs**: `/api/purchasing-items`, `/api/purchasing-shift-log`, `/api/purchasing-analytics`, `/api/recipes`.
 - **PHASE E: Recipe & POS Unification**: `server/services/recipeAuthority.ts` as canonical recipe service. Guard statuses for `UNMAPPED_POS_ITEM`, `RECIPE_INCOMPLETE`. Debug endpoints available.
 - **PHASE F: System Recovery Patch (Dec 27, 2025)**: All 500 errors eliminated with defensive error handling. Fixed /api/data-confidence, /api/ingredients/master, /api/reports/list. All pages verified: Purchasing List (73), Recipes (44), Ingredients (70). All endpoints return 200.
+- **PATCH R1: Ingredient Canonical Layer (Jan 7, 2026)**: Decouples recipes from purchasing items via canonical ingredients table. New fields: `base_unit` (grams|ml|each), `unit_cost_per_base`, `source_purchasing_item_id`. One-way sync from purchasing → ingredients via `ingredientSync.service.ts`. API endpoints: `/api/ingredients/canonical`, `/api/ingredients/sync/:id`, `/api/ingredients/sync-all`. Uses raw SQL for database operations to avoid Drizzle ORM column naming mismatches (mixed camelCase/snake_case columns).
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.

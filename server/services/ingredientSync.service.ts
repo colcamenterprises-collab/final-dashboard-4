@@ -11,7 +11,7 @@
 
 import { db } from "../db";
 import { ingredients, purchasingItems } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 type BaseUnit = 'grams' | 'ml' | 'each';
 
@@ -58,73 +58,66 @@ function calculateUnitCostPerBase(
 /**
  * Sync a single purchasing item to the ingredients table
  * Creates new or updates existing ingredient
+ * Uses raw SQL to avoid Drizzle schema mismatch issues
  */
 export async function syncIngredientFromPurchasing(purchasingItemId: number): Promise<{ success: boolean; ingredientId?: number; error?: string }> {
   try {
-    // Fetch the purchasing item
-    const [item] = await db
-      .select()
-      .from(purchasingItems)
-      .where(eq(purchasingItems.id, purchasingItemId));
+    // Fetch the purchasing item using raw SQL (mixed case column names)
+    const itemResult = await db.execute(sql`
+      SELECT id, item, category, "supplierName", brand, "unitCost", purchase_unit_qty, "orderUnit"
+      FROM purchasing_items
+      WHERE id = ${purchasingItemId}
+    `);
     
-    if (!item) {
+    const items = itemResult.rows || itemResult;
+    if (!items || items.length === 0) {
       return { success: false, error: 'Purchasing item not found' };
     }
+    const item = items[0] as any;
     
     // Check if ingredient already exists for this purchasing item
-    const [existing] = await db
-      .select()
-      .from(ingredients)
-      .where(eq(ingredients.sourcePurchasingItemId, purchasingItemId));
+    const existingResult = await db.execute(sql`
+      SELECT id FROM ingredients WHERE source_purchasing_item_id = ${purchasingItemId}
+    `);
+    const existingRows = existingResult.rows || existingResult;
     
     const baseUnit = deriveBaseUnit(item.orderUnit);
     const unitCostPerBase = calculateUnitCostPerBase(
       Number(item.unitCost || 0),
-      Number(item.purchaseUnitQty || 1),
+      Number(item.purchase_unit_qty || 1),
       item.orderUnit
     );
     
-    if (existing) {
-      // Update existing ingredient
-      await db
-        .update(ingredients)
-        .set({
-          name: item.item,
-          category: item.category,
-          supplier: item.supplierName,
-          brand: item.brand,
-          baseUnit,
-          unitCostPerBase: unitCostPerBase.toFixed(6),
-          purchaseQty: item.purchaseUnitQty?.toString(),
-          purchaseUnit: item.orderUnit,
-          purchaseCost: item.unitCost?.toString(),
-          updatedAt: new Date(),
-        })
-        .where(eq(ingredients.id, existing.id));
+    if (existingRows && existingRows.length > 0) {
+      // Update existing ingredient - only canonical fields
+      const existingId = (existingRows[0] as any).id;
+      await db.execute(sql`
+        UPDATE ingredients SET
+          name = ${item.item},
+          category = ${item.category},
+          supplier = ${item.supplierName},
+          brand = ${item.brand},
+          base_unit = ${baseUnit},
+          unit_cost_per_base = ${unitCostPerBase.toFixed(6)},
+          updated_at = NOW()
+        WHERE id = ${existingId}
+      `);
       
-      console.log(`[IngredientSync] Updated ingredient ${existing.id} from purchasing item ${purchasingItemId}`);
-      return { success: true, ingredientId: existing.id };
+      console.log(`[IngredientSync] Updated ingredient ${existingId} from purchasing item ${purchasingItemId}`);
+      return { success: true, ingredientId: existingId };
     } else {
-      // Create new ingredient
-      const [newIngredient] = await db
-        .insert(ingredients)
-        .values({
-          name: item.item,
-          category: item.category,
-          supplier: item.supplierName,
-          brand: item.brand,
-          baseUnit,
-          unitCostPerBase: unitCostPerBase.toFixed(6),
-          sourcePurchasingItemId: purchasingItemId,
-          purchaseQty: item.purchaseUnitQty?.toString(),
-          purchaseUnit: item.orderUnit,
-          purchaseCost: item.unitCost?.toString(),
-          source: 'purchasing_sync',
-        })
-        .returning({ id: ingredients.id });
+      // Create new ingredient - include all required NOT NULL fields
+      const supplierValue = item.supplierName || 'Unknown';
+      const insertResult = await db.execute(sql`
+        INSERT INTO ingredients (name, category, supplier, brand, base_unit, unit_cost_per_base, source_purchasing_item_id, source, unit_price, unit)
+        VALUES (${item.item}, ${item.category}, ${supplierValue}, ${item.brand}, ${baseUnit}, ${unitCostPerBase.toFixed(6)}, ${purchasingItemId}, 'purchasing_sync', ${unitCostPerBase.toFixed(6)}, ${baseUnit})
+        RETURNING id
+      `);
+      const insertRows = insertResult.rows || insertResult;
+      const newId = (insertRows[0] as any).id;
       
-      console.log(`[IngredientSync] Created ingredient ${newIngredient.id} from purchasing item ${purchasingItemId}`);
-      return { success: true, ingredientId: newIngredient.id };
+      console.log(`[IngredientSync] Created ingredient ${newId} from purchasing item ${purchasingItemId}`);
+      return { success: true, ingredientId: newId };
     }
   } catch (error) {
     console.error('[IngredientSync] Error syncing ingredient:', error);
