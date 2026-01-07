@@ -1744,16 +1744,22 @@ export const recipe = pgTable('recipe', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
-// 🔒 PATCH R1: Recipe ingredients reference canonical ingredients layer
-// NO unit column - baseUnit comes from ingredient
-// NO purchasing references - ingredients are the source
+// 🔒 PATCH R1: Recipe ingredients - TRANSITIONAL SCHEMA
+// Supports both old (purchasingItemId) and new (ingredientId) systems during migration
+// Once migration complete, purchasingItemId + unit columns can be removed
 export const recipeIngredient = pgTable('recipe_ingredient', {
   id: serial('id').primaryKey(),
   recipeId: integer('recipe_id').notNull().references(() => recipe.id, { onDelete: 'cascade' }),
-  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id),
-  portionQty: decimal('portion_qty', { precision: 10, scale: 4 }).notNull(), // quantity in ingredient's baseUnit
+  // OLD: Purchasing-based (to be deprecated)
+  purchasingItemId: integer('purchasing_item_id').references(() => purchasingItems.id),
+  quantity: decimal('quantity', { precision: 10, scale: 4 }),
+  unit: varchar('unit', { length: 50 }),
+  // NEW: Canonical ingredient-based (PATCH R1)
+  ingredientId: integer('ingredient_id').references(() => ingredients.id),
+  portionQty: decimal('portion_qty', { precision: 10, scale: 4 }), // quantity in ingredient's baseUnit
 }, (table) => ({
-  uniqueRecipeIngredient: unique().on(table.recipeId, table.ingredientId),
+  // Unique constraint uses whichever ID is present
+  uniqueRecipeIngredientOld: unique().on(table.recipeId, table.purchasingItemId),
 }));
 
 export const posItemRecipeMap = pgTable('pos_item_recipe_map', {
