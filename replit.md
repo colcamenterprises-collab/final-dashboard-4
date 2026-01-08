@@ -45,52 +45,17 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Shift Logic**: Handles 5 PM to 3 AM Bangkok timezone shift window.
 
 ### Feature Specifications
-- **Daily Shift Form**: Comprehensive form for sales, expenses, cash management, and inventory.
+- **Core Operations**: Daily Shift Form (sales, expenses, cash, inventory), Recipe Management (costing, PDF), Inventory Management (tracking, shopping list), Comprehensive Daily Forms System (dual-form with draft/submit).
 - **AI-Powered Features**: Multi-agent system for receipt analysis, anomaly detection, ingredient calculation, stock recommendations, financial variance analysis, and marketing content generation.
-- **Loyverse POS Integration**: Automated daily receipt sync, shift reports, and webhook handling with timezone-aware processing.
-- **Recipe Management**: System for ingredient portion selection, cost calculation, and PDF generation.
-- **Inventory Management**: Tracking supplier items, stock levels, and automated shopping list generation.
-- **Sales Heatmap**: Visual analytics for hourly sales patterns.
-- **Email Notifications**: Automated daily management reports.
-- **Form Management**: Soft delete, archived view, and robust validation.
-- **Database-Driven Ingredient System**: Dynamic ingredient management based on TypeScript data sync.
-- **Comprehensive Daily Forms System**: Dual-form system (/daily-sales, /daily-stock) with draft/submit status.
-- **POS Ingestion & Analytics System**: Backend modules for POS data ingestion, normalization, analytics, AI summaries, and scheduled tasks.
-- **Production-Grade Security**: Multi-layer security with HTTP method blocking, ORM write protection, database-level constraints, read-only database user, security middleware, and safety script detection.
-- **Layout Integrity Protection**: Automated prebuild check to prevent layout hacks.
-- **Source-Based Expense Management**: System for categorizing expenses as direct or shift-related.
-- **Data-Driven Dashboard**: Real-time analytics display showing snapshot data, purchases-aware variance, authentic payment data, and top-selling items.
-- **Purchases + Audit Fields System**: Implementation with expense types and line items for stock accountability.
-- **Banking Reconciliation System**: Real-time balance checking with visual indicators and automated calculations.
-- **Enhanced Email Reporting**: Daily management emails with detailed breakdowns.
-- **Manager Checklist System**: Standalone modal with database, API, and React component for shift closing procedures.
-- **Online Ordering System**: VEV replica design with centered headings, tight margins, category tabs, modifier support, cart management, and database-driven menu (CRUD via `/marketing/menu-admin`, public at `/order`).
-- **Membership System**: Complete customer membership platform at `/membership` with digital card generation, barcode support, spend tracking, and optional Loyverse Customers API integration.
-- **F&B Analysis Enhanced Metrics**: Shift analytics page displays receipt count, payment type breakdown, and top 5 items by category.
-- **Rolls & Meat Ledger System**: Integrated audit trail for inventory tracking at `/operations/analysis/shift-items` with manual amendment support and historical data rebuild.
-
-### Database Schema (Core Tables)
-- Users, Daily Sales, Shift Reports, Loyverse Receipts, Recipes, Ingredients, Expenses, Shopping List, Marketing, Chat Logs.
-- Restaurant, PosConnection, Receipt, ReceiptItem, ReceiptPayment, MenuItem, Expense, AnalyticsDaily, Job, PosSyncLog, IngestionError for POS, analytics, and job management.
-- DailySalesV2, DailyStockV2, ShoppingPurchaseV2, WageEntryV2, OtherExpenseV2 for enhanced data models.
-- Normalized POS tables: lv_receipt, lv_line_item, lv_modifier.
-- Item catalog and analytics cache tables: item_catalog, analytics_shift_item, analytics_shift_category_summary.
-- Manager checklist tables: cleaning_tasks, manager_checklists.
-- Inventory ledger tables: rolls_ledger, meat_ledger.
-- Online ordering tables: menu_categories_online, menu_items_online, modifier_groups_online, modifier_options_online, orders_online, order_lines_online.
-- Purchasing flow tables: `purchasing_items`, `daily_stock_v2`, `purchasing_shift_items`.
-- Recipe tables: `recipe`, `recipe_ingredient`, `pos_item_recipe_map`.
-
-### Canonical Data Architecture
-- **Purchasing Flow**: `purchasing_items` as single source of truth for all purchasable items, linked to `daily_stock_v2` and `purchasing_shift_items`.
-- **Recipe Architecture**: New canonical system (`recipe` + `recipe_ingredient` tables with Drizzle ORM) with explicit `pos_item_recipe_map`. Recipe costs computed fresh from `purchasing_items.unit_cost`. Legacy recipe pages are read-only.
-- **Key APIs**: `/api/purchasing-items`, `/api/purchasing-shift-log`, `/api/purchasing-analytics`, `/api/recipes`.
-- **PHASE E: Recipe & POS Unification**: `server/services/recipeAuthority.ts` as canonical recipe service. Guard statuses for `UNMAPPED_POS_ITEM`, `RECIPE_INCOMPLETE`. Debug endpoints available.
-- **PHASE F: System Recovery Patch (Dec 27, 2025)**: All 500 errors eliminated with defensive error handling. Fixed /api/data-confidence, /api/ingredients/master, /api/reports/list. All pages verified: Purchasing List (73), Recipes (44), Ingredients (70). All endpoints return 200.
-- **PATCH R1: Ingredient Canonical Layer (Jan 7, 2026)**: Decouples recipes from purchasing items via canonical ingredients table. New fields: `base_unit` (grams|ml|each), `unit_cost_per_base`, `source_purchasing_item_id`. One-way sync from purchasing → ingredients via `ingredientSync.service.ts`. API endpoints: `/api/ingredients/canonical`, `/api/ingredients/sync/:id`, `/api/ingredients/sync-all`. Uses raw SQL for database operations to avoid Drizzle ORM column naming mismatches (mixed camelCase/snake_case columns).
-- **PATCH R1.1: Recipe Cutover to Canonical Ingredients (Jan 7, 2026)**: Complete decoupling of recipes from purchasing. RecipeEditModal now uses `/api/ingredients/canonical` endpoint. Cost formula: `unitCostPerBase × portionQty` (no conversions). Recipe ingredients support both `ingredientId` (canonical) and `purchasingItemId` (legacy). UI shows only: Ingredient name, Portion qty, Base unit, Cost. No purchasing references in recipe UI.
-- **PATCH S1: Unified Stock Logging (Jan 7, 2026)**: Moved stock logging from Manual Stock Purchase page into Shopping List as StockReceivedModal. Single entry point with tabs for Rolls (qty + optional expense), Meat (type + weight, NO expense), Drinks (qty only, NO expense/SKU). APIs: `/api/stock/rolls`, `/api/stock/meat`, `/api/stock/drinks`. Data stored in `stock_received_log` table for analysis. Old `/operations/manual-stock-purchase` route disabled.
-- **PATCH S2: Stock Reconciliation & Security (Jan 7, 2026)**: Read-only analysis layer for shift balancing and theft visibility. Reconciles stock: Start + Purchased - Used = Expected vs Actual. API: `/api/analysis/stock-reconciliation`. Frontend at `/analysis/stock-reconciliation`. Security rules: Rolls variance ≠ 0 → flag, Meat variance > ±0.5kg → flag. Uses `daily_stock_v2` for end-of-shift counts and `stock_received_log` for purchases.
+- **POS Integration**: Loyverse POS for daily receipt sync, shift reports, and webhook handling.
+- **Analytics & Reporting**: Sales Heatmap, Email Notifications, Data-Driven Dashboard (real-time snapshot, variance, payment data), F&B Analysis Enhanced Metrics, Stock Reconciliation & Security.
+- **Management Tools**: Manager Checklist System, Source-Based Expense Management, Banking Reconciliation System, Online Ordering System, Membership System, Rolls & Meat Ledger System.
+- **Security**: Production-Grade Security with multi-layer protection and layout integrity protection.
+- **Canonical Data Architecture**:
+    - **Purchasing Flow**: `purchasing_items` as single source of truth, linked to `daily_stock_v2` and `purchasing_shift_items`.
+    - **Recipe Architecture**: Canonical system (`recipe` + `recipe_ingredient` tables) with `pos_item_recipe_map`. Costs computed from `purchasing_items.unit_cost`. `server/services/recipeAuthority.ts` handles recipe logic.
+    - **Ingredient Management**: Decoupled canonical ingredients table (`base_unit`, `unit_cost_per_base`, `source_purchasing_item_id`) with one-way sync from purchasing items.
+    - **Unified Stock Logging**: Consolidated stock logging via `StockReceivedModal` into Shopping List with tabs for Rolls, Meat, Drinks, stored in `stock_received_log` table.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.
