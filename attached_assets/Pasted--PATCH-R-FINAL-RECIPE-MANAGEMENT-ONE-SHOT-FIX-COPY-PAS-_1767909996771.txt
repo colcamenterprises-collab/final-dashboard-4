@@ -1,0 +1,309 @@
+// ===============================
+// PATCH R-FINAL — RECIPE MANAGEMENT (ONE-SHOT FIX)
+// COPY / PASTE ALL FILES AS-IS
+// ===============================
+
+
+
+// ======================================
+// BACKEND — SCHEMA (Drizzle)
+// File: shared/schema/recipe.ts
+// ======================================
+import { pgTable, uuid, text, numeric, boolean } from "drizzle-orm/pg-core";
+
+export const recipe = pgTable("recipe", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  serves: numeric("serves").default("1").notNull(),
+  imageUrl: text("image_url"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: text("created_at").defaultNow(),
+});
+
+export const recipeIngredient = pgTable("recipe_ingredient", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  recipeId: uuid("recipe_id").notNull(),
+  ingredientId: uuid("ingredient_id").notNull(),
+  portionQty: numeric("portion_qty", { precision: 10, scale: 4 }).notNull(),
+});
+
+
+
+// ======================================
+// BACKEND — SERVICE
+// File: server/services/recipeCost.service.ts
+// ======================================
+import { db } from "@/db";
+import { recipeIngredient, ingredient } from "@/shared/schema";
+import { eq } from "drizzle-orm";
+
+export async function calculateRecipeCost(recipeId: string) {
+  const rows = await db
+    .select({
+      qty: recipeIngredient.portionQty,
+      unitCost: ingredient.unitCostPerBase,
+    })
+    .from(recipeIngredient)
+    .innerJoin(
+      ingredient,
+      eq(recipeIngredient.ingredientId, ingredient.id)
+    )
+    .where(eq(recipeIngredient.recipeId, recipeId));
+
+  let total = 0;
+  for (const r of rows) {
+    total += Number(r.qty) * Number(r.unitCost);
+  }
+  return Number(total.toFixed(2));
+}
+
+
+
+// ======================================
+// BACKEND — ROUTES
+// File: server/routes/recipes.ts
+// ======================================
+import { db } from "@/db";
+import { recipe, recipeIngredient, ingredient } from "@/shared/schema";
+import { calculateRecipeCost } from "@/server/services/recipeCost.service";
+import { eq } from "drizzle-orm";
+
+app.get("/api/recipes", async (_req, res) => {
+  const recipes = await db.select().from(recipe);
+  res.json(recipes);
+});
+
+app.get("/api/recipes/:id", async (req, res) => {
+  const id = req.params.id;
+  const rec = await db.select().from(recipe).where(eq(recipe.id, id));
+  const ingredients = await db
+    .select({
+      id: recipeIngredient.id,
+      ingredientId: recipeIngredient.ingredientId,
+      name: ingredient.name,
+      baseUnit: ingredient.baseUnit,
+      unitCostPerBase: ingredient.unitCostPerBase,
+      portionQty: recipeIngredient.portionQty,
+    })
+    .from(recipeIngredient)
+    .innerJoin(
+      ingredient,
+      eq(recipeIngredient.ingredientId, ingredient.id)
+    )
+    .where(eq(recipeIngredient.recipeId, id));
+
+  const cost = await calculateRecipeCost(id);
+  res.json({ recipe: rec[0], ingredients, cost });
+});
+
+app.post("/api/recipes", async (req, res) => {
+  const { name, serves, imageUrl, ingredients } = req.body;
+
+  if (!ingredients || ingredients.length === 0) {
+    return res.status(400).json({ error: "Recipe must have ingredients" });
+  }
+
+  const [rec] = await db
+    .insert(recipe)
+    .values({ name, serves, imageUrl })
+    .returning();
+
+  for (const ing of ingredients) {
+    if (ing.portionQty <= 0) {
+      return res.status(400).json({ error: "Invalid portion qty" });
+    }
+    await db.insert(recipeIngredient).values({
+      recipeId: rec.id,
+      ingredientId: ing.ingredientId,
+      portionQty: ing.portionQty,
+    });
+  }
+
+  res.json(rec);
+});
+
+app.put("/api/recipes/:id", async (req, res) => {
+  const id = req.params.id;
+  const { name, serves, imageUrl, ingredients } = req.body;
+
+  await db
+    .update(recipe)
+    .set({ name, serves, imageUrl })
+    .where(eq(recipe.id, id));
+
+  await db.delete(recipeIngredient).where(eq(recipeIngredient.recipeId, id));
+
+  for (const ing of ingredients) {
+    await db.insert(recipeIngredient).values({
+      recipeId: id,
+      ingredientId: ing.ingredientId,
+      portionQty: ing.portionQty,
+    });
+  }
+
+  res.json({ ok: true });
+});
+
+
+
+// ======================================
+// FRONTEND — RECIPE LIST
+// File: client/src/pages/recipes/Recipes.tsx
+// ======================================
+import { useEffect, useState } from "react";
+import RecipeViewModal from "./RecipeViewModal";
+import RecipeEditModal from "./RecipeEditModal";
+
+export default function Recipes() {
+  const [recipes, setRecipes] = useState<any[]>([]);
+  const [view, setView] = useState<any>(null);
+  const [edit, setEdit] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/recipes").then(r => r.json()).then(setRecipes);
+  }, []);
+
+  return (
+    <div>
+      <h1>Recipes</h1>
+      <table>
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Name</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {recipes.map(r => (
+            <tr key={r.id}>
+              <td>
+                {r.imageUrl ? <img src={r.imageUrl} width={60} /> : "—"}
+              </td>
+              <td>{r.name}</td>
+              <td>
+                <button onClick={() => setView(r.id)}>View</button>
+                <button onClick={() => setEdit(r.id)}>Edit</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {view && <RecipeViewModal id={view} onClose={() => setView(null)} />}
+      {edit && <RecipeEditModal id={edit} onClose={() => setEdit(null)} />}
+    </div>
+  );
+}
+
+
+
+// ======================================
+// FRONTEND — VIEW MODAL
+// File: client/src/pages/recipes/RecipeViewModal.tsx
+// ======================================
+import { useEffect, useState } from "react";
+
+export default function RecipeViewModal({ id, onClose }) {
+  const [data, setData] = useState<any>(null);
+
+  useEffect(() => {
+    fetch(`/api/recipes/${id}`).then(r => r.json()).then(setData);
+  }, [id]);
+
+  if (!data) return null;
+
+  return (
+    <div className="modal">
+      <h2>{data.recipe.name}</h2>
+      {data.recipe.imageUrl && <img src={data.recipe.imageUrl} />}
+      <ul>
+        {data.ingredients.map(i => (
+          <li key={i.id}>
+            {i.name}: {i.portionQty} {i.baseUnit}
+          </li>
+        ))}
+      </ul>
+      <strong>Total Cost: ฿{data.cost}</strong>
+      <button onClick={onClose}>Close</button>
+    </div>
+  );
+}
+
+
+
+// ======================================
+// FRONTEND — EDIT MODAL
+// File: client/src/pages/recipes/RecipeEditModal.tsx
+// ======================================
+import { useEffect, useState } from "react";
+
+export default function RecipeEditModal({ id, onClose }) {
+  const [data, setData] = useState<any>(null);
+  const [ingredients, setIngredients] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetch(`/api/recipes/${id}`).then(r => r.json()).then(d => {
+      setData(d.recipe);
+      setIngredients(d.ingredients);
+    });
+  }, [id]);
+
+  function updateIngredient(i, field, value) {
+    setIngredients(prev =>
+      prev.map((r, idx) => idx === i ? { ...r, [field]: value } : r)
+    );
+  }
+
+  async function save() {
+    await fetch(`/api/recipes/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...data,
+        ingredients,
+      }),
+    });
+    onClose();
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="modal">
+      <input
+        value={data.name}
+        onChange={e => setData({ ...data, name: e.target.value })}
+      />
+
+      <input
+        placeholder="Image URL"
+        value={data.imageUrl || ""}
+        onChange={e => setData({ ...data, imageUrl: e.target.value })}
+      />
+
+      <table>
+        <tbody>
+          {ingredients.map((i, idx) => (
+            <tr key={i.id}>
+              <td>{i.name}</td>
+              <td>
+                <input
+                  type="number"
+                  value={i.portionQty}
+                  onChange={e =>
+                    updateIngredient(idx, "portionQty", Number(e.target.value))
+                  }
+                />
+                {i.baseUnit}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <button onClick={save}>Save</button>
+      <button onClick={onClose}>Cancel</button>
+    </div>
+  );
+}
