@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, Edit3, Search } from "lucide-react";
+import { Plus, Trash2, Edit3, Search, Eye } from "lucide-react";
 import { z } from "zod";
 import { RecipeEditModal } from "@/components/RecipeEditModal";
+import { RecipeViewModal } from "@/components/RecipeViewModal";
 import { INGREDIENT_CATEGORIES } from "@/constants/ingredientCategories";
 
 const recipeFormSchema = z.object({
@@ -61,6 +62,8 @@ export default function RecipeManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<RecipeAuthority | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [viewingRecipe, setViewingRecipe] = useState<RecipeAuthority | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'recipes' | 'ingredients'>('recipes');
   const [ingredientSearchTerm, setIngredientSearchTerm] = useState('');
   const [ingredientCategoryFilter, setIngredientCategoryFilter] = useState('all');
@@ -142,9 +145,22 @@ export default function RecipeManagement() {
     createRecipeMutation.mutate(data);
   };
 
+  const handleViewRecipe = (recipe: RecipeAuthority) => {
+    setViewingRecipe(recipe);
+    setIsViewModalOpen(true);
+  };
+
   const handleEditRecipe = (recipe: RecipeAuthority) => {
     setEditingRecipe(recipe);
     setIsEditModalOpen(true);
+  };
+
+  const handleEditFromView = () => {
+    if (viewingRecipe) {
+      setIsViewModalOpen(false);
+      setEditingRecipe(viewingRecipe);
+      setIsEditModalOpen(true);
+    }
   };
 
   const handleDeleteRecipe = (id: number) => {
@@ -304,6 +320,9 @@ export default function RecipeManagement() {
                     </td>
                     <td className="py-2 text-right">
                       <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => handleViewRecipe(recipe)} className="h-6 w-6 p-0" data-testid={`button-view-${recipe.id}`}>
+                          <Eye className="h-3 w-3" />
+                        </Button>
                         <Button variant="ghost" size="sm" onClick={() => handleEditRecipe(recipe)} className="h-6 w-6 p-0" data-testid={`button-edit-${recipe.id}`}>
                           <Edit3 className="h-3 w-3" />
                         </Button>
@@ -384,6 +403,16 @@ export default function RecipeManagement() {
           </CardContent>
         </Card>
       )}
+
+      <RecipeViewModal
+        recipe={viewingRecipe}
+        isOpen={isViewModalOpen}
+        onClose={() => {
+          setIsViewModalOpen(false);
+          setViewingRecipe(null);
+        }}
+        onEdit={handleEditFromView}
+      />
 
       <RecipeEditModal
         recipe={editingRecipe}
