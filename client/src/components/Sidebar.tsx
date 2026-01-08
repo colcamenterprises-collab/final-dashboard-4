@@ -222,7 +222,7 @@ function NavSections({
       </div>
 
       {groups.map((g) => {
-        const isOpen = expanded[g.title] ?? true;
+        const isOpen = expanded[g.title] ?? false;
         return (
           <div key={g.title} className="mt-4">
             <button

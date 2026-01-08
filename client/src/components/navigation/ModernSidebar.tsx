@@ -51,20 +51,17 @@ const navigationGroups: NavGroup[] = [
   {
     title: "Dashboard Home",
     isStandalone: true,
-    defaultOpen: true,
     items: []
   },
   {
     title: "Online Ordering Button",
     isStandalone: true,
-    defaultOpen: true,
     items: [
       { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "button-online-ordering", external: true, isButton: true }
     ]
   },
   {
     title: "Operations",
-    defaultOpen: true,
     items: [
       { 
         to: "/operations/daily-sales", 
@@ -81,7 +78,6 @@ const navigationGroups: NavGroup[] = [
   },
   {
     title: "Purchasing",
-    defaultOpen: true,
     items: [
       { to: "/operations/purchasing", label: "Purchasing List", icon: ShoppingCart, testId: "nav-purchasing-list" },
       { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
@@ -91,7 +87,6 @@ const navigationGroups: NavGroup[] = [
   },
   {
     title: "Analysis",
-    defaultOpen: true,
     items: [
       { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
       { to: "/analysis/ingredients", label: "Ingredients (Truth)", icon: Package, testId: "nav-ingredients-truth" },
@@ -115,7 +110,6 @@ const navigationGroups: NavGroup[] = [
   },
   {
     title: "POS & Kitchen",
-    defaultOpen: true,
     items: [
       { to: "/pos", label: "POS Terminal", icon: Receipt, testId: "nav-pos" },
       { to: "/kds", label: "Kitchen Display", icon: ChefHat, testId: "nav-kds" }
@@ -123,7 +117,6 @@ const navigationGroups: NavGroup[] = [
   },
   {
     title: "Sales & Ordering",
-    defaultOpen: true,
     items: [
       { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" }
     ]
