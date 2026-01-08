@@ -1,0 +1,165 @@
+🔐 PATCH S3 — SHOPPING LIST DRINKS (AUTO-GENERATED)
+⚠️ AGENT RULES
+❌ DO NOT add manual inputs for drinks on Shopping List
+❌ DO NOT change Daily Stock v2
+❌ DO NOT change POS logic
+❌ DO NOT add SKUs
+✅ Use end-of-shift stock as source of truth
+✅ Order in pack multiples only (6 / 16)
+✅ Read-only, system-generated rows
+1️⃣ CANONICAL DRINK CONFIG (LOCKED)
+File: server/config/drinks.ts
+👉 CREATE FILE
+Copy code
+Ts
+export type DrinkConfig = {
+  name: string;
+  minStock: number;
+  packSize: number;
+};
+
+export const DRINKS: DrinkConfig[] = [
+  { name: "Coke Zero", minStock: 20, packSize: 6 },
+  { name: "Coke (6 pack)", minStock: 24, packSize: 6 },
+  { name: "Sprite", minStock: 16, packSize: 6 },
+  { name: "Fanta Orange", minStock: 16, packSize: 6 },
+  { name: "Fanta Strawberry", minStock: 16, packSize: 6 },
+  { name: "Soda Water", minStock: 12, packSize: 6 },
+  { name: "Schweppes Manow", minStock: 16, packSize: 6 },
+  { name: "Singha Red Soda", minStock: 12, packSize: 6 },
+  { name: "Singha Pink Soda", minStock: 12, packSize: 6 },
+  { name: "Singha Yellow Soda", minStock: 12, packSize: 6 },
+  { name: "Kids Juice (Apple)", minStock: 12, packSize: 6 },
+  { name: "Kids Juice (Orange)", minStock: 12, packSize: 6 },
+  { name: "Bottled Water", minStock: 16, packSize: 16 },
+];
+2️⃣ BACKEND — STOCK SOURCE (END-OF-SHIFT)
+File: server/services/drinkStock.service.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { db } from "@/db";
+import { DRINKS } from "@/server/config/drinks";
+
+/**
+ * Pulls latest end-of-shift stock for each drink
+ * from Daily Stock v2.
+ */
+export async function getDrinkStock() {
+  // Assumes daily_stock_v2 has columns:
+  // date, item_name, quantity
+  const rows = await db.execute(`
+    SELECT item_name, quantity
+    FROM daily_stock_v2
+    WHERE item_category = 'DRINK'
+  `);
+
+  const map = new Map<string, number>();
+  for (const r of rows as any[]) {
+    map.set(r.item_name, Number(r.quantity));
+  }
+
+  return DRINKS.map((d) => ({
+    ...d,
+    inStock: map.get(d.name) ?? 0,
+  }));
+}
+3️⃣ BACKEND — ORDER CALCULATION
+File: server/services/drinkOrder.service.ts
+👉 CREATE FILE
+Copy code
+Ts
+export function calcOrderQty(
+  inStock: number,
+  minStock: number,
+  packSize: number
+) {
+  if (inStock >= minStock) return 0;
+
+  const deficit = minStock - inStock;
+  return Math.ceil(deficit / packSize) * packSize;
+}
+4️⃣ BACKEND — SHOPPING LIST API
+File: server/routes/purchasing/drinksShopping.ts
+👉 CREATE FILE
+Copy code
+Ts
+import { getDrinkStock } from "@/server/services/drinkStock.service";
+import { calcOrderQty } from "@/server/services/drinkOrder.service";
+
+export async function getDrinksShoppingList() {
+  const drinks = await getDrinkStock();
+
+  return drinks.map((d) => ({
+    name: d.name,
+    inStock: d.inStock,
+    minStock: d.minStock,
+    packSize: d.packSize,
+    orderQty: calcOrderQty(d.inStock, d.minStock, d.packSize),
+  }));
+}
+5️⃣ ROUTE REGISTRATION
+File: server/routes/index.ts
+👉 ADD
+Copy code
+Ts
+import { getDrinksShoppingList } from "./purchasing/drinksShopping";
+
+app.get("/api/purchasing/shopping-list/drinks", async (_req, res) => {
+  const data = await getDrinksShoppingList();
+  res.json(data);
+});
+6️⃣ FRONTEND — SHOPPING LIST (DRINKS SECTION)
+File: client/src/pages/purchasing/ShoppingList.tsx
+👉 ADD DRINKS BLOCK
+Copy code
+Tsx
+const [drinks, setDrinks] = useState<any[]>([]);
+
+useEffect(() => {
+  fetch("/api/purchasing/shopping-list/drinks")
+    .then((r) => r.json())
+    .then(setDrinks);
+}, []);
+Copy code
+Tsx
+<h2 className="text-xl font-bold mt-8">Drinks</h2>
+
+<table className="w-full border">
+  <thead>
+    <tr>
+      <th>Drink</th>
+      <th>In Stock</th>
+      <th>Min Stock</th>
+      <th>Pack</th>
+      <th>Order Qty</th>
+    </tr>
+  </thead>
+  <tbody>
+    {drinks.map((d) => (
+      <tr
+        key={d.name}
+        className={d.orderQty > 0 ? "bg-yellow-50" : ""}
+      >
+        <td>{d.name}</td>
+        <td>{d.inStock}</td>
+        <td>{d.minStock}</td>
+        <td>{d.packSize}</td>
+        <td className="font-bold">{d.orderQty}</td>
+      </tr>
+    ))}
+  </tbody>
+</table>
+7️⃣ HARD GUARANTEES (ENFORCED)
+❌ No manual drink inputs
+❌ No costs
+❌ No SKUs
+❌ No partial packs
+✅ Uses Daily Stock v2
+✅ Orders round UP to pack size
+✅ Zero order when stock ≥ min
+✅ REQUIRED CHECK
+Coke in stock = 18 → Order = 6
+Coke in stock = 20 → Order = 0
+Water in stock = 5 → Order = 16
+Water in stock = 16 → Order = 0

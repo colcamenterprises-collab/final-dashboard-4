@@ -148,24 +148,36 @@ export function StockReceivedModal({ isOpen, onClose }: StockReceivedModalProps)
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md w-[calc(100vw-32px)] mx-auto">
         <DialogHeader>
           <DialogTitle className="text-sm font-semibold">Log Stock Received</DialogTitle>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="rolls" className="text-xs" data-testid="tab-rolls">
-              <Package className="h-3 w-3 mr-1" />
-              Rolls
+          <TabsList className="flex w-full h-auto p-1 gap-1">
+            <TabsTrigger 
+              value="rolls" 
+              className="flex-1 text-xs py-2 px-2 min-h-[36px] flex items-center justify-center gap-1" 
+              data-testid="tab-rolls"
+            >
+              <Package className="h-3 w-3 shrink-0" />
+              <span>Rolls</span>
             </TabsTrigger>
-            <TabsTrigger value="meat" className="text-xs" data-testid="tab-meat">
-              <Beef className="h-3 w-3 mr-1" />
-              Meat
+            <TabsTrigger 
+              value="meat" 
+              className="flex-1 text-xs py-2 px-2 min-h-[36px] flex items-center justify-center gap-1" 
+              data-testid="tab-meat"
+            >
+              <Beef className="h-3 w-3 shrink-0" />
+              <span>Meat</span>
             </TabsTrigger>
-            <TabsTrigger value="drinks" className="text-xs" data-testid="tab-drinks">
-              <GlassWater className="h-3 w-3 mr-1" />
-              Drinks
+            <TabsTrigger 
+              value="drinks" 
+              className="flex-1 text-xs py-2 px-2 min-h-[36px] flex items-center justify-center gap-1" 
+              data-testid="tab-drinks"
+            >
+              <GlassWater className="h-3 w-3 shrink-0" />
+              <span>Drinks</span>
             </TabsTrigger>
           </TabsList>
 
