@@ -116,6 +116,7 @@ import pnlReadModelRoutes from "./routes/pnlReadModel";
 import pnlSnapshotRoutes from "./routes/pnlSnapshot.route";
 import { menuManagementRouter } from "./routes/menuManagement";
 import modifiersRouter from "./routes/modifiers";
+import productsRouter from "./routes/products";
 // Email functionality will be added when needed
 
 
@@ -3687,6 +3688,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/pnl/snapshot', pnlSnapshotRoutes); // PATCH 1: P&L Snapshot with checksums
   app.use('/api/menu-management', menuManagementRouter); // PATCH 2.1: Menu Management Foundation
   app.use('/api/modifiers', modifiersRouter); // PATCH 2.2: Modifiers System
+  app.use(productsRouter); // PATCH P1: Products API
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
   app.use('/api/expenses-v2', expensesV2Routes);
