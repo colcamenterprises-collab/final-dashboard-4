@@ -1,0 +1,124 @@
+// ======================================================================
+// PATCH P2 — SIDEBAR CLEANUP (PRODUCT-FIRST MODEL)
+// ADD THIS TO PATCH P2
+// COPY / PASTE EXACTLY
+// ======================================================================
+
+
+
+// ======================================================================
+// FRONTEND — SIDEBAR CONFIG
+// File: client/src/components/layout/Sidebar.tsx
+// (or wherever your sidebar sections are defined)
+// ======================================================================
+
+// BEFORE (example – remove / ignore old structure)
+// - Recipe Management
+// - Products
+// - Menu Manager
+
+
+
+// AFTER — PRODUCT-FIRST STRUCTURE (LOCKED)
+
+export const sidebarSections = [
+  {
+    title: "Menu & Sales",
+    items: [
+      {
+        label: "Products",
+        path: "/products",
+        icon: "box", // use existing icon system
+      },
+      {
+        label: "Menu Display",
+        path: "/menu-management",
+        icon: "list",
+      },
+      {
+        label: "Online Ordering",
+        path: "/online-ordering",
+        icon: "shopping-cart",
+      },
+    ],
+  },
+
+  {
+    title: "Operations",
+    items: [
+      {
+        label: "Ingredients",
+        path: "/ingredients",
+        icon: "layers",
+      },
+      {
+        label: "Purchasing",
+        path: "/operations/purchasing",
+        icon: "truck",
+      },
+      {
+        label: "Stock & Reconciliation",
+        path: "/analysis/stock-reconciliation",
+        icon: "shield",
+      },
+    ],
+  },
+
+  {
+    title: "Reporting",
+    items: [
+      {
+        label: "Profit & Loss",
+        path: "/reports/pnl",
+        icon: "bar-chart",
+      },
+      {
+        label: "Sales Analysis",
+        path: "/reports/sales",
+        icon: "trending-up",
+      },
+    ],
+  },
+];
+
+
+
+// ======================================================================
+// REMOVE / HIDE LEGACY ENTRY
+// File: same sidebar file
+// ======================================================================
+
+// ❌ REMOVE this entry entirely
+// {
+//   label: "Recipe Management",
+//   path: "/recipes",
+// }
+
+// Recipes are now internal to Products.
+// No standalone sidebar access.
+
+
+
+// ======================================================================
+// ROUTE GUARD CONFIRMATION
+// File: client/src/App.tsx or RouteRegistry.ts
+// ======================================================================
+
+// ENSURE this exists (already added in P1, keep it)
+
+{
+  path: "/products",
+  element: <ProductsPage />,
+}
+
+
+
+// ======================================================================
+// PATCH COMPLETE
+// ======================================================================
+
+// Result:
+// - Products is the primary object in the sidebar
+// - Recipe Management removed from navigation
+// - Menu is correctly positioned as a display layer
+// - Mental model now matches system reality

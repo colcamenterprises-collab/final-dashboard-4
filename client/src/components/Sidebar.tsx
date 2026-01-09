@@ -7,70 +7,35 @@ type Group = {
 };
 
 /**
- * PHASE L — Navigation & Ownership Reset (Legacy Sidebar)
+ * PATCH P2 — SIDEBAR CLEANUP (PRODUCT-FIRST MODEL)
  * 
- * CANONICAL OWNERSHIP:
- * - PURCHASING = items & stock (Purchasing List, Purchasing Log, Manual Stock Purchase)
- * - FINANCE = money only (Expenses, Profit & Loss)
- * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
- * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
+ * Products is the primary object in the sidebar.
+ * Recipe Management removed from navigation (internal to Products).
+ * Menu is correctly positioned as a display layer.
  */
 
 const groups: Group[] = [
   {
-    title: "Daily Sales",
+    title: "Menu & Sales",
     items: [
-      { to: "/operations/daily-sales", label: "Daily Sales Form" },
-      { to: "/operations/daily-sales-library", label: "Library" },
+      { to: "/products", label: "Products" },
+      { to: "/menu-management", label: "Menu Display" },
+      { to: "/order", label: "Online Ordering" },
     ],
   },
   {
     title: "Operations",
     items: [
-      { to: "/operations/health-safety-audit", label: "Health & Safety Audit" },
+      { to: "/menu/ingredients", label: "Ingredients" },
+      { to: "/operations/purchasing", label: "Purchasing" },
+      { to: "/analysis/stock-reconciliation", label: "Stock & Reconciliation" },
     ],
   },
   {
-    title: "Purchasing",
+    title: "Reporting",
     items: [
-      { to: "/operations/purchasing", label: "Purchasing List" },
-      { to: "/operations/purchasing-shift-log", label: "Stock Order History" },
-      { to: "/operations/manual-stock-purchase", label: "Manual Stock Purchase" },
-    ],
-  },
-  {
-    title: "Finance", 
-    items: [
-      { to: "/finance/expenses", label: "Expenses" },
       { to: "/finance/profit-loss", label: "Profit & Loss" },
-    ],
-  },
-  {
-    title: "Menu Management",
-    items: [
-      { to: "/recipe-management", label: "Recipe Management" },
-      { to: "/products", label: "Products" },
-      { to: "/menu/manager", label: "Menu Manager" },
-    ],
-  },
-  {
-    title: "Analysis",
-    items: [
-      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation" },
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis" },
-    ],
-  },
-  {
-    title: "Membership",
-    items: [
-      { to: "/membership/dashboard", label: "Member Dashboard" },
-      { to: "/membership/register", label: "Registration Form" },
-    ],
-  },
-  {
-    title: "Customer Ordering",
-    items: [
-      { to: "/order", label: "Online Ordering" },
+      { to: "/analysis/daily-review", label: "Sales Analysis" },
     ],
   },
 ];
