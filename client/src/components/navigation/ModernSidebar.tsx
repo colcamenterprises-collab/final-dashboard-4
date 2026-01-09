@@ -36,16 +36,11 @@ type NavGroup = {
 };
 
 /**
- * PHASE L — Navigation & Ownership Reset
+ * PATCH P2 — SIDEBAR CLEANUP (PRODUCT-FIRST MODEL)
  * 
- * CANONICAL OWNERSHIP:
- * - PURCHASING = items & stock (Purchasing List, Purchasing Log, Manual Stock Purchase)
- * - FINANCE = money only (Expenses, Profit & Loss)
- * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
- * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
- * 
- * HIDDEN from sidebar (routes still accessible directly with read-only banner):
- * - F&B Analysis, Shopping List, Menu Master V3, Menu Admin, Daily Summary Reports
+ * Products is the primary object in the sidebar.
+ * Recipe Management removed from navigation (internal to Products).
+ * Menu is correctly positioned as a display layer.
  */
 const navigationGroups: NavGroup[] = [
   {
@@ -61,71 +56,26 @@ const navigationGroups: NavGroup[] = [
     ]
   },
   {
+    title: "Menu & Sales",
+    items: [
+      { to: "/products", label: "Products", icon: Package, testId: "nav-products" },
+      { to: "/menu-management", label: "Menu Display", icon: ChefHat, testId: "nav-menu-display" },
+      { to: "/order", label: "Online Ordering", icon: ShoppingCart, testId: "nav-online-ordering" }
+    ]
+  },
+  {
     title: "Operations",
     items: [
-      { 
-        to: "/operations/daily-sales", 
-        label: "Daily Sales & Stock", 
-        icon: Receipt, 
-        testId: "nav-daily-sales",
-        subItems: [
-          { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library" }
-        ]
-      },
-      { to: "/operations/system-health", label: "System Health Test", icon: Settings, testId: "nav-system-health" },
-      { to: "/operations/health-safety-audit", label: "Health & Safety Audit", icon: Settings, testId: "nav-health-safety" }
+      { to: "/menu/ingredients", label: "Ingredients", icon: Package, testId: "nav-ingredients" },
+      { to: "/operations/purchasing", label: "Purchasing", icon: ShoppingCart, testId: "nav-purchasing" },
+      { to: "/analysis/stock-reconciliation", label: "Stock & Reconciliation", icon: BarChart3, testId: "nav-stock-reconciliation" }
     ]
   },
   {
-    title: "Purchasing",
+    title: "Reporting",
     items: [
-      { to: "/operations/purchasing", label: "Purchasing List", icon: ShoppingCart, testId: "nav-purchasing-list" },
-      { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
-      { to: "/operations/purchasing-shift-log", label: "Stock Order History", icon: Package, testId: "nav-purchasing-log" },
-      { to: "/operations/manual-stock-purchase", label: "Manual Stock Purchase", icon: Package, testId: "nav-manual-stock-purchase" }
-    ]
-  },
-  {
-    title: "Analysis",
-    items: [
-      { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
-      { to: "/analysis/ingredients", label: "Ingredients (Truth)", icon: Package, testId: "nav-ingredients-truth" },
-      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" },
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" }
-    ]
-  },
-  {
-    title: "Finance",
-    items: [
-      { to: "/finance/expenses", label: "Expenses", icon: Calculator, testId: "nav-expenses" },
-      { to: "/finance/profit-loss", label: "Profit & Loss", icon: Calculator, testId: "nav-profit-loss" }
-    ]
-  },
-  {
-    title: "Menu Management",
-    items: [
-      { to: "/recipe-management", label: "Recipe Management", icon: ChefHat, testId: "nav-recipe-management" },
-      { to: "/menu/manager", label: "Menu Manager", icon: ChefHat, testId: "nav-menu-manager" }
-    ]
-  },
-  {
-    title: "POS & Kitchen",
-    items: [
-      { to: "/pos", label: "POS Terminal", icon: Receipt, testId: "nav-pos" },
-      { to: "/kds", label: "Kitchen Display", icon: ChefHat, testId: "nav-kds" }
-    ]
-  },
-  {
-    title: "Sales & Ordering",
-    items: [
-      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "nav-online-ordering" }
-    ]
-  },
-  {
-    title: "Membership",
-    items: [
-      { to: "/membership/dashboard", label: "Member Dashboard", icon: Users, testId: "nav-member-dashboard" },
-      { to: "/membership/register", label: "Registration Form", icon: Users, testId: "nav-member-register" }
+      { to: "/finance/profit-loss", label: "Profit & Loss", icon: Calculator, testId: "nav-profit-loss" },
+      { to: "/analysis/daily-review", label: "Sales Analysis", icon: BarChart3, testId: "nav-sales-analysis" }
     ]
   }
 ];
