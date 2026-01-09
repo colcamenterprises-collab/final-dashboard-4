@@ -34,6 +34,7 @@ export const ROUTES = {
   INGREDIENTS_MASTER: "/operations/ingredients-master",
   RECIPE_MAPPING: "/operations/recipe-mapping",
   RECIPE_MANAGEMENT: "/recipe-management",
+  PRODUCTS: "/products",
 
   // Finance
   FINANCE: "/finance",
