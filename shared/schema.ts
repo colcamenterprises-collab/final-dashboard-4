@@ -2117,3 +2117,44 @@ export type Modifier = typeof modifier.$inferSelect;
 export type InsertModifier = z.infer<typeof insertModifierSchema>;
 export type ModifierIngredient = typeof modifierIngredient.$inferSelect;
 export type InsertModifierIngredient = z.infer<typeof insertModifierIngredientSchema>;
+
+// -----------------------------------------------------------------------------
+// PATCH P1 — PRODUCT CORE
+// Products = sellable items with multi-channel pricing and ingredient-based costing
+// -----------------------------------------------------------------------------
+
+export const productChannelEnum = pgEnum('product_channel', ['IN_STORE', 'GRAB', 'ONLINE']);
+
+export const product = pgTable("product", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const productIngredient = pgTable("product_ingredient", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  ingredientId: integer("ingredient_id").notNull(),
+  portionQty: numeric("portion_qty", { precision: 10, scale: 4 }).notNull(),
+});
+
+export const productPrice = pgTable("product_price", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  channel: text("channel").notNull(), // IN_STORE | GRAB | ONLINE
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertProductSchema = createInsertSchema(product).omit({ id: true, createdAt: true });
+export const insertProductIngredientSchema = createInsertSchema(productIngredient).omit({ id: true });
+export const insertProductPriceSchema = createInsertSchema(productPrice).omit({ id: true });
+
+export type Product = typeof product.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type ProductIngredient = typeof productIngredient.$inferSelect;
+export type InsertProductIngredient = z.infer<typeof insertProductIngredientSchema>;
+export type ProductPrice = typeof productPrice.$inferSelect;
+export type InsertProductPrice = z.infer<typeof insertProductPriceSchema>;

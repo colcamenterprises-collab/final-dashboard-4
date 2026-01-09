@@ -1,0 +1,311 @@
+// ======================================================================
+// PATCH P1 — PRODUCT CORE + PRODUCT EDITOR UI (ONE CANONICAL OBJECT)
+// COPY / PASTE ALL FILES EXACTLY AS-IS
+// ======================================================================
+
+
+
+// ======================================================================
+// BACKEND — SCHEMA
+// File: shared/schema/product.ts
+// ======================================================================
+import {
+  pgTable,
+  uuid,
+  text,
+  boolean,
+  numeric,
+  timestamp,
+} from "drizzle-orm/pg-core";
+
+export const product = pgTable("product", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  active: boolean("active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const productIngredient = pgTable("product_ingredient", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  productId: uuid("product_id").notNull(),
+  ingredientId: uuid("ingredient_id").notNull(),
+  portionQty: numeric("portion_qty", { precision: 10, scale: 4 }).notNull(),
+});
+
+export const productPrice = pgTable("product_price", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  productId: uuid("product_id").notNull(),
+  channel: text("channel").notNull(), // IN_STORE | GRAB | ONLINE
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
+});
+
+
+
+// ======================================================================
+// BACKEND — SERVICES
+// File: server/services/productCost.service.ts
+// ======================================================================
+import { db } from "@/db";
+import { productIngredient, ingredient } from "@/shared/schema";
+import { eq } from "drizzle-orm";
+
+export async function getProductCost(productId: string) {
+  const rows = await db
+    .select({
+      qty: productIngredient.portionQty,
+      unitCost: ingredient.unitCostPerBase,
+    })
+    .from(productIngredient)
+    .innerJoin(
+      ingredient,
+      eq(productIngredient.ingredientId, ingredient.id)
+    )
+    .where(eq(productIngredient.productId, productId));
+
+  let total = 0;
+  for (const r of rows) {
+    total += Number(r.qty) * Number(r.unitCost);
+  }
+  return Number(total.toFixed(2));
+}
+
+
+
+// ======================================================================
+// BACKEND — ROUTES
+// File: server/routes/products.ts
+// ======================================================================
+import { db } from "@/db";
+import {
+  product,
+  productIngredient,
+  productPrice,
+  ingredient,
+} from "@/shared/schema";
+import { getProductCost } from "@/server/services/productCost.service";
+import { eq } from "drizzle-orm";
+
+app.get("/api/products", async (_req, res) => {
+  const products = await db.select().from(product);
+  res.json(products);
+});
+
+app.get("/api/products/:id", async (req, res) => {
+  const id = req.params.id;
+
+  const [prod] = await db
+    .select()
+    .from(product)
+    .where(eq(product.id, id));
+
+  const ingredients = await db
+    .select({
+      id: productIngredient.id,
+      ingredientId: ingredient.id,
+      name: ingredient.name,
+      baseUnit: ingredient.baseUnit,
+      portionQty: productIngredient.portionQty,
+      unitCost: ingredient.unitCostPerBase,
+    })
+    .from(productIngredient)
+    .innerJoin(
+      ingredient,
+      eq(productIngredient.ingredientId, ingredient.id)
+    )
+    .where(eq(productIngredient.productId, id));
+
+  const prices = await db
+    .select()
+    .from(productPrice)
+    .where(eq(productPrice.productId, id));
+
+  const cost = await getProductCost(id);
+
+  res.json({ product: prod, ingredients, prices, cost });
+});
+
+app.post("/api/products", async (req, res) => {
+  const { name, description, imageUrl, ingredients, prices } = req.body;
+
+  if (!ingredients || ingredients.length === 0) {
+    return res.status(400).json({ error: "Product requires ingredients" });
+  }
+
+  const [prod] = await db
+    .insert(product)
+    .values({ name, description, imageUrl })
+    .returning();
+
+  for (const ing of ingredients) {
+    await db.insert(productIngredient).values({
+      productId: prod.id,
+      ingredientId: ing.ingredientId,
+      portionQty: ing.portionQty,
+    });
+  }
+
+  for (const p of prices) {
+    await db.insert(productPrice).values({
+      productId: prod.id,
+      channel: p.channel,
+      price: p.price,
+    });
+  }
+
+  res.json(prod);
+});
+
+app.put("/api/products/:id", async (req, res) => {
+  const id = req.params.id;
+  const { name, description, imageUrl, ingredients, prices, active } = req.body;
+
+  await db
+    .update(product)
+    .set({ name, description, imageUrl, active })
+    .where(eq(product.id, id));
+
+  await db
+    .delete(productIngredient)
+    .where(eq(productIngredient.productId, id));
+
+  await db
+    .delete(productPrice)
+    .where(eq(productPrice.productId, id));
+
+  for (const ing of ingredients) {
+    await db.insert(productIngredient).values({
+      productId: id,
+      ingredientId: ing.ingredientId,
+      portionQty: ing.portionQty,
+    });
+  }
+
+  for (const p of prices) {
+    await db.insert(productPrice).values({
+      productId: id,
+      channel: p.channel,
+      price: p.price,
+    });
+  }
+
+  res.json({ ok: true });
+});
+
+
+
+// ======================================================================
+// FRONTEND — PRODUCT EDITOR PAGE
+// File: client/src/pages/products/ProductEditor.tsx
+// ======================================================================
+import { useEffect, useState } from "react";
+
+export default function ProductEditor({ id, onClose }) {
+  const [product, setProduct] = useState<any>({
+    name: "",
+    description: "",
+    imageUrl: "",
+    active: true,
+  });
+  const [ingredients, setIngredients] = useState<any[]>([]);
+  const [prices, setPrices] = useState<any[]>([
+    { channel: "IN_STORE", price: 0 },
+    { channel: "GRAB", price: 0 },
+    { channel: "ONLINE", price: 0 },
+  ]);
+  const [cost, setCost] = useState(0);
+
+  useEffect(() => {
+    if (!id) return;
+    fetch(`/api/products/${id}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setProduct(d.product);
+        setIngredients(d.ingredients);
+        setPrices(d.prices);
+        setCost(d.cost);
+      });
+  }, [id]);
+
+  function updatePrice(channel, value) {
+    setPrices((p) =>
+      p.map((x) => (x.channel === channel ? { ...x, price: value } : x))
+    );
+  }
+
+  async function save() {
+    const payload = { ...product, ingredients, prices };
+    await fetch(id ? `/api/products/${id}` : "/api/products", {
+      method: id ? "PUT" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    onClose();
+  }
+
+  return (
+    <div className="page">
+      <h1>Product</h1>
+
+      <input
+        placeholder="Product name"
+        value={product.name}
+        onChange={(e) => setProduct({ ...product, name: e.target.value })}
+      />
+
+      <textarea
+        placeholder="Description"
+        value={product.description}
+        onChange={(e) =>
+          setProduct({ ...product, description: e.target.value })
+        }
+      />
+
+      <input
+        placeholder="Image URL"
+        value={product.imageUrl || ""}
+        onChange={(e) =>
+          setProduct({ ...product, imageUrl: e.target.value })
+        }
+      />
+
+      <h2>Ingredients</h2>
+      {ingredients.map((i, idx) => (
+        <div key={idx}>
+          {i.name} —
+          <input
+            type="number"
+            value={i.portionQty}
+            onChange={(e) =>
+              setIngredients((prev) =>
+                prev.map((x, ii) =>
+                  ii === idx ? { ...x, portionQty: Number(e.target.value) } : x
+                )
+              )
+            }
+          />
+          {i.baseUnit}
+        </div>
+      ))}
+
+      <h2>Pricing & Margin</h2>
+      {prices.map((p) => (
+        <div key={p.channel}>
+          {p.channel} price:
+          <input
+            type="number"
+            value={p.price}
+            onChange={(e) => updatePrice(p.channel, Number(e.target.value))}
+          />
+          Margin: {(Number(p.price) - cost).toFixed(2)}
+        </div>
+      ))}
+
+      <strong>Cost per serve: ฿{cost}</strong>
+
+      <button onClick={save}>Save Product</button>
+      <button onClick={onClose}>Cancel</button>
+    </div>
+  );
+}
