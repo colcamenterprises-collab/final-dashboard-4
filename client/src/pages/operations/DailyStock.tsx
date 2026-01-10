@@ -513,7 +513,7 @@ const handleCheckDone = async ({ status }:{status:'COMPLETED'|'SKIPPED'|'UNAVAIL
                 )}
               </ul>
               <p className="text-xs text-slate-600 pt-2 border-t border-slate-200">
-                💡 <strong>Tip:</strong> {L.validationTip}
+                <strong>Tip:</strong> {L.validationTip}
               </p>
             </AlertDialogDescription>
           </AlertDialogHeader>
