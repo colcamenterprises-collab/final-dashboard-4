@@ -35,6 +35,7 @@ import RecipeCards from "./pages/menu/RecipeCards";
 import IngredientManagement from "./pages/menu/IngredientManagement";
 import RecipeManagement from "./pages/RecipeManagement";
 import Products from "./pages/Products";
+import PageInventory from "./pages/system/PageInventory";
 import ShiftReports from "./pages/ShiftReports";
 import NightlyChecklist from "./pages/NightlyChecklist";
 import JussiOps from "./pages/JussiOps";
@@ -234,6 +235,8 @@ export default function App() {
                 <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
 
                 <Route path="/analysis/daily-review" element={<DailyReview />} />
+
+                <Route path="/system/page-inventory" element={<PageInventory />} />
 
                 <Route path="*" element={<NotFound />} />
               </Route>

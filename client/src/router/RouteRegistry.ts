@@ -75,6 +75,9 @@ export const ROUTES = {
   MEMBERSHIP: "/membership",
   MEMBERSHIP_DASHBOARD: "/membership/dashboard",
   MEMBERSHIP_REGISTER: "/membership/register",
+
+  // System (Hidden from sidebar)
+  PAGE_INVENTORY: "/system/page-inventory",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
@@ -83,3 +86,11 @@ export const ALLOWED_PATHS: string[] = Object.values(ROUTES);
 
 export const isAllowedPath = (path: string) =>
   ALLOWED_PATHS.includes((path || "/").replace(/\/+$/, "") || "/");
+
+// 🔎 ROUTE INVENTORY EXPORT (AUDIT ONLY)
+export const ROUTE_INVENTORY = Object.entries(ROUTES).map(([key, path]) => ({
+  key,
+  path,
+  title: key.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()),
+  section: key.split('_')[0] || "UNCLASSIFIED",
+}));

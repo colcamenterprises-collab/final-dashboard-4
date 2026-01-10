@@ -80,6 +80,17 @@ const navigationGroups: NavGroup[] = [
   }
 ];
 
+// 🔎 SIDEBAR INVENTORY EXPORT (AUDIT ONLY)
+export const SIDEBAR_INVENTORY = navigationGroups
+  .filter(g => !g.isStandalone)
+  .flatMap(group =>
+    group.items.map(item => ({
+      section: group.title,
+      label: item.label,
+      path: item.to,
+    }))
+  );
+
 interface ModernSidebarProps {
   isOpen: boolean;
   onClose: () => void;
