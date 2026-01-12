@@ -45,7 +45,7 @@ function ShiftAlertBanner() {
   if (v.level === "GREEN") return null;
 
   return (
-    <div className="mb-4 p-4 border-l-4 border-red-600 bg-red-50 rounded flex items-center gap-3" data-testid="shift-alert-banner">
+    <div className="mb-4 p-3 md:p-4 border border-red-200 bg-red-50 rounded-[8px] flex items-center gap-3" data-testid="shift-alert-banner">
       <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
       <div className="flex-1">
         <p className="font-semibold text-red-800 text-sm">Issues detected in the last shift — Review now.</p>
@@ -73,14 +73,14 @@ function ExpensesV2Tile() {
   const [, setLocation] = useLocation();
 
   return (
-    <div className="border p-4 rounded bg-white shadow-sm" data-testid="expenses-v2-tile">
-      <h2 className="font-semibold text-slate-700 text-sm mb-2">Monthly Expenses (V2)</h2>
-      <div className="text-lg font-bold text-slate-800">
+    <div className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white" data-testid="expenses-v2-tile">
+      <h2 className="text-base font-semibold text-slate-800 mb-2">Monthly Expenses (V2)</h2>
+      <div className="text-xl font-bold text-slate-900">
         {isLoading ? "—" : `${(data?.monthlyTotal || 0).toLocaleString()} THB`}
       </div>
       <button
         onClick={() => setLocation("/finance/expenses-v2")}
-        className="text-emerald-600 underline text-xs mt-2"
+        className="text-emerald-700 underline text-xs mt-2"
         data-testid="link-view-expenses-v2"
       >
         View Expenses
@@ -101,8 +101,8 @@ function ShiftHealthTile() {
 
   if (isLoading) {
     return (
-      <div className="border p-4 rounded bg-white shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-2">Shift Health</h2>
+      <div className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white">
+        <h2 className="text-base font-semibold text-slate-800 mb-2">Shift Health</h2>
         <div className="text-slate-400 text-xs">Loading...</div>
       </div>
     );
@@ -110,8 +110,8 @@ function ShiftHealthTile() {
 
   if (!report) {
     return (
-      <div className="border p-4 rounded bg-white shadow-sm">
-        <h2 className="font-semibold text-slate-700 text-sm mb-2">Shift Health</h2>
+      <div className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white">
+        <h2 className="text-base font-semibold text-slate-800 mb-2">Shift Health</h2>
         <div className="text-slate-400 text-xs">No shift report available.</div>
       </div>
     );
@@ -130,10 +130,10 @@ function ShiftHealthTile() {
     : "bg-emerald-50";
 
   return (
-    <div className={`border p-4 rounded shadow-sm ${severityBg}`} data-testid="shift-health-tile">
-      <h2 className="font-semibold text-slate-700 text-sm mb-2">Shift Health</h2>
+    <div className={`rounded-[8px] border p-3 md:p-4 shadow-md ${severityBg}`} data-testid="shift-health-tile">
+      <h2 className="text-base font-semibold text-slate-800 mb-2">Shift Health</h2>
 
-      <div className={`text-lg font-bold ${severityColor}`}>
+      <div className={`text-xl font-bold ${severityColor}`}>
         {v.level || "UNKNOWN"}
       </div>
 
@@ -145,7 +145,7 @@ function ShiftHealthTile() {
 
       <Link
         to={`/reports/shift-report/view/${report.id}`}
-        className="inline-block mt-3 px-3 py-1.5 bg-slate-800 text-white rounded text-xs"
+        className="inline-block mt-3 px-4 py-2 text-xs rounded-[8px] bg-black text-white hover:bg-gray-800 active:bg-gray-900 min-h-[44px] font-semibold transition-all active:scale-98"
         data-testid="button-view-shift-report"
       >
         View Report
@@ -167,35 +167,30 @@ function BalanceHero() {
   const month = (financeSummary as any)?.month || '';
 
   return (
-    <div className="relative overflow-hidden rounded bg-gradient-to-br from-emerald-500 to-teal-600 p-4 sm:p-6 md:p-8 text-white shadow-xl">
-      <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-white/10" />
-      <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-white/5" />
-      
-      <div className="relative">
-        <p className="text-emerald-100 text-xs sm:text-sm font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 md:mb-8">
-          ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </h1>
-        
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => setLocation('/operations/daily-reports')}
-            className="bg-white/15 hover:bg-white/25 active:bg-white/35 text-white border border-white/20 w-full sm:w-auto text-xs font-medium py-2 px-3 rounded transition-colors flex items-center justify-center gap-2"
-            data-testid="button-view-latest-report"
-          >
-            <FileText className="h-4 w-4" />
-            View Latest Report
-          </button>
-          <ExpenseLodgmentModal
-            triggerClassName="bg-white/15 hover:bg-white/25 text-white border-white/20 w-full sm:w-auto text-xs"
-            triggerText="Add Business Expense"
-            triggerIcon={<Plus className="h-4 w-4 mr-2" />}
-            onSuccess={() => {
-              queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
-              queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
-            }}
-          />
-        </div>
+    <div className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white">
+      <p className="text-xs text-slate-600 font-medium mb-2">Monthly Expenses {month && `(${month})`}</p>
+      <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">
+        ฿{currentMonthExpenses.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+      </h1>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={() => setLocation('/operations/daily-reports')}
+          className="px-4 py-2 text-xs sm:text-sm border-2 border-gray-300 rounded-[8px] bg-white hover:bg-gray-50 active:bg-gray-100 min-h-[44px] font-medium transition-all active:scale-98 w-full sm:w-auto flex items-center justify-center gap-2"
+          data-testid="button-view-latest-report"
+        >
+          <FileText className="h-4 w-4" />
+          View Latest Report
+        </button>
+        <ExpenseLodgmentModal
+          triggerClassName="px-6 py-2 text-xs sm:text-sm rounded-[8px] bg-black text-white hover:bg-gray-800 active:bg-gray-900 min-h-[44px] font-semibold transition-all active:scale-98 w-full sm:w-auto"
+          triggerText="Add Business Expense"
+          triggerIcon={<Plus className="h-4 w-4 mr-2" />}
+          onSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
+            queryClient.invalidateQueries({ queryKey: ['expenseTotals'] });
+          }}
+        />
       </div>
     </div>
   );
@@ -246,14 +241,14 @@ function KPIGrid() {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full">
       {kpis.map((kpi, index) => (
-        <div key={index} className="bg-white rounded p-4 sm:p-6 shadow-sm border border-slate-100 hover:shadow-md transition-shadow min-w-0">
-          <div className="flex items-center justify-between mb-3 sm:mb-4">
-            <div className={`p-2 rounded bg-${kpi.color}-50`}>
+        <div key={index} className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white min-w-0">
+          <div className="flex items-center justify-between mb-3">
+            <div className={`p-2 rounded-[8px] bg-${kpi.color}-50`}>
               <kpi.icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${kpi.color}-600`} />
             </div>
           </div>
-          <p className="text-base sm:text-xl md:text-2xl font-bold text-slate-900 mb-1 break-words">{kpi.value}</p>
-          <p className="text-xs sm:text-sm font-medium text-slate-900">{kpi.title}</p>
+          <p className="text-base sm:text-lg font-bold text-slate-900 mb-1 break-words">{kpi.value}</p>
+          <p className="text-xs font-medium text-slate-900">{kpi.title}</p>
           <p className="text-xs text-slate-500 mt-1">{kpi.subtitle}</p>
         </div>
       ))}
@@ -298,8 +293,8 @@ function PrimeCostCards() {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      <div className="rounded-lg border p-4 bg-white shadow-sm">
-        <div className="text-sm text-slate-600 font-semibold">Prime Cost — Latest Shift</div>
+      <div className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white">
+        <div className="text-base text-slate-800 font-semibold">Prime Cost — Latest Shift</div>
         <div className="text-xs text-slate-500 mb-2">Shift date: {date || "—"}</div>
         {loading ? (
           <div className="text-slate-500 text-sm">Loading…</div>
@@ -307,7 +302,7 @@ function PrimeCostCards() {
           <div className="text-rose-600 text-sm">{err}</div>
         ) : (
           <>
-            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(daily?.primePct ?? null)}`}>
+            <div className={`inline-block px-3 py-1 rounded-[8px] text-lg font-bold ${color(daily?.primePct ?? null)}`}>
               {pc(daily?.primePct ?? null)}
             </div>
             <div className="mt-3 text-xs text-slate-600 space-y-1">
@@ -328,8 +323,8 @@ function PrimeCostCards() {
         )}
       </div>
 
-      <div className="rounded-lg border p-4 bg-white shadow-sm">
-        <div className="text-sm text-slate-600 font-semibold">Prime Cost — MTD</div>
+      <div className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white">
+        <div className="text-base text-slate-800 font-semibold">Prime Cost — MTD</div>
         <div className="text-xs text-slate-500 mb-2">Month to date</div>
         {loading ? (
           <div className="text-slate-500 text-sm">Loading…</div>
@@ -337,7 +332,7 @@ function PrimeCostCards() {
           <div className="text-rose-600 text-sm">{err}</div>
         ) : (
           <>
-            <div className={`inline-block px-3 py-1 rounded text-lg font-bold ${color(mtd?.primePct ?? null)}`}>
+            <div className={`inline-block px-3 py-1 rounded-[8px] text-lg font-bold ${color(mtd?.primePct ?? null)}`}>
               {pc(mtd?.primePct ?? null)}
             </div>
             <div className="mt-3 text-xs text-slate-600 space-y-1">
@@ -381,11 +376,11 @@ function CashBalanceSnapshot() {
     });
   }, []);
 
-  if (loading) return <div className="w-full lg:w-1/3 bg-white rounded p-4 sm:p-6 shadow-sm border text-gray-500">Loading balances...</div>;
+  if (loading) return <div className="w-full lg:w-1/3 rounded-[8px] border p-3 md:p-4 shadow-md bg-white text-gray-500">Loading balances...</div>;
 
   return (
-    <div className="w-full lg:w-1/3 bg-white rounded p-4 sm:p-6 shadow-sm border">
-      <h2 className="text-xs sm:text-sm font-bold mb-4 text-gray-800">Shift Summary</h2>
+    <div className="w-full lg:w-1/3 rounded-[8px] border p-3 md:p-4 shadow-md bg-white">
+      <h2 className="text-base font-semibold mb-4 text-gray-800">Shift Summary</h2>
       <div>
         {posBalances.length > 0 ? (
           posBalances.map((b: any, i) => <BalanceCard key={i} {...b} />)
@@ -452,11 +447,11 @@ function SystemHealthSection() {
   ];
 
   return (
-    <div className="bg-white rounded-xl p-6 shadow-sm">
-      <h2 className="text-xl font-extrabold text-gray-800 mb-6">System Health</h2>
+    <div className="rounded-[8px] border p-3 md:p-4 shadow-md bg-white">
+      <h2 className="text-xl font-semibold text-gray-800 mb-4">System Health</h2>
 
       {/* Overall Health Donut */}
-      <div className="flex flex-col md:flex-row gap-8 items-center md:items-start mb-6">
+      <div className="flex flex-col md:flex-row gap-6 items-center md:items-start mb-6">
         <div className="flex-shrink-0 w-48 h-48">
           <DoughnutChart 
             checks={health?.checks} 
@@ -468,7 +463,7 @@ function SystemHealthSection() {
         <div className="flex-1 min-w-0 text-center md:text-left">
           <div className="flex items-center justify-center md:justify-start gap-2 mb-2">
             <status.icon className={`h-5 w-5 text-${status.color}-600`} />
-            <span className={`text-lg font-bold text-${status.color}-600`}>
+            <span className={`text-base font-semibold text-${status.color}-600`}>
               {status.label}
             </span>
           </div>
@@ -492,7 +487,7 @@ function SystemHealthSection() {
       {health?.checks && health.checks.length > 0 && (
         <div className="mb-6">
           <p className="text-xs font-semibold text-slate-600 mb-4">Component Status</p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
             {categories.map((cat) => {
               const check = health.checks.find(c => c.name.includes(cat.name));
               return check ? (
@@ -506,7 +501,7 @@ function SystemHealthSection() {
                   </div>
                   <p className="text-xs font-medium text-slate-700 text-center">{cat.label}</p>
                   <p className={`text-[10px] ${check.ok ? 'text-emerald-600' : 'text-red-600'}`}>
-                    {check.ok ? "✓ OK" : "✗ Error"}
+                    {check.ok ? "OK" : "Error"}
                   </p>
                 </div>
               ) : null;
@@ -517,13 +512,13 @@ function SystemHealthSection() {
 
       {/* Individual Checks List */}
       {health?.checks && health.checks.length > 0 && (
-        <div className="border-t border-slate-100 pt-6">
+        <div className="border-t border-slate-100 pt-4">
           <p className="text-xs font-semibold text-slate-600 mb-3">All Checks</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {health.checks.map((check, i) => (
               <div 
                 key={i} 
-                className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded ${
+                className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded-[8px] ${
                   check.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
                 }`}
               >
@@ -544,7 +539,7 @@ function SystemHealthSection() {
 
 export default function Home() {
   return (
-    <div className="space-y-6 md:space-y-8 p-2 sm:p-0 pb-24 md:pb-8">
+    <div className="space-y-4 md:space-y-6 p-3 sm:p-0 pb-24 md:pb-8">
       <ShiftAlertBanner />
       
       <BalanceHero />
@@ -553,7 +548,7 @@ export default function Home() {
       
       <PrimeCostCards />
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
         <ShiftHealthTile />
         <ExpensesV2Tile />
         <VarianceWidget />
