@@ -27,17 +27,28 @@ const labels = {
     grabSales: 'Grab Sales',
     otherSales: 'Other Sales',
     totalSales: 'Total Sales',
-    totalReceiptCount: 'Total Receipt Count',
+    cashReceiptCount: 'Cash Receipt Count',
+    qrReceiptCount: 'QR Receipt Count',
+    grabReceiptCount: 'Grab Receipt Count',
+    otherReceiptCount: 'Other Receipt Count',
     expenses: 'Expenses',
     shiftExpenses: 'Shift Expenses',
-    shiftExpensesHint: 'Do not group together items - Enter each expense separately',
+    shiftExpensesHint: 'One expense item per line',
     item: 'Item',
     cost: 'Cost',
     shopName: 'Shop Name',
+    supplierRequired: 'Select supplier',
+    supplierOtherOption: 'Other (Manual Supplier)',
+    itemOtherOption: 'Other (Manual Item)',
+    itemDescription: 'Item Description',
+    itemDescriptionPlaceholder: 'Describe the item',
+    supplierOtherLabel: 'Shop Name',
+    supplierOtherPlaceholder: 'Enter supplier/shop name',
     delete: 'Delete',
     addRow: '+ Add Row',
     subtotal: 'Subtotal',
     staffWages: 'Staff Wages',
+    otherPayments: 'Other Staff Payments',
     staffName: 'Staff Name',
     amount: 'Amount',
     type: 'Type',
@@ -45,13 +56,13 @@ const labels = {
     overtime: 'Overtime',
     bonus: 'Bonus',
     reimbursement: 'Reimbursement',
+    tips: 'Tips',
     totalExpenses: 'Total Expenses',
     cashBanking: 'Cash & Banking',
     closingCash: 'Closing Cash',
     closingCashHint: 'Enter the total amount of cash that remains in the register after all expenses. Include the starting cash (float amount)',
-    expectedCashToBank: 'Expected Cash to Bank',
-    expectedQrToBank: 'Expected QR to Bank',
-    expectedTotalToBank: 'Expected Total to Bank',
+    cashBanked: 'Cash Banked',
+    qrBanked: 'QR Banked',
     summary: 'Summary',
     netPosition: 'Net Position',
     saveDraft: 'Save draft',
@@ -59,7 +70,7 @@ const labels = {
     updateForm: 'Update Form',
     saving: 'Saving...',
     loading: 'Loading form data...',
-    formSubmitted: 'Form submitted 🎉',
+    formSubmitted: 'Form submitted',
     dailySalesSaved: 'Daily Sales has been saved successfully.',
     continueToStock: 'Continue to',
     formStock: 'Form 2 (Stock)',
@@ -68,7 +79,19 @@ const labels = {
     goToStock: 'Go to Stock now',
     stayHere: 'Stay here',
     validationError: 'Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.',
-    autoTimestamp: 'Auto timestamp'
+    autoTimestamp: 'Auto timestamp',
+    refunds: 'Refunds',
+    refundsPrompt: 'Did any refunds occur?',
+    refundsYes: 'Yes',
+    refundsNo: 'No',
+    noRefundsConfirm: 'No refunds',
+    originalReceipt: 'Original Receipt Number',
+    refundReason: 'Refund Reason',
+    replacementReceipt: 'Replacement Sale Receipt Number',
+    requiredField: 'Required',
+    purchaseItem: 'Purchase Item',
+    unit: 'Unit',
+    category: 'Category'
   },
   th: {
     pageTitle: 'ยอดขายและค่าใช้จ่ายประจำวัน',
@@ -86,17 +109,28 @@ const labels = {
     grabSales: 'ยอดขาย Grab',
     otherSales: 'ยอดขายอื่นๆ',
     totalSales: 'ยอดขายรวม',
-    totalReceiptCount: 'จำนวนใบเสร็จทั้งหมด',
+    cashReceiptCount: 'จำนวนใบเสร็จเงินสด',
+    qrReceiptCount: 'จำนวนใบเสร็จ QR',
+    grabReceiptCount: 'จำนวนใบเสร็จ Grab',
+    otherReceiptCount: 'จำนวนใบเสร็จอื่นๆ',
     expenses: 'ค่าใช้จ่าย',
     shiftExpenses: 'ค่าใช้จ่ายกะ',
-    shiftExpensesHint: 'ห้ามรวมรายการ - กรอกค่าใช้จ่ายแต่ละรายการแยกกัน',
+    shiftExpensesHint: 'หนึ่งรายการต่อหนึ่งบรรทัด',
     item: 'รายการ',
     cost: 'ราคา',
     shopName: 'ชื่อร้าน',
+    supplierRequired: 'เลือกผู้จำหน่าย',
+    supplierOtherOption: 'อื่นๆ (กรอกผู้จำหน่ายเอง)',
+    itemOtherOption: 'อื่นๆ (กรอกรายการเอง)',
+    itemDescription: 'คำอธิบายรายการ',
+    itemDescriptionPlaceholder: 'อธิบายรายการ',
+    supplierOtherLabel: 'ชื่อร้าน',
+    supplierOtherPlaceholder: 'กรอกชื่อผู้จำหน่าย/ร้าน',
     delete: 'ลบ',
     addRow: '+ เพิ่มแถว',
     subtotal: 'รวมย่อย',
     staffWages: 'ค่าจ้างพนักงาน',
+    otherPayments: 'การจ่ายอื่นๆ ให้พนักงาน',
     staffName: 'ชื่อพนักงาน',
     amount: 'จำนวนเงิน',
     type: 'ประเภท',
@@ -104,13 +138,13 @@ const labels = {
     overtime: 'ล่วงเวลา',
     bonus: 'โบนัส',
     reimbursement: 'เบิกคืน',
+    tips: 'ทิป',
     totalExpenses: 'ค่าใช้จ่ายรวม',
     cashBanking: 'เงินสดและธนาคาร',
     closingCash: 'เงินสดปิดยอด',
     closingCashHint: 'ใส่จำนวนเงินสดที่เหลือในลิ้นชักหลังหักค่าใช้จ่าย รวมเงินสดเริ่มต้นด้วย',
-    expectedCashToBank: 'เงินสดที่ต้องนำส่งธนาคาร',
-    expectedQrToBank: 'ยอด QR ที่ต้องนำส่งธนาคาร',
-    expectedTotalToBank: 'ยอดรวมที่ต้องนำส่งธนาคาร',
+    cashBanked: 'เงินสดที่นำส่งธนาคาร',
+    qrBanked: 'ยอด QR ที่โอนเข้าธนาคาร',
     summary: 'สรุป',
     netPosition: 'ยอดสุทธิ',
     saveDraft: 'บันทึกร่าง',
@@ -118,7 +152,7 @@ const labels = {
     updateForm: 'อัปเดตแบบฟอร์ม',
     saving: 'กำลังบันทึก...',
     loading: 'กำลังโหลดข้อมูล...',
-    formSubmitted: 'ส่งแบบฟอร์มแล้ว 🎉',
+    formSubmitted: 'ส่งแบบฟอร์มแล้ว',
     dailySalesSaved: 'บันทึกยอดขายประจำวันเรียบร้อยแล้ว',
     continueToStock: 'ไปต่อที่',
     formStock: 'แบบฟอร์ม 2 (สต๊อก)',
@@ -127,7 +161,19 @@ const labels = {
     goToStock: 'ไปหน้าสต๊อกเลย',
     stayHere: 'อยู่ที่นี่',
     validationError: 'ไม่สามารถดำเนินการต่อได้: ฟิลด์ไม่ครบ/ไม่ถูกต้อง กรุณาแก้ไขช่องที่ไฮไลท์',
-    autoTimestamp: 'บันทึกเวลาอัตโนมัติ'
+    autoTimestamp: 'บันทึกเวลาอัตโนมัติ',
+    refunds: 'การคืนเงิน',
+    refundsPrompt: 'มีการคืนเงินหรือไม่',
+    refundsYes: 'มี',
+    refundsNo: 'ไม่มี',
+    noRefundsConfirm: 'ไม่มีการคืนเงิน',
+    originalReceipt: 'หมายเลขใบเสร็จต้นฉบับ',
+    refundReason: 'เหตุผลการคืนเงิน',
+    replacementReceipt: 'หมายเลขใบเสร็จการขายแทน',
+    requiredField: 'จำเป็นต้องกรอก',
+    purchaseItem: 'รายการซื้อ',
+    unit: 'หน่วย',
+    category: 'หมวดหมู่'
   }
 };
 
@@ -195,8 +241,9 @@ function SuccessModal({
   );
 }
 
-type ShiftExpenseRow = { id: string; item: string; cost: number; shop: string };
-type WageRow = { id: string; staff: string; amount: number; type: "WAGES" | "OVERTIME" | "BONUS" | "REIMBURSEMENT" };
+type ShiftExpenseRow = { id: string; item: string; cost: number; shop: string; category?: string; unit?: string; purchasingLinked?: boolean; otherItemDescription?: string; otherSupplierName?: string };
+type WageRow = { id: string; staff: string; amount: number; type: "WAGES" };
+type OtherPaymentRow = { id: string; staff: string; amount: number; type: "OVERTIME" | "BONUS" | "REIMBURSEMENT" | "TIPS" };
 
 const uid = () => Math.random().toString(36).slice(2, 9);
 
@@ -207,18 +254,24 @@ export default function DailySales() {
   
   const [completedBy, setCompletedBy] = useState("");
   const [cashStart, setCashStart] = useState(0);
-  const [receiptCount, setReceiptCount] = useState(0);
   const [cash, setCash] = useState(0);
   const [qr, setQr] = useState(0);
   const [grab, setGrab] = useState(0);
   const [aroi, setAroi] = useState(0);
+  const [cashReceipts, setCashReceipts] = useState(0);
+  const [qrReceipts, setQrReceipts] = useState(0);
+  const [grabReceipts, setGrabReceipts] = useState(0);
+  const [otherReceipts, setOtherReceipts] = useState(0);
   
   // Expenses state
-  const [shiftExpenses, setShiftExpenses] = useState<ShiftExpenseRow[]>([{ id: uid(), item: "", cost: 0, shop: "" }]);
+  const [shiftExpenses, setShiftExpenses] = useState<ShiftExpenseRow[]>([{ id: uid(), item: "", cost: 0, shop: "", otherItemDescription: "", otherSupplierName: "" }]);
   const [staffWages, setStaffWages] = useState<WageRow[]>([{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
+  const [otherPayments, setOtherPayments] = useState<OtherPaymentRow[]>([{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
   
   // Banking state
   const [closingCash, setClosingCash] = useState(0);
+  const [cashBanked, setCashBanked] = useState(0);
+  const [qrBanked, setQrBanked] = useState(0);
   
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -229,6 +282,13 @@ export default function DailySales() {
   const [lang, setLang] = useState<'en' | 'th'>('en');
   const [loading, setLoading] = useState(isEditMode);
   const [shiftDate, setShiftDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [refundStatus, setRefundStatus] = useState<'YES' | 'NO' | ''>('');
+  const [noRefundsConfirmed, setNoRefundsConfirmed] = useState(false);
+  const [refundOriginalReceipt, setRefundOriginalReceipt] = useState("");
+  const [refundReason, setRefundReason] = useState("");
+  const [refundReplacementReceipt, setRefundReplacementReceipt] = useState("");
+  const [expenseSuppliers, setExpenseSuppliers] = useState<string[]>([]);
+  const [purchaseItems, setPurchaseItems] = useState<Array<{ name: string; category: string; unit: string; supplier: string }>>([]);
 
   useEffect(() => {
     if (!showSuccess) return;
@@ -264,6 +324,21 @@ export default function DailySales() {
           setGrab(p.grabSales || 0);
           setAroi(p.otherSales || 0);
           setClosingCash(p.closingCash || 0);
+          setCashBanked(p.cashBanked || 0);
+          setQrBanked(p.qrTransfer || 0);
+          if (p.receiptCounts) {
+            setCashReceipts(p.receiptCounts.cash ?? 0);
+            setQrReceipts(p.receiptCounts.qr ?? 0);
+            setGrabReceipts(p.receiptCounts.grab ?? 0);
+            setOtherReceipts(p.receiptCounts.other ?? 0);
+          }
+          if (p.refunds) {
+            setRefundStatus(p.refunds.status || '');
+            setNoRefundsConfirmed(Boolean(p.refunds.noRefundsConfirmed));
+            setRefundOriginalReceipt(p.refunds.originalReceiptNumber || "");
+            setRefundReason(p.refunds.refundReason || "");
+            setRefundReplacementReceipt(p.refunds.replacementReceiptNumber || "");
+          }
           
           // Load shift date for editing
           if (data.record.date) {
@@ -283,18 +358,33 @@ export default function DailySales() {
               id: e.id || uid(),
               item: e.item || "",
               cost: e.cost || 0,
-              shop: e.shop || ""
+              shop: e.shop || "",
+              category: e.category || "",
+              unit: e.unit || "",
+              purchasingLinked: Boolean(e.purchasingLinked),
+              otherItemDescription: e.otherItemDescription || "",
+              otherSupplierName: e.otherSupplierName || ""
             })));
           }
           
           // Load wages (API returns "wages" not "staffWages")
           if (p.wages && Array.isArray(p.wages)) {
-            setStaffWages(p.wages.map((w: any) => ({
+            const regular = p.wages.filter((w: any) => w.type === "WAGES");
+            const others = p.wages.filter((w: any) => w.type !== "WAGES");
+            const regularRows = regular.map((w: any) => ({
               id: w.id || uid(),
               staff: w.staff || "",
               amount: w.amount || 0,
-              type: w.type || "WAGES"
-            })));
+              type: "WAGES"
+            }));
+            const otherRows = others.map((w: any) => ({
+              id: w.id || uid(),
+              staff: w.staff || "",
+              amount: w.amount || 0,
+              type: w.type || "BONUS"
+            }));
+            setStaffWages(regularRows.length ? regularRows : [{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
+            setOtherPayments(otherRows.length ? otherRows : [{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
           }
           
           setShiftId(data.record.id);
@@ -312,6 +402,47 @@ export default function DailySales() {
     loadFormData();
   }, [isEditMode, id]);
 
+  useEffect(() => {
+    let active = true;
+    const loadSuppliers = async () => {
+      try {
+        const res = await fetch("/api/expense-suppliers");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!active) return;
+        const names = Array.isArray(data) ? data.map((s: any) => s.name).filter(Boolean) : [];
+        setExpenseSuppliers(names);
+      } catch {}
+    };
+
+    const loadPurchaseItems = async () => {
+      try {
+        const res = await fetch("/api/purchasing-items/sync-to-daily-stock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!active) return;
+        const items = Array.isArray(data?.list)
+          ? data.list.map((item: any) => ({
+              name: item.name,
+              category: item.category || '',
+              unit: item.unit || '',
+              supplier: item.supplier || ''
+            }))
+          : [];
+        setPurchaseItems(items);
+      } catch {}
+    };
+
+    loadSuppliers();
+    loadPurchaseItems();
+    return () => {
+      active = false;
+    };
+  }, []);
+
   // Restore drafts on mount (only when NOT in edit mode)
   useEffect(() => {
     if (isEditMode) return; // Don't restore drafts when editing existing form
@@ -326,6 +457,21 @@ export default function DailySales() {
         setQr(draft.qr || 0);
         setGrab(draft.grab || 0);
         setAroi(draft.aroi || 0);
+        setCashReceipts(draft.cashReceipts || 0);
+        setQrReceipts(draft.qrReceipts || 0);
+        setGrabReceipts(draft.grabReceipts || 0);
+        setOtherReceipts(draft.otherReceipts || 0);
+        setClosingCash(draft.closingCash || 0);
+        setCashBanked(draft.cashBanked || 0);
+        setQrBanked(draft.qrBanked || 0);
+        setShiftExpenses(draft.shiftExpenses || [{ id: uid(), item: "", cost: 0, shop: "", otherItemDescription: "", otherSupplierName: "" }]);
+        setStaffWages(draft.staffWages || [{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
+        setOtherPayments(draft.otherPayments || [{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
+        setRefundStatus(draft.refundStatus || '');
+        setNoRefundsConfirmed(Boolean(draft.noRefundsConfirmed));
+        setRefundOriginalReceipt(draft.refundOriginalReceipt || "");
+        setRefundReason(draft.refundReason || "");
+        setRefundReplacementReceipt(draft.refundReplacementReceipt || "");
       }
     } catch {}
   }, [isEditMode]);
@@ -341,15 +487,45 @@ export default function DailySales() {
       cashSales: cash,
       qrSales: qr,
       grabSales: grab,
-      otherSales: aroi
+      otherSales: aroi,
+      cashReceipts,
+      qrReceipts,
+      grabReceipts,
+      otherReceipts,
+      cashBanked,
+      qrBanked
     };
     
-    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
-    const newErrors = required.filter(f => {
+    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashReceipts', 'qrReceipts', 'grabReceipts', 'otherReceipts', 'cashBanked', 'qrBanked'];
+    const newErrors = required.filter((f) => {
       const value = formData[f as keyof typeof formData];
       if (f === 'completedBy') return !value || value.toString().trim() === '';
       return value == null || isNaN(Number(value)) || Number(value) < 0;
     });
+    
+    if (!refundStatus) {
+      newErrors.push('refundStatus');
+    } else if (refundStatus === 'NO') {
+      if (!noRefundsConfirmed) newErrors.push('noRefundsConfirmed');
+    } else if (refundStatus === 'YES') {
+      if (!refundOriginalReceipt.trim()) newErrors.push('refundOriginalReceipt');
+      if (!refundReason.trim()) newErrors.push('refundReason');
+      if (!refundReplacementReceipt.trim()) newErrors.push('refundReplacementReceipt');
+    }
+    
+    const invalidSuppliers = shiftExpenses.some((row) => !row.shop || row.shop.trim() === '');
+    if (invalidSuppliers) {
+      newErrors.push('expenseSupplier');
+    }
+
+    const invalidOtherItems = shiftExpenses.some((row) => row.item === '__OTHER__' && !row.otherItemDescription?.trim());
+    if (invalidOtherItems) {
+      newErrors.push('expenseOtherItem');
+    }
+    const invalidOtherSuppliers = shiftExpenses.some((row) => row.shop === '__OTHER__' && !row.otherSupplierName?.trim());
+    if (invalidOtherSuppliers) {
+      newErrors.push('expenseOtherSupplier');
+    }
     
     setErrors(newErrors);
     if (newErrors.length) {
@@ -374,9 +550,28 @@ export default function DailySales() {
         grabSales: grab,
         otherSales: aroi,
         totalSales: cash + qr + grab + aroi,
-        expenses: shiftExpenses,
-        wages: staffWages,
+        receiptCounts: {
+          cash: cashReceipts,
+          qr: qrReceipts,
+          grab: grabReceipts,
+          other: otherReceipts
+        },
+        refunds: {
+          status: refundStatus,
+          noRefundsConfirmed,
+          originalReceiptNumber: refundOriginalReceipt.trim(),
+          refundReason: refundReason.trim(),
+          replacementReceiptNumber: refundReplacementReceipt.trim()
+        },
+        expenses: shiftExpenses.map((row) => ({
+          ...row,
+          otherItemDescription: row.item === '__OTHER__' ? row.otherItemDescription?.trim() : "",
+          otherSupplierName: row.shop === '__OTHER__' ? row.otherSupplierName?.trim() : ""
+        })),
+        wages: [...staffWages, ...otherPayments],
         closingCash,
+        cashBanked,
+        qrTransfer: qrBanked,
         shiftDate: dateToSubmit,
         status: 'submitted'
       };
@@ -446,14 +641,51 @@ export default function DailySales() {
     qr,
     grab,
     aroi,
+    cashReceipts,
+    qrReceipts,
+    grabReceipts,
+    otherReceipts,
     shiftExpenses,
     staffWages,
-    closingCash
+    otherPayments,
+    closingCash,
+    cashBanked,
+    qrBanked,
+    refundStatus,
+    noRefundsConfirmed,
+    refundOriginalReceipt,
+    refundReason,
+    refundReplacementReceipt
   });
 
   const handleSaveDraft = () => {
     const draft = collectDailySalesValues();
     localStorage.setItem("daily_sales_draft", JSON.stringify(draft));
+  };
+
+  const matchPurchaseItem = (name: string) =>
+    purchaseItems.find((item) => item.name.toLowerCase() === name.toLowerCase());
+
+  const handleExpenseItemChange = (id: string, value: string) => {
+    const matched = matchPurchaseItem(value);
+    const isOther = value === '__OTHER__';
+    setShiftExpenses((prev) =>
+      prev.map((row) => {
+        if (row.id !== id) return row;
+        const supplier = matched?.supplier || row.shop;
+        const supplierAllowed = supplier && expenseSuppliers.includes(supplier);
+        return {
+          ...row,
+          item: value,
+          category: isOther ? "" : (matched?.category || row.category || ""),
+          unit: isOther ? "" : (matched?.unit || row.unit || ""),
+          purchasingLinked: Boolean(matched) && !isOther,
+          otherItemDescription: isOther ? row.otherItemDescription || "" : "",
+          shop: supplierAllowed ? supplier : row.shop,
+          otherSupplierName: supplier === '__OTHER__' ? row.otherSupplierName || "" : ""
+        };
+      })
+    );
   };
 
   // Create a shorthand for current language labels
@@ -546,18 +778,7 @@ export default function DailySales() {
 
           <section className="rounded-[4px] border bg-white p-5">
             <h2 className="text-sm font-bold mb-4">{L.salesInfo}</h2>
-            <div className="mb-4">
-              <label className="text-sm text-gray-600 block mb-1">{labels[lang].totalReceiptCount}</label>
-              <input 
-                type="number" 
-                min="0"
-                placeholder={labels[lang].totalReceiptCount}
-                value={receiptCount} 
-                onChange={e=>setReceiptCount(+e.target.value||0)} 
-                className="w-full md:w-48 border rounded-[4px] px-3 py-2 h-9 text-sm"
-              />
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
                 <input 
@@ -567,6 +788,17 @@ export default function DailySales() {
                   value={cash} 
                   onChange={e=>setCash(+e.target.value||0)} 
                   className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashReceiptCount}</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder={labels[lang].cashReceiptCount}
+                  value={cashReceipts} 
+                  onChange={e=>setCashReceipts(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashReceipts') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -581,6 +813,17 @@ export default function DailySales() {
                 />
               </div>
               <div>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrReceiptCount}</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder={labels[lang].qrReceiptCount}
+                  value={qrReceipts} 
+                  onChange={e=>setQrReceipts(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrReceipts') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabSales}</label>
                 <input 
                   type="number" 
@@ -592,6 +835,17 @@ export default function DailySales() {
                 />
               </div>
               <div>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabReceiptCount}</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder={labels[lang].grabReceiptCount}
+                  value={grabReceipts} 
+                  onChange={e=>setGrabReceipts(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('grabReceipts') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].otherSales}</label>
                 <input 
                   type="number" 
@@ -600,6 +854,17 @@ export default function DailySales() {
                   value={aroi} 
                   onChange={e=>setAroi(+e.target.value||0)} 
                   className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].otherReceiptCount}</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder={labels[lang].otherReceiptCount}
+                  value={otherReceipts} 
+                  onChange={e=>setOtherReceipts(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherReceipts') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
@@ -614,17 +879,42 @@ export default function DailySales() {
             <div className="mb-8">
               <h4 className="mb-1 text-sm font-semibold">{L.shiftExpenses}</h4>
               <p className="mb-3 text-xs text-slate-500">{L.shiftExpensesHint}</p>
+              <datalist id="purchase-item-list">
+                {purchaseItems.map((item) => (
+                  <option key={item.name} value={item.name} />
+                ))}
+                <option value="__OTHER__">{L.itemOtherOption}</option>
+              </datalist>
               <div className="space-y-4">
                 {shiftExpenses.map((row) => (
                   <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
                     <div>
-                      <label className="text-sm text-gray-600 block mb-1">{L.item}</label>
+                      <label className="text-sm text-gray-600 block mb-1">{L.purchaseItem}</label>
                       <input 
                         className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
                         value={row.item} 
-                        onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, item: e.target.value } : r))}
-                        placeholder="eg: 2 Gas Bottles, 1kg french Fries" 
+                        onChange={(e) => handleExpenseItemChange(row.id, e.target.value)}
+                        placeholder={L.shiftExpensesHint}
+                        list="purchase-item-list"
                       />
+                      {row.item === '__OTHER__' && (
+                        <div className="mt-2">
+                          <label className="text-sm text-gray-600 block mb-1">{L.itemDescription}</label>
+                          <input
+                            className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('expenseOtherItem') && !row.otherItemDescription?.trim() ? 'border-red-500' : ''}`}
+                            value={row.otherItemDescription || ""}
+                            onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, otherItemDescription: e.target.value } : r))}
+                            placeholder={L.itemDescriptionPlaceholder}
+                          />
+                        </div>
+                      )}
+                      {(row.unit || row.category) && (
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          {row.category ? `${L.category}: ${row.category}` : null}
+                          {row.category && row.unit ? " • " : null}
+                          {row.unit ? `${L.unit}: ${row.unit}` : null}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="text-sm text-gray-600 block mb-1">{L.cost} (฿)</label>
@@ -637,12 +927,28 @@ export default function DailySales() {
                     </div>
                     <div>
                       <label className="text-sm text-gray-600 block mb-1">{L.shopName}</label>
-                      <input 
-                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
-                        value={row.shop} 
-                        onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, shop: e.target.value } : r))}
-                        placeholder="Makro / Lotus" 
-                      />
+                      <select
+                        className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('expenseSupplier') && !row.shop ? 'border-red-500' : ''}`}
+                        value={row.shop}
+                        onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, shop: e.target.value, otherSupplierName: e.target.value === '__OTHER__' ? r.otherSupplierName || "" : "" } : r))}
+                      >
+                        <option value="">{L.supplierRequired}</option>
+                        {expenseSuppliers.map((supplier) => (
+                          <option key={supplier} value={supplier}>{supplier}</option>
+                        ))}
+                        <option value="__OTHER__">{L.supplierOtherOption}</option>
+                      </select>
+                      {row.shop === '__OTHER__' && (
+                        <div className="mt-2">
+                          <label className="text-sm text-gray-600 block mb-1">{L.supplierOtherLabel}</label>
+                          <input
+                            className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('expenseOtherSupplier') && !row.otherSupplierName?.trim() ? 'border-red-500' : ''}`}
+                            value={row.otherSupplierName || ""}
+                            onChange={(e) => setShiftExpenses(prev => prev.map(r => r.id === row.id ? { ...r, otherSupplierName: e.target.value } : r))}
+                            placeholder={L.supplierOtherPlaceholder}
+                          />
+                        </div>
+                      )}
                     </div>
                     <div>
                       <button
@@ -660,7 +966,7 @@ export default function DailySales() {
                 <button 
                   type="button"
                   className="h-9 px-3 border rounded-[4px] text-sm hover:bg-gray-50" 
-                  onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "" }])}
+                  onClick={() => setShiftExpenses(prev => [...prev, { id: uid(), item: "", cost: 0, shop: "", category: "", unit: "", purchasingLinked: false, otherItemDescription: "", otherSupplierName: "" }])}
                 >
                   {L.addRow}
                 </button>
@@ -694,16 +1000,11 @@ export default function DailySales() {
                     </div>
                     <div>
                       <label className="text-sm text-gray-600 block mb-1">{L.type}</label>
-                      <select 
-                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
-                        value={row.type} 
-                        onChange={(e) => setStaffWages(prev => prev.map(r => r.id === row.id ? { ...r, type: e.target.value as any } : r))}
-                      >
-                        <option value="WAGES">{L.wages}</option>
-                        <option value="OVERTIME">{L.overtime}</option>
-                        <option value="BONUS">{L.bonus}</option>
-                        <option value="REIMBURSEMENT">{L.reimbursement}</option>
-                      </select>
+                      <input
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-gray-50"
+                        value={L.wages}
+                        readOnly
+                      />
                     </div>
                     <div>
                       <button
@@ -729,8 +1030,69 @@ export default function DailySales() {
               </div>
             </div>
 
+            {/* Other Staff Payments */}
+            <div className="mt-8">
+              <h4 className="mb-3 text-sm font-semibold">{L.otherPayments}</h4>
+              <div className="space-y-4">
+                {otherPayments.map((row) => (
+                  <div key={row.id} className="grid gap-4 md:grid-cols-[2fr_1fr_1fr_auto] items-end">
+                    <div>
+                      <label className="text-sm text-gray-600 block mb-1">{L.staffName}</label>
+                      <input 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
+                        value={row.staff} 
+                        onChange={(e) => setOtherPayments(prev => prev.map(r => r.id === row.id ? { ...r, staff: e.target.value } : r))}
+                        placeholder={L.staffName} 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 block mb-1">{L.amount} (฿)</label>
+                      <input 
+                        type="number" 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
+                        value={row.amount} 
+                        onChange={(e) => setOtherPayments(prev => prev.map(r => r.id === row.id ? { ...r, amount: Number(e.target.value) } : r))} 
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm text-gray-600 block mb-1">{L.type}</label>
+                      <select 
+                        className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" 
+                        value={row.type} 
+                        onChange={(e) => setOtherPayments(prev => prev.map(r => r.id === row.id ? { ...r, type: e.target.value as OtherPaymentRow['type'] } : r))}
+                      >
+                        <option value="BONUS">{L.bonus}</option>
+                        <option value="TIPS">{L.tips}</option>
+                        <option value="REIMBURSEMENT">{L.reimbursement}</option>
+                        <option value="OVERTIME">{L.overtime}</option>
+                      </select>
+                    </div>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setOtherPayments(prev => prev.filter(r => r.id !== row.id))}
+                        className="h-9 rounded-[4px] border border-red-200 bg-red-50 px-3 text-sm text-red-700 hover:bg-red-100"
+                      >
+                        {L.delete}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <button 
+                  type="button"
+                  className="h-9 px-3 border rounded-[4px] text-sm hover:bg-gray-50" 
+                  onClick={() => setOtherPayments(prev => [...prev, { id: uid(), staff: "", amount: 0, type: "BONUS" }])}
+                >
+                  {L.addRow}
+                </button>
+                <div className="font-semibold">{L.subtotal}: ฿{otherPayments.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</div>
+              </div>
+            </div>
+
             <div className="mt-6 pt-4 border-t text-sm text-right font-bold">
-              {L.totalExpenses}: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
+              {L.totalExpenses}: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
             </div>
           </section>
 
@@ -748,24 +1110,95 @@ export default function DailySales() {
                 />
                 <p className="text-xs text-gray-500 mt-1">{L.closingCashHint}</p>
               </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.cashBanked} (฿)</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={cashBanked} 
+                  onChange={e=>setCashBanked(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashBanked') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.qrBanked} (฿)</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={qrBanked} 
+                  onChange={e=>setQrBanked(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrBanked') ? 'border-red-500' : ''}`}
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 mt-4 bg-white border border-slate-200 p-3 rounded-[4px]">
-              <div className="text-xs text-gray-500">{L.expectedCashToBank}</div>
-              <div className="text-right font-semibold">฿{(() => {
-                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
-                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
-                return expectedCashBank.toLocaleString();
-              })()}</div>
-              <div className="text-xs text-gray-500">{L.expectedQrToBank}</div>
-              <div className="text-right font-semibold">฿{qr.toLocaleString()}</div>
-              <div className="text-xs text-gray-500">{L.expectedTotalToBank}</div>
-              <div className="text-right font-semibold">฿{(() => {
-                const cashExpenses = shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0);
-                const expectedCashBank = Math.max(0, (cashStart + cash) - (closingCash + cashExpenses));
-                const expectedQRBank = qr;
-                return (expectedCashBank + expectedQRBank).toLocaleString();
-              })()}</div>
+          </section>
+
+          {/* Refunds Section */}
+          <section className="rounded-[4px] border bg-white p-5">
+            <h3 className="mb-4 text-sm font-semibold">{L.refunds}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.refundsPrompt}</label>
+                <select
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundStatus') ? 'border-red-500' : ''}`}
+                  value={refundStatus}
+                  onChange={(e) => {
+                    const value = e.target.value as 'YES' | 'NO' | '';
+                    setRefundStatus(value);
+                    if (value === 'NO') {
+                      setRefundOriginalReceipt("");
+                      setRefundReason("");
+                      setRefundReplacementReceipt("");
+                    }
+                  }}
+                >
+                  <option value="">{L.requiredField}</option>
+                  <option value="NO">{L.refundsNo}</option>
+                  <option value="YES">{L.refundsYes}</option>
+                </select>
+              </div>
+              {refundStatus === 'NO' && (
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={noRefundsConfirmed}
+                      onChange={(e) => setNoRefundsConfirmed(e.target.checked)}
+                      className={errors.includes('noRefundsConfirmed') ? 'outline outline-1 outline-red-500' : ''}
+                    />
+                    {L.noRefundsConfirm}
+                  </label>
+                </div>
+              )}
             </div>
+            {refundStatus === 'YES' && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">{L.originalReceipt}</label>
+                  <input
+                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundOriginalReceipt') ? 'border-red-500' : ''}`}
+                    value={refundOriginalReceipt}
+                    onChange={(e) => setRefundOriginalReceipt(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">{L.refundReason}</label>
+                  <input
+                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundReason') ? 'border-red-500' : ''}`}
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">{L.replacementReceipt}</label>
+                  <input
+                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundReplacementReceipt') ? 'border-red-500' : ''}`}
+                    value={refundReplacementReceipt}
+                    onChange={(e) => setRefundReplacementReceipt(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Summary Section */}
@@ -797,7 +1230,7 @@ export default function DailySales() {
               
               <div className="flex justify-between font-medium">
                 <span>{L.totalExpenses}:</span>
-                <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
+                <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
               </div>
               <div className="ml-4 space-y-1 text-xs text-gray-600">
                 <div className="flex justify-between">
@@ -808,11 +1241,15 @@ export default function DailySales() {
                   <span>• {L.staffWages}:</span>
                   <span>฿{staffWages.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>• {L.otherPayments}:</span>
+                  <span>฿{otherPayments.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
+                </div>
               </div>
               <div className="flex justify-between font-bold text-base border-t pt-2">
                 <span>{L.netPosition}:</span>
-                <span className={(cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0)) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
+                <span className={(cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0)) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                  ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
                 </span>
               </div>
             </div>

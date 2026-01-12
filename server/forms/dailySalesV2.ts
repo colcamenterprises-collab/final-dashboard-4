@@ -88,12 +88,69 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const body = req.body;
     
     // EXACT VALIDATION from consolidated patch - FIXED to allow zero values
-    const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales'];
+    const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashBanked', 'qrTransfer'];
     const missing = requiredFields.filter(field => {
       const value = body[field];
       if (field === 'completedBy') return !value || value.toString().trim() === '';
       return value == null || isNaN(Number(value)) || Number(value) < 0;
     });
+    
+    const receiptCounts = body.receiptCounts ?? {
+      cash: body.cashReceiptCount,
+      qr: body.qrReceiptCount,
+      grab: body.grabReceiptCount,
+      other: body.otherReceiptCount
+    };
+    
+    const invalidReceiptCounts = ['cash', 'qr', 'grab', 'other'].some((key) => {
+      const value = receiptCounts?.[key];
+      return value == null || isNaN(Number(value)) || Number(value) < 0;
+    });
+    
+    if (invalidReceiptCounts) {
+      missing.push('receiptCounts');
+    }
+    
+    const refunds = body.refunds ?? {
+      status: body.refundStatus,
+      noRefundsConfirmed: body.noRefundsConfirmed,
+      originalReceiptNumber: body.refundOriginalReceipt,
+      refundReason: body.refundReason,
+      replacementReceiptNumber: body.refundReplacementReceipt
+    };
+    
+    const refundStatus = refunds?.status;
+    if (!refundStatus) {
+      missing.push('refundStatus');
+    } else if (refundStatus === 'NO') {
+      if (!refunds.noRefundsConfirmed) {
+        missing.push('noRefundsConfirmed');
+      }
+    } else if (refundStatus === 'YES') {
+      if (!refunds.originalReceiptNumber || String(refunds.originalReceiptNumber).trim() === '') {
+        missing.push('refundOriginalReceipt');
+      }
+      if (!refunds.refundReason || String(refunds.refundReason).trim() === '') {
+        missing.push('refundReason');
+      }
+      if (!refunds.replacementReceiptNumber || String(refunds.replacementReceiptNumber).trim() === '') {
+        missing.push('refundReplacementReceipt');
+      }
+    }
+
+    const expenseRows = Array.isArray(body.expenses ?? body.shiftExpenses) ? (body.expenses ?? body.shiftExpenses) : [];
+    for (const expense of expenseRows) {
+      if (expense?.item === '__OTHER__' && (!expense.otherItemDescription || String(expense.otherItemDescription).trim() === '')) {
+        missing.push('otherItemDescription');
+        break;
+      }
+    }
+    for (const expense of expenseRows) {
+      if (expense?.shop === '__OTHER__' && (!expense.otherSupplierName || String(expense.otherSupplierName).trim() === '')) {
+        missing.push('otherSupplierName');
+        break;
+      }
+    }
     
     if (missing.length) {
       return res.status(400).json({ error: `Missing or invalid fields: ${missing.join(', ')}. Must be non-negative.` });
@@ -142,9 +199,9 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const diff = Math.abs(expectedClosingCash - closingCashTHB);
     const balanced = diff <= 30;
 
-    // Banking
-    const cashBanked = closingCashTHB - toTHB(startingCash);
-    const qrTransfer = toTHB(qrSales);
+    // Banking (staff-declared)
+    const cashBanked = toTHB(body.cashBanked);
+    const qrTransfer = toTHB(body.qrTransfer);
 
     const shoppingTotal = (expenses || []).reduce((s: number, e: any) => s + toTHB(e.cost), 0);
     const wagesTotal = (wages || []).reduce((s: number, w: any) => s + toTHB(w.amount), 0);
@@ -165,6 +222,19 @@ export async function createDailySalesV2(req: Request, res: Response) {
       qrSales: toTHB(qrSales),
       grabSales: toTHB(grabSales),
       otherSales: toTHB(otherSales),
+      receiptCounts: {
+        cash: toTHB(receiptCounts.cash),
+        qr: toTHB(receiptCounts.qr),
+        grab: toTHB(receiptCounts.grab),
+        other: toTHB(receiptCounts.other)
+      },
+      refunds: {
+        status: refunds.status,
+        noRefundsConfirmed: Boolean(refunds.noRefundsConfirmed),
+        originalReceiptNumber: refunds.originalReceiptNumber || "",
+        refundReason: refunds.refundReason || "",
+        replacementReceiptNumber: refunds.replacementReceiptNumber || ""
+      },
       expenses,
       wages,
       closingCash: closingCashTHB,
@@ -230,13 +300,28 @@ export async function createDailySalesV2(req: Request, res: Response) {
         q4RegisterBalances, q5AmountToBanked, q6ManagerName
       ]
     );
+    
+    const linkedPurchases = (expenses || []).filter((e: any) => e.purchasingLinked && e.item !== '__OTHER__');
+    for (const expense of linkedPurchases) {
+      const supplierName = expense.shop === '__OTHER__' ? (expense.otherSupplierName || null) : (expense.shop || null);
+      const itemName = expense.item === '__OTHER__' ? (expense.otherItemDescription || null) : (expense.item || null);
+      await pool.query(
+        `INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes)
+         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6)`,
+        [
+          new Date(),
+          shiftDateAsDate,
+          completedBy || null,
+          supplierName,
+          toTHB(expense.cost),
+          itemName
+        ]
+      );
+    }
 
     // Build shopping list for email
     const shoppingList = (requisition || [])
       .filter((i: any) => (i.qty || 0) > 0);
-    const shoppingItems = shoppingList
-      .map((i: any) => `${i.name} – ${i.qty} ${i.unit}`);
-
     // Email
     const html = `
       <h2>Daily Sales & Stock Report</h2>
@@ -244,82 +329,100 @@ export async function createDailySalesV2(req: Request, res: Response) {
       <p><strong>Completed By:</strong> ${completedBy}</p>
 
       <h3>Sales</h3>
-      <ul>
-        <li>Cash Sales: ฿${formatTHB(toTHB(cashSales))}</li>
-        <li>QR Sales: ฿${formatTHB(toTHB(qrSales))}</li>
-        <li>Grab Sales: ฿${formatTHB(toTHB(grabSales))}</li>
-        <li>Other Sales: ฿${formatTHB(toTHB(otherSales))}</li>
-        <li><strong>Total Sales:</strong> ฿${formatTHB(totalSales)}</li>
-      </ul>
+      <table>
+        <tr><th>Channel</th><th>Sales (฿)</th><th>Receipt Count</th></tr>
+        <tr><td>Cash</td><td>${formatTHB(toTHB(cashSales))}</td><td>${receiptCounts.cash}</td></tr>
+        <tr><td>QR</td><td>${formatTHB(toTHB(qrSales))}</td><td>${receiptCounts.qr}</td></tr>
+        <tr><td>Grab</td><td>${formatTHB(toTHB(grabSales))}</td><td>${receiptCounts.grab}</td></tr>
+        <tr><td>Other</td><td>${formatTHB(toTHB(otherSales))}</td><td>${receiptCounts.other}</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>${formatTHB(totalSales)}</strong></td><td></td></tr>
+      </table>
 
       <h3>Expenses</h3>
-      <ul>
+      <table>
+        <tr><th>Item</th><th>Cost (฿)</th><th>Supplier</th></tr>
         ${(expenses || [])
-          .map(
-            (e: any) =>
-              `<li>${e.item} – ฿${formatTHB(toTHB(e.cost))} (${e.shop})</li>`
-          )
+          .map((e: any) => {
+            const itemName = e.item === '__OTHER__' ? `Other: ${e.otherItemDescription || ''}` : e.item;
+            const supplierName = e.shop === '__OTHER__' ? `Other: ${e.otherSupplierName || ''}` : e.shop;
+            return `<tr><td>${itemName}</td><td>${formatTHB(toTHB(e.cost))}</td><td>${supplierName}</td></tr>`;
+          })
           .join("")}
+      </table>
+      <h4>Wages & Other Payments</h4>
+      <table>
+        <tr><th>Staff</th><th>Amount (฿)</th><th>Type</th></tr>
         ${(wages || [])
           .map(
             (w: any) =>
-              `<li>${w.staff} – ฿${formatTHB(toTHB(w.amount))} (${w.type})</li>`
+              `<tr><td>${w.staff}</td><td>${formatTHB(toTHB(w.amount))}</td><td>${w.type}</td></tr>`
           )
           .join("")}
-      </ul>
+      </table>
       <p><strong>Total Expenses:</strong> ฿${formatTHB(totalExpenses)}</p>
 
       <h3>Banking</h3>
-      <ul>
-        <li>Starting Cash: ฿${formatTHB(startingCash)}</li>
-        <li>Total Cash in Register: ฿${formatTHB(closingCashTHB)}</li>
-        <li>Expected Register: ฿${formatTHB(expectedClosingCash)}</li>
-        <li>
-          Balanced: ${
-            balanced
-              ? '<span style="color:green;font-weight:bold">YES ✅</span>'
-              : '<span style="color:red;font-weight:bold">NO ❌</span>'
-          }
-        </li>
-        <li>Cash to Bank: ฿${formatTHB(cashBanked)}</li>
-        <li>QR to Bank: ฿${formatTHB(qrTransfer)}</li>
-      </ul>
+      <table>
+        <tr><th>Description</th><th>Amount (฿)</th></tr>
+        <tr><td>Starting Cash</td><td>${formatTHB(startingCash)}</td></tr>
+        <tr><td>Total Cash in Register</td><td>${formatTHB(closingCashTHB)}</td></tr>
+        <tr><td>Expected Register</td><td>${formatTHB(expectedClosingCash)}</td></tr>
+        <tr><td>Balanced</td><td>${balanced ? 'YES' : 'NO'}</td></tr>
+        <tr><td>Cash Banked</td><td>${formatTHB(cashBanked)}</td></tr>
+        <tr><td>QR Banked</td><td>${formatTHB(qrTransfer)}</td></tr>
+      </table>
 
       <h3>Expected Bank Deposits (Auto)</h3>
       ${payload.bankingAuto 
-        ? `<ul>
-            <li>Cash to bank: ฿${Number(payload.bankingAuto.expectedCashBank).toLocaleString()}</li>
-            <li>QR to bank: ฿${Number(payload.bankingAuto.expectedQRBank).toLocaleString()}</li>
-            <li><strong>Total to bank: ฿${Number(payload.bankingAuto.expectedTotalBank).toLocaleString()}</strong></li>
-          </ul>`
+        ? `<table>
+            <tr><th>Description</th><th>Amount (฿)</th></tr>
+            <tr><td>Cash to bank</td><td>${Number(payload.bankingAuto.expectedCashBank).toLocaleString()}</td></tr>
+            <tr><td>QR to bank</td><td>${Number(payload.bankingAuto.expectedQRBank).toLocaleString()}</td></tr>
+            <tr><td><strong>Total to bank</strong></td><td><strong>${Number(payload.bankingAuto.expectedTotalBank).toLocaleString()}</strong></td></tr>
+          </table>`
         : '<p style="color:#6b7280">No auto-banking data</p>'}
 
       <h3>Manager Sign Off</h3>
-      <ul>
-        <li><strong>Cash in register after all expenses:</strong> ฿${formatTHB(q1CashInRegister || 0)}</li>
-        <li><strong>Expenses mirror shift report:</strong> ${q2ExpensesMirrorReport ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
-        <li><strong>Correct expense descriptions:</strong> ${q3CorrectDescriptions ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
-        <li><strong>Register balances:</strong> ${q4RegisterBalances ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
-        <li><strong>Amount to be banked (Combined Total):</strong> ฿${formatTHB(q5AmountToBanked || 0)}</li>
-        <li><strong>Manager Name:</strong> ${q6ManagerName || 'Not provided'}</li>
-      </ul>
+      <table>
+        <tr><th>Question</th><th>Response</th></tr>
+        <tr><td>Cash in register after all expenses</td><td>฿${formatTHB(q1CashInRegister || 0)}</td></tr>
+        <tr><td>Expenses mirror shift report</td><td>${q2ExpensesMirrorReport ? 'YES' : 'NO'}</td></tr>
+        <tr><td>Correct expense descriptions</td><td>${q3CorrectDescriptions ? 'YES' : 'NO'}</td></tr>
+        <tr><td>Register balances</td><td>${q4RegisterBalances ? 'YES' : 'NO'}</td></tr>
+        <tr><td>Amount to be banked (Combined Total)</td><td>฿${formatTHB(q5AmountToBanked || 0)}</td></tr>
+        <tr><td>Manager Name</td><td>${q6ManagerName || 'Not provided'}</td></tr>
+      </table>
+
+      <h3>Refunds</h3>
+      <table>
+        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th></tr>
+        <tr>
+          <td>${refunds.status || 'N/A'}</td>
+          <td>${refunds.originalReceiptNumber || ''}</td>
+          <td>${refunds.refundReason || ''}</td>
+          <td>${refunds.replacementReceiptNumber || ''}</td>
+        </tr>
+      </table>
 
       <h3>Stock Levels</h3>
-      <ul>
-        <li>Rolls Remaining: ${rollsEnd || "Not specified"}</li>
-        <li>Meat Remaining: ${meatEnd || "Not specified"}</li>
-      </ul>
+      <table>
+        <tr><th>Item</th><th>Count</th></tr>
+        <tr><td>Rolls Remaining</td><td>${rollsEnd || "Not specified"}</td></tr>
+        <tr><td>Meat Remaining</td><td>${meatEnd || "Not specified"}</td></tr>
+      </table>
 
       <h3>Drinks Stock</h3>
       ${
         typeof finalDrinkStock === 'object' && !Array.isArray(finalDrinkStock) && Object.keys(finalDrinkStock).length > 0
-          ? `<ul>
-               ${Object.entries(finalDrinkStock).map(([name, qty]) => `<li><strong>${name}</strong>: ${qty}</li>`).join('')}
-             </ul>`
+          ? `<table>
+               <tr><th>Drink</th><th>Qty</th></tr>
+               ${Object.entries(finalDrinkStock).map(([name, qty]) => `<tr><td>${name}</td><td>${qty}</td></tr>`).join('')}
+             </table>`
           : Array.isArray(finalDrinkStock) && finalDrinkStock.length > 0
-          ? `<ul>
-               ${finalDrinkStock.map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
-             </ul>`
+          ? `<table>
+               <tr><th>Drink</th><th>Qty</th><th>Unit</th></tr>
+               ${finalDrinkStock.map((drink: any) => `<tr><td>${drink.name}</td><td>${drink.quantity}</td><td>${drink.unit}</td></tr>`).join('')}
+             </table>`
           : '<p style="color: #6c757d;">No drinks counted.</p>'
       }
 
@@ -327,11 +430,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       ${
         shoppingList.length === 0
           ? '<p style="color: #6c757d;">No shopping items required.</p>'
-          : `<div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
-               <ul style="margin: 0; padding-left: 20px;">
-                 ${shoppingList.map((item: any) => `<li><strong>${item.name}</strong> – ${item.qty} ${item.unit}</li>`).join('')}
-               </ul>
-             </div>`
+          : `<table>
+               <tr><th>Item</th><th>Qty</th><th>Unit</th></tr>
+               ${shoppingList.map((item: any) => `<tr><td>${item.name}</td><td>${item.qty}</td><td>${item.unit}</td></tr>`).join('')}
+             </table>`
       }
     `;
 
@@ -346,7 +448,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     // Store the ID for potential stock updates
     res.locals.recordId = id;
     
-    console.log(`📧 Email sending result: ${emailSent ? 'SUCCESS' : 'FAILED'}`);
+    console.log(`Email sending result: ${emailSent ? 'SUCCESS' : 'FAILED'}`);
 
     res.json({ ok: true, id });
   } catch (err) {
@@ -486,69 +588,67 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     const meatWeightG = meatEnd ?? 0; // meatEnd already in grams from form
     
     // Upsert into daily_stock_v2 for purchasing/analytics systems
-    try {
-      await pool.query(
-        `INSERT INTO daily_stock_v2 (id, "salesId", "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", "createdAt")
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
-         ON CONFLICT ("salesId") 
-         DO UPDATE SET 
-           "burgerBuns" = EXCLUDED."burgerBuns",
-           "meatWeightG" = EXCLUDED."meatWeightG",
-           "drinksJson" = EXCLUDED."drinksJson",
-           "purchasingJson" = EXCLUDED."purchasingJson"`,
-        [id, burgerBuns, meatWeightG, JSON.stringify(drinkStock || {}), JSON.stringify(purchasingJson)]
-      );
-      console.log(`[FIELD BRIDGE] Synced daily_stock_v2: salesId=${id}, burgerBuns=${burgerBuns}, meatWeightG=${meatWeightG}`);
-      
-      // PATCH C: Sync ALL active purchasing items to purchasing_shift_items (including zero qty)
-      // Get the daily_stock_v2 id for this salesId
-      const stockResult = await pool.query(
-        `SELECT id FROM daily_stock_v2 WHERE "salesId" = $1`,
-        [id]
-      );
-      
-      if (stockResult.rows.length > 0) {
-        const dailyStockId = stockResult.rows[0].id;
-        
-        // Get ALL active purchasing items
-        const allActiveItems = await prisma.purchasingItem.findMany({
-          where: { active: true }
-        });
-        
-        // Build quantity map from requisition
-        const qtyMap: Record<string, number> = {};
-        if (Array.isArray(requisition)) {
-          for (const item of requisition) {
-            if (item.name) {
-              qtyMap[item.name] = item.qty || 0;
-            }
-          }
-        }
-        
-        // Upsert ALL items (including zero qty) to purchasing_shift_items
-        for (const pItem of allActiveItems) {
-          const qty = qtyMap[pItem.item] || 0;
-          await prisma.purchasingShiftItem.upsert({
-            where: {
-              dailyStockId_purchasingItemId: {
-                dailyStockId: dailyStockId,
-                purchasingItemId: pItem.id
-              }
-            },
-            update: { quantity: qty },
-            create: {
-              dailyStockId: dailyStockId,
-              purchasingItemId: pItem.id,
-              quantity: qty
-            }
-          });
-        }
-        
-        console.log(`[PATCH C] Synced ${allActiveItems.length} items to purchasing_shift_items (including zeros)`);
-      }
-    } catch (stockErr) {
-      console.error('[FIELD BRIDGE] Failed to sync daily_stock_v2 (non-blocking):', stockErr);
+    await pool.query(
+      `INSERT INTO daily_stock_v2 (id, "salesId", "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", "createdAt")
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, NOW())
+       ON CONFLICT ("salesId") 
+       DO UPDATE SET 
+         "burgerBuns" = EXCLUDED."burgerBuns",
+         "meatWeightG" = EXCLUDED."meatWeightG",
+         "drinksJson" = EXCLUDED."drinksJson",
+         "purchasingJson" = EXCLUDED."purchasingJson"`,
+      [id, burgerBuns, meatWeightG, JSON.stringify(drinkStock || {}), JSON.stringify(purchasingJson)]
+    );
+    console.log(`[FIELD BRIDGE] Synced daily_stock_v2: salesId=${id}, burgerBuns=${burgerBuns}, meatWeightG=${meatWeightG}`);
+    
+    // PATCH C: Sync ALL active purchasing items to purchasing_shift_items (including zero qty)
+    // Get the daily_stock_v2 id for this salesId
+    const stockResult = await pool.query(
+      `SELECT id FROM daily_stock_v2 WHERE "salesId" = $1`,
+      [id]
+    );
+    
+    if (stockResult.rows.length === 0) {
+      throw new Error(`daily_stock_v2 record not found after upsert for salesId ${id}`);
     }
+    
+    const dailyStockId = stockResult.rows[0].id;
+    
+    // Get ALL active purchasing items
+    const allActiveItems = await prisma.purchasingItem.findMany({
+      where: { active: true }
+    });
+    
+    // Build quantity map from requisition
+    const qtyMap: Record<string, number> = {};
+    if (Array.isArray(requisition)) {
+      for (const item of requisition) {
+        if (item.name) {
+          qtyMap[item.name] = item.qty || 0;
+        }
+      }
+    }
+    
+    // Upsert ALL items (including zero qty) to purchasing_shift_items
+    for (const pItem of allActiveItems) {
+      const qty = qtyMap[pItem.item] || 0;
+      await prisma.purchasingShiftItem.upsert({
+        where: {
+          dailyStockId_purchasingItemId: {
+            dailyStockId: dailyStockId,
+            purchasingItemId: pItem.id
+          }
+        },
+        update: { quantity: qty },
+        create: {
+          dailyStockId: dailyStockId,
+          purchasingItemId: pItem.id,
+          quantity: qty
+        }
+      });
+    }
+    
+    console.log(`[PATCH C] Synced ${allActiveItems.length} items to purchasing_shift_items (including zeros)`);
 
     console.log(`Updated daily sales record ${id} with stock data`);
     console.log('About to send updated email with complete data...');
@@ -572,54 +672,65 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       <p><strong>Completed By:</strong> ${completedBy}</p>
 
       <h3>Sales</h3>
-      <ul>
-        <li>Cash Sales: ฿${formatTHB(payload.cashSales || 0)}</li>
-        <li>QR Sales: ฿${formatTHB(payload.qrSales || 0)}</li>
-        <li>Grab Sales: ฿${formatTHB(payload.grabSales || 0)}</li>
-        <li>Other Sales: ฿${formatTHB(payload.otherSales || 0)}</li>
-        <li><strong>Total Sales:</strong> ฿${formatTHB(payload.totalSales || 0)}</li>
-      </ul>
+      <table>
+        <tr><th>Channel</th><th>Sales (฿)</th><th>Receipt Count</th></tr>
+        <tr><td>Cash</td><td>${formatTHB(payload.cashSales || 0)}</td><td>${payload.receiptCounts?.cash ?? 0}</td></tr>
+        <tr><td>QR</td><td>${formatTHB(payload.qrSales || 0)}</td><td>${payload.receiptCounts?.qr ?? 0}</td></tr>
+        <tr><td>Grab</td><td>${formatTHB(payload.grabSales || 0)}</td><td>${payload.receiptCounts?.grab ?? 0}</td></tr>
+        <tr><td>Other</td><td>${formatTHB(payload.otherSales || 0)}</td><td>${payload.receiptCounts?.other ?? 0}</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>${formatTHB(payload.totalSales || 0)}</strong></td><td></td></tr>
+      </table>
 
       <h3>Banking</h3>
-      <ul>
-        <li>Starting Cash: ฿${formatTHB(payload.startingCash || 0)}</li>
-        <li>Total Cash in Register: ฿${formatTHB(payload.closingCash || 0)}</li>
-        <li>Expected Register: ฿${formatTHB(payload.expectedClosingCash || 0)}</li>
-        <li>
-          Balanced: ${
-            payload.balanced
-              ? '<span style="color:green;font-weight:bold">YES ✅</span>'
-              : '<span style="color:red;font-weight:bold">NO ❌</span>'
-          }
-        </li>
-        <li>Cash to Bank: ฿${formatTHB(payload.cashBanked || 0)}</li>
-        <li>QR to Bank: ฿${formatTHB(payload.qrTransfer || 0)}</li>
-      </ul>
+      <table>
+        <tr><th>Description</th><th>Amount (฿)</th></tr>
+        <tr><td>Starting Cash</td><td>${formatTHB(payload.startingCash || 0)}</td></tr>
+        <tr><td>Total Cash in Register</td><td>${formatTHB(payload.closingCash || 0)}</td></tr>
+        <tr><td>Expected Register</td><td>${formatTHB(payload.expectedClosingCash || 0)}</td></tr>
+        <tr><td>Balanced</td><td>${payload.balanced ? 'YES' : 'NO'}</td></tr>
+        <tr><td>Cash Banked</td><td>${formatTHB(payload.cashBanked || 0)}</td></tr>
+        <tr><td>QR Banked</td><td>${formatTHB(payload.qrTransfer || 0)}</td></tr>
+      </table>
 
       <h3>Manager Sign Off</h3>
-      <ul>
-        <li><strong>Amount after expenses (excl. float):</strong> ฿${formatTHB(payload.managerNetAmount || 0)}</li>
-        <li><strong>Register balances:</strong> ${payload.registerBalances ? '<span style="color:green">YES ✅</span>' : '<span style="color:red">NO ❌</span>'}</li>
-        ${!payload.registerBalances && payload.varianceNotes ? `<li><strong>Variance explanation:</strong> ${payload.varianceNotes}</li>` : ''}
-        <li><strong>Expenses review:</strong> ${payload.expensesReview || 'Not provided'}</li>
-      </ul>
+      <table>
+        <tr><th>Question</th><th>Response</th></tr>
+        <tr><td>Amount after expenses (excl. float)</td><td>${formatTHB(payload.managerNetAmount || 0)}</td></tr>
+        <tr><td>Register balances</td><td>${payload.registerBalances ? 'YES' : 'NO'}</td></tr>
+        ${!payload.registerBalances && payload.varianceNotes ? `<tr><td>Variance explanation</td><td>${payload.varianceNotes}</td></tr>` : ''}
+        <tr><td>Expenses review</td><td>${payload.expensesReview || 'Not provided'}</td></tr>
+      </table>
+
+      <h3>Refunds</h3>
+      <table>
+        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th></tr>
+        <tr>
+          <td>${payload.refunds?.status || 'N/A'}</td>
+          <td>${payload.refunds?.originalReceiptNumber || ''}</td>
+          <td>${payload.refunds?.refundReason || ''}</td>
+          <td>${payload.refunds?.replacementReceiptNumber || ''}</td>
+        </tr>
+      </table>
 
       <h3>Stock Levels</h3>
-      <ul>
-        <li>Rolls Remaining: ${rollsEnd || "Not specified"}</li>
-        <li>Meat Remaining: ${meatEnd ? `${meatEnd}g (${(meatEnd/1000).toFixed(1)}kg)` : "Not specified"}</li>
-      </ul>
+      <table>
+        <tr><th>Item</th><th>Count</th></tr>
+        <tr><td>Rolls Remaining</td><td>${rollsEnd || "Not specified"}</td></tr>
+        <tr><td>Meat Remaining</td><td>${meatEnd ? `${meatEnd}g (${(meatEnd/1000).toFixed(1)}kg)` : "Not specified"}</td></tr>
+      </table>
 
       <h3>Drinks Stock</h3>
       ${
         typeof finalDrinkStock === 'object' && !Array.isArray(finalDrinkStock) && Object.keys(finalDrinkStock).length > 0
-          ? `<ul>
-               ${Object.entries(finalDrinkStock).map(([name, qty]) => `<li><strong>${name}</strong>: ${qty}</li>`).join('')}
-             </ul>`
+          ? `<table>
+               <tr><th>Drink</th><th>Qty</th></tr>
+               ${Object.entries(finalDrinkStock).map(([name, qty]) => `<tr><td>${name}</td><td>${qty}</td></tr>`).join('')}
+             </table>`
           : Array.isArray(finalDrinkStock) && finalDrinkStock.length > 0
-          ? `<ul>
-               ${finalDrinkStock.map((drink: any) => `<li><strong>${drink.name}</strong>: ${drink.quantity} ${drink.unit}</li>`).join('')}
-             </ul>`
+          ? `<table>
+               <tr><th>Drink</th><th>Qty</th><th>Unit</th></tr>
+               ${finalDrinkStock.map((drink: any) => `<tr><td>${drink.name}</td><td>${drink.quantity}</td><td>${drink.unit}</td></tr>`).join('')}
+             </table>`
           : '<p style="color: #6c757d;">No drinks counted.</p>'
       }
 
@@ -627,24 +738,22 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       ${
         shoppingList.length === 0
           ? '<p style="color: #6c757d;">No shopping items required.</p>'
-          : `<div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
-               <ul style="margin: 0; padding-left: 20px;">
-                 ${shoppingList.map((item: any) => `<li><strong>${item.name}</strong> – ${item.qty} ${item.unit}</li>`).join('')}
-               </ul>
-             </div>`
+          : `<table>
+               <tr><th>Item</th><th>Qty</th><th>Unit</th></tr>
+               ${shoppingList.map((item: any) => `<tr><td>${item.name}</td><td>${item.qty}</td><td>${item.unit}</td></tr>`).join('')}
+             </table>`
       }
     `;
     
-    try {
-      console.log('Attempting to send updated email...');
-      const emailResult = await workingEmailService.sendEmail(
-        "smashbrothersburgersth@gmail.com",
-        `Daily Sales & Stock COMPLETE – ${shiftDate}`,
-        updatedHtml
-      );
-      console.log(`📧 Updated email result: ${emailResult ? 'SUCCESS' : 'FAILED'}`);
-    } catch (emailError) {
-      console.error('Email sending failed:', emailError);
+    console.log('Attempting to send updated email...');
+    const emailResult = await workingEmailService.sendEmail(
+      "smashbrothersburgersth@gmail.com",
+      `Daily Sales & Stock COMPLETE – ${shiftDate}`,
+      updatedHtml
+    );
+    console.log(`Updated email result: ${emailResult ? 'SUCCESS' : 'FAILED'}`);
+    if (!emailResult) {
+      throw new Error("Email send failed after stock persistence");
     }
     
     res.json({ ok: true, id });
@@ -725,7 +834,7 @@ export async function printDailySalesV2(req: Request, res: Response) {
           <tr><td>Starting Cash</td><td>${formatTHB(p.startingCash || 0)}</td></tr>
           <tr><td>Closing Cash</td><td>${formatTHB(p.closingCash || 0)}</td></tr>
           <tr><td>Expected Closing</td><td>${formatTHB(p.expectedClosingCash || 0)}</td></tr>
-          <tr><td>Balanced</td><td>${p.balanced ? 'YES ✅' : 'NO ❌'}</td></tr>
+          <tr><td>Balanced</td><td>${p.balanced ? 'YES' : 'NO'}</td></tr>
         </table>
         
         <script>window.print();</script>
