@@ -116,7 +116,9 @@ export async function createDailySalesV2(req: Request, res: Response) {
       noRefundsConfirmed: body.noRefundsConfirmed,
       originalReceiptNumber: body.refundOriginalReceipt,
       refundReason: body.refundReason,
-      replacementReceiptNumber: body.refundReplacementReceipt
+      replacementReceiptNumber: body.refundReplacementReceipt,
+      amount: body.refundAmount,
+      time: body.refundTime
     };
     
     const refundStatus = refunds?.status;
@@ -135,6 +137,12 @@ export async function createDailySalesV2(req: Request, res: Response) {
       }
       if (!refunds.replacementReceiptNumber || String(refunds.replacementReceiptNumber).trim() === '') {
         missing.push('refundReplacementReceipt');
+      }
+      if (refunds.amount == null || isNaN(Number(refunds.amount)) || Number(refunds.amount) < 0) {
+        missing.push('refundAmount');
+      }
+      if (!refunds.time || String(refunds.time).trim() === '') {
+        missing.push('refundTime');
       }
     }
 
@@ -233,7 +241,9 @@ export async function createDailySalesV2(req: Request, res: Response) {
         noRefundsConfirmed: Boolean(refunds.noRefundsConfirmed),
         originalReceiptNumber: refunds.originalReceiptNumber || "",
         refundReason: refunds.refundReason || "",
-        replacementReceiptNumber: refunds.replacementReceiptNumber || ""
+        replacementReceiptNumber: refunds.replacementReceiptNumber || "",
+        amount: refunds.amount ?? 0,
+        time: refunds.time || ""
       },
       expenses,
       wages,
@@ -395,12 +405,14 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Refunds</h3>
       <table>
-        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th></tr>
+        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th><th>Amount (฿)</th><th>Time</th></tr>
         <tr>
           <td>${refunds.status || 'N/A'}</td>
           <td>${refunds.originalReceiptNumber || ''}</td>
           <td>${refunds.refundReason || ''}</td>
           <td>${refunds.replacementReceiptNumber || ''}</td>
+          <td>${refunds.amount != null ? formatTHB(toTHB(refunds.amount)) : ''}</td>
+          <td>${refunds.time || ''}</td>
         </tr>
       </table>
 
@@ -703,12 +715,14 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
 
       <h3>Refunds</h3>
       <table>
-        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th></tr>
+        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th><th>Amount (฿)</th><th>Time</th></tr>
         <tr>
           <td>${payload.refunds?.status || 'N/A'}</td>
           <td>${payload.refunds?.originalReceiptNumber || ''}</td>
           <td>${payload.refunds?.refundReason || ''}</td>
           <td>${payload.refunds?.replacementReceiptNumber || ''}</td>
+          <td>${payload.refunds?.amount != null ? formatTHB(toTHB(payload.refunds.amount)) : ''}</td>
+          <td>${payload.refunds?.time || ''}</td>
         </tr>
       </table>
 

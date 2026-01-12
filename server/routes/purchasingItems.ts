@@ -17,6 +17,17 @@ import { isPurchasingItemUsedInRecipe, getRecipesUsingPurchasingItem } from '../
 const router = Router();
 const prisma = new PrismaClient();
 
+const APPROVED_CATEGORIES = [
+  'Meat',
+  'Drinks',
+  'Fresh Food',
+  'Frozen Food',
+  'Kitchen Supplies',
+  'Packaging',
+  'Shelf Items',
+  'Uncategorized',
+];
+
 const purchasingItemSchema = z.object({
   item: z.string().min(1, 'Item name is required'),
   category: z.string().optional().nullable(),
@@ -63,6 +74,13 @@ router.post('/', async (req, res) => {
         details: parsed.error.flatten() 
       });
     }
+    
+    if (!parsed.data.category || !APPROVED_CATEGORIES.includes(parsed.data.category)) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Invalid category. Select from approved categories only.'
+      });
+    }
 
     const item = await prisma.purchasingItem.create({
       data: parsed.data,
@@ -89,6 +107,15 @@ router.put('/:id', async (req, res) => {
         error: 'Invalid data', 
         details: parsed.error.flatten() 
       });
+    }
+    
+    if (parsed.data.category !== undefined) {
+      if (!parsed.data.category || !APPROVED_CATEGORIES.includes(parsed.data.category)) {
+        return res.status(400).json({
+          ok: false,
+          error: 'Invalid category. Select from approved categories only.'
+        });
+      }
     }
 
     // PATCH F: Production lock guard - block renames if PRODUCTION_LOCK=1

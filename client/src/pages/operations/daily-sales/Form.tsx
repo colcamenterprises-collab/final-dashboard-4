@@ -5,6 +5,15 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { queryClient } from "@/lib/queryClient";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 
 const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
@@ -88,10 +97,17 @@ const labels = {
     originalReceipt: 'Original Receipt Number',
     refundReason: 'Refund Reason',
     replacementReceipt: 'Replacement Sale Receipt Number',
+    refundAmount: 'Refund Amount',
+    refundTime: 'Refund Time',
     requiredField: 'Required',
     purchaseItem: 'Purchase Item',
     unit: 'Unit',
-    category: 'Category'
+    category: 'Category',
+    validationTitle: 'Cannot submit this shift yet',
+    validationIntro: 'Please complete:',
+    gotIt: 'Got it',
+    loadError: 'Unable to load form data.',
+    submitError: 'Unable to submit form. Please try again.'
   },
   th: {
     pageTitle: 'ยอดขายและค่าใช้จ่ายประจำวัน',
@@ -170,10 +186,17 @@ const labels = {
     originalReceipt: 'หมายเลขใบเสร็จต้นฉบับ',
     refundReason: 'เหตุผลการคืนเงิน',
     replacementReceipt: 'หมายเลขใบเสร็จการขายแทน',
+    refundAmount: 'จำนวนเงินคืน',
+    refundTime: 'เวลาในการคืนเงิน',
     requiredField: 'จำเป็นต้องกรอก',
     purchaseItem: 'รายการซื้อ',
     unit: 'หน่วย',
-    category: 'หมวดหมู่'
+    category: 'หมวดหมู่',
+    validationTitle: 'ไม่สามารถส่งแบบฟอร์มได้',
+    validationIntro: 'กรุณากรอกข้อมูลต่อไปนี้:',
+    gotIt: 'เข้าใจแล้ว',
+    loadError: 'ไม่สามารถโหลดข้อมูลแบบฟอร์มได้',
+    submitError: 'ไม่สามารถส่งแบบฟอร์มได้ กรุณาลองใหม่อีกครั้ง'
   }
 };
 
@@ -277,7 +300,6 @@ export default function DailySales() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [shiftId, setShiftId] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(4);
-  const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [lang, setLang] = useState<'en' | 'th'>('en');
   const [loading, setLoading] = useState(isEditMode);
@@ -287,8 +309,13 @@ export default function DailySales() {
   const [refundOriginalReceipt, setRefundOriginalReceipt] = useState("");
   const [refundReason, setRefundReason] = useState("");
   const [refundReplacementReceipt, setRefundReplacementReceipt] = useState("");
+  const [refundAmount, setRefundAmount] = useState<number>(0);
+  const [refundTime, setRefundTime] = useState<string>("");
   const [expenseSuppliers, setExpenseSuppliers] = useState<string[]>([]);
   const [purchaseItems, setPurchaseItems] = useState<Array<{ name: string; category: string; unit: string; supplier: string }>>([]);
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [validationMessage, setValidationMessage] = useState("");
+  const L = labels[lang];
 
   useEffect(() => {
     if (!showSuccess) return;
@@ -338,6 +365,8 @@ export default function DailySales() {
             setRefundOriginalReceipt(p.refunds.originalReceiptNumber || "");
             setRefundReason(p.refunds.refundReason || "");
             setRefundReplacementReceipt(p.refunds.replacementReceiptNumber || "");
+            setRefundAmount(p.refunds.amount ?? 0);
+            setRefundTime(p.refunds.time || "");
           }
           
           // Load shift date for editing
@@ -389,10 +418,12 @@ export default function DailySales() {
           
           setShiftId(data.record.id);
         } else {
-          setError("Failed to load form data");
+          setValidationMessage(L.loadError);
+          setShowValidationDialog(true);
         }
       } catch (err) {
-        setError("Failed to load form");
+        setValidationMessage(L.loadError);
+        setShowValidationDialog(true);
         console.error(err);
       } finally {
         setLoading(false);
@@ -472,9 +503,52 @@ export default function DailySales() {
         setRefundOriginalReceipt(draft.refundOriginalReceipt || "");
         setRefundReason(draft.refundReason || "");
         setRefundReplacementReceipt(draft.refundReplacementReceipt || "");
+        setRefundAmount(draft.refundAmount || 0);
+        setRefundTime(draft.refundTime || "");
       }
     } catch {}
   }, [isEditMode]);
+
+  const buildValidationMessage = (missing: string[]) => {
+    const labelMap: Record<string, string> = {
+      completedBy: L.completedBy,
+      startingCash: L.startingCash,
+      cashSales: L.cashSales,
+      qrSales: L.qrSales,
+      grabSales: L.grabSales,
+      otherSales: L.otherSales,
+      cashReceipts: L.cashReceiptCount,
+      qrReceipts: L.qrReceiptCount,
+      grabReceipts: L.grabReceiptCount,
+      otherReceipts: L.otherReceiptCount,
+      cashBanked: L.cashBanked,
+      qrBanked: L.qrBanked,
+      refundStatus: L.refunds,
+      noRefundsConfirmed: L.noRefundsConfirm,
+      refundOriginalReceipt: L.originalReceipt,
+      refundReason: L.refundReason,
+      refundReplacementReceipt: L.replacementReceipt,
+      refundAmount: L.refundAmount,
+      refundTime: L.refundTime,
+      expenseSupplier: L.shopName,
+      expenseOtherItem: L.itemDescription,
+      expenseOtherSupplier: L.supplierOtherLabel,
+    };
+
+    const uniqueLabels = Array.from(
+      new Set(
+        missing
+          .map((key) => labelMap[key])
+          .filter((label): label is string => Boolean(label))
+      )
+    );
+
+    if (uniqueLabels.length === 0) {
+      return `${L.validationTitle}.`;
+    }
+
+    return `${L.validationTitle}. ${L.validationIntro} ${uniqueLabels.join(', ')}.`;
+  };
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault(); // allow call from button with no event
@@ -511,6 +585,8 @@ export default function DailySales() {
       if (!refundOriginalReceipt.trim()) newErrors.push('refundOriginalReceipt');
       if (!refundReason.trim()) newErrors.push('refundReason');
       if (!refundReplacementReceipt.trim()) newErrors.push('refundReplacementReceipt');
+      if (refundAmount == null || Number.isNaN(Number(refundAmount)) || Number(refundAmount) < 0) newErrors.push('refundAmount');
+      if (!refundTime) newErrors.push('refundTime');
     }
     
     const invalidSuppliers = shiftExpenses.some((row) => !row.shop || row.shop.trim() === '');
@@ -529,12 +605,13 @@ export default function DailySales() {
     
     setErrors(newErrors);
     if (newErrors.length) {
-      setError(`Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas: ${newErrors.join(', ')}`);
+      setValidationMessage(buildValidationMessage(newErrors));
+      setShowValidationDialog(true);
       return; // Block navigation to Form 2
     }
     
     setSubmitting(true);
-    setError(null);
+    setValidationMessage("");
     
     try {
       // Convert date from YYYY-MM-DD to ISO string
@@ -561,7 +638,9 @@ export default function DailySales() {
           noRefundsConfirmed,
           originalReceiptNumber: refundOriginalReceipt.trim(),
           refundReason: refundReason.trim(),
-          replacementReceiptNumber: refundReplacementReceipt.trim()
+          replacementReceiptNumber: refundReplacementReceipt.trim(),
+          amount: refundAmount,
+          time: refundTime
         },
         expenses: shiftExpenses.map((row) => ({
           ...row,
@@ -628,7 +707,8 @@ export default function DailySales() {
       }
     } catch (e: any) {
       console.error("[Form1] submit error:", e);
-      setError(e?.message || "Failed to submit. Please try again.");
+      setValidationMessage(L.submitError);
+      setShowValidationDialog(true);
     } finally {
       setSubmitting(false);
     }
@@ -655,7 +735,9 @@ export default function DailySales() {
     noRefundsConfirmed,
     refundOriginalReceipt,
     refundReason,
-    refundReplacementReceipt
+    refundReplacementReceipt,
+    refundAmount,
+    refundTime
   });
 
   const handleSaveDraft = () => {
@@ -688,9 +770,6 @@ export default function DailySales() {
     );
   };
 
-  // Create a shorthand for current language labels
-  const L = labels[lang];
-
   if (loading) {
     return (
       <div className="container mx-auto p-4 max-w-4xl bg-white min-h-screen">
@@ -704,6 +783,27 @@ export default function DailySales() {
 
   return (
     <>
+      <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm font-semibold text-slate-900">
+              {L.validationTitle}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-slate-600">
+              {validationMessage || L.validationIntro}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button
+              onClick={() => setShowValidationDialog(false)}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-[4px]"
+            >
+              {L.gotIt}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="max-w-5xl mx-auto p-4 bg-white min-h-screen">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
@@ -726,9 +826,6 @@ export default function DailySales() {
         <form onSubmit={submit} className="mt-6 space-y-6">
           {/* EXACT LanguageToggle from consolidated patch */}
           <LanguageToggle onChange={setLang} />
-          
-          {/* EXACT error display from consolidated patch */}
-          {errors.length > 0 && <p className="text-red-500 text-sm">{L.validationError}</p>}
           
           <section className="rounded-[4px] border bg-white p-5">
             <h3 className="mb-4 text-sm font-semibold">{L.shiftInfo}</h3>
@@ -778,7 +875,7 @@ export default function DailySales() {
 
           <section className="rounded-[4px] border bg-white p-5">
             <h2 className="text-sm font-bold mb-4">{L.salesInfo}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
                 <input 
@@ -787,18 +884,7 @@ export default function DailySales() {
                   placeholder={labels[lang].cashSales}
                   value={cash} 
                   onChange={e=>setCash(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashReceiptCount}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].cashReceiptCount}
-                  value={cashReceipts} 
-                  onChange={e=>setCashReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashReceipts') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -809,18 +895,7 @@ export default function DailySales() {
                   placeholder={labels[lang].qrSales}
                   value={qr} 
                   onChange={e=>setQr(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrReceiptCount}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].qrReceiptCount}
-                  value={qrReceipts} 
-                  onChange={e=>setQrReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrReceipts') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -831,18 +906,7 @@ export default function DailySales() {
                   placeholder={labels[lang].grabSales}
                   value={grab} 
                   onChange={e=>setGrab(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabReceiptCount}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].grabReceiptCount}
-                  value={grabReceipts} 
-                  onChange={e=>setGrabReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('grabReceipts') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -853,7 +917,42 @@ export default function DailySales() {
                   placeholder={labels[lang].otherSales}
                   value={aroi} 
                   onChange={e=>setAroi(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
+                />
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashReceiptCount}</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder={labels[lang].cashReceiptCount}
+                  value={cashReceipts} 
+                  onChange={e=>setCashReceipts(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('cashReceipts') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrReceiptCount}</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder={labels[lang].qrReceiptCount}
+                  value={qrReceipts} 
+                  onChange={e=>setQrReceipts(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('qrReceipts') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabReceiptCount}</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  placeholder={labels[lang].grabReceiptCount}
+                  value={grabReceipts} 
+                  onChange={e=>setGrabReceipts(+e.target.value||0)} 
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('grabReceipts') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -864,11 +963,105 @@ export default function DailySales() {
                   placeholder={labels[lang].otherReceiptCount}
                   value={otherReceipts} 
                   onChange={e=>setOtherReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherReceipts') ? 'border-red-500' : ''}`}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('otherReceipts') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
             <div className="mt-3 font-semibold text-right">{L.totalSales}: ฿{(cash + qr + grab + aroi).toLocaleString()}</div>
+          </section>
+
+          {/* Refunds Section */}
+          <section className="rounded-[4px] border bg-white p-5">
+            <h3 className="mb-4 text-sm font-semibold">{L.refunds}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.refundsPrompt}</label>
+                <select
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('refundStatus') ? 'border-red-500' : ''}`}
+                  value={refundStatus}
+                  onChange={(e) => {
+                    const value = e.target.value as 'YES' | 'NO' | '';
+                    setRefundStatus(value);
+                    if (value === 'NO') {
+                      setRefundOriginalReceipt("");
+                      setRefundReason("");
+                      setRefundReplacementReceipt("");
+                      setRefundAmount(0);
+                      setRefundTime("");
+                    }
+                  }}
+                >
+                  <option value="">{L.requiredField}</option>
+                  <option value="NO">{L.refundsNo}</option>
+                  <option value="YES">{L.refundsYes}</option>
+                </select>
+              </div>
+              {refundStatus === 'NO' && (
+                <div className="md:col-span-2">
+                  <label className="flex items-center gap-2 text-xs text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={noRefundsConfirmed}
+                      onChange={(e) => setNoRefundsConfirmed(e.target.checked)}
+                      className={errors.includes('noRefundsConfirmed') ? 'outline outline-1 outline-red-500' : ''}
+                    />
+                    {L.noRefundsConfirm}
+                  </label>
+                </div>
+              )}
+            </div>
+            {refundStatus === 'YES' && (
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">{L.originalReceipt}</label>
+                    <input
+                      className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('refundOriginalReceipt') ? 'border-red-500' : ''}`}
+                      value={refundOriginalReceipt}
+                      onChange={(e) => setRefundOriginalReceipt(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">{L.replacementReceipt}</label>
+                    <input
+                      className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('refundReplacementReceipt') ? 'border-red-500' : ''}`}
+                      value={refundReplacementReceipt}
+                      onChange={(e) => setRefundReplacementReceipt(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">{L.refundReason}</label>
+                  <textarea
+                    className={`w-full border rounded-[4px] px-3 py-2 text-xs ${errors.includes('refundReason') ? 'border-red-500' : ''}`}
+                    rows={3}
+                    value={refundReason}
+                    onChange={(e) => setRefundReason(e.target.value)}
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">{L.refundAmount}</label>
+                    <input
+                      type="number"
+                      min="0"
+                      className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('refundAmount') ? 'border-red-500' : ''}`}
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">{L.refundTime}</label>
+                    <input
+                      type="time"
+                      className={`w-full border rounded-[4px] px-3 py-2 h-9 text-xs ${errors.includes('refundTime') ? 'border-red-500' : ''}`}
+                      value={refundTime}
+                      onChange={(e) => setRefundTime(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </section>
 
           {/* Expenses Section */}
@@ -1133,74 +1326,6 @@ export default function DailySales() {
             </div>
           </section>
 
-          {/* Refunds Section */}
-          <section className="rounded-[4px] border bg-white p-5">
-            <h3 className="mb-4 text-sm font-semibold">{L.refunds}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{L.refundsPrompt}</label>
-                <select
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundStatus') ? 'border-red-500' : ''}`}
-                  value={refundStatus}
-                  onChange={(e) => {
-                    const value = e.target.value as 'YES' | 'NO' | '';
-                    setRefundStatus(value);
-                    if (value === 'NO') {
-                      setRefundOriginalReceipt("");
-                      setRefundReason("");
-                      setRefundReplacementReceipt("");
-                    }
-                  }}
-                >
-                  <option value="">{L.requiredField}</option>
-                  <option value="NO">{L.refundsNo}</option>
-                  <option value="YES">{L.refundsYes}</option>
-                </select>
-              </div>
-              {refundStatus === 'NO' && (
-                <div className="md:col-span-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={noRefundsConfirmed}
-                      onChange={(e) => setNoRefundsConfirmed(e.target.checked)}
-                      className={errors.includes('noRefundsConfirmed') ? 'outline outline-1 outline-red-500' : ''}
-                    />
-                    {L.noRefundsConfirm}
-                  </label>
-                </div>
-              )}
-            </div>
-            {refundStatus === 'YES' && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">{L.originalReceipt}</label>
-                  <input
-                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundOriginalReceipt') ? 'border-red-500' : ''}`}
-                    value={refundOriginalReceipt}
-                    onChange={(e) => setRefundOriginalReceipt(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">{L.refundReason}</label>
-                  <input
-                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundReason') ? 'border-red-500' : ''}`}
-                    value={refundReason}
-                    onChange={(e) => setRefundReason(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">{L.replacementReceipt}</label>
-                  <input
-                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundReplacementReceipt') ? 'border-red-500' : ''}`}
-                    value={refundReplacementReceipt}
-                    onChange={(e) => setRefundReplacementReceipt(e.target.value)}
-                  />
-                </div>
-              </div>
-            )}
-          </section>
-
           {/* Summary Section */}
           <section className="rounded-[4px] border bg-white p-5">
             <h3 className="mb-4 text-sm font-semibold">{L.summary}</h3>
@@ -1254,12 +1379,6 @@ export default function DailySales() {
               </div>
             </div>
           </section>
-
-          {error && (
-            <div className="mb-3 rounded-[4px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </div>
-          )}
 
           {/* END-OF-FORM ACTIONS (non-floating) */}
           <div className="mt-8 flex items-center justify-end gap-3">

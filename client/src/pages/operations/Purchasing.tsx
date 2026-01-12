@@ -55,6 +55,17 @@ type PurchasingItem = {
   updatedAt: string;
 };
 
+const APPROVED_CATEGORIES = [
+  'Meat',
+  'Drinks',
+  'Fresh Food',
+  'Frozen Food',
+  'Kitchen Supplies',
+  'Packaging',
+  'Shelf Items',
+  'Uncategorized',
+];
+
 const thb = (v: unknown): string => {
   const n = typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
   return "฿" + n.toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -71,6 +82,7 @@ export default function PurchasingPage() {
   const [showCostWarning, setShowCostWarning] = useState(false);
   const [pendingCostUpdate, setPendingCostUpdate] = useState<{ id: number; oldCost: number | null; newCost: number } | null>(null);
   const [apiWarning, setApiWarning] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   // Handle warning from recipe-management redirect
   useEffect(() => {
@@ -197,14 +209,26 @@ export default function PurchasingPage() {
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
+  const isValidCategory = (value: string | null) => {
+    if (!value) return false;
+    return APPROVED_CATEGORIES.includes(value);
+  };
+
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const newCost = formData.get('unitCost') ? parseFloat(formData.get('unitCost') as string) : null;
+    const categoryValue = (formData.get('category') as string) || null;
+    
+    if (!isValidCategory(categoryValue)) {
+      setCategoryError('Please select a valid category from the list.');
+      return;
+    }
+    setCategoryError(null);
     
     const data = {
       item: formData.get('item') as string,
-      category: formData.get('category') as string || null,
+      category: categoryValue,
       supplierName: formData.get('supplierName') as string || null,
       brand: formData.get('brand') as string || null,
       supplierSku: formData.get('supplierSku') as string || null,
@@ -236,9 +260,15 @@ export default function PurchasingPage() {
       const formEl = document.querySelector('form');
       if (formEl) {
         const formData = new FormData(formEl);
+        const categoryValue = (formData.get('category') as string) || null;
+        if (!isValidCategory(categoryValue)) {
+          setCategoryError('Please select a valid category from the list.');
+          return;
+        }
+        setCategoryError(null);
         const data = {
           item: formData.get('item') as string,
-          category: formData.get('category') as string || null,
+          category: categoryValue,
           supplierName: formData.get('supplierName') as string || null,
           brand: formData.get('brand') as string || null,
           supplierSku: formData.get('supplierSku') as string || null,
@@ -533,12 +563,26 @@ export default function PurchasingPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-900 mb-1 block">Category</label>
-                <Input
+                <select
                   data-testid="input-category"
                   name="category"
-                  defaultValue={editingItem?.category || ''}
-                  className="text-xs rounded-[4px] border-slate-200"
-                />
+                  defaultValue={editingItem?.category && APPROVED_CATEGORIES.includes(editingItem.category) ? editingItem.category : ''}
+                  className="w-full text-xs rounded-[4px] border border-slate-200 px-3 py-2"
+                  required
+                >
+                  <option value="">Select category</option>
+                  {APPROVED_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+                {editingItem?.category && !APPROVED_CATEGORIES.includes(editingItem.category) && (
+                  <div className="mt-1 text-xs text-slate-500">
+                    Current category: {editingItem.category}
+                  </div>
+                )}
+                {categoryError && (
+                  <div className="mt-1 text-xs text-red-600">{categoryError}</div>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-900 mb-1 block">Supplier</label>
