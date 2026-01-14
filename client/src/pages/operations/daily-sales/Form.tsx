@@ -27,10 +27,6 @@ const labels = {
     grabSales: 'Grab Sales',
     otherSales: 'Other Sales',
     totalSales: 'Total Sales',
-    cashReceiptCount: 'Cash Receipt Count',
-    qrReceiptCount: 'QR Receipt Count',
-    grabReceiptCount: 'Grab Receipt Count',
-    otherReceiptCount: 'Other Receipt Count',
     expenses: 'Expenses',
     shiftExpenses: 'Shift Expenses',
     shiftExpensesHint: 'One expense item per line',
@@ -78,14 +74,16 @@ const labels = {
     refundsPrompt: 'Did any refunds occur?',
     refundsYes: 'Yes',
     refundsNo: 'No',
-    noRefundsConfirm: 'No refunds',
-    originalReceipt: 'Original Receipt Number',
+    refundChannel: 'Refund Channel',
+    refundChannelCash: 'Cash',
+    refundChannelQr: 'QR',
+    refundChannelGrab: 'Grab',
     refundReason: 'Refund Reason',
-    replacementReceipt: 'Replacement Sale Receipt Number',
     requiredField: 'Required',
     purchaseItem: 'Purchase Item',
     unit: 'Unit',
-    category: 'Category'
+    category: 'Category',
+    resetForm: 'Clear / Reset'
   },
   th: {
     pageTitle: 'ยอดขายและค่าใช้จ่ายประจำวัน',
@@ -103,10 +101,6 @@ const labels = {
     grabSales: 'ยอดขาย Grab',
     otherSales: 'ยอดขายอื่นๆ',
     totalSales: 'ยอดขายรวม',
-    cashReceiptCount: 'จำนวนใบเสร็จเงินสด',
-    qrReceiptCount: 'จำนวนใบเสร็จ QR',
-    grabReceiptCount: 'จำนวนใบเสร็จ Grab',
-    otherReceiptCount: 'จำนวนใบเสร็จอื่นๆ',
     expenses: 'ค่าใช้จ่าย',
     shiftExpenses: 'ค่าใช้จ่ายกะ',
     shiftExpensesHint: 'หนึ่งรายการต่อหนึ่งบรรทัด',
@@ -154,14 +148,16 @@ const labels = {
     refundsPrompt: 'มีการคืนเงินหรือไม่',
     refundsYes: 'มี',
     refundsNo: 'ไม่มี',
-    noRefundsConfirm: 'ไม่มีการคืนเงิน',
-    originalReceipt: 'หมายเลขใบเสร็จต้นฉบับ',
+    refundChannel: 'ช่องทางการคืนเงิน',
+    refundChannelCash: 'เงินสด',
+    refundChannelQr: 'QR',
+    refundChannelGrab: 'Grab',
     refundReason: 'เหตุผลการคืนเงิน',
-    replacementReceipt: 'หมายเลขใบเสร็จการขายแทน',
     requiredField: 'จำเป็นต้องกรอก',
     purchaseItem: 'รายการซื้อ',
     unit: 'หน่วย',
-    category: 'หมวดหมู่'
+    category: 'หมวดหมู่',
+    resetForm: 'ล้าง / รีเซ็ต'
   }
 };
 
@@ -246,10 +242,6 @@ export default function DailySales() {
   const [qr, setQr] = useState(0);
   const [grab, setGrab] = useState(0);
   const [aroi, setAroi] = useState(0);
-  const [cashReceipts, setCashReceipts] = useState(0);
-  const [qrReceipts, setQrReceipts] = useState(0);
-  const [grabReceipts, setGrabReceipts] = useState(0);
-  const [otherReceipts, setOtherReceipts] = useState(0);
   
   // Expenses state
   const [shiftExpenses, setShiftExpenses] = useState<ShiftExpenseRow[]>([{ id: uid(), item: "", cost: 0, shop: "" }]);
@@ -271,10 +263,8 @@ export default function DailySales() {
   const [loading, setLoading] = useState(isEditMode);
   const [shiftDate, setShiftDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [refundStatus, setRefundStatus] = useState<'YES' | 'NO' | ''>('');
-  const [noRefundsConfirmed, setNoRefundsConfirmed] = useState(false);
-  const [refundOriginalReceipt, setRefundOriginalReceipt] = useState("");
   const [refundReason, setRefundReason] = useState("");
-  const [refundReplacementReceipt, setRefundReplacementReceipt] = useState("");
+  const [refundChannel, setRefundChannel] = useState("");
   const [expenseSuppliers, setExpenseSuppliers] = useState<string[]>([]);
   const [purchaseItems, setPurchaseItems] = useState<Array<{ name: string; category: string; unit: string; supplier: string }>>([]);
 
@@ -314,18 +304,10 @@ export default function DailySales() {
           setClosingCash(p.closingCash || 0);
           setCashBanked(p.cashBanked || 0);
           setQrBanked(p.qrTransfer || 0);
-          if (p.receiptCounts) {
-            setCashReceipts(p.receiptCounts.cash ?? 0);
-            setQrReceipts(p.receiptCounts.qr ?? 0);
-            setGrabReceipts(p.receiptCounts.grab ?? 0);
-            setOtherReceipts(p.receiptCounts.other ?? 0);
-          }
           if (p.refunds) {
             setRefundStatus(p.refunds.status || '');
-            setNoRefundsConfirmed(Boolean(p.refunds.noRefundsConfirmed));
-            setRefundOriginalReceipt(p.refunds.originalReceiptNumber || "");
             setRefundReason(p.refunds.refundReason || "");
-            setRefundReplacementReceipt(p.refunds.replacementReceiptNumber || "");
+            setRefundChannel(p.refunds.refundChannel || p.refunds.channel || "");
           }
           
           // Load shift date for editing
@@ -443,10 +425,6 @@ export default function DailySales() {
         setQr(draft.qr || 0);
         setGrab(draft.grab || 0);
         setAroi(draft.aroi || 0);
-        setCashReceipts(draft.cashReceipts || 0);
-        setQrReceipts(draft.qrReceipts || 0);
-        setGrabReceipts(draft.grabReceipts || 0);
-        setOtherReceipts(draft.otherReceipts || 0);
         setClosingCash(draft.closingCash || 0);
         setCashBanked(draft.cashBanked || 0);
         setQrBanked(draft.qrBanked || 0);
@@ -454,13 +432,33 @@ export default function DailySales() {
         setStaffWages(draft.staffWages || [{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
         setOtherPayments(draft.otherPayments || [{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
         setRefundStatus(draft.refundStatus || '');
-        setNoRefundsConfirmed(Boolean(draft.noRefundsConfirmed));
-        setRefundOriginalReceipt(draft.refundOriginalReceipt || "");
         setRefundReason(draft.refundReason || "");
-        setRefundReplacementReceipt(draft.refundReplacementReceipt || "");
+        setRefundChannel(draft.refundChannel || "");
       }
     } catch {}
   }, [isEditMode]);
+
+  const resetForm = () => {
+    setCompletedBy("");
+    setCashStart(0);
+    setCash(0);
+    setQr(0);
+    setGrab(0);
+    setAroi(0);
+    setShiftExpenses([{ id: uid(), item: "", cost: 0, shop: "" }]);
+    setStaffWages([{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
+    setOtherPayments([{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
+    setClosingCash(0);
+    setCashBanked(0);
+    setQrBanked(0);
+    setRefundStatus('');
+    setRefundReason("");
+    setRefundChannel("");
+    setErrors([]);
+    setError(null);
+    setShiftDate(new Date().toISOString().split('T')[0]);
+    localStorage.removeItem("daily_sales_draft");
+  };
 
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault(); // allow call from button with no event
@@ -474,15 +472,11 @@ export default function DailySales() {
       qrSales: qr,
       grabSales: grab,
       otherSales: aroi,
-      cashReceipts,
-      qrReceipts,
-      grabReceipts,
-      otherReceipts,
       cashBanked,
       qrBanked
     };
     
-    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashReceipts', 'qrReceipts', 'grabReceipts', 'otherReceipts', 'cashBanked', 'qrBanked'];
+    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashBanked', 'qrBanked'];
     const newErrors = required.filter((f) => {
       const value = formData[f as keyof typeof formData];
       if (f === 'completedBy') return !value || value.toString().trim() === '';
@@ -491,12 +485,9 @@ export default function DailySales() {
     
     if (!refundStatus) {
       newErrors.push('refundStatus');
-    } else if (refundStatus === 'NO') {
-      if (!noRefundsConfirmed) newErrors.push('noRefundsConfirmed');
     } else if (refundStatus === 'YES') {
-      if (!refundOriginalReceipt.trim()) newErrors.push('refundOriginalReceipt');
       if (!refundReason.trim()) newErrors.push('refundReason');
-      if (!refundReplacementReceipt.trim()) newErrors.push('refundReplacementReceipt');
+      if (!refundChannel.trim()) newErrors.push('refundChannel');
     }
     
     const invalidSuppliers = shiftExpenses.some((row) => !row.shop || row.shop.trim() === '');
@@ -527,18 +518,10 @@ export default function DailySales() {
         grabSales: grab,
         otherSales: aroi,
         totalSales: cash + qr + grab + aroi,
-        receiptCounts: {
-          cash: cashReceipts,
-          qr: qrReceipts,
-          grab: grabReceipts,
-          other: otherReceipts
-        },
         refunds: {
           status: refundStatus,
-          noRefundsConfirmed,
-          originalReceiptNumber: refundOriginalReceipt.trim(),
           refundReason: refundReason.trim(),
-          replacementReceiptNumber: refundReplacementReceipt.trim()
+          refundChannel: refundChannel.trim()
         },
         expenses: shiftExpenses,
         wages: [...staffWages, ...otherPayments],
@@ -591,6 +574,7 @@ export default function DailySales() {
       } else {
         // Show loading indicator before navigation
         setSubmitting(true);
+        resetForm();
         
         // Brief delay to show loading state before navigation
         setTimeout(() => {
@@ -614,10 +598,6 @@ export default function DailySales() {
     qr,
     grab,
     aroi,
-    cashReceipts,
-    qrReceipts,
-    grabReceipts,
-    otherReceipts,
     shiftExpenses,
     staffWages,
     otherPayments,
@@ -625,10 +605,8 @@ export default function DailySales() {
     cashBanked,
     qrBanked,
     refundStatus,
-    noRefundsConfirmed,
-    refundOriginalReceipt,
     refundReason,
-    refundReplacementReceipt
+    refundChannel
   });
 
   const handleSaveDraft = () => {
@@ -761,17 +739,6 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashReceiptCount}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].cashReceiptCount}
-                  value={cashReceipts} 
-                  onChange={e=>setCashReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashReceipts') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrSales}</label>
                 <input 
                   type="number" 
@@ -780,17 +747,6 @@ export default function DailySales() {
                   value={qr} 
                   onChange={e=>setQr(+e.target.value||0)} 
                   className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrReceiptCount}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].qrReceiptCount}
-                  value={qrReceipts} 
-                  onChange={e=>setQrReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrReceipts') ? 'border-red-500' : ''}`}
                 />
               </div>
               <div>
@@ -805,17 +761,6 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabReceiptCount}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].grabReceiptCount}
-                  value={grabReceipts} 
-                  onChange={e=>setGrabReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('grabReceipts') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
                 <label className="text-sm text-gray-600 block mb-1">{labels[lang].otherSales}</label>
                 <input 
                   type="number" 
@@ -824,17 +769,6 @@ export default function DailySales() {
                   value={aroi} 
                   onChange={e=>setAroi(+e.target.value||0)} 
                   className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].otherReceiptCount}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].otherReceiptCount}
-                  value={otherReceipts} 
-                  onChange={e=>setOtherReceipts(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherReceipts') ? 'border-red-500' : ''}`}
                 />
               </div>
             </div>
@@ -1092,9 +1026,8 @@ export default function DailySales() {
                     const value = e.target.value as 'YES' | 'NO' | '';
                     setRefundStatus(value);
                     if (value === 'NO') {
-                      setRefundOriginalReceipt("");
                       setRefundReason("");
-                      setRefundReplacementReceipt("");
+                      setRefundChannel("");
                     }
                   }}
                 >
@@ -1103,30 +1036,9 @@ export default function DailySales() {
                   <option value="YES">{L.refundsYes}</option>
                 </select>
               </div>
-              {refundStatus === 'NO' && (
-                <div className="md:col-span-2">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={noRefundsConfirmed}
-                      onChange={(e) => setNoRefundsConfirmed(e.target.checked)}
-                      className={errors.includes('noRefundsConfirmed') ? 'outline outline-1 outline-red-500' : ''}
-                    />
-                    {L.noRefundsConfirm}
-                  </label>
-                </div>
-              )}
             </div>
             {refundStatus === 'YES' && (
               <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">{L.originalReceipt}</label>
-                  <input
-                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundOriginalReceipt') ? 'border-red-500' : ''}`}
-                    value={refundOriginalReceipt}
-                    onChange={(e) => setRefundOriginalReceipt(e.target.value)}
-                  />
-                </div>
                 <div>
                   <label className="text-sm text-gray-600 block mb-1">{L.refundReason}</label>
                   <input
@@ -1136,12 +1048,17 @@ export default function DailySales() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600 block mb-1">{L.replacementReceipt}</label>
-                  <input
-                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundReplacementReceipt') ? 'border-red-500' : ''}`}
-                    value={refundReplacementReceipt}
-                    onChange={(e) => setRefundReplacementReceipt(e.target.value)}
-                  />
+                  <label className="text-sm text-gray-600 block mb-1">{L.refundChannel}</label>
+                  <select
+                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundChannel') ? 'border-red-500' : ''}`}
+                    value={refundChannel}
+                    onChange={(e) => setRefundChannel(e.target.value)}
+                  >
+                    <option value="">{L.requiredField}</option>
+                    <option value="CASH">{L.refundChannelCash}</option>
+                    <option value="QR">{L.refundChannelQr}</option>
+                    <option value="GRAB">{L.refundChannelGrab}</option>
+                  </select>
                 </div>
               </div>
             )}
@@ -1215,6 +1132,13 @@ export default function DailySales() {
               className="h-9 rounded-[4px] border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               {L.saveDraft}
+            </button>
+            <button
+              type="button"
+              onClick={resetForm}
+              className="h-9 rounded-[4px] border border-gray-300 px-4 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              {L.resetForm}
             </button>
             <button
               type="button"
