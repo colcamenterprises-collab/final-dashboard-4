@@ -1,0 +1,220 @@
+Final Dashboard 4.0 — REPLIT AGENT TESTING INSTRUCTIONS
+
+ROLE
+
+The Replit Agent acts as a secondary verifier.
+Its sole responsibility is to observe, test, and report UI and runtime behaviour.
+
+The Replit Agent is NOT a builder, fixer, or improver.
+
+🔒 ABSOLUTE RULES (NON‑NEGOTIABLE)
+
+❌ DO NOT modify any code
+
+❌ DO NOT save files
+
+❌ DO NOT hot‑fix errors
+
+❌ DO NOT refactor or rename anything
+
+❌ DO NOT delete legacy components
+
+❌ DO NOT add validation, logging, or guards
+
+❌ DO NOT improve UX or UI
+
+✅ ONLY test
+
+✅ ONLY observe
+
+✅ ONLY report findings
+
+If something is broken, document it.
+If something looks wrong, document it.
+If something is confusing, document it.
+
+🎯 OBJECTIVE
+
+To determine what actually works in the running application and what does not, from a real user and runtime perspective.
+
+The goal is to answer:
+
+What works?
+What partially works?
+What is broken?
+What silently fails?
+What legacy UI still exists?
+
+TESTING ORDER (STRICT — DO NOT REORDER)
+
+The Replit Agent MUST test branches in this exact order:
+
+Recipe & Menu Management
+
+POS‑facing UI
+
+Online Ordering UI
+
+Daily Sales & Stock v2 (ENTRY POINT)
+
+Analysis pages
+
+Finance views
+
+Stock & Purchasing pages
+
+Security / Audit visibility
+
+CORE QUESTIONS (ASK FOR EVERY BRANCH)
+
+A. Entry & Trigger
+
+Can this page / flow be accessed?
+
+What user action triggers it?
+
+Does the trigger consistently work?
+
+B. UI Behaviour
+
+Does the page load?
+
+Does it error?
+
+Does it hang?
+
+Does it show stale data?
+
+C. Data Behaviour
+
+Does data save?
+
+Does data reload correctly?
+
+Does old data leak into new flows?
+
+D. Failure Handling
+
+What happens on invalid input?
+
+What happens on submission failure?
+
+Are errors visible or silent?
+
+E. Flow Continuity
+
+After submission, where does the user land?
+
+Does the next expected page appear?
+
+Does the flow stop unexpectedly?
+
+F. Legacy / Dead UI
+
+Are there screens that appear unused?
+
+Are there buttons that do nothing?
+
+Are there labels or sections that no longer make sense?
+
+BRANCH‑SPECIFIC TEST PROMPTS
+
+1️⃣ Recipe & Menu Management
+
+Can menu items be viewed?
+
+Can recipes be opened?
+
+Are images present?
+
+Are there sections with no visible effect?
+
+2️⃣ POS‑Facing UI
+
+Are POS‑related screens accessible?
+
+Do sales figures appear?
+
+Are refunds visible anywhere?
+
+3️⃣ Online Ordering UI
+
+Is the menu visible?
+
+Can an order be placed?
+
+Does anything break when submitting?
+
+4️⃣ Daily Sales & Stock v2 (CRITICAL)
+
+Can Form 1 submit?
+
+Can Form 2 submit?
+
+Does the form reset after submission?
+
+Does previous shift data persist incorrectly?
+
+Are drinks / rolls / meat visible?
+
+5️⃣ Analysis Pages
+
+Do analysis screens load?
+
+Do they show real data or placeholders?
+
+Are charts populated?
+
+6️⃣ Finance Views
+
+Are reconciliation views visible?
+
+Is manager verification visible anywhere?
+
+Are numbers consistent across pages?
+
+7️⃣ Stock & Purchasing Pages
+
+Does the shopping list load?
+
+Are stock purchase modals accessible?
+
+Do submitted items appear later?
+
+8️⃣ Security / Audit
+
+Is there any visible security or audit view?
+
+Are flags or warnings shown anywhere?
+
+Does this appear conceptual or real?
+
+REQUIRED OUTPUT FORMAT (STRICT)
+
+The Replit Agent MUST report findings exactly in this format:
+
+BRANCH: <name>
+
+UI STATUS:
+- Works:
+- Partially Works:
+- Broken:
+
+OBSERVED FAILURES:
+- …
+
+DATA NOT SAVING / LOADING:
+- …
+
+SILENT ERRORS:
+- …
+
+LEGACY UI / DEAD SCREENS:
+- …
+
+CONFIDENCE LEVEL:
+High / Medium / Low
+
+No opinions.
+No recommendations.
+No fixes.
