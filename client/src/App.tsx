@@ -49,6 +49,7 @@ import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyReview from "./pages/analysis/DailyReview";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
+import MarketingMachine from "./pages/marketing/MarketingMachine";
 import PurchasingLive from "./pages/ops/PurchasingLive";
 import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
@@ -235,6 +236,7 @@ export default function App() {
 
                 <Route path="/analysis/daily-review" element={<DailyReview />} />
 
+                <Route path="/marketing" element={<MarketingMachine />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
