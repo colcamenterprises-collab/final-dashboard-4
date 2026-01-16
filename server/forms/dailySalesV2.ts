@@ -95,46 +95,21 @@ export async function createDailySalesV2(req: Request, res: Response) {
       return value == null || isNaN(Number(value)) || Number(value) < 0;
     });
     
-    const receiptCounts = body.receiptCounts ?? {
-      cash: body.cashReceiptCount,
-      qr: body.qrReceiptCount,
-      grab: body.grabReceiptCount,
-      other: body.otherReceiptCount
-    };
-    
-    const invalidReceiptCounts = ['cash', 'qr', 'grab', 'other'].some((key) => {
-      const value = receiptCounts?.[key];
-      return value == null || isNaN(Number(value)) || Number(value) < 0;
-    });
-    
-    if (invalidReceiptCounts) {
-      missing.push('receiptCounts');
-    }
-    
     const refunds = body.refunds ?? {
       status: body.refundStatus,
-      noRefundsConfirmed: body.noRefundsConfirmed,
-      originalReceiptNumber: body.refundOriginalReceipt,
       refundReason: body.refundReason,
-      replacementReceiptNumber: body.refundReplacementReceipt
+      refundChannel: body.refundChannel
     };
     
     const refundStatus = refunds?.status;
     if (!refundStatus) {
       missing.push('refundStatus');
-    } else if (refundStatus === 'NO') {
-      if (!refunds.noRefundsConfirmed) {
-        missing.push('noRefundsConfirmed');
-      }
     } else if (refundStatus === 'YES') {
-      if (!refunds.originalReceiptNumber || String(refunds.originalReceiptNumber).trim() === '') {
-        missing.push('refundOriginalReceipt');
-      }
       if (!refunds.refundReason || String(refunds.refundReason).trim() === '') {
         missing.push('refundReason');
       }
-      if (!refunds.replacementReceiptNumber || String(refunds.replacementReceiptNumber).trim() === '') {
-        missing.push('refundReplacementReceipt');
+      if (!refunds.refundChannel || String(refunds.refundChannel).trim() === '') {
+        missing.push('refundChannel');
       }
     }
     
@@ -193,14 +168,6 @@ export async function createDailySalesV2(req: Request, res: Response) {
     const wagesTotal = (wages || []).reduce((s: number, w: any) => s + toTHB(w.amount), 0);
     const othersTotal = 0;
     
-    // Manager Sign Off fields (6 questions)
-    const q1CashInRegister = body.q1CashInRegister ?? null;
-    const q2ExpensesMirrorReport = body.q2ExpensesMirrorReport ?? null;
-    const q3CorrectDescriptions = body.q3CorrectDescriptions ?? null;
-    const q4RegisterBalances = body.q4RegisterBalances ?? null;
-    const q5AmountToBanked = body.q5AmountToBanked ?? null;
-    const q6ManagerName = body.q6ManagerName ?? "";
-
     const payload: any = {
       completedBy,
       startingCash: toTHB(startingCash),
@@ -208,18 +175,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
       qrSales: toTHB(qrSales),
       grabSales: toTHB(grabSales),
       otherSales: toTHB(otherSales),
-      receiptCounts: {
-        cash: toTHB(receiptCounts.cash),
-        qr: toTHB(receiptCounts.qr),
-        grab: toTHB(receiptCounts.grab),
-        other: toTHB(receiptCounts.other)
-      },
       refunds: {
         status: refunds.status,
-        noRefundsConfirmed: Boolean(refunds.noRefundsConfirmed),
-        originalReceiptNumber: refunds.originalReceiptNumber || "",
         refundReason: refunds.refundReason || "",
-        replacementReceiptNumber: refunds.replacementReceiptNumber || ""
+        refundChannel: refunds.refundChannel || ""
       },
       expenses,
       wages,
@@ -233,13 +192,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
       requisition,
       rollsEnd,
       meatEnd,
-      drinkStock: finalDrinkStock,
-      q1CashInRegister,
-      q2ExpensesMirrorReport,
-      q3CorrectDescriptions,
-      q4RegisterBalances,
-      q5AmountToBanked,
-      q6ManagerName,
+      drinkStock: finalDrinkStock
     };
 
     const __bankingAuto = computeBankingAuto({
@@ -275,15 +228,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
     
     await pool.query(
       `INSERT INTO daily_sales_v2 (
-        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO", payload,
-        "q1CashInRegister", "q2ExpensesMirrorReport", "q3CorrectDescriptions",
-        "q4RegisterBalances", "q5AmountToBanked", "q6ManagerName"
+        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO", payload
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt, payload,
-        q1CashInRegister, q2ExpensesMirrorReport, q3CorrectDescriptions,
-        q4RegisterBalances, q5AmountToBanked, q6ManagerName
+        id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt, payload
       ]
     );
     
@@ -314,12 +263,12 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
       <h3>Sales</h3>
       <table>
-        <tr><th>Channel</th><th>Sales (฿)</th><th>Receipt Count</th></tr>
-        <tr><td>Cash</td><td>${formatTHB(toTHB(cashSales))}</td><td>${receiptCounts.cash}</td></tr>
-        <tr><td>QR</td><td>${formatTHB(toTHB(qrSales))}</td><td>${receiptCounts.qr}</td></tr>
-        <tr><td>Grab</td><td>${formatTHB(toTHB(grabSales))}</td><td>${receiptCounts.grab}</td></tr>
-        <tr><td>Other</td><td>${formatTHB(toTHB(otherSales))}</td><td>${receiptCounts.other}</td></tr>
-        <tr><td><strong>Total</strong></td><td><strong>${formatTHB(totalSales)}</strong></td><td></td></tr>
+        <tr><th>Channel</th><th>Sales (฿)</th></tr>
+        <tr><td>Cash</td><td>${formatTHB(toTHB(cashSales))}</td></tr>
+        <tr><td>QR</td><td>${formatTHB(toTHB(qrSales))}</td></tr>
+        <tr><td>Grab</td><td>${formatTHB(toTHB(grabSales))}</td></tr>
+        <tr><td>Other</td><td>${formatTHB(toTHB(otherSales))}</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>${formatTHB(totalSales)}</strong></td></tr>
       </table>
 
       <h3>Expenses</h3>
@@ -365,25 +314,13 @@ export async function createDailySalesV2(req: Request, res: Response) {
           </table>`
         : '<p style="color:#6b7280">No auto-banking data</p>'}
 
-      <h3>Manager Sign Off</h3>
-      <table>
-        <tr><th>Question</th><th>Response</th></tr>
-        <tr><td>Cash in register after all expenses</td><td>฿${formatTHB(q1CashInRegister || 0)}</td></tr>
-        <tr><td>Expenses mirror shift report</td><td>${q2ExpensesMirrorReport ? 'YES' : 'NO'}</td></tr>
-        <tr><td>Correct expense descriptions</td><td>${q3CorrectDescriptions ? 'YES' : 'NO'}</td></tr>
-        <tr><td>Register balances</td><td>${q4RegisterBalances ? 'YES' : 'NO'}</td></tr>
-        <tr><td>Amount to be banked (Combined Total)</td><td>฿${formatTHB(q5AmountToBanked || 0)}</td></tr>
-        <tr><td>Manager Name</td><td>${q6ManagerName || 'Not provided'}</td></tr>
-      </table>
-
       <h3>Refunds</h3>
       <table>
-        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th></tr>
+        <tr><th>Status</th><th>Reason</th><th>Channel</th></tr>
         <tr>
           <td>${refunds.status || 'N/A'}</td>
-          <td>${refunds.originalReceiptNumber || ''}</td>
           <td>${refunds.refundReason || ''}</td>
-          <td>${refunds.replacementReceiptNumber || ''}</td>
+          <td>${refunds.refundChannel || ''}</td>
         </tr>
       </table>
 
@@ -656,12 +593,12 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
 
       <h3>Sales</h3>
       <table>
-        <tr><th>Channel</th><th>Sales (฿)</th><th>Receipt Count</th></tr>
-        <tr><td>Cash</td><td>${formatTHB(payload.cashSales || 0)}</td><td>${payload.receiptCounts?.cash ?? 0}</td></tr>
-        <tr><td>QR</td><td>${formatTHB(payload.qrSales || 0)}</td><td>${payload.receiptCounts?.qr ?? 0}</td></tr>
-        <tr><td>Grab</td><td>${formatTHB(payload.grabSales || 0)}</td><td>${payload.receiptCounts?.grab ?? 0}</td></tr>
-        <tr><td>Other</td><td>${formatTHB(payload.otherSales || 0)}</td><td>${payload.receiptCounts?.other ?? 0}</td></tr>
-        <tr><td><strong>Total</strong></td><td><strong>${formatTHB(payload.totalSales || 0)}</strong></td><td></td></tr>
+        <tr><th>Channel</th><th>Sales (฿)</th></tr>
+        <tr><td>Cash</td><td>${formatTHB(payload.cashSales || 0)}</td></tr>
+        <tr><td>QR</td><td>${formatTHB(payload.qrSales || 0)}</td></tr>
+        <tr><td>Grab</td><td>${formatTHB(payload.grabSales || 0)}</td></tr>
+        <tr><td>Other</td><td>${formatTHB(payload.otherSales || 0)}</td></tr>
+        <tr><td><strong>Total</strong></td><td><strong>${formatTHB(payload.totalSales || 0)}</strong></td></tr>
       </table>
 
       <h3>Banking</h3>
@@ -675,23 +612,13 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
         <tr><td>QR Banked</td><td>${formatTHB(payload.qrTransfer || 0)}</td></tr>
       </table>
 
-      <h3>Manager Sign Off</h3>
-      <table>
-        <tr><th>Question</th><th>Response</th></tr>
-        <tr><td>Amount after expenses (excl. float)</td><td>${formatTHB(payload.managerNetAmount || 0)}</td></tr>
-        <tr><td>Register balances</td><td>${payload.registerBalances ? 'YES' : 'NO'}</td></tr>
-        ${!payload.registerBalances && payload.varianceNotes ? `<tr><td>Variance explanation</td><td>${payload.varianceNotes}</td></tr>` : ''}
-        <tr><td>Expenses review</td><td>${payload.expensesReview || 'Not provided'}</td></tr>
-      </table>
-
       <h3>Refunds</h3>
       <table>
-        <tr><th>Status</th><th>Original Receipt</th><th>Reason</th><th>Replacement Receipt</th></tr>
+        <tr><th>Status</th><th>Reason</th><th>Channel</th></tr>
         <tr>
           <td>${payload.refunds?.status || 'N/A'}</td>
-          <td>${payload.refunds?.originalReceiptNumber || ''}</td>
           <td>${payload.refunds?.refundReason || ''}</td>
-          <td>${payload.refunds?.replacementReceiptNumber || ''}</td>
+          <td>${payload.refunds?.refundChannel || ''}</td>
         </tr>
       </table>
 
