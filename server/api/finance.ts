@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { db } from "../db";
-import { plRow, plCategoryMap, plMonthCache, loyverseReceipts, expenses, expenseCategories } from "../../shared/schema";
+import { plRow, plCategoryMap, plMonthCache, expenses, expenseCategories } from "../../shared/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
 import { prisma } from "../../lib/prisma";
 
@@ -40,8 +40,6 @@ router.get('/summary/today', async (req: Request, res: Response) => {
     const year = now.getFullYear();
     const month = now.getMonth() + 1; // 1-12
     
-    // Get verified sales from loyverse_shifts table for current month
-    // Extract net_sales from each shift in the jsonb data array
     const { rows } = await db.execute(sql`
       SELECT 
         COALESCE(
@@ -132,18 +130,9 @@ router.get('/summary/today', async (req: Request, res: Response) => {
     
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] finance/summary/today:', error);
-    res.status(200).json({
-      success: true,
-      sales: 0,
-      currentMonthSales: 0,
-      shiftCount: 0,
-      expenses: 0,
-      currentMonthExpenses: 0,
-      expenseBreakdown: { shopping: 0, wages: 0, business: 0, shiftTotal: 0 },
-      month: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
-      netProfit: 0,
-      timestamp: new Date().toISOString(),
-      warning: 'SAFE_FALLBACK_USED'
+    res.status(500).json({
+      error: 'FINANCE_SUMMARY_FAILED',
+      message: error instanceof Error ? error.message : 'Failed to build finance summary.'
     });
   }
 });
@@ -193,15 +182,9 @@ router.get('/pnl-expenses', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] pnl-expenses:', error);
-    res.status(200).json({
-      success: true,
-      total: 0,
-      bankTotal: 0,
-      cashTotal: 0,
-      byCategory: {},
-      count: 0,
-      expenses: [],
-      warning: 'SAFE_FALLBACK_USED'
+    res.status(500).json({
+      error: 'PNL_EXPENSES_FAILED',
+      message: error instanceof Error ? error.message : 'Failed to load P&L expenses.'
     });
   }
 });
@@ -285,17 +268,9 @@ router.get('/pnl-summary', async (req: Request, res: Response) => {
     });
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] pnl-summary:', error);
-    res.status(200).json({
-      success: true,
-      revenue: 0,
-      expenses: 0,
-      grossProfit: 0,
-      foodCost: { available: false, message: 'Data unavailable' },
-      coverage: { percent: 0, totalItems: 0, mappedItems: 0, unmappedItems: 0, warning: null },
-      alerts: { critical: 0, warning: 0, items: [] },
-      shiftCount: 0,
-      timestamp: new Date().toISOString(),
-      warning: 'SAFE_FALLBACK_USED'
+    res.status(500).json({
+      error: 'PNL_SUMMARY_FAILED',
+      message: error instanceof Error ? error.message : 'Failed to build P&L summary.'
     });
   }
 });
@@ -553,10 +528,9 @@ router.get('/pl', async (req: Request, res: Response) => {
     res.json(result);
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] pl:', error);
-    res.status(200).json({
-      success: true,
-      data: {},
-      warning: 'SAFE_FALLBACK_USED'
+    res.status(500).json({
+      error: 'FINANCE_PL_FAILED',
+      message: error instanceof Error ? error.message : 'Failed to build P&L data.'
     });
   }
 });
@@ -587,7 +561,7 @@ router.get('/pl/export', async (req: Request, res: Response) => {
     console.error('[EXPENSE_SAFE_FAIL] pl/export:', error);
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename=PL_error.csv`);
-    res.send('Account,Full Year\nNO_DATA,0\n');
+    res.status(500).send(`Account,Error\nERROR,${error instanceof Error ? error.message : 'Failed to export P&L'}\n`);
   }
 });
 
@@ -623,17 +597,9 @@ router.get('/summary', async (req: Request, res: Response) => {
     
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] finance/summary:', error);
-    res.status(200).json({
-      success: true,
-      year: new Date().getFullYear(),
-      totalRevenue: 0,
-      netRevenue: 0,
-      totalExpenses: 0,
-      netProfit: 0,
-      monthlyBreakdown: {},
-      includeShift: false,
-      timestamp: new Date().toISOString(),
-      warning: 'SAFE_FALLBACK_USED'
+    res.status(500).json({
+      error: 'FINANCE_SUMMARY_FAILED',
+      message: error instanceof Error ? error.message : 'Failed to build finance summary.'
     });
   }
 });

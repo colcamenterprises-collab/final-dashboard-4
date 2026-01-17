@@ -121,14 +121,11 @@ export async function getIngredientReconciliation(
 
   } catch (err: any) {
     console.error('[INGREDIENT_RECONCILIATION_SAFE_FAIL]', err?.message);
-    // Safe fallback - return empty result, not error
-    return {
-      ok: true,
-      dateRange: { start: startDate, end: endDate },
-      items: [],
-      lastUpdated: new Date().toISOString(),
-      warning: 'SAFE_FALLBACK_USED',
-    };
+    throw new Error(
+      err instanceof Error
+        ? err.message
+        : "Ingredient reconciliation failed."
+    );
   }
 }
 
@@ -149,7 +146,11 @@ export async function getIngredientList(): Promise<{ id: number; name: string; u
       name: r.name,
       unit: r.unit || 'unit',
     }));
-  } catch {
-    return [];
+  } catch (err) {
+    throw new Error(
+      err instanceof Error
+        ? err.message
+        : "Failed to load ingredient list."
+    );
   }
 }

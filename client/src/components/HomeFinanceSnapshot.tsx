@@ -14,11 +14,26 @@ interface Snapshot {
 }
 
 export default function HomeFinanceSnapshot() {
-  const { data, isLoading } = useQuery<Snapshot>({
+  const { data, isLoading, isError, error } = useQuery<Snapshot>({
     queryKey: ['/api/finance/summary/today'],
   });
 
-  if (isLoading || !data) return null;
+  if (isLoading) return null;
+
+  if (isError) {
+    return (
+      <Card>
+        <CardContent>
+          <h2>Finance Snapshot</h2>
+          <div className="text-xs text-orange-600">
+            Finance snapshot unavailable: {(error as Error)?.message}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!data) return null;
 
   return (
     <Card>
