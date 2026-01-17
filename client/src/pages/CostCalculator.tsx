@@ -8,7 +8,6 @@ import { Link } from "wouter";
 export default function CostCalculator() {
   const [recipeName, setRecipeName] = useState("");
   const [recipeYield, setRecipeYield] = useState(1);
-  const [targetMargin, setTargetMargin] = useState(0.3);
   const [selectedIngredients, setSelectedIngredients] = useState<{ ingredientId: string; qty: number }[]>([]);
   const [calculationResult, setCalculationResult] = useState<any>(null);
   
@@ -62,7 +61,7 @@ export default function CostCalculator() {
       <div className="rounded-[4px] border border-slate-200 bg-white p-4">
         <h2 className="text-sm font-medium mb-4">Recipe Details</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <div>
               <label className="block text-xs text-slate-600 mb-2">Recipe Name</label>
               <input
@@ -80,18 +79,6 @@ export default function CostCalculator() {
                 value={recipeYield}
                 onChange={(e) => setRecipeYield(Number(e.target.value))}
                 min="1"
-                className="w-full p-3 border border-slate-200 rounded-[4px] text-xs"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-slate-600 mb-2">Target Margin (%)</label>
-              <input
-                type="number"
-                value={targetMargin * 100}
-                onChange={(e) => setTargetMargin(Number(e.target.value) / 100)}
-                min="0"
-                max="100"
-                step="1"
                 className="w-full p-3 border border-slate-200 rounded-[4px] text-xs"
               />
             </div>
@@ -168,7 +155,7 @@ export default function CostCalculator() {
         <div className="rounded-[4px] border border-slate-200 bg-white p-4">
             <h2 className="h2 mb-4">Cost Analysis</h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               <div className="bg-slate-50 p-4 rounded-[4px]">
                 <div className="text-sm text-gray-600">Total Cost</div>
                 <div className="text-xl font-bold">฿{calculationResult.totalCost.toFixed(2)}</div>
@@ -176,14 +163,6 @@ export default function CostCalculator() {
               <div className="bg-slate-50 p-4 rounded-[4px]">
                 <div className="text-sm text-gray-600">Cost Per Serve</div>
                 <div className="text-xl font-bold">฿{calculationResult.costPerServe.toFixed(2)}</div>
-              </div>
-              <div className="bg-slate-50 p-4 rounded-[4px]">
-                <div className="text-sm text-gray-600">Target Margin</div>
-                <div className="text-xl font-bold">{(calculationResult.targetMargin * 100).toFixed(1)}%</div>
-              </div>
-              <div className="bg-emerald-50 p-4 rounded-[4px]">
-                <div className="text-sm text-emerald-600">Suggested Price</div>
-                <div className="text-xl font-bold text-emerald-600">฿{calculationResult.suggestedPrice.toFixed(2)}</div>
               </div>
             </div>
 

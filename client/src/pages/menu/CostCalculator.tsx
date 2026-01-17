@@ -3,15 +3,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import { RecipeEditor } from "./RecipeEditor";
 
 // ---- Types ----
-type UnitType = "g" | "kg" | "ml" | "litre" | "cup" | "tbsp" | "tsp" | "pcs" | "oz" | "lb" | "each";
+type UnitType = "g" | "ml" | "each";
 
 type Ingredient = {
   id: string;
   name: string;
-  unit: UnitType;
-  packageSize: number;            // e.g., 1000 (g/ml) or 1 (pcs)
-  packageCostTHB: number;         // total price per package
-  supplier?: string;
+  baseUnit: UnitType;
+  unitCostPerBase: number;
 };
 
 type RecipeLine = {
@@ -21,55 +19,18 @@ type RecipeLine = {
   unit: UnitType;      // can be different from ingredient base unit
   unitCostTHB: number; // cost per unit (converted if needed)
   costTHB: number;     // qty * unitCostTHB (with yield if applied)
-  supplier?: string;
 };
 
 const THB = (n:number)=> new Intl.NumberFormat("th-TH",{style:"currency",currency:"THB",maximumFractionDigits:2}).format(n||0);
 const num = (v:any)=> isFinite(+v) ? +v : 0;
 
-// Unit conversion factors (everything converted to base units)
-const UNIT_CONVERSIONS: Record<UnitType, { toBase: number; baseUnit: string }> = {
-  // Weight
-  "g": { toBase: 1, baseUnit: "g" },
-  "kg": { toBase: 1000, baseUnit: "g" },
-  "oz": { toBase: 28.35, baseUnit: "g" },
-  "lb": { toBase: 453.6, baseUnit: "g" },
-  
-  // Volume
-  "ml": { toBase: 1, baseUnit: "ml" },
-  "litre": { toBase: 1000, baseUnit: "ml" },
-  "cup": { toBase: 240, baseUnit: "ml" },
-  "tbsp": { toBase: 15, baseUnit: "ml" },
-  "tsp": { toBase: 5, baseUnit: "ml" },
-  
-  // Count
-  "pcs": { toBase: 1, baseUnit: "pcs" },
-  "each": { toBase: 1, baseUnit: "each" }
-};
-
-// Convert between units
-function convertUnits(fromQty: number, fromUnit: UnitType, toUnit: UnitType): number {
-  const fromConv = UNIT_CONVERSIONS[fromUnit];
-  const toConv = UNIT_CONVERSIONS[toUnit];
-  
-  // Only convert within same category (weight/volume/count)
-  if (fromConv.baseUnit !== toConv.baseUnit) return fromQty;
-  
-  // Convert to base unit, then to target unit
-  const baseQty = fromQty * fromConv.toBase;
-  return baseQty / toConv.toBase;
-}
-
-const UNIT_OPTIONS: UnitType[] = ["g", "kg", "ml", "litre", "cup", "tbsp", "tsp", "pcs", "oz", "lb", "each"];
 
 export default function CostCalculator(){
   // ---- Data ----
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [search, setSearch] = useState("");
   const [lines, setLines] = useState<RecipeLine[]>([]);
-  const [wastePct, setWastePct] = useState(0);           // 0..100
   const [portions, setPortions] = useState(1);
-  const [menuPrice, setMenuPrice] = useState(0);
   const [recipeName, setRecipeName] = useState("");
   const [note, setNote] = useState("");
   const [desc, setDesc] = useState("");                 // AI description
@@ -79,16 +40,13 @@ export default function CostCalculator(){
   // ---- Load Ingredients (live from Ingredient Management) ----
   useEffect(()=>{
     (async ()=>{
-      // Swap URL to your real endpoint that lists current ingredients
-      const r = await fetch("/api/ingredients");
+      const r = await fetch("/api/ingredients/canonical");
       const j = await r.json();
-      const rows: Ingredient[] = (j.rows || j || []).map((x:any)=>({
-        id: String(x.id ?? x.slug ?? x.name),
+      const rows: Ingredient[] = (j.items || []).map((x:any)=>({
+        id: String(x.id),
         name: x.name,
-        unit: (x.unit || "g") as UnitType,
-        packageSize: num(x.packageSize ?? x.size ?? 1),
-        packageCostTHB: num(x.packageCostTHB ?? x.priceTHB ?? 0),
-        supplier: x.supplier || ""
+        baseUnit: x.baseUnit as UnitType,
+        unitCostPerBase: num(x.unitCostPerBase ?? 0)
       }));
       setIngredients(rows);
     })();
@@ -96,57 +54,31 @@ export default function CostCalculator(){
 
   // ---- Derived ----
   const linesWithCosts = useMemo(()=>{
-    const yieldFactor = (100 - Math.max(0, Math.min(100, wastePct)))/100; // e.g., 90% if 10% waste
     return lines.map(l => {
       const unitCost = num(l.unitCostTHB);
-      const cost = num(l.qty) * unitCost / Math.max(0.0001, yieldFactor);
+      const cost = num(l.qty) * unitCost;
       return { ...l, costTHB: cost };
     });
-  }, [lines, wastePct]);
+  }, [lines]);
 
   const recipeCostTHB = useMemo(()=> linesWithCosts.reduce((a,l)=> a + l.costTHB, 0), [linesWithCosts]);
   const costPerPortionTHB = useMemo(()=> recipeCostTHB / Math.max(1, portions), [recipeCostTHB, portions]);
-  const foodCostPct = useMemo(()=> menuPrice > 0 ? (costPerPortionTHB / menuPrice) * 100 : 0, [costPerPortionTHB, menuPrice]);
-  const gpTHB = useMemo(()=> menuPrice - costPerPortionTHB, [menuPrice, costPerPortionTHB]);
-  const marginPct = useMemo(()=> menuPrice>0 ? (gpTHB/menuPrice)*100 : 0, [gpTHB, menuPrice]);
 
   // ---- Actions ----
   function addIngredient(ing: Ingredient){
-    const unitCost = ing.packageCostTHB / Math.max(1, ing.packageSize);
     setLines(prev => [...prev, {
       ingredientId: ing.id,
       name: ing.name,
       qty: 0,
-      unit: ing.unit, // Start with ingredient's default unit
-      unitCostTHB: unitCost,
+      unit: ing.baseUnit,
+      unitCostTHB: ing.unitCostPerBase,
       costTHB: 0,
-      supplier: ing.supplier
     }]);
     setSearch("");
   }
 
   function updateQty(idx:number, q:number){
     setLines(prev => prev.map((l,i)=> i===idx ? { ...l, qty: q } : l));
-  }
-
-  function updateUnit(idx:number, newUnit: UnitType){
-    setLines(prev => prev.map((l,i)=> {
-      if (i !== idx) return l;
-      
-      // Find the original ingredient to get base unit cost
-      const ingredient = ingredients.find(ing => ing.id === l.ingredientId);
-      if (!ingredient) return { ...l, unit: newUnit };
-      
-      // Calculate cost per new unit
-      const baseCostPerUnit = ingredient.packageCostTHB / Math.max(1, ingredient.packageSize);
-      const convertedCostPerUnit = baseCostPerUnit * convertUnits(1, ingredient.unit, newUnit);
-      
-      return { 
-        ...l, 
-        unit: newUnit,
-        unitCostTHB: convertedCostPerUnit
-      };
-    }));
   }
 
   function removeLine(idx:number){
@@ -158,7 +90,7 @@ export default function CostCalculator(){
       mode: chefMode,
       recipeName,
       lines: linesWithCosts.map(l=>({ name: l.name, qty: l.qty, unit: l.unit })),
-      targetPrice: menuPrice
+      targetPrice: 0
     };
     const r = await fetch("/api/chef/describe", { method: "POST", headers: { "Content-Type":"application/json" }, body: JSON.stringify(payload) });
     const j = await r.json();
@@ -167,17 +99,16 @@ export default function CostCalculator(){
 
   async function saveToRecipes(){
     const payload = {
-      recipeName, note, wastePct, portions, menuPrice,
+      recipeName, note, portions,
       lines: linesWithCosts.map(l=> ({
         ingredientId: l.ingredientId,
         name: l.name,
         qty: l.qty,
         unit: l.unit,
         unitCostTHB: l.unitCostTHB,
-        costTHB: l.costTHB,
-        supplier: l.supplier
+        costTHB: l.costTHB
       })),
-      totals: { recipeCostTHB, costPerPortionTHB, foodCostPct, gpTHB, marginPct },
+      totals: { recipeCostTHB, costPerPortionTHB },
       description: desc
     };
     const r = await fetch("/api/recipes/save", {
@@ -192,19 +123,16 @@ export default function CostCalculator(){
   const handleSaveAsRecipe = async (recipeData: any) => {
     const payload = {
       ...recipeData,
-      wastePct, 
       portions, 
-      menuPrice,
       components: linesWithCosts.map(l => ({
         ingredientId: l.ingredientId,
         name: l.name,
         qty: l.qty,
         unit: l.unit,
         unitCostTHB: l.unitCostTHB,
-        costTHB: l.costTHB,
-        supplier: l.supplier
+        costTHB: l.costTHB
       })),
-      totals: { recipeCostTHB, costPerPortionTHB, foodCostPct, gpTHB, marginPct }
+      totals: { recipeCostTHB, costPerPortionTHB }
     };
     
     try {
@@ -224,7 +152,6 @@ export default function CostCalculator(){
       setRecipeName("");
       setNote("");
       setDesc("");
-      setMenuPrice(0);
     } catch (error) {
       console.error("Save error:", error);
       alert("Failed to save recipe: " + (error as Error).message);
@@ -260,14 +187,7 @@ export default function CostCalculator(){
                 <div className="text-sm text-gray-600">Portions Per Recipe</div>
                 <input type="number" min={1} value={portions} onChange={e=>setPortions(num(e.target.value))} className="mt-2 w-full border rounded-xl px-3 py-2" />
               </div>
-              <div>
-                <div className="text-sm text-gray-600">Waste / Yield Loss %</div>
-                <input type="number" min={0} max={100} value={wastePct} onChange={e=>setWastePct(num(e.target.value))} className="mt-2 w-full border rounded-xl px-3 py-2" />
-              </div>
-            </div>
-            <div className="mt-4">
-              <div className="text-sm text-gray-600">Menu Price (THB)</div>
-              <input type="number" min={0} value={menuPrice} onChange={e=>setMenuPrice(num(e.target.value))} className="mt-2 w-full border rounded-xl px-3 py-2" />
+              <div />
             </div>
           </div>
         </div>
@@ -282,8 +202,7 @@ export default function CostCalculator(){
                 {filtered.map(ing=>(
                   <button key={ing.id} onClick={()=>addIngredient(ing)} className="border rounded-xl px-3 py-2 text-left hover:bg-gray-50">
                     <div className="font-medium">{ing.name}</div>
-                    <div className="text-xs text-gray-500">Unit cost: {THB(ing.packageCostTHB/Math.max(1,ing.packageSize))} / {ing.unit}</div>
-                    {ing.supplier && <div className="text-xs text-gray-400">Supplier: {ing.supplier}</div>}
+                    <div className="text-xs text-gray-500">Unit cost: {THB(ing.unitCostPerBase)} / {ing.baseUnit}</div>
                   </button>
                 ))}
               </div>
@@ -305,7 +224,6 @@ export default function CostCalculator(){
                   <th className="p-2 text-left text-xs text-gray-600">Unit</th>
                   <th className="p-2 text-right text-xs text-gray-600">Unit Cost</th>
                   <th className="p-2 text-right text-xs text-gray-600">Cost</th>
-                  <th className="p-2 text-left text-xs text-gray-600">Supplier</th>
                   <th className="p-2"></th>
                 </tr>
               </thead>
@@ -316,23 +234,16 @@ export default function CostCalculator(){
                     <td className="p-2 text-right">
                       <input type="number" min={0} value={l.qty} onChange={e=>updateQty(idx, num(e.target.value))} className="w-28 border rounded-xl px-2 py-1 text-right" />
                     </td>
-                    <td className="p-2">
-                      <select value={l.unit} onChange={e=>updateUnit(idx, e.target.value as UnitType)} className="border rounded-xl px-2 py-1 text-sm bg-white">
-                        {UNIT_OPTIONS.map(unit => (
-                          <option key={unit} value={unit}>{unit}</option>
-                        ))}
-                      </select>
-                    </td>
+                    <td className="p-2 text-sm text-gray-600">{l.unit}</td>
                     <td className="p-2 text-right tabular-nums">{THB(l.unitCostTHB)}</td>
                     <td className="p-2 text-right tabular-nums">{THB(l.costTHB)}</td>
-                    <td className="p-2">{l.supplier || "-"}</td>
                     <td className="p-2 text-right">
                       <button onClick={()=>removeLine(idx)} className="text-sm text-rose-600 underline hover:text-rose-800">Remove</button>
                     </td>
                   </tr>
                 ))}
                 {!linesWithCosts.length && (
-                  <tr><td className="p-4 text-sm text-gray-600" colSpan={7}>Add ingredients to start costing.</td></tr>
+                  <tr><td className="p-4 text-sm text-gray-600" colSpan={6}>Add ingredients to start costing.</td></tr>
                 )}
               </tbody>
             </table>
@@ -341,31 +252,13 @@ export default function CostCalculator(){
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
         <div className="bg-white rounded-2xl shadow-sm border">
           <div className="p-6">
             <div className="text-xs text-gray-600">Recipe Cost</div>
             <div className="text-2xl font-semibold tabular-nums">{THB(recipeCostTHB)}</div>
             <div className="mt-3 text-xs text-gray-600">Cost per Portion</div>
             <div className="text-2xl font-semibold tabular-nums">{THB(costPerPortionTHB)}</div>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border">
-          <div className="p-6">
-            <div className="text-xs text-gray-600">Menu Price</div>
-            <div className="text-2xl font-semibold tabular-nums">{THB(menuPrice)}</div>
-            <div className="mt-3 text-xs text-gray-600">Food Cost %</div>
-            <div className={`inline-block mt-1 px-3 py-1 rounded-md text-sm font-semibold ${foodCostPct<=32? "bg-green-100 text-green-800" : foodCostPct<=38? "bg-amber-100 text-amber-800":"bg-rose-100 text-rose-800"}`}>
-              {foodCostPct.toFixed(1)}%
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm border lg:col-span-1">
-          <div className="p-6">
-            <div className="text-xs text-gray-600">Gross Profit (per portion)</div>
-            <div className="text-2xl font-semibold tabular-nums">{THB(gpTHB)}</div>
-            <div className="mt-3 text-xs text-gray-600">Margin %</div>
-            <div className="text-xl font-semibold tabular-nums">{marginPct.toFixed(1)}%</div>
           </div>
         </div>
       </div>
@@ -390,19 +283,6 @@ export default function CostCalculator(){
           </div>
         </div>
       </div>
-
-      {/* Chef Ramsay Gordon - Always Visible - DISABLED */}
-      {/* <ChefRamsayGordon 
-        mode={chefMode}
-        context={{
-          recipeName,
-          ingredientCount: linesWithCosts.length,
-          foodCostPct,
-          marginPct,
-          costPerPortionTHB,
-          menuPrice
-        }}
-      /> */}
 
       {/* Recipe Editor Modal */}
       {showRecipeEditor && (

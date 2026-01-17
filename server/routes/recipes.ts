@@ -31,14 +31,6 @@ function cleanMoney(v: any) {
   return isFinite(n) ? n : 0;
 }
 
-function calculateCOGS(totalCost: number, suggestedPrice: number): number {
-  return suggestedPrice > 0 ? (totalCost / suggestedPrice) * 100 : 0;
-}
-
-function suggestPrice(totalCost: number, targetMargin: number = 65): number {
-  return totalCost / (1 - targetMargin / 100);
-}
-
 // Initialize enhanced recipes table
 async function initTables() {
   await pool.query(`
@@ -244,7 +236,7 @@ router.post('/', async (req, res) => {
     await initTables();
     const {
       name, description, category = 'Burgers', yieldQuantity = 1, yieldUnit = 'servings',
-      ingredients = [], totalCost = 0, costPerServing = 0, suggestedPrice = 0,
+      ingredients = [], totalCost = 0, costPerServing = 0,
       wasteFactor = 0.05, yieldEfficiency = 0.90, imageUrl, instructions, notes,
       allergens = [], nutritional = {}, isActive = true
     } = req.body;
@@ -294,8 +286,8 @@ router.post('/', async (req, res) => {
     finalTotalCost *= wasteFactorAdjusted / yieldEfficiencyAdjusted; // Adjust
     
     const finalCostPerServing = finalTotalCost / Math.max(1, yieldQuantity);
-    const finalSuggestedPrice = suggestedPrice > 0 ? cleanMoney(suggestedPrice) : suggestPrice(finalTotalCost);
-    const cogsPercent = calculateCOGS(finalTotalCost, finalSuggestedPrice);
+    const finalSuggestedPrice = 0;
+    const cogsPercent = 0;
 
     console.log(`[POST /recipes] Cost calculation: ${name} - Total: ฿${finalTotalCost.toFixed(2)}, Per Serving: ฿${finalCostPerServing.toFixed(2)}`);
 
@@ -417,7 +409,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
           JSON.stringify(recipeData.ingredients ? JSON.parse(recipeData.ingredients) : []),
           cleanMoney(recipeData.totalCost || 0),
           cleanMoney(recipeData.costPerServing || 0),
-          cleanMoney(recipeData.suggestedPrice || 0),
+          0,
           true
         ]);
         imported++;
@@ -557,7 +549,7 @@ router.post('/save', async (req, res) => {
   try {
     console.log('[recipes/save] Received save request:', JSON.stringify(req.body, null, 2));
     
-    const { recipeName, lines, totals, note, wastePct, portions, menuPrice, description } = req.body;
+    const { recipeName, lines, totals, note, wastePct, portions, description } = req.body;
     
     // Enhanced validation with detailed logging
     if (!recipeName || recipeName.trim() === '') {
@@ -575,10 +567,10 @@ router.post('/save', async (req, res) => {
     // Enhanced calculations with defaults and error handling
     const totalCost = totals?.recipeCostTHB || lines.reduce((sum, ing) => sum + (ing.costTHB || 0), 0);
     const costPerServing = totals?.costPerPortionTHB || totalCost / Math.max(1, portions || 1);
-    const suggestedPrice = menuPrice || suggestPrice(totalCost);
-    const cogsPercent = calculateCOGS(totalCost, suggestedPrice);
+    const suggestedPrice = 0;
+    const cogsPercent = 0;
     
-    console.log(`[recipes/save] Calculations - Total: ฿${totalCost}, Per Serving: ฿${costPerServing}, COGS: ${cogsPercent.toFixed(1)}%`);
+    console.log(`[recipes/save] Calculations - Total: ฿${totalCost}, Per Serving: ฿${costPerServing}`);
     
     // Insert main recipe with all defaults
     const { rows } = await pool.query(`
@@ -639,11 +631,7 @@ router.post('/save', async (req, res) => {
     }
     
     // COGS Alert per specifications
-    if (cogsPercent > 35) {
-      console.log(`[recipes/save] COGS Alert: ${cogsPercent.toFixed(1)}% - optimize recommended`);
-    }
-    
-    console.log(`[recipes/save] ✅ Successfully saved recipe: ${rows[0].name}, Cost: ฿${totalCost}, COGS: ${cogsPercent.toFixed(1)}%`);
+    console.log(`[recipes/save] ✅ Successfully saved recipe: ${rows[0].name}, Cost: ฿${totalCost}`);
     res.json({ ok: true, id: recipeId, recipe: rows[0], cogsAlert: cogsPercent > 35 });
     
   } catch (error) {
@@ -673,8 +661,8 @@ router.post('/save-with-photo', async (req, res) => {
     
     const totalCost = totals?.recipeCostTHB || 0;
     const costPerServing = totals?.costPerPortionTHB || 0;
-    const suggestedPrice = suggestPrice(totalCost);
-    const cogsPercent = calculateCOGS(totalCost, suggestedPrice);
+    const suggestedPrice = 0;
+    const cogsPercent = 0;
     
     const { rows } = await pool.query(`
       INSERT INTO recipes (

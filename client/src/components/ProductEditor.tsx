@@ -57,6 +57,10 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [active, setActive] = useState(true);
+  const [category, setCategory] = useState("");
+  const [sortOrder, setSortOrder] = useState("0");
+  const [visibility, setVisibility] = useState({ inStore: false, grab: false, online: false });
+  const [recipeId, setRecipeId] = useState("");
   const [ingredients, setIngredients] = useState<ProductIngredient[]>([]);
   const [prices, setPrices] = useState<ProductPrice[]>([
     { channel: "IN_STORE", price: 0 },
@@ -73,6 +77,13 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
     enabled: isOpen,
   });
 
+  const { data: recipesData } = useQuery<{ ok: boolean; recipes: { id: number; name: string }[] }>({
+    queryKey: ['/api/recipe-authority'],
+    enabled: isOpen,
+  });
+
+  const recipes = recipesData?.recipes || [];
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -85,6 +96,14 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
             setDescription(d.product.description || "");
             setImageUrl(d.product.imageUrl || "");
             setActive(d.product.active !== false);
+            setCategory(d.product.category || "");
+            setSortOrder(String(d.product.sortOrder ?? 0));
+            setVisibility({
+              inStore: d.product.visibleInStore === true,
+              grab: d.product.visibleGrab === true,
+              online: d.product.visibleOnline === true,
+            });
+            setRecipeId(d.product.recipeId ? String(d.product.recipeId) : "");
             setIngredients(d.ingredients.map((i: any) => ({
               ingredientId: i.ingredientId,
               name: i.name,
@@ -104,6 +123,10 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
       setDescription("");
       setImageUrl("");
       setActive(true);
+      setCategory("");
+      setSortOrder("0");
+      setVisibility({ inStore: false, grab: false, online: false });
+      setRecipeId("");
       setIngredients([]);
       setPrices([
         { channel: "IN_STORE", price: 0 },
@@ -163,8 +186,8 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
       toast({ title: "Name required", variant: "destructive" });
       return;
     }
-    if (ingredients.length === 0) {
-      toast({ title: "Add at least one ingredient", variant: "destructive" });
+    if (ingredients.length === 0 && !recipeId) {
+      toast({ title: "Add at least one ingredient or link a recipe", variant: "destructive" });
       return;
     }
 
@@ -175,6 +198,10 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
         description,
         imageUrl,
         active,
+        category: category || null,
+        sortOrder: Number(sortOrder) || 0,
+        visibility,
+        recipeId: recipeId ? Number(recipeId) : null,
         ingredients: ingredients.map(i => ({
           ingredientId: i.ingredientId,
           portionQty: i.portionQty,
@@ -232,6 +259,27 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs">Category</Label>
+              <Input
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="e.g. Burgers"
+                className="text-xs h-9 rounded-[4px]"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Menu Sort Order</Label>
+              <Input
+                type="number"
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value)}
+                className="text-xs h-9 rounded-[4px]"
+              />
+            </div>
+          </div>
+
           <div>
             <Label className="text-xs">Description</Label>
             <Textarea
@@ -240,6 +288,51 @@ export function ProductEditor({ productId, isOpen, onClose, onSaved }: ProductEd
               placeholder="Product description for menu display"
               className="text-xs rounded-[4px] min-h-[60px]"
             />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-xs">Linked Recipe</Label>
+              <Select value={recipeId || "none"} onValueChange={(value) => setRecipeId(value === "none" ? "" : value)}>
+                <SelectTrigger className="h-9 text-xs rounded-[4px]">
+                  <SelectValue placeholder="Select recipe (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No linked recipe</SelectItem>
+                  {recipes.map((recipe) => (
+                    <SelectItem key={recipe.id} value={String(recipe.id)}>
+                      {recipe.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Visibility</Label>
+              <div className="flex flex-wrap gap-3 text-xs">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={visibility.inStore}
+                    onCheckedChange={(checked) => setVisibility((prev) => ({ ...prev, inStore: checked }))}
+                  />
+                  <span>In-store</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={visibility.grab}
+                    onCheckedChange={(checked) => setVisibility((prev) => ({ ...prev, grab: checked }))}
+                  />
+                  <span>Grab</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={visibility.online}
+                    onCheckedChange={(checked) => setVisibility((prev) => ({ ...prev, online: checked }))}
+                  />
+                  <span>Online</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div>

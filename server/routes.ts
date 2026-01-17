@@ -105,6 +105,7 @@ import adminHistoricalImportRouter from "./routes/adminHistoricalImport";
 import systemHealthRouter from "./routes/systemHealth";
 import executiveMetricsRouter from "./routes/executiveMetrics";
 import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./services/menuCanonicalService";
+import { getPublicMenu } from "./services/productMenuView";
 import dashboard4Routes from "./routes/dashboard4Routes";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
@@ -117,6 +118,7 @@ import pnlSnapshotRoutes from "./routes/pnlSnapshot.route";
 import { menuManagementRouter } from "./routes/menuManagement";
 import modifiersRouter from "./routes/modifiers";
 import productsRouter from "./routes/products";
+import productMenuRouter from "./routes/productMenu";
 // Email functionality will be added when needed
 
 
@@ -1153,12 +1155,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Online Ordering API (namespaced to avoid conflicts)
   app.get("/api/ordering/menu", (_, res) => {
-    const p = path.join(process.cwd(), "online-ordering/server/data/menu.json");
-    try {
-      res.json(JSON.parse(fs.readFileSync(p, "utf8")));
-    } catch (e) {
-      res.status(500).json({ error: "Menu not found" });
-    }
+    getPublicMenu("ONLINE")
+      .then((menu) => res.json(menu))
+      .catch((error) => {
+        console.error("Error fetching ordering menu:", error);
+        res.status(500).json({ error: "Menu not found" });
+      });
   });
 
   app.post("/api/ordering/orders", (req, res) => {
@@ -3674,6 +3676,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/menu-management', menuManagementRouter); // PATCH 2.1: Menu Management Foundation
   app.use('/api/modifiers', modifiersRouter); // PATCH 2.2: Modifiers System
   app.use(productsRouter); // PATCH P1: Products API
+  app.use(productMenuRouter);
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);
   app.use('/api/expenses-v2', expensesV2Routes);

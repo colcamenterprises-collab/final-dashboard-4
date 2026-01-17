@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,10 +10,7 @@ import {
   Search, 
   Image as ImageIcon, 
   Upload,
-  DollarSign,
-  Clock,
-  Utensils,
-  QrCode
+  Utensils
 } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import jsPDF from "jspdf";
@@ -30,7 +27,6 @@ interface Recipe {
   image_url: string | null;
   total_cost: string;
   cost_per_serving: string;
-  suggested_price: string;
   instructions: string | null;
   notes: string;
   ingredients: Array<{
@@ -183,11 +179,8 @@ export default function RecipeCards() {
       
       const totalCost = Number(recipe.total_cost ?? 0) || 0;
       const costPerServing = Number(recipe.cost_per_serving ?? 0) || 0;
-      const suggestedPrice = Number(recipe.suggested_price ?? 0) || 0;
-      const margin = suggestedPrice - costPerServing;
-      const marginPercent = suggestedPrice > 0 ? ((margin / suggestedPrice) * 100).toFixed(1) : '0';
       
-      pdf.text(`Total: ฿${totalCost.toFixed(2)} | Per Serving: ฿${costPerServing.toFixed(2)} | Price: ฿${suggestedPrice.toFixed(2)} | Margin: ${marginPercent}%`, 17, yPos);
+      pdf.text(`Total: ฿${totalCost.toFixed(2)} | Per Serving: ฿${costPerServing.toFixed(2)}`, 17, yPos);
       
       // Ingredients section (COMPACT: 3mm spacing)
       yPos += 7;
@@ -625,14 +618,6 @@ export default function RecipeCards() {
                   </span>
                 </div>
                 
-                {(Number(recipe.suggested_price ?? 0) || 0) > 0 && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-600">Suggested Price:</span>
-                    <span className="font-medium text-emerald-600">
-                      ฿{(Number(recipe.suggested_price ?? 0) || 0).toFixed(2)}
-                    </span>
-                  </div>
-                )}
               </div>
               
               {/* Ingredients Count */}
