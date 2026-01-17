@@ -1,84 +1,73 @@
 import { useState } from "react";
 
-type AgentStatus = "idle" | "running" | "completed";
+type AgentStage = "Research" | "Content" | "Review" | "Analysis" | "Ads";
+type CycleStatus = "running" | "completed";
 
-interface Agent {
-  id: string;
-  name: string;
-  role: string;
-  status: AgentStatus;
-  output?: string;
+interface AgentLog {
+  stage: AgentStage;
+  output: string;
+  duration: string;
 }
 
+interface MarketingCycle {
+  id: string;
+  startedAt: string;
+  status: CycleStatus;
+  logs: AgentLog[];
+}
+
+const STAGES: AgentStage[] = [
+  "Research",
+  "Content",
+  "Review",
+  "Analysis",
+  "Ads",
+];
+
 export default function MarketingMachine() {
-  const [agents, setAgents] = useState<Agent[]>([
-    {
-      id: "master",
-      name: "ORION",
-      role: "AI Master Agent",
-      status: "idle",
-    },
-    {
-      id: "research",
-      name: "Atlas",
-      role: "Market Research Agent",
-      status: "idle",
-    },
-    {
-      id: "content",
-      name: "Nova",
-      role: "Content Creation Agent",
-      status: "idle",
-    },
-    {
-      id: "review",
-      name: "Sentinel",
-      role: "Post Review & QA Agent",
-      status: "idle",
-    },
-    {
-      id: "analysis",
-      name: "Echo",
-      role: "Performance & Analytics Agent",
-      status: "idle",
-    },
-    {
-      id: "ads",
-      name: "Pulse",
-      role: "Ads & Campaign Agent",
-      status: "idle",
-    },
-  ]);
+  const [cycles, setCycles] = useState<MarketingCycle[]>([]);
+  const [activeCycleId, setActiveCycleId] = useState<string | null>(null);
 
   const runMarketingCycle = () => {
-    setAgents(prev =>
-      prev.map(agent => ({
-        ...agent,
-        status: "running",
-      }))
-    );
+    const id = crypto.randomUUID();
+    const startTime = new Date().toLocaleString();
 
-    setTimeout(() => {
-      setAgents(prev =>
-        prev.map(agent => ({
-          ...agent,
-          status: "completed",
-          output:
-            agent.id === "research"
-              ? "Identified trending burger content, competitors & hashtags."
-              : agent.id === "content"
-              ? "Generated 5 posts (GrabFood, IG, FB, Ads)."
-              : agent.id === "review"
-              ? "Tone, CTA & branding approved."
-              : agent.id === "analysis"
-              ? "Predicted 18–24% engagement uplift."
-              : agent.id === "ads"
-              ? "Created 2 paid ad variants."
-              : "Marketing cycle completed successfully.",
-        }))
-      );
-    }, 2500);
+    const newCycle: MarketingCycle = {
+      id,
+      startedAt: startTime,
+      status: "running",
+      logs: [],
+    };
+
+    setCycles(prev => [newCycle, ...prev]);
+    setActiveCycleId(id);
+
+    STAGES.forEach((stage, index) => {
+      setTimeout(() => {
+        setCycles(prev =>
+          prev.map(cycle =>
+            cycle.id === id
+              ? {
+                  ...cycle,
+                  logs: [
+                    ...cycle.logs,
+                    {
+                      stage,
+                      output: `${stage} completed successfully.`,
+                      duration: `${2 + index}s`,
+                    },
+                  ],
+                  status:
+                    stage === "Ads" ? "completed" : cycle.status,
+                }
+              : cycle
+          )
+        );
+      }, 1200 * (index + 1));
+    });
   };
+
+  const activeCycle = cycles.find(c => c.id === activeCycleId);
 
   return (
     <div className="min-h-screen bg-[#0b0f14] text-white p-8">
@@ -89,7 +78,7 @@ export default function MarketingMachine() {
             Marketing Machine
           </h1>
           <p className="text-sm text-gray-400">
-            Autonomous AI-driven marketing command centre
+            Autonomous AI marketing execution engine
           </p>
         </div>
 
@@ -97,60 +86,127 @@ export default function MarketingMachine() {
           onClick={runMarketingCycle}
           className="bg-lime-400 text-black px-6 py-3 rounded-xl font-semibold hover:bg-lime-300 transition"
         >
-          Run Full Marketing Cycle
+          Run Marketing Cycle
         </button>
       </div>
 
-      {/* Master Agent */}
-      <div className="bg-gradient-to-br from-[#141a22] to-[#0f131a] rounded-2xl p-6 mb-8 border border-[#1f2937]">
-        <h2 className="text-xl font-bold mb-1">ORION — Master AI Agent</h2>
-        <p className="text-sm text-gray-400">
-          Orchestrates research, content, validation, analytics & advertising
-        </p>
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Cycle History */}
+        <div className="bg-[#111827] rounded-2xl p-6 border border-[#1f2937]">
+          <h2 className="font-bold mb-4">Cycle History</h2>
 
-        <div className="mt-4 flex items-center gap-4">
-          <span className="px-3 py-1 rounded-full text-xs bg-lime-400 text-black font-semibold">
-            ACTIVE
-          </span>
-          <span className="text-sm text-gray-400">
-            Status: Autonomous coordination enabled
-          </span>
-        </div>
-      </div>
+          {cycles.length === 0 && (
+            <p className="text-sm text-gray-400">
+              No marketing cycles executed yet.
+            </p>
+          )}
 
-      {/* Agent Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {agents
-          .filter(agent => agent.id !== "master")
-          .map(agent => (
-            <div
-              key={agent.id}
-              className="bg-[#111827] rounded-2xl p-6 border border-[#1f2937]"
-            >
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="font-bold">{agent.name}</h3>
-                  <p className="text-xs text-gray-400">{agent.role}</p>
+          <div className="space-y-3">
+            {cycles.map(cycle => (
+              <button
+                key={cycle.id}
+                onClick={() => setActiveCycleId(cycle.id)}
+                className={`w-full text-left p-3 rounded-xl border transition ${
+                  activeCycleId === cycle.id
+                    ? "border-lime-400 bg-[#0f172a]"
+                    : "border-[#1f2937] hover:bg-[#0f172a]"
+                }`}
+              >
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold">
+                    {cycle.startedAt}
+                  </span>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full font-semibold ${
+                      cycle.status === "completed"
+                        ? "bg-lime-400 text-black"
+                        : "bg-yellow-400 text-black"
+                    }`}
+                  >
+                    {cycle.status.toUpperCase()}
+                  </span>
                 </div>
+              </button>
+            ))}
+          </div>
+        </div>
 
-                <span
-                  className={`text-xs px-3 py-1 rounded-full font-semibold ${
-                    agent.status === "idle"
-                      ? "bg-gray-700 text-gray-300"
-                      : agent.status === "running"
-                      ? "bg-yellow-400 text-black"
-                      : "bg-lime-400 text-black"
-                  }`}
-                >
-                  {agent.status.toUpperCase()}
-                </span>
-              </div>
+        {/* Execution Timeline */}
+        <div className="bg-[#111827] rounded-2xl p-6 border border-[#1f2937]">
+          <h2 className="font-bold mb-4">Execution Timeline</h2>
 
-              <div className="text-sm text-gray-300 min-h-[48px]">
-                {agent.output ?? "Awaiting execution…"}
-              </div>
+          {!activeCycle && (
+            <p className="text-sm text-gray-400">
+              Select or run a cycle to view execution.
+            </p>
+          )}
+
+          {activeCycle && (
+            <div className="space-y-3">
+              {STAGES.map(stage => {
+                const completed = activeCycle.logs.some(
+                  log => log.stage === stage
+                );
+
+                return (
+                  <div
+                    key={stage}
+                    className="flex items-center gap-3"
+                  >
+                    <div
+                      className={`w-3 h-3 rounded-full ${
+                        completed
+                          ? "bg-lime-400"
+                          : "bg-gray-600"
+                      }`}
+                    />
+                    <span className="text-sm">{stage}</span>
+                  </div>
+                );
+              })}
             </div>
-          ))}
+          )}
+        </div>
+
+        {/* Agent Logs */}
+        <div className="bg-[#111827] rounded-2xl p-6 border border-[#1f2937]">
+          <h2 className="font-bold mb-4">Agent Logs</h2>
+
+          {!activeCycle && (
+            <p className="text-sm text-gray-400">
+              No cycle selected.
+            </p>
+          )}
+
+          {activeCycle && activeCycle.logs.length === 0 && (
+            <p className="text-sm text-gray-400">
+              Cycle running… logs will appear here.
+            </p>
+          )}
+
+          {activeCycle && (
+            <div className="space-y-4">
+              {activeCycle.logs.map((log, index) => (
+                <div
+                  key={index}
+                  className="border border-[#1f2937] rounded-xl p-3"
+                >
+                  <div className="flex justify-between mb-1">
+                    <span className="font-semibold text-sm">
+                      {log.stage}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {log.duration}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-300">
+                    {log.output}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
