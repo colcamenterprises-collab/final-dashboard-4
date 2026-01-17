@@ -1,7 +1,5 @@
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { getPublicMenu } from "../services/productMenuView";
 const router = Router();
 
 /**
@@ -11,27 +9,8 @@ const router = Router();
  */
 router.get("/menu", async (_req, res) => {
   try {
-    const categories = await prisma.menuCategory.findMany({
-      orderBy: { position: "asc" },
-      include: {
-        items: {
-          where: { available: true },
-          orderBy: { position: "asc" },
-          include: {
-            groups: {
-              orderBy: { position: "asc" },
-              include: {
-                options: {
-                  orderBy: { position: "asc" },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    res.json({ categories });
+    const menu = await getPublicMenu("ONLINE");
+    res.json(menu);
   } catch (error) {
     console.error("Error fetching menu:", error);
     res.status(500).json({ error: "Failed to fetch menu" });
@@ -43,22 +22,17 @@ router.get("/menu", async (_req, res) => {
  * Returns categories with their available items, ordered by position ASC.
  */
 router.get("/menu-online", async (_req, res) => {
-  const cats = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT id, name, slug, position FROM menu_categories_online ORDER BY position ASC`
-  );
-  const out = [];
-  for (const c of cats) {
-    const items = await prisma.$queryRawUnsafe<any[]>(
-      `SELECT id, name, slug, sku, description, price,
-              "imageUrl", position, available
-         FROM menu_items_online
-        WHERE "categoryId" = $1 AND available = TRUE
-        ORDER BY position ASC`,
-      c.id
-    );
-    out.push({ ...c, items });
+  try {
+    const menu = await getPublicMenu("ONLINE");
+    const categories = menu.categories.map((category) => ({
+      ...category,
+      items: menu.items.filter((item) => item.categoryId === category.id),
+    }));
+    res.json(categories);
+  } catch (error) {
+    console.error("Error fetching menu-online:", error);
+    res.status(500).json({ error: "Failed to fetch menu" });
   }
-  res.json(out);
 });
 
 /**
@@ -66,29 +40,11 @@ router.get("/menu-online", async (_req, res) => {
  * Allows updating common fields like imageUrl, price, available, etc.
  * Body: { name?, sku?, description?, price?, imageUrl?, position?, available?, categoryId? }
  */
-router.patch("/menu-online/item/:id", async (req, res) => {
-  const { id } = req.params;
-  const allowed = ["name","sku","description","price","imageUrl","position","available","categoryId"];
-  const data: any = {};
-  for (const k of allowed) if (k in req.body) data[k] = req.body[k];
-
-  const keys = Object.keys(data);
-  if (keys.length === 0) return res.json({ ok: true, changed: 0 });
-
-  const setSql = keys.map((k, i) => `"${k}"=$${i + 2}`).join(", ");
-  await prisma.$executeRawUnsafe(
-    `UPDATE menu_items_online SET ${setSql} WHERE id=$1`,
-    id,
-    ...keys.map((k) => data[k])
-  );
-
-  const row = await prisma.$queryRawUnsafe<any[]>(
-    `SELECT id, name, slug, sku, description, price,
-            "imageUrl", position, available, "categoryId"
-       FROM menu_items_online WHERE id=$1 LIMIT 1`,
-    id
-  );
-  res.json(row?.[0] ?? { ok: true });
+router.patch("/menu-online/item/:id", async (_req, res) => {
+  res.status(409).json({
+    ok: false,
+    error: "Menu items are read-only. Update products for pricing and visibility.",
+  });
 });
 
 export default router;

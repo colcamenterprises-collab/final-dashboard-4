@@ -22,6 +22,12 @@ type Product = {
   active: boolean;
   createdAt: string;
   cost: number;
+  category?: string | null;
+  sortOrder?: number | null;
+  visibleInStore?: boolean | null;
+  visibleGrab?: boolean | null;
+  visibleOnline?: boolean | null;
+  recipeId?: number | null;
 };
 
 type ProductDetail = {
@@ -69,6 +75,20 @@ function ProductViewModal({ productId, isOpen, onClose, onEdit }: {
             {data.product.description && (
               <p className="text-xs text-slate-600">{data.product.description}</p>
             )}
+
+            <div>
+              <h3 className="text-xs font-semibold mb-2">Menu Details</h3>
+              <div className="space-y-1 text-xs text-slate-600">
+                <div>Category: {data.product.category || "UNMAPPED"}</div>
+                <div>Sort Order: {data.product.sortOrder ?? 0}</div>
+                <div>Visibility: {[
+                  data.product.visibleInStore ? "In-store" : null,
+                  data.product.visibleGrab ? "Grab" : null,
+                  data.product.visibleOnline ? "Online" : null,
+                ].filter(Boolean).join(", ") || "None"}</div>
+                <div>Linked Recipe: {data.product.recipeId ? `#${data.product.recipeId}` : "None"}</div>
+              </div>
+            </div>
 
             <div>
               <h3 className="text-xs font-semibold mb-2">Ingredients ({data.ingredients.length})</h3>
@@ -219,6 +239,7 @@ export default function Products() {
               <thead>
                 <tr className="border-b border-slate-200">
                   <th className="text-left py-2 font-medium text-slate-600">Name</th>
+                  <th className="text-left py-2 font-medium text-slate-600">Category</th>
                   <th className="text-right py-2 font-medium text-slate-600">Cost</th>
                   <th className="text-left py-2 font-medium text-slate-600">Status</th>
                   <th className="text-right py-2 font-medium text-slate-600">Actions</th>
@@ -228,6 +249,7 @@ export default function Products() {
                 {products.map(p => (
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-2 text-slate-900">{p.name}</td>
+                    <td className="py-2 text-slate-500">{p.category || "UNMAPPED"}</td>
                     <td className="py-2 text-right text-emerald-600 font-medium">฿{Number(p.cost || 0).toFixed(2)}</td>
                     <td className="py-2">
                       <Badge className={`text-[10px] rounded-[4px] ${p.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>

@@ -161,15 +161,15 @@ costingRouter.get("/ingredients", async (req: Request, res: Response) => {
  * See server/services/recipeAuthority.ts for authoritative implementation
  */
 costingRouter.post("/recipes", async (req, res) => {
-  const { name, yield: yl = 1, targetMargin = 0, items = [] } = req.body || {};
+  const { name, yield: yl = 1, items = [] } = req.body || {};
   const recipe = await prisma.recipeV2.upsert({
     where: { name },
     update: {
-      yield: Number(yl), targetMargin: Number(targetMargin),
+      yield: Number(yl), targetMargin: 0,
       items: { deleteMany: {}, create: items.map((i: any) => ({ ingredientId: i.ingredientId, qty: Number(i.qty || 0) })) }
     },
     create: {
-      name, yield: Number(yl), targetMargin: Number(targetMargin),
+      name, yield: Number(yl), targetMargin: 0,
       items: { create: items.map((i: any) => ({ ingredientId: i.ingredientId, qty: Number(i.qty || 0) })) }
     },
     include: { items: { include: { ingredient: true } } }
@@ -185,10 +185,8 @@ costingRouter.get("/recipes/:name/calc", async (req, res) => {
   if (!recipe) return res.status(404).send("Not found");
   const totalCost = recipe.items.reduce((s, it) => s + Number(it.qty) * Number(it.ingredient.unitCost), 0);
   const costPerServe = totalCost / Number(recipe.yield || 1);
-  const m = Number(recipe.targetMargin || 0);
-  const suggestedPrice = m > 0 ? costPerServe / (1 - m) : costPerServe;
   res.json({
-    name: recipe.name, yield: recipe.yield, targetMargin: m, totalCost, costPerServe, suggestedPrice,
+    name: recipe.name, yield: recipe.yield, totalCost, costPerServe,
     lines: recipe.items.map(it => ({
       ingredient: it.ingredient.name, unit: it.ingredient.unit, qty: it.qty,
       unitCost: it.ingredient.unitCost, lineCost: Number(it.qty) * Number(it.ingredient.unitCost)
