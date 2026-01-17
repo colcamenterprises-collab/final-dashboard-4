@@ -41,11 +41,17 @@ export default function IngredientReconciliation() {
   const [endDate, setEndDate] = useState(today);
   const [filter, setFilter] = useState('');
 
-  const { data, isLoading } = useQuery<ReconciliationData>({
+  const { data, isLoading, isError, error } = useQuery<ReconciliationData>({
     queryKey: ['/api/analysis/ingredient-reconciliation', startDate, endDate],
     queryFn: async () => {
       const res = await fetch(`/api/analysis/ingredient-reconciliation?start=${startDate}&end=${endDate}`);
-      return res.json();
+      const payload = await res.json();
+      if (!res.ok) {
+        const err = new Error(payload?.message || 'Ingredient reconciliation unavailable');
+        (err as any).status = res.status;
+        throw err;
+      }
+      return payload;
     },
   });
 
@@ -130,9 +136,11 @@ export default function IngredientReconciliation() {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium">Reconciliation Data</CardTitle>
-            <span className="text-xs text-slate-400">
-              {filteredItems.length} items
-            </span>
+            {!isError && (
+              <span className="text-xs text-slate-400">
+                {filteredItems.length} items
+              </span>
+            )}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -141,6 +149,15 @@ export default function IngredientReconciliation() {
               {[...Array(8)].map((_, i) => (
                 <Skeleton key={i} className="h-10 w-full" />
               ))}
+            </div>
+          ) : isError ? (
+            <div className="p-8 text-center" data-testid="reconciliation-disabled">
+              <div className="text-slate-800 text-sm font-medium">
+                Ingredient Reconciliation is currently unavailable
+              </div>
+              <div className="text-slate-500 text-xs mt-2">
+                {(error as Error)?.message || 'The module is disabled until schema alignment is complete.'}
+              </div>
             </div>
           ) : filteredItems.length === 0 ? (
             <div className="p-8 text-center" data-testid="empty-state">
@@ -203,7 +220,7 @@ export default function IngredientReconciliation() {
 
       <div className="flex items-center justify-between text-xs text-slate-400 px-1">
         <span>Source: POS Receipts + Purchasing Records</span>
-        {data?.warning && (
+        {!isError && data?.warning && (
           <Badge variant="outline" className="text-amber-500 border-amber-200">
             {data.warning}
           </Badge>

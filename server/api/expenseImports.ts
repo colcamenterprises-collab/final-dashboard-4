@@ -39,10 +39,10 @@ router.post('/', async (req, res) => {
     res.json({ batchId: batch.id });
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] imports/create:', error);
-    res.status(200).json({ 
-      success: true, 
-      batchId: null, 
-      warning: 'SAFE_FALLBACK_USED' 
+    res.status(500).json({ 
+      success: false, 
+      error: "EXPENSE_IMPORT_CREATE_FAILED",
+      message: error instanceof Error ? error.message : "Failed to create expense import batch.",
     });
   }
 });
@@ -187,12 +187,10 @@ router.post('/:batchId/parse', async (req, res) => {
 
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] imports/parse:', error);
-    res.status(200).json({ 
-      success: true, 
-      rows: 0, 
-      parsed: 0, 
-      errors: 0, 
-      warning: 'SAFE_FALLBACK_USED' 
+    res.status(500).json({ 
+      success: false, 
+      error: "EXPENSE_IMPORT_PARSE_FAILED",
+      message: error instanceof Error ? error.message : "Failed to parse expense import.",
     });
   }
 });
@@ -233,7 +231,11 @@ router.get('/:batchId/lines', async (req, res) => {
     res.json(lines);
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] imports/lines:', error);
-    res.status(200).json({ success: true, data: [], warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_IMPORT_LINES_FAILED",
+      message: error instanceof Error ? error.message : "Failed to load import lines.",
+    });
   }
 });
 
@@ -254,7 +256,11 @@ router.get('/vendors', async (req, res) => {
     res.json(vendorList);
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] vendors:', error);
-    res.status(200).json({ success: true, data: [], warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_VENDORS_FAILED",
+      message: error instanceof Error ? error.message : "Failed to load vendors.",
+    });
   }
 });
 
@@ -265,7 +271,11 @@ router.get('/categories', async (req, res) => {
     res.json(categoryList);
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] categories:', error);
-    res.status(200).json({ success: true, data: [], warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_CATEGORIES_FAILED",
+      message: error instanceof Error ? error.message : "Failed to load categories.",
+    });
   }
 });
 
@@ -290,7 +300,11 @@ router.patch('/:batchId/lines/:lineId', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] imports/update:', error);
-    res.status(200).json({ success: true, warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_IMPORT_UPDATE_FAILED",
+      message: error instanceof Error ? error.message : "Failed to update import line.",
+    });
   }
 });
 
@@ -348,11 +362,10 @@ router.post('/:batchId/commit', async (req, res) => {
 
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] imports/commit:', error);
-    res.status(200).json({ 
-      success: true, 
-      committed: 0, 
-      skipped: 0, 
-      warning: 'SAFE_FALLBACK_USED' 
+    res.status(500).json({ 
+      success: false, 
+      error: "EXPENSE_IMPORT_COMMIT_FAILED",
+      message: error instanceof Error ? error.message : "Failed to commit expense imports.",
     });
   }
 });
@@ -369,7 +382,11 @@ router.get('/', async (req, res) => {
     res.json(batches);
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] imports/list:', error);
-    res.status(200).json({ success: true, data: [], warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_IMPORT_LIST_FAILED",
+      message: error instanceof Error ? error.message : "Failed to load import batches.",
+    });
   }
 });
 

@@ -363,11 +363,10 @@ router.post('/upload-bank', requireManagerRole, upload.single('file'), async (re
 
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] bank-upload:', error);
-    res.status(200).json({ 
-      success: true, 
-      imported: 0, 
-      batchId: null, 
-      warning: 'SAFE_FALLBACK_USED' 
+    res.status(500).json({ 
+      success: false, 
+      error: "BANK_UPLOAD_FAILED",
+      message: error instanceof Error ? error.message : "Failed to import bank upload.",
     });
   }
 });
@@ -441,11 +440,10 @@ router.post('/upload-partner', requireManagerRole, upload.single('file'), async 
 
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] partner-upload:', error);
-    res.status(200).json({ 
-      success: true, 
-      imported: 0, 
-      batchId: null, 
-      warning: 'SAFE_FALLBACK_USED' 
+    res.status(500).json({ 
+      success: false, 
+      error: "PARTNER_UPLOAD_FAILED",
+      message: error instanceof Error ? error.message : "Failed to import partner upload.",
     });
   }
 });
@@ -474,7 +472,11 @@ router.get('/pending', async (req: Request, res: Response) => {
     res.json(formatted);
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] pending:', error);
-    res.status(200).json({ success: true, data: [], warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "PENDING_EXPENSES_FAILED",
+      message: error instanceof Error ? error.message : "Failed to load pending expenses.",
+    });
   }
 });
 
@@ -602,7 +604,11 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
 
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] approve:', error);
-    res.status(200).json({ success: true, warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_APPROVE_FAILED",
+      message: error instanceof Error ? error.message : "Failed to approve expense.",
+    });
   }
 });
 
@@ -636,7 +642,11 @@ router.patch('/:id/reject', requireManagerRole, async (req: Request, res: Respon
 
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] reject:', error);
-    res.status(200).json({ success: true, warning: 'SAFE_FALLBACK_USED' });
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_REJECT_FAILED",
+      message: error instanceof Error ? error.message : "Failed to reject expense.",
+    });
   }
 });
 
