@@ -110,7 +110,6 @@ import dashboard4Routes from "./routes/dashboard4Routes";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
 import healthSafetyPdf from "./routes/healthSafety/pdf";
-import recipeAuthorityRouter from "./routes/recipeAuthority";
 import ingredientReconciliationRouter from "./routes/ingredientReconciliation";
 import receiptBatchRoutes from "./routes/receiptBatchRoutes";
 import pnlReadModelRoutes from "./routes/pnlReadModel";
@@ -119,6 +118,8 @@ import { menuManagementRouter } from "./routes/menuManagement";
 import modifiersRouter from "./routes/modifiers";
 import productsRouter from "./routes/products";
 import productMenuRouter from "./routes/productMenu";
+import productIngredientsRouter from "./routes/productIngredients";
+import productActivationRouter from "./routes/productActivation";
 // Email functionality will be added when needed
 
 
@@ -3639,12 +3640,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/purchasing-shift-log', purchasingShiftLogRouter); // Purchasing shift log visibility
   app.use('/api/purchasing-analytics', purchasingAnalyticsRouter); // Purchasing analytics metrics
   app.use('/api/debug', debugPurchasingRouter); // PATCH A: Purchasing parity check
-  app.use('/api/recipe-authority', recipeAuthorityRouter); // FOUNDATION-02: Recipe Authority
   app.use('/api/pnl', pnlReadModelRoutes); // PATCH 1.6.18: P&L Read Model
   app.use('/api/pnl/snapshot', pnlSnapshotRoutes); // PATCH 1: P&L Snapshot with checksums
   app.use('/api/menu-management', menuManagementRouter); // PATCH 2.1: Menu Management Foundation
   app.use('/api/modifiers', modifiersRouter); // PATCH 2.2: Modifiers System
   app.use(productsRouter); // PATCH P1: Products API
+  app.use('/api/products', productIngredientsRouter);
+  app.use('/api/products', productActivationRouter);
   app.use(productMenuRouter);
   app.use('/api/membership', membershipRouter);
   app.use('/api/github', githubRouter);

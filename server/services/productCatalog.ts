@@ -1,7 +1,7 @@
 import { db } from "../db";
 import { product, recipe } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import { calculateRecipeCost } from "./recipeAuthority";
+import { calculateRecipeCostCanonical } from "./recipeCost.service";
 
 export type ProductRecord = {
   id: number;
@@ -35,10 +35,7 @@ export async function createProductFromRecipe(recipeId: number): Promise<CreateP
     return { status: "exists", product: existing[0] as ProductRecord };
   }
 
-  const baseCost = await calculateRecipeCost(recipeId);
-  if (baseCost === null) {
-    return { status: "invalid", reason: "Recipe must have valid serves and quantities before promotion" };
-  }
+  const baseCost = await calculateRecipeCostCanonical(recipeId);
 
   const [created] = await db
     .insert(product)
@@ -63,7 +60,7 @@ export async function createProductFromRecipe(recipeId: number): Promise<CreateP
 }
 
 export async function refreshProductBaseCost(recipeId: number): Promise<void> {
-  const baseCost = await calculateRecipeCost(recipeId);
+  const baseCost = await calculateRecipeCostCanonical(recipeId);
   await db
     .update(product)
     .set({ baseCost: baseCost === null ? null : Number(baseCost.toFixed(2)) })

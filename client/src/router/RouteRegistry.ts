@@ -33,8 +33,9 @@ export const ROUTES = {
   HEALTH_SAFETY_QUESTIONS: "/operations/health-safety-audit/questions",
   INGREDIENTS_MASTER: "/operations/ingredients-master",
   RECIPE_MAPPING: "/operations/recipe-mapping",
-  RECIPE_MANAGEMENT: "/recipe-management",
   PRODUCTS: "/products",
+  PRODUCT_NEW: "/products/new",
+  PRODUCT_DETAIL: "/products/:id",
 
   // Finance
   FINANCE: "/finance",
@@ -81,5 +82,15 @@ export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
 
 export const ALLOWED_PATHS: string[] = Object.values(ROUTES);
 
-export const isAllowedPath = (path: string) =>
-  ALLOWED_PATHS.includes((path || "/").replace(/\/+$/, "") || "/");
+export const isAllowedPath = (path: string) => {
+  const normalized = (path || "/").replace(/\/+$/, "") || "/";
+  return ALLOWED_PATHS.some((allowed) => {
+    if (!allowed.includes(":")) {
+      return allowed === normalized;
+    }
+    const allowedParts = allowed.split("/");
+    const pathParts = normalized.split("/");
+    if (allowedParts.length !== pathParts.length) return false;
+    return allowedParts.every((part, index) => part.startsWith(":") || part === pathParts[index]);
+  });
+};

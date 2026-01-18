@@ -5,7 +5,7 @@
  * Cost = SUM(unit_cost_per_base × portion_qty)
  */
 
-import { db } from "../db";
+import { db, pool } from "../db";
 import { sql } from "drizzle-orm";
 
 export interface ProductCostLine {
@@ -21,6 +21,75 @@ export interface ProductCostResult {
   productId: number;
   ingredients: ProductCostLine[];
   totalCost: number | null;
+}
+
+/**
+ * Recalculate and persist derived costs for a product.
+ * This is the ONLY place cost math is allowed.
+ */
+export async function recalcProductCosts(productId: number): Promise<{ totalCost: number }> {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { rows } = await client.query(
+      `
+      SELECT
+        pi.id AS product_ingredient_id,
+        pi.quantity_used,
+        i.purchase_cost,
+        i.yield_per_purchase
+      FROM product_ingredient pi
+      JOIN ingredients i ON i.id = pi.ingredient_id
+      WHERE pi.product_id = $1
+        AND i.active = TRUE
+      `,
+      [productId],
+    );
+
+    if (rows.length === 0) {
+      await client.query("COMMIT");
+      return { totalCost: 0 };
+    }
+
+    let totalCost = 0;
+
+    for (const row of rows) {
+      const yieldPerPurchase = Number(row.yield_per_purchase);
+      if (!Number.isFinite(yieldPerPurchase) || yieldPerPurchase <= 0) {
+        throw new Error("Ingredient yield is not defined");
+      }
+
+      const purchaseCost = Number(row.purchase_cost);
+      if (!Number.isFinite(purchaseCost) || purchaseCost < 0) {
+        throw new Error("Ingredient purchase cost is not defined");
+      }
+
+      const unitCost = purchaseCost / yieldPerPurchase;
+      const lineCost = unitCost * Number(row.quantity_used);
+
+      totalCost += lineCost;
+
+      await client.query(
+        `
+        UPDATE product_ingredient
+        SET unit_cost_derived = $1,
+            line_cost_derived = $2
+        WHERE id = $3
+        `,
+        [unitCost, lineCost, row.product_ingredient_id],
+      );
+    }
+
+    await client.query("COMMIT");
+    return { totalCost };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function getProductCost(productId: number): Promise<number | null> {

@@ -90,17 +90,18 @@ router.post("/online/orders", async (req, res) => {
         continue;
       }
 
-      if (!Number.isFinite(priceAtTime) || priceAtTime !== product.priceOnline) {
+      const priceOnline = product.priceOnline as number;
+      if (!Number.isFinite(priceAtTime) || priceAtTime !== priceOnline) {
         errors.push({ productId, error: "Price mismatch. Refresh menu before checkout." });
         continue;
       }
 
-      const lineTotal = product.priceOnline * quantity;
+      const lineTotal = priceOnline * quantity;
       lineItems.push({
         itemId: String(product.id),
         name: product.name,
         qty: quantity,
-        basePrice: product.priceOnline,
+        basePrice: priceOnline,
         lineTotal,
       });
     }
