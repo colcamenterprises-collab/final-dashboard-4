@@ -66,6 +66,7 @@ export async function fetchOnlineProductRows(): Promise<OnlineProductRow[]> {
     WHERE p.active = true
       AND p.visible_online = true
       AND p.price_online IS NOT NULL
+      AND p.price_online > 0
   `);
 
   return (result.rows || result) as OnlineProductRow[];
