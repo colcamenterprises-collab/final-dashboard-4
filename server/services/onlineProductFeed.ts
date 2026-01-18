@@ -16,8 +16,8 @@ export type OnlineProduct = {
   name: string;
   description: string | null;
   image: string | null;
-  price: number;
-  priceOnline: number;
+  price: number | null;
+  priceOnline: number | null;
   category: string;
 };
 
@@ -37,7 +37,7 @@ export type LegacyMenuItem = {
   categoryId: string;
   name: string;
   desc: string;
-  price: number;
+  price: number | null;
   image?: string | null;
 };
 
@@ -54,22 +54,21 @@ const slugifyCategory = (value: string) =>
 
 export async function fetchOnlineProductRows(): Promise<OnlineProductRow[]> {
   const result = await db.execute(sql`
-    SELECT
-      p.id,
-      p.name,
-      p.description,
-      p.image_url as "imageUrl",
-      p.category,
-      p.visible_online as "visibleOnline",
-      p.price_online as "priceOnline"
-    FROM product p
-    WHERE p.active = true
-      AND p.visible_online = true
-      AND p.price_online IS NOT NULL
-      AND p.price_online > 0
+    SELECT *
+    FROM product
+    WHERE active = true
   `);
 
-  return (result.rows || result) as OnlineProductRow[];
+  const rows = (result.rows || result) as Array<Record<string, any>>;
+  return rows.map((row) => ({
+    id: Number(row.id),
+    name: row.name,
+    description: row.description ?? null,
+    imageUrl: row.image_url ?? null,
+    category: row.category ?? null,
+    visibleOnline: row.visible_online ?? null,
+    priceOnline: row.price_online ?? null,
+  }));
 }
 
 export async function getOnlineProductsFlat(): Promise<OnlineProduct[]> {
@@ -87,8 +86,8 @@ export async function getOnlineProductsFlat(): Promise<OnlineProduct[]> {
       name: row.name,
       description: row.description,
       image: row.imageUrl || null,
-      price: Number(row.priceOnline || 0),
-      priceOnline: Number(row.priceOnline || 0),
+      price: row.priceOnline !== null ? Number(row.priceOnline) : null,
+      priceOnline: row.priceOnline !== null ? Number(row.priceOnline) : null,
       category: normalizeCategory(row.category),
     }));
 }
@@ -134,7 +133,7 @@ export async function getLegacyMenuFromOnlineProducts(): Promise<{
       categoryId,
       name: item.name,
       desc: item.description || "",
-      price: Number(item.price || 0),
+      price: item.price ?? null,
       image: item.image || null,
     };
   });
