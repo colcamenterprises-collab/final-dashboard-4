@@ -23,7 +23,6 @@ type Product = {
   createdAt: string;
   cost: number;
   category?: string | null;
-  sortOrder?: number | null;
   visibleInStore?: boolean | null;
   visibleGrab?: boolean | null;
   visibleOnline?: boolean | null;
@@ -80,7 +79,6 @@ function ProductViewModal({ productId, isOpen, onClose, onEdit }: {
               <h3 className="text-xs font-semibold mb-2">Menu Details</h3>
               <div className="space-y-1 text-xs text-slate-600">
                 <div>Category: {data.product.category || "UNMAPPED"}</div>
-                <div>Sort Order: {data.product.sortOrder ?? 0}</div>
                 <div>Visibility: {[
                   data.product.visibleInStore ? "In-store" : null,
                   data.product.visibleGrab ? "Grab" : null,

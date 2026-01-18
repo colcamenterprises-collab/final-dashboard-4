@@ -27,7 +27,7 @@ type RecipeAuthority = {
   yieldUnits?: string | null;
   active: boolean;
   ingredients: RecipeIngredientAuthority[];
-  totalCost: number;
+  totalCost: number | null;
 };
 
 type RecipeIngredientAuthority = {
@@ -67,9 +67,10 @@ interface RecipeEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: () => void;
+  onCreateProduct?: () => void;
 }
 
-export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEditModalProps) {
+export function RecipeEditModal({ recipe, isOpen, onClose, onSaved, onCreateProduct }: RecipeEditModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -79,6 +80,20 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
   const [modalIngredients, setModalIngredients] = useState<ModalIngredient[]>([]);
   const [newIngredientId, setNewIngredientId] = useState("");
   const [newQuantity, setNewQuantity] = useState("");
+
+  const allowedUnits = new Set(["g", "ml", "each", "grams"]);
+
+  const formatUnitLabel = (unit: string) => {
+    if (unit === "grams") return "g";
+    return unit;
+  };
+
+  const parsePositiveNumber = (value: string) => {
+    if (!value.trim()) return null;
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || parsed <= 0) return null;
+    return parsed;
+  };
 
   const { data: ingredientsData } = useQuery<{ items: CanonicalIngredient[]; count: number }>({
     queryKey: ['/api/ingredients/canonical'],
@@ -102,7 +117,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
           ingredientId: ing.ingredientId || found?.id || 0,
           portionQty: ing.portionQty || ing.quantity || "0",
           ingredientName: ing.ingredientName || found?.name || "Unknown",
-          baseUnit: ing.baseUnit || found?.baseUnit || "each",
+          baseUnit: ing.baseUnit || found?.baseUnit || "UNMAPPED",
           unitCostPerBase: ing.unitCostPerBase || Number(found?.unitCostPerBase) || 0,
         };
       }).filter(ing => ing.ingredientId > 0);
@@ -123,7 +138,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
           active,
           ingredients: modalIngredients.map((ing) => ({
             ingredientId: ing.ingredientId,
-            portionQty: ing.portionQty,
+            quantityPerPortion: ing.portionQty,
           })),
         }),
       });
@@ -145,13 +160,13 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
   });
 
   const handleAddIngredient = () => {
-    if (!newIngredientId || !newQuantity) {
+    if (!newIngredientId || !newQuantity.trim()) {
       toast({ title: "Missing fields", description: "Select ingredient and enter quantity", variant: "destructive" });
       return;
     }
-    const qty = parseFloat(newQuantity);
-    if (isNaN(qty) || qty <= 0) {
-      toast({ title: "Invalid quantity", description: "Quantity must be a positive number", variant: "destructive" });
+    const qty = parsePositiveNumber(newQuantity);
+    if (!qty) {
+      toast({ title: "Invalid quantity", description: "Quantity per portion must be a positive number", variant: "destructive" });
       return;
     }
     const id = parseInt(newIngredientId);
@@ -161,6 +176,10 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
     }
     const found = availableIngredients.find((i) => i.id === id);
     if (!found) return;
+    if (!allowedUnits.has(found.baseUnit)) {
+      toast({ title: "Invalid unit", description: `${found.name}: base unit must be g, ml, or each`, variant: "destructive" });
+      return;
+    }
 
     setModalIngredients([
       ...modalIngredients,
@@ -197,20 +216,52 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
       toast({ title: "Name required", description: "Please enter a recipe name", variant: "destructive" });
       return;
     }
+    const serves = parsePositiveNumber(yieldUnits);
+    if (!serves) {
+      toast({ title: "Invalid serves", description: "Serves must be a positive number", variant: "destructive" });
+      return;
+    }
     for (const ing of modalIngredients) {
-      const qty = parseFloat(ing.portionQty);
-      if (!ing.portionQty || isNaN(qty) || qty <= 0) {
-        toast({ title: "Invalid quantity", description: `${ing.ingredientName}: quantity must be > 0`, variant: "destructive" });
+      const qty = parsePositiveNumber(ing.portionQty);
+      if (!qty) {
+        toast({ title: "Invalid quantity", description: `${ing.ingredientName}: quantity per portion must be > 0`, variant: "destructive" });
+        return;
+      }
+      if (!allowedUnits.has(ing.baseUnit)) {
+        toast({ title: "Invalid unit", description: `${ing.ingredientName}: base unit must be g, ml, or each`, variant: "destructive" });
         return;
       }
     }
     saveMutation.mutate();
   };
 
-  const totalCost = modalIngredients.reduce((sum, ing) => {
-    const lineCost = ing.unitCostPerBase * parseFloat(ing.portionQty || "0");
+  const perPortionCost = modalIngredients.reduce((sum, ing) => {
+    const qty = parsePositiveNumber(ing.portionQty) ?? 0;
+    const lineCost = ing.unitCostPerBase * qty;
     return sum + lineCost;
   }, 0);
+  const serves = parsePositiveNumber(yieldUnits);
+  const totalCost = serves ? perPortionCost * serves : null;
+  const validationErrors: string[] = [];
+  if (!name.trim()) {
+    validationErrors.push("Recipe name is required.");
+  }
+  if (!serves) {
+    validationErrors.push("Serves must be a positive number.");
+  }
+  for (const ing of modalIngredients) {
+    const qty = parsePositiveNumber(ing.portionQty);
+    if (!qty) {
+      validationErrors.push(`${ing.ingredientName}: quantity per portion must be > 0.`);
+      break;
+    }
+    if (!allowedUnits.has(ing.baseUnit)) {
+      validationErrors.push(`${ing.ingredientName}: base unit must be g, ml, or each.`);
+      break;
+    }
+  }
+  const canSave = validationErrors.length === 0;
+  const canCreateProduct = canSave && modalIngredients.length > 0;
 
   if (!recipe) return null;
 
@@ -261,21 +312,23 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
 
           <div className="border-t pt-4">
             <div className="mb-3">
-              <h3 className="text-sm font-semibold text-slate-900">Ingredients (Per Serving)</h3>
+              <h3 className="text-sm font-semibold text-slate-900">Ingredients (Per Portion)</h3>
               <p className="text-xs text-slate-500 mt-1">
                 Canonical ingredients with base units. Cost = unit cost × portion qty.
               </p>
             </div>
             <div className="flex justify-between items-center mb-2">
               <Label className="text-xs font-medium">{modalIngredients.length} ingredient(s)</Label>
-              <span className="text-xs text-emerald-600 font-semibold">Recipe Cost: ฿{totalCost.toFixed(2)}</span>
+              <span className="text-xs text-emerald-600 font-semibold">
+                Recipe Cost: {totalCost !== null ? `฿${totalCost.toFixed(2)}` : "Unavailable"}
+              </span>
             </div>
 
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b bg-slate-50">
                   <th className="text-left py-2 px-1 font-medium">Ingredient</th>
-                  <th className="text-left py-2 px-1 font-medium w-20">Portion</th>
+                  <th className="text-left py-2 px-1 font-medium w-20">Quantity per portion</th>
                   <th className="text-left py-2 px-1 font-medium w-16">Unit</th>
                   <th className="text-right py-2 px-1 font-medium w-16">Cost</th>
                   <th className="w-8"></th>
@@ -299,7 +352,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                           data-testid={`input-quantity-${ing.ingredientId}`}
                         />
                       </td>
-                      <td className="py-2 px-1 text-slate-500">{ing.baseUnit}</td>
+                      <td className="py-2 px-1 text-slate-500">{formatUnitLabel(ing.baseUnit)}</td>
                       <td className="py-2 px-1 text-right font-mono">฿{lineCost.toFixed(2)}</td>
                       <td className="py-2 px-1">
                         <Button
@@ -337,7 +390,7 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                       .filter((i) => !modalIngredients.some((m) => m.ingredientId === i.id))
                       .map((ing) => (
                         <SelectItem key={ing.id} value={ing.id.toString()}>
-                          {ing.name} ({ing.baseUnit})
+                          {ing.name} ({formatUnitLabel(ing.baseUnit)})
                         </SelectItem>
                       ))}
                   </SelectContent>
@@ -346,9 +399,9 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
                   <Input
                     value={newQuantity}
                     onChange={(e) => setNewQuantity(e.target.value)}
-                    placeholder="Qty"
+                    placeholder="Qty per portion"
                     type="number"
-                    min="0"
+                    min="0.01"
                     step="0.01"
                     className="w-20 h-8 text-xs rounded-[4px] bg-white"
                     data-testid="input-new-quantity"
@@ -368,18 +421,36 @@ export function RecipeEditModal({ recipe, isOpen, onClose, onSaved }: RecipeEdit
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <div className="flex justify-between items-center gap-2 pt-4 border-t">
+          {!canSave && (
+            <span className="text-xs text-red-500">
+              {validationErrors[0]}
+            </span>
+          )}
           <Button variant="outline" onClick={handleCancel} className="text-xs rounded-[4px]" data-testid="button-cancel">
             Cancel
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saveMutation.isPending}
-            className="text-xs rounded-[4px] bg-emerald-600 hover:bg-emerald-700"
-            data-testid="button-save-recipe"
-          >
-            {saveMutation.isPending ? "Saving..." : "Save"}
-          </Button>
+          <div className="flex gap-2">
+            {onCreateProduct && (
+              <Button
+                onClick={onCreateProduct}
+                disabled={!canCreateProduct}
+                className="text-xs rounded-[4px] bg-slate-900 hover:bg-slate-800"
+                title={!canCreateProduct ? "Recipe must be valid before creating a product" : undefined}
+                data-testid="button-create-product"
+              >
+                Create Product
+              </Button>
+            )}
+            <Button
+              onClick={handleSave}
+              disabled={saveMutation.isPending || !canSave}
+              className="text-xs rounded-[4px] bg-emerald-600 hover:bg-emerald-700"
+              data-testid="button-save-recipe"
+            >
+              {saveMutation.isPending ? "Saving..." : "Save"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

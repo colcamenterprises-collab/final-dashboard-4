@@ -87,6 +87,7 @@ import shiftReportRoutes from "./routes/shiftReportRoutes";
 import expensesV2Routes from "./routes/expensesV2Routes";
 import menuOrderingRoutes from "./routes/menuOrderingRoutes";
 import ordersV2Routes from "./routes/ordersV2Routes";
+import onlineOrderingV2Router from "./routes/onlineOrderingV2";
 import loyverseMapRoutes from "./routes/loyverseMapRoutes";
 import qrRoutes from "./routes/qrRoutes";
 import scbRoutes from "./routes/payments/scbRoutes";
@@ -105,7 +106,6 @@ import adminHistoricalImportRouter from "./routes/adminHistoricalImport";
 import systemHealthRouter from "./routes/systemHealth";
 import executiveMetricsRouter from "./routes/executiveMetrics";
 import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./services/menuCanonicalService";
-import { getPublicMenu } from "./services/productMenuView";
 import dashboard4Routes from "./routes/dashboard4Routes";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
@@ -1153,39 +1153,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Shift Report V2
   app.use("/api/shift-report", shiftReportRoutes);
 
-  // Online Ordering API (namespaced to avoid conflicts)
-  app.get("/api/ordering/menu", (_, res) => {
-    getPublicMenu("ONLINE")
-      .then((menu) => res.json(menu))
-      .catch((error) => {
-        console.error("Error fetching ordering menu:", error);
-        res.status(500).json({ error: "Menu not found" });
-      });
-  });
-
-  app.post("/api/ordering/orders", (req, res) => {
-    const p = path.join(process.cwd(), "online-ordering/server/data/orders.json");
-    try {
-      const orders = JSON.parse(fs.readFileSync(p, "utf8"));
-      const id = "ORD_" + Math.random().toString(36).slice(2, 10).toUpperCase();
-      const createdAt = new Date().toISOString();
-      orders.push({ id, createdAt, status: "RECEIVED", ...req.body });
-      fs.writeFileSync(p, JSON.stringify(orders, null, 2));
-      res.json({ ok: true, id, createdAt });
-    } catch (e) {
-      res.status(500).json({ error: "Failed to create order" });
-    }
-  });
-
-  app.get("/api/ordering/orders", (_, res) => {
-    const p = path.join(process.cwd(), "online-ordering/server/data/orders.json");
-    try {
-      const orders = JSON.parse(fs.readFileSync(p, "utf8"));
-      res.json(orders.sort((a: any, b: any) => b.createdAt.localeCompare(a.createdAt)));
-    } catch (e) {
-      res.status(500).json({ error: "Failed to fetch orders" });
-    }
-  });
+  // Online Ordering v2 API (product-driven)
+  app.use("/api", onlineOrderingV2Router);
 
   // Serve static uploaded menu item images
   const uploadsDir = path.join(process.cwd(), "uploads");

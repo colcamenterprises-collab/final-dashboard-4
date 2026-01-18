@@ -31,7 +31,7 @@ type RecipeAuthority = {
   active: boolean;
   createdAt?: string;
   ingredients: RecipeIngredientAuthority[];
-  totalCost: number;
+  totalCost: number | null;
 };
 
 type RecipeIngredientAuthority = {
@@ -141,6 +141,26 @@ export default function RecipeManagement() {
     },
   });
 
+  const createProductMutation = useMutation({
+    mutationFn: async (recipeId: number) => {
+      const res = await fetch(`/api/recipe-authority/${recipeId}/create-product`, {
+        method: 'POST',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create product');
+      }
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: "Product created", description: "Product created from recipe. Set prices before activating." });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to create product", description: error.message, variant: "destructive" });
+    },
+  });
+
   const onCreateRecipe = (data: any) => {
     createRecipeMutation.mutate(data);
   };
@@ -161,6 +181,16 @@ export default function RecipeManagement() {
       setEditingRecipe(viewingRecipe);
       setIsEditModalOpen(true);
     }
+  };
+
+  const handleCreateProductFromRecipe = () => {
+    if (!viewingRecipe) return;
+    createProductMutation.mutate(viewingRecipe.id);
+  };
+
+  const handleCreateProductFromEdit = () => {
+    if (!editingRecipe) return;
+    createProductMutation.mutate(editingRecipe.id);
   };
 
   const handleDeleteRecipe = (id: number) => {
@@ -312,7 +342,9 @@ export default function RecipeManagement() {
                   <tr key={recipe.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`row-recipe-${recipe.id}`}>
                     <td className="py-2 text-slate-900">{recipe.name}</td>
                     <td className="py-2 text-slate-600 hidden sm:table-cell">{recipe.ingredients?.length || 0}</td>
-                    <td className="py-2 text-emerald-600 font-medium">฿{Number(recipe.totalCost || 0).toFixed(2)}</td>
+                    <td className="py-2 text-emerald-600 font-medium">
+                      {recipe.totalCost !== null ? `฿${Number(recipe.totalCost).toFixed(2)}` : "Unavailable"}
+                    </td>
                     <td className="py-2 hidden sm:table-cell">
                       <Badge variant={recipe.active ? "default" : "secondary"} className={`text-[10px] rounded-[4px] ${recipe.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                         {recipe.active ? "Active" : "Inactive"}
@@ -412,6 +444,7 @@ export default function RecipeManagement() {
           setViewingRecipe(null);
         }}
         onEdit={handleEditFromView}
+        onCreateProduct={handleCreateProductFromRecipe}
       />
 
       <RecipeEditModal
@@ -424,6 +457,7 @@ export default function RecipeManagement() {
         onSaved={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/recipe-authority'] });
         }}
+        onCreateProduct={handleCreateProductFromEdit}
       />
     </div>
   );

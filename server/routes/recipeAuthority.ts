@@ -7,26 +7,30 @@
 
 import { Router, Request, Response } from 'express';
 import * as recipeService from '../services/recipeAuthority';
+import { createProductFromRecipe, refreshProductBaseCost } from '../services/productCatalog';
 import { insertRecipeV2Schema, insertRecipeIngredientV2Schema, insertPosItemRecipeMapSchema } from '@shared/schema';
 
 const router = Router();
 
-const VALID_PORTION_UNITS = ['grams', 'ml', 'each', 'serving'] as const;
-type PortionUnit = typeof VALID_PORTION_UNITS[number];
+const parsePositiveNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const raw = typeof value === 'string' ? value.trim() : String(value);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+};
 
-function validatePortionUnit(unit: string): unit is PortionUnit {
-  return VALID_PORTION_UNITS.includes(unit as PortionUnit);
-}
-
-function validateIngredients(ingredients: { ingredientId?: number; purchasingItemId?: number; portionQty?: string; quantity?: string; unit?: string }[]): string | null {
+function validateIngredients(ingredients: { ingredientId?: number; purchasingItemId?: number; quantityPerPortion?: string; portionQty?: string; quantity?: string; unit?: string }[]): string | null {
   for (const ing of ingredients) {
-    const id = ing.ingredientId || ing.purchasingItemId;
-    const qty = parseFloat(ing.portionQty || ing.quantity || "0");
-    if (isNaN(qty) || qty <= 0) {
-      return `Ingredient ${id}: quantity must be greater than 0`;
-    }
     if (!ing.ingredientId && !ing.purchasingItemId) {
       return `Ingredient missing: ingredientId or purchasingItemId required`;
+    }
+    const id = ing.ingredientId || ing.purchasingItemId;
+    const qtyValue = ing.quantityPerPortion ?? ing.portionQty ?? ing.quantity;
+    const qty = parsePositiveNumber(qtyValue);
+    if (!qty) {
+      return `Ingredient ${id}: quantity per portion must be greater than 0`;
     }
   }
   return null;
@@ -186,6 +190,10 @@ router.post('/', async (req: Request, res: Response) => {
     if (!parsed.success) {
       return res.status(400).json({ ok: false, error: 'Invalid recipe data', details: parsed.error.errors });
     }
+    const yieldUnits = parsePositiveNumber(parsed.data.yieldUnits);
+    if (!yieldUnits) {
+      return res.status(400).json({ ok: false, error: 'Serves must be a positive number' });
+    }
 
     const recipe = await recipeService.createRecipe(parsed.data);
     res.status(201).json({ ok: true, recipe });
@@ -195,6 +203,35 @@ router.post('/', async (req: Request, res: Response) => {
     }
     console.error('[RecipeAuthority] Error creating recipe:', error);
     res.status(500).json({ ok: false, error: 'Failed to create recipe' });
+  }
+});
+
+/**
+ * POST /api/recipe-authority/:id/create-product
+ * Create a product from a recipe (inactive, prices unset)
+ */
+router.post('/:id/create-product', async (req: Request, res: Response) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ ok: false, error: 'Invalid recipe ID' });
+    }
+
+    const result = await createProductFromRecipe(id);
+    if (result.status === 'missing') {
+      return res.status(404).json({ ok: false, error: 'Recipe not found' });
+    }
+    if (result.status === 'invalid') {
+      return res.status(400).json({ ok: false, error: result.reason });
+    }
+    if (result.status === 'exists') {
+      return res.status(409).json({ ok: false, error: 'Product already exists for this recipe' });
+    }
+
+    res.status(201).json({ ok: true, product: result.product });
+  } catch (error) {
+    console.error('[RecipeAuthority] Error creating product:', error);
+    res.status(500).json({ ok: false, error: 'Failed to create product' });
   }
 });
 
@@ -211,6 +248,11 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, error: 'Invalid recipe ID' });
     }
 
+    const yieldUnits = parsePositiveNumber(req.body?.yieldUnits);
+    if (!yieldUnits) {
+      return res.status(400).json({ ok: false, error: 'Serves must be a positive number' });
+    }
+
     if (req.body.ingredients && Array.isArray(req.body.ingredients)) {
       const validationError = validateIngredients(req.body.ingredients);
       if (validationError) {
@@ -223,6 +265,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ ok: false, error: 'Recipe not found' });
     }
 
+    await refreshProductBaseCost(id);
     res.json({ ok: true, recipe });
   } catch (error: any) {
     if (error.code === '23505') {
@@ -271,27 +314,25 @@ router.post('/:id/ingredients', async (req: Request, res: Response) => {
       return res.status(400).json({ ok: false, error: 'Invalid recipe ID' });
     }
 
-    const { purchasingItemId, quantity, unit } = req.body;
-    if (!purchasingItemId || !quantity || !unit) {
-      return res.status(400).json({ ok: false, error: 'Missing required fields: purchasingItemId, quantity, unit' });
+    const { purchasingItemId, quantityPerPortion, quantity, unit } = req.body;
+    const qtyValue = quantityPerPortion || quantity;
+    if (!purchasingItemId || !qtyValue || !unit) {
+      return res.status(400).json({ ok: false, error: 'Missing required fields: purchasingItemId, quantityPerPortion, unit' });
     }
 
-    const qty = parseFloat(quantity);
-    if (isNaN(qty) || qty <= 0) {
-      return res.status(400).json({ ok: false, error: 'Quantity must be greater than 0' });
-    }
-
-    if (!validatePortionUnit(unit)) {
-      return res.status(400).json({ ok: false, error: `Unit '${unit}' is invalid. Valid units: ${VALID_PORTION_UNITS.join(', ')}` });
+    const qty = parsePositiveNumber(qtyValue);
+    if (!qty) {
+      return res.status(400).json({ ok: false, error: 'Quantity per portion must be greater than 0' });
     }
 
     const ingredient = await recipeService.addIngredientToRecipe(
       recipeId,
       purchasingItemId,
-      quantity.toString(),
+      qtyValue.toString(),
       unit
     );
 
+    await refreshProductBaseCost(recipeId);
     res.status(201).json({ ok: true, ingredient });
   } catch (error: any) {
     if (error.message?.includes('not found or is not marked as ingredient')) {
@@ -316,21 +357,24 @@ router.put('/:id/ingredients/:ingredientId', async (req: Request, res: Response)
       return res.status(400).json({ ok: false, error: 'Invalid ingredient ID' });
     }
 
-    const { quantity, unit } = req.body;
-    if (!quantity || !unit) {
-      return res.status(400).json({ ok: false, error: 'Missing required fields: quantity, unit' });
+    const { quantityPerPortion, quantity } = req.body;
+    const qtyValue = quantityPerPortion || quantity;
+    if (!qtyValue) {
+      return res.status(400).json({ ok: false, error: 'Missing required fields: quantityPerPortion' });
     }
 
-    const ingredient = await recipeService.updateRecipeIngredient(
-      ingredientId,
-      quantity.toString(),
-      unit
-    );
+    const qty = parsePositiveNumber(qtyValue);
+    if (!qty) {
+      return res.status(400).json({ ok: false, error: 'Quantity per portion must be greater than 0' });
+    }
+
+    const ingredient = await recipeService.updateRecipeIngredient(ingredientId, qtyValue.toString());
 
     if (!ingredient) {
       return res.status(404).json({ ok: false, error: 'Ingredient not found' });
     }
 
+    await refreshProductBaseCost(ingredient.recipeId);
     res.json({ ok: true, ingredient });
   } catch (error) {
     console.error('[RecipeAuthority] Error updating ingredient:', error);
@@ -349,7 +393,10 @@ router.delete('/:id/ingredients/:ingredientId', async (req: Request, res: Respon
       return res.status(400).json({ ok: false, error: 'Invalid ingredient ID' });
     }
 
-    await recipeService.removeIngredientFromRecipe(ingredientId);
+    const removed = await recipeService.removeIngredientFromRecipe(ingredientId);
+    if (removed) {
+      await refreshProductBaseCost(removed.recipeId);
+    }
     res.json({ ok: true, message: 'Ingredient removed' });
   } catch (error) {
     console.error('[RecipeAuthority] Error removing ingredient:', error);

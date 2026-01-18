@@ -8,7 +8,8 @@
 import { Router } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { getProductCost, getProductCostDetails } from "../services/productCost.service";
+import { getProductCost } from "../services/productCost.service";
+import { calculateRecipeCost } from "../services/recipeAuthority";
 
 const router = Router();
 
@@ -22,27 +23,13 @@ router.get("/api/products", async (_req, res) => {
         p.image_url as "imageUrl",
         p.active,
         p.created_at as "createdAt",
-        pm.category,
-        pm.sort_order as "sortOrder",
-        pm.visible_in_store as "visibleInStore",
-        pm.visible_grab as "visibleGrab",
-        pm.visible_online as "visibleOnline",
-        pr.recipe_id as "recipeId",
-        COALESCE(
-          (SELECT SUM(pi2.portion_qty::numeric * COALESCE(i.unit_cost_per_base::numeric, 0))
-           FROM product_ingredient pi2
-           JOIN ingredients i ON pi2.ingredient_id = i.id
-           WHERE pi2.product_id = p.id),
-          (SELECT SUM(ri.portion_qty::numeric * COALESCE(i.unit_cost_per_base::numeric, 0))
-           FROM product_recipe pr2
-           JOIN recipe_ingredient ri ON pr2.recipe_id = ri.recipe_id
-           JOIN ingredients i ON ri.ingredient_id = i.id
-           WHERE pr2.product_id = p.id),
-          0
-        ) as cost
+        p.category,
+        p.visible_in_store as "visibleInStore",
+        p.visible_grab as "visibleGrab",
+        p.visible_online as "visibleOnline",
+        p.recipe_id as "recipeId",
+        p.base_cost as cost
       FROM product p
-      LEFT JOIN product_menu pm ON pm.product_id = p.id
-      LEFT JOIN product_recipe pr ON pr.product_id = p.id
       ORDER BY p.created_at DESC
     `);
 
@@ -68,15 +55,16 @@ router.get("/api/products/:id", async (req, res) => {
         p.image_url as "imageUrl", 
         p.active, 
         p.created_at as "createdAt",
-        pm.category,
-        pm.sort_order as "sortOrder",
-        pm.visible_in_store as "visibleInStore",
-        pm.visible_grab as "visibleGrab",
-        pm.visible_online as "visibleOnline",
-        pr.recipe_id as "recipeId"
+        p.category,
+        p.visible_in_store as "visibleInStore",
+        p.visible_grab as "visibleGrab",
+        p.visible_online as "visibleOnline",
+        p.recipe_id as "recipeId",
+        p.price_in_store as "priceInStore",
+        p.price_grab as "priceGrab",
+        p.price_online as "priceOnline",
+        p.base_cost as "baseCost"
       FROM product p
-      LEFT JOIN product_menu pm ON pm.product_id = p.id
-      LEFT JOIN product_recipe pr ON pr.product_id = p.id
       WHERE p.id = ${id}
     `);
 
@@ -88,30 +76,30 @@ router.get("/api/products/:id", async (req, res) => {
 
     const ingredientsResult = await db.execute(sql`
       SELECT 
-        pi.id,
-        pi.ingredient_id as "ingredientId",
+        ri.id,
+        ri.ingredient_id as "ingredientId",
         i.name,
         i.base_unit as "baseUnit",
-        pi.portion_qty as "portionQty",
+        ri.portion_qty as "portionQty",
         i.unit_cost_per_base as "unitCost"
-      FROM product_ingredient pi
-      INNER JOIN ingredients i ON pi.ingredient_id = i.id
-      WHERE pi.product_id = ${id}
+      FROM recipe_ingredient ri
+      INNER JOIN ingredients i ON ri.ingredient_id = i.id
+      WHERE ri.recipe_id = ${product.recipeId}
     `);
 
-    const pricesResult = await db.execute(sql`
-      SELECT id, channel, price
-      FROM product_price
-      WHERE product_id = ${id}
-    `);
+    const prices = [
+      { channel: "IN_STORE", price: product.priceInStore },
+      { channel: "GRAB", price: product.priceGrab },
+      { channel: "ONLINE", price: product.priceOnline },
+    ].filter((price) => price.price !== null && price.price !== undefined);
 
-    const cost = await getProductCost(id);
+    const cost = product.baseCost ?? await getProductCost(id);
 
     res.json({
       ok: true,
       product,
       ingredients: ingredientsResult.rows || ingredientsResult,
-      prices: pricesResult.rows || pricesResult,
+      prices,
       cost,
     });
   } catch (error: any) {
@@ -122,60 +110,66 @@ router.get("/api/products/:id", async (req, res) => {
 
 router.post("/api/products", async (req, res) => {
   try {
-    const { name, description, imageUrl, ingredients, prices, category, sortOrder, visibility, recipeId } = req.body;
+    const { name, description, imageUrl, prices, category, visibility, recipeId, active } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: "Product name is required" });
     }
 
-    if ((!ingredients || ingredients.length === 0) && !recipeId) {
-      return res.status(400).json({ error: "Product requires at least one ingredient or a linked recipe" });
+    if (!recipeId) {
+      return res.status(400).json({ error: "Product requires a linked recipe" });
     }
 
     const product = await db.transaction(async (tx) => {
+      const baseCost = await calculateRecipeCost(Number(recipeId));
+      if (baseCost === null) {
+        throw new Error("Recipe must have valid serves and quantities before creating a product");
+      }
+      const priceInStore = prices?.find((p: any) => p.channel === "IN_STORE")?.price ?? null;
+      const priceOnline = prices?.find((p: any) => p.channel === "ONLINE")?.price ?? null;
+      const hasPrice = (priceInStore && priceInStore > 0) || (priceOnline && priceOnline > 0);
+      const hasImage = Boolean(imageUrl && String(imageUrl).trim());
+      const activeFlag = active === true;
+      const canActivate = hasPrice && hasImage && baseCost !== null && Boolean(recipeId);
+      if (activeFlag && !canActivate) {
+        throw new Error("Product cannot be activated until it has an image, price, linked recipe, and base cost");
+      }
       const productResult = await tx.execute(sql`
-        INSERT INTO product (name, description, image_url)
-        VALUES (${name}, ${description || null}, ${imageUrl || null})
+        INSERT INTO product (
+          name,
+          description,
+          image_url,
+          recipe_id,
+          base_cost,
+          price_in_store,
+          price_grab,
+          price_online,
+          category,
+          active,
+          visible_in_store,
+          visible_grab,
+          visible_online
+        )
+        VALUES (
+          ${name},
+          ${description || null},
+          ${imageUrl || null},
+          ${Number(recipeId)},
+          ${Number(baseCost.toFixed(2))},
+          ${priceInStore},
+          ${prices?.find((p: any) => p.channel === "GRAB")?.price ?? null},
+          ${priceOnline},
+          ${category || null},
+          ${activeFlag},
+          ${Boolean(visibility?.inStore)},
+          ${Boolean(visibility?.grab)},
+          ${Boolean(visibility?.online)}
+        )
         RETURNING id, name, description, image_url as "imageUrl", active, created_at as "createdAt"
       `);
 
       const productRows = productResult.rows || productResult;
       const created = productRows[0] as any;
-
-      await tx.execute(sql`
-        INSERT INTO product_menu (product_id, category, sort_order, visible_in_store, visible_grab, visible_online)
-        VALUES (
-          ${created.id},
-          ${category || null},
-          ${Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0},
-          ${Boolean(visibility?.inStore)},
-          ${Boolean(visibility?.grab)},
-          ${Boolean(visibility?.online)}
-        )
-      `);
-
-      if (recipeId) {
-        await tx.execute(sql`
-          INSERT INTO product_recipe (product_id, recipe_id)
-          VALUES (${created.id}, ${recipeId})
-        `);
-      }
-
-      for (const ing of ingredients) {
-        await tx.execute(sql`
-          INSERT INTO product_ingredient (product_id, ingredient_id, portion_qty)
-          VALUES (${created.id}, ${ing.ingredientId}, ${ing.portionQty})
-        `);
-      }
-
-      if (prices && prices.length > 0) {
-        for (const p of prices) {
-          await tx.execute(sql`
-            INSERT INTO product_price (product_id, channel, price)
-            VALUES (${created.id}, ${p.channel}, ${p.price})
-          `);
-        }
-      }
 
       return created;
     });
@@ -183,6 +177,9 @@ router.post("/api/products", async (req, res) => {
     res.status(201).json({ ok: true, product });
   } catch (error: any) {
     console.error("[products] Create error:", error);
+    if (error.message?.includes("Recipe must have valid serves") || error.message?.includes("Product cannot be activated")) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message });
   }
 });
@@ -194,67 +191,52 @@ router.put("/api/products/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid product ID" });
     }
 
-    const { name, description, imageUrl, ingredients, prices, active, category, sortOrder, visibility, recipeId } = req.body;
+    const { name, description, imageUrl, prices, active, category, visibility, recipeId } = req.body;
+
+    if (!recipeId) {
+      return res.status(400).json({ error: "Product requires a linked recipe" });
+    }
 
     await db.transaction(async (tx) => {
+      const baseCost = recipeId ? await calculateRecipeCost(Number(recipeId)) : null;
+      if (recipeId && baseCost === null) {
+        throw new Error("Recipe must have valid serves and quantities before updating product");
+      }
+      const priceInStore = prices?.find((p: any) => p.channel === "IN_STORE")?.price ?? null;
+      const priceOnline = prices?.find((p: any) => p.channel === "ONLINE")?.price ?? null;
+      const hasPrice = (priceInStore && priceInStore > 0) || (priceOnline && priceOnline > 0);
+      const hasImage = Boolean(imageUrl && String(imageUrl).trim());
+      const activeFlag = active === true;
+      const canActivate = hasPrice && hasImage && baseCost !== null && Boolean(recipeId);
+      if (activeFlag && !canActivate) {
+        throw new Error("Product cannot be activated until it has an image, price, linked recipe, and base cost");
+      }
       await tx.execute(sql`
         UPDATE product
-        SET name = ${name}, description = ${description || null}, image_url = ${imageUrl || null}, active = ${active !== false}
+        SET
+          name = ${name},
+          description = ${description || null},
+          image_url = ${imageUrl || null},
+          recipe_id = ${recipeId ? Number(recipeId) : null},
+          base_cost = ${baseCost !== null ? Number(baseCost.toFixed(2)) : null},
+          price_in_store = ${priceInStore},
+          price_grab = ${prices?.find((p: any) => p.channel === "GRAB")?.price ?? null},
+          price_online = ${priceOnline},
+          category = ${category || null},
+          active = ${activeFlag},
+          visible_in_store = ${Boolean(visibility?.inStore)},
+          visible_grab = ${Boolean(visibility?.grab)},
+          visible_online = ${Boolean(visibility?.online)}
         WHERE id = ${id}
       `);
-
-      await tx.execute(sql`
-        INSERT INTO product_menu (product_id, category, sort_order, visible_in_store, visible_grab, visible_online)
-        VALUES (
-          ${id},
-          ${category || null},
-          ${Number.isFinite(Number(sortOrder)) ? Number(sortOrder) : 0},
-          ${Boolean(visibility?.inStore)},
-          ${Boolean(visibility?.grab)},
-          ${Boolean(visibility?.online)}
-        )
-        ON CONFLICT (product_id)
-        DO UPDATE SET
-          category = EXCLUDED.category,
-          sort_order = EXCLUDED.sort_order,
-          visible_in_store = EXCLUDED.visible_in_store,
-          visible_grab = EXCLUDED.visible_grab,
-          visible_online = EXCLUDED.visible_online
-      `);
-
-      await tx.execute(sql`DELETE FROM product_recipe WHERE product_id = ${id}`);
-      if (recipeId) {
-        await tx.execute(sql`
-          INSERT INTO product_recipe (product_id, recipe_id)
-          VALUES (${id}, ${recipeId})
-        `);
-      }
-
-      await tx.execute(sql`DELETE FROM product_ingredient WHERE product_id = ${id}`);
-      await tx.execute(sql`DELETE FROM product_price WHERE product_id = ${id}`);
-
-      if (ingredients && ingredients.length > 0) {
-        for (const ing of ingredients) {
-          await tx.execute(sql`
-            INSERT INTO product_ingredient (product_id, ingredient_id, portion_qty)
-            VALUES (${id}, ${ing.ingredientId}, ${ing.portionQty})
-          `);
-        }
-      }
-
-      if (prices && prices.length > 0) {
-        for (const p of prices) {
-          await tx.execute(sql`
-            INSERT INTO product_price (product_id, channel, price)
-            VALUES (${id}, ${p.channel}, ${p.price})
-          `);
-        }
-      }
     });
 
     res.json({ ok: true });
   } catch (error: any) {
     console.error("[products] Update error:", error);
+    if (error.message?.includes("Recipe must have valid serves") || error.message?.includes("Product cannot be activated")) {
+      return res.status(400).json({ error: error.message });
+    }
     res.status(500).json({ error: error.message });
   }
 });
