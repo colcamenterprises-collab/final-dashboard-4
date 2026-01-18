@@ -1,0 +1,169 @@
+🔐 REPLIT AGENT — LIVE & BACKEND TESTING INSTRUCTIONS
+READ CAREFULLY. DO NOT SKIP STEPS. DO NOT IMPROVISE.
+These tests must be executed after merging the mega patch.
+If any step fails, STOP immediately and report the exact failure.
+Do not “fix forward” without approval.
+⚠️ ABSOLUTE RULES
+❌ Do NOT modify UI
+❌ Do NOT modify schema during testing
+❌ Do NOT seed fake data unless instructed
+❌ Do NOT bypass validation
+❌ Do NOT assume success without evidence
+✅ Report results step-by-step
+PART A — ENVIRONMENT & DATABASE (MANDATORY FIRST)
+A1. Environment variables
+Confirm all required env vars are set in Replit:
+DATABASE_URL
+Any existing required API keys (do NOT add new ones)
+If DATABASE_URL is missing → STOP
+A2. Run migrations
+Execute migrations exactly once.
+Confirm:
+Product table exists
+No migration errors
+No schema drift warnings
+If migration fails → STOP
+PART B — BACKEND VERIFICATION (NO UI)
+B1. Product table sanity check
+Using DB inspector or logs:
+Confirm Product table exists
+Confirm columns:
+recipeId
+baseCost
+imageUrl
+priceOnline
+isActive
+isVisibleOnline
+If missing → STOP
+B2. API: Online product feed (empty state)
+Call:
+Copy code
+
+GET /api/online/products
+Expected result:
+200 OK
+Empty array []
+❌ Error
+❌ Non-empty data
+→ STOP
+This confirms guardrails are working.
+PART C — RECIPE VALIDATION TEST (FOUNDATIONAL)
+C1. Open Recipe Management
+Open any existing recipe (simple one preferred)
+Verify UI behaviour:
+Quantity field = quantity per portion
+Unit label is derived and read-only
+Unit matches ingredient base unit (g / ml / each)
+“each” does NOT appear unless ingredient baseUnit = each
+If unit editable or ambiguous → STOP
+C2. Validation test (negative)
+Attempt to:
+Enter non-numeric quantity
+Enter zero or empty value
+Expected:
+Save is blocked
+Clear validation error shown
+If recipe saves → STOP
+C3. Validation test (positive)
+Enter valid quantities
+Set serves value
+Save recipe
+Expected:
+Save succeeds
+Cost recalculates deterministically
+If cost does not update → STOP
+PART D — RECIPE → PRODUCT PROMOTION
+D1. Promote recipe
+From Recipe screen:
+Click Create Product from Recipe
+Expected Product state:
+Exists
+isActive = false
+isVisibleOnline = false
+baseCost populated
+price fields empty
+imageUrl empty
+If product auto-activates → STOP
+PART E — PRODUCT EDITOR GUARDRAILS
+E1. Attempt early activation (negative)
+Without image or price:
+Attempt to activate product
+Expected:
+Activation blocked
+Clear message explaining what’s missing
+If activation allowed → STOP
+E2. Complete product (positive)
+Upload image
+Set priceOnline > 0
+Save
+Then:
+Toggle isActive = true
+Toggle isVisibleOnline = true
+Expected:
+Save succeeds
+No errors
+baseCost remains read-only
+If baseCost editable → STOP
+PART F — ONLINE FEED (CRITICAL)
+F1. API: Online product feed (active state)
+Call:
+Copy code
+
+GET /api/online/products
+Expected:
+Exactly 1 product
+Includes:
+name
+description (if set)
+imageUrl
+priceOnline
+category
+❌ Inactive products returned
+❌ Missing image or price
+→ STOP
+PART G — ONLINE ORDERING UI (LIVE)
+G1. Load Online Ordering UI
+Open Online Ordering v2 frontend.
+Expected:
+UI loads (no “Unavailable”)
+Product is visible
+Image loads
+Price correct
+“Place Order” enabled
+If UI still shows unavailable → STOP
+G2. Place order (smoke test)
+Place a single order
+Expected:
+Order created successfully
+No client errors
+PART H — ADMIN & KITCHEN FLOW
+H1. Admin Orders
+Open Admin Orders page.
+Expected:
+New order visible
+Correct product name
+Correct price
+H2. Status update
+Change order status (e.g. Preparing → Completed)
+Expected:
+Status updates persist
+No errors
+PART I — FINAL CONFIRMATION
+Agent must report:
+✅ All steps passed
+❌ OR exact step number + failure details
+DO NOT declare success without completing ALL parts.
+🚨 FAILURE HANDLING
+If any step fails:
+STOP immediately
+Do NOT push fixes
+Report:
+Step ID (e.g. F1)
+Error message
+Screenshot or log output if available
+✅ SUCCESS CONDITION (ONLY THIS)
+System is considered LIVE only when:
+One product is visible online
+Order can be placed
+Order appears in admin
+No UI changes were require
