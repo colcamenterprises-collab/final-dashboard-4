@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getPublicMenu } from "../services/productMenuView";
+import { getLegacyMenuFromOnlineProducts } from "../services/onlineProductFeed";
 const router = Router();
 
 /**
@@ -9,8 +9,8 @@ const router = Router();
  */
 router.get("/menu", async (_req, res) => {
   try {
-    const menu = await getPublicMenu("ONLINE");
-    res.json(menu);
+    const menu = await getLegacyMenuFromOnlineProducts();
+    res.json({ deprecated: true, ...menu });
   } catch (error) {
     console.error("Error fetching menu:", error);
     res.status(500).json({ error: "Failed to fetch menu" });
@@ -23,11 +23,12 @@ router.get("/menu", async (_req, res) => {
  */
 router.get("/menu-online", async (_req, res) => {
   try {
-    const menu = await getPublicMenu("ONLINE");
+    const menu = await getLegacyMenuFromOnlineProducts();
     const categories = menu.categories.map((category) => ({
       ...category,
       items: menu.items.filter((item) => item.categoryId === category.id),
     }));
+    res.set("X-Deprecated", "true");
     res.json(categories);
   } catch (error) {
     console.error("Error fetching menu-online:", error);
@@ -43,7 +44,7 @@ router.get("/menu-online", async (_req, res) => {
 router.patch("/menu-online/item/:id", async (_req, res) => {
   res.status(409).json({
     ok: false,
-    error: "Menu items are read-only. Update products for pricing and visibility.",
+    error: "Menu items are read-only. Update products for pricing and visibility. (Deprecated endpoint)",
   });
 });
 

@@ -1,36 +1,28 @@
-export type Category = { id: string; name: string };
-export type MenuItem = {
-  id: string;
-  categoryId: string;
+export type OnlineProduct = {
+  id: number;
   name: string;
-  desc: string;
+  description: string | null;
+  image: string | null;
   price: number;
-  image?: string;
+  category: string;
+};
+
+export type OnlineCategory = {
+  name: string;
+  items: OnlineProduct[];
 };
 
 export type CartItem = {
-  item: MenuItem;
-  qty: number;
-  note?: string;
+  product: OnlineProduct;
+  quantity: number;
 };
 
 export type OrderPayload = {
-  customer?: {
-    name?: string;
-    phone?: string;
-    notes?: string;
-  };
-  scheduledAt?: string | null; // ISO
   items: Array<{
-    id: string;
-    name: string;
-    unitPrice: number;
-    qty: number;
-    note?: string;
-    categoryId: string;
+    productId: number;
+    quantity: number;
+    priceAtTimeOfSale: number;
   }>;
-  subtotal: number;
-  serviceFee: number;
-  total: number;
-  currency: "THB";
+  channel: "ONLINE";
+  timestamp: string;
 };

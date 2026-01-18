@@ -28,8 +28,17 @@ export interface RecipeWithCost extends RecipeV2 {
     ingredientCost: number | null;
     lineCost: number | null;
   }>;
-  totalCost: number;
+  totalCost: number | null;
 }
+
+const parsePositiveNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined) return null;
+  const raw = typeof value === 'string' ? value.trim() : String(value);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return parsed;
+};
 
 /**
  * 🔒 PATCH R1.2: CANONICAL COST AUTHORITY
@@ -40,27 +49,38 @@ export interface RecipeWithCost extends RecipeV2 {
  * 
  * This is the ONLY authoritative cost calculation.
  */
-export async function calculateRecipeCost(recipeId: number): Promise<number> {
+export async function calculateRecipeCost(recipeId: number): Promise<number | null> {
   const result = await db.execute(sql`
     SELECT 
+      r.yield_units as yield_units,
       COALESCE(ri.portion_qty, ri.quantity) as qty,
       i.unit_cost_per_base
-    FROM recipe_ingredient ri
+    FROM recipe r
+    INNER JOIN recipe_ingredient ri ON r.id = ri.recipe_id
     INNER JOIN ingredients i ON ri.ingredient_id = i.id
-    WHERE ri.recipe_id = ${recipeId}
+    WHERE r.id = ${recipeId}
       AND ri.ingredient_id IS NOT NULL
   `);
 
-  const rows = result.rows || result;
-  let totalCost = 0;
-  
-  for (const row of rows as any[]) {
-    const portionQty = parseFloat(row.qty?.toString() || '0');
-    const unitCost = parseFloat(row.unit_cost_per_base?.toString() || '0');
-    totalCost += portionQty * unitCost;
+  const rows = (result.rows || result) as Array<{
+    yield_units: unknown;
+    qty: unknown;
+    unit_cost_per_base: unknown;
+  }>;
+
+  if (!rows.length) return null;
+
+  let perPortionTotal = 0;
+  for (const row of rows) {
+    const portionQty = parsePositiveNumber(row.qty) ?? 0;
+    const unitCost = Number(row.unit_cost_per_base || 0);
+    perPortionTotal += portionQty * unitCost;
   }
-  
-  return totalCost;
+
+  const serves = parsePositiveNumber(rows[0]?.yield_units);
+  if (!serves) return null;
+
+  return perPortionTotal * serves;
 }
 
 /**
@@ -89,13 +109,13 @@ export async function getAllRecipesWithCost(): Promise<RecipeWithCost[]> {
     `);
 
     const ingRows = (ingResult.rows || ingResult) as any[];
-    let totalCost = 0;
+    let perPortionTotal = 0;
     
     const ingredientsWithCost = ingRows.map(ing => {
-      const portionQty = parseFloat(ing.portion_qty?.toString() || '0');
+      const portionQty = parsePositiveNumber(ing.portion_qty) ?? 0;
       const unitCostPerBase = parseFloat(ing.unit_cost_per_base?.toString() || '0');
       const lineCost = portionQty * unitCostPerBase;
-      totalCost += lineCost;
+      perPortionTotal += lineCost;
       
       return {
         id: ing.id,
@@ -110,10 +130,11 @@ export async function getAllRecipesWithCost(): Promise<RecipeWithCost[]> {
       };
     });
 
+    const serves = parsePositiveNumber(r.yieldUnits);
     result.push({
       ...r,
       ingredients: ingredientsWithCost as any,
-      totalCost,
+      totalCost: serves ? perPortionTotal * serves : null,
     });
   }
   
@@ -144,13 +165,13 @@ export async function getRecipeWithCost(recipeId: number): Promise<RecipeWithCos
   `);
 
   const ingRows = (ingResult.rows || ingResult) as any[];
-  let totalCost = 0;
+  let perPortionTotal = 0;
   
   const ingredientsWithCost = ingRows.map(ing => {
-    const portionQty = parseFloat(ing.portion_qty?.toString() || '0');
+    const portionQty = parsePositiveNumber(ing.portion_qty) ?? 0;
     const unitCostPerBase = parseFloat(ing.unit_cost_per_base?.toString() || '0');
     const lineCost = portionQty * unitCostPerBase;
-    totalCost += lineCost;
+    perPortionTotal += lineCost;
     
     return {
       id: ing.id,
@@ -165,10 +186,12 @@ export async function getRecipeWithCost(recipeId: number): Promise<RecipeWithCos
     };
   });
 
+  const serves = parsePositiveNumber(r.yieldUnits);
+
   return {
     ...r,
     ingredients: ingredientsWithCost as any,
-    totalCost,
+    totalCost: serves ? perPortionTotal * serves : null,
   };
 }
 
@@ -279,23 +302,60 @@ export async function addIngredientToRecipe(
  */
 export async function updateRecipeIngredient(
   ingredientId: number,
-  quantity: string,
-  unit: string
+  quantityPerPortion: string
 ): Promise<RecipeIngredientV2 | null> {
+  const parsedQty = parsePositiveNumber(quantityPerPortion);
+  if (!parsedQty) {
+    throw new Error('Quantity per portion must be greater than 0');
+  }
+  const [current] = await db
+    .select({
+      id: recipeIngredient.id,
+      recipeId: recipeIngredient.recipeId,
+      ingredientId: recipeIngredient.ingredientId,
+      unit: recipeIngredient.unit,
+    })
+    .from(recipeIngredient)
+    .where(eq(recipeIngredient.id, ingredientId));
+
+  if (!current) return null;
+
+  if (current.ingredientId) {
+    const [ingredientRow] = await db
+      .select({ baseUnit: ingredients.baseUnit })
+      .from(ingredients)
+      .where(eq(ingredients.id, current.ingredientId));
+
+    if (!ingredientRow?.baseUnit) {
+      throw new Error('Ingredient base unit is required');
+    }
+    const unit = ingredientRow.baseUnit;
+    const [updated] = await db
+      .update(recipeIngredient)
+      .set({ portionQty: quantityPerPortion, unit })
+      .where(eq(recipeIngredient.id, ingredientId))
+      .returning();
+    return updated || null;
+  }
+
   const [updated] = await db
     .update(recipeIngredient)
-    .set({ quantity, unit })
+    .set({ quantity: quantityPerPortion })
     .where(eq(recipeIngredient.id, ingredientId))
     .returning();
-  
+
   return updated || null;
 }
 
 /**
  * Remove ingredient from recipe
  */
-export async function removeIngredientFromRecipe(ingredientId: number): Promise<void> {
-  await db.delete(recipeIngredient).where(eq(recipeIngredient.id, ingredientId));
+export async function removeIngredientFromRecipe(ingredientId: number): Promise<RecipeIngredientV2 | null> {
+  const [removed] = await db
+    .delete(recipeIngredient)
+    .where(eq(recipeIngredient.id, ingredientId))
+    .returning();
+  return removed || null;
 }
 
 /**
@@ -311,6 +371,7 @@ export async function updateRecipeWithIngredients(
     active?: boolean;
     ingredients?: Array<{
       ingredientId?: number;
+      quantityPerPortion?: string;
       portionQty?: string;
       purchasingItemId?: number;
       quantity?: string;
@@ -344,13 +405,41 @@ export async function updateRecipeWithIngredients(
     // Insert new ingredients
     if (data.ingredients.length > 0) {
       const ingredientValues = [];
+      const ingredientIds = data.ingredients
+        .map((ing) => ing.ingredientId)
+        .filter((ingId): ingId is number => typeof ingId === 'number');
+
+      const baseUnits = ingredientIds.length
+        ? await db
+            .select({ id: ingredients.id, baseUnit: ingredients.baseUnit })
+            .from(ingredients)
+            .where(inArray(ingredients.id, ingredientIds))
+        : [];
+
+      const baseUnitById = new Map<number, string>();
+      for (const row of baseUnits) {
+        if (!row.baseUnit) {
+          throw new Error(`Ingredient ${row.id}: base unit is required`);
+        }
+        baseUnitById.set(row.id, row.baseUnit);
+      }
       
       for (const ing of data.ingredients) {
         if (ing.ingredientId) {
+          const qtyValue = ing.quantityPerPortion ?? ing.portionQty ?? ing.quantity;
+          const parsedQty = parsePositiveNumber(qtyValue);
+          if (!parsedQty) {
+            throw new Error(`Ingredient ${ing.ingredientId}: quantity per portion is required`);
+          }
+          const baseUnit = baseUnitById.get(ing.ingredientId);
+          if (!baseUnit) {
+            throw new Error(`Ingredient ${ing.ingredientId} not found`);
+          }
           ingredientValues.push({
             recipeId: id,
             ingredientId: ing.ingredientId,
-            portionQty: ing.portionQty || ing.quantity,
+            portionQty: String(qtyValue),
+            unit: baseUnit,
           });
         } else if (ing.purchasingItemId) {
           const [item] = await db
@@ -362,10 +451,15 @@ export async function updateRecipeWithIngredients(
             throw new Error(`Purchasing item ${ing.purchasingItemId} not found`);
           }
           
+          const qtyValue = ing.quantityPerPortion ?? ing.quantity;
+          const parsedQty = parsePositiveNumber(qtyValue);
+          if (!parsedQty) {
+            throw new Error(`Ingredient ${ing.purchasingItemId}: quantity must be greater than 0`);
+          }
           ingredientValues.push({
             recipeId: id,
             purchasingItemId: ing.purchasingItemId,
-            quantity: ing.quantity,
+            quantity: String(qtyValue),
             unit: ing.unit,
           });
         }

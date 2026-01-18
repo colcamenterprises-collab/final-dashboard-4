@@ -1,21 +1,60 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type { Category, MenuItem, CartItem, OrderPayload } from "./types";
+import type { CartItem, OnlineCategory, OnlineProduct, OrderPayload } from "./types";
 
-type MenuResponse = { categories: Category[]; items: MenuItem[] };
+type OnlineProductsResponse = { categories: OnlineCategory[] };
 const SBB_YELLOW = "#FFEB00";
 const THB = (n: number) => `THB ${n.toFixed(2)}`;
-const loadLS = <T,>(k: string, f: T) => { try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : f; } catch { return f; } };
+const loadLS = <T,>(k: string, f: T) => {
+  try {
+    const v = localStorage.getItem(k);
+    return v ? (JSON.parse(v) as T) : f;
+  } catch {
+    return f;
+  }
+};
 const saveLS = (k: string, v: unknown) => localStorage.setItem(k, JSON.stringify(v));
 
 export default function App() {
-  const [menu, setMenu] = useState<MenuResponse>({ categories: [], items: [] });
+  const [categories, setCategories] = useState<OnlineCategory[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>("");
   const [cart, setCart] = useState<CartItem[]>(() => loadLS<CartItem[]>("sbb.cart", []));
-  const [modalItem, setModalItem] = useState<MenuItem | null>(null);
-  const [customer, setCustomer] = useState({ name: "", phone: "", notes: "" });
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [successMessage, setSuccessMessage] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
-  const [activeCat, setActiveCat] = useState<string>("");
+  const [cardQty, setCardQty] = useState<Record<number, number>>({});
 
   const fontInjected = useRef(false);
+
+  const productMap = useMemo(() => {
+    const map = new Map<number, OnlineProduct>();
+    for (const category of categories) {
+      for (const product of category.items) {
+        map.set(product.id, product);
+      }
+    }
+    return map;
+  }, [categories]);
+
+  const unavailableCartItems = useMemo(() => {
+    return cart.filter((item) => {
+      const product = productMap.get(item.product.id);
+      return !product || product.price !== item.product.price;
+    });
+  }, [cart, productMap]);
+
+  const subtotal = useMemo(() => {
+    return cart.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
+  }, [cart]);
+
+  const total = subtotal;
+
+  const activeProducts = useMemo(() => {
+    return categories.find((c) => c.name === activeCategory)?.items ?? [];
+  }, [categories, activeCategory]);
+
+  useEffect(() => saveLS("sbb.cart", cart), [cart]);
+
   useEffect(() => {
     if (fontInjected.current) return;
     const link = document.createElement("link");
@@ -23,72 +62,171 @@ export default function App() {
     link.href = "https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap";
     document.head.appendChild(link);
     fontInjected.current = true;
-
-    (async () => {
-      const r = await fetch("/api/ordering/menu").catch(() => fetch("/api/menu"));
-      const data: MenuResponse = await r!.json();
-      setMenu({ categories: data.categories, items: data.items });
-      if (!activeCat && data.categories.length) setActiveCat(data.categories[0].id);
-    })();
   }, []);
 
-  useEffect(() => saveLS("sbb.cart", cart), [cart]);
-
-  const filteredMenu = useMemo(() => {
-    return menu.items.filter((m) => m.categoryId === activeCat);
-  }, [activeCat, menu.items]);
-
-  const subtotal = useMemo(() => cart.reduce((s, c) => s + c.item.price * c.qty, 0), [cart]);
-  const total = subtotal;
-
-  const addToCart = (item: MenuItem, qty: number, note?: string) => {
-    setCart(prev => {
-      const idx = prev.findIndex(ci => ci.item.id === item.id && (ci.note || "") === (note || ""));
-      if (idx >= 0) {
-        const next = [...prev]; next[idx] = { ...next[idx], qty: next[idx].qty + qty }; return next;
+  const fetchProducts = async () => {
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      const response = await fetch("/api/online/products");
+      const data: OnlineProductsResponse = await response.json();
+      if (!response.ok) {
+        throw new Error("Online menu request failed.");
       }
-      return [...prev, { item, qty, note }];
-    });
-    setModalItem(null);
+      const nextCategories = data.categories || [];
+      setCategories(nextCategories);
+      if ((!activeCategory || !nextCategories.some((c) => c.name === activeCategory)) && nextCategories.length > 0) {
+        setActiveCategory(nextCategories[0].name);
+      }
+    } catch (error) {
+      setErrorMessage("Unable to load online menu. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removeFromCart = (id: string, note?: string) => {
-    setCart(prev => prev.filter(ci => !(ci.item.id === id && (ci.note || "") === (note || ""))));
-  };
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
-  const updateQty = (id: string, note: string | undefined, delta: number) => {
-    setCart(prev => prev.map(ci => {
-      if (ci.item.id === id && (ci.note || "") === (note || "")) {
-        return { ...ci, qty: Math.max(1, ci.qty + delta) };
-      }
-      return ci;
+  const setQuantityForProduct = (productId: number, value: number) => {
+    setCardQty((prev) => ({
+      ...prev,
+      [productId]: Math.max(1, value),
     }));
   };
 
-  const postOrder = async () => {
-    if (!cart.length) return;
-    const payload: OrderPayload = {
-      customer: { ...customer },
-      scheduledAt: null,
-      items: cart.map(ci => ({ id: ci.item.id, name: ci.item.name, unitPrice: ci.item.price, qty: ci.qty, note: ci.note, categoryId: ci.item.categoryId })),
-      subtotal, serviceFee: 0, total, currency: "THB"
-    };
-    try {
-      setSubmitting(true);
-      const r = await fetch("/api/ordering/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) })
-        .catch(() => fetch("/api/orders", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }));
-      const data = await r!.json();
-      if (!r!.ok) throw new Error(data?.error || "Failed");
-      setCart([]); alert(`Order received!\nOrder ID: ${data.id}`);
-      setModalItem(null);
-    } catch (e: any) {
-      alert(`Could not place the order: ${e.message}`);
-    } finally { setSubmitting(false); }
+  const addToCart = (product: OnlineProduct) => {
+    const qty = cardQty[product.id] ?? 1;
+    setCart((prev) => {
+      const existing = prev.find((item) => item.product.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.product.id === product.id
+            ? { ...item, quantity: item.quantity + qty }
+            : item
+        );
+      }
+      return [...prev, { product, quantity: qty }];
+    });
   };
+
+  const updateCartQty = (productId: number, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) =>
+          item.product.id === productId
+            ? { ...item, quantity: Math.max(1, item.quantity + delta) }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    );
+  };
+
+  const removeFromCart = (productId: number) => {
+    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+  };
+
+  const submitOrder = async () => {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (cart.length === 0) {
+      setErrorMessage("Add items to your cart before checkout.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const refreshResponse = await fetch("/api/online/products");
+      const refreshData: OnlineProductsResponse = await refreshResponse.json();
+      if (!refreshResponse.ok) {
+        throw new Error("Unable to refresh product feed.");
+      }
+
+      const refreshedMap = new Map<number, OnlineProduct>();
+      for (const category of refreshData.categories || []) {
+        for (const product of category.items) {
+          refreshedMap.set(product.id, product);
+        }
+      }
+
+      const missingItems = cart.filter((item) => {
+        const product = refreshedMap.get(item.product.id);
+        return !product || product.price !== item.product.price;
+      });
+
+      if (missingItems.length > 0) {
+        setErrorMessage("One or more items are no longer available. Please refresh your cart.");
+        setSubmitting(false);
+        return;
+      }
+
+      const payload: OrderPayload = {
+        channel: "ONLINE",
+        timestamp: new Date().toISOString(),
+        items: cart.map((item) => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          priceAtTimeOfSale: item.product.price,
+        })),
+      };
+
+      const response = await fetch("/api/online/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Order submission failed.");
+      }
+
+      setCart([]);
+      setSuccessMessage(`Order confirmed. Reference: ${data.orderId}`);
+    } catch (error: any) {
+      setErrorMessage(error?.message || "Failed to place order.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-black text-white font-[Poppins]">
+        <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
+          <h1 className="text-2xl font-semibold">Loading online menu...</h1>
+        </div>
+      </div>
+    );
+  }
+
+  if (errorMessage && categories.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white font-[Poppins]">
+        <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
+          <h1 className="text-2xl font-semibold">Online ordering unavailable</h1>
+          <p className="mt-2 text-sm text-white/70">{errorMessage}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!errorMessage && categories.length === 0) {
+    return (
+      <div className="min-h-screen bg-black text-white font-[Poppins]">
+        <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
+          <h1 className="text-2xl font-semibold">Online ordering unavailable</h1>
+          <p className="mt-2 text-sm text-white/70">No products are available right now.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-black text-white font-[Poppins]">
-      {/* HEADER */}
       <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
         <div className="flex flex-col items-start">
           <div className="flex items-center gap-3">
@@ -100,13 +238,21 @@ export default function App() {
           <p className="mt-2 text-sm text-white/70">Traditional American Smash Burgers — Opens at 6:00 pm</p>
         </div>
 
-        {/* Tabs */}
         <div className="mt-5">
           <div className="flex flex-wrap items-center gap-4">
-            {menu.categories.map((c) => (
-              <button key={c.id} onClick={() => setActiveCat(c.id)} className="relative pb-2 text-sm font-semibold">
-                <span className="opacity-90">{c.name.toUpperCase()}</span>
-                {activeCat === c.id && <span className="absolute left-0 right-0 -bottom-[9px] h-[3px] rounded" style={{ background: SBB_YELLOW }} />}
+            {categories.map((category) => (
+              <button
+                key={category.name}
+                onClick={() => setActiveCategory(category.name)}
+                className="relative pb-2 text-sm font-semibold"
+              >
+                <span className="opacity-90">{category.name.toUpperCase()}</span>
+                {activeCategory === category.name && (
+                  <span
+                    className="absolute left-0 right-0 -bottom-[9px] h-[3px] rounded"
+                    style={{ background: SBB_YELLOW }}
+                  />
+                )}
               </button>
             ))}
           </div>
@@ -114,188 +260,139 @@ export default function App() {
         </div>
       </div>
 
-      {/* SECTION + LIST */}
       <div className="mx-auto w-full max-w-[700px] px-4">
         <div className="mt-3 flex items-center gap-3">
           <div className="h-1.5 w-6 rounded-full" style={{ background: SBB_YELLOW }} />
-          <h2 className="text-lg md:text-xl font-extrabold">{menu.categories.find(c=>c.id===activeCat)?.name.toUpperCase()}</h2>
+          <h2 className="text-lg md:text-xl font-extrabold">{activeCategory ? activeCategory.toUpperCase() : ""}</h2>
         </div>
 
+        {errorMessage && (
+          <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">
+            {errorMessage}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="mt-4 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm">
+            {successMessage}
+          </div>
+        )}
+
         <div className="mt-4 space-y-4">
-          {filteredMenu.map((m) => (
-            <div key={m.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
-              <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
-                  {m.image ? <img src={m.image} alt="" className="h-full w-full object-cover" /> : null}
+          {activeProducts.map((product) => {
+            const qty = cardQty[product.id] ?? 1;
+            const isAvailable = product.price > 0;
+            return (
+              <div key={product.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+                    {product.image ? (
+                      <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                    ) : null}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold leading-tight">{product.name}</div>
+                    {product.description && (
+                      <div className="text-sm text-white/70 line-clamp-2">{product.description}</div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold leading-tight">{m.name}</div>
-                  {m.desc && <div className="text-sm text-white/70 line-clamp-2">{m.desc}</div>}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                  <div className="font-semibold">{THB(product.price)}</div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="border border-white/20 rounded-lg px-3 py-1"
+                        onClick={() => setQuantityForProduct(product.id, qty - 1)}
+                        disabled={!isAvailable}
+                      >
+                        -
+                      </button>
+                      <div className="min-w-[24px] text-center">{qty}</div>
+                      <button
+                        className="border border-white/20 rounded-lg px-3 py-1"
+                        onClick={() => setQuantityForProduct(product.id, qty + 1)}
+                        disabled={!isAvailable}
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => addToCart(product)}
+                      className="rounded-xl px-3 py-2 text-sm font-semibold text-black"
+                      style={{ background: SBB_YELLOW, opacity: isAvailable ? 1 : 0.5 }}
+                      disabled={!isAvailable}
+                    >
+                      Add to cart
+                    </button>
+                  </div>
                 </div>
-                <button onClick={() => setModalItem(m)} className="rounded-xl px-3 py-2 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
-                  {THB(m.price)} +
-                </button>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="h-28" />
       </div>
 
-      {/* CART BAR */}
       <div className="fixed inset-x-0 bottom-0 z-50">
         <div className="mx-auto w-full max-w-[900px] px-3 pb-4">
-          <div className="rounded-2xl border border-white/10 bg-black/90 backdrop-blur p-2 md:p-3 flex items-center gap-2 md:gap-4">
-            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">{cart.length} item{cart.length!==1?"s":""}</div>
-            <div className="text-xs md:text-sm px-3 py-2 rounded-xl bg-white/10">Subtotal: {THB(subtotal)}</div>
-            <button className="flex-1 rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={() => setModalItem({ id: "__checkout__", categoryId: "", name: "Checkout", desc: "", price: 0 })} disabled={cart.length===0}>Review & Checkout</button>
-          </div>
-        </div>
-      </div>
-
-      {/* ITEM MODAL */}
-      {modalItem && modalItem.id !== "__checkout__" && (
-        <ModalAddItem item={modalItem} onClose={() => setModalItem(null)} onAdd={(qty, note) => addToCart(modalItem, qty, note)} />
-      )}
-
-      {/* CHECKOUT MODAL */}
-      {modalItem && modalItem.id === "__checkout__" && (
-        <ModalCheckout
-          cart={cart}
-          subtotal={subtotal}
-          total={total}
-          customer={customer}
-          onCustomerChange={setCustomer}
-          onRemove={removeFromCart}
-          onUpdateQty={updateQty}
-          submitting={submitting}
-          onClose={() => setModalItem(null)}
-          onSubmit={postOrder}
-        />
-      )}
-    </div>
-  );
-}
-
-function ModalAddItem({ item, onClose, onAdd }: { item: MenuItem; onClose: () => void; onAdd: (qty: number, note?: string) => void; }) {
-  const [qty, setQty] = useState(1);
-  const [note, setNote] = useState("");
-  
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
-      <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">
-        <div className="p-4 border-b border-white/10 flex items-center justify-between">
-          <div className="font-semibold">{item.name}</div>
-          <button className="text-sm underline" onClick={onClose}>Close</button>
-        </div>
-        <div className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setQty(q => Math.max(1, q - 1))}>-</button>
-              <div>{qty}</div>
-              <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setQty(q => q + 1)}>+</button>
-            </div>
-            <div className="font-semibold">{THB(item.price * qty)}</div>
-          </div>
-
-          <div>
-            <div className="text-sm font-semibold mb-2">Add a note (optional)</div>
-            <textarea
-              className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-sm resize-none"
-              placeholder="No onions, extra sauce…"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              rows={3}
-            />
-          </div>
-
-          <button onClick={() => onAdd(qty, note || undefined)} className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
-            Add to order
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ModalCheckout(props: {
-  cart: CartItem[];
-  subtotal: number;
-  total: number;
-  customer: { name: string; phone: string; notes: string };
-  onCustomerChange: (c: { name: string; phone: string; notes: string }) => void;
-  onRemove: (id: string, note?: string) => void;
-  onUpdateQty: (id: string, note: string | undefined, delta: number) => void;
-  submitting: boolean;
-  onClose: () => void;
-  onSubmit: () => void;
-}) {
-  const { cart, subtotal, total, customer, onCustomerChange, onRemove, onUpdateQty, submitting, onClose, onSubmit } = props;
-  const [checkoutType, setCheckoutType] = useState<"Pickup" | "Delivery">("Pickup");
-  const [payment, setPayment] = useState<"Cash" | "QR Code" | "Card">("Cash");
-  const [address, setAddress] = useState("");
-  const vat = subtotal - subtotal / 1.07;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/60 flex items-end sm:items-center justify-center">
-      <div className="w-full sm:max-w-[560px] bg-[#0B0B0B] text-white rounded-t-2xl sm:rounded-2xl overflow-hidden">
-        <div className="p-4 border-b border-white/10 flex items-center justify-between">
-          <div className="font-semibold">Your Order</div>
-          <button className="text-sm underline" onClick={onClose}>Close</button>
-        </div>
-        <div className="max-h-[70vh] overflow-auto">
-          <div className="p-4 space-y-3">
-            {cart.map(ci => (
-              <div key={ci.item.id + (ci.note || "")} className="border border-white/10 rounded-xl p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-semibold leading-tight">{ci.item.name}</div>
-                    {ci.note && <div className="text-xs text-white/70 mt-1">{ci.note}</div>}
-                  </div>
-                  <div className="text-right min-w-[120px]">
-                    <div className="font-semibold">{THB(ci.item.price * ci.qty)}</div>
-                    <div className="mt-2 inline-flex items-center gap-2">
-                      <button className="border border-white/20 rounded-lg px-2" onClick={() => onUpdateQty(ci.item.id, ci.note, -1)}>-</button>
-                      <span className="text-sm w-6 text-center">{ci.qty}</span>
-                      <button className="border border-white/20 rounded-lg px-2" onClick={() => onUpdateQty(ci.item.id, ci.note, +1)}>+</button>
-                    </div>
-                    <div>
-                      <button className="mt-2 text-xs underline text-white/70" onClick={() => onRemove(ci.item.id, ci.note)}>Remove</button>
-                    </div>
-                  </div>
+          <div className="rounded-2xl border border-white/10 bg-black/90 backdrop-blur p-3 flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs md:text-sm">
+              <div className="px-3 py-2 rounded-xl bg-white/10">{cart.length} item{cart.length !== 1 ? "s" : ""}</div>
+              <div className="px-3 py-2 rounded-xl bg-white/10">Subtotal: {THB(subtotal)}</div>
+              {unavailableCartItems.length > 0 && (
+                <div className="px-3 py-2 rounded-xl bg-red-500/20 text-red-200">
+                  Some items are no longer available
                 </div>
-              </div>
-            ))}
-
-            <div className="border-t border-white/10 pt-3 text-sm space-y-1">
-              <div className="flex justify-between"><span>Subtotal</span><span>{THB(subtotal)}</span></div>
-              <div className="flex justify-between"><span>VAT (inc)</span><span>{THB(vat)}</span></div>
-              <div className="flex justify-between font-semibold text-base"><span>Total</span><span>{THB(total)}</span></div>
-            </div>
-
-            <div className="border-t border-white/10 pt-3 grid grid-cols-1 gap-2 text-sm">
-              <input className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" placeholder="Name" value={customer.name} onChange={(e) => onCustomerChange({ ...customer, name: e.target.value })} />
-              <input className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" placeholder="Phone" value={customer.phone} onChange={(e) => onCustomerChange({ ...customer, phone: e.target.value })} />
-              <div className="grid grid-cols-2 gap-2">
-                <select className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" value={checkoutType} onChange={(e) => setCheckoutType(e.target.value as any)}>
-                  <option>Pickup</option>
-                  <option>Delivery</option>
-                </select>
-                <select className="bg-black/50 border border-white/10 rounded-lg px-3 py-2" value={payment} onChange={(e) => setPayment(e.target.value as any)}>
-                  <option>Cash</option>
-                  <option>QR Code</option>
-                  <option>Card</option>
-                </select>
-              </div>
-              {checkoutType === "Delivery" && (
-                <textarea className="bg-black/50 border border-white/10 rounded-lg px-3 py-2 min-h-[80px]" placeholder="Delivery address / notes" value={address} onChange={(e) => setAddress(e.target.value)} />
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-2">
-              <button className="rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={onSubmit} disabled={cart.length === 0 || submitting}>
-                {submitting ? "Sending..." : "Send to POS"}
+            <div className="space-y-3">
+              {cart.map((item) => (
+                <div key={item.product.id} className="rounded-xl border border-white/10 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="font-semibold">{item.product.name}</div>
+                      <div className="text-xs text-white/70">{THB(item.product.price)} each</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="border border-white/20 rounded-lg px-2"
+                        onClick={() => updateCartQty(item.product.id, -1)}
+                      >
+                        -
+                      </button>
+                      <span className="text-sm w-6 text-center">{item.quantity}</span>
+                      <button
+                        className="border border-white/20 rounded-lg px-2"
+                        onClick={() => updateCartQty(item.product.id, +1)}
+                      >
+                        +
+                      </button>
+                      <button
+                        className="text-xs underline text-white/70"
+                        onClick={() => removeFromCart(item.product.id)}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span>Total</span>
+                <span>{THB(total)}</span>
+              </div>
+
+              <button
+                className="rounded-xl px-4 py-3 text-sm font-semibold text-black"
+                style={{ background: SBB_YELLOW, opacity: cart.length === 0 || unavailableCartItems.length > 0 ? 0.5 : 1 }}
+                onClick={submitOrder}
+                disabled={cart.length === 0 || unavailableCartItems.length > 0 || submitting}
+              >
+                {submitting ? "Submitting..." : "Place order"}
               </button>
             </div>
           </div>
