@@ -29,14 +29,18 @@ export default function POS() {
     const i = await axios.get("/api/menu-v3/items");
     const m = await axios.get("/api/menu-v3/modifiers/groups");
 
-    setCategories(c.data || []);
-    setItems(i.data || []);
-    setModifierGroups(m.data || []);
+    const catData = Array.isArray(c.data) ? c.data : [];
+    const itemData = Array.isArray(i.data) ? i.data : [];
+    const modData = Array.isArray(m.data) ? m.data : [];
+    
+    setCategories(catData);
+    setItems(itemData);
+    setModifierGroups(modData);
 
-    if (c.data.length > 0) setActiveCategory(c.data[0].id);
+    if (catData.length > 0) setActiveCategory(catData[0].id);
   };
 
-  const itemsForCategory = items.filter((i) => i.categoryId === activeCategory);
+  const itemsForCategory = Array.isArray(items) ? items.filter((i) => i.categoryId === activeCategory) : [];
 
   const addToCart = () => {
     if (!selectedItem) return;

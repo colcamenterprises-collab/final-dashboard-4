@@ -45,6 +45,7 @@ export const ROUTES = {
   EXPENSES_V2: "/finance/expenses-v2",
 
   // Menu Mgmt
+  RECIPE_MANAGEMENT: "/recipe-management",
   RECIPES: "/menu/recipes",
   // RECIPES_MASTER: merged into RECIPES
   RECIPE_CARDS: "/menu/recipe-cards",

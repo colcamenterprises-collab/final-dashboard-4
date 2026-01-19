@@ -54,12 +54,11 @@ export default function MenuManagement() {
       sortOrder?: number;
       visibility?: { inStore?: boolean; grab?: boolean; online?: boolean };
     }) => {
-      const res = await apiRequest("PATCH", `/api/product-menu/${productId}`, {
-        category,
-        sortOrder,
-        visibility,
+      const res = await apiRequest(`/api/product-menu/${productId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ category, sortOrder, visibility }),
       });
-      return res.json();
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/product-menu"] });

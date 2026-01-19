@@ -1,0 +1,103 @@
+🚨 REPLIT AGENT — PRODUCTION FIX INSTRUCTIONS (AUTHORITATIVE)
+CONTEXT (DO NOT DEVIATE)
+App must be live today
+Product-first system is correct and must remain
+Online ordering must not break
+Recipe Management must not 404
+Menu Management must be meaningful or removed
+POS React error must be eliminated
+No schema changes unless unavoidable
+Fixes must be surgical and minimal
+🔴 ISSUES TO FIX (ALL REQUIRED)
+1️⃣ Recipe Management → 404
+Problem
+/recipe-management route resolves to 404
+Sidebar links exist but route/component is missing or miswired
+Required Fix
+Ensure a valid route exists for /recipe-management
+Either:
+Restore the existing RecipeManagement.tsx page OR
+Redirect /recipe-management → /menu/manager with a notice
+Acceptance
+Clicking Recipe Management never shows 404
+Page renders inside the main app shell (no duplicate headers)
+2️⃣ Menu Management → Blank / Confusing
+Problem
+Page renders but has no functional purpose
+UI does not reflect product-first reality
+Required Fix
+Menu Management should:
+List menus
+Show active products per menu
+Indicate online visibility
+OR (acceptable fallback):
+Make Menu Management a thin wrapper explaining:
+“Menus are derived from active Products. Manage products to control menus.”
+Then show a table of active products + channels
+Acceptance
+Page is not blank
+Page explains or controls something real
+No nested layouts or duplicate navigation
+3️⃣ Online Ordering → No visible change
+Problem
+/order still behaves like legacy system
+Only one product visible despite others being active
+Required Fix
+Audit onlineProductFeed response shape
+Ensure:
+Only active products
+With ONLINE channel pricing
+And visibility enabled are returned
+Ensure frontend uses new feed, not legacy recipe/menu logic
+Acceptance
+/order reflects actual active products
+Categories update correctly
+No regression to recipe logic
+4️⃣ POS → React Error
+Copy code
+
+TypeError: n.filter is not a function
+Root Cause (Likely)
+Frontend assumes array
+API returns object or null
+Missing defensive guards
+Required Fix
+Identify component throwing error
+Wrap all .filter() / .map() calls with:
+Copy code
+Ts
+Array.isArray(x) ? x.filter(...) : []
+Fix the data contract OR harden the UI
+Acceptance
+POS page loads
+No red React error screen
+Empty states allowed, crashes not allowed
+🟢 GLOBAL REQUIREMENTS
+No duplicate headers
+No blank pages
+No 404s from sidebar or bottom nav
+No console errors on load
+Product-first logic preserved
+Online ordering untouched except feed correctness
+🧪 FINAL VERIFICATION (MANDATORY)
+Replit Agent must confirm all of the following:
+/order → products render correctly
+/recipe-management → no 404
+/menu/manager → meaningful content
+POS page → no React errors
+Sidebar + bottom nav → no dead links
+⛔ WHAT NOT TO DO
+Do NOT remove routes silently
+Do NOT introduce new systems
+Do NOT refactor broadly
+Do NOT touch database unless unavoidable
+✅ OUTPUT REQUIRED FROM AGENT
+When finished, respond with:
+Copy code
+
+✅ PRODUCTION READY
+- Recipe Management: FIXED
+- Menu Management: FIXED
+- Online Ordering: VERIFIED
+- POS Error: RESOLVED
+No regressions detected.
