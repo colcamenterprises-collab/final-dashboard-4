@@ -1,0 +1,69 @@
+🔴 REPLIT AGENT — EXECUTION INSTRUCTION (PRODUCTION-CRITICAL)
+Objective
+Restore Menu and Ordering to a correct, live, production-ready state without creating a new Replit, fixing routing, visibility, and UI duplication issues introduced during recent merges.
+1️⃣ ROUTING & UI FIXES (MANDATORY)
+Ensure Menu Manager renders once only (no nested layout, no duplicated headers/nav bars).
+Confirm /menu/manager is the single canonical menu management route.
+Remove or bypass any legacy wrapper/layout that causes:
+Double headers
+Double bottom navigation
+Blank page with duplicated nav bars
+Acceptance criteria
+/menu/manager loads content
+Single header
+Single bottom nav
+No 404
+2️⃣ NAVIGATION ALIGNMENT
+Update all navigation entry points to target /menu/manager:
+Sidebar
+ModernSidebar
+BottomNav
+Any legacy recipe/menu links
+There must be no remaining links to:
+/recipe-management
+deprecated menu or recipe admin routes
+3️⃣ ORDER PAGE DATA ISSUE (CRITICAL)
+The /order page is not reflecting current active products.
+Fix the product feed so that:
+All products marked active = true
+With valid pricing
+With valid channel visibility
+are returned to /order.
+⚠️ This is NOT a UI issue — this is a data eligibility / filtering bug.
+Do NOT:
+Reintroduce recipe coupling
+Add fallback pricing
+Guess defaults
+Products must appear only if valid, but all valid products must appear.
+4️⃣ NO GIT / NO PR / NO REPO RESETS
+Do NOT reset the repo
+Do NOT create new branches
+Do NOT revert merged PRs
+Do NOT create a new Replit
+This is a surgical fix on current main state.
+5️⃣ DATABASE & ENVIRONMENT
+Assume DATABASE_URL exists in Replit secrets
+Do NOT modify schema
+Do NOT reseed data
+Do NOT run destructive scripts
+6️⃣ FINAL VERIFICATION (REQUIRED)
+Confirm these URLs work:
+/menu/manager
+Content visible
+No duplicate UI
+/order
+Shows all active products, not a subset
+Bottom nav → Menu
+Lands on /menu/manager
+7️⃣ STOP CONDITION
+Once complete:
+Do NOT continue refactoring
+Do NOT optimize
+Do NOT “clean up” unrelated files
+Report only:
+What was changed
+Which files were touched
+Confirmation that all three URLs work
+Priority: 🔥 LIVE TOMORROW
+Mode: FIX & STABILIZE
+No interpretation. No redesign. No expansion.
