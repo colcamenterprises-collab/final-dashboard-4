@@ -12,10 +12,12 @@ type Ingredient = {
 type ProductIngredient = {
   id: number;
   ingredient_id: number;
-  quantity_used: number;
+  ingredient_name?: string | null;
+  ingredient_unit?: string | null;
+  quantity_used: number | null;
   prep_note?: string | null;
-  unit_cost_derived: number;
-  line_cost_derived: number;
+  unit_cost_derived: number | null;
+  line_cost_derived: number | null;
 };
 
 type Product = {
@@ -60,6 +62,7 @@ export default function ProductPage() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [lines, setLines] = useState<ProductIngredient[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [activationReasons, setActivationReasons] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -82,14 +85,49 @@ export default function ProductPage() {
   }, [id, isNew]);
 
   const totalCost = useMemo(
-    () => lines.reduce((s, l) => s + Number(l.line_cost_derived || 0), 0),
+    () => {
+      if (!lines.length) return null;
+      let total = 0;
+      for (const line of lines) {
+        const lineCost = Number(line.line_cost_derived);
+        if (!Number.isFinite(lineCost)) {
+          return null;
+        }
+        total += lineCost;
+      }
+      return Number(total.toFixed(2));
+    },
     [lines]
   );
 
   const margin = useMemo(() => {
-    if (!product.sale_price || product.sale_price <= 0) return 0;
+    if (!product.sale_price || product.sale_price <= 0 || totalCost === null) return null;
     return (product.sale_price - totalCost) / product.sale_price;
   }, [product.sale_price, totalCost]);
+
+  const missingCostLines = useMemo(() => {
+    if (!lines.length) return lines;
+    return lines.filter((line) => {
+      const qty = Number(line.quantity_used);
+      const unitCost = Number(line.unit_cost_derived);
+      const lineCost = Number(line.line_cost_derived);
+      return (
+        !Number.isFinite(qty) ||
+        qty <= 0 ||
+        !Number.isFinite(unitCost) ||
+        unitCost < 0 ||
+        !Number.isFinite(lineCost) ||
+        lineCost < 0
+      );
+    });
+  }, [lines]);
+
+  const missingPrice = !product.sale_price || product.sale_price <= 0;
+  const invalidMargin =
+    totalCost !== null && product.sale_price !== null && product.sale_price <= totalCost;
+
+  const activationReady =
+    !missingPrice && !invalidMargin && missingCostLines.length === 0 && totalCost !== null;
 
   async function saveProduct() {
     setSaving(true);
@@ -134,9 +172,16 @@ export default function ProductPage() {
   }
 
   async function activate() {
+    setActivationReasons([]);
     const res = await fetch(`/api/products/${product.id}/activate`, { method: "POST" });
     const data = await res.json();
-    if (!res.ok) return setError(data.error);
+    if (!res.ok || data.ok === false) {
+      if (data?.reasons?.length) {
+        setActivationReasons(data.reasons);
+        return;
+      }
+      return setError(data.error || "Activation failed");
+    }
     setProduct((p) => ({ ...p, active: true }));
   }
 
@@ -184,17 +229,25 @@ export default function ProductPage() {
         <table>
           <thead>
             <tr>
-              <th>Ingredient</th><th>Qty</th><th>Unit Cost</th><th>Line Cost</th><th>Prep</th>
+              <th>Ingredient</th><th>Quantity</th><th>Unit</th><th>Line Cost</th><th>Prep</th>
             </tr>
           </thead>
           <tbody>
             {lines.map((l) => (
               <tr key={l.id}>
-                <td>{ingredients.find((i) => i.id === l.ingredient_id)?.name}</td>
-                <td>{l.quantity_used}</td>
-                <td>{Number(l.unit_cost_derived || 0).toFixed(2)}</td>
-                <td>{Number(l.line_cost_derived || 0).toFixed(2)}</td>
-                <td>{l.prep_note}</td>
+                <td>
+                  {l.ingredient_name ||
+                    ingredients.find((i) => i.id === l.ingredient_id)?.name ||
+                    "UNMAPPED"}
+                </td>
+                <td>{l.quantity_used ?? "—"}</td>
+                <td>{l.ingredient_unit ?? "—"}</td>
+                <td>
+                  {Number.isFinite(Number(l.line_cost_derived))
+                    ? Number(l.line_cost_derived).toFixed(2)
+                    : "—"}
+                </td>
+                <td>{l.prep_note || "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -209,16 +262,76 @@ export default function ProductPage() {
           value={product.sale_price ?? ""}
           onChange={(e) => setProduct({ ...product, sale_price: Number(e.target.value) })}
         />
-        <div>Total Cost: {totalCost.toFixed(2)}</div>
-        <div>Margin: {(margin * 100).toFixed(1)}%</div>
+        <div>Total Cost: {totalCost !== null ? totalCost.toFixed(2) : "—"}</div>
+        <div>
+          Margin: {margin !== null ? `${(margin * 100).toFixed(1)}%` : "—"}
+        </div>
       </section>
 
       <section>
         <button disabled={saving} onClick={saveProduct}>Save</button>
         {!product.active && !isNew && (
-          <button onClick={activate}>Activate</button>
+          <button onClick={activate} disabled={!activationReady}>Activate</button>
         )}
       </section>
+
+      {!isNew && (
+        <section>
+          <h3>Activation Readiness</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Check</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Missing costs</td>
+                <td>
+                  {lines.length === 0
+                    ? "No ingredient lines"
+                    : missingCostLines.length === 0
+                      ? "None"
+                      : `${missingCostLines.length} ingredient lines need cost or quantity`}
+                </td>
+              </tr>
+              <tr>
+                <td>Missing price</td>
+                <td>{missingPrice ? "Sale price is required" : "None"}</td>
+              </tr>
+              <tr>
+                <td>Invalid margin</td>
+                <td>
+                  {invalidMargin
+                    ? "Sale price must exceed total cost"
+                    : "None"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          {activationReasons.length > 0 && (
+            <div>
+              <h4>Activation Blockers</h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Reason</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {activationReasons.map((reason) => (
+                    <tr key={reason}>
+                      <td>{reason}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
     </div>
   );
 }

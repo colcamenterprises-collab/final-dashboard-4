@@ -43,13 +43,40 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-const visibilityKeyByChannel: Record<ProductChannel, keyof ProductMenuRow> = {
+type VisibilityKey = "visibleInStore" | "visibleGrab" | "visibleOnline";
+
+const visibilityKeyByChannel: Record<ProductChannel, VisibilityKey> = {
   IN_STORE: "visibleInStore",
   GRAB: "visibleGrab",
   ONLINE: "visibleOnline",
 };
 
+export type MenuEligibilityInput = {
+  active: boolean;
+  price: number | null;
+  visibleInStore?: boolean | null;
+  visibleGrab?: boolean | null;
+  visibleOnline?: boolean | null;
+};
+
+export function isMenuEligible(input: MenuEligibilityInput, channel: ProductChannel): boolean {
+  const visibleKey = visibilityKeyByChannel[channel];
+  const visible = Boolean(input[visibleKey]);
+  const price = Number(input.price);
+  if (!input.active) return false;
+  if (!visible) return false;
+  if (!Number.isFinite(price) || price <= 0) return false;
+  return true;
+}
+
+const priceColumnByChannel: Record<ProductChannel, string> = {
+  IN_STORE: "price_in_store",
+  GRAB: "price_grab",
+  ONLINE: "price_online",
+};
+
 export async function fetchProductMenuRows(channel: ProductChannel): Promise<ProductMenuRow[]> {
+  const priceColumn = priceColumnByChannel[channel];
   const result = await db.execute(sql`
     SELECT
       p.id,
@@ -57,15 +84,14 @@ export async function fetchProductMenuRows(channel: ProductChannel): Promise<Pro
       p.description,
       p.image_url as "imageUrl",
       p.active,
-      pm.category,
-      pm.sort_order as "sortOrder",
-      pm.visible_in_store as "visibleInStore",
-      pm.visible_grab as "visibleGrab",
-      pm.visible_online as "visibleOnline",
-      pp.price as "price"
+      p.category,
+      NULL as "sortOrder",
+      p.visible_in_store as "visibleInStore",
+      p.visible_grab as "visibleGrab",
+      p.visible_online as "visibleOnline",
+      ${sql.raw(`p.${priceColumn}`)} as "price"
     FROM product p
-    LEFT JOIN product_menu pm ON pm.product_id = p.id
-    LEFT JOIN product_price pp ON pp.product_id = p.id AND pp.channel = ${channel}
+    WHERE p.active = TRUE
     ORDER BY p.created_at DESC
   `);
 
@@ -76,11 +102,8 @@ export function buildPublicMenu(
   rows: ProductMenuRow[],
   channel: ProductChannel
 ): { categories: ProductMenuCategory[]; items: ProductMenuItem[] } {
-  const visibleKey = visibilityKeyByChannel[channel];
   const items = rows
-    .filter((row) => row.active)
-    .filter((row) => Boolean(row[visibleKey]))
-    .filter((row) => row.price !== null && Number(row.price) > 0)
+    .filter((row) => isMenuEligible(row, channel))
     .sort((a, b) => {
       const orderA = a.sortOrder ?? 0;
       const orderB = b.sortOrder ?? 0;
@@ -94,7 +117,7 @@ export function buildPublicMenu(
         categoryId: slugify(categoryName),
         name: row.name,
         desc: row.description || "",
-        price: Number(row.price || 0),
+        price: Number(row.price),
         image: row.imageUrl || null,
         _categoryName: categoryName,
       };
@@ -134,20 +157,25 @@ export async function getAdminMenuRows(): Promise<ProductMenuAdminItem[]> {
       p.description,
       p.image_url as "imageUrl",
       p.active,
-      pm.category,
-      pm.sort_order as "sortOrder",
-      pm.visible_in_store as "visibleInStore",
-      pm.visible_grab as "visibleGrab",
-      pm.visible_online as "visibleOnline",
-      pp.channel,
-      pp.price
+      p.category,
+      NULL as "sortOrder",
+      p.visible_in_store as "visibleInStore",
+      p.visible_grab as "visibleGrab",
+      p.visible_online as "visibleOnline",
+      p.price_in_store as "priceInStore",
+      p.price_grab as "priceGrab",
+      p.price_online as "priceOnline"
     FROM product p
-    LEFT JOIN product_menu pm ON pm.product_id = p.id
-    LEFT JOIN product_price pp ON pp.product_id = p.id
     ORDER BY p.created_at DESC
   `);
 
-  const rows = (result.rows || result) as Array<ProductMenuRow & { channel: string | null }>;
+  const rows = (result.rows || result) as Array<
+    ProductMenuRow & {
+      priceInStore: number | null;
+      priceGrab: number | null;
+      priceOnline: number | null;
+    }
+  >;
   const byId = new Map<number, ProductMenuAdminItem>();
 
   for (const row of rows) {
@@ -159,12 +187,11 @@ export async function getAdminMenuRows(): Promise<ProductMenuAdminItem[]> {
         prices: {},
       });
     }
-    if (row.channel && row.price !== null) {
-      const target = byId.get(row.id);
-      if (target) {
-        target.prices[row.channel] = Number(row.price);
-      }
-    }
+    const target = byId.get(row.id);
+    if (!target) continue;
+    if (row.priceInStore !== null) target.prices.IN_STORE = Number(row.priceInStore);
+    if (row.priceGrab !== null) target.prices.GRAB = Number(row.priceGrab);
+    if (row.priceOnline !== null) target.prices.ONLINE = Number(row.priceOnline);
   }
 
   return Array.from(byId.values());
