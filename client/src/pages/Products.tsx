@@ -19,8 +19,9 @@ type Product = {
   description: string | null;
   active: boolean;
   created_at: string;
-  cost: number;
+  total_cost: number | null;
   category?: string | null;
+  sale_price?: number | null;
 };
 
 export default function Products() {
@@ -96,7 +97,8 @@ export default function Products() {
                 <tr className="border-b border-slate-200">
                   <th className="text-left py-2 font-medium text-slate-600">Name</th>
                   <th className="text-left py-2 font-medium text-slate-600">Category</th>
-                  <th className="text-right py-2 font-medium text-slate-600">Cost</th>
+                  <th className="text-right py-2 font-medium text-slate-600">Sale Price</th>
+                  <th className="text-right py-2 font-medium text-slate-600">Total Cost</th>
                   <th className="text-left py-2 font-medium text-slate-600">Status</th>
                   <th className="text-right py-2 font-medium text-slate-600">Actions</th>
                 </tr>
@@ -106,7 +108,12 @@ export default function Products() {
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-2 text-slate-900">{p.name}</td>
                     <td className="py-2 text-slate-500">{p.category || "UNMAPPED"}</td>
-                    <td className="py-2 text-right text-emerald-600 font-medium">฿{Number(p.cost || 0).toFixed(2)}</td>
+                    <td className="py-2 text-right text-slate-700">
+                      {p.sale_price === null || p.sale_price === undefined ? "—" : `฿${Number(p.sale_price).toFixed(2)}`}
+                    </td>
+                    <td className="py-2 text-right text-emerald-600 font-medium">
+                      {p.total_cost === null ? "—" : `฿${Number(p.total_cost).toFixed(2)}`}
+                    </td>
                     <td className="py-2">
                       <Badge className={`text-[10px] rounded-[4px] ${p.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
                         {p.active ? "Active" : "Inactive"}
@@ -126,7 +133,7 @@ export default function Products() {
                 ))}
                 {products.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">No products yet</td>
+                    <td colSpan={6} className="py-8 text-center text-slate-400">No products yet</td>
                   </tr>
                 )}
               </tbody>
@@ -143,7 +150,12 @@ export default function Products() {
                       {p.active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
-                  <span className="text-xs font-mono text-emerald-600">฿{Number(p.cost || 0).toFixed(2)}</span>
+                  <span className="text-xs font-mono text-emerald-600">
+                    {p.total_cost === null ? "—" : `฿${Number(p.total_cost).toFixed(2)}`}
+                  </span>
+                </div>
+                <div className="text-[10px] text-slate-500">
+                  Sale: {p.sale_price === null || p.sale_price === undefined ? "—" : `฿${Number(p.sale_price).toFixed(2)}`}
                 </div>
                 <div className="flex gap-1 mt-2">
                   <Button variant="outline" size="sm" onClick={() => handleOpen(p.id)} className="h-8 text-xs flex-1 rounded-[4px]">
