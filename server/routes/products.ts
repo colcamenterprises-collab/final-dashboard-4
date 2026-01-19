@@ -51,15 +51,18 @@ router.get("/api/products/:id", async (req, res) => {
 
     const linesResult = await db.execute(sql`
       SELECT 
-        id,
-        ingredient_id,
-        quantity_used,
-        prep_note,
-        unit_cost_derived,
-        line_cost_derived
-      FROM product_ingredient
+        pi.id,
+        pi.ingredient_id,
+        i.name as ingredient_name,
+        i.base_unit as ingredient_unit,
+        pi.quantity_used,
+        pi.prep_note,
+        pi.unit_cost_derived,
+        pi.line_cost_derived
+      FROM product_ingredient pi
+      LEFT JOIN ingredients i ON i.id = pi.ingredient_id
       WHERE product_id = ${id}
-      ORDER BY id
+      ORDER BY pi.id
     `);
 
     res.json({

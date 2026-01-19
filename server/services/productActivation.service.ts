@@ -1,14 +1,24 @@
 import { pool } from "../db";
-import { recalcProductCosts } from "./productCost.service";
 
-export async function validateAndActivateProduct(productId: number): Promise<{
+export type ProductActivationResult = {
+  ok: boolean;
   productId: number;
-  totalCost: number;
-  margin: number;
-}> {
+  totalCost: number | null;
+  margin: number | null;
+  reasons: string[];
+};
+
+const formatIngredientLabel = (name: string | null, id: number) => {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed : `Ingredient #${id}`;
+};
+
+export async function validateAndActivateProduct(productId: number): Promise<ProductActivationResult> {
+  const reasons: string[] = [];
+
   const { rows } = await pool.query(
     `
-    SELECT id, name, description, image_url, sale_price
+    SELECT id, sale_price
     FROM product
     WHERE id = $1
     `,
@@ -17,31 +27,87 @@ export async function validateAndActivateProduct(productId: number): Promise<{
 
   const product = rows[0];
   if (!product) {
-    throw new Error("Product not found");
+    return {
+      ok: false,
+      productId,
+      totalCost: null,
+      margin: null,
+      reasons: ["Product not found"],
+    };
   }
-
-  if (!product.name) throw new Error("Product name required");
-  if (!product.description) throw new Error("Product description required");
-  if (!product.image_url) throw new Error("Product image required");
 
   const salePrice = Number(product.sale_price);
-  if (!Number.isFinite(salePrice) || salePrice <= 0) {
-    throw new Error("Sale price must be greater than zero");
+  const salePriceValid = Number.isFinite(salePrice) && salePrice > 0;
+  if (!salePriceValid) {
+    reasons.push("Sale price must be greater than zero");
   }
 
-  const ingredientCount = await pool.query(
-    `SELECT COUNT(*)::int AS c FROM product_ingredient WHERE product_id = $1`,
+  const { rows: ingredientRows } = await pool.query(
+    `
+    SELECT
+      pi.id,
+      pi.quantity_used,
+      pi.unit_cost_derived,
+      pi.line_cost_derived,
+      i.name as ingredient_name
+    FROM product_ingredient pi
+    LEFT JOIN ingredients i ON i.id = pi.ingredient_id
+    WHERE pi.product_id = $1
+    ORDER BY pi.id
+    `,
     [productId],
   );
 
-  if (ingredientCount.rows[0]?.c === 0) {
-    throw new Error("At least one ingredient required");
+  if (ingredientRows.length === 0) {
+    reasons.push("No ingredient lines found");
   }
 
-  const { totalCost } = await recalcProductCosts(productId);
+  let totalCost = 0;
+  let totalCostValid = ingredientRows.length > 0;
 
-  if (salePrice <= totalCost) {
-    throw new Error("Sale price must exceed total cost");
+  for (const row of ingredientRows) {
+    const label = formatIngredientLabel(row.ingredient_name, Number(row.id));
+    const qty = Number(row.quantity_used);
+    const unitCost = Number(row.unit_cost_derived);
+    const lineCost = Number(row.line_cost_derived);
+
+    if (!Number.isFinite(qty) || qty <= 0) {
+      reasons.push(`Missing quantity for ${label}`);
+      totalCostValid = false;
+    }
+
+    if (!Number.isFinite(unitCost) || unitCost < 0) {
+      reasons.push(`Missing unit cost for ${label}`);
+      totalCostValid = false;
+    }
+
+    if (!Number.isFinite(lineCost) || lineCost < 0) {
+      reasons.push(`Missing line cost for ${label}`);
+      totalCostValid = false;
+    }
+
+    if (Number.isFinite(lineCost) && lineCost >= 0) {
+      totalCost += lineCost;
+    }
+  }
+
+  const totalCostValue = totalCostValid ? Number(totalCost.toFixed(2)) : null;
+  if (totalCostValue === null) {
+    reasons.push("Total cost is not computable");
+  }
+
+  if (salePriceValid && totalCostValue !== null && salePrice <= totalCostValue) {
+    reasons.push("Sale price must exceed total cost");
+  }
+
+  if (reasons.length > 0) {
+    return {
+      ok: false,
+      productId,
+      totalCost: totalCostValue,
+      margin: salePriceValid && totalCostValue !== null ? (salePrice - totalCostValue) / salePrice : null,
+      reasons,
+    };
   }
 
   await pool.query(
@@ -55,8 +121,10 @@ export async function validateAndActivateProduct(productId: number): Promise<{
   );
 
   return {
+    ok: true,
     productId,
-    totalCost,
-    margin: (salePrice - totalCost) / salePrice,
+    totalCost: totalCostValue ?? 0,
+    margin: (salePrice - (totalCostValue ?? 0)) / salePrice,
+    reasons: [],
   };
 }
