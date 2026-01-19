@@ -85,12 +85,12 @@ router.post("/online/orders", async (req, res) => {
         continue;
       }
 
-      if (!Number.isFinite(product.priceOnline)) {
+      if (!Number.isFinite(product.price)) {
         errors.push({ productId, error: "Online price is invalid" });
         continue;
       }
 
-      const priceOnline = product.priceOnline as number;
+      const priceOnline = product.price as number;
       if (!Number.isFinite(priceAtTime) || priceAtTime !== priceOnline) {
         errors.push({ productId, error: "Price mismatch. Refresh menu before checkout." });
         continue;

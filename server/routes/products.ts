@@ -1,13 +1,13 @@
 /**
- * PATCH P1: PRODUCTS API ROUTES
- * 
- * CRUD endpoints for products with multi-channel pricing
- * Products link to canonical ingredients for cost calculation
+ * Product-first API routes.
+ *
+ * Products are costed line-by-line from product_ingredient.
  */
 
 import { Router } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import { getProductCostDetails, recalcProductCosts } from "../services/productCost.service";
 
 const router = Router();
 
@@ -16,7 +16,11 @@ router.get("/api/products", async (_req, res) => {
     const result = await db.execute(sql`
       SELECT 
         p.*,
-        COALESCE(SUM(pi.line_cost_derived), 0) as cost
+        CASE
+          WHEN COUNT(pi.id) = 0 THEN NULL
+          WHEN COUNT(pi.line_cost_derived) < COUNT(pi.id) THEN NULL
+          ELSE SUM(pi.line_cost_derived)
+        END as total_cost
       FROM product p
       LEFT JOIN product_ingredient pi ON pi.product_id = p.id
       GROUP BY p.id
@@ -37,6 +41,8 @@ router.get("/api/products/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid product ID" });
     }
 
+    await recalcProductCosts(id);
+
     const productResult = await db.execute(sql`
       SELECT *
       FROM product
@@ -49,23 +55,12 @@ router.get("/api/products/:id", async (req, res) => {
     }
     const product = products[0];
 
-    const linesResult = await db.execute(sql`
-      SELECT 
-        id,
-        ingredient_id,
-        quantity_used,
-        prep_note,
-        unit_cost_derived,
-        line_cost_derived
-      FROM product_ingredient
-      WHERE product_id = ${id}
-      ORDER BY id
-    `);
+    const { lines } = await getProductCostDetails(id);
 
     res.json({
       ok: true,
       product,
-      lines: linesResult.rows || linesResult,
+      lines,
     });
   } catch (error: any) {
     console.error("[products] Get error:", error);
@@ -75,7 +70,7 @@ router.get("/api/products/:id", async (req, res) => {
 
 router.post("/api/products", async (req, res) => {
   try {
-    const { name, description, prep_notes, image_url, category, sale_price, active } = req.body;
+    const { name, description, prep_notes, image_url, category, sale_price } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: "Product name is required" });
@@ -100,7 +95,7 @@ router.post("/api/products", async (req, res) => {
           ${image_url || null},
           ${category || null},
           ${sale_price ?? null},
-          ${active === true},
+          ${false},
           NOW()
         )
         RETURNING *
@@ -126,7 +121,7 @@ router.put("/api/products/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid product ID" });
     }
 
-    const { name, description, prep_notes, image_url, active, category, sale_price } = req.body;
+    const { name, description, prep_notes, image_url, category, sale_price } = req.body;
 
     await db.transaction(async (tx) => {
       const result = await tx.execute(sql`
@@ -138,7 +133,6 @@ router.put("/api/products/:id", async (req, res) => {
           image_url = ${image_url || null},
           category = ${category || null},
           sale_price = ${sale_price ?? null},
-          active = ${active === true},
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING id
@@ -166,9 +160,7 @@ router.delete("/api/products/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid product ID" });
     }
 
-    await db.execute(sql`DELETE FROM product_menu WHERE product_id = ${id}`);
     await db.execute(sql`DELETE FROM product_ingredient WHERE product_id = ${id}`);
-    await db.execute(sql`DELETE FROM product_price WHERE product_id = ${id}`);
     await db.execute(sql`DELETE FROM product WHERE id = ${id}`);
 
     res.json({ ok: true });
