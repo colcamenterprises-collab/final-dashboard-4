@@ -1,4 +1,4 @@
--- PATCH 1 — Schema enforcement for ingredient yield + product-first costing
+-- PATCH 1 — Schema enforcement for ingredient yield + product recipe truth
 -- Additive-only migration. Safe to re-run.
 
 -- 1) Ingredient yield enforcement (mandatory for costing)
@@ -34,11 +34,11 @@ BEGIN
   END IF;
 END $$;
 
--- 2) Product (sellable menu item)
+-- 2) Product (recipe truth source)
 CREATE TABLE IF NOT EXISTS "public"."product" (
   "id" SERIAL PRIMARY KEY,
   "name" TEXT NOT NULL,
-  "description" TEXT,
+  "description" TEXT NOT NULL,
   "prep_notes" TEXT,
   "image_url" TEXT,
   "category" TEXT,
@@ -65,8 +65,8 @@ CREATE TABLE IF NOT EXISTS "public"."product_ingredient" (
   "quantity_used" NUMERIC(10,2) NOT NULL
     CHECK (quantity_used > 0),
   "prep_note" TEXT,
-  "unit_cost_derived" NUMERIC(10,4),
-  "line_cost_derived" NUMERIC(10,4),
+  "unit_cost_derived" NUMERIC(10,4) NOT NULL,
+  "line_cost_derived" NUMERIC(10,4) NOT NULL,
   "created_at" TIMESTAMP NOT NULL DEFAULT NOW()
 );
 

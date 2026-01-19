@@ -1,14 +1,14 @@
 import { pool } from "../db";
-import { getProductCostTotal, recalcProductCosts } from "./productCost.service";
+import { recalcProductCosts } from "./productCost.service";
 
-export async function activateProduct(productId: number): Promise<{
+export async function validateAndActivateProduct(productId: number): Promise<{
   productId: number;
   totalCost: number;
   margin: number;
 }> {
   const { rows } = await pool.query(
     `
-    SELECT id, name, image_url, sale_price
+    SELECT id, name, description, image_url, sale_price
     FROM product
     WHERE id = $1
     `,
@@ -21,23 +21,24 @@ export async function activateProduct(productId: number): Promise<{
   }
 
   if (!product.name) throw new Error("Product name required");
+  if (!product.description) throw new Error("Product description required");
   if (!product.image_url) throw new Error("Product image required");
 
-  if (product.sale_price === null || product.sale_price === undefined) {
-    throw new Error("Sale price is required");
-  }
-
   const salePrice = Number(product.sale_price);
-  if (!Number.isFinite(salePrice)) {
-    throw new Error("Sale price is invalid");
+  if (!Number.isFinite(salePrice) || salePrice <= 0) {
+    throw new Error("Sale price must be greater than zero");
   }
 
-  await recalcProductCosts(productId);
-  const totalCost = await getProductCostTotal(productId);
+  const ingredientCount = await pool.query(
+    `SELECT COUNT(*)::int AS c FROM product_ingredient WHERE product_id = $1`,
+    [productId],
+  );
 
-  if (totalCost === null) {
-    throw new Error("Product cost is incomplete");
+  if (ingredientCount.rows[0]?.c === 0) {
+    throw new Error("At least one ingredient required");
   }
+
+  const { totalCost } = await recalcProductCosts(productId);
 
   if (salePrice <= totalCost) {
     throw new Error("Sale price must exceed total cost");
@@ -58,18 +59,4 @@ export async function activateProduct(productId: number): Promise<{
     totalCost,
     margin: (salePrice - totalCost) / salePrice,
   };
-}
-
-export async function deactivateProduct(productId: number): Promise<{ productId: number }> {
-  await pool.query(
-    `
-    UPDATE product
-    SET active = FALSE,
-        updated_at = NOW()
-    WHERE id = $1
-    `,
-    [productId],
-  );
-
-  return { productId };
 }
