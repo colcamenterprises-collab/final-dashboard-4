@@ -7,8 +7,8 @@ export type OnlineProductRow = {
   description: string | null;
   imageUrl: string | null;
   category: string | null;
-  visibleOnline: boolean | null;
-  priceOnline: number | null;
+  salePrice: number | null;
+  active: boolean;
 };
 
 export type OnlineProduct = {
@@ -54,7 +54,14 @@ const slugifyCategory = (value: string) =>
 
 export async function fetchOnlineProductRows(): Promise<OnlineProductRow[]> {
   const result = await db.execute(sql`
-    SELECT *
+    SELECT
+      id,
+      name,
+      description,
+      image_url as "imageUrl",
+      category,
+      sale_price as "salePrice",
+      active
     FROM product
     WHERE active = true
   `);
@@ -64,10 +71,10 @@ export async function fetchOnlineProductRows(): Promise<OnlineProductRow[]> {
     id: Number(row.id),
     name: row.name,
     description: row.description ?? null,
-    imageUrl: row.image_url ?? null,
+    imageUrl: row.imageUrl ?? null,
     category: row.category ?? null,
-    visibleOnline: row.visible_online ?? null,
-    priceOnline: row.price_online ?? null,
+    salePrice: row.salePrice === null ? null : Number(row.salePrice),
+    active: Boolean(row.active),
   }));
 }
 
@@ -86,8 +93,8 @@ export async function getOnlineProductsFlat(): Promise<OnlineProduct[]> {
       name: row.name,
       description: row.description,
       image: row.imageUrl || null,
-      price: row.priceOnline !== null ? Number(row.priceOnline) : null,
-      priceOnline: row.priceOnline !== null ? Number(row.priceOnline) : null,
+      price: row.salePrice !== null ? Number(row.salePrice) : null,
+      priceOnline: row.salePrice !== null ? Number(row.salePrice) : null,
       category: normalizeCategory(row.category),
     }));
 }

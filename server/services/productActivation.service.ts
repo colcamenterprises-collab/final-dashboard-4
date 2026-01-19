@@ -8,11 +8,11 @@ export async function validateAndActivateProduct(productId: number): Promise<{
 }> {
   const { rows } = await pool.query(
     `
-    SELECT id, name, description, image_url, sale_price
+    SELECT id, name, image_url, sale_price
     FROM product
     WHERE id = $1
     `,
-    [productId],
+    [productId]
   );
 
   const product = rows[0];
@@ -20,25 +20,18 @@ export async function validateAndActivateProduct(productId: number): Promise<{
     throw new Error("Product not found");
   }
 
-  if (!product.name) throw new Error("Product name required");
-  if (!product.description) throw new Error("Product description required");
+  if (!product.name || !product.name.trim()) throw new Error("Product name required");
   if (!product.image_url) throw new Error("Product image required");
 
   const salePrice = Number(product.sale_price);
-  if (!Number.isFinite(salePrice) || salePrice <= 0) {
-    throw new Error("Sale price must be greater than zero");
-  }
-
-  const ingredientCount = await pool.query(
-    `SELECT COUNT(*)::int AS c FROM product_ingredient WHERE product_id = $1`,
-    [productId],
-  );
-
-  if (ingredientCount.rows[0]?.c === 0) {
-    throw new Error("At least one ingredient required");
+  if (!Number.isFinite(salePrice)) {
+    throw new Error("Sale price must be set");
   }
 
   const { totalCost } = await recalcProductCosts(productId);
+  if (totalCost === null) {
+    throw new Error("Total cost is not available");
+  }
 
   if (salePrice <= totalCost) {
     throw new Error("Sale price must exceed total cost");
@@ -51,7 +44,7 @@ export async function validateAndActivateProduct(productId: number): Promise<{
         updated_at = NOW()
     WHERE id = $1
     `,
-    [productId],
+    [productId]
   );
 
   return {
@@ -59,4 +52,16 @@ export async function validateAndActivateProduct(productId: number): Promise<{
     totalCost,
     margin: (salePrice - totalCost) / salePrice,
   };
+}
+
+export async function deactivateProduct(productId: number): Promise<void> {
+  await pool.query(
+    `
+    UPDATE product
+    SET active = FALSE,
+        updated_at = NOW()
+    WHERE id = $1
+    `,
+    [productId]
+  );
 }

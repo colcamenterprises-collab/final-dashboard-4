@@ -1,8 +1,7 @@
 /**
  * PATCH P1: Products Page
- * 
- * Lists all products with multi-channel pricing and cost display
- * Tablet and mobile responsive
+ *
+ * Lists all products with cost display
  */
 
 import { useNavigate } from "react-router-dom";
@@ -19,7 +18,7 @@ type Product = {
   description: string | null;
   active: boolean;
   created_at: string;
-  cost: number;
+  cost: number | null;
   category?: string | null;
 };
 
@@ -29,9 +28,9 @@ export default function Products() {
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery<{ ok: boolean; products: Product[] }>({
-    queryKey: ['/api/products'],
+    queryKey: ["/api/products"],
     queryFn: async () => {
-      const res = await fetch('/api/products');
+      const res = await fetch("/api/products");
       return res.json();
     },
   });
@@ -39,11 +38,11 @@ export default function Products() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/products/${id}`, { method: "DELETE" });
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       toast({ title: "Product deleted" });
     },
   });
@@ -57,9 +56,14 @@ export default function Products() {
   };
 
   const handleDelete = (id: number) => {
-    if (window.confirm('Delete this product?')) {
+    if (window.confirm("Delete this product?")) {
       deleteMutation.mutate(id);
     }
+  };
+
+  const formatCost = (value: number | null) => {
+    if (value === null || !Number.isFinite(value)) return "N/A";
+    return `฿${Number(value).toFixed(2)}`;
   };
 
   if (isLoading) {
@@ -102,13 +106,13 @@ export default function Products() {
                 </tr>
               </thead>
               <tbody>
-                {products.map(p => (
+                {products.map((p) => (
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-2 text-slate-900">{p.name}</td>
                     <td className="py-2 text-slate-500">{p.category || "UNMAPPED"}</td>
-                    <td className="py-2 text-right text-emerald-600 font-medium">฿{Number(p.cost || 0).toFixed(2)}</td>
+                    <td className="py-2 text-right text-emerald-600 font-medium">{formatCost(p.cost)}</td>
                     <td className="py-2">
-                      <Badge className={`text-[10px] rounded-[4px] ${p.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                      <Badge className={`text-[10px] rounded-[4px] ${p.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
                         {p.active ? "Active" : "Inactive"}
                       </Badge>
                     </td>
@@ -126,7 +130,7 @@ export default function Products() {
                 ))}
                 {products.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-8 text-center text-slate-400">No products yet</td>
+                    <td colSpan={5} className="py-8 text-center text-slate-400">No products yet</td>
                   </tr>
                 )}
               </tbody>
@@ -134,16 +138,16 @@ export default function Products() {
           </div>
 
           <div className="sm:hidden space-y-2">
-            {products.map(p => (
+            {products.map((p) => (
               <div key={p.id} className="bg-slate-50 rounded-[4px] p-3 border border-slate-100">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <span className="text-xs font-medium text-slate-900">{p.name}</span>
-                    <Badge className={`ml-2 text-[10px] rounded-[4px] ${p.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'}`}>
+                    <Badge className={`ml-2 text-[10px] rounded-[4px] ${p.active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>
                       {p.active ? "Active" : "Inactive"}
                     </Badge>
                   </div>
-                  <span className="text-xs font-mono text-emerald-600">฿{Number(p.cost || 0).toFixed(2)}</span>
+                  <span className="text-xs font-mono text-emerald-600">{formatCost(p.cost)}</span>
                 </div>
                 <div className="flex gap-1 mt-2">
                   <Button variant="outline" size="sm" onClick={() => handleOpen(p.id)} className="h-8 text-xs flex-1 rounded-[4px]">
@@ -161,7 +165,6 @@ export default function Products() {
           </div>
         </CardContent>
       </Card>
-
     </div>
   );
 }

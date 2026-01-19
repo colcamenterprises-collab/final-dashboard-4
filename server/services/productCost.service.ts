@@ -1,33 +1,43 @@
 /**
  * PATCH P1: PRODUCT COST SERVICE
- * 
- * Calculates product cost from canonical ingredients
- * Cost = SUM(unit_cost_per_base × portion_qty)
+ *
+ * Product-first costing derived from product_ingredient lines.
+ * unit_cost_derived = ingredient.purchase_cost / ingredient.yield_per_purchase
+ * line_cost_derived = unit_cost_derived * quantity_used
  */
 
 import { db, pool } from "../db";
 import { sql } from "drizzle-orm";
 
-export interface ProductCostLine {
+export type ProductCostLine = {
+  id: number;
   ingredientId: number;
-  ingredientName: string;
-  baseUnit: string;
-  portionQty: number;
-  unitCostPerBase: number;
-  lineCost: number;
-}
+  ingredientName: string | null;
+  quantityUsed: number;
+  unitCostDerived: number | null;
+  lineCostDerived: number | null;
+  yieldUnit: string | null;
+  prepNote: string | null;
+};
 
-export interface ProductCostResult {
+export type ProductCostResult = {
   productId: number;
-  ingredients: ProductCostLine[];
+  lines: ProductCostLine[];
   totalCost: number | null;
-}
+};
+
+const toNumber = (value: any) => {
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
 
 /**
  * Recalculate and persist derived costs for a product.
- * This is the ONLY place cost math is allowed.
+ * Returns null totalCost if any required value is missing.
  */
-export async function recalcProductCosts(productId: number): Promise<{ totalCost: number }> {
+export async function recalcProductCosts(
+  productId: number
+): Promise<{ totalCost: number | null }> {
   const client = await pool.connect();
 
   try {
@@ -41,34 +51,48 @@ export async function recalcProductCosts(productId: number): Promise<{ totalCost
         i.purchase_cost,
         i.yield_per_purchase
       FROM product_ingredient pi
-      JOIN ingredients i ON i.id = pi.ingredient_id
+      LEFT JOIN ingredients i ON i.id = pi.ingredient_id
       WHERE pi.product_id = $1
-        AND i.active = TRUE
       `,
-      [productId],
+      [productId]
     );
 
     if (rows.length === 0) {
       await client.query("COMMIT");
-      return { totalCost: 0 };
+      return { totalCost: null };
     }
 
     let totalCost = 0;
+    let hasMissing = false;
 
     for (const row of rows) {
-      const yieldPerPurchase = Number(row.yield_per_purchase);
-      if (!Number.isFinite(yieldPerPurchase) || yieldPerPurchase <= 0) {
-        throw new Error("Ingredient yield is not defined");
-      }
+      const quantityUsed = toNumber(row.quantity_used);
+      const purchaseCost = toNumber(row.purchase_cost);
+      const yieldPerPurchase = toNumber(row.yield_per_purchase);
 
-      const purchaseCost = Number(row.purchase_cost);
-      if (!Number.isFinite(purchaseCost) || purchaseCost < 0) {
-        throw new Error("Ingredient purchase cost is not defined");
+      if (
+        quantityUsed === null ||
+        quantityUsed <= 0 ||
+        purchaseCost === null ||
+        purchaseCost < 0 ||
+        yieldPerPurchase === null ||
+        yieldPerPurchase <= 0
+      ) {
+        hasMissing = true;
+        await client.query(
+          `
+          UPDATE product_ingredient
+          SET unit_cost_derived = NULL,
+              line_cost_derived = NULL
+          WHERE id = $1
+          `,
+          [row.product_ingredient_id]
+        );
+        continue;
       }
 
       const unitCost = purchaseCost / yieldPerPurchase;
-      const lineCost = unitCost * Number(row.quantity_used);
-
+      const lineCost = unitCost * quantityUsed;
       totalCost += lineCost;
 
       await client.query(
@@ -78,11 +102,16 @@ export async function recalcProductCosts(productId: number): Promise<{ totalCost
             line_cost_derived = $2
         WHERE id = $3
         `,
-        [unitCost, lineCost, row.product_ingredient_id],
+        [unitCost, lineCost, row.product_ingredient_id]
       );
     }
 
     await client.query("COMMIT");
+
+    if (hasMissing) {
+      return { totalCost: null };
+    }
+
     return { totalCost };
   } catch (error) {
     await client.query("ROLLBACK");
@@ -93,152 +122,84 @@ export async function recalcProductCosts(productId: number): Promise<{ totalCost
 }
 
 export async function getProductCost(productId: number): Promise<number | null> {
-  const productResult = await db.execute(sql`
-    SELECT 
-      p.recipe_id as "recipeId"
-    FROM product p
-    WHERE p.id = ${productId}
-  `);
-
-  const productRows = (productResult.rows || productResult) as Array<{ recipeId: number | null }>;
-  const recipeId = productRows[0]?.recipeId;
-
-  if (recipeId) {
-    const recipeResult = await db.execute(sql`
-      SELECT 
-        r.yield_units,
-        ri.portion_qty,
-        i.unit_cost_per_base
-      FROM recipe r
-      INNER JOIN recipe_ingredient ri ON r.id = ri.recipe_id
-      INNER JOIN ingredients i ON ri.ingredient_id = i.id
-      WHERE r.id = ${recipeId}
-    `);
-
-    const recipeRows = (recipeResult.rows || recipeResult) as any[];
-    let perPortionTotal = 0;
-    for (const row of recipeRows) {
-      const qty = Number(row.portion_qty || 0);
-      const unitCost = Number(row.unit_cost_per_base || 0);
-      perPortionTotal += qty * unitCost;
-    }
-    const serves = Number(recipeRows[0]?.yield_units || 0);
-    if (!Number.isFinite(serves) || serves <= 0) {
-      return null;
-    }
-    return Number((perPortionTotal * serves).toFixed(2));
-  }
-
-  const ingredientResult = await db.execute(sql`
-    SELECT 
-      pi.portion_qty,
-      i.unit_cost_per_base
+  const result = await db.execute(sql`
+    SELECT
+      COUNT(pi.id) AS line_count,
+      SUM(
+        CASE
+          WHEN i.purchase_cost IS NULL
+            OR i.yield_per_purchase IS NULL
+            OR pi.quantity_used IS NULL
+            OR pi.line_cost_derived IS NULL
+          THEN 1
+          ELSE 0
+        END
+      ) AS missing_count,
+      SUM(pi.line_cost_derived) AS total_cost
     FROM product_ingredient pi
-    INNER JOIN ingredients i ON pi.ingredient_id = i.id
+    LEFT JOIN ingredients i ON i.id = pi.ingredient_id
     WHERE pi.product_id = ${productId}
   `);
 
-  const ingredientRows = (ingredientResult.rows || ingredientResult) as any[];
-  let total = 0;
-  for (const row of ingredientRows) {
-    const qty = Number(row.portion_qty || 0);
-    const unitCost = Number(row.unit_cost_per_base || 0);
-    total += qty * unitCost;
+  const rows = (result.rows || result) as Array<Record<string, any>>;
+  const row = rows[0];
+  if (!row) return null;
+
+  const lineCount = Number(row.line_count || 0);
+  const missingCount = Number(row.missing_count || 0);
+  if (lineCount === 0 || missingCount > 0) {
+    return null;
   }
 
-  return Number(total.toFixed(2));
+  return row.total_cost === null ? null : Number(row.total_cost);
 }
 
 export async function getProductCostDetails(productId: number): Promise<ProductCostResult> {
-  const productResult = await db.execute(sql`
-    SELECT 
-      p.recipe_id as "recipeId"
-    FROM product p
-    WHERE p.id = ${productId}
-  `);
-
-  const productRows = (productResult.rows || productResult) as Array<{ recipeId: number | null }>;
-  const recipeId = productRows[0]?.recipeId;
-
-  if (recipeId) {
-    const recipeResult = await db.execute(sql`
-      SELECT 
-        r.yield_units,
-        ri.ingredient_id,
-        i.name as ingredient_name,
-        i.base_unit,
-        ri.portion_qty,
-        i.unit_cost_per_base
-      FROM recipe r
-      INNER JOIN recipe_ingredient ri ON r.id = ri.recipe_id
-      INNER JOIN ingredients i ON ri.ingredient_id = i.id
-      WHERE r.id = ${recipeId}
-    `);
-
-    const recipeRows = (recipeResult.rows || recipeResult) as any[];
-    const ingredients: ProductCostLine[] = [];
-    let perPortionTotal = 0;
-
-    for (const row of recipeRows) {
-      const qty = Number(row.portion_qty || 0);
-      const unitCost = Number(row.unit_cost_per_base || 0);
-      const lineCost = qty * unitCost;
-      perPortionTotal += lineCost;
-
-      ingredients.push({
-        ingredientId: Number(row.ingredient_id),
-        ingredientName: row.ingredient_name || 'Unknown',
-        baseUnit: row.base_unit || 'UNMAPPED',
-        portionQty: qty,
-        unitCostPerBase: unitCost,
-        lineCost: Number(lineCost.toFixed(4)),
-      });
-    }
-    const serves = Number(recipeRows[0]?.yield_units || 0);
-    const totalCost = Number.isFinite(serves) && serves > 0 ? Number((perPortionTotal * serves).toFixed(2)) : null;
-
-    return {
-      productId,
-      ingredients,
-      totalCost,
-    };
-  }
-
-  const ingredientResult = await db.execute(sql`
-    SELECT 
+  const result = await db.execute(sql`
+    SELECT
+      pi.id,
       pi.ingredient_id,
-      i.name as ingredient_name,
-      i.base_unit,
-      pi.portion_qty,
-      i.unit_cost_per_base
+      pi.quantity_used,
+      pi.prep_note,
+      CASE
+        WHEN i.purchase_cost IS NULL OR i.yield_per_purchase IS NULL
+        THEN NULL
+        ELSE pi.unit_cost_derived
+      END AS unit_cost_derived,
+      CASE
+        WHEN i.purchase_cost IS NULL OR i.yield_per_purchase IS NULL
+        THEN NULL
+        ELSE pi.line_cost_derived
+      END AS line_cost_derived,
+      i.name AS ingredient_name,
+      i.yield_unit
     FROM product_ingredient pi
-    INNER JOIN ingredients i ON pi.ingredient_id = i.id
+    LEFT JOIN ingredients i ON i.id = pi.ingredient_id
     WHERE pi.product_id = ${productId}
+    ORDER BY pi.id
   `);
 
-  const ingredientRows = (ingredientResult.rows || ingredientResult) as any[];
-  const ingredients: ProductCostLine[] = [];
-  let total = 0;
+  const rows = (result.rows || result) as Array<Record<string, any>>;
+  const lines: ProductCostLine[] = rows.map((row) => ({
+    id: Number(row.id),
+    ingredientId: Number(row.ingredient_id),
+    ingredientName: row.ingredient_name ?? null,
+    quantityUsed: Number(row.quantity_used),
+    unitCostDerived: row.unit_cost_derived === null ? null : Number(row.unit_cost_derived),
+    lineCostDerived: row.line_cost_derived === null ? null : Number(row.line_cost_derived),
+    yieldUnit: row.yield_unit ?? null,
+    prepNote: row.prep_note ?? null,
+  }));
 
-  for (const row of ingredientRows) {
-    const qty = Number(row.portion_qty || 0);
-    const unitCost = Number(row.unit_cost_per_base || 0);
-    const lineCost = qty * unitCost;
-    total += lineCost;
-
-    ingredients.push({
-      ingredientId: Number(row.ingredient_id),
-      ingredientName: row.ingredient_name || 'Unknown',
-      baseUnit: row.base_unit || 'UNMAPPED',
-      portionQty: qty,
-      unitCostPerBase: unitCost,
-      lineCost: Number(lineCost.toFixed(4)),
-    });
-  }
+  const totalCost = lines.length === 0
+    ? null
+    : lines.some((line) => line.lineCostDerived === null)
+      ? null
+      : lines.reduce((sum, line) => sum + Number(line.lineCostDerived || 0), 0);
 
   return {
     productId,
-    ingredients,
-    totalCost: Number(total.toFixed(2)),
+    lines,
+    totalCost,
   };
 }

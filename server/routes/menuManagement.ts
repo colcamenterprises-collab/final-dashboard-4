@@ -15,8 +15,9 @@ menuManagementRouter.get("/", async (_req, res) => {
       description: row.description || null,
       imageUrl: row.imageUrl || null,
       isActive: row.active,
-      isOnlineEnabled: row.visibleOnline,
-      recipes: row.recipeId ? [{ id: row.recipeId, name: `Recipe #${row.recipeId}` }] : [],
+      salePrice: row.salePrice,
+      totalCost: row.totalCost,
+      isOnlineEnabled: row.active,
     }));
 
     res.json({ ok: true, items });
@@ -29,7 +30,7 @@ menuManagementRouter.get("/", async (_req, res) => {
 const writeBlocked = (_req: any, res: any) => {
   res.status(409).json({
     ok: false,
-    error: "Menu management is read-only. Update products for pricing, recipes, and visibility.",
+    error: "Menu management is read-only. Update products and ingredient lines instead.",
   });
 };
 

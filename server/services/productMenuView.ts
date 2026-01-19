@@ -10,12 +10,8 @@ export type ProductMenuRow = {
   imageUrl: string | null;
   active: boolean;
   category: string | null;
-  sortOrder: number | null;
-  visibleInStore: boolean | null;
-  visibleGrab: boolean | null;
-  visibleOnline: boolean | null;
-  recipeId: number | null;
-  price: number | null;
+  salePrice: number | null;
+  totalCost: number | null;
 };
 
 export type ProductMenuCategory = {
@@ -44,13 +40,7 @@ const slugify = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
 
-const visibilityKeyByChannel: Record<ProductChannel, keyof ProductMenuRow> = {
-  IN_STORE: "visibleInStore",
-  GRAB: "visibleGrab",
-  ONLINE: "visibleOnline",
-};
-
-export async function fetchProductMenuRows(channel: ProductChannel): Promise<ProductMenuRow[]> {
+export async function fetchProductMenuRows(): Promise<ProductMenuRow[]> {
   const result = await db.execute(sql`
     SELECT
       p.id,
@@ -58,17 +48,26 @@ export async function fetchProductMenuRows(channel: ProductChannel): Promise<Pro
       p.description,
       p.image_url as "imageUrl",
       p.active,
-      pm.category,
-      pm.sort_order as "sortOrder",
-      pm.visible_in_store as "visibleInStore",
-      pm.visible_grab as "visibleGrab",
-      pm.visible_online as "visibleOnline",
-      pr.recipe_id as "recipeId",
-      pp.price as "price"
+      p.category,
+      p.sale_price as "salePrice",
+      CASE
+        WHEN COUNT(pi.id) = 0 THEN NULL
+        WHEN SUM(
+          CASE
+            WHEN i.purchase_cost IS NULL
+              OR i.yield_per_purchase IS NULL
+              OR pi.quantity_used IS NULL
+              OR pi.line_cost_derived IS NULL
+            THEN 1
+            ELSE 0
+          END
+        ) > 0 THEN NULL
+        ELSE SUM(pi.line_cost_derived)
+      END AS "totalCost"
     FROM product p
-    LEFT JOIN product_menu pm ON pm.product_id = p.id
-    LEFT JOIN product_recipe pr ON pr.product_id = p.id
-    LEFT JOIN product_price pp ON pp.product_id = p.id AND pp.channel = ${channel}
+    LEFT JOIN product_ingredient pi ON pi.product_id = p.id
+    LEFT JOIN ingredients i ON i.id = pi.ingredient_id
+    GROUP BY p.id
     ORDER BY p.created_at DESC
   `);
 
@@ -76,20 +75,12 @@ export async function fetchProductMenuRows(channel: ProductChannel): Promise<Pro
 }
 
 export function buildPublicMenu(
-  rows: ProductMenuRow[],
-  channel: ProductChannel
+  rows: ProductMenuRow[]
 ): { categories: ProductMenuCategory[]; items: ProductMenuItem[] } {
-  const visibleKey = visibilityKeyByChannel[channel];
   const items = rows
     .filter((row) => row.active)
-    .filter((row) => Boolean(row[visibleKey]))
-    .filter((row) => row.price !== null && Number(row.price) > 0)
-    .sort((a, b) => {
-      const orderA = a.sortOrder ?? 0;
-      const orderB = b.sortOrder ?? 0;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.name.localeCompare(b.name);
-    })
+    .filter((row) => row.salePrice !== null && Number(row.salePrice) > 0)
+    .sort((a, b) => a.name.localeCompare(b.name))
     .map((row) => {
       const categoryName = normalizeCategory(row.category);
       return {
@@ -97,7 +88,7 @@ export function buildPublicMenu(
         categoryId: slugify(categoryName),
         name: row.name,
         desc: row.description || "",
-        price: Number(row.price || 0),
+        price: Number(row.salePrice || 0),
         image: row.imageUrl || null,
         _categoryName: categoryName,
       };
@@ -120,57 +111,18 @@ export function buildPublicMenu(
   return { categories, items: sanitizedItems };
 }
 
-export async function getPublicMenu(channel: ProductChannel) {
-  const rows = await fetchProductMenuRows(channel);
-  return buildPublicMenu(rows, channel);
+export async function getPublicMenu() {
+  const rows = await fetchProductMenuRows();
+  return buildPublicMenu(rows);
 }
 
-export type ProductMenuAdminItem = ProductMenuRow & {
-  prices: Record<string, number>;
-};
+export type ProductMenuAdminItem = ProductMenuRow;
 
 export async function getAdminMenuRows(): Promise<ProductMenuAdminItem[]> {
-  const result = await db.execute(sql`
-    SELECT
-      p.id,
-      p.name,
-      p.description,
-      p.image_url as "imageUrl",
-      p.active,
-      pm.category,
-      pm.sort_order as "sortOrder",
-      pm.visible_in_store as "visibleInStore",
-      pm.visible_grab as "visibleGrab",
-      pm.visible_online as "visibleOnline",
-      pr.recipe_id as "recipeId",
-      pp.channel,
-      pp.price
-    FROM product p
-    LEFT JOIN product_menu pm ON pm.product_id = p.id
-    LEFT JOIN product_recipe pr ON pr.product_id = p.id
-    LEFT JOIN product_price pp ON pp.product_id = p.id
-    ORDER BY p.created_at DESC
-  `);
-
-  const rows = (result.rows || result) as Array<ProductMenuRow & { channel: string | null }>;
-  const byId = new Map<number, ProductMenuAdminItem>();
-
-  for (const row of rows) {
-    const existing = byId.get(row.id);
-    if (!existing) {
-      byId.set(row.id, {
-        ...row,
-        price: null,
-        prices: {},
-      });
-    }
-    if (row.channel && row.price !== null) {
-      const target = byId.get(row.id);
-      if (target) {
-        target.prices[row.channel] = Number(row.price);
-      }
-    }
-  }
-
-  return Array.from(byId.values());
+  const rows = await fetchProductMenuRows();
+  return rows.map((row) => ({
+    ...row,
+    salePrice: row.salePrice === null ? null : Number(row.salePrice),
+    totalCost: row.totalCost === null ? null : Number(row.totalCost),
+  }));
 }

@@ -1,8 +1,7 @@
 /**
  * PATCH P1: PRODUCTS API ROUTES
- * 
- * CRUD endpoints for products with multi-channel pricing
- * Products link to canonical ingredients for cost calculation
+ *
+ * Product-first CRUD endpoints with line-by-line costing
  */
 
 import { Router } from "express";
@@ -14,11 +13,25 @@ const router = Router();
 router.get("/api/products", async (_req, res) => {
   try {
     const result = await db.execute(sql`
-      SELECT 
+      SELECT
         p.*,
-        COALESCE(SUM(pi.line_cost_derived), 0) as cost
+        CASE
+          WHEN COUNT(pi.id) = 0 THEN NULL
+          WHEN SUM(
+            CASE
+              WHEN i.purchase_cost IS NULL
+                OR i.yield_per_purchase IS NULL
+                OR pi.quantity_used IS NULL
+                OR pi.line_cost_derived IS NULL
+              THEN 1
+              ELSE 0
+            END
+          ) > 0 THEN NULL
+          ELSE SUM(pi.line_cost_derived)
+        END AS cost
       FROM product p
       LEFT JOIN product_ingredient pi ON pi.product_id = p.id
+      LEFT JOIN ingredients i ON i.id = pi.ingredient_id
       GROUP BY p.id
       ORDER BY p.created_at DESC
     `);
@@ -32,7 +45,7 @@ router.get("/api/products", async (_req, res) => {
 
 router.get("/api/products/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid product ID" });
     }
@@ -50,16 +63,25 @@ router.get("/api/products/:id", async (req, res) => {
     const product = products[0];
 
     const linesResult = await db.execute(sql`
-      SELECT 
-        id,
-        ingredient_id,
-        quantity_used,
-        prep_note,
-        unit_cost_derived,
-        line_cost_derived
-      FROM product_ingredient
-      WHERE product_id = ${id}
-      ORDER BY id
+      SELECT
+        pi.id,
+        pi.ingredient_id,
+        pi.quantity_used,
+        pi.prep_note,
+        CASE
+          WHEN i.purchase_cost IS NULL OR i.yield_per_purchase IS NULL
+          THEN NULL
+          ELSE pi.unit_cost_derived
+        END AS unit_cost_derived,
+        CASE
+          WHEN i.purchase_cost IS NULL OR i.yield_per_purchase IS NULL
+          THEN NULL
+          ELSE pi.line_cost_derived
+        END AS line_cost_derived
+      FROM product_ingredient pi
+      LEFT JOIN ingredients i ON i.id = pi.ingredient_id
+      WHERE pi.product_id = ${id}
+      ORDER BY pi.id
     `);
 
     res.json({
@@ -75,7 +97,7 @@ router.get("/api/products/:id", async (req, res) => {
 
 router.post("/api/products", async (req, res) => {
   try {
-    const { name, description, prep_notes, image_url, category, sale_price, active } = req.body;
+    const { name, description, prep_notes, image_url, category, sale_price } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: "Product name is required" });
@@ -100,16 +122,14 @@ router.post("/api/products", async (req, res) => {
           ${image_url || null},
           ${category || null},
           ${sale_price ?? null},
-          ${active === true},
+          FALSE,
           NOW()
         )
         RETURNING *
       `);
 
       const productRows = productResult.rows || productResult;
-      const created = productRows[0] as any;
-
-      return created;
+      return productRows[0] as any;
     });
 
     res.status(201).json({ ok: true, id: product.id, product });
@@ -121,12 +141,12 @@ router.post("/api/products", async (req, res) => {
 
 router.put("/api/products/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid product ID" });
     }
 
-    const { name, description, prep_notes, image_url, active, category, sale_price } = req.body;
+    const { name, description, prep_notes, image_url, category, sale_price } = req.body;
 
     await db.transaction(async (tx) => {
       const result = await tx.execute(sql`
@@ -138,7 +158,6 @@ router.put("/api/products/:id", async (req, res) => {
           image_url = ${image_url || null},
           category = ${category || null},
           sale_price = ${sale_price ?? null},
-          active = ${active === true},
           updated_at = NOW()
         WHERE id = ${id}
         RETURNING id
@@ -161,15 +180,12 @@ router.put("/api/products/:id", async (req, res) => {
 
 router.delete("/api/products/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(req.params.id, 10);
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid product ID" });
     }
 
-    await db.execute(sql`DELETE FROM product_recipe WHERE product_id = ${id}`);
-    await db.execute(sql`DELETE FROM product_menu WHERE product_id = ${id}`);
     await db.execute(sql`DELETE FROM product_ingredient WHERE product_id = ${id}`);
-    await db.execute(sql`DELETE FROM product_price WHERE product_id = ${id}`);
     await db.execute(sql`DELETE FROM product WHERE id = ${id}`);
 
     res.json({ ok: true });
