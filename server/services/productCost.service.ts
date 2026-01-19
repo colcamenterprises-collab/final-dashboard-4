@@ -2,7 +2,7 @@
  * PATCH P1: PRODUCT COST SERVICE
  * 
  * Calculates product cost from canonical ingredients
- * Cost = SUM(unit_cost_per_base × portion_qty)
+ * Cost = SUM(unit_cost_per_base × quantity_used)
  */
 
 import { db, pool } from "../db";
@@ -38,8 +38,7 @@ export async function recalcProductCosts(productId: number): Promise<{ totalCost
       SELECT
         pi.id AS product_ingredient_id,
         pi.quantity_used,
-        i.purchase_cost,
-        i.yield_per_purchase
+        i.unit_cost_per_base
       FROM product_ingredient pi
       JOIN ingredients i ON i.id = pi.ingredient_id
       WHERE pi.product_id = $1
@@ -56,18 +55,17 @@ export async function recalcProductCosts(productId: number): Promise<{ totalCost
     let totalCost = 0;
 
     for (const row of rows) {
-      const yieldPerPurchase = Number(row.yield_per_purchase);
-      if (!Number.isFinite(yieldPerPurchase) || yieldPerPurchase <= 0) {
-        throw new Error("Ingredient yield is not defined");
+      const quantityUsed = Number(row.quantity_used);
+      if (!Number.isFinite(quantityUsed) || quantityUsed <= 0) {
+        throw new Error("Ingredient quantity is not defined");
       }
 
-      const purchaseCost = Number(row.purchase_cost);
-      if (!Number.isFinite(purchaseCost) || purchaseCost < 0) {
-        throw new Error("Ingredient purchase cost is not defined");
+      const unitCost = Number(row.unit_cost_per_base);
+      if (!Number.isFinite(unitCost) || unitCost < 0) {
+        throw new Error("Ingredient unit cost is not defined");
       }
 
-      const unitCost = purchaseCost / yieldPerPurchase;
-      const lineCost = unitCost * Number(row.quantity_used);
+      const lineCost = unitCost * quantityUsed;
 
       totalCost += lineCost;
 
