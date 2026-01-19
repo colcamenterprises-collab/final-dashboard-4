@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import PageShell from "@/layouts/PageShell";
+import PageShell from "@/components/PageShell";
 
 type Menu = { id:string; name:string; source:string; fileType:string; importedAt:string; version?:string|null };
 
