@@ -166,7 +166,6 @@ router.delete("/api/products/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid product ID" });
     }
 
-    await db.execute(sql`DELETE FROM product_recipe WHERE product_id = ${id}`);
     await db.execute(sql`DELETE FROM product_menu WHERE product_id = ${id}`);
     await db.execute(sql`DELETE FROM product_ingredient WHERE product_id = ${id}`);
     await db.execute(sql`DELETE FROM product_price WHERE product_id = ${id}`);

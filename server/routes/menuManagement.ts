@@ -16,7 +16,6 @@ menuManagementRouter.get("/", async (_req, res) => {
       imageUrl: row.imageUrl || null,
       isActive: row.active,
       isOnlineEnabled: row.visibleOnline,
-      recipes: row.recipeId ? [{ id: row.recipeId, name: `Recipe #${row.recipeId}` }] : [],
     }));
 
     res.json({ ok: true, items });
@@ -29,7 +28,7 @@ menuManagementRouter.get("/", async (_req, res) => {
 const writeBlocked = (_req: any, res: any) => {
   res.status(409).json({
     ok: false,
-    error: "Menu management is read-only. Update products for pricing, recipes, and visibility.",
+    error: "Menu management is read-only. Update products for pricing and visibility.",
   });
 };
 

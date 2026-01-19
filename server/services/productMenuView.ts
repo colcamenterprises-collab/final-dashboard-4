@@ -14,7 +14,6 @@ export type ProductMenuRow = {
   visibleInStore: boolean | null;
   visibleGrab: boolean | null;
   visibleOnline: boolean | null;
-  recipeId: number | null;
   price: number | null;
 };
 
@@ -63,11 +62,9 @@ export async function fetchProductMenuRows(channel: ProductChannel): Promise<Pro
       pm.visible_in_store as "visibleInStore",
       pm.visible_grab as "visibleGrab",
       pm.visible_online as "visibleOnline",
-      pr.recipe_id as "recipeId",
       pp.price as "price"
     FROM product p
     LEFT JOIN product_menu pm ON pm.product_id = p.id
-    LEFT JOIN product_recipe pr ON pr.product_id = p.id
     LEFT JOIN product_price pp ON pp.product_id = p.id AND pp.channel = ${channel}
     ORDER BY p.created_at DESC
   `);
@@ -142,12 +139,10 @@ export async function getAdminMenuRows(): Promise<ProductMenuAdminItem[]> {
       pm.visible_in_store as "visibleInStore",
       pm.visible_grab as "visibleGrab",
       pm.visible_online as "visibleOnline",
-      pr.recipe_id as "recipeId",
       pp.channel,
       pp.price
     FROM product p
     LEFT JOIN product_menu pm ON pm.product_id = p.id
-    LEFT JOIN product_recipe pr ON pr.product_id = p.id
     LEFT JOIN product_price pp ON pp.product_id = p.id
     ORDER BY p.created_at DESC
   `);
