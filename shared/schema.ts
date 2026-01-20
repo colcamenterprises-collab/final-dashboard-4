@@ -1768,10 +1768,63 @@ export const posItemRecipeMap = pgTable('pos_item_recipe_map', {
   recipeId: integer('recipe_id').notNull().references(() => recipe.id, { onDelete: 'cascade' }),
 });
 
+// -----------------------------------------------------------------------------
+// 🔒 RMA: Recipe + Modifier Authority (ADD-ONLY)
+// Canonical source for product recipes + modifier effects derived from POS
+// -----------------------------------------------------------------------------
+
+export const modifierOptionTypeEnum = pgEnum('modifier_option_type', ['ADD', 'REMOVE', 'MULTIPLY', 'SWAP', 'ZERO']);
+
+export const productRecipeAuthority = pgTable('product_recipe_authority', {
+  id: serial('id').primaryKey(),
+  productSku: text('product_sku').notNull(),
+  name: text('name').notNull(),
+  baseYield: numeric('base_yield', { precision: 10, scale: 4 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const recipeIngredientAuthority = pgTable('recipe_ingredient_authority', {
+  id: serial('id').primaryKey(),
+  recipeId: integer('recipe_id').notNull().references(() => productRecipeAuthority.id, { onDelete: 'cascade' }),
+  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id),
+  qty: numeric('qty', { precision: 10, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+});
+
+export const modifierOptionAuthority = pgTable('modifier_option_authority', {
+  id: serial('id').primaryKey(),
+  posModifierId: text('pos_modifier_id').notNull(),
+  posOptionId: text('pos_option_id').notNull(),
+  name: text('name').notNull(),
+  type: modifierOptionTypeEnum('type').notNull(),
+});
+
+export const modifierEffectAuthority = pgTable('modifier_effect_authority', {
+  id: serial('id').primaryKey(),
+  modifierOptionId: integer('modifier_option_id').notNull().references(() => modifierOptionAuthority.id, { onDelete: 'cascade' }),
+  ingredientId: integer('ingredient_id').notNull().references(() => ingredients.id),
+  qtyDelta: numeric('qty_delta', { precision: 10, scale: 4 }).notNull(),
+  unit: varchar('unit', { length: 50 }).notNull(),
+});
+
+export const saleCanonicalAuthority = pgTable('sale_canonical_authority', {
+  id: serial('id').primaryKey(),
+  receiptId: text('receipt_id').notNull(),
+  productSku: text('product_sku').notNull(),
+  modifierOptionIds: integer('modifier_option_ids').array().notNull().default(sql`'{}'::integer[]`),
+  finalCost: numeric('final_cost', { precision: 12, scale: 4 }),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
 // FOUNDATION-02 Recipe Insert Schemas and Types
 export const insertRecipeV2Schema = createInsertSchema(recipe).omit({ id: true, createdAt: true });
 export const insertRecipeIngredientV2Schema = createInsertSchema(recipeIngredient).omit({ id: true });
 export const insertPosItemRecipeMapSchema = createInsertSchema(posItemRecipeMap).omit({ id: true });
+export const insertProductRecipeAuthoritySchema = createInsertSchema(productRecipeAuthority).omit({ id: true, createdAt: true });
+export const insertRecipeIngredientAuthoritySchema = createInsertSchema(recipeIngredientAuthority).omit({ id: true });
+export const insertModifierOptionAuthoritySchema = createInsertSchema(modifierOptionAuthority).omit({ id: true });
+export const insertModifierEffectAuthoritySchema = createInsertSchema(modifierEffectAuthority).omit({ id: true });
+export const insertSaleCanonicalAuthoritySchema = createInsertSchema(saleCanonicalAuthority).omit({ id: true, createdAt: true });
 
 export type RecipeV2 = typeof recipe.$inferSelect;
 export type InsertRecipeV2 = z.infer<typeof insertRecipeV2Schema>;
@@ -1779,6 +1832,16 @@ export type RecipeIngredientV2 = typeof recipeIngredient.$inferSelect;
 export type InsertRecipeIngredientV2 = z.infer<typeof insertRecipeIngredientV2Schema>;
 export type PosItemRecipeMap = typeof posItemRecipeMap.$inferSelect;
 export type InsertPosItemRecipeMap = z.infer<typeof insertPosItemRecipeMapSchema>;
+export type ProductRecipeAuthority = typeof productRecipeAuthority.$inferSelect;
+export type InsertProductRecipeAuthority = z.infer<typeof insertProductRecipeAuthoritySchema>;
+export type RecipeIngredientAuthority = typeof recipeIngredientAuthority.$inferSelect;
+export type InsertRecipeIngredientAuthority = z.infer<typeof insertRecipeIngredientAuthoritySchema>;
+export type ModifierOptionAuthority = typeof modifierOptionAuthority.$inferSelect;
+export type InsertModifierOptionAuthority = z.infer<typeof insertModifierOptionAuthoritySchema>;
+export type ModifierEffectAuthority = typeof modifierEffectAuthority.$inferSelect;
+export type InsertModifierEffectAuthority = z.infer<typeof insertModifierEffectAuthoritySchema>;
+export type SaleCanonicalAuthority = typeof saleCanonicalAuthority.$inferSelect;
+export type InsertSaleCanonicalAuthority = z.infer<typeof insertSaleCanonicalAuthoritySchema>;
 
 // -----------------------------------------------------------------------------
 // 🔒 DERIVED DATA — INGREDIENT USAGE
