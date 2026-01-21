@@ -472,6 +472,23 @@ export const ingredients = pgTable("ingredients", {
   locked: boolean("locked").default(false),
 });
 
+// Ingredient purchasing authority (canonical ingredient cost source)
+export const ingredientAuthority = pgTable("ingredient_authority", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  supplier: text("supplier").notNull(),
+  purchaseQuantity: decimal("purchase_quantity", { precision: 12, scale: 3 }).notNull(),
+  purchaseUnit: text("purchase_unit").notNull(),
+  purchaseCostThb: decimal("purchase_cost_thb", { precision: 12, scale: 2 }).notNull(),
+  portionQuantity: decimal("portion_quantity", { precision: 12, scale: 3 }).notNull(),
+  portionUnit: text("portion_unit").notNull(),
+  conversionFactor: decimal("conversion_factor", { precision: 12, scale: 4 }),
+  isActive: boolean("is_active").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow().notNull().$onUpdate(() => new Date()),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // Recipes table - Market-leading comprehensive recipe management
 export const recipes = pgTable("recipes", {
   id: serial("id").primaryKey(),
@@ -624,6 +641,11 @@ export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id:
   costPerItem: z.coerce.number().min(0, "Cost per item must be positive"),
   unitPrice: z.coerce.number().min(0, "Unit price must be positive").optional(),
 });
+export const insertIngredientAuthoritySchema = createInsertSchema(ingredientAuthority).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
 
@@ -681,6 +703,8 @@ export type DailyStockSales = typeof dailyStockSales.$inferSelect;
 export type InsertDailyStockSales = z.infer<typeof insertDailyStockSalesSchema>;
 export type Ingredient = typeof ingredients.$inferSelect;
 export type InsertIngredient = z.infer<typeof insertIngredientSchema>;
+export type IngredientAuthority = typeof ingredientAuthority.$inferSelect;
+export type InsertIngredientAuthority = z.infer<typeof insertIngredientAuthoritySchema>;
 export type Recipe = typeof recipes.$inferSelect;
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
 export type RecipeIngredient = typeof recipeIngredients.$inferSelect;

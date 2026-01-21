@@ -51,6 +51,8 @@ import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
 import MarketingMachine from "./pages/marketing/MarketingMachine";
 import PurchasingLive from "./pages/ops/PurchasingLive";
+import IngredientPurchasingList from "./pages/ops/IngredientPurchasingList";
+import IngredientPurchasingForm from "./pages/ops/IngredientPurchasingForm";
 import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
 import DailySummaryReportsPage from "./pages/operations/daily-reports";
@@ -124,6 +126,9 @@ export default function App() {
                 <Route path="/operations/purchasing-mapping" element={<Guard><PurchasingFieldMapping /></Guard>} />
                 <Route path="/operations/purchasing-shift-log" element={<Guard><PurchasingShiftLog /></Guard>} />
                 <Route path="/operations/purchasing-analytics" element={<Guard><PurchasingAnalytics /></Guard>} />
+                <Route path={ROUTES.INGREDIENT_PURCHASING} element={<Guard><IngredientPurchasingList /></Guard>} />
+                <Route path="/operations/ingredient-purchasing/new" element={<Guard><IngredientPurchasingForm /></Guard>} />
+                <Route path="/operations/ingredient-purchasing/:id" element={<Guard><IngredientPurchasingForm /></Guard>} />
                 {/* PATCH S1: Disabled - stock logging moved to Shopping List modal */}
                 {/* <Route path="/operations/manual-stock-purchase" element={<Guard><ManualStockPurchase /></Guard>} /> */}
                 

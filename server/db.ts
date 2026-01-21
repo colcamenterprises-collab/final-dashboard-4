@@ -5,11 +5,7 @@ import * as schema from "../shared/schema";
 
 neonConfig.webSocketConstructor = ws;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
+export const databaseAvailable = Boolean(process.env.DATABASE_URL);
 
 // Enhanced pool configuration with better error handling
 const poolConfig = {
@@ -21,36 +17,47 @@ const poolConfig = {
   idleTimeoutMillis: 30000, // 30 seconds idle timeout
 };
 
-export const pool = new Pool(poolConfig);
+export const pool = databaseAvailable ? new Pool(poolConfig) : null;
+
+if (!databaseAvailable) {
+  console.warn("[db] DATABASE_URL missing. Server running in no-database mode.");
+}
 
 // Add error handling for the pool
-pool.on('error', (err) => {
+pool?.on('error', (err) => {
   console.error('Database pool error:', err.message);
   // Don't exit the process, let the pool handle reconnection
 });
 
-pool.on('connect', () => {
+pool?.on('connect', () => {
   console.log('✓ Database connection established');
 });
 
 // Enhanced drizzle client with error handling
-export const db = drizzle({ client: pool, schema });
+export const db = databaseAvailable && pool ? drizzle({ client: pool, schema }) : null;
 
 // Graceful shutdown handler
 process.on('SIGTERM', async () => {
   console.log('Shutting down database connections...');
-  await pool.end();
+  if (pool) {
+    await pool.end();
+  }
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('Shutting down database connections...');
-  await pool.end();
+  if (pool) {
+    await pool.end();
+  }
   process.exit(0);
 });
 
 // Database health check function
 export async function checkDatabaseHealth(): Promise<boolean> {
+  if (!databaseAvailable || !pool) {
+    return false;
+  }
   try {
     const result = await pool.query('SELECT 1');
     return result.rows.length > 0;
