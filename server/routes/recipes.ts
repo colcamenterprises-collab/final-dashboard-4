@@ -130,6 +130,53 @@ router.get('/export/csv', async (req, res) => {
 // GET /api/recipes/cards - Get all recipes for cards library  
 router.get('/cards', async (req, res) => {
   try {
+    const mockRecipeData = process.env.MOCK_RECIPE_DATA === "true";
+    if (process.env.NODE_ENV === "development" && mockRecipeData) {
+      return res.json([
+        {
+          id: 101,
+          name: "Single Smash Burger",
+          description: "Mock recipe for UI validation.",
+          category: "Burgers",
+          version: 1,
+          parent_id: null,
+          image_url: null,
+          total_cost: 69.5,
+          cost_per_serving: 69.5,
+          suggested_price: 0,
+          instructions: null,
+          notes: null,
+          ingredients: [
+            { ingredientId: "1", name: "Beef Patty", portionQty: 120, portionUnit: "g", conversionFactor: null },
+            { ingredientId: "2", name: "Cheddar Slice", portionQty: 1, portionUnit: "slice", conversionFactor: 12 },
+            { ingredientId: "3", name: "Burger Bun", portionQty: 1, portionUnit: "each", conversionFactor: null },
+            { ingredientId: "4", name: "Mayo", portionQty: 20, portionUnit: "ml", conversionFactor: null },
+          ],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        {
+          id: 102,
+          name: "Tomato Burger (Incomplete)",
+          description: "Mock incomplete recipe for UI validation.",
+          category: "Burgers",
+          version: 1,
+          parent_id: null,
+          image_url: null,
+          total_cost: 0,
+          cost_per_serving: 0,
+          suggested_price: 0,
+          instructions: null,
+          notes: null,
+          ingredients: [
+            { ingredientId: "5", name: "Tomato", portionQty: 30, portionUnit: "slice", conversionFactor: null },
+          ],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ]);
+    }
+
     await initTables();
     const { rows } = await pool.query(`
       SELECT id, name, description, category, version, parent_id, image_url, 
