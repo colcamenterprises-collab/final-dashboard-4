@@ -50,6 +50,8 @@ export const ROUTES = {
   // Menu Mgmt
   RECIPE_MANAGEMENT: "/recipe-management",
   RECIPES: "/menu/recipes",
+  RECIPES_NEW: "/menu/recipes/new",
+  RECIPES_EDIT: "/menu/recipes/:id",
   // RECIPES_MASTER: merged into RECIPES
   RECIPE_CARDS: "/menu/recipe-cards",
   INGREDIENT_MANAGEMENT: "/menu/ingredient-management",

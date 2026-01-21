@@ -30,8 +30,9 @@ import MenuManagement from "./pages/menu/MenuManagement";
 import MenuImport from "./pages/menu/MenuImport";
 import DescriptionTool from "./pages/menu/DescriptionTool";
 import IngredientEdit from "./pages/menu/IngredientEdit";
-// RecipesUnified replaced by RecipesPage from operations
 import RecipeCards from "./pages/menu/RecipeCards";
+import RecipeEditorPage from "./pages/menu/RecipeEditor";
+import RecipeListPage from "./pages/menu/Recipes";
 import IngredientManagement from "./pages/menu/IngredientManagement";
 import Products from "./pages/Products";
 import ProductPage from "./pages/ProductPage";
@@ -89,7 +90,6 @@ import TenantSwitcher from "./pages/settings/TenantSwitcher";
 import PaymentProviders from "./pages/settings/PaymentProviders";
 import DataSafety from "./pages/admin/DataSafety";
 import IngredientsMaster from "./pages/operations/IngredientsMaster";
-import RecipesPage from "./pages/operations/Recipes";
 import PurchaseHistory from "./pages/operations/PurchaseHistory";
 import HealthSafetyAuditPage from "./pages/operations/health-safety-audit";
 import HealthSafetyQuestionManager from "./pages/operations/health-safety-audit/questions";
@@ -188,7 +188,9 @@ export default function App() {
                 <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
                 <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
                 <Route path={ROUTES.RECIPE_MANAGEMENT} element={<Navigate to="/menu/recipes" replace />} />
-                <Route path={ROUTES.RECIPES} element={<Guard><RecipesPage /></Guard>} />
+                <Route path={ROUTES.RECIPES} element={<Guard><RecipeListPage /></Guard>} />
+                <Route path={ROUTES.RECIPES_NEW} element={<Guard><RecipeEditorPage /></Guard>} />
+                <Route path={ROUTES.RECIPES_EDIT} element={<Guard><RecipeEditorPage /></Guard>} />
                 <Route path={ROUTES.RECIPE_CARDS} element={<Guard><RecipeCards /></Guard>} />
                 <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<Guard><IngredientManagement /></Guard>} />
                 <Route path="/products" element={<Guard><Products /></Guard>} />
