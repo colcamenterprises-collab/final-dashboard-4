@@ -443,6 +443,10 @@ async function checkSchema() {
   const ingredientMasterRouter = (await import('./routes/ingredientMaster')).default;
   app.use('/api/ingredient-master', ingredientMasterRouter);
 
+  // Ingredient Authority (Purchasing Canonical)
+  const ingredientAuthorityRouter = (await import('./routes/ingredientAuthority')).default;
+  app.use('/api/ingredient-authority', ingredientAuthorityRouter);
+
   // Error guard middleware - must be LAST
   app.use(errorGuard);
 

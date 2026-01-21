@@ -13,6 +13,9 @@ export const ROUTES = {
   PURCHASING_MAPPING: "/operations/purchasing-mapping",
   PURCHASING_SHIFT_LOG: "/operations/purchasing-shift-log",
   PURCHASING_ANALYTICS: "/operations/purchasing-analytics",
+  INGREDIENT_PURCHASING: "/operations/ingredient-purchasing",
+  INGREDIENT_PURCHASING_NEW: "/operations/ingredient-purchasing/new",
+  INGREDIENT_PURCHASING_EDIT: "/operations/ingredient-purchasing/:id",
   // PATCH S1: Disabled - stock logging moved to Shopping List modal
   // MANUAL_STOCK_PURCHASE: "/operations/manual-stock-purchase",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
