@@ -74,6 +74,65 @@ router.get('/', async (req, res) => {
  */
 router.get('/canonical', async (req, res) => {
   try {
+    const mockRecipeData = process.env.MOCK_RECIPE_DATA === "true";
+    if (process.env.NODE_ENV === "development" && mockRecipeData) {
+      return res.json({
+        items: [
+          {
+            id: 1,
+            name: "Beef Patty",
+            baseUnit: "g",
+            unitCostPerBase: 0.42,
+            purchaseQty: 5,
+            purchaseUnit: "kg",
+            purchaseCost: 2100,
+            sourcePurchasingItemId: null,
+          },
+          {
+            id: 2,
+            name: "Cheddar Slice",
+            baseUnit: "g",
+            unitCostPerBase: 0.55,
+            purchaseQty: 1,
+            purchaseUnit: "kg",
+            purchaseCost: 550,
+            sourcePurchasingItemId: null,
+          },
+          {
+            id: 3,
+            name: "Burger Bun",
+            baseUnit: "each",
+            unitCostPerBase: 7.5,
+            purchaseQty: 24,
+            purchaseUnit: "each",
+            purchaseCost: 180,
+            sourcePurchasingItemId: null,
+          },
+          {
+            id: 4,
+            name: "Mayo",
+            baseUnit: "ml",
+            unitCostPerBase: 0.12,
+            purchaseQty: 1,
+            purchaseUnit: "l",
+            purchaseCost: 120,
+            sourcePurchasingItemId: null,
+          },
+          {
+            id: 5,
+            name: "Tomato",
+            baseUnit: "g",
+            unitCostPerBase: 0.08,
+            purchaseQty: 2,
+            purchaseUnit: "kg",
+            purchaseCost: 160,
+            sourcePurchasingItemId: null,
+          },
+        ],
+        count: 5,
+      });
+    }
+
     const result = await db.execute(sql`
       SELECT
         id,
@@ -81,6 +140,9 @@ router.get('/canonical', async (req, res) => {
         category,
         base_unit AS "baseUnit",
         unit_cost_per_base AS "unitCostPerBase",
+        purchase_qty AS "purchaseQty",
+        purchase_unit AS "purchaseUnit",
+        purchase_cost AS "purchaseCost",
         source_purchasing_item_id AS "sourcePurchasingItemId"
       FROM ingredients
       WHERE base_unit IS NOT NULL AND unit_cost_per_base IS NOT NULL
