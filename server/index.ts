@@ -444,8 +444,11 @@ async function checkSchema() {
   app.use('/api/ingredient-master', ingredientMasterRouter);
 
   // Ingredient Authority (Purchasing Canonical)
-  const ingredientAuthorityRouter = (await import('./routes/ingredientAuthority')).default;
+  const ingredientAuthorityModule = await import('./routes/ingredientAuthority');
+  const ingredientAuthorityRouter = ingredientAuthorityModule.default;
+  const ingredientSearchRouter = ingredientAuthorityModule.ingredientSearchRouter;
   app.use('/api/ingredient-authority', ingredientAuthorityRouter);
+  app.use('/', ingredientSearchRouter);
 
   // Error guard middleware - must be LAST
   app.use(errorGuard);

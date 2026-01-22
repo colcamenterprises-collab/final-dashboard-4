@@ -1,5 +1,6 @@
 // Enhanced Recipes routes with comprehensive functionality
 import { Router } from "express";
+import { PrismaClient } from "@prisma/client";
 import { pool } from "../db";
 import multer from 'multer';
 import path from 'path';
@@ -9,6 +10,7 @@ import sharp from 'sharp';
 import { loadCatalogFromCSV } from "../lib/stockCatalog";
 
 const router = Router();
+const prisma = new PrismaClient();
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
@@ -277,6 +279,74 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/:id/ingredients', async (req, res) => {
+  let recipeId: bigint;
+  try {
+    recipeId = BigInt(req.params.id);
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid recipe id' });
+  }
+
+  const rows = await prisma.recipe_lines.findMany({
+    where: { recipe_id: recipeId },
+  });
+
+  let total_cost = 0;
+
+  const ingredients = rows.map((ri) => {
+    const portionQuantity = Number(ri.qty ?? 0);
+    const costPerPortion = Number(ri.unit_cost_thb ?? 0);
+    const computedLineCost = portionQuantity * costPerPortion;
+    const lineCost = Number(ri.cost_thb ?? computedLineCost);
+    total_cost += lineCost;
+
+    return {
+      id: typeof ri.id === "bigint" ? Number(ri.id) : ri.id,
+      ingredient_id: ri.ingredient_id,
+      name: ri.ingredient_name,
+      portion_quantity: portionQuantity,
+      portion_unit: ri.unit,
+      cost_per_portion: costPerPortion,
+      line_cost: lineCost,
+      is_valid:
+        Boolean(ri.ingredient_name) &&
+        portionQuantity > 0 &&
+        Number.isFinite(costPerPortion) &&
+        costPerPortion >= 0,
+    };
+  });
+
+  const status =
+    ingredients.length > 0 && ingredients.every((i) => i.is_valid)
+      ? 'VALID'
+      : 'INVALID';
+
+  res.json({ ingredients, total_cost, status });
+});
+
+router.get('/:id', async (req, res) => {
+  let recipeId: bigint;
+  try {
+    recipeId = BigInt(req.params.id);
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid recipe id' });
+  }
+
+  const recipe = await prisma.recipes.findUnique({
+    where: { id: recipeId },
+  });
+
+  if (!recipe) {
+    return res.status(404).json({ error: 'Recipe not found' });
+  }
+
+  res.json({
+    ...recipe,
+    id: recipe.id.toString(),
+    parent_id: recipe.parent_id ? recipe.parent_id.toString() : null,
+  });
+});
+
 // POST /api/recipes - Create recipe
 router.post('/', async (req, res) => {
   try {
@@ -359,6 +429,83 @@ router.post('/', async (req, res) => {
     console.error('Error creating recipe:', error);
     res.status(500).json({ error: 'Failed to create recipe' });
   }
+});
+
+router.post('/:id/ingredients', async (req, res) => {
+  const { ingredient_id, portion_quantity, portion_unit } = req.body;
+
+  if (!ingredient_id || !portion_quantity || !portion_unit) {
+    return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  let recipeId: bigint;
+  try {
+    recipeId = BigInt(req.params.id);
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid recipe id' });
+  }
+
+  const recipe = await prisma.recipes.findUnique({
+    where: { id: recipeId },
+  });
+
+  if (!recipe) {
+    return res.status(404).json({ error: 'Recipe not found' });
+  }
+
+  const ingredientId = Number(ingredient_id);
+  if (!Number.isFinite(ingredientId)) {
+    return res.status(400).json({ error: 'Invalid ingredient' });
+  }
+
+  const portionQuantity = Number(portion_quantity);
+  if (!Number.isFinite(portionQuantity) || portionQuantity <= 0) {
+    return res.status(400).json({ error: 'Invalid portion quantity' });
+  }
+
+  const ingredientRows = await prisma.$queryRaw<
+    Array<{
+      id: number;
+      name: string;
+      purchase_quantity: number | string;
+      purchase_cost_thb: number | string;
+      conversion_factor: number | string | null;
+      is_active: boolean;
+    }>
+  >`
+    SELECT id, name, purchase_quantity, purchase_cost_thb, conversion_factor, is_active
+    FROM ingredient_authority
+    WHERE id = ${ingredientId}
+      AND is_active = true
+    LIMIT 1
+  `;
+
+  const ingredient = ingredientRows[0];
+  if (!ingredient) {
+    return res.status(400).json({ error: 'Invalid ingredient' });
+  }
+
+  const purchaseQuantity = Number(ingredient.purchase_quantity);
+  const purchaseCostThb = Number(ingredient.purchase_cost_thb);
+  const conversionFactor =
+    ingredient.conversion_factor === null ? null : Number(ingredient.conversion_factor);
+  const baseQty = purchaseQuantity * (conversionFactor === null ? 1 : conversionFactor);
+  const costPerPortion = baseQty > 0 ? purchaseCostThb / baseQty : 0;
+  const lineCost = portionQuantity * costPerPortion;
+
+  const row = await prisma.recipe_lines.create({
+    data: {
+      recipe_id: recipe.id,
+      ingredient_id: String(ingredientId),
+      ingredient_name: ingredient.name,
+      qty: portionQuantity,
+      unit: String(portion_unit),
+      unit_cost_thb: costPerPortion,
+      cost_thb: lineCost,
+    },
+  });
+
+  res.status(201).json(row);
 });
 
 // PUT /api/recipes/:id - Update recipe

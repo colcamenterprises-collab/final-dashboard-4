@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,10 +33,9 @@ const num = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 type UnitType = "g" | "ml" | "each";
 
 type Ingredient = {
-  id: string;
+  id: number;
   name: string;
-  baseUnit: UnitType;
-  unitCostPerBase: number;
+  portion_unit: UnitType;
 };
 
 type RecipeLine = {
@@ -49,24 +49,11 @@ type RecipeLine = {
 };
 
 type Recipe = {
-  id: number;
+  id: string;
   name?: string;
   description?: string;
   category?: string;
   yield_quantity?: number;
-  ingredients?: Array<{ ingredientId?: string; name?: string; qty?: number; unit?: UnitType; unitCostTHB?: number; costTHB?: number }>;
-};
-
-const normalizeRecipeLines = (lines: Recipe["ingredients"]): RecipeLine[] => {
-  return (lines || []).map((line, index) => ({
-    ingredientId: line?.ingredientId || `ingredient-${index}`,
-    name: line?.name || "Unnamed ingredient",
-    qty: num(line?.qty),
-    unit: line?.unit || "g",
-    baseUnit: line?.unit || "g",
-    unitCostTHB: num(line?.unitCostTHB),
-    costTHB: num(line?.costTHB),
-  }));
 };
 
 export default function RecipeEditorPage() {
@@ -75,7 +62,7 @@ export default function RecipeEditorPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const editingId = id ? Number(id) : null;
+  const editingId = id ?? null;
 
   const [recipeName, setRecipeName] = useState("");
   const [recipeCategory, setRecipeCategory] = useState("Burgers");
@@ -83,71 +70,90 @@ export default function RecipeEditorPage() {
   const [yieldQuantity, setYieldQuantity] = useState("1");
   const [lines, setLines] = useState<RecipeLine[]>([]);
   const [search, setSearch] = useState("");
-  const [hasLoadedRecipe, setHasLoadedRecipe] = useState(false);
+  const [searchResults, setSearchResults] = useState<Ingredient[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
-  const { data: ingredients = [], isLoading: ingredientsLoading } = useQuery({
-    queryKey: ["canonical-ingredients"],
+  const [recipeNotFound, setRecipeNotFound] = useState(false);
+
+  const { data: recipeToEdit, isLoading: recipesLoading } = useQuery({
+    queryKey: ["recipe", editingId],
     queryFn: async () => {
-      const response = await fetch("/api/ingredients/canonical");
-      if (!response.ok) {
-        throw new Error("Failed to fetch ingredients");
+      const response = await axios.get<Recipe>(`/api/recipes/${editingId}`);
+      return response.data;
+    },
+    enabled: Boolean(editingId),
+    retry: false,
+    onError: (error: any) => {
+      if (error?.response?.status === 404) {
+        setRecipeNotFound(true);
       }
-      const data = await response.json();
-      return (data.items || []).map((item: any) => ({
-        id: String(item.id),
-        name: item.name,
-        baseUnit: item.baseUnit as UnitType,
-        unitCostPerBase: num(item.unitCostPerBase),
-      }));
     },
   });
 
-  const { data: recipes = [], isLoading: recipesLoading } = useQuery({
-    queryKey: ["recipes"],
+  const { data: ingredientLines, isLoading: ingredientsLoading } = useQuery({
+    queryKey: ["recipe-ingredients", editingId],
     queryFn: async () => {
-      const response = await fetch("/api/recipes");
-      if (!response.ok) {
-        throw new Error("Failed to fetch recipes");
-      }
-      return response.json();
+      const response = await axios.get<{
+        ingredients: Array<{
+          ingredient_id: string;
+          name: string;
+          portion_quantity: number;
+          portion_unit: UnitType;
+          cost_per_portion: number;
+          line_cost: number;
+        }>;
+      }>(`/api/recipes/${editingId}/ingredients`);
+      return response.data.ingredients;
     },
     enabled: Boolean(editingId),
   });
 
-  const recipeToEdit = useMemo(() => {
-    if (!editingId) return null;
-    return (recipes as Recipe[]).find((recipe) => recipe.id === editingId) || null;
-  }, [recipes, editingId]);
+  useEffect(() => {
+    if (!editingId) return;
+    if (recipeToEdit) {
+      setRecipeName(recipeToEdit.name || "");
+      setRecipeCategory(recipeToEdit.category || "Burgers");
+      setRecipeDescription(recipeToEdit.description || "");
+      setYieldQuantity(String(recipeToEdit.yield_quantity ?? 1));
+    }
+  }, [editingId, recipeToEdit]);
 
   useEffect(() => {
-    if (!editingId || !recipeToEdit || hasLoadedRecipe) return;
-    setRecipeName(recipeToEdit.name || "");
-    setRecipeCategory(recipeToEdit.category || "Burgers");
-    setRecipeDescription(recipeToEdit.description || "");
-    setYieldQuantity(String(recipeToEdit.yield_quantity ?? 1));
-    setLines(normalizeRecipeLines(recipeToEdit.ingredients));
-    setHasLoadedRecipe(true);
-  }, [editingId, recipeToEdit, hasLoadedRecipe]);
+    if (!editingId) return;
+    if (ingredientLines) {
+      setLines(
+        ingredientLines.map((line, index) => ({
+          ingredientId: line.ingredient_id || `ingredient-${index}`,
+          name: line.name || "Unnamed ingredient",
+          qty: num(line.portion_quantity),
+          unit: line.portion_unit || "g",
+          baseUnit: line.portion_unit || "g",
+          unitCostTHB: num(line.cost_per_portion),
+          costTHB: num(line.line_cost),
+        })),
+      );
+    }
+  }, [editingId, ingredientLines]);
 
-  const ingredientsById = useMemo(() => {
-    return new Map(ingredients.map((ingredient) => [ingredient.id, ingredient]));
-  }, [ingredients]);
+  useEffect(() => {
+    if (recipeNotFound) {
+      navigate("/menu/recipes");
+    }
+  }, [recipeNotFound, navigate]);
 
   const linesWithCosts = useMemo(() => {
     return lines.map((line) => {
-      const ingredient = ingredientsById.get(line.ingredientId);
-      const unitCost = num(ingredient?.unitCostPerBase ?? line.unitCostTHB);
       const qty = num(line.qty);
-      const cost = qty * unitCost;
+      const unitCost = num(line.unitCostTHB);
       return {
         ...line,
-        unit: line.unit || ingredient?.baseUnit || "g",
-        baseUnit: ingredient?.baseUnit || line.baseUnit || line.unit || "g",
+        unit: line.unit || line.baseUnit || "g",
+        baseUnit: line.baseUnit || line.unit || "g",
         unitCostTHB: unitCost,
-        costTHB: cost,
+        costTHB: qty * unitCost,
       };
     });
-  }, [lines, ingredientsById]);
+  }, [lines]);
 
   const totalCost = useMemo(
     () => linesWithCosts.reduce((sum, line) => sum + num(line.costTHB), 0),
@@ -177,25 +183,40 @@ export default function RecipeEditorPage() {
     return { valid: true, reason: "Ready" };
   }, [recipeName, recipeCategory, yieldQuantity, linesWithCosts]);
 
-  const filteredIngredients = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    if (!term) return [] as Ingredient[];
-    return ingredients.filter((ingredient) => ingredient.name.toLowerCase().includes(term));
-  }, [ingredients, search]);
+  const handleSearch = async (q: string) => {
+    const term = q.trim();
+    if (!term) {
+      setSearchResults([]);
+      return;
+    }
+    setSearchLoading(true);
+    try {
+      const res = await axios.get<Ingredient[]>(`/api/ingredients?search=${term}`);
+      setSearchResults(res.data);
+    } catch (error) {
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  };
 
-  const addIngredient = (ingredient: Ingredient) => {
-    setLines((prev) => [
-      ...prev,
-      {
-        ingredientId: ingredient.id,
-        name: ingredient.name,
-        qty: 0,
-        unit: ingredient.baseUnit,
-        baseUnit: ingredient.baseUnit,
-        unitCostTHB: ingredient.unitCostPerBase,
-        costTHB: 0,
-      },
-    ]);
+  useEffect(() => {
+    void handleSearch(search);
+  }, [search]);
+
+  const reloadIngredients = async () => {
+    if (!editingId) return;
+    await queryClient.invalidateQueries({ queryKey: ["recipe-ingredients", editingId] });
+  };
+
+  const addIngredient = async (ingredient: Ingredient) => {
+    if (!editingId) return;
+    await axios.post(`/api/recipes/${editingId}/ingredients`, {
+      ingredient_id: ingredient.id,
+      portion_quantity: 1,
+      portion_unit: ingredient.portion_unit,
+    });
+    await reloadIngredients();
     setSearch("");
   };
 
@@ -286,7 +307,7 @@ export default function RecipeEditorPage() {
     );
   }
 
-  if (editingId && !recipeToEdit) {
+  if (editingId && recipeNotFound) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center space-y-2">
@@ -375,17 +396,17 @@ export default function RecipeEditorPage() {
             </div>
             {search.trim().length > 0 && (
               <div className="space-y-2">
-                {filteredIngredients.length > 0 ? (
-                  filteredIngredients.map((ingredient) => (
+                {searchLoading ? (
+                  <div className="text-sm text-slate-500">Searching...</div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((ingredient) => (
                     <div
                       key={ingredient.id}
                       className="flex flex-col gap-2 rounded-[4px] border border-slate-100 p-3 sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
                         <div className="text-sm font-medium text-slate-900">{ingredient.name}</div>
-                        <div className="text-xs text-slate-500">
-                          {THB(ingredient.unitCostPerBase)} per {ingredient.baseUnit}
-                        </div>
+                        <div className="text-xs text-slate-500">{ingredient.portion_unit}</div>
                       </div>
                       <Button
                         variant="outline"

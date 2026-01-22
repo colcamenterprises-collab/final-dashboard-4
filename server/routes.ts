@@ -3979,7 +3979,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       
       const recipe = await storage.getRecipeById(id);
       if (!recipe) {
-        return res.status(404).json({ error: "Recipe not found" });
+        return next();
       }
       res.json(recipe);
     } catch (error) {
