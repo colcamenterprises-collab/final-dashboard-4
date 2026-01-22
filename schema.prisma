@@ -1158,6 +1158,24 @@ model ingredients {
   @@index([supplier_id], map: "idx_ingredients_supplier_id")
 }
 
+model ingredient_authority {
+  id                Int      @id @default(autoincrement())
+  name              String
+  category          String
+  supplier          String
+  purchase_quantity Decimal  @db.Decimal(12, 3)
+  purchase_unit     String
+  purchase_cost_thb Decimal  @db.Decimal(12, 2)
+  portion_quantity  Decimal  @db.Decimal(12, 3)
+  portion_unit      String
+  conversion_factor Decimal? @db.Decimal(12, 4)
+  is_active         Boolean  @default(true)
+  updated_at        DateTime @default(now())
+  created_at        DateTime @default(now())
+
+  @@map("ingredient_authority")
+}
+
 model item_alias {
   alias_name   String       @id
   sku          String
