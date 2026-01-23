@@ -35,7 +35,7 @@ type UnitType = "g" | "ml" | "each";
 type Ingredient = {
   id: number;
   name: string;
-  portion_unit: UnitType;
+  portionUnit: UnitType | null;
 };
 
 type RecipeLine = {
@@ -211,13 +211,26 @@ export default function RecipeEditorPage() {
   };
 
   const addIngredient = async (ingredient: Ingredient) => {
-    if (!editingId) return;
-    await axios.post(`/api/recipes/${editingId}/ingredients`, {
-      ingredient_id: ingredient.id,
-      portion_quantity: 1,
-      portion_unit: ingredient.portion_unit,
-    });
-    await reloadIngredients();
+    const unit = ingredient.portionUnit || "g";
+    if (editingId) {
+      await axios.post(`/api/recipes/${editingId}/ingredients`, {
+        ingredientName: ingredient.name,
+        quantity: 1,
+        unit,
+      });
+      await reloadIngredients();
+    } else {
+      const newLine: RecipeLine = {
+        ingredientId: String(ingredient.id),
+        name: ingredient.name,
+        qty: 1,
+        unit: unit as UnitType,
+        baseUnit: unit as UnitType,
+        unitCostTHB: 0,
+        costTHB: 0,
+      };
+      setLines((prev) => [...prev, newLine]);
+    }
     setSearch("");
   };
 

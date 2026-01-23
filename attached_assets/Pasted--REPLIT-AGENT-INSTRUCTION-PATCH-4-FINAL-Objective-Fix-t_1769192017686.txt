@@ -1,0 +1,93 @@
+🔒 REPLIT AGENT INSTRUCTION — PATCH 4 (FINAL)
+Objective
+Fix the “Add Ingredient” button in the New Recipe Builder so it works correctly with the legacy ingredient system without touching backend logic, schema, or cost calculations.
+Ingredient search and visibility are already correct.
+This patch fixes the 400 error on Add Ingredient only.
+🚨 RULES (NON-NEGOTIABLE)
+❌ DO NOT modify backend routes
+❌ DO NOT modify schema
+❌ DO NOT introduce ingredient IDs
+❌ DO NOT change cost logic
+❌ DO NOT add writes to ingredient tables
+❌ DO NOT refactor layout or UI
+✅ FRONTEND ONLY
+✅ SINGLE PATCH
+✅ COPY-PASTE SAFE
+🔧 ROOT CAUSE (FOR CONTEXT ONLY — DO NOT “FIX” BACKEND)
+The Add Ingredient button still posts the old contract (ingredientId) while the UI now uses legacy name-based ingredients, causing a 400 error.
+The backend already supports name-based ingredient adds (legacy behavior).
+We must translate on the frontend, not change the backend.
+🎯 FILE TO UPDATE
+Copy code
+
+client/src/pages/menu/recipes/NewRecipe.tsx
+If the filename differs slightly, update only the add-ingredient click handler, not layout, styling, or surrounding logic.
+🔁 REQUIRED CHANGE (FULL REPLACEMENT)
+Locate the Add Ingredient click handler
+It will look similar to this:
+Copy code
+Ts
+onClick={() => addIngredient(item)}
+🔄 REPLACE IT WITH THIS EXACT LOGIC
+Copy code
+Ts
+onClick={async () => {
+  try {
+    await fetch(`/api/recipes/${recipeId}/ingredients`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        ingredientName: item.name,   // ✅ name-based (legacy-compatible)
+        quantity: 1,
+        unit: item.unit,
+      }),
+    });
+
+    // Refresh recipe ingredients list
+    await reloadRecipe();
+  } catch (err) {
+    console.error("Failed to add ingredient", err);
+  }
+}}
+🧪 REQUIRED VERIFICATION (MANDATORY)
+After applying the patch:
+Go to:
+Copy code
+
+/menu/recipes/new
+Search:
+Copy code
+
+cheese
+Click Add Ingredient
+✅ No error
+✅ Ingredient appears in table
+Enter:
+Copy code
+
+95g
+Cost should calculate to approximately:
+Copy code
+
+฿30.3
+✅ ACCEPTANCE CRITERIA (ALL MUST PASS)
+✅ Ingredient search works
+✅ “Add Ingredient” does NOT throw 400
+✅ Ingredient appears immediately in table
+✅ Cost math unchanged
+✅ No backend files modified
+✅ No schema changes
+✅ No new endpoints
+✅ No regressions in /menu/recipes/:id
+🧱 FINAL STATE AFTER THIS PATCH
+Single ingredient truth
+Canonical read path
+Legacy-compatible write path
+New + old recipe pages aligned
+Zero backend risk
+Locked system
+📢 COMPLETION RESPONSE (ONE LINE ONLY)
+When finished, respond with:
+“Add Ingredient now works”
