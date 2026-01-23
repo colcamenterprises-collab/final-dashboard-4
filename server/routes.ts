@@ -4006,19 +4006,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
-  app.delete("/api/recipes/:id", async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        return next(); // Let router handle non-numeric IDs
-      }
-      
-      await storage.deleteRecipe(id);
-      res.json({ success: true });
-    } catch (error) {
-      res.status(400).json({ error: "Failed to delete recipe", details: (error as Error).message });
-    }
-  });
+  // DELETE /api/recipes/:id is handled by the recipes router (database-backed)
 
   // Ingredients Management Routes (DISABLED - now using enhanced database route)
   // app.get("/api/ingredients", async (req: Request, res: Response) => {
