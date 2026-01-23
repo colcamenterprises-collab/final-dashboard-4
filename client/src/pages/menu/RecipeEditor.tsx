@@ -30,7 +30,9 @@ const THB = (n: number) =>
 
 const num = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-type UnitType = "g" | "ml" | "each";
+type UnitType = "g" | "kg" | "ml" | "l" | "each" | "slice" | "cup";
+
+const PORTION_UNITS: UnitType[] = ["g", "kg", "ml", "l", "each", "slice", "cup"];
 
 type Ingredient = {
   id: number;
@@ -211,6 +213,14 @@ export default function RecipeEditorPage() {
   };
 
   const addIngredient = async (ingredient: Ingredient) => {
+    const isDuplicate = lines.some(
+      (line) => line.ingredientId === String(ingredient.id) || line.name === ingredient.name
+    );
+    if (isDuplicate) {
+      toast({ title: "Already added", description: `${ingredient.name} is already in the recipe.`, variant: "destructive" });
+      return;
+    }
+
     const unit = ingredient.portionUnit || "g";
     if (editingId) {
       await axios.post(`/api/recipes/${editingId}/ingredients`, {
@@ -243,6 +253,14 @@ export default function RecipeEditorPage() {
               qty: num(value),
             }
           : line,
+      ),
+    );
+  };
+
+  const updateLineUnit = (index: number, unit: UnitType) => {
+    setLines((prev) =>
+      prev.map((line, idx) =>
+        idx === index ? { ...line, unit } : line,
       ),
     );
   };
@@ -473,7 +491,19 @@ export default function RecipeEditorPage() {
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 sm:hidden">Portion unit</div>
-                    <div className="text-sm text-slate-700">{line.unit}</div>
+                    <Select
+                      value={line.unit}
+                      onValueChange={(value) => updateLineUnit(index, value as UnitType)}
+                    >
+                      <SelectTrigger className="text-sm rounded-[4px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PORTION_UNITS.map((u) => (
+                          <SelectItem key={u} value={u}>{u}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <div className="text-xs text-slate-500 sm:hidden">Conversion</div>
