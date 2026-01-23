@@ -191,8 +191,9 @@ export default function RecipeEditorPage() {
     }
     setSearchLoading(true);
     try {
-      const res = await axios.get<Ingredient[]>(`/api/ingredients?search=${term}`);
-      setSearchResults(res.data);
+      const res = await axios.get<{ items: Ingredient[]; count: number } | Ingredient[]>(`/api/ingredients?search=${term}`);
+      const items = Array.isArray(res.data) ? res.data : (res.data.items || []);
+      setSearchResults(items);
     } catch (error) {
       setSearchResults([]);
     } finally {
