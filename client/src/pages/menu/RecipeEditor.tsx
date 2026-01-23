@@ -212,7 +212,14 @@ export default function RecipeEditorPage() {
     await queryClient.invalidateQueries({ queryKey: ["recipe-ingredients", editingId] });
   };
 
-  const addIngredient = async (ingredient: Ingredient) => {
+  /**
+   * 🔒 LOCKED RECIPE INGREDIENT FLOW
+   * Ingredients are added via LOCAL STATE ONLY.
+   * Do NOT introduce backend calls when adding ingredients.
+   * Persistence occurs ONLY on Save Recipe.
+   * Violating this will reintroduce 400 errors and broken recipes.
+   */
+  const addIngredient = (ingredient: Ingredient) => {
     const isDuplicate = lines.some(
       (line) => line.ingredientId === String(ingredient.id) || line.name === ingredient.name
     );

@@ -1,0 +1,125 @@
+🔒 REPLIT AGENT PATCH — RECIPE INGREDIENT FLOW LOCKDOWN
+PATCH NAME
+PATCH-LOCK-RECIPE-INGREDIENT-FLOW-v1
+STATUS
+MANDATORY · NON-NEGOTIABLE · DO NOT DEVIATE
+🎯 OBJECTIVE (LOCKDOWN)
+Permanently lock the recipe builder so that:
+“Add Ingredient” is UI-only
+NO backend call occurs when adding ingredients
+Ingredients are saved ONLY when “Save Recipe” is clicked
+No reference to ingredient_authority exists anywhere
+Legacy ingredients are the single source of truth
+This patch is defensive and architectural.
+Future agents MUST NOT reinterpret or optimize this.
+🔐 RULES (HARD LOCK)
+❌ ABSOLUTELY FORBIDDEN
+❌ Creating or referencing ingredient_authority
+❌ API calls on “Add Ingredient”
+❌ Per-ingredient persistence
+❌ Mock ingredient data
+❌ Schema changes
+❌ Backend writes before Save Recipe
+❌ “Optimizing” this flow
+✅ REQUIRED BEHAVIOR
+✅ Ingredient selection is read-only
+✅ Ingredient addition is local state only
+✅ Backend write happens once per recipe save
+✅ Mixed units supported (each / g / ml / etc.)
+✅ Costs calculated client-side, saved server-side
+📍 FILES IN SCOPE (DO NOT EXPAND)
+FRONTEND
+Copy code
+
+client/src/pages/menu/recipes/NewRecipe.tsx
+client/src/pages/menu/recipes/RecipeEditor.tsx
+BACKEND (READ-ONLY)
+Copy code
+
+server/routes/ingredients-legacy.ts
+server/storage.ts
+No other files may be modified.
+🧠 REQUIRED IMPLEMENTATION (AUTHORITATIVE)
+1️⃣ Ingredient Fetch (READ-ONLY)
+Copy code
+Ts
+GET /api/ingredients/legacy
+This endpoint is lookup only
+No mutations
+No transforms beyond mapping
+2️⃣ Add Ingredient (UI-ONLY)
+When user clicks Add Ingredient:
+Copy code
+Ts
+// MUST be local state only
+setRecipeIngredients(prev => [
+  ...prev,
+  {
+    name: ingredient.name,
+    portionQty: 1,
+    portionUnit: ingredient.defaultUnit ?? "each",
+    unitCost: ingredient.unitPrice,
+    calculatedCost: 0
+  }
+]);
+🚫 NO fetch / POST / PUT allowed here
+3️⃣ Portion Unit MUST Be Editable
+Portion unit dropdown/input MUST be editable
+Examples that MUST work in the same recipe:
+1 each Burger Bun
+2 slice Cheese
+90 g Beef Patty
+20 g Mayo
+🚫 Units must NOT default to grams globally
+🚫 Units must NOT be locked
+4️⃣ Save Recipe (SINGLE WRITE)
+Only when Save Recipe is clicked:
+Copy code
+Ts
+POST /api/recipes
+{
+  name,
+  yield,
+  ingredients: [
+    {
+      name,
+      portionQty,
+      portionUnit,
+      calculatedCost
+    }
+  ],
+  totalCost
+}
+✔ One payload
+✔ One write
+✔ Atomic
+🧪 SUCCESS CRITERIA (MUST VERIFY)
+Agent MUST verify all of the following before stopping:
+✅ Typing chee filters correctly (no full-match bug)
+✅ “Add Ingredient” NEVER triggers network request
+✅ Mixed units display correctly
+✅ No 400 errors possible during ingredient add
+✅ Recipe saves successfully
+✅ Reloading recipe preserves units & costs
+✅ No duplicate ingredient injection
+✅ No console errors
+🛑 PERMANENT COMMENT (ADD TO CODE)
+Agent MUST add this comment verbatim near ingredient logic:
+Copy code
+Ts
+/**
+ * 🔒 LOCKED RECIPE INGREDIENT FLOW
+ * Ingredients are added via LOCAL STATE ONLY.
+ * Do NOT introduce backend calls when adding ingredients.
+ * Persistence occurs ONLY on Save Recipe.
+ * Violating this will reintroduce 400 errors and broken recipes.
+ */
+🧠 AGENT ACKNOWLEDGEMENT (REQUIRED)
+Agent must explicitly state:
+“I acknowledge that the recipe ingredient add flow is UI-only by design and must not be altered.”
+📌 FINAL STATE (WHAT THIS ACHIEVES)
+One ingredient truth
+One recipe write
+Zero phantom tables
+Zero backend coupling
+Zero future regressions
