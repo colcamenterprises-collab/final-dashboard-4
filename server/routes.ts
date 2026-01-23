@@ -37,6 +37,7 @@ import expensesImportRouter from "./routes/expenses-import";
 import partnersRouter from "./routes/partners";
 import balanceRoutes from "./routes/balance";
 import ingredientsRoutes from "./routes/ingredients";
+import legacyIngredientsRouter from "./routes/ingredients-legacy";
 import managerCheckRouter from './routes/managerChecks';
 import shoppingListRouter from './routes/shoppingList';
 import shoppingListNewRouter from './routes/shoppingListNew';
@@ -3632,6 +3633,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/balance', balanceRoutes);
 
   // Ingredients API routes
+  app.use('/api/ingredients/legacy', legacyIngredientsRouter);
   app.use('/api/ingredients', ingredientsRoutes);
   app.use('/api/manager-check', managerCheckRouter);
   app.use('/api/shopping-list', shoppingListRoutes);
