@@ -222,25 +222,16 @@ export default function RecipeEditorPage() {
     }
 
     const unit = ingredient.portionUnit || "g";
-    if (editingId) {
-      await axios.post(`/api/recipes/${editingId}/ingredients`, {
-        ingredientName: ingredient.name,
-        quantity: 1,
-        unit,
-      });
-      await reloadIngredients();
-    } else {
-      const newLine: RecipeLine = {
-        ingredientId: String(ingredient.id),
-        name: ingredient.name,
-        qty: 1,
-        unit: unit as UnitType,
-        baseUnit: unit as UnitType,
-        unitCostTHB: 0,
-        costTHB: 0,
-      };
-      setLines((prev) => [...prev, newLine]);
-    }
+    const newLine: RecipeLine = {
+      ingredientId: String(ingredient.id),
+      name: ingredient.name,
+      qty: 1,
+      unit: unit as UnitType,
+      baseUnit: unit as UnitType,
+      unitCostTHB: 0,
+      costTHB: 0,
+    };
+    setLines((prev) => [...prev, newLine]);
     setSearch("");
   };
 
