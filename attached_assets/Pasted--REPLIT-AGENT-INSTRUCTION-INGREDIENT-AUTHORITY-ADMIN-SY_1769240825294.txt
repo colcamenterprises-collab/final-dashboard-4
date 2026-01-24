@@ -1,0 +1,160 @@
+🔒 REPLIT AGENT INSTRUCTION — INGREDIENT AUTHORITY (ADMIN SYSTEM ONLY)
+PROJECT
+Final Dashboard 4.0 – Smash Brothers Burgers
+CONTEXT (MANDATORY READ)
+The Recipe Builder and Ingredient Add Flow are LOCKED and MUST NOT be modified.
+This task is ADMIN-ONLY and ADDITIVE.
+Any deviation from this instruction is considered a critical architecture violation.
+❗ ABSOLUTE PROHIBITIONS (NON-NEGOTIABLE)
+You MUST NOT:
+❌ Modify any recipe builder UI or logic
+❌ Modify /menu/recipes or /menu/recipes/new
+❌ Modify addIngredient or ingredient add/remove logic
+❌ Add backend calls during ingredient add/remove
+❌ Introduce ingredient writes during recipe composition
+❌ Invent or reintroduce ingredient tables for recipe usage
+❌ Touch GET /api/ingredients/legacy
+❌ Reference Ingredient Authority from recipes
+❌ Auto-normalise portion units (grams, ml, etc.)
+❌ Infer, guess, or auto-promote ingredients
+❌ Create implicit syncs or background jobs
+DO NOT BE CLEVER. DO NOT OPTIMISE. DO NOT REFACTOR.
+🎯 OBJECTIVE (WHAT YOU ARE ALLOWED TO BUILD)
+Build an ADMIN-ONLY Ingredient Authority system that:
+Reads from legacy purchasing / ingredient list (read-only)
+Allows explicit admin approval of ingredients
+Defines:
+Default portion unit (free-text, editable)
+Purchase unit (value + unit)
+Stores versioned, auditable records
+Is completely isolated from recipes
+This system is for future cost engines only.
+🧱 ARCHITECTURE BOUNDARY (DO NOT CROSS)
+Copy code
+
+Legacy Ingredients (read-only)
+        ↓
+Ingredient Authority (ADMIN ONLY)
+        ↓
+(FUTURE) Cost Engine
+Recipes never read from Ingredient Authority.
+🗄️ DATABASE (NEW – ISOLATED)
+Create NEW tables only:
+ingredient_authority
+Fields:
+id (uuid, pk)
+legacy_ingredient_id (string, nullable)
+name (string)
+category (string or enum)
+is_active (boolean)
+default_portion_value (number | null)
+default_portion_unit (string | null)
+purchase_unit_value (number)
+purchase_unit (string)
+created_at
+updated_at
+created_by
+ingredient_authority_versions
+Immutable history.
+Fields:
+id
+ingredient_authority_id
+version_number
+snapshot_json
+created_at
+created_by
+Every edit creates a new version. No in-place edits.
+🔌 API (ADMIN-ONLY)
+Create a separate admin router.
+Allowed endpoints ONLY:
+Copy code
+
+GET    /api/admin/ingredient-authority
+POST   /api/admin/ingredient-authority
+PUT    /api/admin/ingredient-authority/:id      // creates new version
+GET    /api/admin/ingredient-authority/:id/versions
+Rules:
+Protected by admin middleware
+No public access
+No recipe access
+No shared DTOs with recipe code
+🖥️ ADMIN UI (NEW SECTION ONLY)
+Create a new admin-only page/module.
+1. Ingredient Review Queue
+Source: legacy purchasing list (read-only)
+Show:
+Name
+Supplier
+Category
+Approval status
+Actions:
+Review
+Ignore
+No automation. No inference.
+2. Approval Modal
+Admin must explicitly define:
+Canonical name
+Category
+Default portion:
+Value
+Unit (free text)
+Purchase unit:
+Value
+Unit
+Notes (optional)
+Buttons:
+Approve & Create
+Cancel
+Creates:
+ingredient_authority
+ingredient_authority_versions (v1)
+3. Ingredient Authority Table
+Admin management table.
+Columns:
+Name
+Category
+Default Portion
+Purchase Unit
+Active
+Version count
+Last edited
+Actions:
+Edit → creates new version
+Deactivate
+View History
+4. Version History (Read-Only)
+Version #
+Timestamp
+Admin user
+Snapshot JSON
+🔒 REQUIRED CODE COMMENTS
+At top of all Ingredient Authority files:
+Copy code
+Ts
+// 🔒 INGREDIENT AUTHORITY SYSTEM
+// ADMIN-ONLY. ISOLATED.
+// MUST NOT be referenced by recipe builder or ingredient add flow.
+// Any integration requires explicit owner approval.
+🧪 TESTING REQUIREMENTS
+Before marking complete, verify:
+✅ Recipe builder unchanged
+✅ No new network traffic when adding/removing ingredients in recipes
+✅ No console errors
+✅ No joins between recipes and ingredient authority
+✅ Admin pages function independently
+✅ Versioning works correctly
+🚫 FAILURE CONDITIONS (AUTO-REJECT)
+If you:
+Touch recipe files
+Add backend calls during recipe ingredient add
+Break mixed portion units
+Introduce ingredient writes during recipe composition
+👉 STOP IMMEDIATELY AND ABORT
+✅ SUCCESS CRITERIA
+Ingredient Authority exists
+Admin can explicitly approve ingredients
+Units are defined but not enforced anywhere else
+Full audit history exists
+Recipe system remains untouched and stable
+You are authorized ONLY to build what is described above.
+Nothing more. Nothing less.

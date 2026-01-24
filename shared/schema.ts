@@ -2276,3 +2276,21 @@ export type ProductIngredient = typeof productIngredient.$inferSelect;
 export type InsertProductIngredient = z.infer<typeof insertProductIngredientSchema>;
 export type ProductPrice = typeof productPrice.$inferSelect;
 export type InsertProductPrice = z.infer<typeof insertProductPriceSchema>;
+
+// 🔒 INGREDIENT AUTHORITY VERSIONS (ADMIN AUDIT TRAIL)
+// ADMIN-ONLY. ISOLATED.
+// MUST NOT be referenced by recipe builder or ingredient add flow.
+// Any integration requires explicit owner approval.
+export const ingredientAuthorityVersions = pgTable("ingredient_authority_versions", {
+  id: serial("id").primaryKey(),
+  ingredientAuthorityId: integer("ingredient_authority_id").notNull(),
+  versionNumber: integer("version_number").notNull(),
+  snapshotJson: jsonb("snapshot_json").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: text("created_by"),
+});
+
+export const insertIngredientAuthorityVersionSchema = createInsertSchema(ingredientAuthorityVersions).omit({ id: true, createdAt: true });
+
+export type IngredientAuthorityVersion = typeof ingredientAuthorityVersions.$inferSelect;
+export type InsertIngredientAuthorityVersion = z.infer<typeof insertIngredientAuthorityVersionSchema>;
