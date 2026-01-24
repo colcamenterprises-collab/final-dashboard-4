@@ -208,7 +208,7 @@ export default function App() {
                 <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
                 <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
                 <Route path="/admin/data-safety" element={<Guard><DataSafety /></Guard>} />
-                <Route path="/admin/ingredient-authority" element={<Guard><IngredientAuthority /></Guard>} />
+                <Route path="/menu-management/ingredient-authority" element={<Guard><IngredientAuthority /></Guard>} />
 
                 <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
                 <Route path="/partners/analytics" element={<Guard><PartnerAnalytics /></Guard>} />

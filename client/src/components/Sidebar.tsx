@@ -52,6 +52,7 @@ const groups: Group[] = [
       { to: "/recipe-management", label: "Recipe Management" },
       { to: "/products", label: "Products" },
       { to: "/menu/manager", label: "Menu Manager" },
+      { to: "/menu-management/ingredient-authority", label: "Ingredient Authority" },
     ],
   },
   {

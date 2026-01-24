@@ -1,0 +1,131 @@
+🔒 REPLIT AGENT INSTRUCTION — INGREDIENT AUTHORITY (FIX & ALIGNMENT PASS)
+PROJECT
+Final Dashboard 4.0 – Smash Brothers Burgers
+PURPOSE OF THIS TASK
+You have already built the Ingredient Authority admin system.
+This task is a correction + alignment pass only.
+You MUST:
+Fix routing and navigation placement
+Correct unit handling rules
+Verify review queue behavior
+Leave the recipe system untouched
+This is NOT a redesign or extension task.
+🚫 ABSOLUTE PROHIBITIONS (RECONFIRMED)
+You MUST NOT:
+❌ Touch recipe builder UI or logic
+❌ Modify /menu/recipes or /menu/recipes/new
+❌ Modify ingredient add/remove behavior in recipes
+❌ Add backend calls during recipe ingredient add
+❌ Reintroduce ingredient writes during recipe composition
+❌ Add joins or references from recipes to Ingredient Authority
+❌ Modify GET /api/ingredients/legacy
+❌ Enforce or normalise units (metric or otherwise)
+❌ Auto-convert units
+❌ Guess, infer, or auto-promote ingredients
+If any of the above occurs → STOP AND ABORT
+✅ REQUIRED FIXES (ALL MUST BE DONE)
+1️⃣ ROUTING & SIDEBAR PLACEMENT (MANDATORY)
+❌ CURRENT (WRONG)
+Copy code
+
+/admin/ingredient-authority
+✅ REQUIRED (LOCKED)
+Copy code
+
+/menu-management/ingredient-authority
+Sidebar rules
+Place under Menu Management
+Visible to:
+Owner
+Manager
+Hidden from:
+Staff
+Kitchen
+Cashier
+No icons
+No badges
+No shortcuts
+No links from recipes or purchasing
+This is management governance, not system admin.
+2️⃣ UNIT HANDLING — FINAL LOCKED RULE
+SOURCE OF TRUTH
+Unit fields MUST be free-text inputs
+Stored value MUST be the literal string entered by the user
+DROPDOWNS (ALLOWED AS HELPERS ONLY)
+You MAY include a dropdown of common unit suggestions
+Selecting a value MUST only insert text into the free-text field
+Dropdowns MUST NOT:
+Restrict values
+Validate values
+Enforce enums
+Convert units
+Normalise units
+Reject non-metric or custom units
+❌ FORBIDDEN
+Fixed enums
+Metric-only logic
+Automatic conversions
+Unit IDs instead of strings
+Validation that blocks entries like:
+2 slices
+1 bag
+0.5 cup
+each
+This system defines meaning, not math.
+3️⃣ REVIEW QUEUE BEHAVIOR (VERIFY & FIX IF NEEDED)
+Endpoint:
+Copy code
+
+GET /api/admin/ingredient-authority/review-queue
+HARD RULES
+Must be a read-only projection of legacy ingredients
+MUST NOT:
+Write back to legacy tables
+Flag legacy rows
+Modify purchasing data
+Any “ignored” or “approved” state MUST live inside Ingredient Authority only
+If the review queue mutates legacy data → remove that logic
+4️⃣ ACCESS CONTROL CONFIRMATION
+Editing allowed:
+Owner
+Manager
+Viewing allowed:
+Owner
+Manager
+All endpoints protected accordingly
+This is management-editable, not developer-only.
+📝 REQUIRED FILE HEADER COMMENT (ALL IA FILES)
+Add to the top of all Ingredient Authority UI + API files:
+Copy code
+Ts
+// 🔒 INGREDIENT AUTHORITY
+// Management-editable governance layer
+// Lives under Menu Management for access ONLY
+// Units are free-text (dropdowns are assistive only)
+// MUST NOT be referenced by recipe builder or ingredient add flow
+🧪 MANDATORY VERIFICATION BEFORE COMPLETION
+You must confirm:
+✅ Recipe builder unchanged
+✅ No network traffic when adding/removing ingredients in recipes
+✅ No console errors
+✅ Ingredient Authority route is /menu-management/ingredient-authority
+✅ Sidebar placement is under Menu Management
+✅ Unit fields accept arbitrary text
+✅ Dropdowns do not enforce or validate units
+✅ Review queue does not mutate legacy data
+✅ Versioning still works as before
+🚫 FAILURE CONDITIONS (AUTO-REJECT)
+If you:
+Leave the route under /admin
+Enforce metric units
+Convert or normalise units
+Touch recipe files
+Mutate legacy purchasing data
+👉 STOP IMMEDIATELY AND ABORT
+✅ SUCCESS CRITERIA
+Ingredient Authority remains fully functional
+Placement and access match management intent
+Units are flexible and future-safe
+Recipe system remains locked and stable
+You are authorized to make ONLY the fixes above.
+Do not improve, extend, or refactor beyond this scope
