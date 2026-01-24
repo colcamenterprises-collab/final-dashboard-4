@@ -78,8 +78,8 @@ router.post('/', async (req, res) => {
       createdBy
     } = req.body;
 
-    if (!name || !category || !purchaseUnit || !portionUnit) {
-      return res.status(400).json({ error: 'Missing required fields' });
+    if (!name || !category) {
+      return res.status(400).json({ error: 'Name and category are required' });
     }
 
     const insertResult = await db.execute(sql`
@@ -103,10 +103,10 @@ router.post('/', async (req, res) => {
         ${category},
         ${supplier || ''},
         ${purchaseQuantity || 1},
-        ${purchaseUnit},
+        ${purchaseUnit || ''},
         ${purchaseCostThb || 0},
         ${portionQuantity || 1},
-        ${portionUnit},
+        ${portionUnit || ''},
         ${conversionFactor || null},
         ${notes || null},
         ${createdBy || 'admin'},

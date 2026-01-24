@@ -127,8 +127,10 @@ export default function IngredientAuthorityPage() {
 
   const approveMutation = useMutation({
     mutationFn: async (data: Record<string, any>) => {
-      const res = await apiRequest('POST', '/api/admin/ingredient-authority', data);
-      return res.json();
+      return await apiRequest('/api/admin/ingredient-authority', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
     },
     onSuccess: () => {
       toast({ title: 'Ingredient Approved', description: 'Added to Ingredient Authority' });
@@ -144,8 +146,10 @@ export default function IngredientAuthorityPage() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: Record<string, any> }) => {
-      const res = await apiRequest('PUT', `/api/admin/ingredient-authority/${id}`, data);
-      return res.json();
+      return await apiRequest(`/api/admin/ingredient-authority/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
     },
     onSuccess: () => {
       toast({ title: 'Authority Updated', description: 'New version created' });
@@ -160,8 +164,10 @@ export default function IngredientAuthorityPage() {
 
   const deactivateMutation = useMutation({
     mutationFn: async (id: number) => {
-      const res = await apiRequest('PATCH', `/api/admin/ingredient-authority/${id}/deactivate`, { deactivatedBy: 'admin' });
-      return res.json();
+      return await apiRequest(`/api/admin/ingredient-authority/${id}/deactivate`, {
+        method: 'PATCH',
+        body: JSON.stringify({ deactivatedBy: 'admin' })
+      });
     },
     onSuccess: () => {
       toast({ title: 'Ingredient Deactivated', description: 'Record has been soft-deleted' });
@@ -174,12 +180,14 @@ export default function IngredientAuthorityPage() {
 
   const manualAddMutation = useMutation({
     mutationFn: async (data: Record<string, any>) => {
-      const res = await apiRequest('POST', '/api/admin/ingredient-authority', {
-        ...data,
-        legacyIngredientId: null,
-        createdBy: 'admin'
+      return await apiRequest('/api/admin/ingredient-authority', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...data,
+          legacyIngredientId: null,
+          createdBy: 'admin'
+        })
       });
-      return res.json();
     },
     onSuccess: () => {
       toast({ title: 'Ingredient Added', description: 'Manual entry created with version 1' });
