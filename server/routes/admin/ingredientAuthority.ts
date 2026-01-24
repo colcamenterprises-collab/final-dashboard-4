@@ -290,4 +290,65 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+// PATCH /api/admin/ingredient-authority/:id/deactivate - Soft delete (set is_active = false)
+// Hard deletes are FORBIDDEN
+router.patch('/:id/deactivate', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: 'Invalid ID' });
+    }
+
+    const { deactivatedBy } = req.body;
+
+    // Get current version number
+    const currentVersionResult = await db.execute(sql`
+      SELECT COALESCE(MAX(version_number), 0) as max_version
+      FROM ingredient_authority_versions
+      WHERE ingredient_authority_id = ${id}
+    `);
+    const maxVersion = Number((currentVersionResult.rows || currentVersionResult)[0]?.max_version || 0);
+
+    // Soft delete: set is_active = false
+    const updateResult = await db.execute(sql`
+      UPDATE ingredient_authority SET
+        is_active = false,
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `);
+
+    const updatedAuthority = (updateResult.rows || updateResult)[0];
+    if (!updatedAuthority) {
+      return res.status(404).json({ error: 'Ingredient authority not found' });
+    }
+
+    // Create version snapshot for audit trail
+    const snapshot = {
+      action: 'deactivated',
+      name: updatedAuthority.name,
+      isActive: false
+    };
+
+    await db.execute(sql`
+      INSERT INTO ingredient_authority_versions (
+        ingredient_authority_id,
+        version_number,
+        snapshot_json,
+        created_by
+      ) VALUES (
+        ${id},
+        ${maxVersion + 1},
+        ${JSON.stringify(snapshot)}::jsonb,
+        ${deactivatedBy || 'admin'}
+      )
+    `);
+
+    res.json({ success: true, data: updatedAuthority, message: 'Ingredient deactivated' });
+  } catch (error: any) {
+    console.error('ingredient-authority.deactivate error', error);
+    res.status(500).json({ error: 'Failed to deactivate ingredient authority' });
+  }
+});
+
 export default router;

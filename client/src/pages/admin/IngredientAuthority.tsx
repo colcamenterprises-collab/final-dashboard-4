@@ -81,6 +81,7 @@ export default function IngredientAuthorityPage() {
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showVersionsModal, setShowVersionsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showManualAddModal, setShowManualAddModal] = useState(false);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -156,6 +157,85 @@ export default function IngredientAuthorityPage() {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     }
   });
+
+  const deactivateMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest('PATCH', `/api/admin/ingredient-authority/${id}/deactivate`, { deactivatedBy: 'admin' });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Ingredient Deactivated', description: 'Record has been soft-deleted' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ingredient-authority'] });
+    },
+    onError: (err: any) => {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  });
+
+  const manualAddMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      const res = await apiRequest('POST', '/api/admin/ingredient-authority', {
+        ...data,
+        legacyIngredientId: null,
+        createdBy: 'admin'
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: 'Ingredient Added', description: 'Manual entry created with version 1' });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/ingredient-authority'] });
+      setShowManualAddModal(false);
+      resetForm();
+    },
+    onError: (err: any) => {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    }
+  });
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      category: 'Other',
+      supplier: '',
+      purchaseQuantity: 1,
+      purchaseUnit: '',
+      purchaseCostThb: 0,
+      portionQuantity: 1,
+      portionUnit: '',
+      conversionFactor: null,
+      notes: ''
+    });
+  };
+
+  const openManualAddModal = () => {
+    resetForm();
+    setShowManualAddModal(true);
+  };
+
+  const handleManualAdd = () => {
+    if (!formData.name || !formData.category) {
+      toast({ title: 'Error', description: 'Name and category are required', variant: 'destructive' });
+      return;
+    }
+    manualAddMutation.mutate({
+      name: formData.name,
+      category: formData.category,
+      supplier: formData.supplier,
+      purchaseQuantity: formData.purchaseQuantity,
+      purchaseUnit: formData.purchaseUnit,
+      purchaseCostThb: formData.purchaseCostThb,
+      portionQuantity: formData.portionQuantity,
+      portionUnit: formData.portionUnit,
+      conversionFactor: formData.conversionFactor,
+      notes: formData.notes
+    });
+  };
+
+  const handleDeactivate = (authority: IngredientAuthority) => {
+    if (confirm(`Deactivate "${authority.name}"? This is a soft delete.`)) {
+      deactivateMutation.mutate(authority.id);
+    }
+  };
 
   const openApprovalModal = (item: ReviewItem) => {
     setSelectedItem(item);
@@ -293,8 +373,11 @@ export default function IngredientAuthorityPage() {
 
         <TabsContent value="authority" className="mt-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Approved Ingredients</CardTitle>
+              <Button size="sm" onClick={openManualAddModal}>
+                Manual Add
+              </Button>
             </CardHeader>
             <CardContent>
               {authorities.isLoading ? (
@@ -306,6 +389,7 @@ export default function IngredientAuthorityPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Name</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead>Purchase</TableHead>
                       <TableHead>Portion</TableHead>
@@ -316,8 +400,13 @@ export default function IngredientAuthorityPage() {
                   </TableHeader>
                   <TableBody>
                     {authorities.data?.map((auth: IngredientAuthority) => (
-                      <TableRow key={auth.id}>
+                      <TableRow key={auth.id} className={!auth.is_active ? 'opacity-50' : ''}>
                         <TableCell className="font-medium">{auth.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={auth.is_active ? 'default' : 'secondary'}>
+                            {auth.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </TableCell>
                         <TableCell>{auth.category}</TableCell>
                         <TableCell>{auth.purchase_quantity} {auth.purchase_unit}</TableCell>
                         <TableCell>{auth.portion_quantity} {auth.portion_unit}</TableCell>
@@ -326,9 +415,16 @@ export default function IngredientAuthorityPage() {
                           <Badge variant="secondary">{auth.version_count || 1}</Badge>
                         </TableCell>
                         <TableCell className="space-x-2">
-                          <Button size="sm" variant="outline" onClick={() => openEditModal(auth)}>
-                            Edit
-                          </Button>
+                          {auth.is_active && (
+                            <>
+                              <Button size="sm" variant="outline" onClick={() => openEditModal(auth)}>
+                                Edit
+                              </Button>
+                              <Button size="sm" variant="ghost" onClick={() => handleDeactivate(auth)}>
+                                Deactivate
+                              </Button>
+                            </>
+                          )}
                           <Button size="sm" variant="ghost" onClick={() => openVersionsModal(auth)}>
                             History
                           </Button>
@@ -592,6 +688,114 @@ export default function IngredientAuthorityPage() {
               </Table>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showManualAddModal} onOpenChange={setShowManualAddModal}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Manual Add Ingredient</DialogTitle>
+            <DialogDescription>
+              Create a new Ingredient Authority record (legacy_ingredient_id = NULL).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Name *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Ingredient name"
+                />
+              </div>
+              <div>
+                <Label>Category *</Label>
+                <Select value={formData.category} onValueChange={v => setFormData(p => ({ ...p, category: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {CATEGORIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Supplier</Label>
+              <Input
+                value={formData.supplier}
+                onChange={e => setFormData(p => ({ ...p, supplier: e.target.value }))}
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Purchase Qty</Label>
+                <Input
+                  type="number"
+                  value={formData.purchaseQuantity}
+                  onChange={e => setFormData(p => ({ ...p, purchaseQuantity: Number(e.target.value) }))}
+                />
+              </div>
+              <div>
+                <Label>Purchase Unit</Label>
+                <Input
+                  list="unit-suggestions"
+                  value={formData.purchaseUnit}
+                  onChange={e => setFormData(p => ({ ...p, purchaseUnit: e.target.value }))}
+                  placeholder="e.g. kg, each, bag"
+                />
+              </div>
+              <div>
+                <Label>Cost (THB)</Label>
+                <Input
+                  type="number"
+                  value={formData.purchaseCostThb}
+                  onChange={e => setFormData(p => ({ ...p, purchaseCostThb: Number(e.target.value) }))}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Portion Qty</Label>
+                <Input
+                  type="number"
+                  value={formData.portionQuantity}
+                  onChange={e => setFormData(p => ({ ...p, portionQuantity: Number(e.target.value) }))}
+                />
+              </div>
+              <div>
+                <Label>Portion Unit</Label>
+                <Input
+                  list="unit-suggestions"
+                  value={formData.portionUnit}
+                  onChange={e => setFormData(p => ({ ...p, portionUnit: e.target.value }))}
+                  placeholder="e.g. g, slice, each"
+                />
+              </div>
+              <div>
+                <Label>Conversion Factor</Label>
+                <Input
+                  type="number"
+                  placeholder="Optional"
+                  value={formData.conversionFactor ?? ''}
+                  onChange={e => setFormData(p => ({ ...p, conversionFactor: e.target.value ? Number(e.target.value) : null }))}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea
+                value={formData.notes}
+                onChange={e => setFormData(p => ({ ...p, notes: e.target.value }))}
+                placeholder="Optional notes..."
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowManualAddModal(false)}>Cancel</Button>
+            <Button onClick={handleManualAdd} disabled={manualAddMutation.isPending}>
+              {manualAddMutation.isPending ? 'Adding...' : 'Add Ingredient'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
