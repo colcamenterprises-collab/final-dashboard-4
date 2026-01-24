@@ -1,7 +1,8 @@
-// 🔒 INGREDIENT AUTHORITY SYSTEM
-// ADMIN-ONLY. ISOLATED.
-// MUST NOT be referenced by recipe builder or ingredient add flow.
-// Any integration requires explicit owner approval.
+// 🔒 INGREDIENT AUTHORITY
+// Management-editable governance layer
+// Lives under Menu Management for access ONLY
+// Units are free-text (dropdowns are assistive only)
+// MUST NOT be referenced by recipe builder or ingredient add flow
 
 import { Router } from 'express';
 import { db } from '../../db';

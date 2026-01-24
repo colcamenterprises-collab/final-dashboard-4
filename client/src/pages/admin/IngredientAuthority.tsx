@@ -1,6 +1,8 @@
-// 🔒 INGREDIENT AUTHORITY ADMIN PAGE
-// ADMIN-ONLY. ISOLATED.
-// NOT connected to recipe builder.
+// 🔒 INGREDIENT AUTHORITY
+// Management-editable governance layer
+// Lives under Menu Management for access ONLY
+// Units are free-text (dropdowns are assistive only)
+// MUST NOT be referenced by recipe builder or ingredient add flow
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -68,7 +70,7 @@ const CATEGORIES = [
   'Other'
 ];
 
-const UNITS = ['g', 'kg', 'ml', 'l', 'each', 'slice', 'cup', 'pack', 'bottle', 'box'];
+const UNIT_SUGGESTIONS = ['g', 'kg', 'ml', 'l', 'each', 'slice', 'cup', 'pack', 'bottle', 'box', 'bag', 'piece', 'portion'];
 
 export default function IngredientAuthorityPage() {
   const { toast } = useToast();
@@ -386,12 +388,12 @@ export default function IngredientAuthorityPage() {
               </div>
               <div>
                 <Label>Purchase Unit</Label>
-                <Select value={formData.purchaseUnit} onValueChange={v => setFormData(p => ({ ...p, purchaseUnit: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Input
+                  list="unit-suggestions"
+                  value={formData.purchaseUnit}
+                  onChange={e => setFormData(p => ({ ...p, purchaseUnit: e.target.value }))}
+                  placeholder="e.g. kg, each, bag"
+                />
               </div>
               <div>
                 <Label>Cost (THB)</Label>
@@ -413,12 +415,12 @@ export default function IngredientAuthorityPage() {
               </div>
               <div>
                 <Label>Portion Unit</Label>
-                <Select value={formData.portionUnit} onValueChange={v => setFormData(p => ({ ...p, portionUnit: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Input
+                  list="unit-suggestions"
+                  value={formData.portionUnit}
+                  onChange={e => setFormData(p => ({ ...p, portionUnit: e.target.value }))}
+                  placeholder="e.g. g, slice, each"
+                />
               </div>
               <div>
                 <Label>Conversion Factor</Label>
@@ -493,12 +495,12 @@ export default function IngredientAuthorityPage() {
               </div>
               <div>
                 <Label>Purchase Unit</Label>
-                <Select value={formData.purchaseUnit} onValueChange={v => setFormData(p => ({ ...p, purchaseUnit: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Input
+                  list="unit-suggestions"
+                  value={formData.purchaseUnit}
+                  onChange={e => setFormData(p => ({ ...p, purchaseUnit: e.target.value }))}
+                  placeholder="e.g. kg, each, bag"
+                />
               </div>
               <div>
                 <Label>Cost (THB)</Label>
@@ -520,12 +522,12 @@ export default function IngredientAuthorityPage() {
               </div>
               <div>
                 <Label>Portion Unit</Label>
-                <Select value={formData.portionUnit} onValueChange={v => setFormData(p => ({ ...p, portionUnit: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Input
+                  list="unit-suggestions"
+                  value={formData.portionUnit}
+                  onChange={e => setFormData(p => ({ ...p, portionUnit: e.target.value }))}
+                  placeholder="e.g. g, slice, each"
+                />
               </div>
               <div>
                 <Label>Conversion Factor</Label>
@@ -592,6 +594,10 @@ export default function IngredientAuthorityPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <datalist id="unit-suggestions">
+        {UNIT_SUGGESTIONS.map(u => <option key={u} value={u} />)}
+      </datalist>
     </div>
   );
 }

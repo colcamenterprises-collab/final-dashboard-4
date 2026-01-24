@@ -56,7 +56,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
     - **Recipe Architecture**: Canonical system (`recipe` + `recipe_ingredient` tables) with `pos_item_recipe_map`. Costs computed from `purchasing_items.unit_cost`. `server/services/recipeAuthority.ts` handles recipe logic.
     - **Ingredient Management**: Decoupled canonical ingredients table (`base_unit`, `unit_cost_per_base`, `source_purchasing_item_id`) with one-way sync from purchasing items.
     - **Unified Stock Logging**: Consolidated stock logging via `StockReceivedModal` into Shopping List with tabs for Rolls, Meat, Drinks, stored in `stock_received_log` table.
-    - **Ingredient Authority System (ADMIN-ONLY, ISOLATED)**: Versioned admin-only ingredient approval system completely isolated from recipe builder. Database tables: `ingredient_authority` (master records), `ingredient_authority_versions` (full audit trail). API: `/api/admin/ingredient-authority/*`. UI: `/admin/ingredient-authority`. Recipe builder must NEVER reference this system - any integration requires explicit owner approval.
+    - **Ingredient Authority System (ADMIN-ONLY, ISOLATED)**: Versioned admin-only ingredient approval system completely isolated from recipe builder. Database tables: `ingredient_authority` (master records), `ingredient_authority_versions` (full audit trail). API: `/api/admin/ingredient-authority/*`. UI: `/menu-management/ingredient-authority`. Recipe builder must NEVER reference this system - any integration requires explicit owner approval.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.
