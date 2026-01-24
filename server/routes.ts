@@ -38,6 +38,7 @@ import partnersRouter from "./routes/partners";
 import balanceRoutes from "./routes/balance";
 import ingredientsRoutes from "./routes/ingredients";
 import legacyIngredientsRouter from "./routes/ingredients-legacy";
+import ingredientAuthorityAdminRoutes from "./routes/admin/ingredientAuthority";
 import managerCheckRouter from './routes/managerChecks';
 import shoppingListRouter from './routes/shoppingList';
 import shoppingListNewRouter from './routes/shoppingListNew';
@@ -3672,8 +3673,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/admin/historical', adminHistoricalImportRouter);
   
   // 🔒 INGREDIENT AUTHORITY ADMIN ROUTES (ISOLATED FROM RECIPES)
-  const ingredientAuthorityAdminRouter = require('./routes/admin/ingredientAuthority').default;
-  app.use('/api/admin/ingredient-authority', ingredientAuthorityAdminRouter);
+  app.use('/api/admin/ingredient-authority', ingredientAuthorityAdminRoutes);
   app.use('/api/system-health', systemHealthRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
