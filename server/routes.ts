@@ -3670,6 +3670,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/admin/import', loyverseMenuImportRouter);
   app.use('/api/admin/backup', adminBackupRouter);
   app.use('/api/admin/historical', adminHistoricalImportRouter);
+  
+  // 🔒 INGREDIENT AUTHORITY ADMIN ROUTES (ISOLATED FROM RECIPES)
+  const ingredientAuthorityAdminRouter = require('./routes/admin/ingredientAuthority').default;
+  app.use('/api/admin/ingredient-authority', ingredientAuthorityAdminRouter);
   app.use('/api/system-health', systemHealthRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
