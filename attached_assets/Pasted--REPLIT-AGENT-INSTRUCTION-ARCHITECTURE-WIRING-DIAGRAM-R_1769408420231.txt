@@ -1,0 +1,131 @@
+🔒 REPLIT AGENT INSTRUCTION — ARCHITECTURE WIRING DIAGRAM (READ-ONLY TASK)
+PROJECT
+Final Dashboard 4.0 – Smash Brothers Burgers
+TASK TYPE
+READ-ONLY ANALYSIS — DO NOT MODIFY CODE
+You are NOT authorized to:
+Write code
+Refactor code
+Fix bugs
+Rename files
+Add endpoints
+Change schemas
+Add migrations
+Touch UI
+This task is analysis only.
+OBJECTIVE
+Produce a clear wiring diagram of the current system so that senior design decisions can be made without guessing.
+The output must show:
+Where data enters the system
+Where it is stored
+Where it is transformed
+Where it is displayed
+REQUIRED OUTPUT FORMAT
+Return a single structured document with the sections below.
+Use:
+Exact file paths
+Exact function names
+Exact API routes
+Exact database table/model names
+Do not paraphrase.
+Do not speculate.
+If something is unclear, state: UNKNOWN.
+SECTION 1 — POS INGESTION (SALES DATA)
+Document exactly how POS data enters the system.
+Provide:
+File(s) handling POS ingestion
+path/to/file.ts
+Method used:
+Webhook
+Polling
+Manual trigger
+Entry function name(s)
+API route(s) exposed (if any)
+DB tables/models written to
+Answer explicitly:
+Is there a manual “Sync” button? If yes, where?
+Is there already a webhook endpoint present but unused?
+Are modifiers ingested separately or inline with line items?
+SECTION 2 — POS NORMALIZATION & MODIFIERS
+Document how items and modifiers are currently handled.
+Provide:
+File(s) where line items are normalized
+File(s) where modifiers are processed
+Data structures used for:
+Items
+Modifiers
+Where modifier attribution happens
+Answer explicitly:
+Where are modifiers possibly being mis-counted as items?
+Where are base items possibly double-counted?
+SECTION 3 — SALES ANALYSIS PIPELINE
+Document how sales data becomes analysis data.
+Provide:
+File(s) computing:
+Items sold
+Category totals
+Sales summaries
+API routes feeding the Analysis page
+Frontend component(s) rendering this data
+SECTION 4 — EXPENSES MODAL (PURCHASE LODGEMENT)
+Document the original Expenses modal flow.
+Provide:
+Frontend file path for modal
+Backend API route it calls
+Payload structure sent from frontend
+DB table/model written to
+Answer explicitly:
+How meat purchases are stored
+Why meat reappears correctly
+Why rolls do NOT populate
+Why drinks do NOT populate
+If unsure, mark UNKNOWN.
+SECTION 5 — SHOPPING LIST LODGEMENT (SECONDARY)
+Document the newer shopping list lodging path.
+Provide:
+Frontend file path
+Backend route(s)
+DB table/model used
+Answer explicitly:
+Does this duplicate the expenses data?
+Does it write to a different table than Expenses modal?
+SECTION 6 — CORE STOCK DATA (ROLLS / MEAT / DRINKS)
+Document where these are supposed to live.
+Provide:
+Table/model holding:
+Rolls purchased
+Meat purchased
+Drinks purchased
+Table/model holding:
+End-of-shift counts (if any)
+File(s) that read these values
+Answer explicitly:
+Is there a single canonical ledger?
+Or multiple partial ledgers?
+SECTION 7 — DAILY EMAIL SUMMARY
+Document how daily email summaries are generated.
+Provide:
+File(s) responsible
+Trigger mechanism (cron, manual, etc.)
+Data source used (sales tables, aggregates, etc.)
+Answer explicitly:
+Does it include modifiers?
+Does it group by category?
+OUTPUT RULES (STRICT)
+Do NOT propose solutions
+Do NOT suggest refactors
+Do NOT write code
+Do NOT merge sections
+Do NOT skip sections
+If a section has no implementation, write:
+Copy code
+
+NOT IMPLEMENTED
+SUCCESS CRITERIA
+This task is successful only if:
+Every section is completed
+File paths and routes are explicit
+Unknowns are clearly marked
+No code is changed
+Once this wiring diagram is delivered, further instructions will follow.
+Do not take any action beyond this analysis.
