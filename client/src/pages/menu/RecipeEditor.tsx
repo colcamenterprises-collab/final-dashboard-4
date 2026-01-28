@@ -589,6 +589,48 @@ export default function RecipeEditorPage() {
           </CardContent>
         </Card>
 
+        {/* Cost Breakdown Panel - Shows packaging math for each ingredient */}
+        {linesWithCosts.length > 0 && (
+          <Card className="border-slate-200">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold text-slate-800">Cost Breakdown</CardTitle>
+              <p className="text-xs text-slate-500">How each ingredient cost is calculated</p>
+            </CardHeader>
+            <CardContent>
+              <div className="border rounded-[4px] overflow-hidden">
+                <div className="grid grid-cols-5 gap-2 p-2 bg-slate-50 text-xs font-medium text-slate-600 border-b">
+                  <div>Ingredient</div>
+                  <div>Cost per Unit</div>
+                  <div>Quantity Used</div>
+                  <div>Calculation</div>
+                  <div className="text-right">Line Cost</div>
+                </div>
+                {linesWithCosts.map((line, idx) => (
+                  <div key={idx} className="grid grid-cols-5 gap-2 p-2 text-xs border-b last:border-b-0">
+                    <div className="font-medium text-slate-800">{line.name}</div>
+                    <div className="text-slate-600 font-mono">
+                      {THB(line.unitCostTHB)} / {line.baseUnit}
+                    </div>
+                    <div className="text-slate-600">
+                      {line.qty} {line.unit}
+                    </div>
+                    <div className="text-slate-500 font-mono">
+                      {THB(line.unitCostTHB)} × {line.qty}
+                    </div>
+                    <div className="text-right font-semibold text-slate-900">
+                      {THB(line.costTHB)}
+                    </div>
+                  </div>
+                ))}
+                <div className="grid grid-cols-5 gap-2 p-2 bg-emerald-50 text-xs font-medium">
+                  <div className="col-span-4 text-right text-emerald-800">Total Recipe Cost</div>
+                  <div className="text-right text-emerald-900 font-semibold">{THB(totalCost)}</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Cost Validation Warning - Show for final recipes with missing base costs */}
         {costValidation && costValidation.isFinal && costValidation.issues.length > 0 && (
           <Card className="border-amber-300 bg-amber-50">
