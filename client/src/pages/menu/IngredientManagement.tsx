@@ -113,11 +113,11 @@ export default function IngredientManagement() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="container mx-auto p-6 max-w-7xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Ingredient Management</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-3xl font-bold text-gray-900">Ingredient Management</h1>
+          <p className="text-sm text-slate-600 mt-1">
             Edit ingredient prices here. Changes immediately affect all recipe costs.
           </p>
         </div>
@@ -126,9 +126,9 @@ export default function IngredientManagement() {
         </Badge>
       </div>
 
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex gap-4 mb-4">
+      <Card className="border-slate-200">
+        <CardContent className="p-4">
+          <div className="flex gap-3 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
@@ -153,32 +153,17 @@ export default function IngredientManagement() {
           {isLoading ? (
             <div className="text-center py-8 text-slate-500">Loading ingredients...</div>
           ) : (
-            <div className="border rounded-[4px] overflow-hidden">
+            <div className="border border-slate-200 rounded-[4px] overflow-hidden">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50">
-                    <TableHead className="font-semibold text-slate-700">Ingredient</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Category</TableHead>
-                    <TableHead className="font-semibold text-slate-700">Supplier</TableHead>
-                    <TableHead className="font-semibold text-slate-700">
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        Price
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-700">
-                      <div className="flex items-center gap-1">
-                        <Package className="h-4 w-4" />
-                        Packaging
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-700">
-                      <div className="flex items-center gap-1">
-                        <Calculator className="h-4 w-4" />
-                        Cost Breakdown
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-semibold text-slate-700 w-24">Actions</TableHead>
+                  <TableRow className="bg-slate-100">
+                    <TableHead className="text-xs font-semibold text-slate-600">Ingredient</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Category</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Supplier</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Price</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Packaging</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Cost Breakdown</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 w-20">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -247,40 +232,40 @@ export default function IngredientManagement() {
                         </>
                       ) : (
                         <>
-                          <TableCell>
+                          <TableCell className="text-xs">
                             <div className="flex items-center gap-2">
                               {ing.photoUrl && (
                                 <img
                                   src={ing.photoUrl}
                                   alt={ing.name}
-                                  className="w-8 h-8 rounded object-cover cursor-pointer"
+                                  className="w-8 h-8 rounded-[4px] object-cover cursor-pointer"
                                   onClick={() => openPhotoDialog(ing)}
                                 />
                               )}
                               <div>
-                                <div className="font-medium text-slate-900">{ing.name}</div>
+                                <div className="font-medium text-slate-900 text-sm">{ing.name}</div>
                                 {ing.brand && <div className="text-xs text-slate-500">{ing.brand}</div>}
                               </div>
                             </div>
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="text-xs">
                             <Badge variant="outline" className="text-xs">{ing.category || "—"}</Badge>
                           </TableCell>
-                          <TableCell className="text-sm text-slate-600">{ing.supplier || "—"}</TableCell>
-                          <TableCell className="font-medium text-slate-900">{THB(ing.price)}</TableCell>
-                          <TableCell className="text-sm text-slate-600">{ing.packagingQty || "—"}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{ing.supplier || "—"}</TableCell>
+                          <TableCell className="text-xs font-medium text-slate-900">{THB(ing.price)}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{ing.packagingQty || "—"}</TableCell>
                           <TableCell>
-                            <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">
+                            <div className="text-xs font-mono bg-slate-50 px-2 py-1 rounded-[4px] border border-slate-200">
                               {getCostBreakdown(ing.price, ing.packagingQty, ing.costPerBase)}
                             </div>
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => startEdit(ing)}>
-                                <Edit className="h-4 w-4 text-slate-500" />
+                              <Button size="sm" variant="ghost" onClick={() => startEdit(ing)} className="h-7 w-7 p-0">
+                                <Edit className="h-3.5 w-3.5 text-slate-500" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)}>
-                                <Upload className="h-4 w-4 text-slate-400" />
+                              <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-7 w-7 p-0">
+                                <Upload className="h-3.5 w-3.5 text-slate-400" />
                               </Button>
                             </div>
                           </TableCell>
