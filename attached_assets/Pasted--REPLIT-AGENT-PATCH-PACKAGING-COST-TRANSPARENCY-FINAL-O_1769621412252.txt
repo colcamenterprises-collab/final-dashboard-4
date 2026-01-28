@@ -1,0 +1,155 @@
+🔧 REPLIT AGENT PATCH — PACKAGING & COST TRANSPARENCY (FINAL)
+OBJECTIVE
+Make ingredient costing correct, transparent, and production-safe, including packaging items (boxes, bags, packs of 50, etc.), with no changes to recipe math or schema.
+HARD RULES (DO NOT BREAK)
+❌ Do NOT change recipe cost math
+❌ Do NOT add or modify database schema
+❌ Do NOT store cost inside recipes
+❌ Do NOT introduce syncing or caching
+❌ Do NOT add new ingredient tables
+❌ Do NOT touch POS, stock ledgers, or history
+PATCH SCOPE (FILES ALLOWED)
+Backend
+server/utils/computeUnitCostPerBase.ts (or equivalent helper)
+server/routes/ingredients.ts
+server/controllers/ingredientsController.ts (if present)
+Frontend
+client/src/pages/menu/IngredientManagement.tsx
+client/src/pages/menu/RecipeEditor.tsx
+PATCH 1 — SERVER: UNIT COST NORMALIZATION (MANDATORY)
+File
+server/utils/computeUnitCostPerBase.ts
+REQUIRED LOGIC (FULL REPLACEMENT)
+Copy code
+Ts
+export function computeUnitCostPerBase(
+  costTHB: number,
+  packagingQty: number | null,
+  unit: string
+): number {
+  if (!costTHB || costTHB <= 0) return 0;
+
+  const normalizedUnit = unit?.toLowerCase().trim();
+
+  // EACH-based items (packaging, buns, bags, etc.)
+  if (normalizedUnit === 'each') {
+    if (!packagingQty || packagingQty <= 0) return costTHB;
+    return costTHB / packagingQty;
+  }
+
+  // Weight-based
+  if (normalizedUnit === 'kg') {
+    return costTHB / 1000;
+  }
+
+  if (normalizedUnit === 'g') {
+    return costTHB;
+  }
+
+  // Volume-based
+  if (normalizedUnit === 'litre' || normalizedUnit === 'l') {
+    return costTHB / 1000;
+  }
+
+  if (normalizedUnit === 'ml') {
+    return costTHB;
+  }
+
+  // Fallback (no conversion)
+  return costTHB;
+}
+PATCH 2 — SERVER: INGREDIENT API MUST RETURN TRANSPARENT COST DATA
+File
+server/routes/ingredients.ts
+REQUIRED RESPONSE FIELDS (DO NOT OMIT)
+For each ingredient returned by /api/ingredients, ensure response includes:
+Copy code
+Ts
+{
+  id,
+  name,
+  category,
+  supplier,
+  costTHB,
+  packagingQty,
+  unit,
+  unitCostPerBase, // computed via computeUnitCostPerBase
+}
+❗ unitCostPerBase must be computed server-side
+❗ Frontend must NOT recompute
+PATCH 3 — FRONTEND: INGREDIENT MANAGEMENT (VISIBILITY)
+File
+client/src/pages/menu/IngredientManagement.tsx
+REQUIRED UI (DISPLAY ONLY)
+For every ingredient row, show:
+Copy code
+
+Purchase:
+฿{costTHB} / {packagingQty} {unit}
+
+Cost Breakdown:
+→ ฿{unitCostPerBase} per base unit
+Packaging Example
+Copy code
+
+฿250 / box of 50 (each)
+→ ฿5.00 per item
+Weight Example
+Copy code
+
+฿29 / 1kg
+→ ฿0.029 per gram
+❌ No editing logic changes
+❌ No recalculation on frontend
+PATCH 4 — FRONTEND: RECIPE EDITOR COST BREAKDOWN PANEL
+File
+client/src/pages/menu/RecipeEditor.tsx
+ADD READ-ONLY PANEL PER INGREDIENT LINE
+Display the following (derived from API data):
+Copy code
+
+Ingredient: Onion
+Purchase: ฿29 / 1kg
+Base cost: ฿0.029 per gram
+Quantity used: 29 g
+────────────────────────
+Line cost: ฿0.84
+❌ No logic changes
+❌ No local math beyond qty × unitCostPerBase
+❌ No persistence
+PATCH 5 — VALIDATION GUARD (NON-BLOCKING)
+Location
+Ingredient Management UI
+If:
+unit === 'each'
+packagingQty <= 1
+Show warning text (UI only):
+Copy code
+
+⚠ Packaging item has no quantity breakdown
+✔ Allow save
+❌ Do NOT block
+ACCEPTANCE TESTS (MUST PASS)
+Packaging
+Box of 50 bags @ ฿250
+→ unitCostPerBase = ฿5
+→ Recipe uses 2 → ฿10
+Weight
+Onion 1kg @ ฿29
+→ unitCostPerBase = ฿0.029
+→ Recipe uses 100g → ฿2.90
+Live Propagation
+Change ingredient price
+→ All recipe totals update immediately
+→ No reload required
+FINAL CHECK
+No schema changes
+No new tables
+No broken routes
+No styling regressions
+Cost math unchanged
+Cost visibility restored
+✅ EXECUTE THIS PATCH AS-IS
+❌ DO NOT IMPROVISE
+❌ DO NOT ADD FEATURES
+Once this lands, the system is trustworthy again.

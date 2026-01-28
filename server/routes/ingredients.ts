@@ -3,6 +3,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { toBase } from '../lib/uom';
 import { syncIngredientFromPurchasing, syncAllIngredientsFromPurchasing } from '../services/ingredientSync.service';
+import { computeUnitCostPerBase as computeCostFromUtil, parsePackagingQty, getBaseUnit } from '../utils/computeUnitCostPerBase';
 
 const router = Router();
 
@@ -20,46 +21,49 @@ function computeUnitCostPerBase(ingredient: {
   const packQty = ingredient.packaging_qty?.toLowerCase() || '';
   const unit = ingredient.unit?.toLowerCase() || '';
   
-  // Parse packaging quantity to get numeric value and unit type
-  let divisor = 1;
+  // Parse packaging quantity to get numeric value
+  let packagingQtyNum: number | null = null;
   
   // Handle "10kg bag", "1kg pack", "per 1kg", "Per kg" patterns
   const kgMatch = packQty.match(/(\d+(?:\.\d+)?)\s*kg/i);
   if (kgMatch) {
-    divisor = parseFloat(kgMatch[1]) * 1000; // convert kg to grams
+    packagingQtyNum = parseFloat(kgMatch[1]) * 1000; // convert kg to grams
   } else if (packQty.includes('per kg') || packQty === 'per 1kg') {
-    divisor = 1000; // 1kg = 1000g
+    packagingQtyNum = 1000; // 1kg = 1000g
   }
   // Handle "500g", "3kg" patterns  
   else {
     const gMatch = packQty.match(/(\d+(?:\.\d+)?)\s*g(?:rams?)?$/i);
     if (gMatch) {
-      divisor = parseFloat(gMatch[1]); // already in grams
+      packagingQtyNum = parseFloat(gMatch[1]); // already in grams
     }
     // Handle litre patterns
     const litreMatch = packQty.match(/(\d+(?:\.\d+)?)\s*(?:litre|liter|l)s?/i);
     if (litreMatch) {
-      divisor = parseFloat(litreMatch[1]) * 1000; // convert to ml
+      packagingQtyNum = parseFloat(litreMatch[1]) * 1000; // convert to ml
     }
-    // Handle plain numbers like "1", "6"
+    // Handle plain numbers like "1", "6", "50"
     const plainNum = packQty.match(/^(\d+)$/);
     if (plainNum) {
-      divisor = parseFloat(plainNum[1]); // count of items
+      packagingQtyNum = parseFloat(plainNum[1]); // count of items
+    }
+    // Handle "box of 50", "pack of 100"
+    const ofMatch = packQty.match(/(?:box|pack|bag|case)\s*(?:of)?\s*(\d+)/i);
+    if (ofMatch) {
+      packagingQtyNum = parseFloat(ofMatch[1]);
     }
   }
   
-  // For "each" units with no kg/g packaging, divisor stays 1
-  if (unit === 'each' && divisor === 1 && !packQty.includes('kg') && !packQty.includes('g')) {
-    // Try to extract number from packaging_qty for count-based items
+  // For "each" units with no kg/g packaging, try to extract count
+  if (unit === 'each' && !packagingQtyNum && !packQty.includes('kg') && !packQty.includes('g')) {
     const countMatch = packQty.match(/(\d+)/);
     if (countMatch) {
-      divisor = parseFloat(countMatch[1]);
+      packagingQtyNum = parseFloat(countMatch[1]);
     }
   }
   
-  if (divisor <= 0) return null;
-  
-  return ingredient.price / divisor;
+  // Use the utility function for final computation
+  return computeCostFromUtil(ingredient.price, packagingQtyNum, unit || 'each');
 }
 
 /**
