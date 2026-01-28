@@ -278,6 +278,9 @@ router.get('/management', async (req, res) => {
         unit: r.unit
       });
       
+      // Determine base unit for display
+      const baseUnit = getBaseUnit(r.unit);
+      
       return {
         id: r.id,
         name: r.name,
@@ -285,12 +288,14 @@ router.get('/management', async (req, res) => {
         supplier: r.supplier || '',
         brand: r.brand || '',
         unit: r.unit || 'each',
+        baseUnit: baseUnit,
         price: Number(r.price) || 0,
         packagingQty: r.packaging_qty || '',
         notes: r.notes || '',
         photoUrl: r.photo_url || null,
         updatedAt: r.updated_at,
         costPerBase: computedCost ?? 0,
+        unitCostPerBase: computedCost ?? 0,
       };
     });
 
