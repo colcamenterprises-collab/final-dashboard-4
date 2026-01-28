@@ -501,57 +501,67 @@ export default function RecipeEditorPage() {
             </div>
             {linesWithCosts.map((line, index) => {
               const conversionRequired = line.unit !== line.baseUnit;
+              const formatUnitCost = (cost: number) => cost < 0.01 ? cost.toFixed(4) : cost < 1 ? cost.toFixed(3) : cost.toFixed(2);
               return (
                 <div
                   key={`${line.ingredientId}-${index}`}
-                  className="grid grid-cols-1 sm:grid-cols-6 gap-4 border border-slate-100 rounded-[4px] p-4 sm:items-center"
+                  className="border border-slate-100 rounded-[4px] p-4"
                 >
-                  <div>
-                    <div className="text-xs text-slate-500 sm:hidden">Ingredient name</div>
-                    <div className="text-sm font-medium text-slate-900">{line.name}</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500 sm:hidden">Portion quantity</div>
-                    <Input
-                      value={line.qty}
-                      onChange={(event) => updateLineQty(index, event.target.value)}
-                      className="text-sm rounded-[4px]"
-                    />
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500 sm:hidden">Portion unit</div>
-                    <Select
-                      value={line.unit}
-                      onValueChange={(value) => updateLineUnit(index, value as UnitType)}
-                    >
-                      <SelectTrigger className="text-sm rounded-[4px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PORTION_UNITS.map((u) => (
-                          <SelectItem key={u} value={u}>{u}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <div className="text-xs text-slate-500 sm:hidden">Conversion</div>
-                    <div className="text-sm text-slate-700">
-                      {conversionRequired ? "Conversion required" : "Not required"}
+                  <div className="grid grid-cols-1 sm:grid-cols-6 gap-4 sm:items-center">
+                    <div>
+                      <div className="text-xs text-slate-500 sm:hidden">Ingredient name</div>
+                      <div className="text-sm font-medium text-slate-900">{line.name}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 sm:hidden">Portion quantity</div>
+                      <Input
+                        value={line.qty}
+                        onChange={(event) => updateLineQty(index, event.target.value)}
+                        className="text-sm rounded-[4px]"
+                      />
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 sm:hidden">Portion unit</div>
+                      <Select
+                        value={line.unit}
+                        onValueChange={(value) => updateLineUnit(index, value as UnitType)}
+                      >
+                        <SelectTrigger className="text-sm rounded-[4px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PORTION_UNITS.map((u) => (
+                            <SelectItem key={u} value={u}>{u}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 sm:hidden">Conversion</div>
+                      <div className="text-sm text-slate-700">
+                        {conversionRequired ? "Conversion required" : "Not required"}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-slate-500 sm:hidden">Line cost</div>
+                      <div className="text-sm font-medium text-slate-900">{THB(line.costTHB)}</div>
+                    </div>
+                    <div>
+                      <Button
+                        variant="outline"
+                        className="text-xs rounded-[4px] border-rose-200 text-rose-600 hover:text-rose-700"
+                        onClick={() => removeLine(index)}
+                      >
+                        Remove
+                      </Button>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-xs text-slate-500 sm:hidden">Line cost</div>
-                    <div className="text-sm font-medium text-slate-900">{THB(line.costTHB)}</div>
-                  </div>
-                  <div>
-                    <Button
-                      variant="outline"
-                      className="text-xs rounded-[4px] border-rose-200 text-rose-600 hover:text-rose-700"
-                      onClick={() => removeLine(index)}
-                    >
-                      Remove
-                    </Button>
+                  <div className="mt-2 pt-2 border-t border-slate-100">
+                    <div className="text-[10px] font-mono text-slate-500 space-y-0.5">
+                      <div>Base cost: ฿{formatUnitCost(line.unitCostTHB)} per {line.baseUnit}</div>
+                      <div>Quantity used: {line.qty} {line.unit}</div>
+                      <div className="text-emerald-600 font-medium">Line cost: {THB(line.costTHB)}</div>
+                    </div>
                   </div>
                 </div>
               );
