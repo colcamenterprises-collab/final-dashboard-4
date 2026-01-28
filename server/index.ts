@@ -307,28 +307,38 @@ async function checkSchema() {
 
   // Daily Stock API routes are now in routes.ts
 
-  // Basic ingredients API for testing
+  // Ingredients API - returns real DB data with base_unit and unit_cost_per_base
   app.get('/api/ingredients', async (req: Request, res: Response) => {
     try {
-      // Mock ingredients data for now - this would normally come from the database
-      const mockIngredients = [
-        { name: 'Lettuce', category: 'Fresh Food' },
-        { name: 'Tomato', category: 'Fresh Food' },
-        { name: 'Onion', category: 'Fresh Food' },
-        { name: 'Chicken Wings', category: 'Frozen Food' },
-        { name: 'French Fries', category: 'Frozen Food' },
-        { name: 'Chicken Nuggets', category: 'Frozen Food' },
-        { name: 'Salt', category: 'Shelf Items' },
-        { name: 'Pepper', category: 'Shelf Items' },
-        { name: 'Cooking Oil', category: 'Shelf Items' },
-        { name: 'Gloves', category: 'Kitchen Supplies' },
-        { name: 'Paper Towels', category: 'Kitchen Supplies' },
-        { name: 'Cleaning Spray', category: 'Kitchen Supplies' },
-        { name: 'Food Containers', category: 'Packaging' },
-        { name: 'Paper Bags', category: 'Packaging' },
-        { name: 'Napkins', category: 'Packaging' }
-      ];
-      res.json(mockIngredients);
+      const search = (req.query.search as string || '').trim();
+      
+      let query = `
+        SELECT DISTINCT ON (name) 
+          id, name, category, base_unit, unit_cost_per_base, portion_unit
+        FROM ingredients 
+        WHERE unit_cost_per_base IS NOT NULL AND unit_cost_per_base > 0
+      `;
+      const params: any[] = [];
+      
+      if (search) {
+        query += ` AND name ILIKE $1`;
+        params.push(`%${search}%`);
+      }
+      
+      query += ` ORDER BY name, unit_cost_per_base DESC NULLS LAST LIMIT 50`;
+      
+      const result = await pool.query(query, params);
+      
+      const ingredients = result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        category: row.category || null,
+        portionUnit: row.base_unit || row.portion_unit || 'each',
+        baseUnit: row.base_unit || 'each',
+        unitCostPerBase: Number(row.unit_cost_per_base) || 0,
+      }));
+      
+      res.json(ingredients);
     } catch (err) {
       console.error('[ingredients] Error fetching ingredients:', err);
       res.status(500).json({ error: 'Failed to fetch ingredients' });

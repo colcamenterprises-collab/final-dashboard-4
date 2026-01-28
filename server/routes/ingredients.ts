@@ -8,81 +8,59 @@ const router = Router();
 
 /**
  * GET /api/ingredients
- * Returns enriched rows with supplierName, unitPrice, costPerPortion, etc.
+ * Returns enriched rows with base_unit and unit_cost_per_base for recipe costing.
+ * DISTINCT ON (name) to avoid duplicates - prefers records with cost data.
  * Supports ?search= query parameter for filtering by name
  */
 router.get('/', async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit ?? 2000), 5000);
+    const limit = Math.min(Number(req.query.limit ?? 200), 500);
     const search = req.query.search ? String(req.query.search).trim().toLowerCase() : null;
 
-    // Pull raw fields. Adjust table/column names to your Drizzle schema if needed.
+    // DISTINCT ON (name) to avoid duplicates, prefer records with cost data
     const result = search
       ? await db.execute(sql`
-          SELECT
+          SELECT DISTINCT ON (i.name)
             i.id,
             i.name,
             i.category,
-            i.supplier_id,
-            s.name AS supplier_name,
-            i.brand,
-            i.package_cost,
-            i.package_qty,
-            i.package_unit,
-            i.portion_qty,
+            i.base_unit,
+            i.unit_cost_per_base,
             i.portion_unit
           FROM ingredients i
-          LEFT JOIN suppliers s ON s.id = i.supplier_id
           WHERE LOWER(i.name) LIKE ${'%' + search + '%'}
-          ORDER BY i.name ASC
+          ORDER BY i.name ASC, i.unit_cost_per_base DESC NULLS LAST
           LIMIT ${limit};
         `)
       : await db.execute(sql`
-          SELECT
+          SELECT DISTINCT ON (i.name)
             i.id,
             i.name,
             i.category,
-            i.supplier_id,
-            s.name AS supplier_name,
-            i.brand,
-            i.package_cost,
-            i.package_qty,
-            i.package_unit,
-            i.portion_qty,
+            i.base_unit,
+            i.unit_cost_per_base,
             i.portion_unit
           FROM ingredients i
-          LEFT JOIN suppliers s ON s.id = i.supplier_id
-          ORDER BY i.name ASC
+          ORDER BY i.name ASC, i.unit_cost_per_base DESC NULLS LAST
           LIMIT ${limit};
         `);
 
     const rows = result.rows || result;
     const enriched = rows.map(r => {
-      const packageBase = toBase(r.package_qty, r.package_unit);
-      const unitPrice = r.package_cost && packageBase > 0 ? r.package_cost / packageBase : null;
-
-      // For UI only (display). Shopping estimator will compute per request.
-      const portionBase = toBase(r.portion_qty, r.portion_unit);
-      const costPerPortion = unitPrice && portionBase ? unitPrice * portionBase : null;
+      const unitCostPerBase = Number(r.unit_cost_per_base) || 0;
+      const baseUnit = r.base_unit || r.portion_unit || 'each';
 
       return {
         id: r.id,
         name: r.name,
-        category: r.category,
-        supplierId: r.supplier_id,
-        supplierName: r.supplier_name || null,
-        brand: r.brand || null,
-        packageCost: r.package_cost ?? null,
-        packageQty: r.package_qty ?? null,
-        packageUnit: r.package_unit ?? 'each',
-        portionQty: r.portion_qty ?? null,
-        portionUnit: r.portion_unit ?? null,
-        unitPrice,
-        costPerPortion
+        category: r.category || null,
+        portionUnit: baseUnit,
+        baseUnit: baseUnit,
+        unitCostPerBase: unitCostPerBase,
       };
     });
 
-    res.json({ items: enriched, count: enriched.length });
+    res.json(enriched);
   } catch (e: any) {
     console.error('ingredients.list error', e);
     res.status(500).json({ error: 'Server error' });

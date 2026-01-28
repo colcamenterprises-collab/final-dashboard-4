@@ -50,6 +50,8 @@ type Ingredient = {
   id: number;
   name: string;
   portionUnit: UnitType | null;
+  baseUnit?: string;
+  unitCostPerBase?: number;
 };
 
 type RecipeLine = {
@@ -256,15 +258,16 @@ export default function RecipeEditorPage() {
       return;
     }
 
-    const unit = ingredient.portionUnit || "g";
+    const unit = (ingredient.baseUnit || ingredient.portionUnit || "each") as UnitType;
+    const unitCost = num(ingredient.unitCostPerBase);
     const newLine: RecipeLine = {
       ingredientId: String(ingredient.id),
       name: ingredient.name,
       qty: 1,
-      unit: unit as UnitType,
-      baseUnit: unit as UnitType,
-      unitCostTHB: 0,
-      costTHB: 0,
+      unit: unit,
+      baseUnit: unit,
+      unitCostTHB: unitCost,
+      costTHB: unitCost,
     };
     setLines((prev) => [...prev, newLine]);
     setSearch("");
