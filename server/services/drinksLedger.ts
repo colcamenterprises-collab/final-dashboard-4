@@ -194,3 +194,23 @@ export async function getDrinksLedgerHistory(days: number = 30): Promise<DrinksL
   `;
   return rows;
 }
+
+export async function getDrinksLedgerRange(startDate: string, endDate: string): Promise<any[]> {
+  const rows = await db.$queryRaw<any[]>`
+    SELECT 
+      shift_date::text AS shift_date,
+      drinks_start,
+      drinks_purchased,
+      drinks_sold,
+      estimated_drinks_end,
+      actual_drinks_end,
+      waste_allowance,
+      variance,
+      status,
+      approved
+    FROM drinks_ledger
+    WHERE shift_date >= ${startDate}::date AND shift_date <= ${endDate}::date
+    ORDER BY shift_date DESC
+  `;
+  return rows;
+}

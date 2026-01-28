@@ -1185,6 +1185,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   const meatLedgerRouter = (await import('./routes/meatLedger.js')).default;
   app.use('/api/analysis/meat-ledger', meatLedgerRouter);
   
+  // Register drinks ledger routes BEFORE catch-all :date route
+  const drinksLedgerRouter = (await import('./routes/drinksLedger.js')).default;
+  app.use('/api/analysis/drinks-ledger', drinksLedgerRouter);
+  
   // PHASE I: Register ingredient reconciliation BEFORE catch-all :date route
   app.use('/api/analysis/ingredient-reconciliation', ingredientReconciliationRouter);
   

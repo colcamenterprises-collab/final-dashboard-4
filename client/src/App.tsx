@@ -49,6 +49,7 @@ import StockReview from "./pages/analysis/StockReview";
 import StockReconciliation from "./pages/analysis/StockReconciliation";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyReview from "./pages/analysis/DailyReview";
+import StockLedgers from "./pages/analysis/StockLedgers";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
 import MarketingMachine from "./pages/marketing/MarketingMachine";
@@ -160,6 +161,8 @@ export default function App() {
                 
                 {/* PATCH S2: Stock Reconciliation & Security Analysis */}
                 <Route path="/analysis/stock-reconciliation" element={<Guard><StockReconciliation /></Guard>} />
+                <Route path="/analysis/stock-review" element={<Guard><StockReview /></Guard>} />
+                <Route path="/analysis/ledgers" element={<Guard><StockLedgers /></Guard>} />
                 
                 <Route path="upload" element={<UploadStatements />} />
                 <Route path="receipts" element={<Receipts />} />

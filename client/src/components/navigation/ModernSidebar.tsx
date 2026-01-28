@@ -89,10 +89,13 @@ const navigationGroups: NavGroup[] = [
   {
     title: "Analysis",
     items: [
+      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
+      { to: "/analysis/stock-review", label: "Stock Review", icon: Package, testId: "nav-stock-review" },
+      { to: "/analysis/stock-reconciliation", label: "Stock Reconciliation", icon: Package, testId: "nav-stock-reconciliation" },
+      { to: "/analysis/ledgers", label: "Stock Ledgers", icon: BarChart3, testId: "nav-stock-ledgers" },
       { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
       { to: "/analysis/ingredients", label: "Ingredients (Truth)", icon: Package, testId: "nav-ingredients-truth" },
-      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" },
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" }
+      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" }
     ]
   },
   {

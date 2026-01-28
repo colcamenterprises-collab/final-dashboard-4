@@ -1,0 +1,115 @@
+Got it. This is not testing, this is completion + visibility.
+Below is a strict follow-up Replit agent instruction to finish the job properly.
+This instruction is UI + wiring only, no logic changes, no testing, no refactors.
+🔒 REPLIT AGENT INSTRUCTION — UI COMPLETION & NAV VISIBILITY
+CONTEXT
+The following backend patches are already completed and must be surfaced correctly in the app:
+POS sync automation (no manual sync)
+Core stock intake (rolls / meat / drinks)
+Drinks ledger
+Modifier safety layer
+Your task is NOT to test.
+Your task is to ensure all required pages, routes, and sidebar entries exist and are reachable.
+GLOBAL RULES (STRICT)
+❌ Do NOT modify backend logic
+❌ Do NOT add calculations
+❌ Do NOT rename existing routes
+❌ Do NOT remove existing pages
+❌ Do NOT add new data sources
+❌ Do NOT test or seed data
+This is navigation + existence only.
+OBJECTIVE
+Ensure management can actually see and access:
+Sales analysis
+Stock review (rolls / meat / drinks)
+Ledger views
+Menu management tools
+If a page exists but is not reachable, that is a failure.
+REQUIRED CHECKS & FIXES
+1️⃣ Sidebar — Operations Section
+Verify the following exist and are visible in the sidebar:
+Operations
+Daily Review
+Analysis
+Stock Review
+Stock Reconciliation
+📌 If any route exists but is missing from sidebar → add it
+📌 If label exists but route is broken → fix route only
+Files to check
+client/src/components/Sidebar.tsx
+client/src/components/layout/Sidebar.tsx
+Any role-based nav config files
+2️⃣ Sidebar — Menu Management Section
+Verify Menu Management exists and contains:
+Recipes
+Products (if applicable)
+Ingredient Authority (admin-only)
+Modifier / Options (if present)
+📌 Ingredient Authority must live under Menu Management, not Admin root
+📌 If the page exists but is orphaned → link it
+3️⃣ Analysis Page Wiring
+Verify these pages are reachable via routing:
+/analysis
+/analysis/daily-review
+/analysis/stock-review
+/analysis/stock-reconciliation
+📌 Do NOT change page content
+📌 Only ensure routes + menu links exist
+Files to check
+client/src/App.tsx
+client/src/router.tsx (or equivalent)
+Analysis page imports
+4️⃣ Stock Ledger Visibility (Read-Only)
+Ensure the following are reachable (even if basic):
+Rolls ledger view
+Meat ledger view
+Drinks ledger view
+📌 These may already exist as:
+Tabs
+Sub-pages
+Drill-down routes
+If no UI exists, create a minimal read-only page that:
+Calls the existing API
+Displays a table
+No editing, no logic
+This is allowed because it is visibility only.
+5️⃣ Permissions & Access
+Verify:
+Management roles can see:
+Stock
+Ledgers
+Ingredient authority
+Staff roles do not see:
+Ledgers
+Ingredient authority
+📌 If role checks exist, reuse them
+📌 Do NOT invent new auth logic
+REQUIRED DELIVERY
+When finished, respond with only:
+A) Sidebar Map
+Copy code
+
+Operations
+ ├─ Daily Review → /analysis/daily-review
+ ├─ Analysis → /analysis
+ ├─ Stock Review → /analysis/stock-review
+ └─ Stock Reconciliation → /analysis/stock-reconciliation
+
+Menu Management
+ ├─ Recipes → /menu/recipes
+ ├─ Ingredient Authority → /menu/ingredient-authority
+ └─ Modifiers → /menu/modifiers
+(adjust to actual routes)
+B) Routes Confirmed
+List of all routes verified reachable.
+C) Pages Added (if any)
+File path
+Purpose
+Route
+STOP CONDITION
+Once sidebar + routing is complete:
+STOP
+Do NOT suggest improvements
+Do NOT continue building
+This closes the loop so management can see what now exists.
+Once this is done, then we decide what to enhance next.
