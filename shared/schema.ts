@@ -1566,6 +1566,26 @@ export const insertRollsLedgerSchema = createInsertSchema(rollsLedger);
 export type RollsLedger = typeof rollsLedger.$inferSelect;
 export type InsertRollsLedger = z.infer<typeof insertRollsLedgerSchema>;
 
+// PATCH 3: Drinks Ledger - Tracks drink inventory per shift (mirrors rolls_ledger)
+export const drinksLedger = pgTable("drinks_ledger", {
+  shiftDate: date("shift_date").primaryKey(),
+  drinksStart: integer("drinks_start").notNull().default(0),
+  drinksPurchased: integer("drinks_purchased").notNull().default(0),
+  drinksSold: integer("drinks_sold").notNull().default(0),
+  estimatedDrinksEnd: integer("estimated_drinks_end").notNull().default(0),
+  actualDrinksEnd: integer("actual_drinks_end"),
+  wasteAllowance: integer("waste_allowance"),
+  variance: integer("variance").notNull().default(0),
+  status: text("status").notNull().default('PENDING'),
+  approved: boolean("approved").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDrinksLedgerSchema = createInsertSchema(drinksLedger);
+export type DrinksLedger = typeof drinksLedger.$inferSelect;
+export type InsertDrinksLedger = z.infer<typeof insertDrinksLedgerSchema>;
+
 // Daily Review Manager Comments
 export const dailyReviewComments = pgTable("daily_review_comments", {
   id: serial("id").primaryKey(),

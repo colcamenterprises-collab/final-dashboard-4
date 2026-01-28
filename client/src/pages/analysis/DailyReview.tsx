@@ -368,17 +368,7 @@ export default function DailyReview() {
         <div className="flex items-center gap-3">
           <label className="text-sm text-gray-600">Month</label>
           <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-          {selectedDate && (
-            <button
-              onClick={() => manualSync(selectedDate)}
-              disabled={syncing}
-              className="px-3 py-1 text-sm bg-slate-600 text-white rounded hover:bg-slate-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              data-testid="button-manual-sync"
-              title="Optional: Retry fetching POS data from Loyverse"
-            >
-              {syncing ? "Syncing..." : "Retry POS"}
-            </button>
-          )}
+{/* PATCH 1: Manual sync button hidden - POS sync is now automatic via cron + webhook */}
         </div>
       </header>
 

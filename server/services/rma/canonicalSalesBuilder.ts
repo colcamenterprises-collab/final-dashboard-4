@@ -38,6 +38,15 @@ const resolver = new ModifierResolver();
 
 const ensureArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
+// PATCH 4: Safety tracking for modifier attribution
+const attributionWarnings: { receiptId: string; sku: string; issue: string }[] = [];
+const processedSkus = new Set<string>();
+
+function logAttributionWarning(receiptId: string, sku: string, issue: string) {
+  console.warn(`[MODIFIER_ATTRIBUTION] Receipt ${receiptId}, SKU ${sku}: ${issue}`);
+  attributionWarnings.push({ receiptId, sku, issue });
+}
+
 const normalizeSku = (item: ReceiptItem): string | null => {
   const sku = item.sku ?? item.item_sku ?? item.item_id;
   if (!sku) return null;
@@ -178,10 +187,28 @@ export async function buildSaleCanonicalAuthority({ receiptIds, from, to }: Buil
         continue;
       }
 
+      // PATCH 4: Safety assertion - check if SKU looks like a modifier (not a base item)
+      const modifierInputs = extractModifierInputs(item);
+      const isLikelyModifier = modifierInputs.some((mod) => 
+        mod.posOptionId === sku || mod.posModifierId === sku
+      );
+      
+      if (isLikelyModifier) {
+        logAttributionWarning(receipt.receiptId, sku, 'SKU appears to be a modifier, skipping as base item');
+        continue;
+      }
+
       const recipe = recipeBySku.get(sku);
       if (!recipe) {
         continue;
       }
+
+      // PATCH 4: Safety assertion - prevent bundle double-counting
+      const receiptSkuKey = `${receipt.receiptId}::${sku}`;
+      if (processedSkus.has(receiptSkuKey)) {
+        logAttributionWarning(receipt.receiptId, sku, 'Duplicate SKU in same receipt - possible bundle double-count');
+      }
+      processedSkus.add(receiptSkuKey);
 
       const baseIngredients = (ingredientsByRecipe.get(recipe.id) ?? []).map((ingredient) => ({
         ingredientId: ingredient.ingredientId,
@@ -255,5 +282,10 @@ export async function buildSaleCanonicalAuthority({ receiptIds, from, to }: Buil
     inserted += chunk.length;
   }
 
-  return { inserted, receiptsProcessed: receipts.length };
+  // PATCH 4: Clear tracking for next run and return warnings
+  processedSkus.clear();
+  const warnings = [...attributionWarnings];
+  attributionWarnings.length = 0;
+
+  return { inserted, receiptsProcessed: receipts.length, attributionWarnings: warnings };
 }

@@ -1,0 +1,123 @@
+🔥 REPLIT AGENT EXECUTION BRIEF — 60 MINUTES MAX
+Project: Final Dashboard 4.0 – Smash Brothers Burgers
+Mode: EXECUTION
+Scope: STRICT — follow exactly, no improvisation
+⛔ GLOBAL RULES (NON-NEGOTIABLE)
+❌ Do NOT change POS ingestion logic
+❌ Do NOT change sales totals or item counts
+❌ Do NOT touch recipe builder
+❌ Do NOT add new UX flows
+❌ Do NOT refactor unrelated files
+❌ Do NOT invent new schemas unless explicitly instructed
+If something is unclear → STOP and REPORT, do not guess.
+🎯 OBJECTIVE (WHAT MUST WORK AT THE END)
+POS sync is automatic (manual button not required)
+Rolls, Meat, Drinks purchases persist correctly
+Rolls + Drinks behave the same as Meat
+Analysis page reflects:
+What was sold (POS)
+What was purchased (Expenses modal)
+What should remain vs what was counted
+System is now safe to build ingredient-level analysis on later
+⏱️ PATCH PLAN (ONE PASS, ORDERED)
+🔧 PATCH 1 — AUTOMATE POS SYNC (10 MIN)
+Goal
+Ensure POS data always updates without human action.
+Actions
+DO NOT delete any endpoints
+In frontend:
+Hide / disable manual sync button (UI only)
+In backend:
+Confirm SchedulerService.syncReceiptsAndReports() is active
+Ensure webhook handler remains enabled
+Files to touch
+client/src/pages/**/POSSync*.tsx (or wherever manual button lives)
+Possibly scheduler.ts (VERIFY ONLY, minimal change)
+Result
+POS updates via webhook + cron only
+Manual sync endpoint remains for emergency use
+🔧 PATCH 2 — CANONICAL CORE STOCK INTAKE (20 MIN)
+Goal
+All rolls, meat, drinks purchases enter the system the same way.
+Create ONE service
+File: server/services/coreStockIntake.ts
+Copy code
+Ts
+export async function recordRollsPurchase({ date, qty, source }) {}
+export async function recordMeatPurchase({ date, grams, source }) {}
+export async function recordDrinksPurchase({ date, sku, qty, source }) {}
+Rules
+These functions:
+Write to stock_received_log
+Use consistent item_type: rolls | meat | drinks
+Tag source = 'EXPENSES_MODAL' or 'SHOPPING_LIST'
+NO string matching
+NO guessing
+Wire Expenses Modal → CoreStockIntake
+Modify backend handler only:
+File:
+server/routes/expensesV2Routes.ts
+When expense category is:
+Rolls → call recordRollsPurchase
+Meat → call recordMeatPurchase (already works, normalize)
+Drinks → call recordDrinksPurchase
+🚫 Do NOT change frontend modal
+🚫 Do NOT remove existing expense records
+Result
+Expenses modal is now a reliable stock intake
+Rolls + drinks finally persist
+🔧 PATCH 3 — DRINKS LEDGER (20 MIN)
+Goal
+Drinks get the same protection as rolls & meat.
+Create ledger
+Files:
+server/services/drinksLedger.ts
+DB table: drinks_ledger
+Mirror meatLedger / rollsLedger pattern exactly.
+Inputs
+Purchases → stock_received_log
+Sales → analytics_shift_item (drinks category)
+End-of-shift count:
+If missing → store in daily_sales_v2.payload->drinksEnd
+Outputs
+Expected drinks remaining
+Actual drinks remaining
+Variance
+Result
+Drinks no longer invisible
+Highest risk category now tracked
+🔧 PATCH 4 — MODIFIER ATTRIBUTION SAFETY (10 MIN)
+Goal
+Prevent silent corruption of ingredient analysis later.
+Modify
+File: server/services/rma/canonicalSalesBuilder.ts
+Add assertions, not features:
+Ensure modifiers are NOT counted as base items
+Ensure bundles resolve once
+If ambiguous:
+Log warning
+Skip ingredient resolution (do NOT guess)
+🚫 Do NOT change POS totals
+🚫 Do NOT alter analytics outputs yet
+Result
+Clean foundation for ingredient portion reporting
+✅ END STATE CHECKLIST (MUST PASS)
+Agent must confirm:
+[ ] POS sync runs without UI interaction
+[ ] Rolls purchased via Expenses modal now appear
+[ ] Drinks purchased via Expenses modal now appear
+[ ] Meat behavior unchanged
+[ ] No sales numbers changed
+[ ] No recipe code touched
+[ ] No console errors
+📣 FINAL DELIVERY REQUIREMENT
+Agent must return:
+List of files changed
+What was verified manually
+Any remaining UNKNOWNs (if any)
+No explanations.
+No future plans.
+Just confirmation.
+Cam — this is the correct execution slice.
+It stabilizes the system today, unlocks everything you want tomorrow, and avoids blowing the architecture up.
+If the agent hits friction mid-way, paste their response here and I’ll unblock instantly.
