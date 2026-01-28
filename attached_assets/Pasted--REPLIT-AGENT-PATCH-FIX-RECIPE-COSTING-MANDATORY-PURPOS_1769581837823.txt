@@ -1,0 +1,141 @@
+🔧 REPLIT AGENT PATCH — FIX RECIPE COSTING (MANDATORY)
+PURPOSE
+Fix incorrect ingredient costing caused by missing unit normalisation.
+After this patch:
+Onions, tomatoes, beef, buns all calculate correctly
+No absurd prices
+Recipe totals are mathematically correct
+No schema changes
+No CSV / seed scripts
+No UI-side guessing
+🚨 NON-NEGOTIABLE RULES FOR THIS PATCH
+DO NOT add new tables
+DO NOT modify schemas
+DO NOT add UI conversions
+DO NOT add seed scripts
+DO NOT lock anything
+ONLY implement what is written below
+PATCH OVERVIEW
+Fix location (source of truth):
+➡️ server/routes/ingredients.ts
+Fix type:
+➡️ Normalize ingredient cost once, server-side
+PATCH 1 — NORMALISE INGREDIENT COST (SERVER)
+File
+Copy code
+
+server/routes/ingredients.ts
+Add this helper function exactly (top or bottom of file):
+Copy code
+Ts
+function computeUnitCostPerBase(ingredient: {
+  cost: number | null;
+  packaging_qty: number | null;
+  unit: string | null;
+}) {
+  if (!ingredient.cost || !ingredient.packaging_qty) return null;
+
+  let divisor = ingredient.packaging_qty;
+  const unit = ingredient.unit?.toLowerCase();
+
+  // Convert packaging unit → base unit
+  if (unit === 'kg') divisor *= 1000;
+  if (unit === 'litre') divisor *= 1000;
+
+  // each / slice / pack → no conversion
+  return ingredient.cost / divisor;
+}
+Locate the ingredient SELECT / mapping logic
+(inside the GET /api/ingredients route)
+You will see something like:
+Copy code
+Ts
+rows.map(i => ({
+  id: i.id,
+  name: i.name,
+  unit: i.unit,
+  // other fields...
+}));
+Replace / extend mapping exactly as follows:
+Copy code
+Ts
+rows.map(i => ({
+  id: i.id,
+  name: i.name,
+  unit: i.unit,
+  defaultPortionSize: i.default_portion_size,
+  portionUnit: i.portion_unit,
+
+  // 🔴 CRITICAL: normalized cost per base unit
+  unitCostPerBase: computeUnitCostPerBase({
+    cost: i.cost,
+    packaging_qty: i.packaging_qty,
+    unit: i.unit
+  })
+}));
+⚠️ unitCostPerBase MUST now mean:
+THB per gram / ml / each
+No other interpretation is allowed.
+PATCH 2 — UI MUST TRUST SERVER COST
+File
+Copy code
+
+client/src/pages/menu/RecipeEditor.tsx
+Verify / enforce this rule:
+When calculating ingredient line cost, the only formula must be:
+Copy code
+Ts
+lineCostTHB = ingredient.unitCostPerBase * quantity;
+Explicitly remove / forbid:
+dividing by 1000 in UI
+checking ingredient.unit in UI
+falling back to ingredient.cost
+any “conversion required” logic
+UI must not guess.
+PATCH 3 — (VISUAL SANITY CHECK)
+Optional but recommended.
+Where ingredient cost is displayed, show:
+Copy code
+Ts
+฿{lineCostTHB.toFixed(2)}
+Optionally add:
+Copy code
+Ts
+(฿{ingredient.unitCostPerBase.toFixed(4)} / {ingredient.portionUnit})
+This helps humans instantly verify realism.
+✅ ACCEPTANCE CRITERIA (TEST THESE)
+After patch, these must be true:
+Ingredient
+Quantity
+Expected
+Burger Bun
+1 each
+฿8.00
+Onions
+1000 g
+฿29.00
+Tomatoes
+29 g
+~฿2.58
+Beef
+95 g
+~฿30
+Fries
+150 g
+~฿9–10
+If these numbers are not correct:
+STOP
+Do not add patches
+Do not adjust UI
+Report back with ingredient row data
+🔒 POST-PATCH STATUS
+Recipe costing works
+Ingredient data is trusted
+System is now numerically sane
+Only after this can lockdown be discussed
+FINAL AGENT INSTRUCTION
+Apply the above patches exactly.
+Do not refactor.
+Do not “improve”.
+Do not add new logic elsewhere.
+Confirm by testing onions, tomatoes, buns, beef.
