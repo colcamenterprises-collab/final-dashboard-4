@@ -100,10 +100,12 @@ export async function calculateRecipeCostCanonical(recipeId: number): Promise<nu
 
 /**
  * Get recipe with full ingredient breakdown using canonical data
+ * 
+ * 🔒 NO ZERO DEFAULTS - Throws on missing cost data
  */
 export async function getRecipeCostBreakdown(recipeId: number): Promise<RecipeCostResult | null> {
   const recipeResult = await db.execute(sql`
-    SELECT id, name FROM recipe WHERE id = ${recipeId}
+    SELECT id, name, is_final FROM recipe WHERE id = ${recipeId}
   `);
   const recipes = recipeResult.rows || recipeResult;
   if (!recipes || recipes.length === 0) return null;
@@ -128,15 +130,29 @@ export async function getRecipeCostBreakdown(recipeId: number): Promise<RecipeCo
   let totalCost = 0;
 
   for (const row of ingredientRows as any[]) {
-    const qty = Number(row.portion_qty || 0);
-    const unitCost = Number(row.unit_cost_per_base || 0);
+    const ingredientName = row.ingredient_name || 'Unknown';
+    const baseUnit = row.base_unit;
+    const qty = Number(row.portion_qty);
+    const unitCost = Number(row.unit_cost_per_base);
+
+    // 🔒 NO ZERO DEFAULTS - Fail loudly on missing data
+    if (!baseUnit) {
+      throw new Error(`Ingredient "${ingredientName}" has no base_unit defined`);
+    }
+    if (unitCost === null || unitCost === undefined || isNaN(unitCost) || unitCost <= 0) {
+      throw new Error(`Ingredient "${ingredientName}" has no valid cost_per_base_unit (got: ${row.unit_cost_per_base})`);
+    }
+    if (qty === null || qty === undefined || isNaN(qty) || qty <= 0) {
+      throw new Error(`Ingredient "${ingredientName}" has no valid portion_qty (got: ${row.portion_qty})`);
+    }
+
     const lineCost = qty * unitCost;
     totalCost += lineCost;
 
     ingredients.push({
       ingredientId: row.ingredient_id,
-      ingredientName: row.ingredient_name,
-      baseUnit: row.base_unit,
+      ingredientName: ingredientName,
+      baseUnit: baseUnit,
       portionQty: qty,
       unitCostPerBase: unitCost,
       lineCost: Number(lineCost.toFixed(2)),
@@ -149,6 +165,70 @@ export async function getRecipeCostBreakdown(recipeId: number): Promise<RecipeCo
     ingredients,
     totalCost: Number(totalCost.toFixed(2)),
   };
+}
+
+/**
+ * Check if a recipe has valid cost data for all ingredients
+ * Returns list of ingredients with missing base cost data
+ * Used by UI to show warnings
+ */
+export async function getRecipeMissingCostData(recipeId: number): Promise<{ ingredientName: string; issue: string }[]> {
+  const result = await db.execute(sql`
+    SELECT 
+      i.name as ingredient_name,
+      i.base_unit,
+      i.unit_cost_per_base,
+      ri.portion_qty
+    FROM recipe_ingredient ri
+    INNER JOIN ingredients i ON ri.ingredient_id = i.id
+    WHERE ri.recipe_id = ${recipeId}
+      AND ri.ingredient_id IS NOT NULL
+  `);
+
+  const rows = result.rows || result;
+  const issues: { ingredientName: string; issue: string }[] = [];
+
+  for (const row of rows as any[]) {
+    const ingredientName = row.ingredient_name || 'Unknown';
+    const baseUnit = row.base_unit;
+    const unitCost = Number(row.unit_cost_per_base);
+    const qty = Number(row.portion_qty);
+
+    if (!baseUnit) {
+      issues.push({ ingredientName, issue: 'Missing base_unit' });
+    }
+    if (unitCost === null || unitCost === undefined || isNaN(unitCost) || unitCost <= 0) {
+      issues.push({ ingredientName, issue: `No valid cost_per_base_unit (${row.unit_cost_per_base})` });
+    }
+    if (qty === null || qty === undefined || isNaN(qty) || qty <= 0) {
+      issues.push({ ingredientName, issue: `No valid portion_qty (${row.portion_qty})` });
+    }
+  }
+
+  return issues;
+}
+
+/**
+ * Get recipe cost for analytics - returns null for non-final recipes
+ * 
+ * 🔒 ANALYTICS BLOCK: Draft recipes return null, final recipes must calculate or fail
+ */
+export async function getRecipeCostForAnalytics(recipeId: number): Promise<number | null> {
+  const recipeResult = await db.execute(sql`
+    SELECT id, name, is_final FROM recipe WHERE id = ${recipeId}
+  `);
+  const recipes = recipeResult.rows || recipeResult;
+  if (!recipes || recipes.length === 0) return null;
+
+  const recipeRow = recipes[0] as any;
+
+  // 🔒 Block analytics on non-final recipes
+  if (!recipeRow.is_final) {
+    return null;
+  }
+
+  // Final recipes MUST calculate or fail - no silent zeros
+  return calculateRecipeCostCanonical(recipeId);
 }
 
 /**
