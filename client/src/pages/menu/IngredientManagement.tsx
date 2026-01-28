@@ -272,9 +272,20 @@ export default function IngredientManagement() {
                           <TableCell className="text-xs font-medium text-slate-900">{THB(ing.price)}</TableCell>
                           <TableCell className="text-xs text-slate-600">{ing.packagingQty || "—"}</TableCell>
                           <TableCell>
-                            <div className="text-xs font-mono bg-slate-50 px-2 py-1 rounded-[4px] border border-slate-200">
-                              {getCostBreakdown(ing.price, ing.packagingQty, ing.costPerBase)}
-                            </div>
+                            {(() => {
+                              const breakdown = getCostBreakdown(ing);
+                              return (
+                                <div className="text-xs space-y-0.5">
+                                  <div className="font-mono bg-slate-50 px-2 py-1 rounded-[4px] border border-slate-200">
+                                    <div>{breakdown.purchase}</div>
+                                    <div className="text-emerald-600">{breakdown.cost}</div>
+                                  </div>
+                                  {breakdown.warning && (
+                                    <div className="text-amber-600 text-[10px]">⚠ No quantity breakdown</div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell>
                             <div className="flex gap-1">
