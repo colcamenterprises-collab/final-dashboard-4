@@ -240,4 +240,129 @@ router.post('/sync-all', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/ingredients/management
+ * Returns full ingredient data for management page with editable fields
+ * Shows cost breakdown: price, packaging_qty, computed cost_per_base
+ */
+router.get('/management', async (req, res) => {
+  try {
+    const result = await db.execute(sql`
+      SELECT
+        i.id,
+        i.name,
+        i.category,
+        i.supplier,
+        i.brand,
+        i.unit,
+        i.price,
+        i.packaging_qty,
+        i.notes,
+        i.photo_url,
+        i.updated_at
+      FROM ingredients i
+      ORDER BY i.name ASC
+      LIMIT 1000;
+    `);
+    
+    const rows = result.rows || result;
+    const enriched = rows.map((r: any) => {
+      // Compute normalized cost using same logic
+      const computedCost = computeUnitCostPerBase({
+        price: Number(r.price) || null,
+        packaging_qty: r.packaging_qty,
+        unit: r.unit
+      });
+      
+      return {
+        id: r.id,
+        name: r.name,
+        category: r.category || '',
+        supplier: r.supplier || '',
+        brand: r.brand || '',
+        unit: r.unit || 'each',
+        price: Number(r.price) || 0,
+        packagingQty: r.packaging_qty || '',
+        notes: r.notes || '',
+        photoUrl: r.photo_url || null,
+        updatedAt: r.updated_at,
+        costPerBase: computedCost ?? 0,
+      };
+    });
+
+    res.json({ items: enriched, count: enriched.length });
+  } catch (e: any) {
+    console.error('ingredients.management error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * PUT /api/ingredients/:id
+ * Update ingredient price/packaging - immediately affects all recipe costs
+ */
+router.put('/:id', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ error: 'Invalid ingredient ID' });
+    }
+    
+    const { name, category, supplier, brand, unit, price, packagingQty, notes, photoUrl } = req.body;
+    
+    await db.execute(sql`
+      UPDATE ingredients SET
+        name = COALESCE(${name}, name),
+        category = COALESCE(${category}, category),
+        supplier = COALESCE(${supplier}, supplier),
+        brand = COALESCE(${brand}, brand),
+        unit = COALESCE(${unit}, unit),
+        price = COALESCE(${price ? Number(price) : null}, price),
+        packaging_qty = COALESCE(${packagingQty}, packaging_qty),
+        notes = COALESCE(${notes}, notes),
+        photo_url = COALESCE(${photoUrl}, photo_url),
+        updated_at = NOW()
+      WHERE id = ${id};
+    `);
+    
+    // Fetch updated record with computed cost
+    const updated = await db.execute(sql`
+      SELECT id, name, category, supplier, brand, unit, price, packaging_qty, notes, photo_url, updated_at
+      FROM ingredients WHERE id = ${id}
+    `);
+    
+    const row = (updated.rows || updated)[0];
+    if (!row) {
+      return res.status(404).json({ error: 'Ingredient not found' });
+    }
+    
+    const computedCost = computeUnitCostPerBase({
+      price: Number(row.price) || null,
+      packaging_qty: row.packaging_qty,
+      unit: row.unit
+    });
+    
+    res.json({
+      success: true,
+      ingredient: {
+        id: row.id,
+        name: row.name,
+        category: row.category || '',
+        supplier: row.supplier || '',
+        brand: row.brand || '',
+        unit: row.unit || 'each',
+        price: Number(row.price) || 0,
+        packagingQty: row.packaging_qty || '',
+        notes: row.notes || '',
+        photoUrl: row.photo_url || null,
+        updatedAt: row.updated_at,
+        costPerBase: computedCost ?? 0,
+      }
+    });
+  } catch (e: any) {
+    console.error('ingredients.update error', e);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 export default router;

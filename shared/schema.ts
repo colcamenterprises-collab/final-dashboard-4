@@ -462,6 +462,7 @@ export const ingredients = pgTable("ingredients", {
   costPerPortion: decimal("cost_per_portion", { precision: 10, scale: 2 }),
   unit: text("unit"),
   notes: text("notes"),
+  photoUrl: text("photo_url"),
   packagingQty: text("packaging_qty"),
   lastReviewDate: text("last_review_date"),
   source: text("source").default("manual"),
