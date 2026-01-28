@@ -50,12 +50,16 @@ export interface RecipeCostResult {
  * Formula: SUM(unit_cost_per_base × portion_qty)
  * 
  * This is the ONLY authoritative cost calculation for recipes.
+ * 
+ * 🔒 NO ZERO DEFAULTS - Throws on missing cost data
  */
 export async function calculateRecipeCostCanonical(recipeId: number): Promise<number> {
   const result = await db.execute(sql`
     SELECT 
       ri.portion_qty,
-      i.unit_cost_per_base
+      i.unit_cost_per_base,
+      i.name as ingredient_name,
+      i.base_unit
     FROM recipe_ingredient ri
     INNER JOIN ingredients i ON ri.ingredient_id = i.id
     WHERE ri.recipe_id = ${recipeId}
@@ -66,12 +70,26 @@ export async function calculateRecipeCostCanonical(recipeId: number): Promise<nu
   let total = 0;
 
   for (const row of rows as any[]) {
-    const qty = Number(row.portion_qty || 0);
-    const unitCost = Number(row.unit_cost_per_base || 0);
+    const ingredientName = row.ingredient_name || 'Unknown';
+    const baseUnit = row.base_unit;
+    const qty = Number(row.portion_qty);
+    const unitCost = Number(row.unit_cost_per_base);
+
+    // 🔒 NO ZERO DEFAULTS - Fail loudly on missing data
+    if (!baseUnit) {
+      throw new Error(`Ingredient "${ingredientName}" has no base_unit defined`);
+    }
+    if (unitCost === null || unitCost === undefined || isNaN(unitCost) || unitCost <= 0) {
+      throw new Error(`Ingredient "${ingredientName}" has no valid cost_per_base_unit (got: ${row.unit_cost_per_base})`);
+    }
+    if (qty === null || qty === undefined || isNaN(qty) || qty <= 0) {
+      throw new Error(`Ingredient "${ingredientName}" has no valid portion_qty (got: ${row.portion_qty})`);
+    }
+
     const lineCost = qty * unitCost;
 
     if (!Number.isFinite(lineCost) || lineCost < 0) {
-      throw new Error(`Invalid canonical ingredient cost for recipe ${recipeId}`);
+      throw new Error(`Invalid cost calculation for ingredient "${ingredientName}" in recipe ${recipeId}`);
     }
 
     total += lineCost;

@@ -1785,6 +1785,7 @@ export const recipe = pgTable('recipe', {
   name: varchar('name', { length: 255 }).notNull().unique(),
   yieldUnits: decimal('yield_units', { precision: 10, scale: 2 }),
   active: boolean('active').notNull().default(true),
+  isFinal: boolean('is_final').notNull().default(false), // Draft recipes cannot be used in analytics
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
