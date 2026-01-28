@@ -20,23 +20,40 @@ type Ingredient = {
   supplier: string;
   brand: string;
   unit: string;
+  baseUnit: string;
   price: number;
   packagingQty: string;
   notes: string;
   photoUrl: string | null;
   updatedAt: string;
   costPerBase: number;
+  unitCostPerBase: number;
 };
 
 const categories = ["All", "Meat", "Drinks", "Fresh Food", "Frozen Food", "Kitchen Supplies", "Packaging", "Shelf Items"];
 
 const THB = (n: number) => `฿${n.toFixed(2)}`;
-const THB4 = (n: number) => `฿${n.toFixed(4)}`;
+const formatCost = (n: number) => {
+  if (n < 0.01) return `฿${n.toFixed(4)}`;
+  if (n < 1) return `฿${n.toFixed(3)}`;
+  return `฿${n.toFixed(2)}`;
+};
 
-function getCostBreakdown(price: number, packagingQty: string, costPerBase: number): string {
-  if (!price || !packagingQty) return "—";
-  const unit = costPerBase < 1 ? "g" : "each";
-  return `${THB(price)} / ${packagingQty} → ${THB4(costPerBase)} per ${unit}`;
+function getCostBreakdown(ing: Ingredient): { purchase: string; cost: string; warning: boolean } {
+  if (!ing.price) {
+    return { purchase: "No price set", cost: "—", warning: true };
+  }
+  
+  const unit = ing.unit?.toLowerCase() || 'each';
+  const baseUnit = ing.baseUnit || (unit === 'kg' || unit === 'g' ? 'g' : unit === 'litre' || unit === 'l' ? 'ml' : 'each');
+  
+  const purchase = `฿${ing.price.toFixed(2)} / ${ing.packagingQty || '1'} ${ing.unit || 'each'}`;
+  const cost = `→ ${formatCost(ing.unitCostPerBase || ing.costPerBase)} per ${baseUnit}`;
+  
+  const isPackaging = unit === 'each' || unit === 'pcs';
+  const hasNoBreakdown = isPackaging && (!ing.packagingQty || ing.packagingQty === '1' || ing.packagingQty === '');
+  
+  return { purchase, cost, warning: hasNoBreakdown };
 }
 
 export default function IngredientManagement() {
