@@ -1,3 +1,15 @@
+/**
+ * 🔒 MODIFIER ATTRIBUTION LOCK
+ *
+ * Modifiers MUST:
+ * - Never be counted as base items
+ * - Never double-count ingredients
+ *
+ * If attribution is ambiguous:
+ * - Log warning
+ * - Skip ingredient resolution
+ * - Do NOT guess
+ */
 import { and, gte, inArray, lte } from "drizzle-orm";
 import { db } from "../../db";
 import {

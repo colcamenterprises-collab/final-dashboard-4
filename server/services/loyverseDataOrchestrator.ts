@@ -1,3 +1,18 @@
+/**
+ * 🔒 POS INGESTION CONTRACT
+ *
+ * Loyverse is the source of truth for:
+ * - Items sold
+ * - Modifiers
+ * - Sales quantities
+ *
+ * Do NOT:
+ * - Alter totals
+ * - Re-map SKUs without approval
+ * - Infer data not present in POS
+ *
+ * POS ingestion feeds analytics ONLY.
+ */
 import { DateTime } from 'luxon';
 import cron from 'node-cron';
 import winston from 'winston';

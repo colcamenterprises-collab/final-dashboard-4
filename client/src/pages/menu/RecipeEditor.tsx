@@ -1,3 +1,15 @@
+/**
+ * 🔒 RECIPE BUILDER LOCK
+ *
+ * Ingredient add/remove is UI-ONLY.
+ *
+ * During recipe composition:
+ * - NO API calls
+ * - NO DB writes
+ * - NO ingredient mutations
+ *
+ * Backend interaction occurs ONLY on Save Recipe.
+ */
 import React, { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";

@@ -1,3 +1,17 @@
+/**
+ * 🔒 CORE STOCK LOCK
+ *
+ * Rolls, Meat, and Drinks are FIRST-CLASS STOCK ITEMS.
+ *
+ * Rules:
+ * - All purchases MUST enter via coreStockIntake
+ * - No string matching (e.g. "bun", "roll") allowed
+ * - No alternate write paths permitted
+ * - Ledgers are the ONLY reconciliation mechanism
+ *
+ * Any change here requires explicit approval.
+ */
+
 // server/services/meatLedger.ts
 import { PrismaClient } from '@prisma/client';
 import { computeShiftAll } from './shiftItems.js';

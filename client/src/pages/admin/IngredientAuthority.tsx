@@ -1,3 +1,19 @@
+/**
+ * 🔒 INGREDIENT AUTHORITY GOVERNANCE
+ *
+ * This system:
+ * - Is MANAGEMENT-ONLY
+ * - Does NOT feed purchasing automatically
+ * - Does NOT affect recipe builder directly
+ *
+ * Ingredient Authority exists for:
+ * - Review
+ * - Versioning
+ * - Audit
+ *
+ * Not for live ops mutation.
+ */
+
 // 🔒 INGREDIENT AUTHORITY
 // Management-editable governance layer
 // Lives under Menu Management for access ONLY

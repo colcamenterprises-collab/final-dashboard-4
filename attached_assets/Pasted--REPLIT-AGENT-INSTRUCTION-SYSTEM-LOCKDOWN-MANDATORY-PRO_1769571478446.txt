@@ -1,0 +1,201 @@
+🔒 REPLIT AGENT INSTRUCTION — SYSTEM LOCKDOWN (MANDATORY)
+PROJECT
+Final Dashboard 4.0 – Smash Brothers Burgers
+MODE
+LOCKDOWN / GOVERNANCE
+You are performing a lockdown pass.
+This task exists to freeze approved architecture and navigation and prevent unauthorized changes.
+⛔ ABSOLUTE RULES
+You are NOT allowed to:
+Add new features
+Refactor logic
+Change data flows
+Modify calculations
+Rename routes
+Move pages
+Introduce new schemas
+Remove existing pages
+This task is comments, guards, and documentation only.
+🎯 OBJECTIVE
+Ensure the system cannot be accidentally or silently changed by:
+Future agents
+Over-eager refactors
+Misunderstood “improvements”
+Lock down:
+Navigation
+Core stock architecture
+POS ingestion contract
+Recipe builder isolation
+Ingredient Authority boundaries
+🔐 LOCKDOWN TASKS (ALL REQUIRED)
+1️⃣ NAVIGATION LOCK
+Files to update
+client/src/components/Sidebar.tsx
+client/src/App.tsx (or router file)
+Action
+Add a top-level comment block:
+Copy code
+Ts
+/**
+ * 🔒 NAVIGATION LOCK — APPROVED STRUCTURE
+ * Date: Jan 28, 2026
+ *
+ * Sidebar sections are FINAL:
+ * - Operations
+ * - Purchasing
+ * - Analysis
+ * - Finance
+ * - Menu Management
+ *
+ * Do NOT:
+ * - Move Ingredient Authority out of Menu Management
+ * - Move Stock Ledgers out of Analysis
+ * - Add new root sections
+ *
+ * All navigation changes require explicit owner approval.
+ */
+No logic changes. No reordering.
+2️⃣ CORE STOCK ARCHITECTURE LOCK
+(Rolls / Meat / Drinks)
+Files to update
+server/services/coreStockIntake.ts
+server/services/rollsLedger.ts
+server/services/meatLedger.ts
+server/services/drinksLedger.ts
+Action
+Add this block at the top of each file:
+Copy code
+Ts
+/**
+ * 🔒 CORE STOCK LOCK
+ *
+ * Rolls, Meat, and Drinks are FIRST-CLASS STOCK ITEMS.
+ *
+ * Rules:
+ * - All purchases MUST enter via coreStockIntake
+ * - No string matching (e.g. "bun", "roll") allowed
+ * - No alternate write paths permitted
+ * - Ledgers are the ONLY reconciliation mechanism
+ *
+ * Any change here requires explicit approval.
+ */
+3️⃣ POS INGESTION CONTRACT LOCK
+Files to update
+server/webhooks.ts
+server/services/loyverseReceipts.ts
+server/services/loyverseDataOrchestrator.ts
+Action
+Add:
+Copy code
+Ts
+/**
+ * 🔒 POS INGESTION CONTRACT
+ *
+ * Loyverse is the source of truth for:
+ * - Items sold
+ * - Modifiers
+ * - Sales quantities
+ *
+ * Do NOT:
+ * - Alter totals
+ * - Re-map SKUs without approval
+ * - Infer data not present in POS
+ *
+ * POS ingestion feeds analytics ONLY.
+ */
+No code changes. Comments only.
+4️⃣ MODIFIER SAFETY LOCK
+File
+server/services/rma/canonicalSalesBuilder.ts
+Action
+Above the modifier handling logic, add:
+Copy code
+Ts
+/**
+ * 🔒 MODIFIER ATTRIBUTION LOCK
+ *
+ * Modifiers MUST:
+ * - Never be counted as base items
+ * - Never double-count ingredients
+ *
+ * If attribution is ambiguous:
+ * - Log warning
+ * - Skip ingredient resolution
+ * - Do NOT guess
+ */
+This prevents “helpful” but dangerous future edits.
+5️⃣ RECIPE BUILDER ISOLATION LOCK
+Files (where ingredient add occurs)
+Recipe builder UI file(s)
+Action
+Ensure the existing lockdown comment remains and add this if missing:
+Copy code
+Ts
+/**
+ * 🔒 RECIPE BUILDER LOCK
+ *
+ * Ingredient add/remove is UI-ONLY.
+ *
+ * During recipe composition:
+ * - NO API calls
+ * - NO DB writes
+ * - NO ingredient mutations
+ *
+ * Backend interaction occurs ONLY on Save Recipe.
+ */
+Do not alter behavior.
+6️⃣ INGREDIENT AUTHORITY BOUNDARY LOCK
+Files
+Ingredient Authority admin page
+Related API routes
+Action
+Add:
+Copy code
+Ts
+/**
+ * 🔒 INGREDIENT AUTHORITY GOVERNANCE
+ *
+ * This system:
+ * - Is MANAGEMENT-ONLY
+ * - Does NOT feed purchasing automatically
+ * - Does NOT affect recipe builder directly
+ *
+ * Ingredient Authority exists for:
+ * - Review
+ * - Versioning
+ * - Audit
+ *
+ * Not for live ops mutation.
+ */
+7️⃣ PROJECT-LEVEL LOCK NOTE
+File
+replit.md or README.md
+Action
+Append a Lockdown Summary:
+Copy code
+Md
+## 🔒 SYSTEM LOCKDOWN — JAN 28, 2026
+
+The following are LOCKED:
+- POS ingestion contract
+- Core stock (Rolls / Meat / Drinks)
+- Navigation structure
+- Recipe builder ingredient flow
+- Ingredient Authority boundaries
+
+Changes require explicit owner approval.
+Unauthorized refactors are prohibited.
+✅ COMPLETION REQUIREMENTS
+When finished, respond with only:
+List of files touched
+Confirmation:
+“No logic changed”
+“No schemas altered”
+“No routes modified”
+No explanations. No suggestions.
+🛑 STOP CONDITION
+Once lockdown is complete:
+STOP
+Do NOT continue work
+Await next instruction
+This lockdown ensures everything you’ve just stabilized cannot drift while we move into higher-value features next.

@@ -1,3 +1,21 @@
+/**
+ * 🔒 NAVIGATION LOCK — APPROVED STRUCTURE
+ * Date: Jan 28, 2026
+ *
+ * Sidebar sections are FINAL:
+ * - Operations
+ * - Purchasing
+ * - Analysis
+ * - Finance
+ * - Menu Management
+ *
+ * Do NOT:
+ * - Move Ingredient Authority out of Menu Management
+ * - Move Stock Ledgers out of Analysis
+ * - Add new root sections
+ *
+ * All navigation changes require explicit owner approval.
+ */
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { 

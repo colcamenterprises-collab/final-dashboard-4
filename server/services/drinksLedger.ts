@@ -1,4 +1,18 @@
 /**
+ * 🔒 CORE STOCK LOCK
+ *
+ * Rolls, Meat, and Drinks are FIRST-CLASS STOCK ITEMS.
+ *
+ * Rules:
+ * - All purchases MUST enter via coreStockIntake
+ * - No string matching (e.g. "bun", "roll") allowed
+ * - No alternate write paths permitted
+ * - Ledgers are the ONLY reconciliation mechanism
+ *
+ * Any change here requires explicit approval.
+ */
+
+/**
  * PATCH 3: DRINKS LEDGER SERVICE
  * Mirrors rollsLedger and meatLedger pattern for drinks tracking.
  * Tracks: Drinks Start → Purchased → Sold → Expected End → Actual End → Variance

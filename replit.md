@@ -64,3 +64,15 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 - **Database Services**: Neon Database (Serverless PostgreSQL).
 - **Email Service**: Gmail API.
 - **PDF Generation**: jsPDF.
+
+## 🔒 SYSTEM LOCKDOWN — JAN 28, 2026
+
+The following are LOCKED:
+- POS ingestion contract
+- Core stock (Rolls / Meat / Drinks)
+- Navigation structure
+- Recipe builder ingredient flow
+- Ingredient Authority boundaries
+
+Changes require explicit owner approval.
+Unauthorized refactors are prohibited.
