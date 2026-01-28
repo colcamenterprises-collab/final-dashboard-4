@@ -113,57 +113,57 @@ export default function IngredientManagement() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Ingredient Management</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Edit ingredient prices here. Changes immediately affect all recipe costs.
-          </p>
-        </div>
-        <Badge variant="outline" className="text-emerald-600 border-emerald-600">
-          {ingredients.length} Ingredients
-        </Badge>
+    <div className="p-6 space-y-6">
+      <div className="mb-4">
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">Ingredient Management</h1>
+        <p className="text-xs text-slate-600">Edit ingredient prices here. Changes immediately affect all recipe costs.</p>
       </div>
 
-      <Card className="border-slate-200">
-        <CardContent className="p-4">
-          <div className="flex gap-3 mb-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <Input
-                placeholder="Search ingredients..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+      <div className="flex gap-3 mb-4">
+        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-900">{ingredients.length}</span>
+          <span className="text-xs text-slate-600">Total Ingredients</span>
+        </Card>
+      </div>
 
-          {isLoading ? (
-            <div className="text-center py-8 text-slate-500">Loading ingredients...</div>
-          ) : (
-            <div className="border border-slate-200 rounded-[4px] overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-100">
-                    <TableHead className="text-xs font-semibold text-slate-600">Ingredient</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600">Category</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600">Supplier</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600">Price</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600">Packaging</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600">Cost Breakdown</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600 w-20">Actions</TableHead>
+      <Card className="p-4 mb-4 rounded-[4px] border-slate-200">
+        <div className="flex gap-3 items-center flex-wrap">
+          <div className="flex-1 min-w-[200px] relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search ingredients..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10 text-xs rounded-[4px] border-slate-200"
+            />
+          </div>
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="text-xs px-3 py-2 border border-slate-200 rounded-[4px] bg-white"
+          >
+            {categories.map((cat) => (
+              <option key={cat} value={cat}>{cat}</option>
+            ))}
+          </select>
+        </div>
+      </Card>
+
+      {isLoading ? (
+        <div className="text-xs text-slate-600">Loading...</div>
+      ) : (
+        <Card className="rounded-[4px] border-slate-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-slate-200">
+                    <TableHead className="text-xs font-medium text-slate-900">Ingredient</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-900">Price</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-900">Packaging</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-900">Cost Breakdown</TableHead>
+                    <TableHead className="text-xs font-medium text-slate-900 text-center w-20">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -276,9 +276,8 @@ export default function IngredientManagement() {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+        </Card>
+      )}
 
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
         <DialogContent>

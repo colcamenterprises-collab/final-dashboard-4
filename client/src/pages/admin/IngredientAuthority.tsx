@@ -339,50 +339,60 @@ export default function IngredientAuthorityPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 bg-white min-h-screen">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-slate-900">Ingredient Authority</h1>
-        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600">ADMIN ONLY</Badge>
+    <div className="p-6 space-y-6">
+      <div className="mb-4">
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">Ingredient Authority</h1>
+        <p className="text-xs text-slate-600">Management-only governance layer for ingredient review and versioning.</p>
+        <Badge variant="outline" className="text-xs border-amber-500 text-amber-600 mt-2">ADMIN ONLY</Badge>
+      </div>
+
+      <div className="flex gap-3 mb-4">
+        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-900">{reviewQueue.data?.length || 0}</span>
+          <span className="text-xs text-slate-600">Pending Review</span>
+        </Card>
+        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
+          <span className="text-sm font-medium text-slate-900">{authorities.data?.length || 0}</span>
+          <span className="text-xs text-slate-600">Approved</span>
+        </Card>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
-          <TabsTrigger value="review">Review Queue ({reviewQueue.data?.length || 0})</TabsTrigger>
-          <TabsTrigger value="authority">Authority List ({authorities.data?.length || 0})</TabsTrigger>
+          <TabsTrigger value="review">Review Queue</TabsTrigger>
+          <TabsTrigger value="authority">Authority List</TabsTrigger>
         </TabsList>
 
         <TabsContent value="review" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Pending Approval</CardTitle>
-            </CardHeader>
-            <CardContent>
+          <Card className="rounded-[4px] border-slate-200 overflow-hidden">
+            <div className="p-4">
+              <h2 className="text-sm font-medium text-slate-900 mb-3">Pending Approval</h2>
               {reviewQueue.isLoading ? (
-                <p className="text-slate-500">Loading...</p>
+                <p className="text-xs text-slate-600">Loading...</p>
               ) : reviewQueue.data?.length === 0 ? (
-                <p className="text-slate-500">All ingredients approved</p>
+                <p className="text-xs text-slate-600">All ingredients approved</p>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Supplier</TableHead>
-                      <TableHead>Package</TableHead>
-                      <TableHead>Action</TableHead>
+                    <TableRow className="border-slate-200">
+                      <TableHead className="text-xs font-medium text-slate-900">Name</TableHead>
+                      <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
+                      <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
+                      <TableHead className="text-xs font-medium text-slate-900">Package</TableHead>
+                      <TableHead className="text-xs font-medium text-slate-900">Action</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {reviewQueue.data?.map((item: ReviewItem) => (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell>{item.category || '-'}</TableCell>
-                        <TableCell>{item.supplier_name || '-'}</TableCell>
-                        <TableCell>
+                      <TableRow key={item.id} className="border-slate-200">
+                        <TableCell className="text-xs text-slate-900 font-medium">{item.name}</TableCell>
+                        <TableCell className="text-xs text-slate-600">{item.category || '-'}</TableCell>
+                        <TableCell className="text-xs text-slate-600">{item.supplier_name || '-'}</TableCell>
+                        <TableCell className="text-xs text-slate-600">
                           {item.package_qty} {item.package_unit} @ ฿{item.package_cost}
                         </TableCell>
                         <TableCell>
-                          <Button size="sm" onClick={() => openApprovalModal(item)}>
+                          <Button size="sm" onClick={() => openApprovalModal(item)} className="text-xs h-8 px-3 bg-emerald-600 hover:bg-emerald-700 rounded-[4px]">
                             Review
                           </Button>
                         </TableCell>
@@ -391,74 +401,78 @@ export default function IngredientAuthorityPage() {
                   </TableBody>
                 </Table>
               )}
-            </CardContent>
+            </div>
           </Card>
         </TabsContent>
 
         <TabsContent value="authority" className="mt-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg">Approved Ingredients</CardTitle>
-              <Button size="sm" onClick={openManualAddModal}>
+          <Card className="rounded-[4px] border-slate-200 overflow-hidden">
+            <div className="p-4 flex items-center justify-between border-b border-slate-200">
+              <h2 className="text-sm font-medium text-slate-900">Approved Ingredients</h2>
+              <Button size="sm" onClick={openManualAddModal} className="text-xs h-8 px-3 bg-emerald-600 hover:bg-emerald-700 rounded-[4px]">
                 Manual Add
               </Button>
-            </CardHeader>
-            <CardContent>
+            </div>
+            <div className="p-4">
               {authorities.isLoading ? (
-                <p className="text-slate-500">Loading...</p>
+                <p className="text-xs text-slate-600">Loading...</p>
               ) : authorities.data?.length === 0 ? (
-                <p className="text-slate-500">No approved ingredients yet</p>
+                <p className="text-xs text-slate-600">No approved ingredients yet</p>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Purchase</TableHead>
-                      <TableHead>Portion</TableHead>
-                      <TableHead>Cost</TableHead>
-                      <TableHead>Versions</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {authorities.data?.map((auth: IngredientAuthority) => (
-                      <TableRow key={auth.id} className={!auth.is_active ? 'opacity-50' : ''}>
-                        <TableCell className="font-medium">{auth.name}</TableCell>
-                        <TableCell>
-                          <Badge variant={auth.is_active ? 'default' : 'secondary'}>
-                            {auth.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{auth.category}</TableCell>
-                        <TableCell>{auth.purchase_quantity} {auth.purchase_unit}</TableCell>
-                        <TableCell>{auth.portion_quantity} {auth.portion_unit}</TableCell>
-                        <TableCell>฿{auth.purchase_cost_thb}</TableCell>
-                        <TableCell>
-                          <Badge variant="secondary">{auth.version_count || 1}</Badge>
-                        </TableCell>
-                        <TableCell className="space-x-2">
-                          {auth.is_active && (
-                            <>
-                              <Button size="sm" variant="outline" onClick={() => openEditModal(auth)}>
-                                Edit
-                              </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDeactivate(auth)}>
-                                Deactivate
-                              </Button>
-                            </>
-                          )}
-                          <Button size="sm" variant="ghost" onClick={() => openVersionsModal(auth)}>
-                            History
-                          </Button>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-slate-200">
+                        <TableHead className="text-xs font-medium text-slate-900">Name</TableHead>
+                        <TableHead className="text-xs font-medium text-slate-900">Status</TableHead>
+                        <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
+                        <TableHead className="text-xs font-medium text-slate-900">Purchase</TableHead>
+                        <TableHead className="text-xs font-medium text-slate-900">Portion</TableHead>
+                        <TableHead className="text-xs font-medium text-slate-900">Cost</TableHead>
+                        <TableHead className="text-xs font-medium text-slate-900">Versions</TableHead>
+                        <TableHead className="text-xs font-medium text-slate-900">Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {authorities.data?.map((auth: IngredientAuthority) => (
+                        <TableRow key={auth.id} className={`border-slate-200 ${!auth.is_active ? 'opacity-50' : ''}`}>
+                          <TableCell className="text-xs text-slate-900 font-medium">{auth.name}</TableCell>
+                          <TableCell>
+                            <Badge variant={auth.is_active ? 'default' : 'secondary'} className="text-xs">
+                              {auth.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-600">{auth.category}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{auth.purchase_quantity} {auth.purchase_unit}</TableCell>
+                          <TableCell className="text-xs text-slate-600">{auth.portion_quantity} {auth.portion_unit}</TableCell>
+                          <TableCell className="text-xs text-slate-900 font-medium">฿{auth.purchase_cost_thb}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">{auth.version_count || 1}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              {auth.is_active && (
+                                <>
+                                  <Button size="sm" variant="outline" onClick={() => openEditModal(auth)} className="text-xs h-7 px-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50 rounded-[4px]">
+                                    Edit
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => handleDeactivate(auth)} className="text-xs h-7 px-2 text-slate-500 hover:text-slate-700 rounded-[4px]">
+                                    Deactivate
+                                  </Button>
+                                </>
+                              )}
+                              <Button size="sm" variant="ghost" onClick={() => openVersionsModal(auth)} className="text-xs h-7 px-2 text-slate-500 hover:text-slate-700 rounded-[4px]">
+                                History
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
-            </CardContent>
+            </div>
           </Card>
         </TabsContent>
       </Tabs>
