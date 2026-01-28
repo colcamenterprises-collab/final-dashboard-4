@@ -89,6 +89,22 @@ export default function RecipeEditorPage() {
 
   const [recipeNotFound, setRecipeNotFound] = useState(false);
 
+  // Cost validation query - checks for missing base unit costs
+  const { data: costValidation } = useQuery({
+    queryKey: ["recipe-cost-validation", editingId],
+    queryFn: async () => {
+      const response = await axios.get<{
+        recipeId: number;
+        isFinal: boolean;
+        issues: { ingredientName: string; issue: string }[];
+        canBeCost: boolean;
+      }>(`/api/recipes/${editingId}/cost-validation`);
+      return response.data;
+    },
+    enabled: Boolean(editingId),
+    retry: false,
+  });
+
   const { data: recipeToEdit, isLoading: recipesLoading } = useQuery({
     queryKey: ["recipe", editingId],
     queryFn: async () => {
@@ -569,6 +585,34 @@ export default function RecipeEditorPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Cost Validation Warning - Show for final recipes with missing base costs */}
+        {costValidation && costValidation.isFinal && costValidation.issues.length > 0 && (
+          <Card className="border-amber-300 bg-amber-50">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold text-amber-800 flex items-center gap-2">
+                <span className="text-lg">⚠️</span>
+                Recipe cannot be costed
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-sm text-amber-700">
+                This recipe is marked as Final but has ingredients with missing base unit cost data.
+                Analytics will not include this recipe until all ingredient costs are resolved.
+              </p>
+              <div className="bg-white rounded-[4px] p-3 border border-amber-200">
+                <div className="text-xs font-medium text-amber-800 mb-2">Missing cost data:</div>
+                <ul className="space-y-1">
+                  {costValidation.issues.map((issue, idx) => (
+                    <li key={idx} className="text-xs text-amber-700">
+                      • <span className="font-medium">{issue.ingredientName}</span>: {issue.issue}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="border-slate-200">
           <CardHeader>

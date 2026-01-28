@@ -279,6 +279,36 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Check for missing base cost data in recipe ingredients
+router.get('/:id/cost-validation', async (req, res) => {
+  let recipeId: number;
+  try {
+    recipeId = Number(req.params.id);
+    if (!Number.isFinite(recipeId)) throw new Error('Invalid id');
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid recipe id' });
+  }
+
+  try {
+    const { getRecipeMissingCostData } = await import('../services/recipeCost.service.js');
+    const issues = await getRecipeMissingCostData(recipeId);
+    
+    // Also check if recipe is final
+    const recipeResult = await pool.query('SELECT is_final FROM recipe WHERE id = $1', [recipeId]);
+    const isFinal = recipeResult.rows[0]?.is_final ?? false;
+
+    res.json({
+      recipeId,
+      isFinal,
+      issues,
+      canBeCost: issues.length === 0,
+    });
+  } catch (error: any) {
+    console.error('[recipes] Cost validation error:', error);
+    res.status(500).json({ error: error.message || 'Failed to validate recipe cost' });
+  }
+});
+
 router.get('/:id/ingredients', async (req, res) => {
   let recipeId: bigint;
   try {
