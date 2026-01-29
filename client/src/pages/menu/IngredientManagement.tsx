@@ -132,7 +132,7 @@ export default function IngredientManagement() {
   return (
     <div className="p-6 space-y-6">
       <div className="mb-4">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">Ingredient Management</h1>
+        <h1 className="text-3xl font-bold text-slate-900 mb-1">Ingredients</h1>
         <p className="text-xs text-slate-600">Edit ingredient prices here. Changes immediately affect all recipe costs.</p>
       </div>
 
@@ -173,14 +173,14 @@ export default function IngredientManagement() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-slate-200">
-                    <TableHead className="text-xs font-medium text-slate-900">Ingredient</TableHead>
-                    <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
-                    <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
-                    <TableHead className="text-xs font-medium text-slate-900">Price</TableHead>
-                    <TableHead className="text-xs font-medium text-slate-900">Packaging</TableHead>
-                    <TableHead className="text-xs font-medium text-slate-900">Cost Breakdown</TableHead>
-                    <TableHead className="text-xs font-medium text-slate-900 text-center w-20">Actions</TableHead>
+                <TableRow className="bg-slate-100 border-slate-200">
+                    <TableHead className="text-xs font-semibold text-slate-600">Ingredient</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Category</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Supplier</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Price</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Packaging</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600">Cost Breakdown</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-center w-20">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
