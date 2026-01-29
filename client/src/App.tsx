@@ -228,7 +228,6 @@ export default function App() {
                 <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
                 <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
                 <Route path="/admin/data-safety" element={<Guard><DataSafety /></Guard>} />
-                <Route path="/menu-management/ingredients" element={<Guard><IngredientManagement /></Guard>} />
 
                 <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
                 <Route path="/partners/analytics" element={<Guard><PartnerAnalytics /></Guard>} />
@@ -241,6 +240,7 @@ export default function App() {
                 <Route path="/kds/history" element={<KDSHistory />} />
 
                 <Route path="/menu-v3" element={<MenuAdminV3 />} />
+                <Route path="/menu-management/ingredients" element={<Guard><IngredientManagement /></Guard>} />
                 <Route path="/menu-management" element={<Guard><MenuManagement /></Guard>} />
 
                 <Route path="/pos-login" element={<POSLogin />} />

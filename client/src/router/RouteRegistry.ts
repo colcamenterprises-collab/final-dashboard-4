@@ -77,7 +77,7 @@ export const ROUTES = {
   ADMIN_ORDERS: "/admin/orders",
   LOYVERSE_MAPPING: "/admin/loyverse-mapping",
   DATA_SAFETY: "/admin/data-safety",
-  INGREDIENT_AUTHORITY: "/menu-management/ingredient-authority",
+  INGREDIENTS_PAGE: "/menu-management/ingredients",
 
   // Membership
   MEMBERSHIP: "/membership",
