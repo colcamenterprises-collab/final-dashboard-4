@@ -200,7 +200,7 @@ export default function IngredientManagement() {
                     <TableHead className="text-xs font-semibold text-slate-600 w-[10%] min-w-[70px]">Price</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-600 w-[12%] min-w-[80px]">Packaging</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-600 w-[24%] min-w-[140px]">Cost Breakdown</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-600 text-center w-[12%] min-w-[70px]">Actions</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-center w-[12%] min-w-[100px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -313,8 +313,8 @@ export default function IngredientManagement() {
                               <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-7 w-7 p-0" title="Photo">
                                 <Upload className="h-3.5 w-3.5 text-slate-400" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleHide(ing)} className="h-7 w-7 p-0" title="Hide">
-                                <EyeOff className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
+                              <Button size="sm" variant="ghost" onClick={() => handleHide(ing)} className="h-7 w-7 p-0" title="Hide from list">
+                                <EyeOff className="h-3.5 w-3.5 text-red-400 hover:text-red-600" />
                               </Button>
                             </div>
                           </TableCell>
