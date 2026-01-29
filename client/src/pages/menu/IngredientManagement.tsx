@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Search, Edit, Save, X, Upload, Trash2 } from "lucide-react";
+import { Search, Edit, Save, X, Upload, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -74,7 +74,7 @@ export default function IngredientManagement() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...data }: { id: number } & Partial<Ingredient>) => {
-      return apiRequest("PUT", `/api/ingredients/${id}`, data);
+      return apiRequest(`/api/ingredients/${id}`, { method: "PUT", body: JSON.stringify(data) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients/management"] });
@@ -89,23 +89,23 @@ export default function IngredientManagement() {
     }
   });
 
-  const deleteMutation = useMutation({
+  const hideMutation = useMutation({
     mutationFn: async (id: number) => {
-      return apiRequest("DELETE", `/api/ingredients/${id}`);
+      return apiRequest(`/api/ingredients/${id}`, { method: "PUT", body: JSON.stringify({ hidden: true }) });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients/management"] });
       queryClient.invalidateQueries({ queryKey: ["/api/ingredients"] });
-      toast({ title: "Deleted", description: "Ingredient removed from this list." });
+      toast({ title: "Hidden", description: "Ingredient hidden from this list." });
     },
     onError: (e: any) => {
-      toast({ title: "Error", description: e.message || "Failed to delete", variant: "destructive" });
+      toast({ title: "Error", description: e.message || "Failed to hide", variant: "destructive" });
     }
   });
 
-  const handleDelete = (ing: Ingredient) => {
-    if (confirm(`Remove "${ing.name}" from ingredients list?`)) {
-      deleteMutation.mutate(ing.id);
+  const handleHide = (ing: Ingredient) => {
+    if (confirm(`Hide "${ing.name}" from ingredients list?`)) {
+      hideMutation.mutate(ing.id);
     }
   };
 
@@ -313,8 +313,8 @@ export default function IngredientManagement() {
                               <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-7 w-7 p-0" title="Photo">
                                 <Upload className="h-3.5 w-3.5 text-slate-400" />
                               </Button>
-                              <Button size="sm" variant="ghost" onClick={() => handleDelete(ing)} className="h-7 w-7 p-0" title="Delete">
-                                <Trash2 className="h-3.5 w-3.5 text-rose-400 hover:text-rose-600" />
+                              <Button size="sm" variant="ghost" onClick={() => handleHide(ing)} className="h-7 w-7 p-0" title="Hide">
+                                <EyeOff className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
                               </Button>
                             </div>
                           </TableCell>

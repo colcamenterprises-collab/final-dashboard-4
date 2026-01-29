@@ -265,6 +265,7 @@ router.get('/management', async (req, res) => {
         i.photo_url,
         i.updated_at
       FROM ingredients i
+      WHERE i.hidden IS NOT TRUE
       ORDER BY i.name ASC
       LIMIT 1000;
     `);
@@ -317,7 +318,7 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid ingredient ID' });
     }
     
-    const { name, category, supplier, brand, unit, price, packagingQty, notes, photoUrl } = req.body;
+    const { name, category, supplier, brand, unit, price, packagingQty, notes, photoUrl, hidden } = req.body;
     
     await db.execute(sql`
       UPDATE ingredients SET
@@ -330,6 +331,7 @@ router.put('/:id', async (req, res) => {
         packaging_qty = COALESCE(${packagingQty}, packaging_qty),
         notes = COALESCE(${notes}, notes),
         photo_url = COALESCE(${photoUrl}, photo_url),
+        hidden = COALESCE(${hidden}, hidden),
         updated_at = NOW()
       WHERE id = ${id};
     `);

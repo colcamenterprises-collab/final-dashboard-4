@@ -3374,28 +3374,67 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
-  // Update individual ingredient
+  // Update individual ingredient (including hidden field for soft-delete)
   app.put("/api/ingredients/:id", async (req: Request, res: Response) => {
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
       
-      // Validate and sanitize update data
-      const allowedFields = ['name', 'category', 'supplier', 'price', 'unitPrice', 'packageSize', 'portionSize', 'unit', 'notes'];
-      const sanitizedUpdates: any = {};
+      // Build dynamic update object for only provided fields
+      const setClauses: string[] = [];
+      const values: any[] = [];
       
-      Object.keys(updates).forEach(key => {
-        if (allowedFields.includes(key) && updates[key] !== undefined) {
-          sanitizedUpdates[key] = updates[key];
-        }
-      });
+      if (updates.name !== undefined) {
+        setClauses.push(`name = $${values.length + 1}`);
+        values.push(updates.name);
+      }
+      if (updates.category !== undefined) {
+        setClauses.push(`category = $${values.length + 1}`);
+        values.push(updates.category);
+      }
+      if (updates.supplier !== undefined) {
+        setClauses.push(`supplier = $${values.length + 1}`);
+        values.push(updates.supplier);
+      }
+      if (updates.price !== undefined) {
+        setClauses.push(`price = $${values.length + 1}`);
+        values.push(Number(updates.price));
+      }
+      if (updates.unit !== undefined) {
+        setClauses.push(`unit = $${values.length + 1}`);
+        values.push(updates.unit);
+      }
+      if (updates.notes !== undefined) {
+        setClauses.push(`notes = $${values.length + 1}`);
+        values.push(updates.notes);
+      }
+      if (updates.hidden !== undefined) {
+        setClauses.push(`hidden = $${values.length + 1}`);
+        values.push(updates.hidden);
+      }
+      if (updates.packagingQty !== undefined) {
+        setClauses.push(`packaging_qty = $${values.length + 1}`);
+        values.push(updates.packagingQty);
+      }
       
-      if (Object.keys(sanitizedUpdates).length === 0) {
+      if (setClauses.length === 0) {
         return res.status(400).json({ error: "No valid fields to update" });
       }
       
-      const ingredient = await storage.updateIngredient(id, sanitizedUpdates);
-      res.json(ingredient);
+      setClauses.push("updated_at = NOW()");
+      values.push(id);
+      
+      const { pool } = await import('./db');
+      const query = `UPDATE ingredients SET ${setClauses.join(", ")} WHERE id = $${values.length}`;
+      await pool.query(query, values);
+      
+      const result = await pool.query("SELECT * FROM ingredients WHERE id = $1", [id]);
+      
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: "Ingredient not found" });
+      }
+      
+      res.json({ success: true, ingredient: result.rows[0] });
     } catch (error) {
       console.error("Error updating ingredient:", error);
       res.status(500).json({ error: "Failed to update ingredient" });
