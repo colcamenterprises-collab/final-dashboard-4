@@ -52,7 +52,6 @@ import RecipeCards from "./pages/menu/RecipeCards";
 import RecipeEditorPage from "./pages/menu/RecipeEditor";
 import RecipeListPage from "./pages/menu/Recipes";
 import IngredientManagement from "./pages/menu/IngredientManagement";
-import IngredientAuthority from "./pages/admin/IngredientAuthority";
 import Products from "./pages/Products";
 import ProductPage from "./pages/ProductPage";
 import ShiftReports from "./pages/ShiftReports";
@@ -229,7 +228,7 @@ export default function App() {
                 <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
                 <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
                 <Route path="/admin/data-safety" element={<Guard><DataSafety /></Guard>} />
-                <Route path="/menu-management/ingredient-authority" element={<Guard><IngredientAuthority /></Guard>} />
+                <Route path="/menu-management/ingredients" element={<Guard><IngredientManagement /></Guard>} />
 
                 <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
                 <Route path="/partners/analytics" element={<Guard><PartnerAnalytics /></Guard>} />

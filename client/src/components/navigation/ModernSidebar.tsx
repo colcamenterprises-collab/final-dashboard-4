@@ -112,7 +112,6 @@ const navigationGroups: NavGroup[] = [
       { to: "/analysis/stock-reconciliation", label: "Stock Reconciliation", icon: Package, testId: "nav-stock-reconciliation" },
       { to: "/analysis/ledgers", label: "Stock Ledgers", icon: BarChart3, testId: "nav-stock-ledgers" },
       { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
-      { to: "/analysis/ingredients", label: "Ingredients (Truth)", icon: Package, testId: "nav-ingredients-truth" },
       { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" }
     ]
   },
@@ -128,8 +127,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { to: "/recipe-management", label: "Recipe Management", icon: ChefHat, testId: "nav-recipe-management" },
       { to: "/menu/manager", label: "Menu Manager", icon: ChefHat, testId: "nav-menu-manager" },
-      { to: "/menu/ingredient-management", label: "Ingredient Management", icon: ChefHat, testId: "nav-ingredient-management" },
-      { to: "/menu-management/ingredient-authority", label: "Ingredient Authority", icon: ChefHat, testId: "nav-ingredient-authority" }
+      { to: "/menu-management/ingredients", label: "Ingredients", icon: ChefHat, testId: "nav-ingredients" }
     ]
   },
   {

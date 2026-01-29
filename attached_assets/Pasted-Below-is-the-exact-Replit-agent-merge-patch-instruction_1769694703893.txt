@@ -1,0 +1,142 @@
+Below is the exact Replit agent merge patch instruction.
+This is execution-only. No explanations, no design debate, no improvisation.
+🔧 REPLIT AGENT PATCH — MERGE INGREDIENT PAGES (FINAL)
+OBJECTIVE
+Merge Ingredient Management and Ingredient Authority into one single Ingredients page under Menu Management, with full cost visibility and editability, using the existing ingredient data source.
+HARD RULES (NON-NEGOTIABLE)
+❌ Do NOT change recipe cost math
+❌ Do NOT change database schema
+❌ Do NOT add new tables
+❌ Do NOT introduce approval workflows
+❌ Do NOT duplicate ingredient routes
+❌ Do NOT store cost in recipes
+❌ Do NOT touch POS, stock ledgers, or history
+This is a UI + routing consolidation only.
+FINAL NAVIGATION STRUCTURE
+Sidebar — Menu Management
+Copy code
+Text
+Menu Management
+├─ Recipe Management
+├─ Menu Manager
+└─ Ingredients   ← SINGLE PAGE (FINAL)
+❌ REMOVE:
+Ingredient Authority
+Any duplicate Ingredients/Truth pages
+PATCH SCOPE (FILES ALLOWED)
+Frontend
+client/src/components/navigation/ModernSidebar.tsx
+client/src/App.tsx
+client/src/pages/menu/IngredientManagement.tsx
+client/src/pages/admin/IngredientAuthority.tsx (REMOVAL)
+Backend
+❌ NONE (backend already correct)
+PATCH 1 — SIDEBAR CLEANUP
+File
+client/src/components/navigation/ModernSidebar.tsx
+REQUIRED ACTIONS
+REMOVE sidebar entry:
+“Ingredient Authority”
+Any “Ingredients (Truth)” or duplicate ingredient entries
+ENSURE ONLY ONE ENTRY EXISTS:
+Copy code
+Ts
+{
+  label: "Ingredients",
+  path: "/menu-management/ingredients"
+}
+❌ No admin-only segregation
+❌ No secondary ingredient links
+PATCH 2 — ROUTING CONSOLIDATION
+File
+client/src/App.tsx
+REQUIRED ACTIONS
+REMOVE route:
+Copy code
+Ts
+/menu-management/ingredient-authority
+ENSURE SINGLE ROUTE EXISTS:
+Copy code
+Tsx
+<Route
+  path="/menu-management/ingredients"
+  element={<IngredientManagement />}
+/>
+❌ No redirects
+❌ No aliases
+❌ No secondary routes
+PATCH 3 — INGREDIENT AUTHORITY REMOVAL
+File
+client/src/pages/admin/IngredientAuthority.tsx
+REQUIRED ACTIONS
+DELETE file entirely
+OR
+Replace contents with:
+Copy code
+Ts
+export default function DeprecatedIngredientAuthority() {
+  return null;
+}
+⚠️ Must not be reachable from UI
+PATCH 4 — INGREDIENT MANAGEMENT = SINGLE SOURCE UI
+File
+client/src/pages/menu/IngredientManagement.tsx
+THIS PAGE MUST CONTAIN (MERGED FEATURES)
+Editable (Purchasing-backed)
+Name
+Category (dropdown, purchasing-sourced)
+Supplier
+Packaging Qty
+Unit (each | kg | g | litre | ml)
+Cost (THB)
+Notes
+Read-only (Computed)
+Cost per base unit (server-calculated)
+Explicit packaging math display:
+Copy code
+
+฿250 / 50 each → ฿5.00 per item
+฿29 / 1kg → ฿0.029 per gram
+Visibility Add-ons
+Photo upload (URL only, reuse existing upload infra)
+“Used in Recipes” list (read-only)
+Live price impact (implicit via live updates)
+❌ No approval tabs
+❌ No review queues
+❌ No dual modes
+This page replaces both previous pages.
+PATCH 5 — STYLING ENFORCEMENT
+Ingredient page MUST match:
+Purchasing List
+Expenses page
+REQUIRED STYLES
+Copy code
+Ts
+container: "p-6 space-y-6"
+title: "text-3xl font-bold text-slate-900"
+table headers: "text-xs font-semibold text-slate-600 bg-slate-100"
+table cells: "text-xs text-slate-700"
+cards: "rounded-[4px] border border-slate-200"
+buttons: same classes as Expenses page
+❌ No new fonts
+❌ No new spacing system
+❌ No Tailwind creativity
+ACCEPTANCE TESTS (MUST PASS)
+Sidebar shows only one Ingredients link
+Ingredient Authority page is unreachable
+Ingredients page:
+Shows cost math clearly
+Allows editing purchase price
+Updates recipe costs instantly
+No duplicated ingredient lists
+No broken routes
+No console errors
+FINAL STATE (LOCK THIS)
+ONE Ingredients page
+ONE ingredient data source
+ONE cost engine
+ZERO duplication
+✅ EXECUTE THIS PATCH EXACTLY
+❌ DO NOT ADD FEATURES
+❌ DO NOT REFECTOR BACKEND
+Once applied, ingredient management is simplified, auditable, and stable.
