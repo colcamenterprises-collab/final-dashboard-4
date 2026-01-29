@@ -248,27 +248,50 @@ router.post('/sync-all', async (req, res) => {
  * GET /api/ingredients/management
  * Returns full ingredient data for management page with editable fields
  * Shows cost breakdown: price, packaging_qty, computed cost_per_base
+ * Query params: showHidden=true to include hidden ingredients
  */
 router.get('/management', async (req, res) => {
   try {
-    const result = await db.execute(sql`
-      SELECT
-        i.id,
-        i.name,
-        i.category,
-        i.supplier,
-        i.brand,
-        i.unit,
-        i.price,
-        i.packaging_qty,
-        i.notes,
-        i.photo_url,
-        i.updated_at
-      FROM ingredients i
-      WHERE i.hidden IS NOT TRUE
-      ORDER BY i.name ASC
-      LIMIT 1000;
-    `);
+    const showHidden = req.query.showHidden === 'true';
+    
+    const result = showHidden 
+      ? await db.execute(sql`
+          SELECT
+            i.id,
+            i.name,
+            i.category,
+            i.supplier,
+            i.brand,
+            i.unit,
+            i.price,
+            i.packaging_qty,
+            i.notes,
+            i.photo_url,
+            i.updated_at,
+            i.hidden
+          FROM ingredients i
+          ORDER BY i.name ASC
+          LIMIT 1000;
+        `)
+      : await db.execute(sql`
+          SELECT
+            i.id,
+            i.name,
+            i.category,
+            i.supplier,
+            i.brand,
+            i.unit,
+            i.price,
+            i.packaging_qty,
+            i.notes,
+            i.photo_url,
+            i.updated_at,
+            i.hidden
+          FROM ingredients i
+          WHERE i.hidden IS NOT TRUE
+          ORDER BY i.name ASC
+          LIMIT 1000;
+        `);
     
     const rows = result.rows || result;
     const enriched = rows.map((r: any) => {
@@ -297,6 +320,7 @@ router.get('/management', async (req, res) => {
         updatedAt: r.updated_at,
         costPerBase: computedCost ?? 0,
         unitCostPerBase: computedCost ?? 0,
+        hidden: r.hidden || false,
       };
     });
 
