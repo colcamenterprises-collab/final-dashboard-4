@@ -4,11 +4,10 @@ import { sql } from 'drizzle-orm';
 import { toBase } from '../lib/uom';
 import { syncIngredientFromPurchasing, syncAllIngredientsFromPurchasing } from '../services/ingredientSync.service';
 import { 
-  computeUnitCostPerBase as computeCostNew,
-  computePortionCost,
   checkUnitCompatibility,
   getBaseUnit 
 } from '../utils/computeUnitCostPerBase';
+import { computeYield, computeEstimatedYield, YieldMethod } from '../utils/computeYield';
 
 const router = Router();
 
@@ -273,6 +272,9 @@ router.get('/management', async (req, res) => {
         i.base_unit,
         i.base_yield_qty,
         i.unit_cost_per_base,
+        i.yield_method,
+        i.avg_portion_size,
+        i.variance_pct,
         i.portion_qty,
         i.portion_unit,
         i.notes,
@@ -290,23 +292,56 @@ router.get('/management', async (req, res) => {
     
     const enriched = rows.map((r: any) => {
       const purchaseCost = Number(r.price) || 0;
-      const baseYieldQty = Number(r.base_yield_qty) || null;
-      const portionQty = Number(r.portion_qty) || null;
-      const baseUnit = r.base_unit || 'each';
+      const purchaseQty = Number(r.purchase_qty) || 1;
+      const purchaseUnit = r.purchase_unit || 'kg';
+      const baseUnit = r.base_unit || 'g';
+      const yieldMethod: YieldMethod = r.yield_method === 'ESTIMATED' ? 'ESTIMATED' : 'DIRECT';
+      const avgPortionSize = Number(r.avg_portion_size) || null;
+      const variancePct = Number(r.variance_pct) || 10;
       const portionUnit = r.portion_unit || baseUnit;
       
-      // Compute unit cost using explicit baseYieldQty (no text parsing)
-      const unitCostPerBase = baseYieldQty && baseYieldQty > 0 && purchaseCost > 0
-        ? purchaseCost / baseYieldQty
-        : null;
+      // Compute yield based on method
+      let unitCostPerBase: number | null = null;
+      let yieldCountAvg: number | null = null;
+      let yieldCountMin: number | null = null;
+      let yieldCountMax: number | null = null;
+      let costPerPortionAvg: number | null = null;
+      let costPerPortionMin: number | null = null;
+      let costPerPortionMax: number | null = null;
+      let missingYield = false;
       
-      // Compute portion cost
-      const portionCost = unitCostPerBase && portionQty && portionQty > 0
-        ? unitCostPerBase * portionQty
-        : null;
-      
-      // Check unit compatibility
-      const unitCheck = checkUnitCompatibility(baseUnit, portionUnit);
+      if (yieldMethod === 'DIRECT') {
+        const baseYieldQty = Number(r.base_yield_qty) || null;
+        if (baseYieldQty && baseYieldQty > 0 && purchaseCost > 0) {
+          unitCostPerBase = purchaseCost / baseYieldQty;
+          yieldCountAvg = baseYieldQty;
+        } else {
+          missingYield = true;
+        }
+      } else if (yieldMethod === 'ESTIMATED') {
+        if (avgPortionSize && avgPortionSize > 0) {
+          const result = computeEstimatedYield(
+            purchaseCost,
+            purchaseQty,
+            purchaseUnit,
+            baseUnit,
+            avgPortionSize,
+            portionUnit,
+            variancePct
+          );
+          if (result) {
+            yieldCountAvg = result.yieldCountAvg;
+            yieldCountMin = result.yieldCountMin;
+            yieldCountMax = result.yieldCountMax;
+            costPerPortionAvg = result.costPerPortionAvg;
+            costPerPortionMin = result.costPerPortionMin;
+            costPerPortionMax = result.costPerPortionMax;
+            unitCostPerBase = costPerPortionAvg; // For display compatibility
+          }
+        } else {
+          missingYield = true;
+        }
+      }
       
       return {
         id: r.id,
@@ -317,19 +352,27 @@ router.get('/management', async (req, res) => {
         // Purchase side
         purchaseCost: purchaseCost,
         purchaseQty: r.purchase_qty || r.packaging_qty || '',
-        purchaseUnit: r.purchase_unit || '',
-        // Yield side  
-        baseYieldQty: baseYieldQty,
+        purchaseUnit: purchaseUnit,
+        // Yield method
+        yieldMethod: yieldMethod,
+        // DIRECT yield
+        baseYieldQty: Number(r.base_yield_qty) || null,
         baseUnit: baseUnit,
-        // Computed cost
+        // ESTIMATED yield fields
+        avgPortionSize: avgPortionSize,
+        variancePct: variancePct,
+        // Computed yield ranges
+        yieldCountAvg: yieldCountAvg,
+        yieldCountMin: yieldCountMin,
+        yieldCountMax: yieldCountMax,
+        // Computed costs
         unitCostPerBase: unitCostPerBase,
-        missingYield: !baseYieldQty || baseYieldQty <= 0,
+        costPerPortionAvg: costPerPortionAvg,
+        costPerPortionMin: costPerPortionMin,
+        costPerPortionMax: costPerPortionMax,
+        missingYield: missingYield,
         // Portion side
-        portionQty: portionQty,
         portionUnit: portionUnit,
-        portionCost: portionCost,
-        unitMismatch: !unitCheck.compatible,
-        unitWarning: unitCheck.warning || null,
         // Meta
         notes: r.notes || '',
         photoUrl: r.photo_url || null,
@@ -347,8 +390,8 @@ router.get('/management', async (req, res) => {
 
 /**
  * PUT /api/ingredients/:id
- * Update ingredient with explicit yield/portion fields
- * Computed fields (unitCostPerBase, portionCost) calculated server-side from explicit numeric inputs
+ * Update ingredient with DIRECT or ESTIMATED yield fields
+ * Computed fields calculated server-side from explicit numeric inputs
  */
 router.put('/:id', async (req, res) => {
   try {
@@ -360,12 +403,13 @@ router.put('/:id', async (req, res) => {
     const { 
       name, category, supplier, brand,
       purchaseCost, purchaseQty, purchaseUnit,
-      baseYieldQty, baseUnit,
-      portionQty, portionUnit,
+      yieldMethod, // 'DIRECT' | 'ESTIMATED'
+      baseYieldQty, baseUnit, // DIRECT fields
+      avgPortionSize, variancePct, portionUnit, // ESTIMATED fields
       notes, photoUrl, hidden 
     } = req.body;
     
-    // Compute unit cost from explicit fields
+    // Compute unit cost for DIRECT method
     const yieldNum = baseYieldQty ? Number(baseYieldQty) : null;
     const costNum = purchaseCost ? Number(purchaseCost) : null;
     const computedUnitCost = (yieldNum && yieldNum > 0 && costNum && costNum > 0)
@@ -379,12 +423,14 @@ router.put('/:id', async (req, res) => {
         supplier = COALESCE(${supplier}, supplier),
         brand = COALESCE(${brand}, brand),
         price = COALESCE(${costNum}, price),
-        purchase_qty = COALESCE(${purchaseQty}, purchase_qty),
+        purchase_qty = COALESCE(${purchaseQty ? Number(purchaseQty) : null}, purchase_qty),
         purchase_unit = COALESCE(${purchaseUnit}, purchase_unit),
+        yield_method = COALESCE(${yieldMethod}, yield_method),
         base_yield_qty = COALESCE(${yieldNum}, base_yield_qty),
         base_unit = COALESCE(${baseUnit}, base_unit),
         unit_cost_per_base = COALESCE(${computedUnitCost}, unit_cost_per_base),
-        portion_qty = COALESCE(${portionQty ? Number(portionQty) : null}, portion_qty),
+        avg_portion_size = COALESCE(${avgPortionSize ? Number(avgPortionSize) : null}, avg_portion_size),
+        variance_pct = COALESCE(${variancePct ? Number(variancePct) : null}, variance_pct),
         portion_unit = COALESCE(${portionUnit}, portion_unit),
         notes = COALESCE(${notes}, notes),
         photo_url = COALESCE(${photoUrl}, photo_url),

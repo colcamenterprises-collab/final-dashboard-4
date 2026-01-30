@@ -10,6 +10,8 @@ import { Search, Edit, Save, X, Upload, EyeOff, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
+type YieldMethod = 'DIRECT' | 'ESTIMATED';
+
 type Ingredient = {
   id: number;
   name: string;
@@ -20,18 +22,25 @@ type Ingredient = {
   purchaseCost: number;
   purchaseQty: string;
   purchaseUnit: string;
-  // Yield side
+  // Yield method
+  yieldMethod: YieldMethod;
+  // DIRECT yield
   baseYieldQty: number | null;
   baseUnit: string;
+  // ESTIMATED yield
+  avgPortionSize: number | null;
+  variancePct: number;
+  portionUnit: string;
+  // Computed yield ranges
+  yieldCountAvg: number | null;
+  yieldCountMin: number | null;
+  yieldCountMax: number | null;
   // Computed costs
   unitCostPerBase: number | null;
+  costPerPortionAvg: number | null;
+  costPerPortionMin: number | null;
+  costPerPortionMax: number | null;
   missingYield: boolean;
-  // Portion side
-  portionQty: number | null;
-  portionUnit: string;
-  portionCost: number | null;
-  unitMismatch: boolean;
-  unitWarning: string | null;
   // Meta
   notes: string;
   photoUrl: string | null;
@@ -54,29 +63,33 @@ function getCostBreakdown(ing: Ingredient): { line1: string; line2: string; line
   if (ing.missingYield) {
     return { 
       line1: `฿${ing.purchaseCost.toFixed(2)} / ${ing.purchaseQty || '?'}`,
-      line2: "⚠ Missing yield — cannot compute cost",
+      line2: "⚠ Missing yield data",
       line3: "",
-      warning: "Set Yield Qty to enable cost calculation"
+      warning: ing.yieldMethod === 'ESTIMATED' 
+        ? "Set avg portion size to compute" 
+        : "Set yield qty to compute"
     };
   }
   
-  // Line 1: Purchase info
-  const line1 = `฿${ing.purchaseCost.toFixed(2)} / ${ing.baseYieldQty} ${ing.baseUnit}`;
+  if (ing.yieldMethod === 'DIRECT') {
+    // DIRECT: Simple cost calculation
+    const line1 = `฿${ing.purchaseCost.toFixed(2)} / ${ing.baseYieldQty} ${ing.baseUnit}`;
+    const line2 = ing.unitCostPerBase !== null 
+      ? `= ${formatCost(ing.unitCostPerBase)} per ${ing.baseUnit}`
+      : '';
+    return { line1, line2, line3: '', warning: null };
+  }
   
-  // Line 2: Unit cost
-  const line2 = ing.unitCostPerBase !== null 
-    ? `= ${formatCost(ing.unitCostPerBase)} per ${ing.baseUnit}`
+  // ESTIMATED: Show ranges
+  const line1 = `~${ing.yieldCountAvg} ${ing.portionUnit}s (${ing.yieldCountMin}–${ing.yieldCountMax})`;
+  const line2 = ing.costPerPortionAvg !== null 
+    ? `${formatCost(ing.costPerPortionAvg)} per ${ing.portionUnit}`
+    : '';
+  const line3 = (ing.costPerPortionMin !== null && ing.costPerPortionMax !== null)
+    ? `Range: ${formatCost(ing.costPerPortionMin)} – ${formatCost(ing.costPerPortionMax)}`
     : '';
   
-  // Line 3: Default portion cost
-  const line3 = (ing.portionQty && ing.portionCost !== null)
-    ? `Default ${ing.portionQty}${ing.portionUnit} = ${formatCost(ing.portionCost)}`
-    : '';
-  
-  // Unit mismatch warning
-  const warning = ing.unitMismatch ? ing.unitWarning : null;
-  
-  return { line1, line2, line3, warning };
+  return { line1, line2, line3, warning: null };
 }
 
 export default function IngredientManagement() {
@@ -166,9 +179,11 @@ export default function IngredientManagement() {
       purchaseCost: ing.purchaseCost,
       purchaseQty: ing.purchaseQty,
       purchaseUnit: ing.purchaseUnit,
+      yieldMethod: ing.yieldMethod,
       baseYieldQty: ing.baseYieldQty,
       baseUnit: ing.baseUnit,
-      portionQty: ing.portionQty,
+      avgPortionSize: ing.avgPortionSize,
+      variancePct: ing.variancePct,
       portionUnit: ing.portionUnit,
       notes: ing.notes,
       photoUrl: ing.photoUrl,
@@ -241,15 +256,15 @@ export default function IngredientManagement() {
       ) : (
         <div className="rounded-[4px] border border-slate-300 overflow-hidden" style={{backgroundColor: '#ffffff'}}>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs" style={{backgroundColor: '#ffffff', minWidth: '800px'}}>
+            <table className="w-full text-xs" style={{backgroundColor: '#ffffff', minWidth: '850px'}}>
               <thead>
                 <tr style={{backgroundColor: '#f8f8f8'}} className="border-b border-slate-300">
                   <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '16%'}}>Ingredient</th>
                   <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '8%'}}>Supplier</th>
                   <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '10%'}}>Purchase</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '14%'}}>Yield</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '14%'}}>Portion</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '26%'}}>Cost Breakdown</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '8%'}}>Type</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '14%'}}>Yield / Portion</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '32%'}}>Cost Breakdown</th>
                   <th className="p-2 text-center font-medium text-slate-700" style={{width: '12%'}}>Actions</th>
                 </tr>
               </thead>
@@ -305,52 +320,72 @@ export default function IngredientManagement() {
                           </div>
                         </td>
                         <td className="p-2 border-r border-slate-200">
-                          <div className="space-y-1">
-                            <Input
-                              type="number"
-                              value={editForm.baseYieldQty || ""}
-                              onChange={(e) => setEditForm({ ...editForm, baseYieldQty: parseFloat(e.target.value) || null })}
-                              className="h-7 text-xs"
-                              placeholder="Yield qty"
-                            />
-                            <Select
-                              value={editForm.baseUnit || "each"}
-                              onValueChange={(v) => setEditForm({ ...editForm, baseUnit: v })}
-                            >
-                              <SelectTrigger className="h-6 text-[10px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="g">grams (g)</SelectItem>
-                                <SelectItem value="ml">milliliters (ml)</SelectItem>
-                                <SelectItem value="each">each</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          <Select
+                            value={editForm.yieldMethod || "DIRECT"}
+                            onValueChange={(v) => setEditForm({ ...editForm, yieldMethod: v as YieldMethod })}
+                          >
+                            <SelectTrigger className="h-7 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="DIRECT">DIRECT</SelectItem>
+                              <SelectItem value="ESTIMATED">ESTIMATED</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </td>
                         <td className="p-2 border-r border-slate-200">
-                          <div className="space-y-1">
-                            <Input
-                              type="number"
-                              value={editForm.portionQty || ""}
-                              onChange={(e) => setEditForm({ ...editForm, portionQty: parseFloat(e.target.value) || null })}
-                              className="h-7 text-xs"
-                              placeholder="Portion qty"
-                            />
-                            <Select
-                              value={editForm.portionUnit || editForm.baseUnit || "each"}
-                              onValueChange={(v) => setEditForm({ ...editForm, portionUnit: v })}
-                            >
-                              <SelectTrigger className="h-6 text-[10px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="g">grams (g)</SelectItem>
-                                <SelectItem value="ml">milliliters (ml)</SelectItem>
-                                <SelectItem value="each">each</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                          {editForm.yieldMethod === 'ESTIMATED' ? (
+                            <div className="space-y-1">
+                              <div className="flex gap-1">
+                                <Input
+                                  type="number"
+                                  value={editForm.avgPortionSize || ""}
+                                  onChange={(e) => setEditForm({ ...editForm, avgPortionSize: parseFloat(e.target.value) || null })}
+                                  className="h-6 text-[10px] w-16"
+                                  placeholder="Avg size"
+                                />
+                                <Input
+                                  value={editForm.portionUnit || ""}
+                                  onChange={(e) => setEditForm({ ...editForm, portionUnit: e.target.value })}
+                                  className="h-6 text-[10px] flex-1"
+                                  placeholder="rasher/slice"
+                                />
+                              </div>
+                              <div className="flex gap-1 items-center">
+                                <span className="text-[10px] text-slate-500">±</span>
+                                <Input
+                                  type="number"
+                                  value={editForm.variancePct || 10}
+                                  onChange={(e) => setEditForm({ ...editForm, variancePct: parseFloat(e.target.value) || 10 })}
+                                  className="h-6 text-[10px] w-12"
+                                />
+                                <span className="text-[10px] text-slate-500">%</span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <Input
+                                type="number"
+                                value={editForm.baseYieldQty || ""}
+                                onChange={(e) => setEditForm({ ...editForm, baseYieldQty: parseFloat(e.target.value) || null })}
+                                className="h-7 text-xs"
+                                placeholder="Yield qty"
+                              />
+                              <Select
+                                value={editForm.baseUnit || "g"}
+                                onValueChange={(v) => setEditForm({ ...editForm, baseUnit: v })}
+                              >
+                                <SelectTrigger className="h-6 text-[10px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="g">grams (g)</SelectItem>
+                                  <SelectItem value="ml">milliliters (ml)</SelectItem>
+                                  <SelectItem value="each">each</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
                         </td>
                         <td className="p-2 border-r border-slate-200">
                           <span className="text-xs text-slate-500 italic">Save to update</span>
@@ -389,20 +424,36 @@ export default function IngredientManagement() {
                         <td className="p-2 text-slate-600 border-r border-slate-200 text-xs">{ing.supplier || "—"}</td>
                         <td className="p-2 border-r border-slate-200">
                           <div className="text-xs text-slate-900">{THB(ing.purchaseCost)}</div>
-                          <div className="text-[10px] text-slate-500">{ing.purchaseQty || "—"}</div>
+                          <div className="text-[10px] text-slate-500">{ing.purchaseQty} {ing.purchaseUnit}</div>
                         </td>
                         <td className="p-2 border-r border-slate-200">
-                          {ing.baseYieldQty ? (
-                            <div className="text-xs text-slate-700">{ing.baseYieldQty} {ing.baseUnit}</div>
-                          ) : (
-                            <div className="text-amber-600 text-[10px]">⚠ Not set</div>
-                          )}
+                          <Badge 
+                            variant={ing.yieldMethod === 'ESTIMATED' ? 'default' : 'secondary'}
+                            className={`text-[9px] px-1.5 py-0.5 ${
+                              ing.yieldMethod === 'ESTIMATED' 
+                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-100' 
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-100'
+                            }`}
+                          >
+                            {ing.yieldMethod}
+                          </Badge>
                         </td>
                         <td className="p-2 border-r border-slate-200">
-                          {ing.portionQty ? (
-                            <div className="text-xs text-slate-700">{ing.portionQty} {ing.portionUnit}</div>
+                          {ing.yieldMethod === 'ESTIMATED' ? (
+                            ing.avgPortionSize ? (
+                              <div>
+                                <div className="text-xs text-slate-700">{ing.avgPortionSize}g per {ing.portionUnit}</div>
+                                <div className="text-[10px] text-slate-500">±{ing.variancePct}%</div>
+                              </div>
+                            ) : (
+                              <div className="text-amber-600 text-[10px]">⚠ Set portion</div>
+                            )
                           ) : (
-                            <div className="text-[10px] text-slate-400">—</div>
+                            ing.baseYieldQty ? (
+                              <div className="text-xs text-slate-700">{ing.baseYieldQty} {ing.baseUnit}</div>
+                            ) : (
+                              <div className="text-amber-600 text-[10px]">⚠ Not set</div>
+                            )
                           )}
                         </td>
                         <td className="p-2 text-slate-700 border-r border-slate-200">
