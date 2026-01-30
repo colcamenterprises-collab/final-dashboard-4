@@ -3,7 +3,12 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { toBase } from '../lib/uom';
 import { syncIngredientFromPurchasing, syncAllIngredientsFromPurchasing } from '../services/ingredientSync.service';
-import { computeUnitCostPerBase as computeCostFromUtil, parsePackagingQty, getBaseUnit } from '../utils/computeUnitCostPerBase';
+import { 
+  computeUnitCostPerBase as computeCostNew,
+  computePortionCost,
+  checkUnitCompatibility,
+  getBaseUnit 
+} from '../utils/computeUnitCostPerBase';
 
 const router = Router();
 
@@ -247,63 +252,61 @@ router.post('/sync-all', async (req, res) => {
 /**
  * GET /api/ingredients/management
  * Returns full ingredient data for management page with editable fields
- * Shows cost breakdown: price, packaging_qty, computed cost_per_base
+ * Shows explicit yield/portion fields for transparent cost calculation
  * Query params: showHidden=true to include hidden ingredients
  */
 router.get('/management', async (req, res) => {
   try {
     const showHidden = req.query.showHidden === 'true';
     
-    const result = showHidden 
-      ? await db.execute(sql`
-          SELECT
-            i.id,
-            i.name,
-            i.category,
-            i.supplier,
-            i.brand,
-            i.unit,
-            i.price,
-            i.packaging_qty,
-            i.notes,
-            i.photo_url,
-            i.updated_at,
-            i.hidden
-          FROM ingredients i
-          ORDER BY i.name ASC
-          LIMIT 1000;
-        `)
-      : await db.execute(sql`
-          SELECT
-            i.id,
-            i.name,
-            i.category,
-            i.supplier,
-            i.brand,
-            i.unit,
-            i.price,
-            i.packaging_qty,
-            i.notes,
-            i.photo_url,
-            i.updated_at,
-            i.hidden
-          FROM ingredients i
-          WHERE i.hidden IS NOT TRUE
-          ORDER BY i.name ASC
-          LIMIT 1000;
-        `);
+    const baseQuery = sql`
+      SELECT
+        i.id,
+        i.name,
+        i.category,
+        i.supplier,
+        i.brand,
+        i.price,
+        i.packaging_qty,
+        i.purchase_qty,
+        i.purchase_unit,
+        i.base_unit,
+        i.base_yield_qty,
+        i.unit_cost_per_base,
+        i.portion_qty,
+        i.portion_unit,
+        i.notes,
+        i.photo_url,
+        i.updated_at,
+        i.hidden
+      FROM ingredients i
+      ${showHidden ? sql`` : sql`WHERE i.hidden IS NOT TRUE`}
+      ORDER BY i.name ASC
+      LIMIT 1000;
+    `;
     
+    const result = await db.execute(baseQuery);
     const rows = result.rows || result;
+    
     const enriched = rows.map((r: any) => {
-      // Compute normalized cost using same logic
-      const computedCost = computeUnitCostPerBase({
-        price: Number(r.price) || null,
-        packaging_qty: r.packaging_qty,
-        unit: r.unit
-      });
+      const purchaseCost = Number(r.price) || 0;
+      const baseYieldQty = Number(r.base_yield_qty) || null;
+      const portionQty = Number(r.portion_qty) || null;
+      const baseUnit = r.base_unit || 'each';
+      const portionUnit = r.portion_unit || baseUnit;
       
-      // Determine base unit for display
-      const baseUnit = getBaseUnit(r.unit);
+      // Compute unit cost using explicit baseYieldQty (no text parsing)
+      const unitCostPerBase = baseYieldQty && baseYieldQty > 0 && purchaseCost > 0
+        ? purchaseCost / baseYieldQty
+        : null;
+      
+      // Compute portion cost
+      const portionCost = unitCostPerBase && portionQty && portionQty > 0
+        ? unitCostPerBase * portionQty
+        : null;
+      
+      // Check unit compatibility
+      const unitCheck = checkUnitCompatibility(baseUnit, portionUnit);
       
       return {
         id: r.id,
@@ -311,15 +314,26 @@ router.get('/management', async (req, res) => {
         category: r.category || '',
         supplier: r.supplier || '',
         brand: r.brand || '',
-        unit: r.unit || 'each',
+        // Purchase side
+        purchaseCost: purchaseCost,
+        purchaseQty: r.purchase_qty || r.packaging_qty || '',
+        purchaseUnit: r.purchase_unit || '',
+        // Yield side  
+        baseYieldQty: baseYieldQty,
         baseUnit: baseUnit,
-        price: Number(r.price) || 0,
-        packagingQty: r.packaging_qty || '',
+        // Computed cost
+        unitCostPerBase: unitCostPerBase,
+        missingYield: !baseYieldQty || baseYieldQty <= 0,
+        // Portion side
+        portionQty: portionQty,
+        portionUnit: portionUnit,
+        portionCost: portionCost,
+        unitMismatch: !unitCheck.compatible,
+        unitWarning: unitCheck.warning || null,
+        // Meta
         notes: r.notes || '',
         photoUrl: r.photo_url || null,
         updatedAt: r.updated_at,
-        costPerBase: computedCost ?? 0,
-        unitCostPerBase: computedCost ?? 0,
         hidden: r.hidden || false,
       };
     });
@@ -333,7 +347,8 @@ router.get('/management', async (req, res) => {
 
 /**
  * PUT /api/ingredients/:id
- * Update ingredient price/packaging - immediately affects all recipe costs
+ * Update ingredient with explicit yield/portion fields
+ * Computed fields (unitCostPerBase, portionCost) calculated server-side from explicit numeric inputs
  */
 router.put('/:id', async (req, res) => {
   try {
@@ -342,7 +357,20 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid ingredient ID' });
     }
     
-    const { name, category, supplier, brand, unit, price, packagingQty, notes, photoUrl, hidden } = req.body;
+    const { 
+      name, category, supplier, brand,
+      purchaseCost, purchaseQty, purchaseUnit,
+      baseYieldQty, baseUnit,
+      portionQty, portionUnit,
+      notes, photoUrl, hidden 
+    } = req.body;
+    
+    // Compute unit cost from explicit fields
+    const yieldNum = baseYieldQty ? Number(baseYieldQty) : null;
+    const costNum = purchaseCost ? Number(purchaseCost) : null;
+    const computedUnitCost = (yieldNum && yieldNum > 0 && costNum && costNum > 0)
+      ? costNum / yieldNum
+      : null;
     
     await db.execute(sql`
       UPDATE ingredients SET
@@ -350,9 +378,14 @@ router.put('/:id', async (req, res) => {
         category = COALESCE(${category}, category),
         supplier = COALESCE(${supplier}, supplier),
         brand = COALESCE(${brand}, brand),
-        unit = COALESCE(${unit}, unit),
-        price = COALESCE(${price ? Number(price) : null}, price),
-        packaging_qty = COALESCE(${packagingQty}, packaging_qty),
+        price = COALESCE(${costNum}, price),
+        purchase_qty = COALESCE(${purchaseQty}, purchase_qty),
+        purchase_unit = COALESCE(${purchaseUnit}, purchase_unit),
+        base_yield_qty = COALESCE(${yieldNum}, base_yield_qty),
+        base_unit = COALESCE(${baseUnit}, base_unit),
+        unit_cost_per_base = COALESCE(${computedUnitCost}, unit_cost_per_base),
+        portion_qty = COALESCE(${portionQty ? Number(portionQty) : null}, portion_qty),
+        portion_unit = COALESCE(${portionUnit}, portion_unit),
         notes = COALESCE(${notes}, notes),
         photo_url = COALESCE(${photoUrl}, photo_url),
         hidden = COALESCE(${hidden}, hidden),
@@ -360,9 +393,12 @@ router.put('/:id', async (req, res) => {
       WHERE id = ${id};
     `);
     
-    // Fetch updated record with computed cost
+    // Fetch updated record
     const updated = await db.execute(sql`
-      SELECT id, name, category, supplier, brand, unit, price, packaging_qty, notes, photo_url, updated_at
+      SELECT id, name, category, supplier, brand, price,
+        purchase_qty, purchase_unit, base_yield_qty, base_unit,
+        unit_cost_per_base, portion_qty, portion_unit,
+        notes, photo_url, updated_at, hidden
       FROM ingredients WHERE id = ${id}
     `);
     
@@ -371,11 +407,11 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Ingredient not found' });
     }
     
-    const computedCost = computeUnitCostPerBase({
-      price: Number(row.price) || null,
-      packaging_qty: row.packaging_qty,
-      unit: row.unit
-    });
+    const unitCostPerBase = Number(row.unit_cost_per_base) || null;
+    const finalPortionQty = Number(row.portion_qty) || null;
+    const portionCost = (unitCostPerBase && finalPortionQty)
+      ? unitCostPerBase * finalPortionQty
+      : null;
     
     res.json({
       success: true,
@@ -385,13 +421,19 @@ router.put('/:id', async (req, res) => {
         category: row.category || '',
         supplier: row.supplier || '',
         brand: row.brand || '',
-        unit: row.unit || 'each',
-        price: Number(row.price) || 0,
-        packagingQty: row.packaging_qty || '',
+        purchaseCost: Number(row.price) || 0,
+        purchaseQty: row.purchase_qty || '',
+        purchaseUnit: row.purchase_unit || '',
+        baseYieldQty: Number(row.base_yield_qty) || null,
+        baseUnit: row.base_unit || 'each',
+        unitCostPerBase: unitCostPerBase,
+        portionQty: finalPortionQty,
+        portionUnit: row.portion_unit || row.base_unit || 'each',
+        portionCost: portionCost,
         notes: row.notes || '',
         photoUrl: row.photo_url || null,
         updatedAt: row.updated_at,
-        costPerBase: computedCost ?? 0,
+        hidden: row.hidden || false,
       }
     });
   } catch (e: any) {
