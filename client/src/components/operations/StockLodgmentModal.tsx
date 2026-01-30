@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { convertFromInputDate } from "@/lib/format";
+
+interface DrinkIngredient {
+  id: number;
+  name: string;
+}
 
 const rollsSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -55,11 +60,6 @@ interface StockLodgmentModalProps {
   };
 }
 
-const DRINK_TYPES = [
-  "Coke", "Coke Zero", "Sprite", "Schweppes Manow", "Red Fanta", 
-  "Orange Fanta", "Red Singha", "Yellow Singha", "Pink Singha", "Soda Water"
-];
-
 const MEAT_TYPES = [
   "Topside", "Chuck", "Brisket", "Rump", "Outside", "Mixed", "Other"
 ];
@@ -78,11 +78,37 @@ export function StockLodgmentModal({
   const setIsOpen = onOpenChange || setInternalIsOpen;
   
   const [activeTab, setActiveTab] = useState<"rolls" | "meat" | "drinks">(initialData?.type || "rolls");
+  const [drinkCounts, setDrinkCounts] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const isEditMode = !!initialData?.id;
   const today = new Date().toISOString().split('T')[0];
+
+  // Fetch drink ingredients from database (filter by Drinks category client-side)
+  const { data: drinkIngredients = [], isLoading: drinksLoading } = useQuery<DrinkIngredient[]>({
+    queryKey: ['/api/ingredients/management', 'drinks'],
+    queryFn: async () => {
+      const res = await fetch('/api/ingredients/management');
+      if (!res.ok) throw new Error('Failed to fetch drink ingredients');
+      const json = await res.json();
+      const items = json.items || json; // API returns {items: [...]} 
+      return items
+        .filter((ing: any) => ing.category === 'Drinks' && !ing.hidden)
+        .map((ing: any) => ({
+          id: ing.id,
+          name: ing.name
+        }))
+        .sort((a: DrinkIngredient, b: DrinkIngredient) => a.name.localeCompare(b.name));
+    },
+  });
+
+  // Initialize drink counts when ingredients load
+  useEffect(() => {
+    if (drinkIngredients.length > 0 && Object.keys(drinkCounts).length === 0) {
+      setDrinkCounts(Object.fromEntries(drinkIngredients.map(d => [String(d.id), 0])));
+    }
+  }, [drinkIngredients]);
 
   const rollsForm = useForm<RollsForm>({
     resolver: zodResolver(rollsSchema),
@@ -98,7 +124,7 @@ export function StockLodgmentModal({
     resolver: zodResolver(drinksSchema),
     defaultValues: { 
       date: initialData?.date || today,
-      counts: Object.fromEntries(DRINK_TYPES.map(d => [d, 0]))
+      counts: {}
     }
   });
 
@@ -129,19 +155,19 @@ export function StockLodgmentModal({
           weightKg: initialData.weightKg || 0
         });
       } else if (initialData.type === "drinks") {
-        const counts = Object.fromEntries(DRINK_TYPES.map(d => [d, 0]));
-        if (initialData.drinkType && initialData.quantity) {
-          counts[initialData.drinkType] = initialData.quantity;
-        }
+        const counts = Object.fromEntries(drinkIngredients.map(d => [String(d.id), 0]));
         drinksForm.reset({ date: initialData.date || today, counts });
+        setDrinkCounts(counts);
       }
     } else if (isOpen && !initialData) {
       // Reset to default for new entries
       rollsForm.reset({ date: today, quantity: 0, cost: 0, paid: false });
       meatForm.reset({ date: today, meatType: "", weightKg: 0 });
-      drinksForm.reset({ date: today, counts: Object.fromEntries(DRINK_TYPES.map(d => [d, 0])) });
+      const counts = Object.fromEntries(drinkIngredients.map(d => [String(d.id), 0]));
+      drinksForm.reset({ date: today, counts });
+      setDrinkCounts(counts);
     }
-  }, [isOpen, initialData, today]);
+  }, [isOpen, initialData, today, drinkIngredients]);
 
   // Auto-calculate cost for rolls (qty * 8 THB)
   const handleQuantityChange = (quantity: number) => {
@@ -199,11 +225,20 @@ export function StockLodgmentModal({
     });
   };
 
-  const handleDrinksSubmit = (data: DrinksForm) => {
+  const handleDrinksSubmit = () => {
+    const date = drinksForm.getValues('date');
+    
     // Filter out zero quantities and convert to items array for backend
-    const items = Object.entries(data.counts)
+    const items = Object.entries(drinkCounts)
       .filter(([_, qty]) => qty > 0)
-      .map(([type, quantity]) => ({ type, quantity }));
+      .map(([ingredientId, quantity]) => {
+        const ingredient = drinkIngredients.find(d => String(d.id) === ingredientId);
+        return { 
+          type: ingredient?.name || ingredientId,
+          ingredientId: parseInt(ingredientId),
+          quantity 
+        };
+      });
     
     if (items.length === 0) {
       toast({
@@ -216,7 +251,7 @@ export function StockLodgmentModal({
     
     stockMutation.mutate({
       type: "drinks",
-      date: data.date,
+      date,
       items,
     });
   };
@@ -398,7 +433,7 @@ export function StockLodgmentModal({
         {/* Drinks Tab - Table Format */}
         {activeTab === "drinks" && (
           <Form {...drinksForm}>
-            <form onSubmit={drinksForm.handleSubmit(handleDrinksSubmit)} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleDrinksSubmit(); }} className="space-y-4">
               <FormField
                 control={drinksForm.control}
                 name="date"
@@ -425,38 +460,40 @@ export function StockLodgmentModal({
               />
               
               <div className="border rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-100 border-b">
-                      <th className="text-left p-2 font-medium text-slate-700">Drink Type</th>
-                      <th className="text-right p-2 font-medium text-slate-700 w-24">Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {DRINK_TYPES.map((drink) => (
-                      <FormField
-                        key={drink}
-                        control={drinksForm.control}
-                        name={`counts.${drink}`}
-                        render={({ field }) => (
-                          <tr className="border-b last:border-b-0 hover:bg-slate-50">
-                            <td className="p-2 text-slate-700">{drink}</td>
-                            <td className="p-2">
-                              <Input
-                                type="number"
-                                min="0"
-                                value={field.value || ""}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                                className="h-8 text-sm text-right w-20 ml-auto"
-                                data-testid={`input-drink-${drink.toLowerCase().replace(/\s+/g, "-")}`}
-                              />
-                            </td>
-                          </tr>
-                        )}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                {drinksLoading ? (
+                  <div className="p-4 text-center text-sm text-slate-500">Loading drinks...</div>
+                ) : drinkIngredients.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-500">No drink ingredients found</div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-100 border-b">
+                        <th className="text-left p-2 font-medium text-slate-700">Drink Type</th>
+                        <th className="text-right p-2 font-medium text-slate-700 w-24">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {drinkIngredients.map((drink) => (
+                        <tr key={drink.id} className="border-b last:border-b-0 hover:bg-slate-50">
+                          <td className="p-2 text-slate-700">{drink.name}</td>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={drinkCounts[String(drink.id)] || ""}
+                              onChange={(e) => setDrinkCounts(prev => ({
+                                ...prev,
+                                [String(drink.id)]: parseInt(e.target.value) || 0
+                              }))}
+                              className="h-8 text-sm text-right w-20 ml-auto"
+                              data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
               
               <div className="flex gap-3 pt-4">
