@@ -16,42 +16,67 @@ type Ingredient = {
   category: string;
   supplier: string;
   brand: string;
-  unit: string;
+  // Purchase side
+  purchaseCost: number;
+  purchaseQty: string;
+  purchaseUnit: string;
+  // Yield side
+  baseYieldQty: number | null;
   baseUnit: string;
-  price: number;
-  packagingQty: string;
+  // Computed costs
+  unitCostPerBase: number | null;
+  missingYield: boolean;
+  // Portion side
+  portionQty: number | null;
+  portionUnit: string;
+  portionCost: number | null;
+  unitMismatch: boolean;
+  unitWarning: string | null;
+  // Meta
   notes: string;
   photoUrl: string | null;
   updatedAt: string;
-  costPerBase: number;
-  unitCostPerBase: number;
+  hidden: boolean;
 };
 
 const categories = ["All", "Meat", "Drinks", "Fresh Food", "Frozen Food", "Kitchen Supplies", "Packaging", "Shelf Items", "Sauces"];
 
-const THB = (n: number) => `฿${n.toFixed(2)}`;
-const formatCost = (n: number) => {
+const THB = (n: number | null) => n !== null ? `฿${n.toFixed(2)}` : '—';
+const formatCost = (n: number | null) => {
+  if (n === null) return '—';
   if (n < 0.01) return `฿${n.toFixed(4)}`;
   if (n < 1) return `฿${n.toFixed(3)}`;
   return `฿${n.toFixed(2)}`;
 };
 
-function getCostBreakdown(ing: Ingredient): { line1: string; line2: string; warning: boolean } {
-  if (!ing.price) {
-    return { line1: "No price set", line2: "—", warning: true };
+function getCostBreakdown(ing: Ingredient): { line1: string; line2: string; line3: string; warning: string | null } {
+  // Missing yield warning
+  if (ing.missingYield) {
+    return { 
+      line1: `฿${ing.purchaseCost.toFixed(2)} / ${ing.purchaseQty || '?'}`,
+      line2: "⚠ Missing yield — cannot compute cost",
+      line3: "",
+      warning: "Set Yield Qty to enable cost calculation"
+    };
   }
   
-  const unit = ing.unit?.toLowerCase() || 'each';
-  const baseUnit = ing.baseUnit || (unit === 'kg' || unit === 'g' ? 'g' : unit === 'litre' || unit === 'l' ? 'ml' : 'each');
+  // Line 1: Purchase info
+  const line1 = `฿${ing.purchaseCost.toFixed(2)} / ${ing.baseYieldQty} ${ing.baseUnit}`;
   
-  const line1 = `฿${ing.price.toFixed(2)} / ${ing.packagingQty || '1'} ${ing.unit || 'each'}`;
-  const costPerBase = ing.unitCostPerBase || ing.costPerBase;
-  const line2 = costPerBase ? `= ${formatCost(costPerBase)} per ${baseUnit}` : '';
+  // Line 2: Unit cost
+  const line2 = ing.unitCostPerBase !== null 
+    ? `= ${formatCost(ing.unitCostPerBase)} per ${ing.baseUnit}`
+    : '';
   
-  const isPackaging = unit === 'each' || unit === 'pcs';
-  const hasNoBreakdown = isPackaging && (!ing.packagingQty || ing.packagingQty === '1' || ing.packagingQty === '');
+  // Line 3: Default portion cost
+  const line3 = (ing.portionQty && ing.portionCost !== null)
+    ? `Default ${ing.portionQty}${ing.portionUnit} = ${formatCost(ing.portionCost)}`
+    : '';
   
-  return { line1, line2, warning: hasNoBreakdown };
+  // Unit mismatch warning
+  const warning = ing.unitMismatch ? ing.unitWarning : null;
+  
+  return { line1, line2, line3, warning };
 }
 
 export default function IngredientManagement() {
@@ -138,9 +163,13 @@ export default function IngredientManagement() {
       category: ing.category,
       supplier: ing.supplier,
       brand: ing.brand,
-      unit: ing.unit,
-      price: ing.price,
-      packagingQty: ing.packagingQty,
+      purchaseCost: ing.purchaseCost,
+      purchaseQty: ing.purchaseQty,
+      purchaseUnit: ing.purchaseUnit,
+      baseYieldQty: ing.baseYieldQty,
+      baseUnit: ing.baseUnit,
+      portionQty: ing.portionQty,
+      portionUnit: ing.portionUnit,
       notes: ing.notes,
       photoUrl: ing.photoUrl,
     });
@@ -212,16 +241,16 @@ export default function IngredientManagement() {
       ) : (
         <div className="rounded-[4px] border border-slate-300 overflow-hidden" style={{backgroundColor: '#ffffff'}}>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs" style={{backgroundColor: '#ffffff', minWidth: '700px'}}>
+            <table className="w-full text-xs" style={{backgroundColor: '#ffffff', minWidth: '800px'}}>
               <thead>
                 <tr style={{backgroundColor: '#f8f8f8'}} className="border-b border-slate-300">
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '18%'}}>Ingredient</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '10%'}}>Category</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '16%'}}>Ingredient</th>
                   <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '8%'}}>Supplier</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '9%'}}>Price</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '10%'}}>Packaging</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '30%'}}>Cost Breakdown</th>
-                  <th className="p-2 text-center font-medium text-slate-700" style={{width: '15%'}}>Actions</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '10%'}}>Purchase</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '14%'}}>Yield</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '14%'}}>Portion</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '26%'}}>Cost Breakdown</th>
+                  <th className="p-2 text-center font-medium text-slate-700" style={{width: '12%'}}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -234,15 +263,14 @@ export default function IngredientManagement() {
                             value={editForm.name || ""}
                             onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                             className="h-7 text-xs"
+                            placeholder="Name"
                           />
-                        </td>
-                        <td className="p-2 border-r border-slate-200">
                           <Select
                             value={editForm.category || ""}
                             onValueChange={(v) => setEditForm({ ...editForm, category: v })}
                           >
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue />
+                            <SelectTrigger className="h-6 text-[10px] mt-1">
+                              <SelectValue placeholder="Category" />
                             </SelectTrigger>
                             <SelectContent>
                               {categories.filter(c => c !== "All").map((cat) => (
@@ -256,23 +284,73 @@ export default function IngredientManagement() {
                             value={editForm.supplier || ""}
                             onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })}
                             className="h-7 text-xs"
+                            placeholder="Supplier"
                           />
                         </td>
                         <td className="p-2 border-r border-slate-200">
-                          <Input
-                            type="number"
-                            value={editForm.price || 0}
-                            onChange={(e) => setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })}
-                            className="h-7 w-20 text-xs"
-                          />
+                          <div className="space-y-1">
+                            <Input
+                              type="number"
+                              value={editForm.purchaseCost || 0}
+                              onChange={(e) => setEditForm({ ...editForm, purchaseCost: parseFloat(e.target.value) || 0 })}
+                              className="h-7 text-xs"
+                              placeholder="Cost ฿"
+                            />
+                            <Input
+                              value={editForm.purchaseQty || ""}
+                              onChange={(e) => setEditForm({ ...editForm, purchaseQty: e.target.value })}
+                              placeholder="e.g. 1 box"
+                              className="h-6 text-[10px]"
+                            />
+                          </div>
                         </td>
                         <td className="p-2 border-r border-slate-200">
-                          <Input
-                            value={editForm.packagingQty || ""}
-                            onChange={(e) => setEditForm({ ...editForm, packagingQty: e.target.value })}
-                            placeholder="e.g., 1kg"
-                            className="h-7 text-xs"
-                          />
+                          <div className="space-y-1">
+                            <Input
+                              type="number"
+                              value={editForm.baseYieldQty || ""}
+                              onChange={(e) => setEditForm({ ...editForm, baseYieldQty: parseFloat(e.target.value) || null })}
+                              className="h-7 text-xs"
+                              placeholder="Yield qty"
+                            />
+                            <Select
+                              value={editForm.baseUnit || "each"}
+                              onValueChange={(v) => setEditForm({ ...editForm, baseUnit: v })}
+                            >
+                              <SelectTrigger className="h-6 text-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="g">grams (g)</SelectItem>
+                                <SelectItem value="ml">milliliters (ml)</SelectItem>
+                                <SelectItem value="each">each</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-200">
+                          <div className="space-y-1">
+                            <Input
+                              type="number"
+                              value={editForm.portionQty || ""}
+                              onChange={(e) => setEditForm({ ...editForm, portionQty: parseFloat(e.target.value) || null })}
+                              className="h-7 text-xs"
+                              placeholder="Portion qty"
+                            />
+                            <Select
+                              value={editForm.portionUnit || editForm.baseUnit || "each"}
+                              onValueChange={(v) => setEditForm({ ...editForm, portionUnit: v })}
+                            >
+                              <SelectTrigger className="h-6 text-[10px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="g">grams (g)</SelectItem>
+                                <SelectItem value="ml">milliliters (ml)</SelectItem>
+                                <SelectItem value="each">each</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </td>
                         <td className="p-2 border-r border-slate-200">
                           <span className="text-xs text-slate-500 italic">Save to update</span>
@@ -304,24 +382,39 @@ export default function IngredientManagement() {
                             <div>
                               <div className="text-xs text-slate-900">{ing.name}</div>
                               {ing.brand && <div className="text-[10px] text-slate-500">{ing.brand}</div>}
+                              <div className="text-[10px] text-slate-400">{ing.category || "—"}</div>
                             </div>
                           </div>
                         </td>
+                        <td className="p-2 text-slate-600 border-r border-slate-200 text-xs">{ing.supplier || "—"}</td>
                         <td className="p-2 border-r border-slate-200">
-                          <span className="text-xs text-slate-700">{ing.category || "—"}</span>
+                          <div className="text-xs text-slate-900">{THB(ing.purchaseCost)}</div>
+                          <div className="text-[10px] text-slate-500">{ing.purchaseQty || "—"}</div>
                         </td>
-                        <td className="p-2 text-slate-600 border-r border-slate-200">{ing.supplier || "—"}</td>
-                        <td className="p-2 text-slate-900 border-r border-slate-200">{THB(ing.price)}</td>
-                        <td className="p-2 text-slate-600 border-r border-slate-200">{ing.packagingQty || "—"}</td>
+                        <td className="p-2 border-r border-slate-200">
+                          {ing.baseYieldQty ? (
+                            <div className="text-xs text-slate-700">{ing.baseYieldQty} {ing.baseUnit}</div>
+                          ) : (
+                            <div className="text-amber-600 text-[10px]">⚠ Not set</div>
+                          )}
+                        </td>
+                        <td className="p-2 border-r border-slate-200">
+                          {ing.portionQty ? (
+                            <div className="text-xs text-slate-700">{ing.portionQty} {ing.portionUnit}</div>
+                          ) : (
+                            <div className="text-[10px] text-slate-400">—</div>
+                          )}
+                        </td>
                         <td className="p-2 text-slate-700 border-r border-slate-200">
                           {(() => {
                             const breakdown = getCostBreakdown(ing);
                             return (
                               <div>
                                 <div className="text-xs text-slate-700">{breakdown.line1}</div>
-                                {breakdown.line2 && <div className="text-xs text-slate-500">{breakdown.line2}</div>}
+                                {breakdown.line2 && <div className="text-xs text-emerald-600 font-medium">{breakdown.line2}</div>}
+                                {breakdown.line3 && <div className="text-[10px] text-slate-500">{breakdown.line3}</div>}
                                 {breakdown.warning && (
-                                  <div className="text-amber-600 text-[10px]">⚠ No qty breakdown</div>
+                                  <div className="text-amber-600 text-[10px]">{breakdown.warning}</div>
                                 )}
                               </div>
                             );
@@ -336,7 +429,7 @@ export default function IngredientManagement() {
                             <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-7 w-7 p-0" title="Photo">
                               <Upload className="h-3.5 w-3.5 text-slate-500" />
                             </Button>
-                            {(ing as any).hidden ? (
+                            {ing.hidden ? (
                               <Button size="sm" variant="ghost" onClick={() => handleRestore(ing)} className="h-7 w-7 p-0" title="Restore">
                                 <Eye className="h-3.5 w-3.5 text-emerald-500" />
                               </Button>
