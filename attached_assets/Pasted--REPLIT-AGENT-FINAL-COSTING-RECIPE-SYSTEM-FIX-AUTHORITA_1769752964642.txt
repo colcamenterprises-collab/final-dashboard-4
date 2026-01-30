@@ -1,0 +1,167 @@
+🔧 REPLIT AGENT — FINAL COSTING & RECIPE SYSTEM FIX (AUTHORITATIVE)
+CONTEXT (DO NOT IGNORE)
+The current ingredient + recipe system is mathematically unstable because it pretends yield is exact.
+This patch introduces explicit yield modeling with variance, which is how real kitchens work.
+This is not a redesign — it is a correction.
+HARD RULES (NON-NEGOTIABLE)
+❌ Do NOT infer yield from text
+❌ Do NOT auto-parse “box of 50”
+❌ Do NOT require manual yield entry for deterministic units
+❌ Do NOT change POS ingestion
+❌ Do NOT change purchasing list structure
+❌ Do NOT add new ingredient tables
+✅ Use existing ingredient table
+✅ Make uncertainty explicit
+✅ Make math transparent
+✅ Make UI useful
+CORE CONCEPT TO IMPLEMENT
+Every ingredient has a Yield Method:
+Copy code
+
+DIRECT       → math is exact (kg, g, ml, each)
+ESTIMATED    → requires average + variance (rasher, slice, ring, fillet)
+PATCH 1 — INGREDIENT DATA MODEL (NO NEW TABLE)
+Extend the existing ingredient model with the following fields:
+Copy code
+Ts
+yieldMethod: 'DIRECT' | 'ESTIMATED'          // REQUIRED
+baseUnit: 'g' | 'ml' | 'each'                // REQUIRED
+purchaseQty: number                          // existing
+purchaseUnit: 'kg' | 'g' | 'l' | 'ml' | 'each'
+purchaseCostTHB: number                     // existing
+
+// ONLY used when yieldMethod = ESTIMATED
+avgPortionSize?: number                     // e.g. 14
+portionUnit?: 'rasher' | 'slice' | 'ring'   // free text enum
+variancePct?: number                        // e.g. 10 (%)
+⚠️ Do not backfill fake values
+⚠️ Leave estimated fields NULL until user enters them
+PATCH 2 — YIELD CALCULATION LOGIC (SERVER ONLY)
+Create / update utility:
+Copy code
+
+server/utils/computeYield.ts
+Rules:
+DIRECT
+Copy code
+
+unitCostPerBase =
+  purchaseCostTHB / (purchaseQty converted to baseUnit)
+ESTIMATED
+Copy code
+
+avgPortionWeight = avgPortionSize
+minPortionWeight = avg * (1 - variancePct / 100)
+maxPortionWeight = avg * (1 + variancePct / 100)
+
+yieldCountAvg = totalBaseQty / avgPortionWeight
+Return all three values:
+avg
+min
+max
+🚫 Never collapse this to one number.
+PATCH 3 — INGREDIENT MANAGEMENT UI (FIX IT PROPERLY)
+Route:
+Copy code
+
+/menu-management/ingredients
+Table MUST show:
+Column
+Content
+Ingredient
+Name + supplier
+Purchase
+฿ / qty / unit
+Yield Type
+DIRECT or ESTIMATED (badge)
+Portion
+e.g. “14g per rasher (±10%)”
+Yield
+“~71 rashers (64–78)”
+Cost
+“฿X per rasher”
+Actions
+Edit / Hide
+Edit Modal Logic
+If DIRECT:
+Hide portion fields completely
+If ESTIMATED:
+Require:
+Avg portion size
+Portion unit
+Variance %
+🚫 No auto-calculation 🚫 No guessing 🚫 No blocking save — but show warning if missing
+PATCH 4 — RECIPE EDITOR (THIS IS WHERE IT WAS WRONG)
+For each ingredient line:
+Display (READ-ONLY, VISUAL):
+Copy code
+
+Ingredient: Bacon (rasher)
+Avg cost: ฿4.20 per rasher
+Expected range: ฿3.80 – ฿4.60
+
+Quantity used: 2 rashers
+
+Line cost:
+- Avg: ฿8.40
+- Range: ฿7.60 – ฿9.20
+Recipe Total MUST show:
+Copy code
+
+Total Cost (avg): ฿38.20
+Expected Range: ฿34.90 – ฿41.10
+This is the entire point of a costing system.
+PATCH 5 — SHIFT USAGE (NO POS CHANGE)
+When aggregating usage:
+Use avg for reporting
+Use min/max for variance detection
+Example:
+Copy code
+
+Sold: 100 burgers
+Expected bacon usage:
+- Min: 1.26kg
+- Avg: 1.40kg
+- Max: 1.54kg
+Flag if actual usage falls outside range.
+PATCH 6 — UI QUALITY (NO MORE SPREADSHEET LOOK)
+Minimum UI requirements:
+Ingredient cards show:
+Icon / photo
+Yield badge
+Cost confidence bar (green → amber → red)
+Recipe page MUST have:
+Image upload
+Cost delta preview
+“If price changes” simulation
+No tables pretending to be Excel.
+ACCEPTANCE TESTS (MUST PASS)
+Bacon Example
+Input:
+Copy code
+
+1kg bacon
+Avg rasher: 14g
+Variance: 10%
+System shows:
+Copy code
+
+~71 rashers (64–78)
+฿X per rasher
+Recipe Example
+Copy code
+
+2 rashers used
+System shows:
+Copy code
+
+Avg: ฿Y
+Range: ฿Y-10% → ฿Y+10%
+Change ingredient price
+→ Recipe updates instantly
+→ Range updates instantly
+FINAL NOTE (READ THIS)
+This patch stops fake precision
+This patch models reality
+This patch ends the guessing
+If the agent deviates from this spec, stop immediately.
