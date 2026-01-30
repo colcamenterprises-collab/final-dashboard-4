@@ -1,0 +1,132 @@
+Understood.
+Here is the single, correct, no-discussion Replit agent patch to fix this properly and permanently.
+✅ REPLIT AGENT PATCH — DRINKS MUST COME FROM PURCHASING LIST (FINAL)
+OBJECTIVE (LOCK THIS IN)
+Drinks must NOT come from Ingredients.
+Drinks must ONLY come from the Purchasing List, which is already canonical.
+Ingredients may reference drink costs, but never define drink existence.
+HARD RULES (DO NOT VIOLATE)
+❌ Do NOT read drinks from ingredients
+❌ Do NOT infer drinks by category
+❌ Do NOT create duplicate drink sources
+❌ Do NOT change ledgers, expenses, or schema
+❌ Do NOT touch recipe cost math
+CANONICAL SOURCE OF TRUTH
+Entity
+Source
+Drink types
+Purchasing List
+Drink prices
+Purchasing List
+Drink stock intake
+Purchasing List
+Drink usage
+POS → analytics
+Drink costing in recipes
+Derived from Purchasing List
+PATCH SCOPE
+Only affects:
+Drinks stock intake modal (Expenses / Stock Lodgment)
+Backend API used by that modal
+PATCH 1 — BACKEND (MANDATORY)
+🔧 Create / update API endpoint
+File
+Copy code
+
+server/routes/purchasing.ts
+Add this endpoint (or equivalent existing service):
+Copy code
+Ts
+GET /api/purchasing/drinks
+Query logic
+Copy code
+Sql
+SELECT
+  id,
+  name,
+  unit,
+  packaging_qty,
+  cost
+FROM purchasing_list
+WHERE category = 'Drinks'
+  AND active = true
+ORDER BY name ASC;
+Response shape (STRICT)
+Copy code
+Json
+{
+  "items": [
+    {
+      "id": 12,
+      "name": "Coke",
+      "unit": "each",
+      "packagingQty": 24,
+      "cost": 240
+    }
+  ]
+}
+⚠️ NO joins to ingredients ⚠️ NO category guessing ⚠️ NO fallback logic
+PATCH 2 — FRONTEND (MANDATORY)
+🔧 Update drinks stock modal data source
+File
+Copy code
+
+client/src/components/operations/StockLodgmentModal.tsx
+Replace
+Copy code
+Ts
+fetch('/api/ingredients/management')
+With
+Copy code
+Ts
+fetch('/api/purchasing/drinks')
+Rendering logic (UNCHANGED UI)
+Keep the current table layout:
+Drink
+Quantity Purchased
+Each row:
+drink.name (from purchasing list)
+numeric input (qty)
+submit writes to existing stock routes
+PATCH 3 — REMOVE WRONG DEPENDENCY (MANDATORY)
+🔥 Delete / disable this logic if present:
+Copy code
+Ts
+filter(ingredient => ingredient.category === 'Drinks')
+There must be ZERO references to ingredient categories for drinks.
+PATCH 4 — DATA FLOW CONFIRMATION (DO NOT CHANGE)
+✔ Submitting drinks still writes to:
+stock_received_log
+existing expenses logic (if paid)
+✔ Ledgers continue to work
+✔ Daily Sales & Stock v2 untouched
+✔ Shopping list untouched
+ACCEPTANCE TESTS (NON-NEGOTIABLE)
+Test 1 — Canonical List
+Rename a drink in Purchasing List → modal updates
+Disable a drink → disappears from modal
+Test 2 — No Ingredient Coupling
+Delete all drink ingredients → modal still works
+Add ingredient category “Drinks” → ignored
+Test 3 — Cost Consistency
+Change Coke price in Purchasing List
+Recipe costs using Coke update automatically
+FINAL ARCHITECTURE (LOCK THIS)
+Copy code
+
+Purchasing List
+   ├─ defines drinks
+   ├─ defines price
+   ├─ defines stock intake
+   │
+   ├──► Ingredients (cost reference only)
+   │        └─ recipes consume
+   │
+   └──► Daily Sales / Stock / Shopping List
+STATUS AFTER PATCH
+✅ Single source of truth
+✅ No duplication
+✅ No category drift
+✅ No future confusion
+This is the correct fix.
+No more patches needed for this area once applied.

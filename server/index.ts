@@ -19,6 +19,7 @@ import healthRouter from "./routes/health";
 import opsMtdRouter from "./routes/ops_mtd";
 import purchasingRouter from "./routes/purchasing";
 import purchasingItemsRouter from "./routes/purchasingItems";
+import purchasingDrinksRouter from "./routes/purchasingDrinks";
 import menuOnlineRouter from "./routes/menuOnline";
 import imageUploadRouter from "./routes/imageUpload";
 import analysisCsv from "./routes/analysisCsv";
@@ -213,6 +214,7 @@ async function checkSchema() {
   app.use('/api', healthRouter);
   app.use('/api', opsMtdRouter);
   app.use('/api/purchasing', purchasingRouter);
+  app.use('/api/purchasing', purchasingDrinksRouter);
   app.use('/api/purchasing-items', purchasingItemsRouter);
   
   // Mount Purchasing Shift Log routes

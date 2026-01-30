@@ -85,21 +85,17 @@ export function StockLodgmentModal({
   const isEditMode = !!initialData?.id;
   const today = new Date().toISOString().split('T')[0];
 
-  // Fetch drink ingredients from database (filter by Drinks category client-side)
+  // Fetch drinks from Purchasing List (CANONICAL SOURCE - NOT from ingredients)
   const { data: drinkIngredients = [], isLoading: drinksLoading } = useQuery<DrinkIngredient[]>({
-    queryKey: ['/api/ingredients/management', 'drinks'],
+    queryKey: ['/api/purchasing/drinks'],
     queryFn: async () => {
-      const res = await fetch('/api/ingredients/management');
-      if (!res.ok) throw new Error('Failed to fetch drink ingredients');
+      const res = await fetch('/api/purchasing/drinks');
+      if (!res.ok) throw new Error('Failed to fetch drinks from purchasing list');
       const json = await res.json();
-      const items = json.items || json; // API returns {items: [...]} 
-      return items
-        .filter((ing: any) => ing.category === 'Drinks' && !ing.hidden)
-        .map((ing: any) => ({
-          id: ing.id,
-          name: ing.name
-        }))
-        .sort((a: DrinkIngredient, b: DrinkIngredient) => a.name.localeCompare(b.name));
+      return (json.items || []).map((item: any) => ({
+        id: item.id,
+        name: item.name
+      }));
     },
   });
 
