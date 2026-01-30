@@ -212,25 +212,16 @@ export default function IngredientManagement() {
       ) : (
         <div className="rounded-[4px] border border-slate-300 overflow-hidden" style={{backgroundColor: '#ffffff'}}>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse" style={{backgroundColor: '#ffffff', tableLayout: 'fixed'}}>
-              <colgroup>
-                <col style={{width: '140px'}} />
-                <col style={{width: '80px'}} />
-                <col style={{width: '60px'}} />
-                <col style={{width: '70px'}} />
-                <col style={{width: '80px'}} />
-                <col style={{width: '200px'}} />
-                <col style={{width: '100px'}} />
-              </colgroup>
+            <table className="w-full text-xs" style={{backgroundColor: '#ffffff', minWidth: '700px'}}>
               <thead>
                 <tr style={{backgroundColor: '#f8f8f8'}} className="border-b border-slate-300">
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Ingredient</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Category</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Supplier</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Price</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Packaging</th>
-                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Cost Breakdown</th>
-                  <th className="p-2 text-center font-medium text-slate-700">Actions</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '18%'}}>Ingredient</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '10%'}}>Category</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '8%'}}>Supplier</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '9%'}}>Price</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '10%'}}>Packaging</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200" style={{width: '30%'}}>Cost Breakdown</th>
+                  <th className="p-2 text-center font-medium text-slate-700" style={{width: '15%'}}>Actions</th>
                 </tr>
               </thead>
               <tbody>
