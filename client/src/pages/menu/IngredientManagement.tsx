@@ -1,6 +1,5 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -170,10 +169,10 @@ export default function IngredientManagement() {
       </div>
 
       <div className="flex flex-wrap gap-2 md:gap-3 mb-2 md:mb-4 items-center">
-        <Card className="px-3 py-2 md:px-4 md:py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
+        <div className="px-3 py-2 md:px-4 md:py-3 rounded-[4px] border border-slate-300 flex items-center gap-2 bg-white">
           <span className="text-sm font-medium text-slate-900">{ingredients.length}</span>
           <span className="text-xs text-slate-600">Total</span>
-        </Card>
+        </div>
         <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
           <input
             type="checkbox"
@@ -185,7 +184,7 @@ export default function IngredientManagement() {
         </label>
       </div>
 
-      <Card className="p-3 md:p-4 mb-2 md:mb-4 rounded-[4px] border-slate-200">
+      <div className="p-3 md:p-4 mb-2 md:mb-4 rounded-[4px] border border-slate-300 bg-white">
         <div className="flex flex-col sm:flex-row gap-2 md:gap-3 items-stretch sm:items-center">
           <div className="flex-1 relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -206,43 +205,52 @@ export default function IngredientManagement() {
             ))}
           </select>
         </div>
-      </Card>
+      </div>
 
       {isLoading ? (
         <div className="text-xs text-slate-600">Loading...</div>
       ) : (
-        <Card className="rounded-[4px] border-slate-200 overflow-hidden">
+        <div className="rounded-[4px] border border-slate-300 overflow-hidden" style={{backgroundColor: '#ffffff'}}>
           <div className="overflow-x-auto">
-            <table className="min-w-[1100px] w-full text-xs">
+            <table className="w-full text-xs border-collapse" style={{backgroundColor: '#ffffff', tableLayout: 'fixed'}}>
+              <colgroup>
+                <col style={{width: '140px'}} />
+                <col style={{width: '80px'}} />
+                <col style={{width: '60px'}} />
+                <col style={{width: '70px'}} />
+                <col style={{width: '80px'}} />
+                <col style={{width: '200px'}} />
+                <col style={{width: '100px'}} />
+              </colgroup>
               <thead>
-                <tr className="bg-slate-100 border-b border-slate-200">
-                  <th className="p-3 text-left font-medium text-slate-600" style={{width: '220px'}}>Ingredient</th>
-                  <th className="p-3 text-left font-medium text-slate-600" style={{width: '140px'}}>Category</th>
-                  <th className="p-3 text-left font-medium text-slate-600" style={{width: '140px'}}>Supplier</th>
-                  <th className="p-3 text-left font-medium text-slate-600" style={{width: '120px'}}>Purchase Price</th>
-                  <th className="p-3 text-left font-medium text-slate-600" style={{width: '140px'}}>Packaging</th>
-                  <th className="p-3 text-left font-medium text-slate-600" style={{width: '260px'}}>Cost Breakdown</th>
-                  <th className="p-3 text-center font-medium text-slate-600" style={{width: '110px'}}>Actions</th>
+                <tr style={{backgroundColor: '#f8f8f8'}} className="border-b border-slate-300">
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Ingredient</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Category</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Supplier</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Price</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Packaging</th>
+                  <th className="p-2 text-left font-medium text-slate-700 border-r border-slate-200">Cost Breakdown</th>
+                  <th className="p-2 text-center font-medium text-slate-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((ing) => (
-                  <tr key={ing.id} className={`border-b border-slate-100 ${editingId === ing.id ? "bg-emerald-50" : ""}`}>
+                  <tr key={ing.id} className={`border-b border-slate-200 ${editingId === ing.id ? "bg-amber-50" : "bg-white"}`}>
                     {editingId === ing.id ? (
                       <>
-                        <td className="p-3">
+                        <td className="p-2 border-r border-slate-200">
                           <Input
                             value={editForm.name || ""}
                             onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                            className="h-8 text-xs"
+                            className="h-7 text-xs"
                           />
                         </td>
-                        <td className="p-3">
+                        <td className="p-2 border-r border-slate-200">
                           <Select
                             value={editForm.category || ""}
                             onValueChange={(v) => setEditForm({ ...editForm, category: v })}
                           >
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className="h-7 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -252,36 +260,37 @@ export default function IngredientManagement() {
                             </SelectContent>
                           </Select>
                         </td>
-                        <td className="p-3">
+                        <td className="p-2 border-r border-slate-200">
                           <Input
                             value={editForm.supplier || ""}
                             onChange={(e) => setEditForm({ ...editForm, supplier: e.target.value })}
-                            className="h-8 text-xs"
+                            className="h-7 text-xs"
                           />
                         </td>
-                        <td className="p-3">
+                        <td className="p-2 border-r border-slate-200">
                           <Input
                             type="number"
                             value={editForm.price || 0}
                             onChange={(e) => setEditForm({ ...editForm, price: parseFloat(e.target.value) || 0 })}
-                            className="h-8 w-24 text-xs"
+                            className="h-7 w-20 text-xs"
                           />
                         </td>
-                        <td className="p-3">
+                        <td className="p-2 border-r border-slate-200">
                           <Input
                             value={editForm.packagingQty || ""}
                             onChange={(e) => setEditForm({ ...editForm, packagingQty: e.target.value })}
-                            placeholder="e.g., 1kg, 500g"
-                            className="h-8 text-xs"
+                            placeholder="e.g., 1kg"
+                            className="h-7 text-xs"
                           />
                         </td>
-                        <td className="p-3">
-                          <span className="text-xs text-slate-500 italic">Save to recalculate</span>
+                        <td className="p-2 border-r border-slate-200">
+                          <span className="text-xs text-slate-500 italic">Save to update</span>
                         </td>
-                        <td className="p-3">
+                        <td className="p-2">
                           <div className="flex justify-center gap-1">
-                            <Button size="sm" variant="ghost" onClick={saveEdit} disabled={updateMutation.isPending} className="h-7 w-7 p-0">
-                              <Save className="h-4 w-4 text-emerald-600" />
+                            <Button size="sm" variant="ghost" onClick={saveEdit} disabled={updateMutation.isPending} className="h-7 px-2">
+                              <Save className="h-4 w-4 text-emerald-600 mr-1" />
+                              <span className="text-xs">Save</span>
                             </Button>
                             <Button size="sm" variant="ghost" onClick={cancelEdit} className="h-7 w-7 p-0">
                               <X className="h-4 w-4 text-slate-500" />
@@ -291,13 +300,13 @@ export default function IngredientManagement() {
                       </>
                     ) : (
                       <>
-                        <td className="p-3 text-slate-900">
+                        <td className="p-2 text-slate-900 border-r border-slate-200">
                           <div className="flex items-center gap-2">
                             {ing.photoUrl && (
                               <img
                                 src={ing.photoUrl}
                                 alt={ing.name}
-                                className="w-6 h-6 rounded-[4px] object-cover cursor-pointer flex-shrink-0"
+                                className="w-5 h-5 rounded object-cover cursor-pointer flex-shrink-0"
                                 onClick={() => openPhotoDialog(ing)}
                               />
                             )}
@@ -307,19 +316,19 @@ export default function IngredientManagement() {
                             </div>
                           </div>
                         </td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="text-xs">{ing.category || "—"}</Badge>
+                        <td className="p-2 border-r border-slate-200">
+                          <span className="text-xs text-slate-700">{ing.category || "—"}</span>
                         </td>
-                        <td className="p-3 text-slate-600">{ing.supplier || "—"}</td>
-                        <td className="p-3 text-slate-900">{THB(ing.price)}</td>
-                        <td className="p-3 text-slate-600">{ing.packagingQty || "—"}</td>
-                        <td className="p-3 text-slate-700">
+                        <td className="p-2 text-slate-600 border-r border-slate-200">{ing.supplier || "—"}</td>
+                        <td className="p-2 text-slate-900 border-r border-slate-200">{THB(ing.price)}</td>
+                        <td className="p-2 text-slate-600 border-r border-slate-200">{ing.packagingQty || "—"}</td>
+                        <td className="p-2 text-slate-700 border-r border-slate-200">
                           {(() => {
                             const breakdown = getCostBreakdown(ing);
                             return (
                               <div>
                                 <div className="text-xs text-slate-700">{breakdown.line1}</div>
-                                {breakdown.line2 && <div className="text-xs text-slate-600">{breakdown.line2}</div>}
+                                {breakdown.line2 && <div className="text-xs text-slate-500">{breakdown.line2}</div>}
                                 {breakdown.warning && (
                                   <div className="text-amber-600 text-[10px]">⚠ No qty breakdown</div>
                                 )}
@@ -327,18 +336,18 @@ export default function IngredientManagement() {
                             );
                           })()}
                         </td>
-                        <td className="p-3">
-                          <div className="flex justify-center gap-2">
-                            <Button size="sm" variant="outline" onClick={() => startEdit(ing)} className="h-8 px-2" title="Edit">
-                              <Edit className="h-4 w-4 text-slate-600 mr-1" />
+                        <td className="p-2">
+                          <div className="flex justify-center gap-1">
+                            <Button size="sm" variant="outline" onClick={() => startEdit(ing)} className="h-7 px-2" title="Edit">
+                              <Edit className="h-3.5 w-3.5 text-slate-600 mr-1" />
                               <span className="text-xs">Edit</span>
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-8 w-8 p-0" title="Photo">
-                              <Upload className="h-4 w-4 text-slate-500" />
+                            <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-7 w-7 p-0" title="Photo">
+                              <Upload className="h-3.5 w-3.5 text-slate-500" />
                             </Button>
                             {(ing as any).hidden ? (
-                              <Button size="sm" variant="ghost" onClick={() => handleRestore(ing)} className="h-8 w-8 p-0" title="Restore">
-                                <Eye className="h-3.5 w-3.5 text-emerald-500 hover:text-emerald-700" />
+                              <Button size="sm" variant="ghost" onClick={() => handleRestore(ing)} className="h-7 w-7 p-0" title="Restore">
+                                <Eye className="h-3.5 w-3.5 text-emerald-500" />
                               </Button>
                             ) : (
                               <Button size="sm" variant="ghost" onClick={() => handleHide(ing)} className="h-7 w-7 p-0" title="Hide from list">
@@ -354,7 +363,7 @@ export default function IngredientManagement() {
               </tbody>
             </table>
           </div>
-        </Card>
+        </div>
       )}
 
       <Dialog open={photoDialogOpen} onOpenChange={setPhotoDialogOpen}>
@@ -370,7 +379,7 @@ export default function IngredientManagement() {
                 className="w-full max-h-64 object-contain rounded border"
               />
             ) : (
-              <div className="w-full h-32 bg-slate-100 rounded flex items-center justify-center text-slate-400">
+              <div className="w-full h-32 rounded border border-slate-300 flex items-center justify-center text-slate-400 bg-white">
                 No photo uploaded
               </div>
             )}
