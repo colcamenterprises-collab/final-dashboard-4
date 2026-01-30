@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,7 +11,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { X, Plus } from "lucide-react";
 import { convertFromInputDate } from "@/lib/format";
 
 const rollsSchema = z.object({
@@ -23,10 +22,7 @@ const rollsSchema = z.object({
 
 const drinksSchema = z.object({
   date: z.string().min(1, "Date is required"),
-  items: z.array(z.object({
-    type: z.string().min(1, "Drink type is required"),
-    quantity: z.number().min(1, "Quantity must be at least 1"),
-  })).min(1, "At least one drink item is required"),
+  counts: z.record(z.string(), z.number()),
 });
 
 const meatSchema = z.object({
@@ -102,7 +98,7 @@ export function StockLodgmentModal({
     resolver: zodResolver(drinksSchema),
     defaultValues: { 
       date: initialData?.date || today,
-      items: initialData?.drinkType ? [{ type: initialData.drinkType, quantity: initialData.quantity || 0 }] : [{ type: "", quantity: 0 }] 
+      counts: Object.fromEntries(DRINK_TYPES.map(d => [d, 0]))
     }
   });
 
@@ -133,23 +129,19 @@ export function StockLodgmentModal({
           weightKg: initialData.weightKg || 0
         });
       } else if (initialData.type === "drinks") {
-        drinksForm.reset({
-          date: initialData.date || today,
-          items: initialData.drinkType ? [{ type: initialData.drinkType, quantity: initialData.quantity || 0 }] : [{ type: "", quantity: 0 }]
-        });
+        const counts = Object.fromEntries(DRINK_TYPES.map(d => [d, 0]));
+        if (initialData.drinkType && initialData.quantity) {
+          counts[initialData.drinkType] = initialData.quantity;
+        }
+        drinksForm.reset({ date: initialData.date || today, counts });
       }
     } else if (isOpen && !initialData) {
       // Reset to default for new entries
       rollsForm.reset({ date: today, quantity: 0, cost: 0, paid: false });
       meatForm.reset({ date: today, meatType: "", weightKg: 0 });
-      drinksForm.reset({ date: today, items: [{ type: "", quantity: 0 }] });
+      drinksForm.reset({ date: today, counts: Object.fromEntries(DRINK_TYPES.map(d => [d, 0])) });
     }
   }, [isOpen, initialData, today]);
-
-  const { fields, append, remove } = useFieldArray({
-    control: drinksForm.control,
-    name: "items"
-  });
 
   // Auto-calculate cost for rolls (qty * 8 THB)
   const handleQuantityChange = (quantity: number) => {
@@ -208,10 +200,24 @@ export function StockLodgmentModal({
   };
 
   const handleDrinksSubmit = (data: DrinksForm) => {
+    // Filter out zero quantities and convert to items array for backend
+    const items = Object.entries(data.counts)
+      .filter(([_, qty]) => qty > 0)
+      .map(([type, quantity]) => ({ type, quantity }));
+    
+    if (items.length === 0) {
+      toast({
+        title: "No drinks entered",
+        description: "Enter at least one drink quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     stockMutation.mutate({
       type: "drinks",
       date: data.date,
-      items: data.items,
+      items,
     });
   };
 
@@ -389,7 +395,7 @@ export function StockLodgmentModal({
           </Form>
         )}
 
-        {/* Drinks Tab */}
+        {/* Drinks Tab - Table Format */}
         {activeTab === "drinks" && (
           <Form {...drinksForm}>
             <form onSubmit={drinksForm.handleSubmit(handleDrinksSubmit)} className="space-y-4">
@@ -418,76 +424,40 @@ export function StockLodgmentModal({
                 )}
               />
               
-              {fields.map((field, index) => (
-                <div key={field.id} className="border rounded-lg p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium">Drink {index + 1}</h4>
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remove(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <FormField
-                    control={drinksForm.control}
-                    name={`items.${index}.type`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Drink Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select drink type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {DRINK_TYPES.map((drink) => (
-                              <SelectItem key={drink} value={drink}>
-                                {drink}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={drinksForm.control}
-                    name={`items.${index}.quantity`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantity</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ))}
-              
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => append({ type: "", quantity: 0 })}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Drink
-              </Button>
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-100 border-b">
+                      <th className="text-left p-2 font-medium text-slate-700">Drink Type</th>
+                      <th className="text-right p-2 font-medium text-slate-700 w-24">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DRINK_TYPES.map((drink) => (
+                      <FormField
+                        key={drink}
+                        control={drinksForm.control}
+                        name={`counts.${drink}`}
+                        render={({ field }) => (
+                          <tr className="border-b last:border-b-0 hover:bg-slate-50">
+                            <td className="p-2 text-slate-700">{drink}</td>
+                            <td className="p-2">
+                              <Input
+                                type="number"
+                                min="0"
+                                value={field.value || ""}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                                className="h-8 text-sm text-right w-20 ml-auto"
+                                data-testid={`input-drink-${drink.toLowerCase().replace(/\s+/g, "-")}`}
+                              />
+                            </td>
+                          </tr>
+                        )}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
               
               <div className="flex gap-3 pt-4">
                 <Button
