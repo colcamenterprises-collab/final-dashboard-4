@@ -328,15 +328,16 @@ export default function IngredientManagement() {
                           })()}
                         </td>
                         <td className="p-3">
-                          <div className="flex justify-center gap-1">
-                            <Button size="sm" variant="ghost" onClick={() => startEdit(ing)} className="h-7 w-7 p-0" title="Edit">
-                              <Edit className="h-3.5 w-3.5 text-slate-500" />
+                          <div className="flex justify-center gap-2">
+                            <Button size="sm" variant="outline" onClick={() => startEdit(ing)} className="h-8 px-2" title="Edit">
+                              <Edit className="h-4 w-4 text-slate-600 mr-1" />
+                              <span className="text-xs">Edit</span>
                             </Button>
-                            <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-7 w-7 p-0" title="Photo">
-                              <Upload className="h-3.5 w-3.5 text-slate-400" />
+                            <Button size="sm" variant="ghost" onClick={() => openPhotoDialog(ing)} className="h-8 w-8 p-0" title="Photo">
+                              <Upload className="h-4 w-4 text-slate-500" />
                             </Button>
                             {(ing as any).hidden ? (
-                              <Button size="sm" variant="ghost" onClick={() => handleRestore(ing)} className="h-7 w-7 p-0" title="Restore">
+                              <Button size="sm" variant="ghost" onClick={() => handleRestore(ing)} className="h-8 w-8 p-0" title="Restore">
                                 <Eye className="h-3.5 w-3.5 text-emerald-500 hover:text-emerald-700" />
                               </Button>
                             ) : (

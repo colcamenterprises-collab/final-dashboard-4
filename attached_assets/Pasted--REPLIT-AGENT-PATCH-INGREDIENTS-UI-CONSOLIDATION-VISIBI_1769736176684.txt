@@ -1,0 +1,155 @@
+🔧 REPLIT AGENT PATCH — INGREDIENTS UI CONSOLIDATION & VISIBILITY (POST-R-FINAL)
+CONTEXT (READ CAREFULLY)
+recipeCost.service.ts is correct and locked
+Canonical formula unitCostPerBase × portionQty is working
+/api/recipe-authority is working
+Recipe edit + live cost display is working
+This patch is UI + management only
+❌ Do NOT touch:
+recipeCost.service.ts
+Recipe math
+Canonical ingredient logic
+POS, stock, ledgers, or historical data
+OBJECTIVE
+Consolidate Ingredients viewing + management into one clean, usable table view that:
+Shows how costs are calculated (no black box)
+Allows management to hide ingredients from view
+Uses consistent fonts, spacing, and column widths
+Works on tablet without switching to card layouts
+Does not create more pages
+FINAL PAGE STRUCTURE (NON-NEGOTIABLE)
+✅ SINGLE PAGE ONLY
+Copy code
+
+/menu-management/ingredients
+❌ REMOVE / DO NOT USE
+Card layouts
+Separate “Ingredients” vs “Ingredient Management” pages
+Any responsive switch to cards
+Tablet and mobile must scroll horizontally, not restructure data.
+SIDEBAR (CONFIRM ONLY)
+Copy code
+
+Menu Management
+ ├─ Recipe Management
+ ├─ Products (if already added)
+ ├─ Ingredients        ← THIS PAGE
+ └─ Ingredient Authority
+No new sidebar items.
+PATCH 1 — TABLE LAYOUT (CRITICAL)
+Enforce TABLE ONLY layout for all screen sizes
+Use horizontal scroll on small screens
+Do NOT collapse into cards
+Do NOT bunch content into one column
+Copy code
+Tsx
+<div className="overflow-x-auto">
+  <table className="min-w-[1100px] w-full">
+PATCH 2 — COLUMN DEFINITIONS (LOCKED)
+Use explicit column widths to avoid UI drift.
+Column
+Width
+Notes
+Ingredient
+220px
+Same font size as other cells
+Category
+140px
+From existing data only
+Supplier
+140px
+—
+Purchase Price
+120px
+฿X
+Packaging
+140px
+“1 kg pack”
+Cost Breakdown
+260px
+Multi-line math
+Avg Portion
+140px
+qty + unit
+Portion Cost
+120px
+computed
+Actions
+110px
+Edit / Photo / Hide
+No auto widths.
+PATCH 3 — FONT & STYLE CONSISTENCY
+Mandatory rules
+Ingredient name same font size & weight as all other cells
+Cost math uses same font family as purchasing list & expenses
+No bold math
+No green “→” arrows unless already used elsewhere
+Use existing canonical classes from:
+Purchasing List
+Expenses page
+If needed, copy exact class names.
+PATCH 4 — COST VISIBILITY (DISPLAY ONLY)
+In Cost Breakdown column show:
+Copy code
+
+฿29 / 1 kg
+= ฿0.029 per g
+No icons. No colours. No cards.
+If breakdown missing:
+Copy code
+
+⚠ No quantity breakdown
+PATCH 5 — AVERAGE PORTION (MANAGEMENT DATA)
+Columns:
+Avg Portion Qty (editable)
+Avg Portion Unit (editable)
+Below or adjacent:
+Copy code
+
+Portion cost: ฿0.58
+This must use existing canonical cost math. Do NOT recompute logic client-side.
+PATCH 6 — HIDE (NOT DELETE)
+Add explicit Hide from list action
+Icon: eye-off
+Color: red
+Confirmation modal required
+Behavior:
+Copy code
+Ts
+ingredient.hidden = true
+Rules:
+Hides ingredient from this page
+Removes from recipe picker
+Does NOT delete from DB
+Does NOT affect existing recipes or history
+Also add:
+Copy code
+
+Show hidden ingredients (toggle)
+PATCH 7 — MOBILE / TABLET BEHAVIOR
+No cards
+No stacked layout
+Horizontal scroll only
+Actions column must always be visible
+Test at:
+768px (tablet)
+1024px (iPad landscape)
+ACCEPTANCE CHECKLIST (MUST PASS)
+Ingredient names same font size as pricing rows
+Cost math readable and obvious
+Portion cost visible without opening recipe
+Hide button visible on tablet
+No card UI anywhere
+No recipe cost changes
+No duplicate ingredient pages
+OUT OF SCOPE (DO NOT TOUCH)
+Recipe routes
+RecipeEditModal logic
+Cost service
+POS
+Stock
+CSV
+Authority logic
+FINAL NOTE TO AGENT
+If you are unsure — do not invent UI.
+Match Purchasing List and Expenses page exactly.
