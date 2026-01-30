@@ -1,0 +1,68 @@
+REPLIT AGENT PATCH INSTRUCTION (COPY/PASTE)
+PATCH TITLE
+Ingredient conversions + portion sizing + recipe visuals (no changes to cost engine)
+HARD RULES
+Do NOT change recipeCost.service.ts math.
+Do NOT parse “slice/pack/bag/box” from free text for calculation. Only display it.
+Calculations must rely on explicit numeric fields.
+PATCH 1 — DB: Add ingredient conversion + portion fields
+Target table/model: whatever backs /api/ingredients (your canonical ingredient table).
+Add columns:
+purchaseQty NUMERIC NULL
+purchaseUnit TEXT NULL
+purchaseCostTHB NUMERIC NULL (or reuse existing cost field if present)
+baseYieldQty NUMERIC NULL
+baseYieldUnit TEXT NULL  // g | ml | each
+defaultPortionQty NUMERIC NULL
+defaultPortionUnit TEXT NULL // g | ml | each
+photoUrl TEXT NULL  (single image is enough for v1)
+Migration required.
+PATCH 2 — Server: compute unit cost using baseYield ONLY
+Update computeUnitCostPerBase() (or replace usage) to:
+If baseYieldQty and purchaseCostTHB exist:
+unitCostPerBase = purchaseCostTHB / baseYieldQty
+unit = baseYieldUnit
+Else:
+set unitCostPerBase = null and show “⚠ Missing yield” No “packaging text” math.
+Update /api/ingredients response to include:
+unitCostPerBase
+baseYieldQty/baseYieldUnit
+defaultPortionQty/defaultPortionUnit
+defaultPortionCost (computed server-side)
+PATCH 3 — Ingredients page: add portion + yield editing + clear math display
+On /menu-management/ingredients table add editable fields (inline edit or modal):
+Purchase: cost, purchaseQty, purchaseUnit
+Yield: baseYieldQty, baseYieldUnit (g/ml/each)
+Default Portion: defaultPortionQty, defaultPortionUnit
+Add read-only computed display:
+฿{purchaseCost} / {baseYieldQty}{baseYieldUnit} = ฿{unitCostPerBase} per {baseYieldUnit}
+Default portion {defaultPortionQty}{unit} = ฿{defaultPortionCost}
+If baseYieldQty missing:
+Show ⚠ Missing yield — cannot compute portion cost
+PATCH 4 — Recipe UI: add recipe image + better visual display
+On recipe editor page (/menu/recipes/:id):
+Add recipe.imageUrl field (DB + API if not present)
+UI: image uploader (store URL only)
+Display recipe header with image thumbnail + recipe name + total cost
+For each ingredient line, show:
+base cost per unit (from ingredient)
+qty used + unit
+line cost This is display only.
+PATCH 5 — Fix cheese/bags/boxes properly (data entry, not code hacks)
+After patch, update these sample ingredients in DB via UI:
+Cheese: purchaseCost=359, baseYield=1000 g, defaultPortion=1 each is invalid → set defaultPortion to grams OR set recipe to grams. (If you want slices, you must set defaultPortionUnit=each and baseYieldUnit=each with baseYieldQty=82 slices — your choice, but it must be explicit.)
+Bags box of 50: baseYieldUnit=each, baseYieldQty=50
+Coke tray of 24: baseYieldUnit=each, baseYieldQty=24
+ACCEPTANCE TESTS
+Cheese:
+If baseYield is 1000g and recipe uses 1 each → should show warning “unit mismatch” OR disallow “each” when base unit is g/ml.
+Bags:
+฿120 / box, baseYield=50 each → unitCost=2.4 each
+Recipe visual:
+recipe has image shown in header, not blank
+Portion cost visible:
+every ingredient shows default portion cost when yield exists
+Why this solves your “box of 50 bags” question
+Because you’ll enter:
+Purchase: 1 box
+Yield: 50 each Then the system correctly knows “per bag” cost without guessing.

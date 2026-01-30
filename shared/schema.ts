@@ -435,7 +435,8 @@ export const ingredients = pgTable("ingredients", {
 
   // 🔒 CANONICAL FIELDS (PATCH R1) - Used for recipe cost calculation
   baseUnit: text("base_unit"), // grams | ml | each (canonical unit for recipes)
-  unitCostPerBase: decimal("unit_cost_per_base", { precision: 10, scale: 6 }), // cost PER baseUnit (e.g. ฿0.35/gram)
+  baseYieldQty: decimal("base_yield_qty", { precision: 10, scale: 3 }), // yield qty in base units from one purchase
+  unitCostPerBase: decimal("unit_cost_per_base", { precision: 10, scale: 6 }), // cost PER baseUnit (computed: purchaseCost / baseYieldQty)
   sourcePurchasingItemId: integer("source_purchasing_item_id"), // link to purchasing_items for sync
 
   // Purchase (bulk side) - nullable to match DB during backfill
@@ -444,9 +445,12 @@ export const ingredients = pgTable("ingredients", {
   purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }),
 
   // Portion (recipe side)
-  portionUnit: text("portion_unit"),
-  portionsPerPurchase: integer("portions_per_purchase"),
-  portionCost: decimal("portion_cost", { precision: 10, scale: 4 }),
+  portionQty: decimal("portion_qty", { precision: 10, scale: 3 }), // default portion quantity
+  portionUnit: text("portion_unit"), // default portion unit (g/ml/each)
+  portionCost: decimal("portion_cost", { precision: 10, scale: 4 }), // computed: unitCostPerBase * portionQty
+  
+  // Hidden flag for soft delete
+  hidden: boolean("hidden").default(false),
 
   // External mapping for purchasing
   supplierSku: text("supplier_sku"), // Supplier product code (e.g., Makro code)
@@ -471,6 +475,11 @@ export const ingredients = pgTable("ingredients", {
   createdAt: timestamp("created_at").defaultNow(),
   verified: boolean("verified").default(false),
   locked: boolean("locked").default(false),
+  
+  // Old fields kept for DB compatibility  
+  packageQty: decimal("package_qty", { precision: 10, scale: 2 }),
+  packageUnit: text("package_unit"),
+  packageCost: decimal("package_cost", { precision: 10, scale: 2 }),
 });
 
 // Ingredient purchasing authority (canonical ingredient cost source)
