@@ -1670,6 +1670,7 @@ model PurchasingItem {
   id              Int      @id @default(autoincrement())
   item            String
   category        String?
+  supplier        String   @default("Makro")
   supplierName    String?
   brand           String?
   supplierSku     String?
@@ -1696,6 +1697,8 @@ model PurchasingItem {
 model RecipeAuthority {
   id         Int       @id @default(autoincrement())
   name       String    @unique @db.VarChar(255)
+  totalCost  Decimal   @default(0) @map("total_cost") @db.Decimal(12, 4)
+  marginPercentage Decimal @default(0) @map("margin_percentage") @db.Decimal(5, 2)
   yieldUnits Decimal?  @map("yield_units") @db.Decimal(10, 2)
   active     Boolean   @default(true)
   createdAt  DateTime  @default(now()) @map("created_at")
@@ -1712,6 +1715,7 @@ model RecipeIngredientAuthority {
   purchasingItemId Int      @map("purchasing_item_id")
   quantity         Decimal  @db.Decimal(10, 4)
   unit             String   @db.VarChar(50)
+  wastePercentage  Decimal  @default(5.0) @map("waste_percentage") @db.Decimal(5, 2)
 
   recipe           RecipeAuthority  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   purchasingItem   PurchasingItem   @relation(fields: [purchasingItemId], references: [id])
