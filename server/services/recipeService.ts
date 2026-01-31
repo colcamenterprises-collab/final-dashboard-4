@@ -107,8 +107,12 @@ export async function createOrUpdateRecipe(data: any): Promise<any> {
     await calculateRecipeCost(recipeId);
   }
 
+  // Always allow status-only updates (e.g. approve)
   if (normalizedStatus === "approved") {
     await publishToMenu(recipeId);
+
+    // Re-run cost calc AFTER publish so it can use any price set on MenuItem
+    await calculateRecipeCost(recipeId);
   }
 
   return { id: recipeId, message: "Recipe saved" };
