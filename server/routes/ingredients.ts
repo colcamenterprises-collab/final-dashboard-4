@@ -8,8 +8,10 @@ import {
   getBaseUnit 
 } from '../utils/computeUnitCostPerBase';
 import { computeYield, computeEstimatedYield, YieldMethod } from '../utils/computeYield';
+import OpenAI from 'openai';
 
 const router = Router();
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /**
  * Normalize ingredient cost to THB per base unit (gram/ml/each)
@@ -168,6 +170,55 @@ router.get('/', async (req, res) => {
   } catch (e: any) {
     console.error('ingredients.list error', e);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+/**
+ * POST /api/ingredients/suggest
+ * AI draft suggestion for new ingredient names (read-only, no pricing guesses).
+ */
+router.post('/suggest', async (req, res) => {
+  try {
+    const term = String(req.body?.term || '').trim();
+    if (!term) {
+      return res.status(400).json({ error: 'Missing search term' });
+    }
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(501).json({ error: 'OpenAI is not configured' });
+    }
+
+    const prompt = `You help draft ingredient records. Provide a JSON response with fields:
+suggestedName, priceEstimateTHB, notes. Do NOT guess price; use null if missing.
+User request: "${term}".`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: 'Return only JSON. Avoid guessing any price or SKU.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 200,
+      temperature: 0.2
+    });
+
+    const content = response.choices[0].message.content || '';
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(content);
+    } catch (error) {
+      parsed = null;
+    }
+
+    const suggestion = parsed || {
+      suggestedName: term,
+      priceEstimateTHB: null,
+      notes: 'INSUFFICIENT_DATA',
+    };
+
+    res.json({ suggestion });
+  } catch (error) {
+    console.error('ingredients.suggest error', error);
+    res.status(500).json({ error: 'Failed to generate suggestion' });
   }
 });
 
