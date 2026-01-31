@@ -12,6 +12,7 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { queryClient } from '@/lib/queryClient';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -61,6 +62,7 @@ const thb = (v: unknown): string => {
 };
 
 export default function PurchasingPage() {
+  const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -346,6 +348,12 @@ export default function PurchasingPage() {
             download="purchasing-items-export.csv"
             data-testid="button-export-csv"
             className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-slate-200 bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 text-xs rounded-[4px]"
+            onClick={() => {
+              toast({
+                title: "Export Started",
+                description: "Your CSV file is downloading. Check your Downloads folder.",
+              });
+            }}
           >
             <Download className="h-4 w-4 mr-1" />
             Export CSV
