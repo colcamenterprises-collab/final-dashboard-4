@@ -41,24 +41,6 @@ export default function PurchasingListPage() {
     enabled: !!dailyStockId,
   });
 
-  const handleDownload = async () => {
-    try {
-      const response = await fetch(`/api/purchasing-list/${dailyStockId}/csv`);
-      if (!response.ok) throw new Error('Failed to download CSV');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `shopping-list-${dailyStockId}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Download failed:', error);
-    }
-  };
-
   if (!dailyStockId) {
     return (
       <div className="p-6">
@@ -93,14 +75,15 @@ export default function PurchasingListPage() {
     <div className="p-6 max-w-full">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-bold text-slate-900">Shopping List</h1>
-        <Button 
-          onClick={handleDownload}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 px-3 rounded-[4px]"
+        <a 
+          href={`/api/purchasing-list/${dailyStockId}/csv`}
+          download={`shopping-list-${dailyStockId}.csv`}
+          className="inline-flex items-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 px-3 rounded-[4px]"
           data-testid="button-download-csv"
         >
           <Download className="h-4 w-4 mr-1" />
           Download CSV
-        </Button>
+        </a>
       </div>
 
       {lines.length === 0 ? (

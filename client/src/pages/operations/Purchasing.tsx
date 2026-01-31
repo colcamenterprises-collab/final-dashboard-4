@@ -341,31 +341,15 @@ export default function PurchasingPage() {
             <Plus className="h-4 w-4 mr-1" />
             Add Item
           </Button>
-          <Button
+          <a
+            href="/api/purchasing-items/export/csv"
+            download="purchasing-items-export.csv"
             data-testid="button-export-csv"
-            variant="outline"
-            onClick={async () => {
-              try {
-                const response = await fetch('/api/purchasing-items/export/csv');
-                if (!response.ok) throw new Error('Failed to export CSV');
-                const blob = await response.blob();
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'purchasing-items-export.csv';
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-              } catch (error) {
-                console.error('Export failed:', error);
-              }
-            }}
-            className="text-xs rounded-[4px] border-slate-200"
+            className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-slate-200 bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 text-xs rounded-[4px]"
           >
             <Download className="h-4 w-4 mr-1" />
             Export CSV
-          </Button>
+          </a>
           <label>
             <input
               type="file"
