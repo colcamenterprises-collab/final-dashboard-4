@@ -1644,6 +1644,7 @@ export const purchasingItems = pgTable("purchasing_items", {
   id: serial("id").primaryKey(),
   item: varchar("item").notNull(),
   category: varchar("category"),
+  supplier: varchar("supplier").default("Makro"),
   supplierName: varchar("supplierName"),
   brand: varchar("brand"),
   supplierSku: varchar("supplierSku"),
@@ -1700,6 +1701,15 @@ export const shoppingListV2 = pgTable('shopping_list_v2', {
   updatedAt: timestamp('updated_at').defaultNow(),
 });
 
+export const shoppingPurchaseV2 = pgTable('shopping_purchase_v2', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  item: text('item').notNull(),
+  cost: decimal('cost', { precision: 10, scale: 2 }).default('0'),
+  shop: text('shop').notNull(),
+  salesId: text('sales_id').notNull(),
+});
+
 export const purchaseAnalyticsV2 = pgTable('purchase_analytics_v2', {
   id: serial('id').primaryKey(),
   date: date('date'),
@@ -1712,6 +1722,18 @@ export const purchaseAnalyticsV2 = pgTable('purchase_analytics_v2', {
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
 });
+
+// Derived analysis reports (deterministic + rebuildable)
+export const analysisReports = pgTable('analysis_reports', {
+  id: serial('id').primaryKey(),
+  reportDate: date('report_date').notNull(),
+  reportType: text('report_type').notNull(),
+  data: jsonb('data').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
+}, (table) => ({
+  uniqueReport: unique().on(table.reportDate, table.reportType),
+}));
 
 // -----------------------------------------------------------------------------
 // Daily Reports V2 — stores the compiled daily report (JSON + reference IDs)
@@ -1793,6 +1815,8 @@ export const drinkPurchasesV2 = pgTable('drink_purchases_v2', {
 export const recipe = pgTable('recipe', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull().unique(),
+  totalCost: decimal('total_cost', { precision: 12, scale: 4 }).default('0'),
+  marginPercentage: decimal('margin_percentage', { precision: 5, scale: 2 }).default('0'),
   yieldUnits: decimal('yield_units', { precision: 10, scale: 2 }),
   active: boolean('active').notNull().default(true),
   isFinal: boolean('is_final').notNull().default(false), // Draft recipes cannot be used in analytics
@@ -1812,6 +1836,7 @@ export const recipeIngredient = pgTable('recipe_ingredient', {
   // NEW: Canonical ingredient-based (PATCH R1)
   ingredientId: integer('ingredient_id').references(() => ingredients.id),
   portionQty: decimal('portion_qty', { precision: 10, scale: 4 }), // quantity in ingredient's baseUnit
+  wastePercentage: decimal('waste_percentage', { precision: 5, scale: 2 }).default('5.0'),
 }, (table) => ({
   // Unique constraint uses whichever ID is present
   uniqueRecipeIngredientOld: unique().on(table.recipeId, table.purchasingItemId),

@@ -122,6 +122,7 @@ import productsRouter from "./routes/products";
 import productMenuRouter from "./routes/productMenu";
 import productIngredientsRouter from "./routes/productIngredients";
 import productActivationRouter from "./routes/productActivation";
+import purchasesRouter from "./routes/purchases";
 // Email functionality will be added when needed
 
 
@@ -1155,6 +1156,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Shift Report V2
   app.use("/api/shift-report", shiftReportRoutes);
+
+  // Purchases import
+  app.use("/api/purchases", purchasesRouter);
 
   // Online Ordering v2 API (product-driven)
   app.use("/api", onlineOrderingV2Router);
