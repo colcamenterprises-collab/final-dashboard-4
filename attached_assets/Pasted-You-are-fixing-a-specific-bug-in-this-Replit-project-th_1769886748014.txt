@@ -1,0 +1,62 @@
+You are fixing a specific bug in this Replit project: the Ingredient Selector on the New Recipe page (/menu/recipes/new) shows "No ingredients found" even when searching for existing items like "bun" or "roll".
+
+No visible changes happened after recent backend PR (recipeService, purchases route, etc.). The problem is frontend-side: the search does not load/display ingredients from the backend.
+
+Do this step-by-step, safely, without breaking anything else:
+
+1. First, diagnose the root cause.
+   - Open the browser preview → go to /menu/recipes/new
+   - Open DevTools (F12) → Network tab
+   - Type "bun" or "roll" in the search box
+   - Look for any API call (e.g. GET /api/items, /api/ingredients, /api/search-items, etc.)
+   - Tell me:
+     - What is the exact endpoint being called?
+     - What params are sent (e.g. ?search=bun&isIngredient=true)?
+     - What status code (200, 404, 500, etc.)?
+     - What is the response body (empty array [] ? error message?)
+   - Also check Console tab for JavaScript errors (red messages) related to fetch, axios, useQuery, etc.
+
+2. Find the frontend code responsible for the search.
+   - Search the codebase for these strings (case-insensitive):
+     - "Search ingredients"
+     - "No ingredients found"
+     - "bun" (as test search)
+     - IngredientSelector
+     - ingredients (in components or pages/menu or pages/recipes)
+   - Most likely files:
+     - client/src/components/IngredientSelector.tsx (or similar)
+     - client/src/pages/menu/recipes/new.tsx
+     - client/src/pages/RecipesNew.tsx
+     - Any file with useQuery, axios.get, fetch for /api/items or similar
+
+3. Fix the loading issue. Common causes and fixes:
+   - If no API call fires → the input onChange / search handler is broken or not wired.
+     → Add console.log("Search triggered", value) in the onChange to confirm.
+   - If API call fires but returns [] → wrong endpoint or missing params.
+     → Make sure it calls the correct backend route, e.g. /api/items?isIngredient=true&search={value}
+     → If backend has /api/items route, ensure it's mounted in server/index.ts or app.ts
+   - If 404 → mount missing route in backend (but only if not already there)
+   - If 200 but empty → backend query doesn't find records because:
+     → No items with isIngredient = true exist → add debug seed if needed
+     → Search is case-sensitive or wrong field (e.g. searches brand instead of sku)
+     → Fix: adjust query params or backend filter
+
+4. Quick test data injection if DB is empty (very likely cause)
+   - Run in Replit Shell (you can suggest or execute if allowed):
+     npx prisma db execute --sql "INSERT INTO \"Item\" (category, brand, sku, \"unitPrice\", \"packagingSize\", \"portionMeasurement\", \"isIngredient\") VALUES ('bakery', 'Test Rolls', 'ROLL-001', 30, '12pcs', 'pcs', true);"
+   - Or use npx prisma studio to manually add 2-3 rows with isIngredient = true, sku containing "bun" or "roll"
+
+5. After any code change:
+   - Restart the web preview (kill 1 in shell if needed)
+   - Hard refresh browser (Ctrl+Shift+R)
+   - Test search again → "roll" or "bun" should now show results
+   - If still broken, log the full API response in frontend (console.log(data))
+
+Priorities:
+- Do NOT change backend logic (recipeService, menu publish, etc.) — only touch frontend if needed
+- Keep changes minimal — fix loading first, don't refactor whole component
+- After fix, confirm in chat: "Search now shows ingredients — tested with 'roll'"
+- If you need to add console logs or small code tweaks, show me the diff before applying
+
+Start by diagnosing: open DevTools, reproduce the search, and report Network + Console findings.
+Then propose the exact file + code fix.

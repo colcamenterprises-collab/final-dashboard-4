@@ -66,8 +66,13 @@ function computeUnitCostPerBase(ingredient: {
     }
   }
   
-  // Use the utility function for final computation
-  return computeCostFromUtil(ingredient.price, packagingQtyNum, unit || 'each');
+  // Compute cost per base unit
+  if (!packagingQtyNum || packagingQtyNum <= 0) {
+    // If we can't determine quantity, return price as-is (cost per unit)
+    return ingredient.price;
+  }
+  
+  return ingredient.price / packagingQtyNum;
 }
 
 /**
