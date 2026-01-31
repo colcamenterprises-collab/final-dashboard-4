@@ -41,8 +41,22 @@ export default function PurchasingListPage() {
     enabled: !!dailyStockId,
   });
 
-  const handleDownload = () => {
-    window.location.href = `/api/purchasing-list/${dailyStockId}/csv`;
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(`/api/purchasing-list/${dailyStockId}/csv`);
+      if (!response.ok) throw new Error('Failed to download CSV');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `shopping-list-${dailyStockId}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
   };
 
   if (!dailyStockId) {

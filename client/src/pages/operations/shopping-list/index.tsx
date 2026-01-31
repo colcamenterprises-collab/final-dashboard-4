@@ -110,8 +110,22 @@ export default function ShoppingListPage() {
                 data-testid="input-date"
               />
               <button
-                onClick={() => {
-                  window.open(`/api/purchasing-list/latest/csv?date=${selectedDate}`, "_blank");
+                onClick={async () => {
+                  try {
+                    const response = await fetch(`/api/purchasing-list/latest/csv?date=${selectedDate}`);
+                    if (!response.ok) throw new Error('Failed to download CSV');
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `shopping-list-${selectedDate}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                  } catch (error) {
+                    console.error('Download failed:', error);
+                  }
                 }}
                 className="px-4 py-2 bg-slate-900 text-white rounded-[4px] text-xs font-medium hover:bg-slate-800"
                 data-testid="button-download-csv"

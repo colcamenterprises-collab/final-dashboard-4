@@ -344,8 +344,22 @@ export default function PurchasingPage() {
           <Button
             data-testid="button-export-csv"
             variant="outline"
-            onClick={() => {
-              window.open('/api/purchasing-items/export/csv', '_blank');
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/purchasing-items/export/csv');
+                if (!response.ok) throw new Error('Failed to export CSV');
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'purchasing-items-export.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+              } catch (error) {
+                console.error('Export failed:', error);
+              }
             }}
             className="text-xs rounded-[4px] border-slate-200"
           >
