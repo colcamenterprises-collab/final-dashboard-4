@@ -1,0 +1,57 @@
+You are fixing and finalizing the backend in this Replit project after PR #26 has been merged to main.
+
+PR #26 added:
+- supplier default "Makro" on Item
+- wastePercentage default 5.0 on RecipeIngredient
+- totalCost and marginPercentage on Recipe
+- new purchases import endpoint /api/purchases/import-purchases
+- recipeService.ts with createOrUpdateRecipe (conditional ingredient handling)
+- menuService.ts with publishToMenu
+- analysis worker with variance alerts
+
+Goal: Make sure everything is applied, migrated, and testable in the current environment.
+
+Do this step-by-step:
+
+1. Pull latest main
+   - Run in shell: git checkout main && git pull origin main
+
+2. Apply Prisma migration
+   - Run: npx prisma migrate dev --name backend-flow-enhancements-final
+   - If it asks for confirmation or has errors, tell me the exact message
+
+3. Install any missing dependencies (should already be there, but make sure)
+   - Run: npm install csv-parser axios nodemailer node-cron
+   - If already installed, it will say so
+
+4. Restart the web server
+   - If the preview is running, stop it (kill process 1 in shell if needed)
+   - Then run: npm run dev
+
+5. Quick smoke tests – execute these and report results in chat:
+   a. Check DB schema: run npx prisma studio → open in new tab
+      - Look at model Item → confirm it has "supplier" field with default "Makro"
+      - Look at model RecipeIngredient → confirm wastePercentage Float @default(5.0)
+      - Look at model Recipe → confirm totalCost and marginPercentage exist
+      - Report: "Schema looks correct" or paste any missing fields
+
+   b. Seed one test ingredient if none exist:
+      Run this SQL in shell:
+      npx prisma db execute --sql "INSERT INTO \"Item\" (category, brand, sku, \"unitPrice\", \"packagingSize\", \"portionMeasurement\", \"isIngredient\") VALUES ('bakery', 'Test Rolls', 'ROLL-001', 30, '12pcs', 'pcs', true);"
+
+   c. Test ingredient search in UI:
+      - Open preview → go to /menu/recipes/new
+      - Type "ROLL" or "roll" in the ingredient search box
+      - Tell me: Does it show the test item? Or still "No ingredients found"?
+
+   d. Test recipe approve flow (if UI allows or via Postman/curl):
+      - Create a draft recipe (add the seeded ingredient if possible)
+      - Approve it (change status to "approved")
+      - In Prisma Studio: check MenuItem table → is there a new row linked to the recipe with isLive = true?
+      - Report result
+
+6. If any step fails (migration error, search empty, approve doesn't create MenuItem), report the exact error message or behavior.
+
+7. After successful tests, reply: "Backend post-merge tests passed. Ready for UI #27 fixes"
+
+Execute now and report step-by-step results in chat.
