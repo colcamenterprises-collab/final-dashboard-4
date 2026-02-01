@@ -37,7 +37,6 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { IngredientSelector, type IngredientSearchItem } from "@/components/menu/IngredientSelector";
-import { DishPreview3D } from "@/components/menu/DishPreview3D";
 import { useDropzone } from "react-dropzone";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
@@ -1107,15 +1106,6 @@ export default function RecipeEditorPage() {
             </Card>
 
             <div className="grid gap-6 md:grid-cols-2">
-              <Card className="border-slate-200">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold text-slate-800">3D Dish Preview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <DishPreview3D className="h-56 w-full rounded-[12px]" />
-                </CardContent>
-              </Card>
-
               <Card className="border-slate-200">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base font-semibold text-slate-800">AR Preview</CardTitle>
