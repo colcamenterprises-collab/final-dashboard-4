@@ -40,7 +40,6 @@ import { IngredientSelector, type IngredientSearchItem } from "@/components/menu
 import { DishPreview3D } from "@/components/menu/DishPreview3D";
 import { useDropzone } from "react-dropzone";
 import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
-import { Scene, Entity } from "@aframe-react/core";
 
 const THB = (n: number) =>
   new Intl.NumberFormat("th-TH", {
@@ -1126,22 +1125,9 @@ export default function RecipeEditorPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {showArPreview ? (
-                    <div className="rounded-[12px] border border-slate-200 bg-slate-50 p-2">
-                      <div className="text-xs text-slate-600 mb-2">A-Frame preview (requires AR-capable device).</div>
-                      <Scene embedded vr-mode-ui="enabled: false" renderer="colorManagement: true">
-                        <Entity primitive="a-camera" position="0 1.2 4" />
-                        <Entity primitive="a-light" type="ambient" intensity="0.8" />
-                        <Entity primitive="a-box" position="0 1 0" color="#fbbf24" depth="1.5" height="1" width="1.5" />
-                        <Entity primitive="a-cylinder" position="0 0.3 0" color="#7c2d12" radius="0.8" height="0.4" />
-                        <Entity primitive="a-plane" rotation="-90 0 0" width="6" height="6" color="#e2e8f0" />
-                      </Scene>
-                    </div>
-                  ) : (
-                    <div className="rounded-[12px] border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
-                      Toggle AR preview to display A-Frame scene.
-                    </div>
-                  )}
+                  <div className="rounded-[12px] border border-dashed border-slate-200 p-6 text-center text-xs text-slate-500">
+                    AR preview feature coming soon.
+                  </div>
                 </CardContent>
               </Card>
             </div>
