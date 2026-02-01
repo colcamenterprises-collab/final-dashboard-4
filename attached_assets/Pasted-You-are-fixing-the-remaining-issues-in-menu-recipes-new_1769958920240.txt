@@ -1,0 +1,50 @@
+You are fixing the remaining issues in /menu/recipes/new after removing the broken 3D import.
+
+Problems from screenshots:
+- Line cost does not include waste % (e.g. 20g at ฿0.139/g = ฿2.78, waste 5% → should be ~฿2.92)
+- Rounding inconsistent (฿2.77 vs 2.78)
+- AI Waste Suggestion static – not loading history or smart value
+- No total recipe cost or margin shown
+
+Do this step-by-step:
+
+1. Fix line cost math in client/src/pages/menu/RecipeEditor.tsx (or Ingredient row component):
+   - Find where line cost is calculated (likely qty * unitCost)
+   - Change to: lineCost = qty * unitCost * (1 + (wastePercentage / 100))
+   - Round to 2 decimals: lineCost.toFixed(2)
+   - Update display: {`฿${lineCost.toFixed(2)}`}
+   - Add console.log('Adjusted line cost', lineCost) for debug
+
+2. Add total cost & margin at bottom of Ingredients tab:
+   - Sum all adjusted line costs → totalCost
+   - Add input for sellingPrice (top of page)
+   - Margin % = ((sellingPrice - totalCost) / sellingPrice) * 100 || 0
+   - Display: <div>Total Cost: ฿{totalCost.toFixed(2)} | Margin: {margin.toFixed(1)}%</div>
+
+3. Make AI Waste Suggestion smarter:
+   - On ingredient add: Fetch mock history (or /api/items/{id}/waste-history if exists)
+   - Default: 5% → set slider value
+   - Load history button: On click → set slider to random 3-12% (simulate) + toast "Loaded average 6.5% from history"
+
+4. Re-add 3D preview safely (no crash):
+   - Install package: npm install @aframe-react/core aframe
+   - In MenuManagement or RecipeEditor: Wrap DishPreview3D in Suspense + lazy
+   - Code snippet to add:
+     import { Suspense, lazy } from 'react';
+     const DishPreview3D = lazy(() => import('./DishPreview3D'));
+     // Usage:
+     <Suspense fallback={<div>Loading 3D...</div>}>
+       <DishPreview3D modelUrl={...} />
+     </Suspense>
+   - Or keep hover-only as before
+
+5. Test & report:
+   - Add mayonnaise 20g, waste 10% → line cost ~฿3.06 (2.78 * 1.1)
+   - Add second item → see total cost sum
+   - Change selling price → see margin %
+   - Load history → slider updates
+   - Confirm no crash on load
+
+Apply in branch feature/recipe-calc-fixes-2, push, create PR #28 or update #27.
+
+Show diffs. After test, reply: "Calculations fixed – waste applied, rounding correct, total/margin shown, 3D safe"

@@ -128,6 +128,7 @@ export default function RecipeEditorPage() {
   const [recipeCategory, setRecipeCategory] = useState("Burgers");
   const [recipeDescription, setRecipeDescription] = useState("");
   const [yieldQuantity, setYieldQuantity] = useState("1");
+  const [sellingPrice, setSellingPrice] = useState("");
   const [lines, setLines] = useState<RecipeLine[]>([]);
   const [recipeNotFound, setRecipeNotFound] = useState(false);
   const [notes, setNotes] = useState("");
@@ -294,12 +295,14 @@ export default function RecipeEditorPage() {
     return lines.map((line) => {
       const qty = num(line.qty);
       const unitCost = num(line.unitCostTHB);
+      const wastePct = num(line.wastePct ?? 5);
+      const adjustedCost = qty * unitCost * (1 + wastePct / 100);
       return {
         ...line,
         unit: line.unit || line.baseUnit || "g",
         baseUnit: line.baseUnit || line.unit || "g",
         unitCostTHB: unitCost,
-        costTHB: qty * unitCost,
+        costTHB: Math.round(adjustedCost * 100) / 100,
       };
     });
   }, [lines]);
@@ -311,6 +314,12 @@ export default function RecipeEditorPage() {
 
   const yieldCount = Math.max(1, num(yieldQuantity));
   const costPerServe = totalCost / yieldCount;
+  
+  const marginPercentage = useMemo(() => {
+    const price = num(sellingPrice);
+    if (price <= 0 || totalCost <= 0) return null;
+    return ((price - totalCost) / price) * 100;
+  }, [sellingPrice, totalCost]);
 
   const validation = useMemo(() => {
     if (!recipeName.trim()) {
@@ -640,14 +649,28 @@ export default function RecipeEditorPage() {
                 className="rounded-[4px] text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Yield / Serves</label>
-              <Input
-                value={yieldQuantity}
-                onChange={(event) => setYieldQuantity(event.target.value)}
-                placeholder="Yield quantity"
-                className="text-sm rounded-[4px]"
-              />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Yield / Serves</label>
+                <Input
+                  value={yieldQuantity}
+                  onChange={(event) => setYieldQuantity(event.target.value)}
+                  placeholder="Yield quantity"
+                  className="text-sm rounded-[4px]"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-700">Selling Price (THB)</label>
+                <Input
+                  value={sellingPrice}
+                  onChange={(event) => setSellingPrice(event.target.value)}
+                  placeholder="e.g. 189"
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="text-sm rounded-[4px]"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">AI Readiness</label>
@@ -846,6 +869,12 @@ export default function RecipeEditorPage() {
                   <div className="text-xs text-slate-500">Waste guidance</div>
                   <div className="text-2xl font-semibold text-slate-900">
                     {wasteAverage === null ? "UNMAPPED" : `${wasteAverage.toFixed(1)}%`}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs text-slate-500">Margin %</div>
+                  <div className={`text-2xl font-semibold ${marginPercentage !== null && marginPercentage >= 60 ? 'text-emerald-600' : marginPercentage !== null && marginPercentage >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
+                    {marginPercentage === null ? "Set price" : `${marginPercentage.toFixed(1)}%`}
                   </div>
                 </div>
               </CardContent>
