@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,8 +11,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { X, Plus } from "lucide-react";
 import { convertFromInputDate } from "@/lib/format";
+
+interface DrinkIngredient {
+  id: number;
+  name: string;
+}
 
 const rollsSchema = z.object({
   date: z.string().min(1, "Date is required"),
@@ -23,10 +27,7 @@ const rollsSchema = z.object({
 
 const drinksSchema = z.object({
   date: z.string().min(1, "Date is required"),
-  items: z.array(z.object({
-    type: z.string().min(1, "Drink type is required"),
-    quantity: z.number().min(1, "Quantity must be at least 1"),
-  })).min(1, "At least one drink item is required"),
+  counts: z.record(z.string(), z.number()),
 });
 
 const meatSchema = z.object({
@@ -59,11 +60,6 @@ interface StockLodgmentModalProps {
   };
 }
 
-const DRINK_TYPES = [
-  "Coke", "Coke Zero", "Sprite", "Schweppes Manow", "Red Fanta", 
-  "Orange Fanta", "Red Singha", "Yellow Singha", "Pink Singha", "Soda Water"
-];
-
 const MEAT_TYPES = [
   "Topside", "Chuck", "Brisket", "Rump", "Outside", "Mixed", "Other"
 ];
@@ -82,11 +78,33 @@ export function StockLodgmentModal({
   const setIsOpen = onOpenChange || setInternalIsOpen;
   
   const [activeTab, setActiveTab] = useState<"rolls" | "meat" | "drinks">(initialData?.type || "rolls");
+  const [drinkCounts, setDrinkCounts] = useState<Record<string, number>>({});
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
   const isEditMode = !!initialData?.id;
   const today = new Date().toISOString().split('T')[0];
+
+  // Fetch drinks from Purchasing List (CANONICAL SOURCE - NOT from ingredients)
+  const { data: drinkIngredients = [], isLoading: drinksLoading } = useQuery<DrinkIngredient[]>({
+    queryKey: ['/api/purchasing/drinks'],
+    queryFn: async () => {
+      const res = await fetch('/api/purchasing/drinks');
+      if (!res.ok) throw new Error('Failed to fetch drinks from purchasing list');
+      const json = await res.json();
+      return (json.items || []).map((item: any) => ({
+        id: item.id,
+        name: item.name
+      }));
+    },
+  });
+
+  // Initialize drink counts when ingredients load
+  useEffect(() => {
+    if (drinkIngredients.length > 0 && Object.keys(drinkCounts).length === 0) {
+      setDrinkCounts(Object.fromEntries(drinkIngredients.map(d => [String(d.id), 0])));
+    }
+  }, [drinkIngredients]);
 
   const rollsForm = useForm<RollsForm>({
     resolver: zodResolver(rollsSchema),
@@ -102,7 +120,7 @@ export function StockLodgmentModal({
     resolver: zodResolver(drinksSchema),
     defaultValues: { 
       date: initialData?.date || today,
-      items: initialData?.drinkType ? [{ type: initialData.drinkType, quantity: initialData.quantity || 0 }] : [{ type: "", quantity: 0 }] 
+      counts: {}
     }
   });
 
@@ -133,23 +151,19 @@ export function StockLodgmentModal({
           weightKg: initialData.weightKg || 0
         });
       } else if (initialData.type === "drinks") {
-        drinksForm.reset({
-          date: initialData.date || today,
-          items: initialData.drinkType ? [{ type: initialData.drinkType, quantity: initialData.quantity || 0 }] : [{ type: "", quantity: 0 }]
-        });
+        const counts = Object.fromEntries(drinkIngredients.map(d => [String(d.id), 0]));
+        drinksForm.reset({ date: initialData.date || today, counts });
+        setDrinkCounts(counts);
       }
     } else if (isOpen && !initialData) {
       // Reset to default for new entries
       rollsForm.reset({ date: today, quantity: 0, cost: 0, paid: false });
       meatForm.reset({ date: today, meatType: "", weightKg: 0 });
-      drinksForm.reset({ date: today, items: [{ type: "", quantity: 0 }] });
+      const counts = Object.fromEntries(drinkIngredients.map(d => [String(d.id), 0]));
+      drinksForm.reset({ date: today, counts });
+      setDrinkCounts(counts);
     }
-  }, [isOpen, initialData, today]);
-
-  const { fields, append, remove } = useFieldArray({
-    control: drinksForm.control,
-    name: "items"
-  });
+  }, [isOpen, initialData, today, drinkIngredients]);
 
   // Auto-calculate cost for rolls (qty * 8 THB)
   const handleQuantityChange = (quantity: number) => {
@@ -207,11 +221,34 @@ export function StockLodgmentModal({
     });
   };
 
-  const handleDrinksSubmit = (data: DrinksForm) => {
+  const handleDrinksSubmit = () => {
+    const date = drinksForm.getValues('date');
+    
+    // Filter out zero quantities and convert to items array for backend
+    const items = Object.entries(drinkCounts)
+      .filter(([_, qty]) => qty > 0)
+      .map(([ingredientId, quantity]) => {
+        const ingredient = drinkIngredients.find(d => String(d.id) === ingredientId);
+        return { 
+          type: ingredient?.name || ingredientId,
+          ingredientId: parseInt(ingredientId),
+          quantity 
+        };
+      });
+    
+    if (items.length === 0) {
+      toast({
+        title: "No drinks entered",
+        description: "Enter at least one drink quantity",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     stockMutation.mutate({
       type: "drinks",
-      date: data.date,
-      items: data.items,
+      date,
+      items,
     });
   };
 
@@ -389,10 +426,10 @@ export function StockLodgmentModal({
           </Form>
         )}
 
-        {/* Drinks Tab */}
+        {/* Drinks Tab - Table Format */}
         {activeTab === "drinks" && (
           <Form {...drinksForm}>
-            <form onSubmit={drinksForm.handleSubmit(handleDrinksSubmit)} className="space-y-4">
+            <form onSubmit={(e) => { e.preventDefault(); handleDrinksSubmit(); }} className="space-y-4">
               <FormField
                 control={drinksForm.control}
                 name="date"
@@ -418,76 +455,42 @@ export function StockLodgmentModal({
                 )}
               />
               
-              {fields.map((field, index) => (
-                <div key={field.id} className="border rounded-lg p-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-medium">Drink {index + 1}</h4>
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => remove(index)}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
-                  
-                  <FormField
-                    control={drinksForm.control}
-                    name={`items.${index}.type`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Drink Type</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select drink type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {DRINK_TYPES.map((drink) => (
-                              <SelectItem key={drink} value={drink}>
-                                {drink}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={drinksForm.control}
-                    name={`items.${index}.quantity`}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantity</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              ))}
-              
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => append({ type: "", quantity: 0 })}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Drink
-              </Button>
+              <div className="border rounded-lg overflow-hidden">
+                {drinksLoading ? (
+                  <div className="p-4 text-center text-sm text-slate-500">Loading drinks...</div>
+                ) : drinkIngredients.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-500">No drink ingredients found</div>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-slate-100 border-b">
+                        <th className="text-left p-2 font-medium text-slate-700">Drink Type</th>
+                        <th className="text-right p-2 font-medium text-slate-700 w-24">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {drinkIngredients.map((drink) => (
+                        <tr key={drink.id} className="border-b last:border-b-0 hover:bg-slate-50">
+                          <td className="p-2 text-slate-700">{drink.name}</td>
+                          <td className="p-2">
+                            <Input
+                              type="number"
+                              min="0"
+                              value={drinkCounts[String(drink.id)] || ""}
+                              onChange={(e) => setDrinkCounts(prev => ({
+                                ...prev,
+                                [String(drink.id)]: parseInt(e.target.value) || 0
+                              }))}
+                              className="h-8 text-sm text-right w-20 ml-auto"
+                              data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
               
               <div className="flex gap-3 pt-4">
                 <Button

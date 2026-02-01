@@ -109,15 +109,14 @@ export default function ShoppingListPage() {
                 className="border border-slate-200 dark:border-slate-700 rounded-[4px] p-2 text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                 data-testid="input-date"
               />
-              <button
-                onClick={() => {
-                  window.open(`/api/purchasing-list/latest/csv?date=${selectedDate}`, "_blank");
-                }}
-                className="px-4 py-2 bg-slate-900 text-white rounded-[4px] text-xs font-medium hover:bg-slate-800"
+              <a
+                href={`/api/purchasing-list/latest/csv?date=${selectedDate}`}
+                download={`shopping-list-${selectedDate}.csv`}
+                className="px-4 py-2 bg-slate-900 text-white rounded-[4px] text-xs font-medium hover:bg-slate-800 inline-flex items-center"
                 data-testid="button-download-csv"
               >
                 Download CSV
-              </button>
+              </a>
             </div>
           </CardContent>
         </Card>

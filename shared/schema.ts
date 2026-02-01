@@ -434,20 +434,27 @@ export const ingredients = pgTable("ingredients", {
   brand: text("brand"),
 
   // 🔒 CANONICAL FIELDS (PATCH R1) - Used for recipe cost calculation
-  baseUnit: text("base_unit"), // grams | ml | each (canonical unit for recipes)
+  baseUnit: text("base_unit"), // g | ml | each (canonical unit for recipes)
   baseYieldQty: decimal("base_yield_qty", { precision: 10, scale: 3 }), // yield qty in base units from one purchase
   unitCostPerBase: decimal("unit_cost_per_base", { precision: 10, scale: 6 }), // cost PER baseUnit (computed: purchaseCost / baseYieldQty)
   sourcePurchasingItemId: integer("source_purchasing_item_id"), // link to purchasing_items for sync
 
+  // Yield method: DIRECT (exact) or ESTIMATED (requires variance)
+  yieldMethod: text("yield_method").default("DIRECT"), // 'DIRECT' | 'ESTIMATED'
+  
   // Purchase (bulk side) - nullable to match DB during backfill
   purchaseQty: decimal("purchase_qty", { precision: 10, scale: 3 }),
-  purchaseUnit: text("purchase_unit"),
+  purchaseUnit: text("purchase_unit"), // kg | g | l | ml | each
   purchaseCost: decimal("purchase_cost", { precision: 10, scale: 2 }),
 
   // Portion (recipe side)
   portionQty: decimal("portion_qty", { precision: 10, scale: 3 }), // default portion quantity
-  portionUnit: text("portion_unit"), // default portion unit (g/ml/each)
+  portionUnit: text("portion_unit"), // default portion unit (g/ml/each) or custom (rasher/slice/ring)
   portionCost: decimal("portion_cost", { precision: 10, scale: 4 }), // computed: unitCostPerBase * portionQty
+  
+  // ESTIMATED yield fields (only used when yieldMethod = 'ESTIMATED')
+  avgPortionSize: decimal("avg_portion_size", { precision: 10, scale: 3 }), // e.g. 14g per rasher
+  variancePct: decimal("variance_pct", { precision: 5, scale: 2 }), // e.g. 10 for ±10%
   
   // Hidden flag for soft delete
   hidden: boolean("hidden").default(false),

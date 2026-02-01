@@ -1,9 +1,10 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "../db";
 import {
   ingredients,
   menuItemRecipe,
   menuItemV3,
+  purchasingItems,
   recipe,
   recipeIngredient,
 } from "../schema";
@@ -15,107 +16,149 @@ function toNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export async function createOrUpdateRecipe(data: any): Promise<any> {
+export async function createOrUpdateRecipe(data: any) {
   if (!db) {
     throw new Error("Database unavailable");
   }
 
-  const { id, name, status, ingredients: payloadIngredients } = data ?? {};
-  const normalizedStatus = typeof status === "string" ? status.toLowerCase() : null;
-  const isFinal = normalizedStatus === "approved";
+  const status = typeof data?.status === "string" ? data.status.toLowerCase() : null;
+  const isFinal = status === "approved" ? true : data?.isFinal ?? false;
 
-  let recipeId: number;
+  if (!data?.name && !data?.id) {
+    throw new Error("Recipe name is required");
+  }
 
-  if (id) {
+  let recipeId = data?.id ? Number(data.id) : null;
+
+  if (recipeId) {
     const updatePayload: Record<string, unknown> = {};
-    if (name) updatePayload.name = name;
-    if (normalizedStatus) updatePayload.isFinal = isFinal;
+    if (data?.name) updatePayload.name = data.name;
+    if (data?.yieldUnits !== undefined || data?.yield_units !== undefined) {
+      updatePayload.yieldUnits = data?.yieldUnits ?? data?.yield_units ?? null;
+    }
+    if (typeof data?.active === "boolean") updatePayload.active = data.active;
+    if (status || data?.isFinal !== undefined) updatePayload.isFinal = isFinal;
 
     if (Object.keys(updatePayload).length > 0) {
-      await db.update(recipe).set(updatePayload).where(eq(recipe.id, id));
+      await db.update(recipe).set(updatePayload).where(eq(recipe.id, recipeId));
     }
-    recipeId = id;
   } else {
-    if (!name) {
-      throw new Error("Recipe name is required");
-    }
+    const recipePayload = {
+      name: data?.name,
+      yieldUnits: data?.yieldUnits ?? data?.yield_units ?? null,
+      active: data?.active ?? true,
+      isFinal,
+    };
 
-    const newRecipe = await db
+    const inserted = await db
       .insert(recipe)
-      .values({ name, isFinal: false, active: true })
+      .values(recipePayload)
       .returning({ id: recipe.id });
-    recipeId = newRecipe[0].id;
+    recipeId = inserted[0]?.id ?? null;
   }
 
-  const ingredientRows = Array.isArray(payloadIngredients) ? payloadIngredients : [];
+  if (!recipeId) {
+    throw new Error("Failed to create or update recipe");
+  }
 
-  if (ingredientRows.length > 0) {
-    await db.delete(recipeIngredient).where(eq(recipeIngredient.recipeId, recipeId));
+  await db.delete(recipeIngredient).where(eq(recipeIngredient.recipeId, recipeId));
 
-    for (const ing of ingredientRows) {
-      const sku = ing?.sku || ing?.supplierSku || ing?.itemSku || ing?.item_sku;
-      const ingredientName = ing?.name || ing?.ingredientName || ing?.itemName;
-      const portionQty = toNumber(ing?.portionQty) ?? toNumber(ing?.quantity) ?? toNumber(ing?.qty);
+  const ingredientRows = Array.isArray(data?.ingredients) ? data.ingredients : [];
 
-      if (!portionQty) {
-        throw new Error(`Missing portion quantity for ingredient "${ingredientName ?? sku ?? "unknown"}"`);
-      }
+  for (const ingredientRow of ingredientRows) {
+    const sku =
+      ingredientRow?.sku ||
+      ingredientRow?.supplierSku ||
+      ingredientRow?.itemSku ||
+      ingredientRow?.item_sku;
+    const ingredientName =
+      ingredientRow?.name || ingredientRow?.ingredientName || ingredientRow?.itemName;
+    const portionQty =
+      toNumber(ingredientRow?.portionQty) ??
+      toNumber(ingredientRow?.quantity) ??
+      toNumber(ingredientRow?.qty);
+    const unit = ingredientRow?.unit || ingredientRow?.portionUnit || null;
+    const wastePercentage =
+      toNumber(ingredientRow?.wastePercentage) ??
+      toNumber(ingredientRow?.waste_percentage) ??
+      5;
 
-      let ingredientId = ing?.ingredientId ? Number(ing.ingredientId) : null;
-      if (!ingredientId && sku) {
-        const existingIngredient = await db
-          .select({ id: ingredients.id })
-          .from(ingredients)
-          .where(eq(ingredients.supplierSku, sku))
-          .limit(1);
-        ingredientId = existingIngredient[0]?.id ?? null;
-      }
-
-      if (!ingredientId) {
-        if (!ingredientName) {
-          throw new Error("Ingredient name required to create pending ingredient.");
-        }
-
-        const supplier = ing?.supplier || "Makro";
-        const pending = await db
-          .insert(ingredients)
-          .values({
-            name: ingredientName,
-            supplier,
-            supplierSku: sku,
-            source: "pending",
-            verified: false,
-          })
-          .returning({ id: ingredients.id });
-        ingredientId = pending[0]?.id ?? null;
-      }
-
-      if (!ingredientId) {
-        throw new Error(`Unable to resolve ingredient "${ingredientName ?? sku ?? "unknown"}".`);
-      }
-
-      await db.insert(recipeIngredient).values({
-        recipeId,
-        ingredientId,
-        portionQty: portionQty.toString(),
-        quantity: ing?.quantity ?? portionQty.toString(),
-        unit: ing?.unit || ing?.portionUnit || null,
-        wastePercentage: (toNumber(ing?.wastePercentage) ?? 5).toFixed(2),
-      });
+    if (!portionQty) {
+      throw new Error(`Missing portion quantity for ingredient "${ingredientName ?? sku ?? "unknown"}"`);
     }
 
-    await calculateRecipeCost(recipeId);
+    let ingredientId = ingredientRow?.ingredientId
+      ? Number(ingredientRow.ingredientId)
+      : null;
+
+    if (!ingredientId && sku) {
+      const existingIngredient = await db
+        .select({ id: ingredients.id })
+        .from(ingredients)
+        .where(eq(ingredients.supplierSku, sku))
+        .limit(1);
+      ingredientId = existingIngredient[0]?.id ?? null;
+    }
+
+    if (!ingredientId) {
+      if (!ingredientName) {
+        throw new Error("Ingredient name required to create pending ingredient.");
+      }
+
+      const supplier = ingredientRow?.supplier || "Makro";
+      const createdIngredient = await db
+        .insert(ingredients)
+        .values({
+          name: ingredientName,
+          supplier,
+          supplierSku: sku,
+          source: "pending",
+          verified: false,
+        })
+        .returning({ id: ingredients.id });
+      ingredientId = createdIngredient[0]?.id ?? null;
+
+      if (sku) {
+        const existingPurchasing = await db
+          .select({ id: purchasingItems.id })
+          .from(purchasingItems)
+          .where(eq(purchasingItems.supplierSku, sku))
+          .limit(1);
+        if (existingPurchasing.length === 0) {
+          await db.insert(purchasingItems).values({
+            item: ingredientName,
+            supplier,
+            supplierName: supplier,
+            supplierSku: sku,
+            active: true,
+            isIngredient: true,
+          });
+        }
+      }
+    }
+
+    if (!ingredientId) {
+      throw new Error(`Unable to resolve ingredient "${ingredientName ?? sku ?? "unknown"}".`);
+    }
+
+    await db.insert(recipeIngredient).values({
+      recipeId,
+      ingredientId,
+      portionQty: portionQty.toString(),
+      quantity: ingredientRow?.quantity ?? null,
+      unit,
+      purchasingItemId: ingredientRow?.purchasingItemId ?? null,
+      wastePercentage: wastePercentage.toFixed(2),
+    });
   }
 
-  // Always allow status-only updates (e.g. approve)
-  if (normalizedStatus === "approved") {
+  await calculateRecipeCost(recipeId);
+
+  if (status === "approved") {
     await publishToMenu(recipeId);
-
-    // Re-run cost calc AFTER publish so it can use any price set on MenuItem
-    await calculateRecipeCost(recipeId);
   }
 
-  return { id: recipeId, message: "Recipe saved" };
+  return { id: recipeId };
 }
 
 export async function calculateRecipeCost(recipeId: number) {

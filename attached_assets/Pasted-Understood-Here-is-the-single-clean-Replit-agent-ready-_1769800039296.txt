@@ -1,0 +1,110 @@
+Understood.
+Here is the single, clean, Replit-agent-ready instruction to finish this properly, based strictly on what already exists and what broke last.
+No commentary. No theory. No redesign. Just the fix.
+🔧 REPLIT AGENT — FINAL PATCH: DRINKS MODAL + COSTING CONSISTENCY
+SCOPE
+This patch finishes the costing system by fixing the Drinks purchase flow so it matches:
+Ingredient yield logic
+Ingredient Management
+Real kitchen workflow
+This is a UI + wiring correction, not a new feature.
+HARD RULES
+❌ Do NOT touch ingredient yield logic (it is correct now)
+❌ Do NOT change recipe costing logic
+❌ Do NOT introduce new tables
+❌ Do NOT refactor expenses architecture
+❌ Do NOT affect rolls or meat flows
+✅ Modify drinks purchase UI only
+✅ Reuse existing drink ingredient records
+✅ Quantities must feed the same ledger path
+PROBLEM TO FIX (FACTUAL)
+Drinks purchasing under Expenses → Stock Lodgment still uses the old dropdown + add row pattern
+This is inconsistent with:
+Ingredient Management
+Yield logic
+StockReceivedModal (which already works correctly)
+Drinks are discrete “each” units → they do NOT need yield logic
+The UI is slowing down real usage
+PATCH — DRINKS PURCHASE MODAL (EXACT)
+File to modify
+Copy code
+
+client/src/components/operations/StockLodgmentModal.tsx
+Target section
+Drinks tab only
+REQUIRED UI BEHAVIOUR
+Replace existing drinks UI with:
+Static table layout
+Drink Type
+Qty Purchased
+Coke
+[ 0 ]
+Coke Zero
+[ 0 ]
+Sprite
+[ 0 ]
+Water
+[ 0 ]
+…
+…
+One row per drink ingredient
+Numeric input only
+Default = 0
+No add/remove buttons
+No dropdowns
+DATA SOURCE (MANDATORY)
+Populate rows from:
+Ingredient table
+Filter where:
+Copy code
+
+category = 'Drinks'
+AND hidden = false
+Do NOT hardcode drink names.
+SUBMIT BEHAVIOUR
+On submit:
+For each row where qty > 0:
+Create stock entry exactly as before
+Use existing drinks stock route
+Preserve existing ledger logic
+🚫 Zero quantities are ignored
+🚫 No partial submits
+BACKEND (IMPORTANT)
+NO backend changes required
+You are ONLY changing how data is collected.
+Payload structure stays identical:
+Copy code
+Ts
+{
+  ingredientId,
+  quantity
+}
+ACCEPTANCE TESTS (MUST PASS)
+Open Expenses → Stock Lodgment → Drinks
+See table with all drink types listed
+Enter quantities for multiple drinks
+Submit once
+Drinks ledger updates correctly
+Ingredient costs remain unchanged
+No dropdowns, no “add row” UX
+DO NOT TOUCH
+Ingredient yield system
+Recipe editor
+Ingredient Management page
+Cost calculations
+Stock ledgers
+POS ingestion
+FINAL CHECKLIST
+[ ] Drinks tab is table-based
+[ ] All drink ingredients listed
+[ ] Quantities editable inline
+[ ] Submission works in one action
+[ ] UI matches rest of app styling
+[ ] No regressions
+This is the last loose end in the costing workflow.
+Once this is in:
+Ingredients → correct
+Recipes → correct
+Yield → correct
+Stock → usable in real life
+Execute only this.

@@ -41,10 +41,6 @@ export default function PurchasingListPage() {
     enabled: !!dailyStockId,
   });
 
-  const handleDownload = () => {
-    window.location.href = `/api/purchasing-list/${dailyStockId}/csv`;
-  };
-
   if (!dailyStockId) {
     return (
       <div className="p-6">
@@ -79,14 +75,15 @@ export default function PurchasingListPage() {
     <div className="p-6 max-w-full">
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-xl font-bold text-slate-900">Shopping List</h1>
-        <Button 
-          onClick={handleDownload}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 px-3 rounded-[4px]"
+        <a 
+          href={`/api/purchasing-list/${dailyStockId}/csv`}
+          download={`shopping-list-${dailyStockId}.csv`}
+          className="inline-flex items-center bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8 px-3 rounded-[4px]"
           data-testid="button-download-csv"
         >
           <Download className="h-4 w-4 mr-1" />
           Download CSV
-        </Button>
+        </a>
       </div>
 
       {lines.length === 0 ? (
