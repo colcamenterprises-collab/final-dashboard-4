@@ -163,11 +163,13 @@ async function buildVarianceReport(reportDate: string) {
     let variancePct: number | null = null;
     let status = "OK";
 
-    if (!purchase || purchaseQty === 0) {
+    if (!purchase || purchaseQty === 0 || !usage?.unit) {
       status = "INSUFFICIENT_DATA";
     } else if (purchase?.unit && usage.unit && purchase.unit !== usage.unit) {
       status = "UNIT_MISMATCH";
-    } else {
+    }
+
+    if (status === "OK") {
       variancePct = ((usage.qty - purchaseQty) / purchaseQty) * 100;
       status = Math.abs(variancePct) > 10 ? "ALERT" : "OK";
     }
