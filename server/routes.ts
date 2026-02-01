@@ -52,7 +52,7 @@ import { managerChecklistStore } from "./managerChecklist";
 import crypto from "crypto"; // For webhook signature
 import { LoyverseDataOrchestrator } from "./services/loyverseDataOrchestrator"; // For webhook process
 import { db } from "./db"; // For transactions
-import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2, dailyShiftAnalysis, expenses } from "../shared/schema"; // Adjust path
+import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2, dailyShiftAnalysis, expenses, analysisReports } from "../shared/schema"; // Adjust path
 import { generateShiftAnalysis } from "./services/shiftAnalysisService";
 import { z } from "zod";
 import { eq, desc, sql, inArray, isNull, lt } from "drizzle-orm";
@@ -4076,6 +4076,65 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     } catch (error) {
       res.status(400).json({ error: "Failed to create ingredient", details: (error as Error).message });
     }
+  });
+
+  app.get("/api/items/:id/waste-history", async (req: Request, res: Response) => {
+    try {
+      const itemId = Number(req.params.id);
+      if (!Number.isFinite(itemId)) {
+        return res.status(400).json({ error: "Invalid item id" });
+      }
+
+      const reports = await db
+        .select({ reportDate: analysisReports.reportDate, data: analysisReports.data })
+        .from(analysisReports)
+        .where(eq(analysisReports.reportType, "ingredient_variance_daily"))
+        .orderBy(desc(analysisReports.reportDate))
+        .limit(14);
+
+      const history = reports
+        .map((report) => {
+          const varianceRows = (report.data as any)?.varianceRows || [];
+          if (!Array.isArray(varianceRows)) return null;
+          const match = varianceRows.find((row: any) => Number(row.ingredientId) === itemId);
+          if (!match) return null;
+          return {
+            reportDate: String(report.reportDate),
+            variancePct: match.variancePct ?? null,
+            status: match.status ?? "INSUFFICIENT_DATA",
+            usageQty: match.usageQty ?? null,
+            purchaseQty: match.purchaseQty ?? null,
+            unit: match.unit ?? null,
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+
+      const varianceValues = history
+        .map((entry) => entry.variancePct)
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+      const suggestedWastePct = varianceValues.length
+        ? Number((varianceValues.reduce((sum, value) => sum + Math.max(0, value), 0) / varianceValues.length).toFixed(2))
+        : null;
+
+      res.json({
+        itemId,
+        suggestedWastePct,
+        historyCount: history.length,
+        history,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to load waste history" });
+    }
+  });
+
+  app.get("/api/suppliers/makro/prices", async (_req: Request, res: Response) => {
+    res.json({
+      status: "UNAVAILABLE",
+      reason: "INTEGRATION_NOT_CONFIGURED",
+      updatedAt: new Date().toISOString(),
+      items: [],
+    });
   });
 
   // Register Loyverse enhanced routes

@@ -733,6 +733,162 @@ Respond in your signature direct, passionate style but keep it professional for 
   }
 });
 
+// POST /api/recipes/:id/optimize - AI optimization suggestions (read-only)
+router.post('/:id/optimize', async (req, res) => {
+  try {
+    const recipeId = Number(req.params.id);
+    if (!Number.isFinite(recipeId)) {
+      return res.status(400).json({ error: 'Invalid recipe id' });
+    }
+
+    await initTables();
+    const recipeResult = await pool.query(
+      `SELECT id, name, description, category, total_cost, cost_per_serving
+       FROM recipes WHERE id = $1`,
+      [recipeId]
+    );
+    if (recipeResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    const linesResult = await pool.query(
+      `SELECT ingredient_id, ingredient_name, qty, unit, unit_cost_thb, cost_thb
+       FROM recipe_lines WHERE recipe_id = $1`,
+      [recipeId]
+    );
+
+    const recipe = recipeResult.rows[0];
+    const prompt = `You are a restaurant operations AI optimizing recipe profitability without harming quality.
+Return a compact JSON object with keys: substitutions, marginTweaks, wasteReductions, supplierNotes.
+If data is insufficient, respond with "INSUFFICIENT_DATA" for that list.
+
+Recipe: ${recipe.name}
+Description: ${recipe.description || 'None'}
+Category: ${recipe.category}
+Total Cost: ${recipe.total_cost}
+Cost Per Serving: ${recipe.cost_per_serving}
+Ingredients: ${JSON.stringify(linesResult.rows)}
+Target: Improve margin by 10% with explicit, auditable suggestions.`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        { role: 'system', content: 'Return only JSON. Avoid guessing prices. Use INSUFFICIENT_DATA if missing.' },
+        { role: 'user', content: prompt }
+      ],
+      max_tokens: 600,
+      temperature: 0.2
+    });
+
+    const content = response.choices[0].message.content || '';
+    let parsed: any = null;
+    try {
+      parsed = JSON.parse(content);
+    } catch (error) {
+      parsed = null;
+    }
+
+    res.json({ recipeId, suggestions: parsed || undefined, raw: parsed ? undefined : content });
+  } catch (error) {
+    console.error('Error generating optimization:', error);
+    res.status(500).json({ error: 'Failed to generate optimization' });
+  }
+});
+
+// GET /api/recipes/:id/forecast - Forecast cost using analysis variance reports (read-only)
+router.get('/:id/forecast', async (req, res) => {
+  try {
+    const recipeId = Number(req.params.id);
+    if (!Number.isFinite(recipeId)) {
+      return res.status(400).json({ error: 'Invalid recipe id' });
+    }
+
+    await initTables();
+    const linesResult = await pool.query(
+      `SELECT ingredient_id, ingredient_name, cost_thb
+       FROM recipe_lines WHERE recipe_id = $1`,
+      [recipeId]
+    );
+
+    const recipeLines = linesResult.rows || [];
+    if (recipeLines.length === 0) {
+      return res.json({
+        recipeId,
+        coveragePct: 0,
+        totalCurrentCost: 0,
+        totalForecastCost: null,
+        lineForecasts: [],
+      });
+    }
+
+    const reportResult = await pool.query(
+      `SELECT report_date, data
+       FROM analysis_reports
+       WHERE report_type = $1
+       ORDER BY report_date DESC
+       LIMIT 14`,
+      ['ingredient_variance_daily']
+    );
+
+    const varianceByIngredient = new Map<number, number[]>();
+    for (const row of reportResult.rows) {
+      const varianceRows = row?.data?.varianceRows || [];
+      if (!Array.isArray(varianceRows)) continue;
+      varianceRows.forEach((entry: any) => {
+        const ingredientId = Number(entry.ingredientId);
+        const variancePct = Number(entry.variancePct);
+        if (!Number.isFinite(ingredientId) || !Number.isFinite(variancePct)) return;
+        const list = varianceByIngredient.get(ingredientId) ?? [];
+        list.push(variancePct);
+        varianceByIngredient.set(ingredientId, list);
+      });
+    }
+
+    let coverageCount = 0;
+    const lineForecasts = recipeLines.map((line: any) => {
+      const ingredientId = Number(line.ingredient_id);
+      const currentCost = Number(line.cost_thb) || 0;
+      const varianceList = Number.isFinite(ingredientId) ? varianceByIngredient.get(ingredientId) : undefined;
+      if (!varianceList || varianceList.length === 0) {
+        return {
+          ingredientId: String(line.ingredient_id),
+          ingredientName: line.ingredient_name,
+          currentCost,
+          forecastCost: null,
+          variancePctAvg: null,
+        };
+      }
+      coverageCount += 1;
+      const avgVariance = varianceList.reduce((sum, val) => sum + val, 0) / varianceList.length;
+      const forecastCost = currentCost * (1 + avgVariance / 100);
+      return {
+        ingredientId: String(line.ingredient_id),
+        ingredientName: line.ingredient_name,
+        currentCost,
+        forecastCost: Number(forecastCost.toFixed(2)),
+        variancePctAvg: Number(avgVariance.toFixed(2)),
+      };
+    });
+
+    const totalCurrentCost = lineForecasts.reduce((sum, line) => sum + line.currentCost, 0);
+    const allCovered = coverageCount === lineForecasts.length;
+    const totalForecastCost = allCovered
+      ? Number(lineForecasts.reduce((sum, line) => sum + (line.forecastCost || 0), 0).toFixed(2))
+      : null;
+
+    res.json({
+      recipeId,
+      coveragePct: lineForecasts.length ? (coverageCount / lineForecasts.length) * 100 : 0,
+      totalCurrentCost: Number(totalCurrentCost.toFixed(2)),
+      totalForecastCost,
+      lineForecasts,
+    });
+  } catch (error) {
+    console.error('Error generating forecast:', error);
+    res.status(500).json({ error: 'Failed to generate forecast' });
+  }
+});
+
 // GET /api/recipes/cross-ref-shift - Cross-reference used ingredients vs stock
 router.get('/cross-ref-shift', async (req, res) => {
   try {

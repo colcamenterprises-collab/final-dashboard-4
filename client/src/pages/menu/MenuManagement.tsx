@@ -4,9 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
+import { DishPreview3D } from "@/components/menu/DishPreview3D";
 
 const toNumber = (value: unknown) => {
   const parsed = Number(value);
@@ -43,6 +46,9 @@ type RecipeCard = {
   id: number;
   name: string;
   ingredients: Array<{ ingredientId: string; qty: number; unit: string; name: string }>;
+  total_cost?: number;
+  cost_per_serving?: number;
+  image_url?: string | null;
 };
 
 export default function MenuManagement() {
@@ -53,6 +59,7 @@ export default function MenuManagement() {
   const [newItemCategoryId, setNewItemCategoryId] = useState("");
   const [newItemPrice, setNewItemPrice] = useState("");
   const [newItemKitchen, setNewItemKitchen] = useState("prep");
+  const [syncingItemId, setSyncingItemId] = useState<string | null>(null);
 
   const [ingredientSearch, setIngredientSearch] = useState("");
   const [selectedIngredientId, setSelectedIngredientId] = useState("");
@@ -161,6 +168,36 @@ export default function MenuManagement() {
     });
   }, [menuRecipeLines, recipeCards]);
 
+  const recipeMatchByItem = useMemo(() => {
+    const map = new Map<string, RecipeCard>();
+    items.forEach((item) => {
+      if (!item.recipes?.length) return;
+      const match = recipeCards.find((recipe) => {
+        if (!recipe.ingredients?.length) return false;
+        return recipe.ingredients.every((ing) =>
+          item.recipes.some(
+            (line) =>
+              String(line.ingredientId) === String(ing.ingredientId) &&
+              toNumber(line.quantityUsed) === toNumber(ing.qty) &&
+              line.unit === ing.unit
+          )
+        );
+      });
+      if (match) map.set(item.id, match);
+    });
+    return map;
+  }, [items, recipeCards]);
+
+  const getMarginForecast = (item: MenuItem) => {
+    const recipe = recipeMatchByItem.get(item.id);
+    if (!recipe) return { status: "INSUFFICIENT_DATA" as const };
+    const costPerServing = toNumber(recipe.cost_per_serving ?? recipe.total_cost);
+    if (!costPerServing || item.basePrice <= 0) return { status: "INSUFFICIENT_DATA" as const };
+    const margin = item.basePrice - costPerServing;
+    const marginPct = (margin / item.basePrice) * 100;
+    return { status: "READY" as const, margin, marginPct, costPerServing };
+  };
+
   const createCategoryMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/menu-v3/categories/create", {
@@ -217,12 +254,18 @@ export default function MenuManagement() {
       if (!res.ok) throw new Error("Failed to update item");
       return res.json();
     },
+    onMutate: (payload: any) => {
+      setSyncingItemId(payload?.id ?? null);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/items"] });
       toast({ title: "Menu item updated" });
     },
     onError: (error: any) => {
       toast({ title: "Update failed", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => {
+      setSyncingItemId(null);
     },
   });
 
@@ -419,40 +462,72 @@ export default function MenuManagement() {
               </Button>
             </div>
 
-            <div className="border-t pt-4">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-xs">Item</TableHead>
-                    <TableHead className="text-xs">Category</TableHead>
-                    <TableHead className="text-xs text-right">Recipe Lines</TableHead>
-                    <TableHead className="text-xs text-right">Modifiers</TableHead>
-                    <TableHead className="text-xs text-right">Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-xs font-medium">{item.name}</TableCell>
-                      <TableCell className="text-xs">{item.category?.name || "UNMAPPED"}</TableCell>
-                      <TableCell className="text-xs text-right">{item.recipes?.length || 0}</TableCell>
-                      <TableCell className="text-xs text-right">{item.modifiers?.length || 0}</TableCell>
-                      <TableCell className="text-xs text-right">
+            <div className="border-t pt-4 space-y-3">
+              <div className="text-xs font-semibold text-slate-600">Menu Items Grid</div>
+              <div className="grid gap-4 md:grid-cols-2">
+                {items.map((item) => {
+                  const forecast = getMarginForecast(item);
+                  const isSyncing = syncingItemId === item.id && updateItemMutation.isPending;
+                  return (
+                    <Card key={item.id} className="rounded-[10px] border border-slate-200 shadow-sm">
+                      <CardContent className="space-y-3 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-900">{item.name}</div>
+                            <div className="text-xs text-slate-500">{item.category?.name || "UNMAPPED"}</div>
+                          </div>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {forecast.status === "READY"
+                              ? `Margin ${forecast.marginPct.toFixed(1)}%`
+                              : "Forecast unavailable"}
+                          </Badge>
+                        </div>
+
+                        <DishPreview3D className="h-24 w-full rounded-[10px]" />
+
+                        <div className="flex items-center justify-between text-xs text-slate-500">
+                          <span>Base price: ฿{item.basePrice.toFixed(2)}</span>
+                          <span>Recipe lines: {item.recipes?.length || 0}</span>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 text-xs text-slate-600">
+                            <div className={`h-2 w-2 rounded-full ${isSyncing ? "bg-amber-400" : "bg-emerald-500"}`} />
+                            {isSyncing ? "Syncing" : "Synced"}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-slate-500">Publish</span>
+                            <Switch
+                              checked={item.isActive}
+                              onCheckedChange={(checked) =>
+                                updateItemMutation.mutate({
+                                  id: item.id,
+                                  name: item.name,
+                                  basePrice: item.basePrice,
+                                  categoryId: item.categoryId,
+                                  kitchenStation: item.kitchenStation,
+                                  isActive: checked,
+                                })
+                              }
+                            />
+                          </div>
+                        </div>
+
                         <Button size="sm" variant="outline" onClick={() => setSelectedItemId(item.id)}>
                           Manage
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                  {items.length === 0 && (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-xs text-slate-400 text-center py-6">
-                        No menu items created yet.
-                      </TableCell>
-                    </TableRow>
-                  )}
-                </TableBody>
-              </Table>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+                {items.length === 0 && (
+                  <Card className="rounded-[10px] border border-dashed border-slate-200">
+                    <CardContent className="py-6 text-center text-xs text-slate-400">
+                      No menu items created yet.
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
