@@ -10,7 +10,9 @@
  *
  * Backend interaction occurs ONLY on Save Recipe.
  */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
+
+const DishPreview3D = lazy(() => import("@/components/menu/DishPreview3D"));
 import axios from "axios";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1135,6 +1137,19 @@ export default function RecipeEditorPage() {
             </Card>
 
             <div className="grid gap-6 md:grid-cols-2">
+              <Card className="border-slate-200">
+                <CardHeader>
+                  <CardTitle className="text-base font-semibold text-slate-800">3D Preview</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Suspense fallback={<div className="h-[200px] flex items-center justify-center bg-slate-100 rounded-lg text-sm text-slate-500">Loading 3D...</div>}>
+                    <DishPreview3D 
+                      modelUrl={images.length > 0 ? "uploaded.glb" : undefined}
+                      className="h-[200px]"
+                    />
+                  </Suspense>
+                </CardContent>
+              </Card>
               <Card className="border-slate-200">
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle className="text-base font-semibold text-slate-800">AR Preview</CardTitle>
