@@ -368,7 +368,18 @@ export default function RecipeEditorPage() {
     await queryClient.invalidateQueries({ queryKey: ["recipe-ingredients", editingId] });
   };
 
-  const addIngredient = (ingredient: Ingredient) => {
+  const fetchVarianceHistory = async (ingredientId: string): Promise<number | null> => {
+    try {
+      const response = await fetch(`/api/items/${ingredientId}/variance-history`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.avgWastePct ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  const addIngredient = async (ingredient: Ingredient) => {
     const isDuplicate = lines.some(
       (line) => line.ingredientId === String(ingredient.id) || line.name === ingredient.name
     );
@@ -379,6 +390,9 @@ export default function RecipeEditorPage() {
 
     const unit = (ingredient.baseUnit || ingredient.portionUnit || "each") as UnitType;
     const unitCost = num(ingredient.unitCostPerBase);
+    
+    const varianceWaste = await fetchVarianceHistory(String(ingredient.id));
+    
     const newLine: RecipeLine = {
       ingredientId: String(ingredient.id),
       name: ingredient.name,
@@ -387,10 +401,17 @@ export default function RecipeEditorPage() {
       baseUnit: unit,
       unitCostTHB: unitCost,
       costTHB: unitCost,
-      wastePct: null,
-      wasteStatus: "INSUFFICIENT_DATA",
+      wastePct: varianceWaste ?? 5,
+      wasteStatus: varianceWaste !== null ? "VARIANCE_BASED" : "DEFAULT",
     };
     setLines((prev) => [...prev, newLine]);
+    
+    if (varianceWaste !== null) {
+      toast({ 
+        title: "Waste % set from history", 
+        description: `${ingredient.name}: ${varianceWaste.toFixed(1)}% based on 7-day variance` 
+      });
+    }
   };
 
   const updateLineQty = (index: number, value: string) => {
@@ -488,9 +509,37 @@ export default function RecipeEditorPage() {
 
       return result;
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
       toast({ title: "Recipe saved", description: "Your recipe changes have been saved." });
+      
+      if (linesWithCosts.length > 0) {
+        try {
+          const ingredientsForLine = linesWithCosts.map(line => ({
+            name: line.name,
+            qty: line.qty,
+            unit: line.unit,
+            wasteAdj: line.qty * (1 + (line.wastePct || 5) / 100)
+          }));
+          
+          const lineRes = await fetch("/api/line/send", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              recipeName: recipeName.trim(),
+              ingredients: ingredientsForLine
+            })
+          });
+          
+          const lineResult = await lineRes.json();
+          if (lineResult.mock) {
+            console.log("Sent to Line:", ingredientsForLine);
+          }
+        } catch (lineError) {
+          console.log("Line notification skipped:", lineError);
+        }
+      }
+      
       if (aiSuggestions) {
         toast({
           title: "AI suggestions available",

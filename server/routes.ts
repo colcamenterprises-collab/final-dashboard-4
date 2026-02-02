@@ -123,6 +123,8 @@ import productMenuRouter from "./routes/productMenu";
 import productIngredientsRouter from "./routes/productIngredients";
 import productActivationRouter from "./routes/productActivation";
 import purchasesRouter from "./routes/purchases";
+import lineNotifyRouter from "./routes/lineNotify";
+import varianceHistoryRouter from "./routes/varianceHistory";
 // Email functionality will be added when needed
 
 
@@ -3722,6 +3724,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // 🔒 INGREDIENT AUTHORITY ADMIN ROUTES (ISOLATED FROM RECIPES)
   app.use('/api/admin/ingredient-authority', ingredientAuthorityAdminRoutes);
   app.use('/api/system-health', systemHealthRouter);
+  app.use('/api/line', lineNotifyRouter);
+  app.use('/api/items', varianceHistoryRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
   // Note: ingredientReconciliationRouter is registered earlier at line ~1204
