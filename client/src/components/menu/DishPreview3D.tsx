@@ -78,7 +78,7 @@ export default function DishPreview3D({ modelUrl, className }: DishPreview3DProp
   }, [modelUrl]);
 
   return (
-    <div className={`relative rounded-lg overflow-hidden ${className || ""}`}>
+    <div className={`relative rounded-lg overflow-hidden bg-slate-100 min-h-[180px] ${className || ""}`}>
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-100">
           <div className="text-sm text-slate-500">Loading 3D...</div>
@@ -88,7 +88,8 @@ export default function DishPreview3D({ modelUrl, className }: DishPreview3DProp
         ref={canvasRef}
         width={300}
         height={200}
-        className="w-full h-auto"
+        className="w-full h-full min-h-[180px] block"
+        style={{ display: 'block' }}
       />
       <div className="absolute bottom-2 left-2 text-xs text-slate-500 bg-white/80 px-2 py-1 rounded">
         {modelUrl ? `Model: ${modelUrl}` : "Default burger preview"}

@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient } from "@/lib/queryClient";
-import { DishPreview3D } from "@/components/menu/DishPreview3D";
+import DishPreview3D from "@/components/menu/DishPreview3D";
 
 const toNumber = (value: unknown) => {
   const parsed = Number(value);
