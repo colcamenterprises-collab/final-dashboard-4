@@ -1,4 +1,3 @@
-import axios from "axios";
 import { eq } from "drizzle-orm";
 import { db } from "../db";
 import { menuItemRecipe, menuItemV3, recipe } from "../schema";
@@ -69,19 +68,39 @@ export async function publishToMenu(recipeId: number) {
 
   const apiUrl = process.env.ONLINE_ORDERING_API || "https://example.com/online-ordering";
   try {
-    await axios.post(apiUrl, { recipeId, menuItemId, name: recipeRow[0].name });
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipeId, menuItemId, name: recipeRow[0].name }),
+    });
+    if (!res || typeof res.json !== "function") {
+      return { error: "Invalid response – check API config" };
+    }
+    if (!res.ok) {
+      return { error: "Sync failed" };
+    }
+    try {
+      await res.json();
+    } catch (error) {
+      return { error: "Invalid response – check API config" };
+    }
   } catch (error) {
     console.error("[publishToMenu] Online ordering API failed:", error);
+    return { error: "Sync failed" };
   }
 
   const grabApiUrl = process.env.GRAB_ORDERING_API;
   if (grabApiUrl) {
     try {
-      await axios.post(grabApiUrl, { recipeId, menuItemId, name: recipeRow[0].name });
+      await fetch(grabApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeId, menuItemId, name: recipeRow[0].name }),
+      });
     } catch (error) {
       console.error("[publishToMenu] Grab API failed:", error);
     }
   }
 
-  return { recipeId, menuItemId };
+  return { success: true, message: "Synced" };
 }

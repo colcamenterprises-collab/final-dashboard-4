@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { ingredients } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export async function getAllIngredients() {
   return db.select().from(ingredients).orderBy(ingredients.name);
@@ -155,4 +155,56 @@ export async function updateIngredient(id: number, data: Partial<{
 export async function deleteIngredient(id: number) {
   const result = await db.delete(ingredients).where(eq(ingredients.id, id)).returning();
   return result[0];
+}
+
+export async function getItemsWithPurchasing(options?: { search?: string; limit?: number }) {
+  const limit = Math.min(options?.limit ?? 200, 500);
+  const search = options?.search?.trim().toLowerCase();
+
+  const baseQuery = sql`
+    SELECT
+      i.id,
+      i.name,
+      i.category,
+      i.base_unit AS "baseUnit",
+      i.unit_cost_per_base AS "unitCostPerBase",
+      COALESCE(p.brand, i.brand) AS brand,
+      COALESCE(p."supplierSku", i.supplier_sku) AS sku,
+      COALESCE(p."unitCost", i.unit_price) AS "unitPrice",
+      COALESCE(p.pack_cost, i.purchase_cost) AS "packCost",
+      CASE
+        WHEN p.portion_size IS NOT NULL AND p.portion_unit IS NOT NULL
+          THEN p.portion_size::text || ' ' || p.portion_unit
+        ELSE NULL
+      END AS "portionMeasurement"
+    FROM ingredients i
+    LEFT JOIN purchasing_items p ON i.source_purchasing_item_id = p.id
+  `;
+
+  const result = search
+    ? await db.execute(sql`
+        ${baseQuery}
+        WHERE LOWER(i.name) LIKE ${'%' + search + '%'}
+        ORDER BY i.name ASC
+        LIMIT ${limit};
+      `)
+    : await db.execute(sql`
+        ${baseQuery}
+        ORDER BY i.name ASC
+        LIMIT ${limit};
+      `);
+
+  const rows = result.rows || result;
+  return rows.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    category: row.category ?? null,
+    baseUnit: row.baseUnit ?? null,
+    unitCostPerBase: row.unitCostPerBase !== null ? Number(row.unitCostPerBase) : null,
+    brand: row.brand ?? null,
+    sku: row.sku ?? null,
+    unitPrice: row.unitPrice !== null ? Number(row.unitPrice) : null,
+    packCost: row.packCost !== null ? Number(row.packCost) : null,
+    portionMeasurement: row.portionMeasurement ?? null,
+  }));
 }
