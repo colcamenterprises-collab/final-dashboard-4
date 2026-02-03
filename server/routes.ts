@@ -131,7 +131,7 @@ import varianceHistoryRouter from "./routes/varianceHistory";
 
 
 const upload = multer({ storage: multer.memoryStorage() });
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 // Auto-build ordering client if dist missing
 const orderingClientDir = path.join(process.cwd(), "online-ordering", "client");

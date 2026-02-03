@@ -3,7 +3,7 @@ import { dailyReceiptSummaries, dailySalesV2, expenses, recipes } from "../../sh
 import { getShiftReport, getLoyverseReceipts } from "../utils/loyverse.js";
 import OpenAI from "openai";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 export async function generateJussiReport(date) {
   try {

@@ -78,13 +78,17 @@ interface ShiftAnalysis {
 }
 
 export class AIAnalysisService {
-  private openai: OpenAI;
+  private openai: OpenAI | null;
   private static instance: AIAnalysisService;
 
   private constructor() {
-    this.openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
+    this.openai = process.env.OPENAI_API_KEY 
+      ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      : null;
+  }
+  
+  isConfigured(): boolean {
+    return this.openai !== null;
   }
 
   static getInstance(): AIAnalysisService {

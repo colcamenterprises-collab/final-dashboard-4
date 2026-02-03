@@ -169,9 +169,9 @@ export async function getItemsWithPurchasing(options?: { search?: string; limit?
       i.base_unit AS "baseUnit",
       i.unit_cost_per_base AS "unitCostPerBase",
       COALESCE(p.brand, i.brand) AS brand,
-      COALESCE(p."supplierSku", i.supplier_sku) AS sku,
+      p."supplierSku" AS sku,
       COALESCE(p."unitCost", i.unit_price) AS "unitPrice",
-      COALESCE(p.pack_cost, i.purchase_cost) AS "packCost",
+      p."unitCost" AS "packCost",
       CASE
         WHEN p.portion_size IS NOT NULL AND p.portion_unit IS NOT NULL
           THEN p.portion_size::text || ' ' || p.portion_unit

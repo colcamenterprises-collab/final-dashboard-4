@@ -11,7 +11,7 @@ import { computeYield, computeEstimatedYield, YieldMethod } from '../utils/compu
 import OpenAI from 'openai';
 
 const router = Router();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openai = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 
 /**
  * Normalize ingredient cost to THB per base unit (gram/ml/each)

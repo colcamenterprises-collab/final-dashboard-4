@@ -67,6 +67,10 @@ export class LoyverseDataOrchestrator {
     this.loyverseAPI = new EnhancedLoyverseAPI(accessToken);
     this.aiAnalysisService = AIAnalysisService.getInstance();
     this.validator = LoyverseDataValidator.getInstance();
+    
+    if (!this.aiAnalysisService.isConfigured()) {
+      console.warn('⚠️ OpenAI not configured - AI analysis features will be disabled');
+    }
   }
 
   static getInstance(): LoyverseDataOrchestrator {
