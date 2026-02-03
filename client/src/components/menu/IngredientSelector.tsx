@@ -12,6 +12,11 @@ export type IngredientSearchItem = {
   portionUnit: string | null;
   baseUnit?: string | null;
   unitCostPerBase?: number | null;
+  unitPrice?: number | null;
+  packCost?: number | null;
+  brand?: string | null;
+  sku?: string | null;
+  portionMeasurement?: string | null;
   category?: string | null;
 };
 
@@ -40,11 +45,12 @@ export function IngredientSelector({ onAdd }: IngredientSelectorProps) {
   const { data: results = [], isLoading } = useQuery<IngredientSearchItem[]>({
     queryKey: ["ingredient-search", trimmed],
     queryFn: async () => {
-      const res = await fetch(`/api/ingredients?search=${encodeURIComponent(trimmed)}`);
+      const res = await fetch(`/api/items?search=${encodeURIComponent(trimmed)}`);
       if (!res.ok) {
         throw new Error("Failed to load ingredients");
       }
-      return res.json();
+      const data = await res.json();
+      return data.items ?? [];
     },
     enabled: trimmed.length > 0,
   });
@@ -109,7 +115,8 @@ export function IngredientSelector({ onAdd }: IngredientSelectorProps) {
         {trimmed.length > 0 && !isLoading && sortedResults.length > 0 && (
           <div className="grid gap-3">
             {sortedResults.map((ingredient) => {
-              const unitCost = ingredient.unitCostPerBase ?? 0;
+              const unitCost = ingredient.unitCostPerBase ?? ingredient.unitPrice ?? 0;
+              const packCost = ingredient.packCost ?? null;
               return (
                 <div
                   key={ingredient.id}
@@ -128,8 +135,9 @@ export function IngredientSelector({ onAdd }: IngredientSelectorProps) {
                     </div>
                   </div>
                   <div className="grid gap-1 text-xs text-slate-500 sm:text-right">
-                    <div>Brand: UNMAPPED</div>
-                    <div>SKU: UNMAPPED</div>
+                    <div>Brand: {ingredient.brand || "UNMAPPED"}</div>
+                    <div>SKU: {ingredient.sku || "UNMAPPED"}</div>
+                    <div>Pack cost: {packCost !== null ? THB(packCost) : "UNMAPPED"}</div>
                     <div className="font-medium text-slate-800">
                       Unit cost: {THB(unitCost)} / {ingredient.baseUnit || ingredient.portionUnit || "unit"}
                     </div>

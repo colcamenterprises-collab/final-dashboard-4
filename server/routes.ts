@@ -33,6 +33,7 @@ import { bankImportRouter } from "./routes/bankImport";
 import { menuRouter } from "./routes/menu";
 import { seedGodList } from "./lib/seedIngredients";
 import { publishToMenu } from "./services/menuService";
+import { getItemsWithPurchasing } from "./services/ingredientService";
 
 import expensesImportRouter from "./routes/expenses-import";
 import partnersRouter from "./routes/partners";
@@ -3726,6 +3727,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/admin/ingredient-authority', ingredientAuthorityAdminRoutes);
   app.use('/api/system-health', systemHealthRouter);
   app.use('/api/line', lineNotifyRouter);
+  app.get('/api/items', async (req: Request, res: Response) => {
+    try {
+      const limit = Math.min(Number(req.query.limit ?? 200), 500);
+      const search = req.query.search ? String(req.query.search) : undefined;
+      const items = await getItemsWithPurchasing({ search, limit });
+      return res.json({ items, count: items.length });
+    } catch (error: any) {
+      console.error('[items.list] error', error);
+      return res.status(500).json({ error: 'Failed to load items' });
+    }
+  });
   app.use('/api/items', varianceHistoryRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
@@ -4548,14 +4560,17 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     try {
       const recipeId = Number(req.body?.recipeId ?? req.body?.id);
       if (!Number.isFinite(recipeId)) {
-        return res.status(400).json({ ok: false, error: 'Invalid recipe id' });
+        return res.status(400).json({ error: 'Invalid recipe id' });
       }
 
       const result = await publishToMenu(recipeId);
-      return res.json({ ok: true, ...result });
+      if ("error" in result) {
+        return res.status(502).json(result);
+      }
+      return res.json(result);
     } catch (error: any) {
       console.error('[menu.publish] error', error);
-      return res.status(500).json({ ok: false, error: error?.message || 'Failed to publish menu' });
+      return res.status(500).json({ error: error?.message || 'Failed to publish menu' });
     }
   });
   

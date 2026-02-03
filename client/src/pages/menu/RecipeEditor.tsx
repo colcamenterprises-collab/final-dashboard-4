@@ -483,7 +483,7 @@ export default function RecipeEditorPage() {
     }
 
     const unit = (ingredient.baseUnit || ingredient.portionUnit || "each") as UnitType;
-    const unitCost = num(ingredient.unitCostPerBase);
+    const unitCost = num(ingredient.unitCostPerBase ?? ingredient.unitPrice);
     
     const varianceWaste = await fetchVarianceHistory(String(ingredient.id));
     
@@ -492,7 +492,7 @@ export default function RecipeEditorPage() {
       name: ingredient.name,
       portionQty: 1,
       portionUnit: unit,
-      packCost: null,
+      packCost: ingredient.packCost ?? null,
       packYield: null,
       unitCostTHB: unitCost,
       costTHB: unitCost,
@@ -957,8 +957,8 @@ export default function RecipeEditorPage() {
               <CardHeader>
                 <CardTitle className="text-base font-semibold text-slate-800">Ingredients Table</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="rounded border border-slate-200">
+              <CardContent className="space-y-4 h-full">
+                <div className="rounded border border-slate-200 h-full overflow-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -981,14 +981,14 @@ export default function RecipeEditorPage() {
                             tooltip="Portion for this recipe (e.g. 1 slice or 100g)"
                           />
                         </TableHead>
-                        <TableHead className="text-xs">Portion Unit</TableHead>
+                        <TableHead className="text-xs">Unit</TableHead>
                         <TableHead className="text-xs text-right">
                           <LabelWithTooltip
                             label="Waste %"
                             tooltip="Waste % (typical loss)"
                           />
                         </TableHead>
-                        <TableHead className="text-xs text-right">Adjusted Line Cost (฿)</TableHead>
+                        <TableHead className="text-xs text-right">Line Cost (฿)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
