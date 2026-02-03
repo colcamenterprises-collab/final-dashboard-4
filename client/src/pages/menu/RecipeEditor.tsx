@@ -34,13 +34,14 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { IngredientSelector, type IngredientSearchItem } from "@/components/menu/IngredientSelector";
 import { useDropzone } from "react-dropzone";
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { Info } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from "recharts";
 
 const THB = (n: number) =>
   new Intl.NumberFormat("th-TH", {
@@ -51,21 +52,23 @@ const THB = (n: number) =>
 
 const num = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-type UnitType = "g" | "kg" | "ml" | "l" | "each" | "slice" | "cup";
+type UnitType = "g" | "kg" | "slice" | "each" | "pack" | "ml" | "L" | "piece";
 
-const PORTION_UNITS: UnitType[] = ["g", "kg", "ml", "l", "each", "slice", "cup"];
+const PORTION_UNITS: UnitType[] = ["g", "kg", "slice", "each", "pack", "ml", "L", "piece"];
 
 type Ingredient = IngredientSearchItem;
 
 type RecipeLine = {
+  rowId?: number;
   ingredientId: string;
   name: string;
-  qty: number;
-  unit: UnitType;
-  baseUnit?: UnitType;
+  portionQty: number;
+  portionUnit: UnitType;
+  packCost: number | null;
+  packYield: number | null;
   unitCostTHB: number;
   costTHB: number;
-  wastePct?: number | null;
+  wastePercentage?: number | null;
   wasteStatus?: string | null;
 };
 
@@ -76,6 +79,8 @@ type Recipe = {
   category?: string;
   yield_quantity?: number;
   notes?: string | null;
+  instructions?: string | null;
+  suggested_price?: number | null;
 };
 
 type ForecastResponse = {
@@ -104,6 +109,25 @@ type OptimizationResponse = {
 };
 
 const COST_COLORS = ["#0f172a", "#2563eb", "#14b8a6", "#f97316", "#f43f5e", "#9333ea"];
+const MARGIN_COLORS = ["#ef4444", "#22c55e"];
+
+const LabelWithTooltip = ({ label, tooltip }: { label: string; tooltip: string }) => (
+  <div className="flex items-center gap-1 text-xs font-medium text-slate-600">
+    <span>{label}</span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          className="text-slate-400 hover:text-slate-600"
+          aria-label={`${label} info`}
+        >
+          <Info className="h-3.5 w-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[240px] text-xs">{tooltip}</TooltipContent>
+    </Tooltip>
+  </div>
+);
 
 function markdownToHtml(markdown: string) {
   const escaped = markdown
@@ -129,6 +153,7 @@ export default function RecipeEditorPage() {
   const [recipeName, setRecipeName] = useState("");
   const [recipeCategory, setRecipeCategory] = useState("Burgers");
   const [recipeDescription, setRecipeDescription] = useState("");
+  const [recipeInstructions, setRecipeInstructions] = useState("");
   const [yieldQuantity, setYieldQuantity] = useState("1");
   const [sellingPrice, setSellingPrice] = useState("");
   const [lines, setLines] = useState<RecipeLine[]>([]);
@@ -140,6 +165,8 @@ export default function RecipeEditorPage() {
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const lineSaveTimers = useRef<Record<string, number>>({});
+  const recipeSaveTimer = useRef<number | null>(null);
   const [wasteLookupIndex, setWasteLookupIndex] = useState<number | null>(null);
   const [showAllergens, setShowAllergens] = useState(false);
 
@@ -178,11 +205,15 @@ export default function RecipeEditorPage() {
     queryFn: async () => {
       const response = await axios.get<{
         ingredients: Array<{
+          id: number;
           ingredient_id: string;
           name: string;
           portion_quantity: number;
           portion_unit: UnitType;
           cost_per_portion: number;
+          pack_cost: number | null;
+          yield_per_pack: number | null;
+          waste_percentage: number | null;
           line_cost: number;
         }>;
       }>(`/api/recipes/${editingId}/ingredients`);
@@ -217,8 +248,14 @@ export default function RecipeEditorPage() {
       setRecipeName(recipeToEdit.name || "");
       setRecipeCategory(recipeToEdit.category || "Burgers");
       setRecipeDescription(recipeToEdit.description || "");
+      setRecipeInstructions(recipeToEdit.instructions || "");
       setYieldQuantity(String(recipeToEdit.yield_quantity ?? 1));
       setNotes(recipeToEdit.notes || "");
+      setSellingPrice(
+        recipeToEdit.suggested_price !== null && recipeToEdit.suggested_price !== undefined
+          ? String(recipeToEdit.suggested_price)
+          : ""
+      );
     }
   }, [editingId, recipeToEdit]);
 
@@ -227,15 +264,17 @@ export default function RecipeEditorPage() {
     if (ingredientLines) {
       setLines(
         ingredientLines.map((line, index) => ({
+          rowId: line.id,
           ingredientId: line.ingredient_id || `ingredient-${index}`,
           name: line.name || "Unnamed ingredient",
-          qty: num(line.portion_quantity),
-          unit: line.portion_unit || "g",
-          baseUnit: line.portion_unit || "g",
+          portionQty: num(line.portion_quantity),
+          portionUnit: line.portion_unit || "g",
+          packCost: line.pack_cost ?? null,
+          packYield: line.yield_per_pack ?? null,
           unitCostTHB: num(line.cost_per_portion),
           costTHB: num(line.line_cost),
-          wastePct: null,
-          wasteStatus: "INSUFFICIENT_DATA",
+          wastePercentage: line.waste_percentage ?? 5,
+          wasteStatus: "SAVED",
         })),
       );
     }
@@ -295,16 +334,21 @@ export default function RecipeEditorPage() {
 
   const linesWithCosts = useMemo(() => {
     return lines.map((line) => {
-      const qty = num(line.qty);
-      const unitCost = num(line.unitCostTHB);
-      const wastePct = num(line.wastePct ?? 5);
-      const adjustedCost = qty * unitCost * (1 + wastePct / 100);
+      const portionQty = num(line.portionQty);
+      const packCost = line.packCost ?? null;
+      const packYield = line.packYield ?? null;
+      const fallbackUnitCost = num(line.unitCostTHB);
+      const wastePercentage = num(line.wastePercentage ?? 5);
+      const resolvedUnitCost =
+        packCost && packYield ? packCost / packYield : fallbackUnitCost;
+      const adjustedCost =
+        portionQty * resolvedUnitCost * (1 + wastePercentage / 100);
       return {
         ...line,
-        unit: line.unit || line.baseUnit || "g",
-        baseUnit: line.baseUnit || line.unit || "g",
-        unitCostTHB: unitCost,
-        costTHB: Math.round(adjustedCost * 100) / 100,
+        portionUnit: line.portionUnit || "g",
+        unitCostTHB: Number(resolvedUnitCost.toFixed(2)),
+        costTHB: Number(adjustedCost.toFixed(2)),
+        wastePercentage,
       };
     });
   }, [lines]);
@@ -323,6 +367,15 @@ export default function RecipeEditorPage() {
     return ((price - totalCost) / price) * 100;
   }, [sellingPrice, totalCost]);
 
+  const marginMixData = useMemo(() => {
+    const price = num(sellingPrice);
+    if (price <= 0) return [];
+    return [
+      { name: "Cost", value: Math.min(totalCost, price) },
+      { name: "Margin", value: Math.max(price - totalCost, 0) },
+    ];
+  }, [sellingPrice, totalCost]);
+
   const validation = useMemo(() => {
     if (!recipeName.trim()) {
       return { valid: false, reason: "Missing name" };
@@ -336,7 +389,7 @@ export default function RecipeEditorPage() {
     if (linesWithCosts.length === 0) {
       return { valid: false, reason: "No ingredients" };
     }
-    const hasMissingQty = linesWithCosts.some((line) => num(line.qty) <= 0);
+    const hasMissingQty = linesWithCosts.some((line) => num(line.portionQty) <= 0);
     if (hasMissingQty) {
       return { valid: false, reason: "Ingredient quantity required" };
     }
@@ -357,11 +410,52 @@ export default function RecipeEditorPage() {
 
   const wasteAverage = useMemo(() => {
     const values = linesWithCosts
-      .map((line) => line.wastePct)
+      .map((line) => line.wastePercentage)
       .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
     if (!values.length) return null;
     return values.reduce((sum, value) => sum + value, 0) / values.length;
   }, [linesWithCosts]);
+
+  useEffect(() => {
+    if (!editingId) return;
+    if (recipeSaveTimer.current) {
+      window.clearTimeout(recipeSaveTimer.current);
+    }
+    recipeSaveTimer.current = window.setTimeout(async () => {
+      try {
+        await fetch(`/api/recipes/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: recipeName.trim(),
+            description: recipeDescription || "",
+            instructions: recipeInstructions || "",
+            notes: notes || "",
+            suggested_price: num(sellingPrice) || 0,
+            yield_quantity: num(yieldQuantity) || 1,
+            category: recipeCategory,
+          }),
+        });
+      } catch (error) {
+        console.error("Auto-save recipe failed:", error);
+      }
+    }, 500);
+
+    return () => {
+      if (recipeSaveTimer.current) {
+        window.clearTimeout(recipeSaveTimer.current);
+      }
+    };
+  }, [
+    editingId,
+    recipeName,
+    recipeCategory,
+    recipeDescription,
+    recipeInstructions,
+    sellingPrice,
+    yieldQuantity,
+    notes,
+  ]);
 
   const reloadIngredients = async () => {
     if (!editingId) return;
@@ -396,12 +490,13 @@ export default function RecipeEditorPage() {
     const newLine: RecipeLine = {
       ingredientId: String(ingredient.id),
       name: ingredient.name,
-      qty: 1,
-      unit: unit,
-      baseUnit: unit,
+      portionQty: 1,
+      portionUnit: unit,
+      packCost: null,
+      packYield: null,
       unitCostTHB: unitCost,
       costTHB: unitCost,
-      wastePct: varianceWaste ?? 5,
+      wastePercentage: varianceWaste ?? 5,
       wasteStatus: varianceWaste !== null ? "VARIANCE_BASED" : "DEFAULT",
     };
     setLines((prev) => [...prev, newLine]);
@@ -414,32 +509,59 @@ export default function RecipeEditorPage() {
     }
   };
 
+  const queueLineSave = (line: RecipeLine) => {
+    if (!editingId || !line.rowId) return;
+    const key = String(line.rowId);
+    if (lineSaveTimers.current[key]) {
+      window.clearTimeout(lineSaveTimers.current[key]);
+    }
+    lineSaveTimers.current[key] = window.setTimeout(async () => {
+      try {
+        await fetch(`/api/recipes/${editingId}/ingredient/${line.rowId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            portionQty: line.portionQty,
+            portionUnit: line.portionUnit,
+            wastePercentage: line.wastePercentage ?? 5,
+          }),
+        });
+      } catch (error) {
+        console.error("Failed to auto-save ingredient line:", error);
+      }
+    }, 500);
+  };
+
   const updateLineQty = (index: number, value: string) => {
     setLines((prev) =>
-      prev.map((line, idx) =>
-        idx === index
-          ? {
-              ...line,
-              qty: num(value),
-            }
-          : line,
-      ),
+      prev.map((line, idx) => {
+        if (idx !== index) return line;
+        const updated = { ...line, portionQty: num(value) };
+        queueLineSave(updated);
+        return updated;
+      }),
     );
   };
 
-  const updateLineUnit = (index: number, unit: UnitType) => {
+  const updateLineUnit = (index: number, portionUnit: UnitType) => {
     setLines((prev) =>
-      prev.map((line, idx) =>
-        idx === index ? { ...line, unit } : line,
-      ),
+      prev.map((line, idx) => {
+        if (idx !== index) return line;
+        const updated = { ...line, portionUnit };
+        queueLineSave(updated);
+        return updated;
+      }),
     );
   };
 
   const updateLineWaste = (index: number, value: number) => {
     setLines((prev) =>
-      prev.map((line, idx) =>
-        idx === index ? { ...line, wastePct: value } : line,
-      ),
+      prev.map((line, idx) => {
+        if (idx !== index) return line;
+        const updated = { ...line, wastePercentage: value };
+        queueLineSave(updated);
+        return updated;
+      }),
     );
   };
 
@@ -463,12 +585,14 @@ export default function RecipeEditorPage() {
           idx === index
             ? {
                 ...entry,
-                wastePct: suggested ?? entry.wastePct,
+                wastePercentage: suggested ?? entry.wastePercentage,
                 wasteStatus: suggested === null ? "INSUFFICIENT_DATA" : "HISTORICAL_DATA",
               }
             : entry,
         ),
       );
+      const updated = suggested !== null ? { ...line, wastePercentage: suggested } : line;
+      queueLineSave(updated);
     } catch (error: any) {
       toast({
         title: "Waste history unavailable",
@@ -482,9 +606,34 @@ export default function RecipeEditorPage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (editingId) {
+        const response = await fetch(`/api/recipes/${editingId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: recipeName.trim(),
+            description: recipeDescription || "",
+            instructions: recipeInstructions || "",
+            notes: notes || "",
+            suggested_price: num(sellingPrice) || 0,
+            yield_quantity: num(yieldQuantity) || 1,
+            category: recipeCategory,
+          }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) {
+          throw new Error(result?.details || result?.error || "Failed to save recipe");
+        }
+
+        return result;
+      }
+
       const payload = {
         recipeName: recipeName.trim(),
         description: recipeDescription || "",
+        instructions: recipeInstructions || "",
+        sellingPrice: num(sellingPrice) || 0,
         category: recipeCategory,
         lines: linesWithCosts,
         totals: {
@@ -517,9 +666,9 @@ export default function RecipeEditorPage() {
         try {
           const ingredientsForLine = linesWithCosts.map(line => ({
             name: line.name,
-            qty: line.qty,
-            unit: line.unit,
-            wasteAdj: line.qty * (1 + (line.wastePct || 5) / 100)
+            qty: line.portionQty,
+            unit: line.portionUnit,
+            wasteAdj: line.portionQty * (1 + (line.wastePercentage || 5) / 100)
           }));
           
           const lineRes = await fetch("/api/line/send", {
@@ -552,6 +701,43 @@ export default function RecipeEditorPage() {
       toast({
         title: "Save failed",
         description: error?.message || "Unable to save the recipe.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingId) {
+        throw new Error("Save the recipe before approving.");
+      }
+      const approveRes = await fetch(`/api/recipes/${editingId}/approve`, { method: "POST" });
+      const approveBody = await approveRes.json();
+      if (!approveRes.ok) {
+        throw new Error(approveBody?.error || "Failed to approve recipe");
+      }
+
+      const publishRes = await fetch("/api/menu/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeId: Number(editingId) }),
+      });
+      const publishBody = await publishRes.json();
+      if (!publishRes.ok) {
+        throw new Error(publishBody?.error || "Failed to publish menu");
+      }
+
+      return publishBody;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["recipes"] });
+      toast({ title: "Recipe approved", description: "Menu and online channels synced." });
+      navigate("/menu/recipes");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Approve failed",
+        description: error?.message || "Unable to approve recipe.",
         variant: "destructive",
       });
     },
@@ -657,7 +843,15 @@ export default function RecipeEditorPage() {
               onClick={() => saveMutation.mutate()}
               disabled={!validation.valid || saveMutation.isLoading}
             >
-              {editingId ? "Save & Approve" : "Save Recipe"}
+              {editingId ? "Save Updates" : "Save Recipe"}
+            </Button>
+            <Button
+              variant="outline"
+              className="text-xs rounded-[6px]"
+              onClick={() => approveMutation.mutate()}
+              disabled={!editingId || approveMutation.isPending || !validation.valid}
+            >
+              {approveMutation.isPending ? "Approving..." : "Approve & Publish"}
             </Button>
           </div>
         </div>
@@ -696,7 +890,17 @@ export default function RecipeEditorPage() {
               <Textarea
                 value={recipeDescription}
                 onChange={(event) => setRecipeDescription(event.target.value)}
-                placeholder="Short description or preparation notes"
+                placeholder="Recipe description..."
+                className="rounded-[4px] text-sm"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <label className="text-sm font-medium text-slate-700">Instructions</label>
+              <Textarea
+                value={recipeInstructions}
+                onChange={(event) => setRecipeInstructions(event.target.value)}
+                placeholder={"Step 1: ...\nStep 2: ..."}
+                rows={8}
                 className="rounded-[4px] text-sm"
               />
             </div>
@@ -715,7 +919,7 @@ export default function RecipeEditorPage() {
                 <Input
                   value={sellingPrice}
                   onChange={(event) => setSellingPrice(event.target.value)}
-                  placeholder="e.g. 189"
+                  placeholder="Selling Price (THB)"
                   type="number"
                   min="0"
                   step="1"
@@ -754,103 +958,116 @@ export default function RecipeEditorPage() {
                 <CardTitle className="text-base font-semibold text-slate-800">Ingredients Table</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {linesWithCosts.map((line, index) => {
-                  const conversionRequired = line.unit !== line.baseUnit;
-                  const formatUnitCost = (cost: number) =>
-                    cost < 0.01 ? cost.toFixed(4) : cost < 1 ? cost.toFixed(3) : cost.toFixed(2);
-                  return (
-                    <div
-                      key={`${line.ingredientId}-${index}`}
-                      className="border border-slate-100 rounded-[10px] p-4 space-y-4"
-                    >
-                      <div className="grid grid-cols-1 gap-4 md:grid-cols-6 md:items-center">
-                        <div>
-                          <div className="text-xs text-slate-500">Ingredient</div>
-                          <div className="text-sm font-medium text-slate-900">{line.name}</div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-500">Quantity</div>
-                          <Input
-                            value={line.qty}
-                            onChange={(event) => updateLineQty(index, event.target.value)}
-                            className="text-sm rounded-[4px]"
+                <div className="rounded border border-slate-200">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Ingredient</TableHead>
+                        <TableHead className="text-xs text-right">
+                          <LabelWithTooltip
+                            label="Pack Cost (฿) – read-only from purchasing"
+                            tooltip="Pulled from purchasing data."
                           />
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-500">Unit</div>
-                          <Select value={line.unit} onValueChange={(value) => updateLineUnit(index, value as UnitType)}>
-                            <SelectTrigger className="text-sm rounded-[4px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {PORTION_UNITS.map((unit) => (
-                                <SelectItem key={unit} value={unit}>
-                                  {unit}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-500">Conversion</div>
-                          <div className="text-sm text-slate-700">
-                            {conversionRequired ? "Conversion required" : "Aligned"}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-slate-500">Line cost</div>
-                          <div className="text-sm font-medium text-slate-900">{THB(line.costTHB)}</div>
-                        </div>
-                        <div className="flex justify-start md:justify-end">
-                          <Button
-                            variant="outline"
-                            className="text-xs rounded-[4px] border-rose-200 text-rose-600 hover:text-rose-700"
-                            onClick={() => removeLine(index)}
-                          >
-                            Remove
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 md:grid-cols-[1.4fr_1fr]">
-                        <div className="text-[11px] text-slate-500 space-y-1">
-                          <div>Base cost: ฿{formatUnitCost(line.unitCostTHB)} per {line.baseUnit}</div>
-                          <div>Quantity used: {line.qty} {line.unit}</div>
-                          <div className="text-emerald-600 font-medium">Line cost: {THB(line.costTHB)}</div>
-                        </div>
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs font-medium text-slate-700">AI Waste Suggestion</div>
-                            <Badge variant="secondary" className="text-[10px]">
-                              {line.wasteStatus || "INSUFFICIENT_DATA"}
-                            </Badge>
-                          </div>
-                          <Slider
-                            value={[line.wastePct ?? 0]}
-                            max={25}
-                            step={0.5}
-                            onValueChange={(value) => updateLineWaste(index, value[0] ?? 0)}
+                        </TableHead>
+                        <TableHead className="text-xs text-right">
+                          <LabelWithTooltip
+                            label="Yield (how many portions per pack, e.g. 82 slices per 1kg block)"
+                            tooltip="Total portions available from one pack."
                           />
-                          <div className="flex items-center justify-between text-xs text-slate-500">
-                            <span>Waste %: {line.wastePct ?? 0}%</span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="text-[10px]"
-                              onClick={() => fetchWasteSuggestion(index)}
-                              disabled={wasteLookupIndex === index}
+                        </TableHead>
+                        <TableHead className="text-xs text-right">
+                          <LabelWithTooltip
+                            label="Portion for this recipe (e.g. 1 slice or 100g)"
+                            tooltip="How much of this ingredient is used in the recipe."
+                          />
+                        </TableHead>
+                        <TableHead className="text-xs">Portion Unit</TableHead>
+                        <TableHead className="text-xs text-right">Waste %</TableHead>
+                        <TableHead className="text-xs text-right">Adjusted Line Cost</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {linesWithCosts.map((line, index) => (
+                        <TableRow key={`${line.ingredientId}-${index}`}>
+                          <TableCell className="text-xs font-medium">
+                            <div>{line.name}</div>
+                            <div className="mt-2">
+                              <Button
+                                variant="outline"
+                                className="text-[10px] rounded-[4px] border-rose-200 text-rose-600 hover:text-rose-700"
+                                onClick={() => removeLine(index)}
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-right">
+                            {line.packCost !== null ? THB(line.packCost) : "UNMAPPED"}
+                          </TableCell>
+                          <TableCell className="text-xs text-right">
+                            {line.packYield !== null ? line.packYield.toFixed(2) : "UNMAPPED"}
+                          </TableCell>
+                          <TableCell className="text-xs text-right">
+                            <Input
+                              value={line.portionQty}
+                              onChange={(event) => updateLineQty(index, event.target.value)}
+                              className="text-sm rounded-[4px] text-right"
+                            />
+                          </TableCell>
+                          <TableCell className="text-xs">
+                            <Select
+                              value={line.portionUnit}
+                              onValueChange={(value) => updateLineUnit(index, value as UnitType)}
                             >
-                              {wasteLookupIndex === index ? "Loading..." : "Load history"}
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {linesWithCosts.length === 0 && (
-                  <div className="text-sm text-slate-500">Add ingredients to begin costing.</div>
-                )}
+                              <SelectTrigger className="text-sm rounded-[4px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {PORTION_UNITS.map((unit) => (
+                                  <SelectItem key={unit} value={unit}>
+                                    {unit}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-xs text-right">
+                            <Input
+                              value={line.wastePercentage ?? 0}
+                              onChange={(event) => updateLineWaste(index, num(event.target.value))}
+                              className="text-sm rounded-[4px] text-right"
+                              type="number"
+                              min="0"
+                              step="0.1"
+                            />
+                            <div className="mt-1 flex items-center justify-end gap-2 text-[10px] text-slate-500">
+                              <span>{line.wasteStatus || "INSUFFICIENT_DATA"}</span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="text-[10px]"
+                                onClick={() => fetchWasteSuggestion(index)}
+                                disabled={wasteLookupIndex === index}
+                              >
+                                {wasteLookupIndex === index ? "Loading..." : "Load history"}
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-right">
+                            {THB(line.costTHB)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {linesWithCosts.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-xs text-slate-400 text-center py-6">
+                            Add ingredients to begin costing.
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
 
@@ -931,6 +1148,31 @@ export default function RecipeEditorPage() {
               </CardContent>
             </Card>
 
+            <Card className="border-slate-200">
+              <CardHeader>
+                <CardTitle className="text-base font-semibold text-slate-800">Margin Mix</CardTitle>
+              </CardHeader>
+              <CardContent className="h-56">
+                {marginMixData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={marginMixData} dataKey="value" nameKey="name" outerRadius={90}>
+                        {marginMixData.map((_, index) => (
+                          <Cell key={`margin-cell-${index}`} fill={MARGIN_COLORS[index % MARGIN_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <RechartsTooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-500">
+                    Set selling price to view margin mix.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
               <Card className="border-slate-200">
                 <CardHeader>
@@ -951,8 +1193,8 @@ export default function RecipeEditorPage() {
                         {linesWithCosts.map((line, idx) => (
                           <TableRow key={`${line.ingredientId}-${idx}`}>
                             <TableCell className="text-xs font-medium">{line.name}</TableCell>
-                            <TableCell className="text-xs text-right">{line.qty}</TableCell>
-                            <TableCell className="text-xs">{line.unit}</TableCell>
+                            <TableCell className="text-xs text-right">{line.portionQty}</TableCell>
+                            <TableCell className="text-xs">{line.portionUnit}</TableCell>
                             <TableCell className="text-xs text-right">{THB(line.costTHB)}</TableCell>
                           </TableRow>
                         ))}
@@ -982,7 +1224,7 @@ export default function RecipeEditorPage() {
                             <Cell key={`cell-${index}`} fill={COST_COLORS[index % COST_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip />
+                        <RechartsTooltip />
                         <Legend />
                       </PieChart>
                     </ResponsiveContainer>
@@ -1017,7 +1259,7 @@ export default function RecipeEditorPage() {
                           <LineChart data={forecastSeries}>
                             <XAxis dataKey="label" />
                             <YAxis />
-                            <Tooltip />
+                            <RechartsTooltip />
                             <Legend />
                             <Line type="monotone" dataKey="cost" stroke="#2563eb" strokeWidth={3} />
                           </LineChart>
@@ -1296,7 +1538,15 @@ export default function RecipeEditorPage() {
                 onClick={() => saveMutation.mutate()}
                 disabled={!validation.valid || saveMutation.isLoading}
               >
-                {editingId ? "Save & Approve" : "Save recipe"}
+                {editingId ? "Save Updates" : "Save recipe"}
+              </Button>
+              <Button
+                variant="outline"
+                className="text-xs rounded-[6px]"
+                onClick={() => approveMutation.mutate()}
+                disabled={!editingId || approveMutation.isPending || !validation.valid}
+              >
+                {approveMutation.isPending ? "Approving..." : "Approve & Publish"}
               </Button>
             </div>
           </CardContent>

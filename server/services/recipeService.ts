@@ -147,6 +147,7 @@ export async function createOrUpdateRecipe(data: any) {
       portionQty: portionQty.toString(),
       quantity: ingredientRow?.quantity ?? null,
       unit,
+      portionUnit: ingredientRow?.portionUnit ?? unit,
       purchasingItemId: ingredientRow?.purchasingItemId ?? null,
       wastePercentage: wastePercentage.toFixed(2),
     });
@@ -171,15 +172,12 @@ export async function calculateRecipeCost(recipeId: number) {
       ingredientId: recipeIngredient.ingredientId,
       portionQty: recipeIngredient.portionQty,
       wastePercentage: recipeIngredient.wastePercentage,
-      ingredientName: ingredients.name,
-      baseUnit: ingredients.baseUnit,
-      unitCostPerBase: ingredients.unitCostPerBase,
-      purchaseCost: ingredients.purchaseCost,
-      baseYieldQty: ingredients.baseYieldQty,
-      packageSize: ingredients.packageSize,
+      ingredientName: purchasingItems.item,
+      packCost: purchasingItems.packCost,
+      itemYield: purchasingItems.yield,
     })
     .from(recipeIngredient)
-    .leftJoin(ingredients, eq(recipeIngredient.ingredientId, ingredients.id))
+    .leftJoin(purchasingItems, eq(recipeIngredient.purchasingItemId, purchasingItems.id))
     .where(eq(recipeIngredient.recipeId, recipeId));
 
   const missing: string[] = [];
@@ -188,31 +186,21 @@ export async function calculateRecipeCost(recipeId: number) {
   for (const row of ingredientRows) {
     const portionQty = toNumber(row.portionQty);
     const wastePercentage = toNumber(row.wastePercentage) ?? 5;
-    const unitCostPerBase = toNumber(row.unitCostPerBase);
-    const purchaseCost = toNumber(row.purchaseCost);
-    const baseYieldQty = toNumber(row.baseYieldQty);
-    const packageSize = toNumber(row.packageSize);
+    const packCost = toNumber(row.packCost);
+    const itemYield = toNumber(row.itemYield);
 
     if (!portionQty) {
       missing.push(`${row.ingredientName ?? "Unknown"}: missing portion quantity`);
       continue;
     }
 
-    let resolvedUnitCost = unitCostPerBase;
-    if (resolvedUnitCost === null && purchaseCost !== null && baseYieldQty) {
-      resolvedUnitCost = purchaseCost / baseYieldQty;
-    }
-    if (resolvedUnitCost === null && purchaseCost !== null && packageSize) {
-      resolvedUnitCost = purchaseCost / packageSize;
-    }
-
-    if (!resolvedUnitCost) {
-      missing.push(`${row.ingredientName ?? "Unknown"}: missing cost data`);
+    if (!packCost || !itemYield) {
+      missing.push(`${row.ingredientName ?? "Unknown"}: missing pack cost or yield`);
       continue;
     }
 
-    const lineCost = portionQty * resolvedUnitCost * (1 + wastePercentage / 100);
-    totalCost += lineCost;
+    const lineCost = (packCost / itemYield) * portionQty * (1 + wastePercentage / 100);
+    totalCost += Number(lineCost.toFixed(2));
   }
 
   if (missing.length > 0) {
@@ -227,20 +215,21 @@ export async function calculateRecipeCost(recipeId: number) {
     .limit(1);
 
   const menuPrice = menuPriceRow.length > 0 ? toNumber(menuPriceRow[0].price) : null;
+  const roundedTotalCost = Number(totalCost.toFixed(2));
   const marginPercentage =
-    menuPrice && menuPrice > 0 ? ((menuPrice - totalCost) / menuPrice) * 100 : null;
+    menuPrice && menuPrice > 0 ? ((menuPrice - roundedTotalCost) / menuPrice) * 100 : null;
 
   await db
     .update(recipe)
     .set({
-      totalCost: totalCost.toFixed(4),
+      totalCost: roundedTotalCost.toFixed(2),
       marginPercentage: marginPercentage !== null ? marginPercentage.toFixed(2) : undefined,
     })
     .where(eq(recipe.id, recipeId));
 
   return {
     recipeId,
-    totalCost: Number(totalCost.toFixed(4)),
+    totalCost: roundedTotalCost,
     marginPercentage: marginPercentage !== null ? Number(marginPercentage.toFixed(2)) : null,
   };
 }

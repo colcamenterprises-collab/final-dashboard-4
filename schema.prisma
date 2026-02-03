@@ -1677,6 +1677,7 @@ model PurchasingItem {
   orderUnit       String?
   unitDescription String?
   unitCost        Decimal? @db.Decimal(10, 2)
+  packCost        Float?   @map("pack_cost")
   lastReviewDate  String?
   active          Boolean  @default(true)
   isIngredient    Boolean  @default(false) @map("is_ingredient")
@@ -1715,6 +1716,8 @@ model RecipeIngredientAuthority {
   purchasingItemId Int      @map("purchasing_item_id")
   quantity         Decimal  @db.Decimal(10, 4)
   unit             String   @db.VarChar(50)
+  portionQty       Float?   @map("portion_qty")
+  portionUnit      String?  @map("portion_unit") @db.VarChar(50)
   wastePercentage  Decimal  @default(5.0) @map("waste_percentage") @db.Decimal(5, 2)
 
   recipe           RecipeAuthority  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
