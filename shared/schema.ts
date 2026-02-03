@@ -1658,6 +1658,7 @@ export const purchasingItems = pgTable("purchasing_items", {
   orderUnit: varchar("orderUnit"),
   unitDescription: varchar("unitDescription"),
   unitCost: decimal("unitCost", { precision: 10, scale: 2 }),
+  packCost: decimal("pack_cost", { precision: 10, scale: 2 }),
   lastReviewDate: varchar("lastReviewDate"),
   active: boolean("active").notNull().default(true),
   isIngredient: boolean("is_ingredient").notNull().default(false),
@@ -1843,6 +1844,7 @@ export const recipeIngredient = pgTable('recipe_ingredient', {
   // NEW: Canonical ingredient-based (PATCH R1)
   ingredientId: integer('ingredient_id').references(() => ingredients.id),
   portionQty: decimal('portion_qty', { precision: 10, scale: 4 }), // quantity in ingredient's baseUnit
+  portionUnit: varchar('portion_unit', { length: 50 }),
   wastePercentage: decimal('waste_percentage', { precision: 5, scale: 2 }).default('5.0'),
 }, (table) => ({
   // Unique constraint uses whichever ID is present

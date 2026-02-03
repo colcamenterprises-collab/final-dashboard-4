@@ -1,6 +1,6 @@
 // Enhanced Recipes routes with comprehensive functionality
 import { Router } from "express";
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { pool } from "../db";
 import multer from 'multer';
 import path from 'path';
@@ -73,6 +73,7 @@ async function initTables() {
       unit TEXT NOT NULL,
       unit_cost_thb NUMERIC NOT NULL DEFAULT 0,
       cost_thb NUMERIC NOT NULL DEFAULT 0,
+      waste_percentage NUMERIC NOT NULL DEFAULT 5,
       supplier TEXT
     )
   `);
@@ -321,13 +322,57 @@ router.get('/:id/ingredients', async (req, res) => {
     where: { recipe_id: recipeId },
   });
 
+  const ingredientIds = rows
+    .map((row) => Number(row.ingredient_id))
+    .filter((value) => Number.isFinite(value));
+
+  const authorityRows = ingredientIds.length
+    ? await prisma.$queryRaw<
+        Array<{
+          id: number;
+          purchase_cost_thb: number | string;
+          purchase_quantity: number | string;
+          conversion_factor: number | string | null;
+          portion_quantity: number | string;
+        }>
+      >`
+        SELECT id, purchase_cost_thb, purchase_quantity, conversion_factor, portion_quantity
+        FROM ingredient_authority
+        WHERE id IN (${Prisma.join(ingredientIds)})
+      `
+    : [];
+
+  const authorityMap = new Map<number, { packCost: number | null; yieldPerPack: number | null }>();
+  for (const row of authorityRows) {
+    const packCost = Number(row.purchase_cost_thb);
+    const purchaseQty = Number(row.purchase_quantity);
+    const conversionFactor = row.conversion_factor === null ? 1 : Number(row.conversion_factor);
+    const portionQuantity = Number(row.portion_quantity);
+    const baseQty = Number.isFinite(purchaseQty) ? purchaseQty * conversionFactor : 0;
+    const yieldPerPack =
+      portionQuantity > 0 && Number.isFinite(baseQty) ? baseQty / portionQuantity : null;
+    authorityMap.set(row.id, {
+      packCost: Number.isFinite(packCost) ? packCost : null,
+      yieldPerPack,
+    });
+  }
+
   let total_cost = 0;
 
   const ingredients = rows.map((ri) => {
     const portionQuantity = Number(ri.qty ?? 0);
-    const costPerPortion = Number(ri.unit_cost_thb ?? 0);
-    const computedLineCost = portionQuantity * costPerPortion;
-    const lineCost = Number(ri.cost_thb ?? computedLineCost);
+    const wastePercentage = Number(ri.waste_percentage ?? 5);
+    const authority = authorityMap.get(Number(ri.ingredient_id));
+    const packCost = authority?.packCost ?? null;
+    const yieldPerPack = authority?.yieldPerPack ?? null;
+    const fallbackCostPerPortion = Number(ri.unit_cost_thb ?? 0);
+    const resolvedCostPerPortion =
+      packCost && yieldPerPack ? packCost / yieldPerPack : fallbackCostPerPortion;
+    const adjustedLineCost =
+      portionQuantity > 0
+        ? resolvedCostPerPortion * portionQuantity * (1 + wastePercentage / 100)
+        : 0;
+    const lineCost = Number(adjustedLineCost.toFixed(2));
     total_cost += lineCost;
 
     return {
@@ -336,13 +381,16 @@ router.get('/:id/ingredients', async (req, res) => {
       name: ri.ingredient_name,
       portion_quantity: portionQuantity,
       portion_unit: ri.unit,
-      cost_per_portion: costPerPortion,
+      cost_per_portion: Number(resolvedCostPerPortion.toFixed(2)),
+      pack_cost: packCost !== null ? Number(packCost.toFixed(2)) : null,
+      yield_per_pack: yieldPerPack !== null ? Number(yieldPerPack.toFixed(2)) : null,
+      waste_percentage: wastePercentage,
       line_cost: lineCost,
       is_valid:
         Boolean(ri.ingredient_name) &&
         portionQuantity > 0 &&
-        Number.isFinite(costPerPortion) &&
-        costPerPortion >= 0,
+        Number.isFinite(resolvedCostPerPortion) &&
+        resolvedCostPerPortion > 0,
     };
   });
 
@@ -352,6 +400,101 @@ router.get('/:id/ingredients', async (req, res) => {
       : 'INVALID';
 
   res.json({ ingredients, total_cost, status });
+});
+
+router.patch('/:id/ingredient/:rowId', async (req, res) => {
+  let recipeId: bigint;
+  let rowId: bigint;
+  try {
+    recipeId = BigInt(req.params.id);
+    rowId = BigInt(req.params.rowId);
+  } catch (error) {
+    return res.status(400).json({ error: 'Invalid recipe or ingredient id' });
+  }
+
+  const portionQty = Number(req.body?.portionQty);
+  const portionUnit = req.body?.portionUnit ? String(req.body.portionUnit) : null;
+  const wastePercentage = Number(req.body?.wastePercentage);
+
+  if (!Number.isFinite(portionQty) || portionQty <= 0) {
+    return res.status(400).json({ error: 'Invalid portion quantity' });
+  }
+
+  if (!portionUnit) {
+    return res.status(400).json({ error: 'Portion unit required' });
+  }
+
+  const line = await prisma.recipe_lines.findFirst({
+    where: { id: rowId, recipe_id: recipeId },
+  });
+
+  if (!line) {
+    return res.status(404).json({ error: 'Ingredient line not found' });
+  }
+
+  const ingredientId = Number(line.ingredient_id);
+  const authorityRows = Number.isFinite(ingredientId)
+    ? await prisma.$queryRaw<
+        Array<{
+          id: number;
+          purchase_cost_thb: number | string;
+          purchase_quantity: number | string;
+          conversion_factor: number | string | null;
+          portion_quantity: number | string;
+        }>
+      >`
+        SELECT id, purchase_cost_thb, purchase_quantity, conversion_factor, portion_quantity
+        FROM ingredient_authority
+        WHERE id = ${ingredientId}
+        LIMIT 1
+      `
+    : [];
+
+  const authority = authorityRows[0] ?? null;
+  const packCost = authority ? Number(authority.purchase_cost_thb) : null;
+  const purchaseQty = authority ? Number(authority.purchase_quantity) : null;
+  const conversionFactor =
+    authority?.conversion_factor === null || authority?.conversion_factor === undefined
+      ? 1
+      : Number(authority.conversion_factor);
+  const portionQtyAuthority = authority ? Number(authority.portion_quantity) : null;
+  const baseQty =
+    purchaseQty !== null && Number.isFinite(purchaseQty) ? purchaseQty * conversionFactor : 0;
+  const yieldPerPack =
+    portionQtyAuthority && portionQtyAuthority > 0 && baseQty > 0
+      ? baseQty / portionQtyAuthority
+      : null;
+
+  const resolvedWaste = Number.isFinite(wastePercentage) ? wastePercentage : 5;
+  const fallbackCostPerPortion = Number(line.unit_cost_thb ?? 0);
+  const resolvedCostPerPortion =
+    packCost && yieldPerPack ? packCost / yieldPerPack : fallbackCostPerPortion;
+  const lineCost =
+    resolvedCostPerPortion * portionQty * (1 + resolvedWaste / 100);
+
+  const updated = await prisma.recipe_lines.update({
+    where: { id: rowId },
+    data: {
+      qty: portionQty,
+      unit: portionUnit,
+      waste_percentage: Number(resolvedWaste.toFixed(2)),
+      unit_cost_thb: Number(resolvedCostPerPortion.toFixed(2)),
+      cost_thb: Number(lineCost.toFixed(2)),
+    },
+  });
+
+  return res.json({
+    id: typeof updated.id === "bigint" ? Number(updated.id) : updated.id,
+    ingredient_id: updated.ingredient_id,
+    name: updated.ingredient_name,
+    portion_quantity: Number(updated.qty),
+    portion_unit: updated.unit,
+    cost_per_portion: Number(updated.unit_cost_thb ?? 0),
+    pack_cost: packCost !== null ? Number(packCost.toFixed(2)) : null,
+    yield_per_pack: yieldPerPack !== null ? Number(yieldPerPack.toFixed(2)) : null,
+    waste_percentage: Number(updated.waste_percentage ?? resolvedWaste),
+    line_cost: Number(updated.cost_thb ?? 0),
+  });
 });
 
 router.get('/:id', async (req, res) => {
@@ -462,7 +605,7 @@ router.post('/', async (req, res) => {
 });
 
 router.post('/:id/ingredients', async (req, res) => {
-  const { ingredient_id, portion_quantity, portion_unit } = req.body;
+  const { ingredient_id, portion_quantity, portion_unit, waste_percentage } = req.body;
 
   if (!ingredient_id || !portion_quantity || !portion_unit) {
     return res.status(400).json({ error: 'Missing fields' });
@@ -519,9 +662,15 @@ router.post('/:id/ingredients', async (req, res) => {
   const purchaseCostThb = Number(ingredient.purchase_cost_thb);
   const conversionFactor =
     ingredient.conversion_factor === null ? null : Number(ingredient.conversion_factor);
-  const baseQty = purchaseQuantity * (conversionFactor === null ? 1 : conversionFactor);
-  const costPerPortion = baseQty > 0 ? purchaseCostThb / baseQty : 0;
-  const lineCost = portionQuantity * costPerPortion;
+  const portionQuantityAuthority = Number(ingredient.portion_quantity);
+  const baseQty = purchaseQuantity * (conversionFactor === null ? 1 : conversionFactor ?? 1);
+  const yieldPerPack =
+    portionQuantityAuthority > 0 && baseQty > 0 ? baseQty / portionQuantityAuthority : 0;
+  const costPerPortion = yieldPerPack > 0 ? purchaseCostThb / yieldPerPack : 0;
+  const wastePercentage = Number.isFinite(Number(waste_percentage))
+    ? Number(waste_percentage)
+    : 5;
+  const lineCost = costPerPortion * portionQuantity * (1 + wastePercentage / 100);
 
   const row = await prisma.recipe_lines.create({
     data: {
@@ -530,8 +679,9 @@ router.post('/:id/ingredients', async (req, res) => {
       ingredient_name: ingredient.name,
       qty: portionQuantity,
       unit: String(portion_unit),
-      unit_cost_thb: costPerPortion,
-      cost_thb: lineCost,
+      unit_cost_thb: Number(costPerPortion.toFixed(2)),
+      cost_thb: Number(lineCost.toFixed(2)),
+      waste_percentage: Number(wastePercentage.toFixed(2)),
     },
   });
 
@@ -564,6 +714,31 @@ router.put('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error updating recipe:', error);
     res.status(500).json({ error: 'Failed to update recipe' });
+  }
+});
+
+// POST /api/recipes/:id/approve - Mark recipe approved
+router.post('/:id/approve', async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: 'Invalid recipe id' });
+    }
+
+    const { rows } = await pool.query(
+      `UPDATE recipes SET is_active = true, updated_at = now()
+       WHERE id = $1 RETURNING id, name, updated_at`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Recipe not found' });
+    }
+
+    res.json({ ok: true, recipe: rows[0] });
+  } catch (error) {
+    console.error('Error approving recipe:', error);
+    res.status(500).json({ error: 'Failed to approve recipe' });
   }
 });
 
@@ -929,7 +1104,7 @@ router.post('/save', async (req, res) => {
   try {
     console.log('[recipes/save] Received save request:', JSON.stringify(req.body, null, 2));
     
-    const { recipeName, lines, totals, note, wastePct, portions, description } = req.body;
+    const { recipeName, lines, totals, note, wastePct, portions, description, instructions, sellingPrice } = req.body;
     
     // Enhanced validation with detailed logging
     if (!recipeName || recipeName.trim() === '') {
@@ -947,7 +1122,7 @@ router.post('/save', async (req, res) => {
     // Enhanced calculations with defaults and error handling
     const totalCost = totals?.recipeCostTHB || lines.reduce((sum, ing) => sum + (ing.costTHB || 0), 0);
     const costPerServing = totals?.costPerPortionTHB || totalCost / Math.max(1, portions || 1);
-    const suggestedPrice = 0;
+    const suggestedPrice = Number(sellingPrice) || 0;
     const cogsPercent = 0;
     
     console.log(`[recipes/save] Calculations - Total: ฿${totalCost}, Per Serving: ฿${costPerServing}`);
@@ -957,8 +1132,8 @@ router.post('/save', async (req, res) => {
       INSERT INTO recipes (
         name, description, category, yield_quantity, yield_unit, ingredients,
         total_cost, cost_per_serving, cogs_percent, suggested_price,
-        waste_factor, yield_efficiency, notes, is_active, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, now())
+        waste_factor, yield_efficiency, notes, instructions, is_active, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, now())
       RETURNING id, name
     `, [
       recipeName.trim(), 
@@ -974,6 +1149,7 @@ router.post('/save', async (req, res) => {
       Math.max(0, Math.min(1, (wastePct || 0) / 100)), // Ensure 0-1 range
       0.90, 
       note || '', 
+      instructions || '',
       true
     ]);
     
@@ -985,22 +1161,23 @@ router.post('/save', async (req, res) => {
       if (lines && lines.length > 0) {
         const values = [];
         const placeholders = lines.map((l, i) => {
-          const offset = i * 8;
+          const offset = i * 9;
           values.push(
             recipeId, 
             l.ingredientId || `ingredient-${i}`, 
             l.name || 'Unknown Ingredient', 
-            l.qty || 0, 
-            l.unit || 'g', 
+            l.portionQty ?? l.qty ?? 0, 
+            l.portionUnit ?? l.unit ?? 'g', 
             l.unitCostTHB || 0, 
             l.costTHB || 0, 
+            Number(l.wastePercentage ?? l.wastePct ?? 5),
             l.supplier || ""
           );
-          return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`;
+          return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9})`;
         }).join(",");
 
         await pool.query(`
-          INSERT INTO recipe_lines (recipe_id, ingredient_id, ingredient_name, qty, unit, unit_cost_thb, cost_thb, supplier) 
+          INSERT INTO recipe_lines (recipe_id, ingredient_id, ingredient_name, qty, unit, unit_cost_thb, cost_thb, waste_percentage, supplier) 
           VALUES ${placeholders}
         `, values);
         console.log(`[recipes/save] Successfully inserted ${lines.length} recipe lines`);

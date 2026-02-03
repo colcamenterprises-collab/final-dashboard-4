@@ -32,6 +32,7 @@ import { purchaseTallyRouter } from "./routes/purchaseTally";
 import { bankImportRouter } from "./routes/bankImport";
 import { menuRouter } from "./routes/menu";
 import { seedGodList } from "./lib/seedIngredients";
+import { publishToMenu } from "./services/menuService";
 
 import expensesImportRouter from "./routes/expenses-import";
 import partnersRouter from "./routes/partners";
@@ -4543,6 +4544,20 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   // Register Chef and Recipe routes
   app.use('/api/chef', chef);
   app.use('/api/recipes', recipes);
+  app.post('/api/menu/publish', async (req: Request, res: Response) => {
+    try {
+      const recipeId = Number(req.body?.recipeId ?? req.body?.id);
+      if (!Number.isFinite(recipeId)) {
+        return res.status(400).json({ ok: false, error: 'Invalid recipe id' });
+      }
+
+      const result = await publishToMenu(recipeId);
+      return res.json({ ok: true, ...result });
+    } catch (error: any) {
+      console.error('[menu.publish] error', error);
+      return res.status(500).json({ ok: false, error: error?.message || 'Failed to publish menu' });
+    }
+  });
   
   // Register Upload and Import routes
   app.use('/api/upload', uploadsRouter);

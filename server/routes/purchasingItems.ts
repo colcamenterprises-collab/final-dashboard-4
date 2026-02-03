@@ -25,6 +25,7 @@ const purchasingItemSchema = z.object({
   orderUnit: z.string().optional().nullable(),
   unitDescription: z.string().optional().nullable(),
   unitCost: z.number().optional().nullable(),
+  packCost: z.number().optional().nullable(),
   lastReviewDate: z.string().optional().nullable(),
   active: z.boolean().optional(),
   isIngredient: z.boolean().optional(),
