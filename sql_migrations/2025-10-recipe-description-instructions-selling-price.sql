@@ -1,0 +1,4 @@
+ALTER TABLE recipe
+  ADD COLUMN IF NOT EXISTS description TEXT,
+  ADD COLUMN IF NOT EXISTS instructions TEXT,
+  ADD COLUMN IF NOT EXISTS selling_price NUMERIC(10, 2);

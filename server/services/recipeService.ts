@@ -2,8 +2,6 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import {
   ingredients,
-  menuItemRecipe,
-  menuItemV3,
   purchasingItems,
   recipe,
   recipeIngredient,
@@ -33,6 +31,11 @@ export async function createOrUpdateRecipe(data: any) {
   if (recipeId) {
     const updatePayload: Record<string, unknown> = {};
     if (data?.name) updatePayload.name = data.name;
+    if (data?.description !== undefined) updatePayload.description = data.description;
+    if (data?.instructions !== undefined) updatePayload.instructions = data.instructions;
+    if (data?.sellingPrice !== undefined || data?.selling_price !== undefined) {
+      updatePayload.sellingPrice = data?.sellingPrice ?? data?.selling_price ?? null;
+    }
     if (data?.yieldUnits !== undefined || data?.yield_units !== undefined) {
       updatePayload.yieldUnits = data?.yieldUnits ?? data?.yield_units ?? null;
     }
@@ -45,6 +48,9 @@ export async function createOrUpdateRecipe(data: any) {
   } else {
     const recipePayload = {
       name: data?.name,
+      description: data?.description ?? null,
+      instructions: data?.instructions ?? null,
+      sellingPrice: data?.sellingPrice ?? data?.selling_price ?? null,
       yieldUnits: data?.yieldUnits ?? data?.yield_units ?? null,
       active: data?.active ?? true,
       isFinal,
@@ -207,29 +213,30 @@ export async function calculateRecipeCost(recipeId: number) {
     throw new Error(`Insufficient data to calculate cost: ${missing.join("; ")}`);
   }
 
-  const menuPriceRow = await db
-    .select({ price: menuItemV3.price })
-    .from(menuItemRecipe)
-    .innerJoin(menuItemV3, eq(menuItemRecipe.menuItemId, menuItemV3.id))
-    .where(eq(menuItemRecipe.recipeId, recipeId))
+  const recipeRow = await db
+    .select({ sellingPrice: recipe.sellingPrice })
+    .from(recipe)
+    .where(eq(recipe.id, recipeId))
     .limit(1);
 
-  const menuPrice = menuPriceRow.length > 0 ? toNumber(menuPriceRow[0].price) : null;
+  const sellingPrice = recipeRow.length > 0 ? toNumber(recipeRow[0].sellingPrice) : null;
   const roundedTotalCost = Number(totalCost.toFixed(2));
   const marginPercentage =
-    menuPrice && menuPrice > 0 ? ((menuPrice - roundedTotalCost) / menuPrice) * 100 : null;
+    sellingPrice && sellingPrice > 0
+      ? ((sellingPrice - roundedTotalCost) / sellingPrice * 100).toFixed(1)
+      : "0";
 
   await db
     .update(recipe)
     .set({
       totalCost: roundedTotalCost.toFixed(2),
-      marginPercentage: marginPercentage !== null ? marginPercentage.toFixed(2) : undefined,
+      marginPercentage,
     })
     .where(eq(recipe.id, recipeId));
 
   return {
     recipeId,
     totalCost: roundedTotalCost,
-    marginPercentage: marginPercentage !== null ? Number(marginPercentage.toFixed(2)) : null,
+    marginPercentage: Number(marginPercentage),
   };
 }

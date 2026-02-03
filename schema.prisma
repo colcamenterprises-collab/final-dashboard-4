@@ -1698,6 +1698,9 @@ model PurchasingItem {
 model RecipeAuthority {
   id         Int       @id @default(autoincrement())
   name       String    @unique @db.VarChar(255)
+  description  String?
+  instructions String?
+  sellingPrice Float?   @map("selling_price")
   totalCost  Decimal   @default(0) @map("total_cost") @db.Decimal(12, 4)
   marginPercentage Decimal @default(0) @map("margin_percentage") @db.Decimal(5, 2)
   yieldUnits Decimal?  @map("yield_units") @db.Decimal(10, 2)
