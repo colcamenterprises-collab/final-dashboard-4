@@ -731,7 +731,7 @@ export default function RecipeEditorPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recipes"] });
-      toast({ title: "Recipe approved", description: "Menu and online channels synced." });
+      toast({ title: "Synced to menu and online ordering" });
       navigate("/menu/recipes");
     },
     onError: (error: any) => {
@@ -890,7 +890,7 @@ export default function RecipeEditorPage() {
               <Textarea
                 value={recipeDescription}
                 onChange={(event) => setRecipeDescription(event.target.value)}
-                placeholder="Recipe description..."
+                placeholder="Short description of the recipe..."
                 className="rounded-[4px] text-sm"
               />
             </div>
@@ -900,7 +900,7 @@ export default function RecipeEditorPage() {
                 value={recipeInstructions}
                 onChange={(event) => setRecipeInstructions(event.target.value)}
                 placeholder={"Step 1: ...\nStep 2: ..."}
-                rows={8}
+                rows={10}
                 className="rounded-[4px] text-sm"
               />
             </div>
@@ -915,11 +915,11 @@ export default function RecipeEditorPage() {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-700">Selling Price (THB)</label>
+                <label className="text-sm font-medium text-slate-700">Selling Price</label>
                 <Input
                   value={sellingPrice}
                   onChange={(event) => setSellingPrice(event.target.value)}
-                  placeholder="Selling Price (THB)"
+                  placeholder="Selling Price per serve (THB)"
                   type="number"
                   min="0"
                   step="1"
@@ -965,25 +965,30 @@ export default function RecipeEditorPage() {
                         <TableHead className="text-xs">Ingredient</TableHead>
                         <TableHead className="text-xs text-right">
                           <LabelWithTooltip
-                            label="Pack Cost (฿) – read-only from purchasing"
-                            tooltip="Pulled from purchasing data."
+                            label="Pack Cost"
+                            tooltip="Pack Cost (฿) – from purchasing (read-only)"
                           />
                         </TableHead>
                         <TableHead className="text-xs text-right">
                           <LabelWithTooltip
-                            label="Yield (how many portions per pack, e.g. 82 slices per 1kg block)"
-                            tooltip="Total portions available from one pack."
+                            label="Yield"
+                            tooltip="Yield (how many portions per pack, e.g. 82 slices per 1kg block)"
                           />
                         </TableHead>
                         <TableHead className="text-xs text-right">
                           <LabelWithTooltip
-                            label="Portion for this recipe (e.g. 1 slice or 100g)"
-                            tooltip="How much of this ingredient is used in the recipe."
+                            label="Portion Qty"
+                            tooltip="Portion for this recipe (e.g. 1 slice or 100g)"
                           />
                         </TableHead>
                         <TableHead className="text-xs">Portion Unit</TableHead>
-                        <TableHead className="text-xs text-right">Waste %</TableHead>
-                        <TableHead className="text-xs text-right">Adjusted Line Cost</TableHead>
+                        <TableHead className="text-xs text-right">
+                          <LabelWithTooltip
+                            label="Waste %"
+                            tooltip="Waste % (typical loss)"
+                          />
+                        </TableHead>
+                        <TableHead className="text-xs text-right">Adjusted Line Cost (฿)</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>

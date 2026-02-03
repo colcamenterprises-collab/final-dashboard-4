@@ -1823,6 +1823,9 @@ export const drinkPurchasesV2 = pgTable('drink_purchases_v2', {
 export const recipe = pgTable('recipe', {
   id: serial('id').primaryKey(),
   name: varchar('name', { length: 255 }).notNull().unique(),
+  description: text('description'),
+  instructions: text('instructions'),
+  sellingPrice: decimal('selling_price', { precision: 10, scale: 2 }),
   totalCost: decimal('total_cost', { precision: 12, scale: 4 }).default('0'),
   marginPercentage: decimal('margin_percentage', { precision: 5, scale: 2 }).default('0'),
   yieldUnits: decimal('yield_units', { precision: 10, scale: 2 }),
