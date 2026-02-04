@@ -1,8 +1,11 @@
 import { Router } from "express";
+import { DateTime } from "luxon";
 import { prisma } from "../../lib/prisma";
 import { ingestPosForBusinessDate } from "../services/loyverseIngest";
 import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expenseTotals";
 import { shiftWindow } from "../services/time/shiftWindow";
+import { importReceiptsV2 } from "../services/loyverseImportV2";
+import { rebuildReceiptTruth } from "../services/receiptTruthSummary";
 import type {
   DailyComparisonResponse,
   DailySource,
@@ -417,5 +420,57 @@ analysisDailyReviewRouter.post("/sync-pos-for-date", async (req, res) => {
       reason: error.message || "Failed to sync POS data",
       message: "Could not sync with POS system. Data shown may be from cache."
     });
+  }
+});
+
+analysisDailyReviewRouter.post("/backdate-receipts", async (req, res) => {
+  const date = String(req.body?.date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
+  }
+
+  const requestedDate = DateTime.fromISO(date, { zone: "Asia/Bangkok" }).startOf("day");
+  if (!requestedDate.isValid) {
+    return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
+  }
+
+  const today = DateTime.now().setZone("Asia/Bangkok").startOf("day");
+  if (requestedDate > today) {
+    return res.status(400).json({ message: "Date cannot be in the future" });
+  }
+
+  try {
+    const { fromISO, toISO } = shiftWindow(date);
+    const ingestResult = await importReceiptsV2(fromISO, toISO);
+
+    const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint as count 
+      FROM lv_receipt 
+      WHERE datetime_bkk >= ${fromISO}::timestamptz 
+        AND datetime_bkk < ${toISO}::timestamptz`;
+    const receiptsInWindow = Number(countResult[0]?.count ?? 0);
+
+    if (receiptsInWindow === 0) {
+      return res.status(404).json({ message: "No POS receipts in Loyverse for this date" });
+    }
+
+    await rebuildReceiptTruth(date);
+
+    const storeId = process.env.LOYVERSE_STORE_ID || "0c87cebd-e5e5-45b6-b57a-6764b869f38e";
+    await ingestPosForBusinessDate(storeId, date);
+
+    return res.json({
+      success: true,
+      receiptsProcessed: ingestResult.upserted ?? receiptsInWindow,
+      rebuilt: true,
+      message: "Backdated successfully",
+    });
+  } catch (error: any) {
+    const message = error?.message || "Failed to backdate receipts";
+    if (message.includes("NO_POS_RECEIPTS")) {
+      return res.status(404).json({ message: "No POS receipts in Loyverse for this date" });
+    }
+    console.error("[BACKDATE_RECEIPTS_FAIL]", message);
+    return res.status(500).json({ message });
   }
 });

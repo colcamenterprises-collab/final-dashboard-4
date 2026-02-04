@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
 import { AlertTriangle, CheckCircle2, XCircle, Receipt } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 // K-4.1: Receipt evidence types
 type ReceiptStatus = 
@@ -187,6 +188,7 @@ export default function DailyReview() {
   const [savingComment, setSavingComment] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [exportDate, setExportDate] = useState("");
+  const { toast } = useToast();
   // K-2.5: Inline banner instead of blocking dialog
   const [syncBanner, setSyncBanner] = useState<{
     show: boolean;
@@ -297,27 +299,29 @@ export default function DailyReview() {
     }
   };
 
-  useEffect(() => {
-    (async () => {
-      if (!month) return;
-      setLoading(true);
-      try {
-        const data = await fetchJSON(`/api/analysis/daily-comparison-range?month=${month}`);
-        setAll(data);
-        const sorted = data.filter((d: DailyComparisonResponse) => d.date).sort(
-          (a: DailyComparisonResponse, b: DailyComparisonResponse) =>
-            a.date < b.date ? 1 : -1
-        );
-        if (sorted.length > 0 && !selectedDate) {
-          setSelectedDate(sorted[0].date);
-        }
-      } catch (err) {
-        console.error(err);
-        setAll([]);
-      } finally {
-        setLoading(false);
+  const reloadMonthData = async (nextMonth: string) => {
+    if (!nextMonth) return;
+    setLoading(true);
+    try {
+      const data = await fetchJSON(`/api/analysis/daily-comparison-range?month=${nextMonth}`);
+      setAll(data);
+      const sorted = data.filter((d: DailyComparisonResponse) => d.date).sort(
+        (a: DailyComparisonResponse, b: DailyComparisonResponse) =>
+          a.date < b.date ? 1 : -1
+      );
+      if (sorted.length > 0 && !selectedDate) {
+        setSelectedDate(sorted[0].date);
       }
-    })();
+    } catch (err) {
+      console.error(err);
+      setAll([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void reloadMonthData(month);
   }, [month]);
 
   useEffect(() => {
@@ -338,6 +342,40 @@ export default function DailyReview() {
       }
     })();
   }, [selectedDate]);
+
+  const backdateMutation = useMutation({
+    mutationFn: async (dateStr: string) => {
+      const response = await fetch("/api/analysis/backdate-receipts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateStr }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = data?.message || data?.error || "Failed to backdate receipts";
+        throw new Error(message);
+      }
+      return data as { success: boolean; receiptsProcessed: number };
+    },
+    onSuccess: async () => {
+      toast({
+        title: "Backdate complete",
+        description: "POS receipts backdated and comparison rebuilt",
+      });
+      await reloadMonthData(month);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Backdate failed",
+        description: error?.message || "No receipts found for this date",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const today = todayISO();
+  const backdateDisabled = !selectedDate || selectedDate >= today || backdateMutation.isLoading;
+  const showBackdateWarning = !selectedDate || selectedDate >= today;
 
   const Section = ({ title, rows }: { title: string; rows: any[] }) => (
     <section className="mb-6">
@@ -405,6 +443,35 @@ export default function DailyReview() {
       )}
 
       <div className="flex gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-gray-600">Selected date</label>
+          <input
+            type="date"
+            value={selectedDate ?? ""}
+            onChange={(event) => {
+              const nextDate = event.target.value;
+              if (!nextDate) return;
+              setSelectedDate(nextDate);
+              setMonth(nextDate.slice(0, 7));
+            }}
+            className="border rounded px-2 py-1 text-xs"
+          />
+          <button
+            type="button"
+            onClick={() => selectedDate && backdateMutation.mutate(selectedDate)}
+            disabled={backdateDisabled}
+            title="Re-ingest Loyverse receipts for past dates to update analysis"
+            className="inline-flex items-center gap-2 rounded border px-3 py-1 text-xs bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+          >
+            {backdateMutation.isLoading && (
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            )}
+            Backdate POS Receipts for Selected Date
+          </button>
+          {showBackdateWarning && (
+            <span className="text-xs text-amber-700">Backdating only for past dates</span>
+          )}
+        </div>
         {all.map((d) => (
           <DayPill
             key={d.date}
