@@ -9,7 +9,7 @@ import { rebuildReceiptTruth } from "../server/services/receiptTruthSummary";
 import { rebuildIngredientTruth } from "../server/services/receiptTruthIngredientService";
 import { getIngredientReconciliationForDate } from "../server/services/ingredientReconciliationService";
 
-const REPORT_TYPE = "ingredient_reconciliation_daily";
+const REPORT_TYPE = "ingredient_variance_daily";
 const TIMEZONE = process.env.REPORT_TIMEZONE || "Asia/Bangkok";
 
 function getBusinessDate(date: Date): string {
@@ -46,6 +46,7 @@ async function buildVarianceReport(reportDate: string) {
   }
 
   const varianceRows = reconciliation.details.map((row) => ({
+    ingredientId: row.ingredientId,
     ingredientName: row.ingredientName,
     usageQty: row.usedQuantity,
     purchaseQty: row.purchasedQuantity,
