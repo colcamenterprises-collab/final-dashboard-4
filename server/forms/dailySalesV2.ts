@@ -656,14 +656,16 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     `;
     
     console.log('Attempting to send updated email...');
-    const emailResult = await workingEmailService.sendEmail(
-      "smashbrothersburgersth@gmail.com",
-      `Daily Sales & Stock COMPLETE – ${shiftDate}`,
-      updatedHtml
-    );
-    console.log(`Updated email result: ${emailResult ? 'SUCCESS' : 'FAILED'}`);
-    if (!emailResult) {
-      throw new Error("Email send failed after stock persistence");
+    try {
+      const emailResult = await workingEmailService.sendEmail(
+        "smashbrothersburgersth@gmail.com",
+        `Daily Sales & Stock COMPLETE – ${shiftDate}`,
+        updatedHtml
+      );
+      console.log(`Updated email result: ${emailResult ? 'SUCCESS' : 'FAILED'}`);
+    } catch (emailErr) {
+      console.error("Email send failed (non-blocking):", emailErr);
+      // Continue - do not throw
     }
     
     res.json({ ok: true, id });
