@@ -351,7 +351,6 @@ export default function DailyReview() {
         body: JSON.stringify({ date: dateStr }),
       });
       const data = await response.json().catch(() => ({}));
-      console.log("Backdate response:", data);
       if (!response.ok) {
         const message = data?.message || data?.error || "Failed to backdate receipts";
         throw new Error(message);
@@ -366,10 +365,9 @@ export default function DailyReview() {
       await reloadMonthData(month);
     },
     onError: (error: any) => {
-      const responseMessage = error?.response?.data?.message;
       toast({
         title: "Backdate failed",
-        description: responseMessage || error?.message || "Backdate failed – check console",
+        description: error?.message || "No receipts found for this date",
         variant: "destructive",
       });
     },

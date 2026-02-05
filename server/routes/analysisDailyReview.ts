@@ -425,13 +425,6 @@ analysisDailyReviewRouter.post("/sync-pos-for-date", async (req, res) => {
 
 analysisDailyReviewRouter.post("/backdate-receipts", async (req, res) => {
   const date = String(req.body?.date || "").trim();
-  console.log(`Backdate requested for: ${date}`);
-  console.log(
-    `Calling Loyverse ingest with token: ${process.env.LOYVERSE_TOKEN ? "present" : "MISSING"}`
-  );
-  if (!process.env.LOYVERSE_TOKEN && process.env.LOYVERSE_API_TOKEN) {
-    console.log("LOYVERSE_TOKEN missing; LOYVERSE_API_TOKEN is present");
-  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
   }
@@ -449,11 +442,6 @@ analysisDailyReviewRouter.post("/backdate-receipts", async (req, res) => {
   try {
     const { fromISO, toISO } = shiftWindow(date);
     const ingestResult = await importReceiptsV2(fromISO, toISO);
-    const receiptsProcessed = ingestResult?.upserted ?? ingestResult?.fetched ?? 0;
-    console.log(`Ingest returned ${receiptsProcessed} receipts`);
-    if (receiptsProcessed === 0) {
-      console.log("No receipts – check Loyverse date range, token, or API response");
-    }
 
     const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
       SELECT COUNT(*)::bigint as count 
@@ -467,19 +455,13 @@ analysisDailyReviewRouter.post("/backdate-receipts", async (req, res) => {
     }
 
     await rebuildReceiptTruth(date);
-    const insertedCountResult = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*)::bigint as count
-      FROM receipt_truth_line
-      WHERE receipt_date = ${date}::date`;
-    const insertedCount = Number(insertedCountResult[0]?.count ?? 0);
-    console.log(`Rebuilt receipt_truth for ${date} – inserted ${insertedCount} rows`);
 
     const storeId = process.env.LOYVERSE_STORE_ID || "0c87cebd-e5e5-45b6-b57a-6764b869f38e";
     await ingestPosForBusinessDate(storeId, date);
 
     return res.json({
       success: true,
-      receiptsProcessed: receiptsProcessed || receiptsInWindow,
+      receiptsProcessed: ingestResult.upserted ?? receiptsInWindow,
       rebuilt: true,
       message: "Backdated successfully",
     });
@@ -488,45 +470,7 @@ analysisDailyReviewRouter.post("/backdate-receipts", async (req, res) => {
     if (message.includes("NO_POS_RECEIPTS")) {
       return res.status(404).json({ message: "No POS receipts in Loyverse for this date" });
     }
-    console.error("Backdate error:", message);
-    return res.status(500).json({
-      success: false,
-      message,
-      details: error?.details,
-    });
-  }
-});
-
-analysisDailyReviewRouter.get("/test-ingest", async (req, res) => {
-  const date = String(req.query.date || "").trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
-  }
-
-  try {
-    const { fromISO, toISO } = shiftWindow(date);
-    await importReceiptsV2(fromISO, toISO);
-    const rows = await prisma.$queryRaw<any[]>`
-      SELECT receipt_id, datetime_bkk, total_amount
-      FROM lv_receipt
-      WHERE datetime_bkk >= ${fromISO}::timestamptz
-        AND datetime_bkk < ${toISO}::timestamptz
-      ORDER BY datetime_bkk ASC
-      LIMIT 1`;
-    const countResult = await prisma.$queryRaw<{ count: bigint }[]>`
-      SELECT COUNT(*)::bigint as count 
-      FROM lv_receipt 
-      WHERE datetime_bkk >= ${fromISO}::timestamptz 
-        AND datetime_bkk < ${toISO}::timestamptz`;
-    const receiptsCount = Number(countResult[0]?.count ?? 0);
-    return res.json({
-      receiptsCount,
-      sample: rows[0] ?? null,
-    });
-  } catch (error: any) {
-    return res.status(500).json({
-      receiptsCount: 0,
-      error: error?.message || "Failed to ingest receipts",
-    });
+    console.error("[BACKDATE_RECEIPTS_FAIL]", message);
+    return res.status(500).json({ message });
   }
 });
