@@ -427,8 +427,11 @@ analysisDailyReviewRouter.post("/backdate-receipts", async (req, res) => {
   const date = String(req.body?.date || "").trim();
   console.log(`Backdate requested for: ${date}`);
   console.log(
-    `Calling Loyverse ingest with token: ${process.env.LOYVERSE_API_TOKEN ? "present" : "MISSING"}`
+    `Calling Loyverse ingest with token: ${process.env.LOYVERSE_TOKEN ? "present" : "MISSING"}`
   );
+  if (!process.env.LOYVERSE_TOKEN && process.env.LOYVERSE_API_TOKEN) {
+    console.log("LOYVERSE_TOKEN missing; LOYVERSE_API_TOKEN is present");
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ message: "Invalid date format. Use YYYY-MM-DD" });
   }
