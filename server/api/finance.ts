@@ -3,6 +3,7 @@ import { db } from "../db";
 import { plRow, plCategoryMap, plMonthCache, expenses, expenseCategories } from "../../shared/schema";
 import { eq, and, sql, gte, lte, inArray } from "drizzle-orm";
 import { prisma } from "../../lib/prisma";
+import { rebuildDate as rebuildPnLDate } from "../services/pnlReadModelService";
 
 const router = Router();
 
@@ -277,6 +278,27 @@ router.get('/pnl-summary', async (req: Request, res: Response) => {
 
 // Apply authentication to all other finance routes below
 router.use(requireAuth);
+
+// POST /api/finance/pl-entry - Rebuild P&L read model for a single date
+router.post("/pl-entry", async (req: Request, res: Response) => {
+  const date = String(req.body?.date || "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
+  }
+
+  try {
+    const result = await rebuildPnLDate(date);
+    return res.json({ success: true, result });
+  } catch (error: any) {
+    const message = error?.message || "Failed to rebuild P&L";
+    console.error("[P&L_ENTRY_FAIL]", message);
+    return res.status(200).json({
+      success: false,
+      warning: "PNL_ENTRY_FAILED",
+      message
+    });
+  }
+});
 
 // P&L calculation logic based on your specifications
 type MonthVec = { m: number[]; total: number };

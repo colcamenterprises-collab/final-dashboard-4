@@ -6,6 +6,10 @@ import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expens
 import { shiftWindow } from "../services/time/shiftWindow";
 import { importReceiptsV2 } from "../services/loyverseImportV2";
 import { rebuildReceiptTruth } from "../services/receiptTruthSummary";
+import { getShiftReport } from "../utils/loyverse";
+import { normalizeDrinkStock } from "../forms/dailySalesV2";
+import { rebuildDate as rebuildPnLDate } from "../services/pnlReadModelService";
+import { spawn } from "child_process";
 import type {
   DailyComparisonResponse,
   DailySource,
@@ -17,6 +21,11 @@ import type {
 export const analysisDailyReviewRouter = Router();
 
 const THB = (n: number) => Number((n ?? 0).toFixed(2));
+const toNumberOrNull = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+};
 
 // K-4.2: Receipt status types
 type ReceiptStatus = 
@@ -33,6 +42,43 @@ interface ReceiptEvidence {
   receiptDifference: number | null;
   receiptStatus: ReceiptStatus;
 }
+
+type StaffComparisonData = {
+  totalSales: number | null;
+  cashSales: number | null;
+  grabSales: number | null;
+  scanSales: number | null;
+  expensesTotal: number | null;
+  rollsEnd: number | null;
+  meatEnd: number | null;
+  drinksCount: number | null;
+};
+
+type PosShiftReportData = {
+  totalSales: number | null;
+  startingCash: number | null;
+  cashPayments: number | null;
+  grab: number | null;
+  scan: number | null;
+  expenses: number | null;
+  expectedCash: number | null;
+  actualCash: number | null;
+  difference: number | null;
+};
+
+type DailyComparisonShiftResponse = {
+  date: string;
+  shiftWindow: string;
+  staffData: StaffComparisonData | { message: string };
+  posShiftReport: PosShiftReportData | { message: string };
+  differences: {
+    totalSales: number | null;
+    cash: number | null;
+    grab: number | null;
+    scan: number | null;
+    expenses: number | null;
+  };
+};
 
 // K-4.1: Fetch POS receipt count from lv_receipt within shift window
 async function fetchPosReceiptCount(businessDate: string): Promise<number | null> {
@@ -128,6 +174,85 @@ function dayRange(businessDate: string) {
   const end = new Date(start);
   end.setUTCDate(end.getUTCDate() + 1);
   return { start, end };
+}
+
+function buildStaffComparisonData(row: any): StaffComparisonData {
+  const payload = row?.payload ?? {};
+  const expenseTotals = extractFormExpenseTotals(row);
+  const drinks = normalizeDrinkStock(payload?.drinkStock);
+  const drinksCount = drinks.reduce((sum, d) => sum + Number(d.quantity || 0), 0);
+
+  return {
+    totalSales: toNumberOrNull(payload?.totalSales ?? row?.totalSales),
+    cashSales: toNumberOrNull(payload?.cashSales ?? row?.cashSales),
+    grabSales: toNumberOrNull(payload?.grabSales ?? row?.grabSales),
+    scanSales: toNumberOrNull(payload?.qrSales ?? row?.qrSales),
+    expensesTotal: toNumberOrNull(expenseTotals?.grandTotal),
+    rollsEnd: toNumberOrNull(payload?.rollsEnd),
+    meatEnd: toNumberOrNull(payload?.meatEnd),
+    drinksCount: toNumberOrNull(drinksCount)
+  };
+}
+
+function buildShiftReportData(shift: any): PosShiftReportData {
+  return {
+    totalSales: toNumberOrNull(shift?.gross_sales ?? shift?.net_sales ?? shift?.total_sales),
+    startingCash: toNumberOrNull(shift?.starting_cash),
+    cashPayments: toNumberOrNull(shift?.cash_sales ?? shift?.cash_payments),
+    grab: toNumberOrNull(shift?.grab_sales),
+    scan: toNumberOrNull(shift?.qr_sales),
+    expenses: toNumberOrNull(shift?.paid_out ?? shift?.expenses),
+    expectedCash: toNumberOrNull(shift?.expected_cash),
+    actualCash: toNumberOrNull(shift?.actual_cash),
+    difference: toNumberOrNull(shift?.cash_difference ?? shift?.difference)
+  };
+}
+
+function computeDifference(left: number | null, right: number | null) {
+  if (left === null || right === null) return null;
+  return THB(left - right);
+}
+
+async function findSnapshotForDate(businessDate: string) {
+  const start = DateTime.fromISO(businessDate, { zone: "Asia/Bangkok" }).startOf("day");
+  if (!start.isValid) return null;
+  const end = start.plus({ days: 1 });
+
+  const candidates = await prisma.shiftSnapshot.findMany({
+    where: {
+      windowStartUTC: {
+        gte: start.toUTC().toJSDate(),
+        lt: end.toUTC().toJSDate()
+      }
+    },
+    orderBy: { windowStartUTC: "desc" }
+  });
+
+  return candidates.find((snapshot) => {
+    const snapshotDate = DateTime.fromJSDate(snapshot.windowStartUTC).setZone("Asia/Bangkok").toISODate();
+    return snapshotDate === businessDate;
+  }) ?? null;
+}
+
+async function ensureShiftSnapshot(businessDate: string) {
+  const existing = await findSnapshotForDate(businessDate);
+  if (existing) return existing;
+
+  await new Promise<void>((resolve, reject) => {
+    const worker = spawn("node", ["workers/snapshotWorker.mjs", businessDate], { cwd: process.cwd() });
+    let error = "";
+
+    worker.stderr.on("data", (data: Buffer) => {
+      error += data.toString();
+    });
+
+    worker.on("close", (code: number) => {
+      if (code === 0) return resolve();
+      reject(new Error(error || "Snapshot creation failed"));
+    });
+  });
+
+  return findSnapshotForDate(businessDate);
 }
 
 async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null> {
@@ -264,36 +389,57 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
   const date = String(req.query.date || "").trim();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
 
-  // K-4.1: Fetch all data including receipt evidence in parallel
-  const [pos, form, receiptEvidence] = await Promise.all([
-    fetchPOSFromDB(date), 
-    fetchForm1FromDB(date),
-    buildReceiptEvidence(date)
-  ]);
-  
-  // PATCH B: Use receipt count as truth for POS availability
-  const hasReceipts = (receiptEvidence.posReceiptCount ?? 0) > 0;
-  const availability = availabilityOf(pos, form, hasReceipts);
-  
-  // PATCH E: Log missing data for debugging
-  if (availability !== "ok") {
-    console.error('[ANALYSIS_MISSING_DATA]', {
-      businessDate: date,
-      hasReceipts,
-      hasDailySales: form !== null,
-      posReceiptCount: receiptEvidence.posReceiptCount,
-      availability
-    });
+  const { start, end } = dayRange(date);
+  const staffRow = await prisma.dailySalesV2.findFirst({
+    where: {
+      shift_date: { gte: start, lt: end },
+      deletedAt: null,
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  let staffData: StaffComparisonData | { message: string } = { message: "No daily sales form submitted" };
+  if (staffRow) {
+    staffData = buildStaffComparisonData(staffRow);
   }
 
-  const payload: DailyComparisonResponse & { receiptEvidence?: ReceiptEvidence } = { date, availability };
-  if (pos) payload.pos = pos;
-  if (form) payload.form = form;
-  // Variance requires BOTH pos summary AND form - pos summary may not exist even when receipts do
-  if (pos && form) payload.variance = buildVariance(pos, form);
-  
-  // K-4.1: Always include receipt evidence
-  payload.receiptEvidence = receiptEvidence;
+  let posShiftReport: PosShiftReportData | { message: string } = { message: "Shift report unavailable" };
+  try {
+    const storeId = process.env.LOYVERSE_STORE_ID;
+    const shiftResult = await getShiftReport({ date, storeId });
+    const shift = shiftResult?.shifts?.[0] ?? null;
+    if (shift) {
+      posShiftReport = buildShiftReportData(shift);
+    }
+  } catch (error: any) {
+    console.error("[SHIFT_REPORT_FETCH_FAIL]", error?.message || error);
+  }
+
+  const differences = {
+    totalSales: staffData && "totalSales" in staffData && "totalSales" in posShiftReport
+      ? computeDifference(staffData.totalSales, posShiftReport.totalSales)
+      : null,
+    cash: staffData && "cashSales" in staffData && "cashPayments" in posShiftReport
+      ? computeDifference(staffData.cashSales, posShiftReport.cashPayments)
+      : null,
+    grab: staffData && "grabSales" in staffData && "grab" in posShiftReport
+      ? computeDifference(staffData.grabSales, posShiftReport.grab)
+      : null,
+    scan: staffData && "scanSales" in staffData && "scan" in posShiftReport
+      ? computeDifference(staffData.scanSales, posShiftReport.scan)
+      : null,
+    expenses: staffData && "expensesTotal" in staffData && "expenses" in posShiftReport
+      ? computeDifference(staffData.expensesTotal, posShiftReport.expenses)
+      : null
+  };
+
+  const payload: DailyComparisonShiftResponse = {
+    date,
+    shiftWindow: "17:00-03:00",
+    staffData,
+    posShiftReport,
+    differences
+  };
 
   res.json(payload);
 });
@@ -473,4 +619,76 @@ analysisDailyReviewRouter.post("/backdate-receipts", async (req, res) => {
     console.error("[BACKDATE_RECEIPTS_FAIL]", message);
     return res.status(500).json({ message });
   }
+});
+
+analysisDailyReviewRouter.post("/approve-shift", async (req, res) => {
+  const { date, notes, approvedBy } = req.body ?? {};
+  const businessDate = String(date || "").trim();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+    return res.status(400).json({ error: "Provide date=YYYY-MM-DD" });
+  }
+
+  const userRole = String(req.headers["x-user-role"] || "").toLowerCase();
+  if (userRole !== "manager") {
+    return res.status(403).json({ error: "Manager role required to approve shift" });
+  }
+
+  if (!approvedBy || String(approvedBy).trim() === "") {
+    return res.status(400).json({ error: "approvedBy is required" });
+  }
+
+  const { start, end } = dayRange(businessDate);
+  const staffRow = await prisma.dailySalesV2.findFirst({
+    where: {
+      shift_date: { gte: start, lt: end },
+      deletedAt: null
+    },
+    orderBy: { createdAt: "desc" }
+  });
+
+  if (!staffRow) {
+    return res.status(404).json({ error: "No daily sales form submitted" });
+  }
+
+  const payload = (staffRow.payload ?? {}) as Record<string, any>;
+  const approvalPayload = {
+    ...payload,
+    approval: {
+      status: "approved",
+      approvedBy: String(approvedBy).trim(),
+      approvedAt: new Date().toISOString(),
+      notes: notes ? String(notes) : null
+    }
+  };
+
+  await prisma.dailySalesV2.update({
+    where: { id: staffRow.id },
+    data: { payload: approvalPayload }
+  });
+
+  let snapshotId: string | null = null;
+  try {
+    const snapshot = await ensureShiftSnapshot(businessDate);
+    snapshotId = snapshot?.id ?? null;
+  } catch (error: any) {
+    console.error("[APPROVE_SHIFT_SNAPSHOT_FAIL]", error?.message || error);
+  }
+
+  let pnlResult: any = null;
+  let pnlWarning: string | null = null;
+  try {
+    pnlResult = await rebuildPnLDate(businessDate);
+  } catch (error: any) {
+    pnlWarning = error?.message || "Failed to rebuild P&L";
+    console.error("[APPROVE_SHIFT_PNL_FAIL]", pnlWarning);
+  }
+
+  return res.json({
+    ok: true,
+    date: businessDate,
+    snapshotId,
+    pnlResult,
+    pnlWarning
+  });
 });

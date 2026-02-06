@@ -1,29 +1,45 @@
-import React, { useEffect, useMemo, useState } from "react";
-import type { DailyComparisonResponse } from "../../../../shared/analysisTypes";
-import { AlertTriangle, CheckCircle2, XCircle, Receipt } from "lucide-react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
-// K-4.1: Receipt evidence types
-type ReceiptStatus = 
-  | "EVIDENCE_MATCH"
-  | "MISSING_RECEIPTS"
-  | "PHANTOM_RECEIPTS"
-  | "POS_UNAVAILABLE"
-  | "FORM_MISSING"
-  | "NO_EVIDENCE";
+type StaffComparisonData = {
+  totalSales: number | null;
+  cashSales: number | null;
+  grabSales: number | null;
+  scanSales: number | null;
+  expensesTotal: number | null;
+  rollsEnd: number | null;
+  meatEnd: number | null;
+  drinksCount: number | null;
+};
 
-interface ReceiptEvidence {
-  posReceiptCount: number | null;
-  cashierReceiptCount: number | null;
-  receiptDifference: number | null;
-  receiptStatus: ReceiptStatus;
-}
+type PosShiftReportData = {
+  totalSales: number | null;
+  startingCash: number | null;
+  cashPayments: number | null;
+  grab: number | null;
+  scan: number | null;
+  expenses: number | null;
+  expectedCash: number | null;
+  actualCash: number | null;
+  difference: number | null;
+};
 
-// Extended type with receipt evidence
-interface DailyComparisonWithEvidence extends DailyComparisonResponse {
-  receiptEvidence?: ReceiptEvidence;
-}
+type DailyComparisonShiftResponse = {
+  date: string;
+  shiftWindow: string;
+  staffData: StaffComparisonData | { message: string };
+  posShiftReport: PosShiftReportData | { message: string };
+  differences: {
+    totalSales: number | null;
+    cash: number | null;
+    grab: number | null;
+    scan: number | null;
+    expenses: number | null;
+  };
+};
 
 interface DailySalesRow {
   id: string;
@@ -52,155 +68,19 @@ const fmt = (n: number | null | undefined) => {
   return n.toLocaleString("en-US", { minimumFractionDigits: 0 });
 };
 
-function Flag({ val }: { val: number }) {
-  const match = val === 0;
-  return (
-    <div className={`rounded px-2 py-1 text-center font-semibold ${match ? "bg-green-200 text-green-800" : "bg-red-200 text-red-800"}`}>
-      {match ? "✓" : "⚠"}
-    </div>
-  );
-}
-
-function DayPill({
-  date,
-  selected,
-  status,
-  onClick,
-}: {
-  date: string;
-  selected: boolean;
-  status: DailyComparisonResponse["availability"];
-  onClick: () => void;
-}) {
-  const flagged = status === "ok";
-  const cls =
-    status === "ok"
-      ? "border-gray-300"
-      : "border-gray-200 bg-gray-100 text-gray-400";
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1 rounded-full border text-sm ${
-        selected ? "bg-black text-white" : "bg-white hover:bg-gray-50"
-      } ${cls}`}
-      title={
-        status === "ok"
-          ? "Data available"
-          : status === "missing_both"
-          ? "Missing POS and Form"
-          : status === "missing_pos"
-          ? "Missing POS"
-          : "Missing Form"
-      }
-    >
-      {date.slice(-2)}
-    </button>
-  );
-}
-
-// K-4.3: Evidence Summary component (non-blocking, at top of page)
-function EvidenceSummary({ evidence }: { evidence: ReceiptEvidence | undefined }) {
-  if (!evidence) return null;
-  
-  const { posReceiptCount, cashierReceiptCount, receiptDifference, receiptStatus } = evidence;
-  
-  // Determine visual state
-  let bgColor = "bg-amber-50 border-amber-200";
-  let textColor = "text-amber-800";
-  let message = "";
-  
-  switch (receiptStatus) {
-    case "EVIDENCE_MATCH":
-      bgColor = "bg-green-50 border-green-200";
-      textColor = "text-green-800";
-      message = "Receipt counts match — proceed with reconciliation";
-      break;
-    case "MISSING_RECEIPTS":
-      bgColor = "bg-red-50 border-red-200";
-      textColor = "text-red-800";
-      message = "Receipt mismatch detected — investigate cashier activity";
-      break;
-    case "PHANTOM_RECEIPTS":
-      bgColor = "bg-red-50 border-red-200";
-      textColor = "text-red-800";
-      message = "Receipt mismatch detected — investigate cashier activity";
-      break;
-    case "POS_UNAVAILABLE":
-      message = "POS receipts not available for this shift";
-      break;
-    case "FORM_MISSING":
-      message = "Cashier receipt count not submitted";
-      break;
-    case "NO_EVIDENCE":
-      message = "No receipt data available";
-      break;
-  }
-  
-  return (
-    <div className={`rounded-lg border p-4 ${bgColor}`} data-testid="evidence-summary">
-      <div className="flex items-start gap-3">
-        <Receipt className={`w-5 h-5 mt-0.5 ${textColor}`} />
-        <div className="flex-1">
-          <div className="text-xs font-semibold text-gray-600 mb-2">
-            Receipts are the primary evidence for this shift
-          </div>
-          <div className="grid grid-cols-3 gap-4 text-sm mb-2">
-            <div>
-              <div className="text-xs text-gray-500">POS Receipts</div>
-              <div className={`font-bold text-lg ${textColor}`}>
-                {posReceiptCount !== null ? posReceiptCount : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Cashier Declared</div>
-              <div className={`font-bold text-lg ${textColor}`}>
-                {cashierReceiptCount !== null ? cashierReceiptCount : "—"}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Difference</div>
-              <div className={`font-bold text-lg ${
-                receiptDifference === null ? "text-gray-400" 
-                : receiptDifference === 0 ? "text-green-700" 
-                : "text-red-700"
-              }`}>
-                {receiptDifference !== null ? (receiptDifference > 0 ? `+${receiptDifference}` : receiptDifference) : "—"}
-              </div>
-            </div>
-          </div>
-          <div className={`text-sm font-medium ${textColor}`}>
-            {message}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+const isMessage = (value: unknown): value is { message: string } =>
+  Boolean(value && typeof value === "object" && "message" in value);
 
 export default function DailyReview() {
   const [month, setMonth] = useState(thisMonth());
-  const [all, setAll] = useState<DailyComparisonWithEvidence[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [current, setCurrent] = useState<DailyComparisonWithEvidence | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [comment, setComment] = useState("");
-  const [actualAmountBanked, setActualAmountBanked] = useState("");
-  const [savingComment, setSavingComment] = useState(false);
-  const [syncing, setSyncing] = useState(false);
-  const [exportDate, setExportDate] = useState("");
+  const [selectedDate, setSelectedDate] = useState(todayISO());
+  const [notes, setNotes] = useState("");
+  const [approvedBy, setApprovedBy] = useState("");
+  const [approving, setApproving] = useState(false);
   const { toast } = useToast();
-  // K-2.5: Inline banner instead of blocking dialog
-  const [syncBanner, setSyncBanner] = useState<{
-    show: boolean;
-    status: "success" | "warning" | "error";
-    message: string;
-    date?: string;
-    sales?: number;
-  } | null>(null);
 
-  // K-4.4: Query for Daily Sales table data - binds to selected month
   const { data: dailySalesRows = [], isLoading: isDailySalesLoading } = useQuery<DailySalesRow[]>({
-    queryKey: ['/api/analysis/daily-sales', month],
+    queryKey: ["/api/analysis/daily-sales", month],
     queryFn: async () => {
       const r = await fetch(`/api/analysis/daily-sales?month=${month}`);
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
@@ -208,436 +88,370 @@ export default function DailyReview() {
     },
   });
 
-  async function fetchJSON(url: string, init?: RequestInit) {
-    const r = await fetch(url, init);
-    if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
-    return r.json();
-  }
+  const { data: comparison, isLoading: isComparisonLoading } = useQuery<DailyComparisonShiftResponse>({
+    queryKey: ["/api/analysis/daily-comparison", selectedDate],
+    queryFn: async () => {
+      const r = await fetch(`/api/analysis/daily-comparison?date=${selectedDate}`);
+      if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+      return r.json();
+    },
+    enabled: Boolean(selectedDate),
+  });
 
-  // K-2.1: Sync is now optional recovery action, not a dependency
-  async function manualSync(dateStr: string) {
-    try {
-      setSyncing(true);
-      setSyncBanner(null);
-      
-      const result = await fetchJSON(
-        `/api/analysis/sync-pos-for-date?date=${dateStr}`,
-        { method: "POST" }
+  const staffData = comparison && !isMessage(comparison.staffData) ? comparison.staffData : null;
+  const posShift = comparison && !isMessage(comparison.posShiftReport) ? comparison.posShiftReport : null;
+
+  const comparisonRows = useMemo(() => {
+    return [
+      {
+        label: "Total Sales",
+        staff: staffData?.totalSales ?? null,
+        pos: posShift?.totalSales ?? null,
+        diff: comparison?.differences.totalSales ?? null,
+      },
+      {
+        label: "Cash",
+        staff: staffData?.cashSales ?? null,
+        pos: posShift?.cashPayments ?? null,
+        diff: comparison?.differences.cash ?? null,
+      },
+      {
+        label: "Grab",
+        staff: staffData?.grabSales ?? null,
+        pos: posShift?.grab ?? null,
+        diff: comparison?.differences.grab ?? null,
+      },
+      {
+        label: "Scan (QR)",
+        staff: staffData?.scanSales ?? null,
+        pos: posShift?.scan ?? null,
+        diff: comparison?.differences.scan ?? null,
+      },
+      {
+        label: "Expenses",
+        staff: staffData?.expensesTotal ?? null,
+        pos: posShift?.expenses ?? null,
+        diff: comparison?.differences.expenses ?? null,
+      },
+      {
+        label: "Rolls Remaining",
+        staff: staffData?.rollsEnd ?? null,
+        pos: null,
+        diff: null,
+      },
+      {
+        label: "Meat Remaining (g)",
+        staff: staffData?.meatEnd ?? null,
+        pos: null,
+        diff: null,
+      },
+      {
+        label: "Drinks Remaining",
+        staff: staffData?.drinksCount ?? null,
+        pos: null,
+        diff: null,
+      },
+    ];
+  }, [comparison?.differences, staffData, posShift]);
+
+  const managerRole = (typeof window !== "undefined" && window.localStorage.getItem("user-role")) || "";
+  const canApprove = managerRole.toLowerCase() === "manager" && approvedBy.trim().length > 0;
+
+  const renderCell = (value: number | null, testId?: string) => {
+    if (value === null || value === undefined) {
+      return (
+        <span
+          className="inline-block rounded bg-gray-100 px-2 py-1 text-xs text-gray-400"
+          title="Missing – check form submission or Loyverse sync"
+          data-testid={testId}
+        >
+          Missing
+        </span>
       );
-      
-      // K-2.4: Backend always returns 200 with status field
-      if (result.status === "OK" && result.reconciled) {
-        setSyncBanner({
-          show: true,
-          status: "success",
-          message: result.message || "Data synced and reconciled successfully.",
-          date: result.date,
-          sales: result.sales,
-        });
-        // Reload to refresh data
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        window.location.reload();
-      } else if (result.status === "PARTIAL_DATA") {
-        // K-2.5: Show warning banner, page remains usable
-        setSyncBanner({
-          show: true,
-          status: "warning",
-          message: result.message || "Partial data available.",
-          date: result.date,
-          sales: result.sales,
-        });
-        // Reload to show whatever data is available
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        window.location.reload();
-      } else {
-        // Error or SYNC_ERROR status
-        setSyncBanner({
-          show: true,
-          status: "error",
-          message: result.message || result.reason || "Could not sync. Please try again.",
-        });
-      }
-    } catch (err: any) {
-      // K-2.4: Never block on errors
-      setSyncBanner({
-        show: true,
-        status: "error",
-        message: `Connection error: ${err.message || "Please check network"}`,
-      });
-    } finally {
-      setSyncing(false);
     }
-  }
+    return <span data-testid={testId}>{fmt(value)}</span>;
+  };
 
-  async function saveComment() {
+  const renderDiff = (value: number | null) => {
+    if (value === null || value === undefined) {
+      return (
+        <span
+          className="inline-block rounded bg-gray-100 px-2 py-1 text-xs text-gray-400"
+          title="Missing – check form submission or Loyverse sync"
+        >
+          Missing
+        </span>
+      );
+    }
+    if (value === 0) return <span>{fmt(value)}</span>;
+    return <span className="font-semibold text-red-600">{fmt(value)}</span>;
+  };
+
+  const generateApprovalPdf = () => {
+    if (!comparison) return;
+    const doc = new jsPDF();
+
+    doc.setFontSize(14);
+    doc.text("Daily Shift Review", 14, 18);
+    doc.setFontSize(10);
+    doc.text(`Date: ${comparison.date}`, 14, 26);
+    doc.text(`Shift Window: ${comparison.shiftWindow}`, 14, 32);
+    doc.text(`Approved By: ${approvedBy.trim()}`, 14, 38);
+    if (notes.trim()) {
+      doc.text(`Notes: ${notes.trim()}`, 14, 44);
+    }
+
+    const body = comparisonRows.map((row) => [
+      row.label,
+      row.staff === null ? "Missing" : fmt(row.staff),
+      row.pos === null ? "Missing" : fmt(row.pos),
+      row.diff === null ? "Missing" : fmt(row.diff),
+    ]);
+
+    autoTable(doc, {
+      startY: notes.trim() ? 52 : 46,
+      head: [["Item", "Staff Form", "POS Shift Report", "Difference"]],
+      body,
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [240, 240, 240] },
+    });
+
+    if (posShift) {
+      const cashStartY = (doc as any).lastAutoTable?.finalY ? (doc as any).lastAutoTable.finalY + 10 : 90;
+      doc.setFontSize(11);
+      doc.text("POS Cash Controls", 14, cashStartY);
+      autoTable(doc, {
+        startY: cashStartY + 4,
+        head: [["Metric", "Value"]],
+        body: [
+          ["Starting Cash", posShift.startingCash === null ? "Missing" : fmt(posShift.startingCash)],
+          ["Expected Cash", posShift.expectedCash === null ? "Missing" : fmt(posShift.expectedCash)],
+          ["Actual Cash", posShift.actualCash === null ? "Missing" : fmt(posShift.actualCash)],
+          ["Difference", posShift.difference === null ? "Missing" : fmt(posShift.difference)],
+        ],
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [240, 240, 240] },
+      });
+    }
+
+    doc.save(`shift-approval-${comparison.date}.pdf`);
+  };
+
+  const approveShift = async () => {
     if (!selectedDate) {
-      alert("No date selected. Please select a date first.");
+      toast({
+        title: "Select a date",
+        description: "Choose a shift date to approve.",
+        variant: "destructive",
+      });
       return;
     }
-    setSavingComment(true);
-    try {
-      const payload = {
-        comment,
-        actualAmountBanked: actualAmountBanked ? parseFloat(actualAmountBanked) : null,
-      };
-      const resp = await fetchJSON(`/api/daily-review-comments/${selectedDate}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+    if (!approvedBy.trim()) {
+      toast({
+        title: "Manager name required",
+        description: "Enter the approving manager name.",
+        variant: "destructive",
       });
-      alert(`Saved manager review for ${selectedDate}: ${resp.message || "Success"}`);
-    } catch (err: any) {
-      alert("Error saving review: " + err.message);
-    } finally {
-      setSavingComment(false);
+      return;
     }
-  }
 
-  const handleDateExport = () => {
-    if (exportDate) {
-      window.open(`/api/analysis/daily-sales/export.csv?date=${exportDate}`, '_blank');
-    }
-  };
-
-  const reloadMonthData = async (nextMonth: string) => {
-    if (!nextMonth) return;
-    setLoading(true);
+    setApproving(true);
     try {
-      const data = await fetchJSON(`/api/analysis/daily-comparison-range?month=${nextMonth}`);
-      setAll(data);
-      const sorted = data.filter((d: DailyComparisonResponse) => d.date).sort(
-        (a: DailyComparisonResponse, b: DailyComparisonResponse) =>
-          a.date < b.date ? 1 : -1
-      );
-      if (sorted.length > 0 && !selectedDate) {
-        setSelectedDate(sorted[0].date);
-      }
-    } catch (err) {
-      console.error(err);
-      setAll([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void reloadMonthData(month);
-  }, [month]);
-
-  useEffect(() => {
-    const item = all.find((d) => d.date === selectedDate);
-    setCurrent(item ?? null);
-  }, [selectedDate, all]);
-
-  useEffect(() => {
-    (async () => {
-      if (!selectedDate) return;
-      try {
-        const resp = await fetchJSON(`/api/daily-review-comments/${selectedDate}`);
-        if (resp.comment !== undefined) setComment(resp.comment || "");
-        if (resp.actualAmountBanked !== undefined)
-          setActualAmountBanked(resp.actualAmountBanked != null ? String(resp.actualAmountBanked) : "");
-      } catch (err) {
-        console.error(err);
-      }
-    })();
-  }, [selectedDate]);
-
-  const backdateMutation = useMutation({
-    mutationFn: async (dateStr: string) => {
-      const response = await fetch("/api/analysis/backdate-receipts", {
+      const response = await fetch("/api/analysis/approve-shift", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateStr }),
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-role": managerRole,
+        },
+        body: JSON.stringify({
+          date: selectedDate,
+          notes: notes.trim() || null,
+          approvedBy: approvedBy.trim(),
+        }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const message = data?.message || data?.error || "Failed to backdate receipts";
-        throw new Error(message);
+        throw new Error(data?.error || "Approval failed");
       }
-      return data as { success: boolean; receiptsProcessed: number };
-    },
-    onSuccess: async () => {
+
+      generateApprovalPdf();
+
       toast({
-        title: "Backdate complete",
-        description: "POS receipts backdated and comparison rebuilt",
+        title: "Shift approved",
+        description: "Shift approved, snapshot created, PDF ready, data sent to P&L.",
       });
-      await reloadMonthData(month);
-    },
-    onError: (error: any) => {
+    } catch (error: any) {
       toast({
-        title: "Backdate failed",
-        description: error?.message || "No receipts found for this date",
+        title: "Approval failed",
+        description: error?.message || "Unable to approve shift.",
         variant: "destructive",
       });
-    },
-  });
-
-  const today = todayISO();
-  const backdateDisabled = !selectedDate || selectedDate >= today || backdateMutation.isLoading;
-  const showBackdateWarning = !selectedDate || selectedDate >= today;
-
-  const Section = ({ title, rows }: { title: string; rows: any[] }) => (
-    <section className="mb-6">
-      <h2 className="text-sm font-bold mb-2">{title}</h2>
-      <div className="grid grid-cols-5 gap-1 text-sm items-center">
-        <div className="font-semibold text-gray-500">Item</div>
-        <div className="font-semibold">POS</div>
-        <div className="font-semibold">Form</div>
-        <div className="font-semibold">Diff (Form−POS)</div>
-        <div className="font-semibold text-center">Flag</div>
-        {rows.map((r: any) => (
-          <React.Fragment key={r.label}>
-            <div className="text-gray-600">{r.label}</div>
-            <div>{r.pos == null ? "—" : fmt(Number(r.pos))}</div>
-            <div>{r.form == null ? "—" : fmt(Number(r.form))}</div>
-            <div>{r.diff == null ? "—" : r.diff === 0 ? "—" : fmt(r.diff)}</div>
-            <div>{r.diff == null ? "—" : <Flag val={r.diff} />}</div>
-          </React.Fragment>
-        ))}
-      </div>
-    </section>
-  );
+    } finally {
+      setApproving(false);
+    }
+  };
 
   return (
-    <div className="mx-auto max-w-[980px] p-4 space-y-6">
+    <div className="mx-auto max-w-[1100px] p-4 space-y-6">
       <header className="border-b pb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-sm font-extrabold">Sales & Shift Analysis</h1>
+        <h1 className="text-sm font-extrabold">Daily Sales & Shift Analysis</h1>
         <div className="flex items-center gap-3">
           <label className="text-sm text-gray-600">Month</label>
-          <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="border rounded px-2 py-1 text-sm" />
-{/* PATCH 1: Manual sync button hidden - POS sync is now automatic via cron + webhook */}
+          <input
+            type="month"
+            value={month}
+            onChange={(e) => setMonth(e.target.value)}
+            className="border rounded px-2 py-1 text-sm"
+          />
         </div>
       </header>
 
-      {/* K-2.5: Inline sync status banner (not blocking modal) */}
-      {syncBanner?.show && (
-        <div 
-          className={`rounded-lg p-3 flex items-center justify-between ${
-            syncBanner.status === "success" 
-              ? "bg-green-50 border border-green-200 text-green-800" 
-              : syncBanner.status === "warning"
-              ? "bg-amber-50 border border-amber-200 text-amber-800"
-              : "bg-red-50 border border-red-200 text-red-800"
-          }`}
-          data-testid="sync-banner"
-        >
-          <div className="flex items-center gap-2">
-            {syncBanner.status === "success" && <CheckCircle2 className="w-4 h-4" />}
-            {syncBanner.status === "warning" && <AlertTriangle className="w-4 h-4" />}
-            {syncBanner.status === "error" && <XCircle className="w-4 h-4" />}
-            <span className="text-sm">{syncBanner.message}</span>
-            {syncBanner.sales !== undefined && (
-              <span className="text-sm font-semibold ml-2">
-                Sales: ฿{syncBanner.sales.toLocaleString()}
-              </span>
-            )}
-          </div>
-          <button 
-            onClick={() => setSyncBanner(null)} 
-            className="text-xs underline hover:no-underline"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      <div className="flex gap-2 flex-wrap">
+      <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <label className="text-xs text-gray-600">Selected date</label>
           <input
             type="date"
-            value={selectedDate ?? ""}
-            onChange={(event) => {
-              const nextDate = event.target.value;
-              if (!nextDate) return;
-              setSelectedDate(nextDate);
-              setMonth(nextDate.slice(0, 7));
-            }}
+            value={selectedDate}
+            onChange={(event) => setSelectedDate(event.target.value)}
             className="border rounded px-2 py-1 text-xs"
           />
-          <button
-            type="button"
-            onClick={() => selectedDate && backdateMutation.mutate(selectedDate)}
-            disabled={backdateDisabled}
-            title="Re-ingest Loyverse receipts for past dates to update analysis"
-            className="inline-flex items-center gap-2 rounded border px-3 py-1 text-xs bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {backdateMutation.isLoading && (
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
-            )}
-            Backdate POS Receipts for Selected Date
-          </button>
-          {showBackdateWarning && (
-            <span className="text-xs text-amber-700">Backdating only for past dates</span>
+          {comparison?.shiftWindow && (
+            <span className="text-xs text-gray-500">
+              Shift window: {comparison.shiftWindow}
+            </span>
           )}
         </div>
-        {all.map((d) => (
-          <DayPill
-            key={d.date}
-            date={d.date}
-            selected={selectedDate === d.date}
-            status={d.availability}
-            onClick={() => setSelectedDate(d.date)}
-          />
-        ))}
-      </div>
 
-      {loading && <div className="text-sm p-4">Loading…</div>}
-      {!loading && !current && <div className="text-sm p-4 text-gray-600">No data for this month.</div>}
-
-      {!loading && current && (
-        <>
-          {/* K-4.3: Evidence Summary - TOP OF PAGE, above reconciliation */}
-          <EvidenceSummary evidence={current.receiptEvidence} />
-          
-          <div className="rounded border p-3 bg-gray-50">
-            <div className="text-sm">
-              <span className="font-semibold">Business date:</span> {current.date} (17:00→03:00, POS = source of truth)
-              {current.availability !== "ok" && (
-                <span className="ml-2 text-red-700">
-                  — {current.availability === "missing_both" ? "Missing POS & Form" :
-                      current.availability === "missing_pos" ? "Missing POS" : "Missing Form"}
-                </span>
+        {isComparisonLoading && <div className="text-sm text-gray-600">Loading shift comparison…</div>}
+        {!isComparisonLoading && comparison && (
+          <div className="rounded border p-4">
+            <div className="flex flex-col gap-2">
+              {isMessage(comparison.staffData) && (
+                <div className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
+                  Staff form: {comparison.staffData.message}
+                </div>
+              )}
+              {isMessage(comparison.posShiftReport) && (
+                <div className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
+                  Loyverse shift report: {comparison.posShiftReport.message}
+                </div>
               )}
             </div>
-          </div>
 
-          {current.availability === "ok" && current.pos && current.form && current.variance && (
-            <>
-              <Section
-                title="Sales (Form vs POS)"
-                rows={[
-                  { label: "Cash", pos: current.pos.sales.cash, form: current.form.sales.cash, diff: current.variance.sales.cash },
-                  { label: "QR", pos: current.pos.sales.qr, form: current.form.sales.qr, diff: current.variance.sales.qr },
-                  { label: "Grab", pos: current.pos.sales.grab, form: current.form.sales.grab, diff: current.variance.sales.grab },
-                  { label: "Total", pos: current.pos.sales.total, form: current.form.sales.total, diff: current.variance.sales.total },
-                ]}
-              />
-
-              <Section
-                title="Expenses"
-                rows={[
-                  { label: "Shopping", pos: current.pos.expenses.shoppingTotal, form: current.form.expenses.shoppingTotal, diff: current.variance.expenses.shoppingTotal },
-                  { label: "Wages", pos: current.pos.expenses.wageTotal, form: current.form.expenses.wageTotal, diff: current.variance.expenses.wageTotal },
-                  { label: "Other", pos: current.pos.expenses.otherTotal, form: current.form.expenses.otherTotal, diff: current.variance.expenses.otherTotal },
-                  { label: "Total", pos: (current.pos.expenses.shoppingTotal + current.pos.expenses.wageTotal + current.pos.expenses.otherTotal), form: (current.form.expenses.shoppingTotal + current.form.expenses.wageTotal + current.form.expenses.otherTotal), diff: current.variance.expenses.grandTotal },
-                ]}
-              />
-
-              <Section
-                title="Net Banking & Cash"
-                rows={[
-                  { label: "Est. Net Banked", pos: current.pos.banking.estimatedNetBanked, form: current.form.banking.estimatedNetBanked, diff: current.variance.banking.estimatedNetBanked },
-                  { label: "Expected Cash", pos: current.pos.banking.expectedCash, form: current.form.banking.expectedCash, diff: current.variance.banking.expectedCash },
-                ]}
-              />
-            </>
-          )}
-
-          {current.availability !== "ok" && (
-            <div className="text-sm text-gray-600">
-              We don't have both sources to compare for this date. Data present:
-              <ul className="list-disc ml-5 mt-1">
-                {current.pos && <li>POS shift totals</li>}
-                {current.form && <li>Daily Sales & Stock Form</li>}
-                {!current.pos && !current.form && <li>None</li>}
-              </ul>
+            <div className="mt-3 overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-left">
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Item</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Staff Form</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Loyverse Shift Report</th>
+                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Difference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comparisonRows.map((row) => (
+                    <tr key={row.label} className="border-b">
+                      <td className="px-3 py-2 text-gray-600">{row.label}</td>
+                      <td className="px-3 py-2">{renderCell(row.staff)}</td>
+                      <td className="px-3 py-2">{renderCell(row.pos)}</td>
+                      <td className="px-3 py-2">{renderDiff(row.diff)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
 
-          <section className="border-t pt-3">
-            <h2 className="font-bold text-sm mb-3">Manager Review</h2>
-            
-            {/* Banking Verification */}
-            <div className="mb-4 p-3 bg-gray-50 rounded border">
-              <div className="grid grid-cols-3 gap-3 items-center text-sm mb-2">
-                <div>
-                  <div className="text-xs text-gray-500">Expected Net Banked (from above)</div>
-                  <div className="font-semibold text-base">
-                    {current?.variance 
-                      ? fmt(current.form?.banking.estimatedNetBanked ?? 0) 
-                      : "—"}
-                  </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="rounded border border-gray-200 p-3">
+                <h3 className="text-xs font-semibold text-gray-500">Staff Daily Sales & Stock v2</h3>
+                <div className="mt-2 text-sm text-gray-700">
+                  <div>Total Sales: {renderCell(staffData?.totalSales ?? null)}</div>
+                  <div>Cash: {renderCell(staffData?.cashSales ?? null)}</div>
+                  <div>Grab: {renderCell(staffData?.grabSales ?? null)}</div>
+                  <div>Scan (QR): {renderCell(staffData?.scanSales ?? null)}</div>
+                  <div>Expenses: {renderCell(staffData?.expensesTotal ?? null)}</div>
+                  <div>Rolls Remaining: {renderCell(staffData?.rollsEnd ?? null)}</div>
+                  <div>Meat Remaining (g): {renderCell(staffData?.meatEnd ?? null)}</div>
+                  <div>Drinks Remaining: {renderCell(staffData?.drinksCount ?? null)}</div>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-500 block mb-1">Actual Amount Banked</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    placeholder="Enter actual..."
-                    value={actualAmountBanked}
-                    onChange={(e) => setActualAmountBanked(e.target.value)}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    data-testid="input-actual-banked"
-                  />
+              </div>
+              <div className="rounded border border-gray-200 p-3">
+                <h3 className="text-xs font-semibold text-gray-500">Loyverse Shift Report Totals</h3>
+                <div className="mt-2 text-sm text-gray-700">
+                  <div>Total Sales: {renderCell(posShift?.totalSales ?? null)}</div>
+                  <div>Cash Payments: {renderCell(posShift?.cashPayments ?? null)}</div>
+                  <div>Grab: {renderCell(posShift?.grab ?? null)}</div>
+                  <div>Scan (QR): {renderCell(posShift?.scan ?? null)}</div>
+                  <div>Expenses (Paid Out): {renderCell(posShift?.expenses ?? null)}</div>
                 </div>
-                <div>
-                  {actualAmountBanked && current?.variance && current.form && (
-                    (() => {
-                      const expected = current.form.banking.estimatedNetBanked;
-                      const actual = parseFloat(actualAmountBanked);
-                      const diff = actual - expected;
-                      const hasDiff = Math.abs(diff) > 0.01;
-                      return (
-                        <div className={`text-center p-2 rounded ${hasDiff ? 'bg-red-100 border border-red-300' : 'bg-green-100 border border-green-300'}`}>
-                          <div className="text-xs font-semibold">{hasDiff ? '⚠️ Variance' : '✓ Match'}</div>
-                          {hasDiff && (
-                            <div className="text-sm font-bold text-red-700">
-                              {diff > 0 ? '+' : ''}{fmt(diff)}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })()
-                  )}
+                <div className="mt-3 border-t pt-3 text-sm text-gray-700">
+                  <div>Starting Cash: {renderCell(posShift?.startingCash ?? null)}</div>
+                  <div>Expected Cash: {renderCell(posShift?.expectedCash ?? null)}</div>
+                  <div>Actual Cash: {renderCell(posShift?.actualCash ?? null)}</div>
+                  <div>Difference: {renderCell(posShift?.difference ?? null)}</div>
                 </div>
               </div>
             </div>
+          </div>
+        )}
+      </section>
 
-            {/* Manager Comments */}
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="font-semibold text-sm">Notes</h3>
-              <button
-                onClick={saveComment}
-                disabled={savingComment || !selectedDate}
-                className="px-3 py-1 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                data-testid="button-save-review"
-              >
-                {savingComment ? "Saving..." : "Save Review"}
-              </button>
-            </div>
-            <textarea
-              className="w-full border rounded p-2 min-h-[110px] text-sm"
-              placeholder="Record findings, explanations, or actions taken for this specific date…"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              data-testid="textarea-manager-comment"
+      <section className="border-t pt-4">
+        <h2 className="text-sm font-bold mb-3">Manager Review & Sign Off</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <div className="md:col-span-1">
+            <label className="text-xs text-gray-500">Manager Name</label>
+            <input
+              className="mt-1 w-full rounded border px-2 py-1 text-sm"
+              value={approvedBy}
+              onChange={(event) => setApprovedBy(event.target.value)}
+              placeholder="Manager name"
             />
-            <div className="text-xs text-gray-500 mt-1">
-              Manager review data is saved per business date and stored in the database.
+            <div className="mt-2 text-xs text-gray-500">
+              Approval requires manager role.
             </div>
-          </section>
-        </>
-      )}
+          </div>
+          <div className="md:col-span-2">
+            <label className="text-xs text-gray-500">Notes / Explanation</label>
+            <textarea
+              className="mt-1 w-full rounded border p-2 text-sm min-h-[120px]"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+              placeholder="Record findings or explanations for this shift."
+            />
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={approveShift}
+            disabled={!canApprove || approving}
+            className="rounded bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-400"
+          >
+            {approving ? "Approving…" : "Approve & Close Shift"}
+          </button>
+          {!canApprove && (
+            <span className="text-xs text-gray-500">Manager role required to approve.</span>
+          )}
+        </div>
+      </section>
 
-      {/* All Shifts Data Section */}
       <section className="border-t pt-6 mt-8">
         <div className="mb-4">
           <h2 className="text-sm font-extrabold mb-4">All Shifts Data</h2>
-          
+
           <div className="flex items-center gap-2 text-xs sm:text-sm">
             <input
               id="export-by-date"
               type="date"
-              value={exportDate}
-              onChange={(e) => setExportDate(e.target.value)}
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
               className="border rounded px-2 py-1"
             />
             <button
-              onClick={handleDateExport}
+              onClick={() => selectedDate && window.open(`/api/analysis/daily-sales/export.csv?date=${selectedDate}`, "_blank")}
               className="border rounded px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700"
-              disabled={!exportDate}
+              disabled={!selectedDate}
             >
               Export by Date (CSV)
             </button>
@@ -650,8 +464,8 @@ export default function DailyReview() {
         </div>
 
         {!isDailySalesLoading && dailySalesRows.length > 0 && (
-          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}>
-            <table className="border-collapse text-xs sm:text-sm" style={{ minWidth: '1400px' }}>
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
+            <table className="border-collapse text-xs sm:text-sm" style={{ minWidth: "1400px" }}>
               <thead>
                 <tr className="bg-gray-100 border-b">
                   <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
@@ -709,7 +523,6 @@ export default function DailyReview() {
           </div>
         )}
       </section>
-
     </div>
   );
 }
