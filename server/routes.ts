@@ -81,6 +81,7 @@ import stockReviewManual from "./routes/stockReviewManual";
 import receiptsBurgers from "./routes/receiptsBurgers";
 import receiptsDebug from "./routes/receiptsDebug";
 import loyverseSync from "./routes/loyverseSync";
+import loyverseShiftReportRouter from "./routes/loyverseShiftReport";
 import { registerOnlineMenuRoutes } from "./routes/onlineMenu";
 import { registerAdminMenuRoutes } from "./routes/adminMenu";
 import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
@@ -1157,6 +1158,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Loyverse sync and cache builder
   app.use("/api/loyverse", loyverseSync);
+  app.use("/api/loyverse", loyverseShiftReportRouter);
 
   // Shift Report V2
   app.use("/api/shift-report", shiftReportRoutes);
