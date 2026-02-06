@@ -276,134 +276,138 @@ export default function PurchasingPage() {
           </AlertDescription>
         </Alert>
       )}
-      <div className="mb-4">
-        <h1 className="text-3xl font-bold text-slate-900 mb-1">Purchasing List</h1>
-        <p className="text-xs text-slate-600">Master control panel for all items. Changes here affect Form 2, Shopping List, and Analytics.</p>
-        <p className="text-xs text-slate-400 mt-1">Source: purchasing_items</p>
+      <div className="mb-3">
+        <h1 className="text-lg font-bold text-slate-900 mb-0.5">Purchasing List</h1>
+        <p className="text-[11px] text-slate-600">Master control panel for all items. Changes here affect Form 2, Shopping List, and Analytics.</p>
+        <p className="text-[11px] text-slate-400 mt-0.5">Source: purchasing_items</p>
       </div>
 
-      <div className="flex gap-3 mb-4">
-        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
-          <CheckCircle className="h-4 w-4 text-emerald-600" />
-          <span className="text-sm font-medium text-slate-900">{activeCount}</span>
-          <span className="text-xs text-slate-600">Active</span>
+      <div className="flex gap-2 mb-3">
+        <Card className="px-3 py-2 rounded-[4px] border-slate-200 flex items-center gap-1.5">
+          <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+          <span className="text-xs font-medium text-slate-900">{activeCount}</span>
+          <span className="text-[11px] text-slate-600">Active</span>
         </Card>
-        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
-          <XCircle className="h-4 w-4 text-slate-400" />
-          <span className="text-sm font-medium text-slate-900">{inactiveCount}</span>
-          <span className="text-xs text-slate-600">Inactive</span>
+        <Card className="px-3 py-2 rounded-[4px] border-slate-200 flex items-center gap-1.5">
+          <XCircle className="h-3.5 w-3.5 text-slate-400" />
+          <span className="text-xs font-medium text-slate-900">{inactiveCount}</span>
+          <span className="text-[11px] text-slate-600">Inactive</span>
         </Card>
-        <Card className="px-4 py-3 rounded-[4px] border-slate-200 flex items-center gap-2">
-          <span className="text-sm font-medium text-slate-900">{items.length}</span>
-          <span className="text-xs text-slate-600">Total Items</span>
+        <Card className="px-3 py-2 rounded-[4px] border-slate-200 flex items-center gap-1.5">
+          <span className="text-xs font-medium text-slate-900">{items.length}</span>
+          <span className="text-[11px] text-slate-600">Total Items</span>
         </Card>
       </div>
 
-      <Card className="p-4 mb-4 rounded-[4px] border-slate-200">
-        <div className="flex gap-3 items-center flex-wrap">
-          <div className="flex-1 min-w-[200px] relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+      <Card className="p-3 mb-3 rounded-[4px] border-slate-200">
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
             <Input
               data-testid="input-search"
-              placeholder="Search items, brands, suppliers, category..."
+              placeholder="Search items, brands, suppliers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 text-xs rounded-[4px] border-slate-200"
+              className="pl-8 text-xs h-8 rounded-[4px] border-slate-200"
             />
           </div>
-          <select
-            data-testid="select-category-filter"
-            value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-            className="text-xs px-3 py-2 border border-slate-200 rounded-[4px] bg-white"
-          >
-            <option value="">All Categories</option>
-            {categories.map(cat => (
-              <option key={cat} value={cat || ''}>{cat}</option>
-            ))}
-          </select>
-          <select
-            data-testid="select-status-filter"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
-            className="text-xs px-3 py-2 border border-slate-200 rounded-[4px] bg-white"
-          >
-            <option value="active">Active Only</option>
-            <option value="inactive">Inactive Only</option>
-            <option value="all">All Items</option>
-          </select>
-          <Button
-            data-testid="button-add-item"
-            onClick={() => {
-              setEditingItem(null);
-              setShowDialog(true);
-            }}
-            className="bg-emerald-600 hover:bg-emerald-700 text-xs rounded-[4px]"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            Add Item
-          </Button>
-          <a
-            href="/api/purchasing-items/export/csv"
-            download="purchasing-items-export.csv"
-            data-testid="button-export-csv"
-            className="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 border border-slate-200 bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2 text-xs rounded-[4px]"
-            onClick={() => {
-              toast({
-                title: "Export Started",
-                description: "Your CSV file is downloading. Check your Downloads folder.",
-              });
-            }}
-          >
-            <Download className="h-4 w-4 mr-1" />
-            Export CSV
-          </a>
-          <label>
-            <input
-              type="file"
-              accept=".csv"
-              className="hidden"
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const text = await file.text();
-                const lines = text.split('\n');
-                const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-                const csvData = [];
-                for (let i = 1; i < lines.length; i++) {
-                  if (!lines[i].trim()) continue;
-                  const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                  const row: any = {};
-                  headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
-                  csvData.push(row);
-                }
-                const res = await fetch('/api/purchasing-items/import/csv', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ csvData }),
-                });
-                const result = await res.json();
-                if (result.ok) {
-                  queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
-                  alert(`Imported: ${result.inserted} new, ${result.updated} updated`);
-                } else {
-                  alert('Import failed: ' + (result.error || 'Unknown error'));
-                }
-                e.target.value = '';
-              }}
-            />
-            <Button
-              data-testid="button-import-csv"
-              variant="outline"
-              className="text-xs rounded-[4px] border-slate-200"
-              asChild
+          <div className="flex gap-2">
+            <select
+              data-testid="select-category-filter"
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="text-xs h-8 px-2 py-0 border border-slate-200 rounded-[4px] bg-white flex-1 min-w-0"
             >
-              <span>
-                <Upload className="h-4 w-4 mr-1" />
-                Import CSV
-              </span>
+              <option value="">All Categories</option>
+              {categories.map(cat => (
+                <option key={cat} value={cat || ''}>{cat}</option>
+              ))}
+            </select>
+            <select
+              data-testid="select-status-filter"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'inactive')}
+              className="text-xs h-8 px-2 py-0 border border-slate-200 rounded-[4px] bg-white flex-1 min-w-0"
+            >
+              <option value="active">Active Only</option>
+              <option value="inactive">Inactive Only</option>
+              <option value="all">All Items</option>
+            </select>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              data-testid="button-add-item"
+              onClick={() => {
+                setEditingItem(null);
+                setShowDialog(true);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-xs h-8 px-3 rounded-[4px]"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Add Item
             </Button>
-          </label>
+            <a
+              href="/api/purchasing-items/export/csv"
+              download="purchasing-items-export.csv"
+              data-testid="button-export-csv"
+              className="inline-flex items-center justify-center whitespace-nowrap font-medium transition-colors border border-slate-200 bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground h-8 px-3 text-xs rounded-[4px]"
+              onClick={() => {
+                toast({
+                  title: "Export Started",
+                  description: "Your CSV file is downloading.",
+                });
+              }}
+            >
+              <Download className="h-3.5 w-3.5 mr-1" />
+              Export CSV
+            </a>
+            <label>
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const text = await file.text();
+                  const lines = text.split('\n');
+                  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+                  const csvData = [];
+                  for (let i = 1; i < lines.length; i++) {
+                    if (!lines[i].trim()) continue;
+                    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+                    const row: any = {};
+                    headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
+                    csvData.push(row);
+                  }
+                  const res = await fetch('/api/purchasing-items/import/csv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ csvData }),
+                  });
+                  const result = await res.json();
+                  if (result.ok) {
+                    queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
+                    alert(`Imported: ${result.inserted} new, ${result.updated} updated`);
+                  } else {
+                    alert('Import failed: ' + (result.error || 'Unknown error'));
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <Button
+                data-testid="button-import-csv"
+                variant="outline"
+                className="text-xs h-8 px-3 rounded-[4px] border-slate-200"
+                asChild
+              >
+                <span>
+                  <Upload className="h-3.5 w-3.5 mr-1" />
+                  Import CSV
+                </span>
+              </Button>
+            </label>
+          </div>
         </div>
       </Card>
 
@@ -412,21 +416,21 @@ export default function PurchasingPage() {
       ) : (
         <Card className="rounded-[4px] border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1200px]">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow className="border-slate-200">
-                  <TableHead className="text-xs font-medium text-slate-900 w-16 text-center">Active</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900 w-16 text-center">Ingredient</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900 sticky left-0 bg-slate-50 z-10">Item</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900">Category</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900">Supplier</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900">Brand</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900">SKU</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900">Order Unit</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900">Unit Desc</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900 text-right">Unit Cost</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900">Last Review</TableHead>
-                  <TableHead className="text-xs font-medium text-slate-900 text-center sticky right-0 bg-slate-50 z-10 border-l border-slate-200">Actions</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Item</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Supplier</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 text-right px-2 py-2">Cost</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden md:table-cell">Category</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden lg:table-cell">Brand</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">SKU</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Order Unit</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Unit Desc</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Last Review</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 w-10 text-center px-1.5 py-2">Active</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 w-10 text-center px-1.5 py-2">Ingr.</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 text-center px-1.5 py-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -436,7 +440,23 @@ export default function PurchasingPage() {
                     className={`border-slate-200 ${!item.active ? 'opacity-50 bg-slate-50' : ''}`} 
                     data-testid={`row-item-${item.id}`}
                   >
-                    <TableCell className="text-center">
+                    <TableCell className="text-[11px] text-slate-900 font-medium px-2 py-1.5">
+                      {item.item}
+                      {!item.active && (
+                        <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Inactive</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5">{item.supplierName || <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
+                    <TableCell className="text-[11px] text-slate-900 font-medium text-right px-2 py-1.5">
+                      {item.unitCost !== null ? thb(item.unitCost) : <span className="text-amber-600 text-[10px]">Missing</span>}
+                    </TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden md:table-cell">{item.category || '-'}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden lg:table-cell">{item.brand || '-'}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.supplierSku || '-'}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.orderUnit || <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.unitDescription || '-'}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.lastReviewDate || '-'}</TableCell>
+                    <TableCell className="text-center px-1.5 py-1.5">
                       <Switch
                         data-testid={`switch-active-${item.id}`}
                         checked={item.active}
@@ -444,9 +464,10 @@ export default function PurchasingPage() {
                           toggleActiveMutation.mutate({ id: item.id, active: checked });
                         }}
                         disabled={toggleActiveMutation.isPending}
+                        className="scale-75"
                       />
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center px-1.5 py-1.5">
                       <Switch
                         data-testid={`switch-ingredient-${item.id}`}
                         checked={item.isIngredient || false}
@@ -454,26 +475,11 @@ export default function PurchasingPage() {
                           toggleIngredientMutation.mutate({ id: item.id, isIngredient: checked });
                         }}
                         disabled={toggleIngredientMutation.isPending}
+                        className="scale-75"
                       />
                     </TableCell>
-                    <TableCell className="text-xs text-slate-900 font-medium sticky left-0 bg-white z-10">
-                      {item.item}
-                      {!item.active && (
-                        <Badge variant="secondary" className="ml-2 text-[10px]">Inactive</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.category || '-'}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.supplierName || <span className="text-amber-600">Missing</span>}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.brand || '-'}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.supplierSku || '-'}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.orderUnit || <span className="text-amber-600">Missing</span>}</TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.unitDescription || '-'}</TableCell>
-                    <TableCell className="text-xs text-slate-900 font-medium text-right">
-                      {item.unitCost !== null ? thb(item.unitCost) : <span className="text-amber-600">Missing</span>}
-                    </TableCell>
-                    <TableCell className="text-xs text-slate-600">{item.lastReviewDate || '-'}</TableCell>
-                    <TableCell className="sticky right-0 bg-white z-10 border-l border-slate-200">
-                      <div className="flex gap-1 justify-center">
+                    <TableCell className="px-1 py-1.5">
+                      <div className="flex gap-0.5 justify-center">
                         <Button
                           data-testid={`button-edit-${item.id}`}
                           variant="outline"
@@ -482,18 +488,18 @@ export default function PurchasingPage() {
                             setEditingItem(item);
                             setShowDialog(true);
                           }}
-                          className="text-xs h-8 px-2 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                          className="text-[11px] h-7 w-7 p-0 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
                         >
-                          <Pencil className="h-4 w-4" />
+                          <Pencil className="h-3.5 w-3.5" />
                         </Button>
                         <Button
                           data-testid={`button-delete-${item.id}`}
                           variant="outline"
                           size="sm"
                           onClick={() => setDeleteId(item.id)}
-                          className="text-xs h-8 px-2 border-red-200 text-red-600 hover:bg-red-50"
+                          className="text-[11px] h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
@@ -501,7 +507,7 @@ export default function PurchasingPage() {
                 ))}
                 {filteredItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center text-xs text-slate-600 py-8">
+                    <TableCell colSpan={12} className="text-center text-[11px] text-slate-600 py-6">
                       No items found
                     </TableCell>
                   </TableRow>
@@ -512,7 +518,7 @@ export default function PurchasingPage() {
         </Card>
       )}
 
-      <div className="mt-4 text-xs text-slate-600">
+      <div className="mt-2 text-[11px] text-slate-500">
         Showing {filteredItems.length} of {items.length} items
       </div>
 
