@@ -559,6 +559,29 @@ async function checkSchema() {
             timezone: "Asia/Bangkok"
           });
           console.log("📊 Shift Report V2 auto-generation + email scheduled for 3:10am Bangkok time");
+          // Shift snapshot POS ingestion (08:00 Bangkok, yesterday)
+          const { storeShiftSnapshot } = await import('./services/loyverseService');
+          nodeCron.default.schedule("0 8 * * *", async () => {
+            const targetDate = new Date(Date.now() - 24 * 60 * 60 * 1000)
+              .toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            try {
+              await storeShiftSnapshot(targetDate);
+              console.log(`[SCHEDULER] shift_snapshot_v2 POS sync complete for ${targetDate}`);
+            } catch (error) {
+              console.error('[SCHEDULER] shift_snapshot_v2 POS sync failed', { targetDate, error });
+            }
+          }, { timezone: 'Asia/Bangkok' });
+
+          // Daily anomaly email (08:00 Bangkok, same pass)
+          const { runDailyShiftAnomalyAudit } = await import('./services/shiftReportEmail');
+          nodeCron.default.schedule("0 8 * * *", async () => {
+            try {
+              const result = await runDailyShiftAnomalyAudit();
+              console.log('[SCHEDULER] Daily shift anomaly audit done', result);
+            } catch (error) {
+              console.error('[SCHEDULER] Daily shift anomaly audit failed', error);
+            }
+          }, { timezone: 'Asia/Bangkok' });
           
           // PATCH O3 — LOYVERSE QUEUE SCHEDULER
           const { processLoyverseQueue } = await import('./services/loyverseQueue.js');
