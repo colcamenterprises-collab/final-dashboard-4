@@ -7,12 +7,14 @@ export const ROUTES = {
   // Operations (Core active routes only)
   DAILY_STOCK: "/operations/daily-stock",
   DAILY_SALES_LIBRARY: "/operations/daily-sales-v2/library",
+  DAILY_SALES_LIBRARY_ALT: "/operations/daily-sales-library",
   ANALYSIS: "/operations/analysis",
   SHOPPING_LIST: "/operations/shopping-list",
   PURCHASING: "/operations/purchasing",
   PURCHASING_MAPPING: "/operations/purchasing-mapping",
   PURCHASING_SHIFT_LOG: "/operations/purchasing-shift-log",
   PURCHASING_ANALYTICS: "/operations/purchasing-analytics",
+  PURCHASING_LIST: "/operations/purchasing-list/:id",
   INGREDIENT_PURCHASING: "/operations/ingredient-purchasing",
   INGREDIENT_PURCHASING_NEW: "/operations/ingredient-purchasing/new",
   INGREDIENT_PURCHASING_EDIT: "/operations/ingredient-purchasing/:id",
@@ -27,6 +29,8 @@ export const ROUTES = {
   // DAILY_SHIFT_ANALYSIS: "/operations/analysis/daily-shift-analysis", // Hidden - can be re-enabled
   STOCK_REVIEW: "/operations/analysis/stock-review",
   STOCK_RECONCILIATION: "/analysis/stock-reconciliation",
+  ANALYSIS_STOCK_REVIEW: "/analysis/stock-review",
+  ANALYSIS_LEDGERS: "/analysis/ledgers",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",
@@ -36,6 +40,7 @@ export const ROUTES = {
   HEALTH_SAFETY_QUESTIONS: "/operations/health-safety-audit/questions",
   INGREDIENTS_MASTER: "/operations/ingredients-master",
   RECIPE_MAPPING: "/operations/recipe-mapping",
+  OPS_PURCHASING_LIVE: "/ops/purchasing-live",
   PRODUCTS: "/products",
   PRODUCT_NEW: "/products/new",
   PRODUCT_DETAIL: "/products/:id",
@@ -55,6 +60,7 @@ export const ROUTES = {
   // RECIPES_MASTER: merged into RECIPES
   RECIPE_CARDS: "/menu/recipe-cards",
   INGREDIENT_MANAGEMENT: "/menu/ingredient-management",
+  INGREDIENT_EDIT: "/menu/ingredients/edit/:id",
   // INGREDIENTS_MASTER: merged into INGREDIENTS
   COST_CALCULATOR: "/menu/cost-calculator",
   INGREDIENTS: "/menu/ingredients",
@@ -78,6 +84,20 @@ export const ROUTES = {
   LOYVERSE_MAPPING: "/admin/loyverse-mapping",
   DATA_SAFETY: "/admin/data-safety",
   INGREDIENTS_PAGE: "/menu-management/ingredients",
+
+  // Reports
+  SHIFT_REPORT: "/reports/shift-report",
+  SHIFT_REPORT_HISTORY: "/reports/shift-report/history",
+  SHIFT_REPORT_VIEW: "/reports/shift-report/view/:id",
+
+  // Partners
+  PARTNERS: "/partners",
+  PARTNERS_ANALYTICS: "/partners/analytics",
+
+  // Delivery
+  DELIVERY_ADMIN: "/delivery/admin",
+  DELIVERY_DRIVERS: "/delivery/drivers",
+  DELIVERY_HISTORY: "/delivery/history",
 
   // Membership
   MEMBERSHIP: "/membership",
