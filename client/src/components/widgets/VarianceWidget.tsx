@@ -14,9 +14,8 @@ export function VarianceWidget() {
   const { data: variance } = useQuery({
     queryKey: ["daily-variance"],
     queryFn: async () => {
-      const today = new Date().toISOString().split("T")[0];
       const res = await axios.get(`/api/reports/latest`);
-      return res.data?.variance as VarianceData;
+      return (res.data?.variance as VarianceData) || null;
     },
   });
 

@@ -3681,8 +3681,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Golden Patch - Expenses Import & Approval Routes
   app.use('/api/expenses', expensesImportRouter);
   
-  // Partners Router - Dedicated endpoints for partner analytics
-  app.use('/api/partners', partnersRouter);
+  // Partners Router - Partner bar routes (no auth) must come BEFORE analytics routes (auth-protected)
+  // to prevent the auth middleware from intercepting public partner bar endpoints
 
   // Balance Reconciliation Router - Cash balance comparisons 
   app.use('/api/balance', balanceRoutes);
@@ -3717,6 +3717,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/payments/qr', qrDynamicRoutes);
   app.use('/api/partners', partnerBarRoutes);
   app.use('/api/partners', partnerAnalyticsRoutes);
+  app.use('/api/partners', partnersRouter);
   app.use('/api/delivery', deliveryRoutes);
   app.use('/api/kds', kdsRoutes);
   app.use('/api/menu-v3', menuV3Routes);

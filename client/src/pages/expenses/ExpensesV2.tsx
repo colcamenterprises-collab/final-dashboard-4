@@ -31,7 +31,7 @@ export default function ExpensesV2Page() {
     queryKey: ["/api/expenses-v2/all"],
     queryFn: async () => {
       const res = await axios.get("/api/expenses-v2/all");
-      return res.data;
+      return Array.isArray(res.data) ? res.data : (res.data?.data || []);
     }
   });
 
