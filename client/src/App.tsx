@@ -219,7 +219,6 @@ export default function App() {
                 <Route path="/products" element={<Guard><Products /></Guard>} />
                 <Route path="/products/new" element={<Guard><ProductPage /></Guard>} />
                 <Route path="/products/:id" element={<Guard><ProductPage /></Guard>} />
-                <Route path={ROUTES.INGREDIENTS} element={<Guard><IngredientsMaster /></Guard>} />
 
                 <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
                 <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
