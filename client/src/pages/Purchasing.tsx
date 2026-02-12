@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShoppingCart, Package, Plus, Search, FileText, DollarSign, BarChart3 } from "lucide-react";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 import { JussiChatBubble } from "@/components/JussiChatBubble";
 
 
@@ -55,7 +55,7 @@ const Purchasing = () => {
         
         {/* Navigation to other Operations sections */}
         <div className="flex flex-wrap gap-2 mt-3 sm:mt-4">
-          <Link href="/daily-sales-stock">
+          <Link to="/daily-sales-stock">
             <Button variant="outline" className="px-3 py-2">
               <FileText className="h-4 w-4 mr-2" />
               Daily Sales & Stock
@@ -65,13 +65,13 @@ const Purchasing = () => {
             <ShoppingCart className="h-4 w-4 mr-2" />
             Purchasing (Current)
           </Button>
-          <Link href="/expenses">
+          <Link to="/expenses">
             <Button variant="outline" className="px-3 py-2">
               <DollarSign className="h-4 w-4 mr-2" />
               Expenses
             </Button>
           </Link>
-          <Link href="/reports-analysis">
+          <Link to="/reports-analysis">
             <Button variant="outline" className="px-3 py-2">
               <BarChart3 className="h-4 w-4 mr-2" />
               <span className="text-xs sm:text-sm font-medium">Reports & Analysis</span>

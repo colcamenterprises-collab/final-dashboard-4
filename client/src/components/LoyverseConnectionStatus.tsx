@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Wifi, WifiOff, RefreshCw } from "lucide-react";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 
 interface LoyverseConnectionProps {
   compact?: boolean;
@@ -52,7 +52,7 @@ export default function LoyverseConnectionStatus({ compact = false }: LoyverseCo
               >
                 {isLoading ? "Checking..." : status?.connected ? "Connected" : "Disconnected"}
               </Badge>
-              <Link href="/pos-loyverse">
+              <Link to="/pos-loyverse">
                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
                   Manage
                 </Button>
@@ -107,7 +107,7 @@ export default function LoyverseConnectionStatus({ compact = false }: LoyverseCo
            "Connection failed"}
         </p>
         <div className="mt-3">
-          <Link href="/pos-loyverse">
+          <Link to="/pos-loyverse">
             <Button variant="outline" size="sm" className="w-full">
               Manage Integration
             </Button>

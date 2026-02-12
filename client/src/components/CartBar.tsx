@@ -1,6 +1,6 @@
 // PATCH O2 — FLOATING CART BAR
 import { useCart } from "../lib/cartStore";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 
 export default function CartBar() {
   const { items } = useCart();
@@ -13,7 +13,7 @@ export default function CartBar() {
     <div className="fixed bottom-0 left-0 right-0 bg-black text-white p-4 flex justify-between items-center shadow-lg z-50">
       <div>{items.length} items · {subtotal} THB</div>
       <Link
-        href="/online-ordering/checkout"
+        to="/online-ordering/checkout"
         className="px-4 py-2 bg-white text-black rounded"
       >
         Checkout

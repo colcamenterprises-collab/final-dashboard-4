@@ -3,8 +3,7 @@ import { MetricCard, SectionCard, ModernButton } from "@/components/ui";
 import BalanceCard from "@/components/BalanceCard";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { DoughnutChart } from "@/components/health";
 import { VarianceWidget } from "@/components/widgets/VarianceWidget";
 import { Button } from "@/components/ui/button";
@@ -75,7 +74,7 @@ function ExpensesV2Tile() {
     },
   });
 
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="expenses-v2-tile">
@@ -84,7 +83,7 @@ function ExpensesV2Tile() {
         {isLoading ? "—" : `${(data?.monthlyTotal || 0).toLocaleString()} THB`}
       </div>
       <button
-        onClick={() => setLocation("/finance/expenses-v2")}
+        onClick={() => navigate("/finance/expenses-v2")}
         className="mt-3 text-xs font-semibold text-slate-900 underline"
         data-testid="link-view-expenses-v2"
       >
@@ -162,7 +161,7 @@ function ShiftHealthTile() {
 // Balance Hero Component
 function BalanceHero() {
   const queryClient = useQueryClient();
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
 
   const { data: financeSummary } = useQuery({
     queryKey: ["/api/finance/summary/today"],
@@ -183,7 +182,7 @@ function BalanceHero() {
 
         <div className="flex flex-col sm:flex-row gap-3">
           <button
-            onClick={() => setLocation("/operations/daily-reports")}
+            onClick={() => navigate("/operations/daily-reports")}
             className="bg-white/10 hover:bg-white/20 text-white border border-white/20 w-full sm:w-auto text-xs font-semibold py-2 px-3 rounded transition-colors flex items-center justify-center gap-2"
             data-testid="button-view-latest-report"
           >

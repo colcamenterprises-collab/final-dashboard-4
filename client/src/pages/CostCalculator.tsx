@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 
 export default function CostCalculator() {
   const [recipeName, setRecipeName] = useState("");
@@ -48,7 +48,7 @@ export default function CostCalculator() {
         <AlertTitle className="text-amber-800 font-medium">Read-Only View</AlertTitle>
         <AlertDescription className="text-amber-700">
           Recipe editing has moved to{" "}
-          <Link href="/recipe-management" className="underline font-medium hover:text-amber-900">
+          <Link to="/recipe-management" className="underline font-medium hover:text-amber-900">
             Recipe Management
           </Link>.
           This page is deprecated and will be removed.

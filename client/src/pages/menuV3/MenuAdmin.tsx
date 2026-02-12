@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import CategoriesEditor from "./CategoriesEditor";
 import ItemsEditor from "./ItemsEditor";
 import ModifiersEditor from "./ModifiersEditor";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 
 export default function MenuAdmin() {
   const [view, setView] = useState("categories");
@@ -32,7 +32,7 @@ export default function MenuAdmin() {
       <div style={{ marginTop: "24px", padding: "16px", backgroundColor: "#fef3c7", borderRadius: "8px", border: "1px solid #f59e0b" }}>
         <p style={{ color: "#92400e", fontWeight: 500 }}>
           Recipe editing has moved to{" "}
-          <Link href="/recipe-management" style={{ color: "#1d4ed8", textDecoration: "underline" }}>
+          <Link to="/recipe-management" style={{ color: "#1d4ed8", textDecoration: "underline" }}>
             Recipe Management
           </Link>
         </p>

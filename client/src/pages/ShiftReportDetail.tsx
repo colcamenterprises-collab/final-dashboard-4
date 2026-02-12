@@ -1,8 +1,7 @@
-import { useParams } from "wouter";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { useLocation } from "wouter";
 
 interface ShiftReport {
   id: string;
@@ -26,7 +25,7 @@ interface ShiftReport {
 
 export default function ShiftReportDetail() {
   const { date } = useParams();
-  const [, setLocation] = useLocation();
+  const navigate = useNavigate();
   
   const { data: report, isLoading, error } = useQuery<ShiftReport>({
     queryKey: ['/api/shift-reports', date],
@@ -58,7 +57,7 @@ export default function ShiftReportDetail() {
             <div className="text-center">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">Report Not Found</h2>
               <p className="text-gray-600 mb-4">No shift report found for {date}</p>
-              <Button onClick={() => setLocation('/reports-analysis?tab=analysis')}>
+              <Button onClick={() => navigate('/reports-analysis?tab=analysis')}>
                 Back to Analysis
               </Button>
             </div>
@@ -99,7 +98,7 @@ export default function ShiftReportDetail() {
         </div>
         <Button 
           variant="outline" 
-          onClick={() => setLocation('/reports-analysis?tab=analysis')}
+          onClick={() => navigate('/reports-analysis?tab=analysis')}
         >
           Back to Analysis
         </Button>

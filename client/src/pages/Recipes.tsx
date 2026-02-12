@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Edit, Save, X, Trash2 } from "lucide-react";
-import { Link } from "wouter";
+import { Link } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -302,7 +302,7 @@ const Recipes = () => {
       {/* READ-ONLY BANNER */}
       <div className="mb-4 bg-amber-50 border border-amber-200 rounded p-3 text-sm text-amber-800">
         <strong>Read-only</strong> — Recipe editing is managed in{" "}
-        <Link href="/recipe-management" className="text-emerald-600 underline">Recipe Management</Link>
+        <Link to="/recipe-management" className="text-emerald-600 underline">Recipe Management</Link>
       </div>
       
       <div className="flex items-baseline justify-between mb-4">

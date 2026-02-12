@@ -3,12 +3,12 @@
 // PATCH O4 — DISPLAY ETA
 // PATCH O5 — REAL-TIME PAYMENT STATUS POLLING
 import { useEffect, useState } from "react";
-import { useSearch } from "wouter";
+import { useSearchParams } from "react-router-dom";
 import axios from "../../utils/axiosInstance";
 
 export default function OrderConfirmation() {
-  const search = useSearch();
-  const params = new URLSearchParams(search);
+  const [searchParams] = useSearchParams();
+  const params = searchParams;
   const orderId = params.get("orderId");
   const orderNumber = params.get("orderNumber");
   const etaParam = params.get("etaJSON");
