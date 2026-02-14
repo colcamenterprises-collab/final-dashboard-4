@@ -2703,7 +2703,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const crypto = await import("crypto");
 
       if (req.body.type === "rolls") {
-        const { date, quantity, cost, paid } = req.body;
+        const { date, quantity, cost, paid, submittedBy } = req.body;
         const purchaseDate = date || new Date().toISOString().split('T')[0];
         
         // Insert into purchase_tally for rolls count (always - this tracks inventory)
@@ -2713,7 +2713,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             gen_random_uuid(),
             NOW(),
             ${purchaseDate}::date,
-            NULL,
+            ${submittedBy || null},
             ${'Bakery'},
             ${paid ? Number(cost) : 0},
             ${paid ? 'Rolls purchase (paid)' : 'Rolls pickup (unpaid)'},
@@ -2751,7 +2751,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "meat") {
-        const { date, meatType, weightKg } = req.body;
+        const { date, meatType, weightKg, submittedBy } = req.body;
         const purchaseDate = date || new Date().toISOString().split('T')[0];
         
         // Meat → insert into purchase_tally with proper weight handling
@@ -2764,7 +2764,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             gen_random_uuid(),
             NOW(),
             ${purchaseDate}::date,
-            NULL,
+            ${submittedBy || null},
             ${'Meat Supplier'},
             0,
             ${meatType},
@@ -2777,7 +2777,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "drinks") {
-        const { date, items } = req.body;
+        const { date, items, submittedBy } = req.body;
         const purchaseDate = date || new Date().toISOString().split('T')[0];
         
         // Handle multiple drink items - create separate records for each
@@ -2789,7 +2789,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
               gen_random_uuid(),
               NOW(),
               ${purchaseDate}::date,
-              NULL,
+              ${submittedBy || null},
               NULL,
               0,
               ${JSON.stringify({ "drinkType": item.type, "qty": item.quantity, "type": "drinks" })}
@@ -2817,7 +2817,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const { id } = req.params;
 
       if (req.body.type === "rolls") {
-        const { date, quantity, cost } = req.body;
+        const { date, quantity, cost, submittedBy } = req.body;
         const purchaseDate = date || new Date().toISOString().split('T')[0];
         
         // Update purchase_tally for rolls
@@ -2827,6 +2827,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             date = ${purchaseDate}::date,
             rolls_pcs = ${Number(quantity)},
             amount_thb = ${Number(cost)},
+            staff = ${submittedBy || null},
             supplier = ${'Bakery'},
             notes = ${'Rolls purchase'}
           WHERE id = ${id}
@@ -2841,7 +2842,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "meat") {
-        const { date, meatType, weightKg } = req.body;
+        const { date, meatType, weightKg, submittedBy } = req.body;
         const purchaseDate = date || new Date().toISOString().split('T')[0];
         const weightGrams = Math.round(Number(weightKg) * 1000);
         
@@ -2851,6 +2852,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           SET 
             date = ${purchaseDate}::date,
             meat_grams = ${weightGrams},
+            staff = ${submittedBy || null},
             supplier = ${'Meat Supplier'},
             notes = ${meatType}
           WHERE id = ${id}
@@ -2865,7 +2867,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "drinks") {
-        const { date, items } = req.body;
+        const { date, items, submittedBy } = req.body;
         const purchaseDate = date || new Date().toISOString().split('T')[0];
         
         // For drinks, we update the first item only (since edit is one-to-one)
@@ -2875,6 +2877,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             UPDATE purchase_tally
             SET 
               date = ${purchaseDate}::date,
+              staff = ${submittedBy || null},
               notes = ${JSON.stringify({ "drinkType": item.type, "qty": item.quantity, "type": "drinks" })}
             WHERE id = ${id}
             RETURNING id, created_at, date, notes as item

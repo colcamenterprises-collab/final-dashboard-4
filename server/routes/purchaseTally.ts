@@ -59,15 +59,17 @@ purchaseTallyRouter.get("/", async (req, res) => {
     
     // Month filter (YYYY-MM format)
     if (month && typeof month === 'string') {
-      const year = parseInt(month.split('-')[0]);
-      const monthNum = parseInt(month.split('-')[1]);
-      const startDate = new Date(year, monthNum - 1, 1);
-      const endDate = new Date(year, monthNum, 0);
-      
+      const [yearStr, monthStr] = month.split('-');
+      const year = parseInt(yearStr, 10);
+      const monthNum = parseInt(monthStr, 10);
+      const startDate = `${yearStr}-${monthStr}-01`;
+      const endDay = new Date(Date.UTC(year, monthNum, 0)).getUTCDate();
+      const endDate = `${yearStr}-${monthStr}-${String(endDay).padStart(2, '0')}`;
+
       conditions.push(
         and(
-          gte(purchaseTally.date, startDate.toISOString().split('T')[0]),
-          lte(purchaseTally.date, endDate.toISOString().split('T')[0])
+          gte(purchaseTally.date, startDate),
+          lte(purchaseTally.date, endDate)
         )
       );
     }
