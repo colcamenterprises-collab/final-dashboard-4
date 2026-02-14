@@ -1,27 +1,12 @@
 /**
  * 🔒 CORE STOCK LOCK
- *
- * Rolls, Meat, and Drinks are FIRST-CLASS STOCK ITEMS.
- *
- * Rules:
- * - All purchases MUST enter via coreStockIntake
- * - No string matching (e.g. "bun", "roll") allowed
- * - No alternate write paths permitted
- * - Ledgers are the ONLY reconciliation mechanism
- *
- * Any change here requires explicit approval.
- */
-
-/**
- * PATCH 3: DRINKS LEDGER SERVICE
- * Mirrors rollsLedger and meatLedger pattern for drinks tracking.
- * Tracks: Drinks Start → Purchased → Sold → Expected End → Actual End → Variance
  */
 import { PrismaClient } from '@prisma/client';
 import { computeShiftAll } from './shiftItems.js';
+import { toShiftDateKey } from '../lib/shiftWindow.js';
+import { getDrinksPurchases } from './stockPurchaseAdapter.js';
 
 const db = new PrismaClient();
-
 const WASTE_ALLOWANCE = Number(process.env.DRINKS_WASTE_ALLOWANCE ?? 2);
 
 export function shiftWindowUTC(shiftDate: string) {
@@ -36,18 +21,15 @@ async function ensureAnalytics(shiftDate: string) {
     SELECT COUNT(*)::bigint AS cnt FROM analytics_shift_item WHERE shift_date = ${shiftDate}::date
   `;
   const has = existing?.[0]?.cnt && Number(existing[0].cnt) > 0;
-  if (!has) {
-    await computeShiftAll(shiftDate);
-  }
+  if (!has) await computeShiftAll(shiftDate);
 }
 
 async function getDrinksSoldFromAnalytics(shiftDate: string): Promise<number> {
   await ensureAnalytics(shiftDate);
-  
   const rows = await db.$queryRaw<{ n: number }[]>`
     SELECT COALESCE(SUM(qty), 0)::int AS n
     FROM analytics_shift_item
-    WHERE shift_date = ${shiftDate}::date 
+    WHERE shift_date = ${shiftDate}::date
       AND (category ILIKE '%drink%' OR category ILIKE '%beverage%')
   `;
   return rows?.[0]?.n ?? 0;
@@ -55,57 +37,47 @@ async function getDrinksSoldFromAnalytics(shiftDate: string): Promise<number> {
 
 async function getDrinksPurchased(shiftDate: string): Promise<{ qty: number }> {
   try {
-    const r = await db.$queryRaw<{ qty: number }[]>`
-      SELECT COALESCE(SUM(qty), 0)::int AS qty
-      FROM stock_received_log
-      WHERE item_type = 'drinks'
-        AND shift_date = ${shiftDate}::date
-    `;
-    return { qty: r?.[0]?.qty ?? 0 };
+    const rows = await getDrinksPurchases(shiftDate);
+    const qty = rows.reduce((sum, row: any) => sum + Number((row as any)?.qty ?? 0), 0);
+    return { qty };
   } catch (_e) {
     console.error('Error fetching drinks purchased:', _e);
     return { qty: 0 };
   }
 }
 
-async function getActualDrinksEnd(shiftDate: string): Promise<{ count: number | null }> {
-  try {
-    const a = await db.$queryRaw<{ drinks_end: number | null }[]>`
-      SELECT (payload->>'drinksEnd')::int AS drinks_end
-      FROM daily_sales_v2
-      WHERE "shiftDate" = ${shiftDate}
-        AND "deletedAt" IS NULL
-      ORDER BY "createdAt" DESC
-      LIMIT 1
-    `;
-    if (a?.length && a[0].drinks_end !== null) {
-      return { count: a[0].drinks_end! };
-    }
-  } catch (_e) {
-    console.error('Error fetching drinks from daily_sales_v2:', _e);
+async function getActualDrinksEnd(shiftDate: string): Promise<{ count: number }> {
+  const form = await db.daily_sales_v2.findFirst({
+    where: { shiftDate, deletedAt: null },
+    orderBy: { createdAt: 'desc' },
+    select: { payload: true },
+  });
+
+  if (!form) return { count: 0 };
+
+  const payload = (form as any).payload || {};
+  const drinksEnd = Number(payload.drinksEnd ?? 0);
+  const drinkStock = payload.drinkStock;
+
+  if (drinkStock && typeof drinkStock === 'object') {
+    const total = Object.values(drinkStock).reduce((sum: number, value) => sum + Number(value ?? 0), 0);
+    return { count: total };
   }
-  return { count: null };
+
+  return { count: drinksEnd || 0 };
 }
 
 async function getDrinksStart(shiftDate: string): Promise<number> {
-  const prev = new Date(shiftDate + 'T00:00:00Z');
+  const prev = new Date(`${shiftDate}T00:00:00Z`);
   prev.setUTCDate(prev.getUTCDate() - 1);
   const prevDate = prev.toISOString().slice(0, 10);
-  
-  const r1 = await db.$queryRaw<{ v: number | null }[]>`
-    SELECT actual_drinks_end AS v FROM drinks_ledger WHERE shift_date = ${prevDate}::date
-  `;
-  if (r1?.[0]?.v !== undefined && r1[0].v !== null) {
-    return r1[0].v;
-  }
-  
-  const r2 = await db.$queryRaw<{ v: number | null }[]>`
-    SELECT estimated_drinks_end AS v FROM drinks_ledger WHERE shift_date = ${prevDate}::date
-  `;
-  if (r2?.[0]?.v !== undefined && r2[0].v !== null) {
-    return r2[0].v;
-  }
-  
+
+  const r1 = await db.$queryRaw<{ v: number | null }[]>`SELECT actual_drinks_end AS v FROM drinks_ledger WHERE shift_date = ${prevDate}::date`;
+  if (r1?.[0]?.v !== undefined && r1[0].v !== null) return r1[0].v;
+
+  const r2 = await db.$queryRaw<{ v: number | null }[]>`SELECT estimated_drinks_end AS v FROM drinks_ledger WHERE shift_date = ${prevDate}::date`;
+  if (r2?.[0]?.v !== undefined && r2[0].v !== null) return r2[0].v;
+
   return 0;
 }
 
@@ -115,38 +87,39 @@ export interface DrinksLedgerEntry {
   drinksPurchased: number;
   drinksSold: number;
   estimatedDrinksEnd: number;
-  actualDrinksEnd: number | null;
+  actualDrinksEnd: number;
   wasteAllowance: number;
   variance: number;
   status: 'PENDING' | 'OK' | 'WARNING' | 'ALERT';
   approved: boolean;
+  provenance: {
+    purchasesSource: string;
+    actualSource: string;
+    soldSource: string;
+  };
 }
 
 export async function computeDrinksLedger(shiftDate: string): Promise<DrinksLedgerEntry> {
-  const { fromISO, toISO } = shiftWindowUTC(shiftDate);
-  
-  const drinksStart = await getDrinksStart(shiftDate);
-  const { qty: drinksPurchased } = await getDrinksPurchased(shiftDate);
-  const drinksSold = await getDrinksSoldFromAnalytics(shiftDate);
-  const { count: actualDrinksEnd } = await getActualDrinksEnd(shiftDate);
-  
+  const normalizedShiftDate = toShiftDateKey(`${shiftDate}T17:00:00+07:00`);
+
+  const drinksStart = await getDrinksStart(normalizedShiftDate);
+  const { qty: drinksPurchased } = await getDrinksPurchased(normalizedShiftDate);
+  const drinksSold = await getDrinksSoldFromAnalytics(normalizedShiftDate);
+  const { count: actualDrinksEnd } = await getActualDrinksEnd(normalizedShiftDate);
+
   const estimatedDrinksEnd = drinksStart + drinksPurchased - drinksSold;
-  const variance = actualDrinksEnd !== null ? actualDrinksEnd - estimatedDrinksEnd : 0;
-  
+  const variance = actualDrinksEnd - estimatedDrinksEnd;
+
   let status: 'PENDING' | 'OK' | 'WARNING' | 'ALERT' = 'PENDING';
-  if (actualDrinksEnd !== null) {
-    const absVariance = Math.abs(variance);
-    if (absVariance <= WASTE_ALLOWANCE) {
-      status = 'OK';
-    } else if (absVariance <= WASTE_ALLOWANCE * 2) {
-      status = 'WARNING';
-    } else {
-      status = 'ALERT';
-    }
-  }
-  
+  const absVariance = Math.abs(variance);
+  if (absVariance <= WASTE_ALLOWANCE) status = 'OK';
+  else if (absVariance <= WASTE_ALLOWANCE * 2) status = 'WARNING';
+  else status = 'ALERT';
+
+  console.info('DRINKS LEDGER', { shiftDate: normalizedShiftDate, purchases: drinksPurchased, soldTotal: drinksSold, actualEnd: actualDrinksEnd });
+
   return {
-    shiftDate,
+    shiftDate: normalizedShiftDate,
     drinksStart,
     drinksPurchased,
     drinksSold,
@@ -156,19 +129,24 @@ export async function computeDrinksLedger(shiftDate: string): Promise<DrinksLedg
     variance,
     status,
     approved: false,
+    provenance: {
+      purchasesSource: 'stock_received_log',
+      actualSource: 'daily_sales_v2.payload',
+      soldSource: 'analytics_shift_item',
+    },
   };
 }
 
 export async function computeAndUpsertDrinksLedger(shiftDate: string): Promise<DrinksLedgerEntry> {
   const entry = await computeDrinksLedger(shiftDate);
-  
+
   await db.$executeRaw`
     INSERT INTO drinks_ledger (
       shift_date, drinks_start, drinks_purchased, drinks_sold,
       estimated_drinks_end, actual_drinks_end, waste_allowance,
       variance, status, approved, created_at, updated_at
     ) VALUES (
-      ${shiftDate}::date, ${entry.drinksStart}, ${entry.drinksPurchased}, ${entry.drinksSold},
+      ${entry.shiftDate}::date, ${entry.drinksStart}, ${entry.drinksPurchased}, ${entry.drinksSold},
       ${entry.estimatedDrinksEnd}, ${entry.actualDrinksEnd}, ${entry.wasteAllowance},
       ${entry.variance}, ${entry.status}, ${entry.approved}, NOW(), NOW()
     )
@@ -183,15 +161,13 @@ export async function computeAndUpsertDrinksLedger(shiftDate: string): Promise<D
       status = EXCLUDED.status,
       updated_at = NOW()
   `;
-  
-  console.log(`[DRINKS_LEDGER] Upserted for ${shiftDate}: start=${entry.drinksStart}, purchased=${entry.drinksPurchased}, sold=${entry.drinksSold}, variance=${entry.variance}`);
-  
+
   return entry;
 }
 
 export async function getDrinksLedgerHistory(days: number = 30): Promise<DrinksLedgerEntry[]> {
   const rows = await db.$queryRaw<any[]>`
-    SELECT 
+    SELECT
       shift_date::text AS "shiftDate",
       drinks_start AS "drinksStart",
       drinks_purchased AS "drinksPurchased",
@@ -206,12 +182,19 @@ export async function getDrinksLedgerHistory(days: number = 30): Promise<DrinksL
     ORDER BY shift_date DESC
     LIMIT ${days}
   `;
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    provenance: {
+      purchasesSource: 'stock_received_log',
+      actualSource: 'daily_sales_v2.payload',
+      soldSource: 'analytics_shift_item',
+    },
+  }));
 }
 
 export async function getDrinksLedgerRange(startDate: string, endDate: string): Promise<any[]> {
   const rows = await db.$queryRaw<any[]>`
-    SELECT 
+    SELECT
       shift_date::text AS shift_date,
       drinks_start,
       drinks_purchased,
@@ -226,5 +209,12 @@ export async function getDrinksLedgerRange(startDate: string, endDate: string): 
     WHERE shift_date >= ${startDate}::date AND shift_date <= ${endDate}::date
     ORDER BY shift_date DESC
   `;
-  return rows;
+  return rows.map((row) => ({
+    ...row,
+    provenance: {
+      purchasesSource: 'stock_received_log',
+      actualSource: 'daily_sales_v2.payload',
+      soldSource: 'analytics_shift_item',
+    },
+  }));
 }
