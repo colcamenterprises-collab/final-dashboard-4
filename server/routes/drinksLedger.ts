@@ -7,8 +7,9 @@ const r = Router();
 r.get('/', async (req, res) => {
   try {
     const qp = req.query as any;
-    if (qp.date) {
-      const s = normalizeDateParam(qp.date);
+    const singleDate = qp.shiftDate || qp.date;
+    if (singleDate) {
+      const s = normalizeDateParam(singleDate);
       const rows = await getDrinksLedgerRange(s, s);
       const row = rows[0] ?? null;
       const win = shiftWindowUTC(s);
