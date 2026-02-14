@@ -10,7 +10,7 @@ type Group = {
  * PHASE L — Navigation & Ownership Reset (Legacy Sidebar)
  * 
  * CANONICAL OWNERSHIP:
- * - PURCHASING = items & stock (Purchasing List, Purchasing Log, Manual Stock Purchase)
+ * - PURCHASING = items & stock (Purchasing List, Purchasing Log)
  * - FINANCE = money only (Expenses, Profit & Loss)
  * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
  * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
@@ -36,7 +36,6 @@ const groups: Group[] = [
       { to: "/operations/purchasing", label: "Purchasing List" },
       { to: "/operations/purchasing-shift-log", label: "Stock Order History" },
       { to: "/operations/ingredient-purchasing", label: "Ingredient Purchasing" },
-      { to: "/operations/manual-stock-purchase", label: "Manual Stock Purchase" },
     ],
   },
   {

@@ -57,7 +57,7 @@ type NavGroup = {
  * PHASE L — Navigation & Ownership Reset
  * 
  * CANONICAL OWNERSHIP:
- * - PURCHASING = items & stock (Purchasing List, Purchasing Log, Manual Stock Purchase)
+ * - PURCHASING = items & stock (Purchasing List, Purchasing Log)
  * - FINANCE = money only (Expenses, Profit & Loss)
  * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
  * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
@@ -101,7 +101,6 @@ const navigationGroups: NavGroup[] = [
       { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
       { to: "/operations/purchasing-shift-log", label: "Stock Order History", icon: Package, testId: "nav-purchasing-log" },
       { to: "/operations/ingredient-purchasing", label: "Ingredient Purchasing", icon: Package, testId: "nav-ingredient-purchasing" },
-      { to: "/operations/manual-stock-purchase", label: "Manual Stock Purchase", icon: Package, testId: "nav-manual-stock-purchase" }
     ]
   },
   {
