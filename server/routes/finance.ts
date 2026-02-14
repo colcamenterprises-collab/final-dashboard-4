@@ -29,26 +29,22 @@ router.get("/summary", async (_req, res) => {
 // GET /api/finance/summary/today - Current Month Sales and Expenses
 router.get("/summary/today", async (_req, res) => {
   try {
-    // Get current month date range
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1; // 1-12
-    
-    // Get verified sales from loyverse_shifts table for current month
-    // Extract net_sales from each shift in the jsonb data array
+
+    // Use Asia/Bangkok business month boundaries from POS shift reports.
     const { rows } = await db.execute(sql`
-      SELECT 
-        COALESCE(
-          SUM(
-            (shift_data->>'net_sales')::decimal
-          ), 0
-        ) as total_sales,
-        COUNT(*) as shift_count
-      FROM loyverse_shifts,
-      jsonb_array_elements(data->'shifts') as shift_data
-      WHERE EXTRACT(YEAR FROM shift_date) = ${year}
-        AND EXTRACT(MONTH FROM shift_date) = ${month}
-        AND jsonb_array_length(data->'shifts') > 0
+      WITH month_window AS (
+        SELECT
+          date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok'))::date AS month_start,
+          (date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok')) + interval '1 month')::date AS next_month_start
+      )
+      SELECT
+        COALESCE(SUM("netSales"), 0) AS total_sales,
+        COUNT(*)::int AS shift_count
+      FROM "PosShiftReport", month_window
+      WHERE "businessDate" >= month_window.month_start
+        AND "businessDate" < month_window.next_month_start
+        AND "businessDate" IS NOT NULL
     `);
     
     // Get shift expenses from PosShiftReport for current month
@@ -58,8 +54,8 @@ router.get("/summary/today", async (_req, res) => {
         COALESCE(SUM("wagesTotal"), 0) as wages_total,
         COALESCE(SUM("otherExpense"), 0) as other_total
       FROM "PosShiftReport"
-      WHERE EXTRACT(YEAR FROM "businessDate") = ${year}
-        AND EXTRACT(MONTH FROM "businessDate") = ${month}
+      WHERE "businessDate" >= date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok'))::date
+        AND "businessDate" < (date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok')) + interval '1 month')::date
         AND "businessDate" IS NOT NULL
     `);
     
@@ -68,8 +64,8 @@ router.get("/summary/today", async (_req, res) => {
       SELECT 
         COALESCE(SUM("costCents") / 100.0, 0) as business_total
       FROM expenses
-      WHERE EXTRACT(YEAR FROM "shiftDate") = ${year}
-        AND EXTRACT(MONTH FROM "shiftDate") = ${month}
+      WHERE ("shiftDate" AT TIME ZONE 'Asia/Bangkok')::date >= date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok'))::date
+        AND ("shiftDate" AT TIME ZONE 'Asia/Bangkok')::date < (date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok')) + interval '1 month')::date
     `);
     
     const currentMonthSales = parseFloat(rows[0]?.total_sales || '0');

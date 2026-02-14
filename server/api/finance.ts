@@ -36,24 +36,21 @@ const requireAuth = (req: Request, res: Response, next: NextFunction) => {
 // Public endpoint - no auth required for dashboard display
 router.get('/summary/today', async (req: Request, res: Response) => {
   try {
-    // Get current month date range
     const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth() + 1; // 1-12
-    
+
     const { rows } = await db.execute(sql`
-      SELECT 
-        COALESCE(
-          SUM(
-            (shift_data->>'net_sales')::decimal
-          ), 0
-        ) as total_sales,
-        COUNT(*) as shift_count
-      FROM loyverse_shifts,
-      jsonb_array_elements(data->'shifts') as shift_data
-      WHERE EXTRACT(YEAR FROM shift_date) = ${year}
-        AND EXTRACT(MONTH FROM shift_date) = ${month}
-        AND jsonb_array_length(data->'shifts') > 0
+      WITH month_window AS (
+        SELECT
+          date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok'))::date AS month_start,
+          (date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok')) + interval '1 month')::date AS next_month_start
+      )
+      SELECT
+        COALESCE(SUM("netSales"), 0) AS total_sales,
+        COUNT(*)::int AS shift_count
+      FROM "PosShiftReport", month_window
+      WHERE "businessDate" >= month_window.month_start
+        AND "businessDate" < month_window.next_month_start
+        AND "businessDate" IS NOT NULL
     `);
     
     // Get shift expenses by parsing payload from daily_sales_v2 (matches expenses page display)
@@ -63,8 +60,8 @@ router.get('/summary/today', async (req: Request, res: Response) => {
         payload
       FROM daily_sales_v2
       WHERE payload IS NOT NULL
-        AND EXTRACT(YEAR FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${year}
-        AND EXTRACT(MONTH FROM TO_DATE("shiftDate", 'YYYY-MM-DD')) = ${month}
+        AND TO_DATE("shiftDate", 'YYYY-MM-DD') >= date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok'))::date
+        AND TO_DATE("shiftDate", 'YYYY-MM-DD') < (date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok')) + interval '1 month')::date
     `);
     
     // Parse payload to get accurate line-item totals
@@ -100,8 +97,8 @@ router.get('/summary/today', async (req: Request, res: Response) => {
       SELECT 
         COALESCE(SUM("costCents"), 0) as business_total
       FROM expenses
-      WHERE EXTRACT(YEAR FROM "shiftDate") = ${year}
-        AND EXTRACT(MONTH FROM "shiftDate") = ${month}
+      WHERE ("shiftDate" AT TIME ZONE 'Asia/Bangkok')::date >= date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok'))::date
+        AND ("shiftDate" AT TIME ZONE 'Asia/Bangkok')::date < (date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok')) + interval '1 month')::date
         AND source = 'DIRECT'
     `);
     
@@ -131,9 +128,22 @@ router.get('/summary/today', async (req: Request, res: Response) => {
     
   } catch (error) {
     console.error('[EXPENSE_SAFE_FAIL] finance/summary/today:', error);
-    res.status(500).json({
-      error: 'FINANCE_SUMMARY_FAILED',
-      message: error instanceof Error ? error.message : 'Failed to build finance summary.'
+    res.status(200).json({
+      sales: 0,
+      currentMonthSales: 0,
+      shiftCount: 0,
+      expenses: 0,
+      currentMonthExpenses: 0,
+      expenseBreakdown: {
+        shopping: 0,
+        wages: 0,
+        business: 0,
+        shiftTotal: 0,
+      },
+      month: new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+      netProfit: 0,
+      timestamp: new Date().toISOString(),
+      warning: 'SAFE_FALLBACK_USED',
     });
   }
 });
