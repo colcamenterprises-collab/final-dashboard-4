@@ -2,14 +2,25 @@
 import { Router } from 'express';
 import { computeAndUpsertMeatLedger, getMeatLedgerRange, shiftWindowUTC, updateMeatLedgerManual } from '../services/meatLedger.js';
 import { normalizeDateParam } from '../utils/normalizeDate.js';
+import { toShiftDateKey } from '../lib/shiftWindow.js';
 
 const r = Router();
+
+function logValidation400(route: string, req: any, validationFailure: string, errorMessage: string) {
+  console.warn('[meat-ledger][400]', {
+    route,
+    query: req.query,
+    body: req.body,
+    validationFailure,
+    errorMessage,
+  });
+}
 
 // GET one or range
 r.get('/', async (req, res) => {
   try {
     const qp = req.query as any;
-    const singleDate = qp.shiftDate || qp.date;
+    const singleDate = qp.shiftDate || qp.date || toShiftDateKey(new Date());
     if (singleDate) {
       const s = normalizeDateParam(singleDate);
       const rows = await getMeatLedgerRange(s, s);
@@ -23,6 +34,7 @@ r.get('/', async (req, res) => {
       const rows = await getMeatLedgerRange(start, end);
       return res.json({ ok: true, start, end, rows });
     }
+    logValidation400('/api/analysis/meat-ledger', req, 'missing date and range query params', 'Provide ?date= or ?start=&end=');
     return res.status(400).json({ ok: false, error: 'Provide ?date= or ?start=&end=' });
   } catch (e:any) {
     return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
@@ -49,6 +61,7 @@ r.post('/rebuild', async (req, res) => {
       }
       return res.json({ ok: true, results: out });
     }
+    logValidation400('/api/analysis/meat-ledger/rebuild', req, 'missing date and range query params', 'Provide ?date= or ?start=&end=');
     return res.status(400).json({ ok: false, error: 'Provide ?date= or ?start=&end=' });
   } catch (e:any) {
     return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
@@ -98,6 +111,7 @@ r.post('/update-manual', async (req, res) => {
     const { shiftDate, meatPurchasedManualG, actualMeatEndManualG, notes } = req.body;
     
     if (!shiftDate) {
+      logValidation400('/api/analysis/meat-ledger/update-manual', req, 'shiftDate missing in body', 'shiftDate is required');
       return res.status(400).json({ ok: false, error: 'shiftDate is required' });
     }
     
@@ -121,6 +135,7 @@ r.post('/approve', async (req, res) => {
     const { shiftDate, approved } = req.body;
     
     if (!shiftDate) {
+      logValidation400('/api/analysis/meat-ledger/approve', req, 'shiftDate missing in body', 'shiftDate is required');
       return res.status(400).json({ ok: false, error: 'shiftDate is required' });
     }
     

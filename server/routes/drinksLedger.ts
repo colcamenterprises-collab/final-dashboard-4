@@ -1,13 +1,24 @@
 import { Router } from 'express';
 import { computeAndUpsertDrinksLedger, getDrinksLedgerRange, shiftWindowUTC } from '../services/drinksLedger.js';
 import { normalizeDateParam } from '../utils/normalizeDate.js';
+import { toShiftDateKey } from '../lib/shiftWindow.js';
 
 const r = Router();
+
+function logValidation400(route: string, req: any, validationFailure: string, errorMessage: string) {
+  console.warn('[drinks-ledger][400]', {
+    route,
+    query: req.query,
+    body: req.body,
+    validationFailure,
+    errorMessage,
+  });
+}
 
 r.get('/', async (req, res) => {
   try {
     const qp = req.query as any;
-    const singleDate = qp.shiftDate || qp.date;
+    const singleDate = qp.shiftDate || qp.date || toShiftDateKey(new Date());
     if (singleDate) {
       const s = normalizeDateParam(singleDate);
       const rows = await getDrinksLedgerRange(s, s);
@@ -21,6 +32,7 @@ r.get('/', async (req, res) => {
       const rows = await getDrinksLedgerRange(start, end);
       return res.json({ ok: true, start, end, rows });
     }
+    logValidation400('/api/analysis/drinks-ledger', req, 'missing date and range query params', 'Provide ?date= or ?start=&end=');
     return res.status(400).json({ ok: false, error: 'Provide ?date= or ?start=&end=' });
   } catch (e:any) {
     return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });
@@ -46,6 +58,7 @@ r.post('/rebuild', async (req, res) => {
       }
       return res.json({ ok: true, results: out });
     }
+    logValidation400('/api/analysis/drinks-ledger/rebuild', req, 'missing date and range query params', 'Provide ?date= or ?start=&end=');
     return res.status(400).json({ ok: false, error: 'Provide ?date= or ?start=&end=' });
   } catch (e:any) {
     return res.status(500).json({ ok: false, error: e?.message ?? 'unknown' });

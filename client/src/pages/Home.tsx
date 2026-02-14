@@ -632,6 +632,7 @@ function StockLodgementPanels() {
   const [rollsMessage, setRollsMessage] = useState('');
   const [meatMessage, setMeatMessage] = useState('');
   const [drinksMessage, setDrinksMessage] = useState('');
+  const [snapshotError, setSnapshotError] = useState<string>('');
 
   const { data: drinksSkus } = useQuery({
     queryKey: ['purchasing-drinks-skus'],
@@ -641,15 +642,55 @@ function StockLodgementPanels() {
     },
   });
 
+  const snapshotRequest = async (label: string, endpoint: string, params: Record<string, string>) => {
+    console.info('[refreshSnapshots] request', { method: 'GET', endpoint, params });
+    try {
+      const response = await axios.get(endpoint, { params });
+      return response;
+    } catch (error: any) {
+      console.error('[refreshSnapshots] request_failed', {
+        method: 'GET',
+        endpoint,
+        params,
+        status: error?.response?.status,
+        responseBody: error?.response?.data,
+      });
+      throw Object.assign(error ?? new Error('snapshot request failed'), { snapshotLabel: label });
+    }
+  };
+
   const refreshSnapshots = async () => {
-    const [rollsRes, meatRes, drinksRes] = await Promise.all([
-      axios.get('/api/analysis/rolls-ledger', { params: { shiftDate } }),
-      axios.get('/api/analysis/meat-ledger', { params: { shiftDate } }),
-      axios.get('/api/analysis/drinks-ledger', { params: { shiftDate } }),
+    setSnapshotError('');
+    const results = await Promise.allSettled([
+      snapshotRequest('rolls', '/api/analysis/rolls-ledger', { shiftDate }),
+      snapshotRequest('meat', '/api/analysis/meat-ledger', { shiftDate }),
+      snapshotRequest('drinks', '/api/analysis/drinks-ledger', { shiftDate }),
     ]);
-    setRollsSummary(toStockSummary(rollsRes.data?.row, 'rolls'));
-    setMeatSummary(toStockSummary(meatRes.data?.row, 'meat'));
-    setDrinksSummary(toStockSummary(drinksRes.data?.row, 'drinks'));
+
+    const [rollsRes, meatRes, drinksRes] = results;
+
+    if (rollsRes.status === 'fulfilled') {
+      setRollsSummary(toStockSummary(rollsRes.value.data?.row, 'rolls'));
+    } else {
+      setRollsSummary(null);
+    }
+
+    if (meatRes.status === 'fulfilled') {
+      setMeatSummary(toStockSummary(meatRes.value.data?.row, 'meat'));
+    } else {
+      setMeatSummary(null);
+    }
+
+    if (drinksRes.status === 'fulfilled') {
+      setDrinksSummary(toStockSummary(drinksRes.value.data?.row, 'drinks'));
+    } else {
+      setDrinksSummary(null);
+    }
+
+    const failed = results.filter((result) => result.status === 'rejected');
+    if (failed.length > 0) {
+      setSnapshotError('Snapshot unavailable. Some stock summaries could not be loaded.');
+    }
   };
 
   useEffect(() => { void refreshSnapshots(); }, []);
@@ -697,6 +738,11 @@ function StockLodgementPanels() {
 
   return (
     <div className="space-y-4">
+      {snapshotError && (
+        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          {snapshotError}
+        </div>
+      )}
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold text-slate-900">Rolls Lodgement</h2>
         <div className="mt-3 space-y-2">
