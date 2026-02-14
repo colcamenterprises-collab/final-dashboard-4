@@ -26,7 +26,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import axios from "axios";
-import { resolveShiftDate } from "@/utils/resolveShiftDate";
+import { StockLodgementPanels } from "@/components/stock-lodgement/StockLodgementPanels";
 
 // PATCH 7 — SHIFT ALERT BANNER
 function ShiftAlertBanner() {
@@ -618,192 +618,6 @@ function StockSummaryTable({ summary }: { summary: StockLedgerSummary | null }) 
   );
 }
 
-function StockLodgementPanels() {
-  const shiftDate = resolveShiftDate();
-  const [rollsStaffName, setRollsStaffName] = useState('');
-  const [rollsPurchased, setRollsPurchased] = useState('');
-  const [meatStaffName, setMeatStaffName] = useState('');
-  const [kilosPurchased, setKilosPurchased] = useState('');
-  const [drinksStaffName, setDrinksStaffName] = useState('');
-  const [drinkQuantities, setDrinkQuantities] = useState<Record<string, string>>({});
-  const [rollsSummary, setRollsSummary] = useState<StockLedgerSummary | null>(null);
-  const [meatSummary, setMeatSummary] = useState<StockLedgerSummary | null>(null);
-  const [drinksSummary, setDrinksSummary] = useState<StockLedgerSummary | null>(null);
-  const [rollsMessage, setRollsMessage] = useState('');
-  const [meatMessage, setMeatMessage] = useState('');
-  const [drinksMessage, setDrinksMessage] = useState('');
-  const [snapshotError, setSnapshotError] = useState<string>('');
-
-  const { data: drinksSkus } = useQuery({
-    queryKey: ['purchasing-drinks-skus'],
-    queryFn: async () => {
-      const res = await axios.get('/api/purchasing', { params: { category: 'Drinks' } });
-      return (res.data?.items || []).map((item: any) => item.sku).filter((sku: string) => Boolean(sku));
-    },
-  });
-
-  const snapshotRequest = async (label: string, endpoint: string, params: Record<string, string>) => {
-    console.info('[refreshSnapshots] request', { method: 'GET', endpoint, params });
-    try {
-      const response = await axios.get(endpoint, { params });
-      return response;
-    } catch (error: any) {
-      console.error('[refreshSnapshots] request_failed', {
-        method: 'GET',
-        endpoint,
-        params,
-        status: error?.response?.status,
-        responseBody: error?.response?.data,
-      });
-      throw Object.assign(error ?? new Error('snapshot request failed'), { snapshotLabel: label });
-    }
-  };
-
-  const refreshSnapshots = async () => {
-    setSnapshotError('');
-    const results = await Promise.allSettled([
-      snapshotRequest('rolls', '/api/analysis/rolls-ledger', { shiftDate }),
-      snapshotRequest('meat', '/api/analysis/meat-ledger', { shiftDate }),
-      snapshotRequest('drinks', '/api/analysis/drinks-ledger', { shiftDate }),
-    ]);
-
-    const [rollsRes, meatRes, drinksRes] = results;
-
-    if (rollsRes.status === 'fulfilled') {
-      setRollsSummary(toStockSummary(rollsRes.value.data?.row, 'rolls'));
-    } else {
-      setRollsSummary(null);
-    }
-
-    if (meatRes.status === 'fulfilled') {
-      setMeatSummary(toStockSummary(meatRes.value.data?.row, 'meat'));
-    } else {
-      setMeatSummary(null);
-    }
-
-    if (drinksRes.status === 'fulfilled') {
-      setDrinksSummary(toStockSummary(drinksRes.value.data?.row, 'drinks'));
-    } else {
-      setDrinksSummary(null);
-    }
-
-    const failed = results.filter((result) => result.status === 'rejected');
-    if (failed.length > 0) {
-      setSnapshotError('Snapshot unavailable. Some stock summaries could not be loaded.');
-    }
-  };
-
-  useEffect(() => { void refreshSnapshots(); }, []);
-
-  const submitRolls = async () => {
-    setRollsMessage('');
-    await axios.post('/api/stock/lodge/rolls', {
-      shiftDate,
-      staffName: rollsStaffName,
-      rollsPurchased: Number(rollsPurchased),
-    });
-    await refreshSnapshots();
-    setRollsMessage('Rolls lodgement saved.');
-    setRollsPurchased('');
-  };
-
-  const submitMeat = async () => {
-    setMeatMessage('');
-    await axios.post('/api/stock/lodge/meat', {
-      shiftDate,
-      staffName: meatStaffName,
-      kilosPurchased: Number(kilosPurchased),
-    });
-    await refreshSnapshots();
-    setMeatMessage('Meat lodgement saved.');
-    setKilosPurchased('');
-  };
-
-  const submitDrinks = async () => {
-    setDrinksMessage('');
-    const items = Object.entries(drinkQuantities)
-      .map(([sku, quantity]) => ({ sku, quantity: Number(quantity) }))
-      .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0);
-
-    await axios.post('/api/stock/lodge/drinks', {
-      shiftDate,
-      staffName: drinksStaffName,
-      items,
-    });
-
-    await refreshSnapshots();
-    setDrinksMessage('Drinks lodgement saved.');
-    setDrinkQuantities({});
-  };
-
-  return (
-    <div className="space-y-4">
-      {snapshotError && (
-        <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-          {snapshotError}
-        </div>
-      )}
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Rolls Lodgement</h2>
-        <div className="mt-3 space-y-2">
-          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Staff Name" value={rollsStaffName} onChange={(e) => setRollsStaffName(e.target.value)} />
-          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" type="number" min="0" placeholder="Rolls Purchased" value={rollsPurchased} onChange={(e) => setRollsPurchased(e.target.value)} />
-          <Button onClick={submitRolls} className="w-full" disabled={!rollsStaffName.trim() || !Number(rollsPurchased)}>Submit Rolls</Button>
-          {rollsMessage && <div className="text-xs text-emerald-700">{rollsMessage}</div>}
-        </div>
-        <StockSummaryTable summary={rollsSummary} />
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Meat Lodgement</h2>
-        <div className="mt-3 space-y-2">
-          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Staff Name" value={meatStaffName} onChange={(e) => setMeatStaffName(e.target.value)} />
-          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" type="number" min="0" step="0.01" placeholder="Kilos Purchased" value={kilosPurchased} onChange={(e) => setKilosPurchased(e.target.value)} />
-          <Button onClick={submitMeat} className="w-full" disabled={!meatStaffName.trim() || !Number(kilosPurchased)}>Submit Meat</Button>
-          {meatMessage && <div className="text-xs text-emerald-700">{meatMessage}</div>}
-        </div>
-        <StockSummaryTable summary={meatSummary} />
-      </div>
-
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="text-sm font-semibold text-slate-900">Drinks Lodgement</h2>
-        <div className="mt-3 space-y-2">
-          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Staff Name" value={drinksStaffName} onChange={(e) => setDrinksStaffName(e.target.value)} />
-          <div className="rounded border border-slate-200">
-            <div className="grid grid-cols-2 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
-              <div>Drink SKU</div>
-              <div className="text-right">Quantity</div>
-            </div>
-            <div className="max-h-56 overflow-y-auto">
-              {(drinksSkus || []).map((sku: string) => (
-                <div key={sku} className="grid grid-cols-2 items-center gap-2 border-t border-slate-100 px-3 py-2 text-sm">
-                  <div className="truncate">{sku}</div>
-                  <input
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-right"
-                    type="number"
-                    min="0"
-                    value={drinkQuantities[sku] || ''}
-                    onChange={(e) => setDrinkQuantities((prev) => ({ ...prev, [sku]: e.target.value }))}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-          <Button
-            onClick={submitDrinks}
-            className="w-full"
-            disabled={!drinksStaffName.trim() || !Object.values(drinkQuantities).some((v) => Number(v) > 0)}
-          >
-            Submit Drinks
-          </Button>
-          {drinksMessage && <div className="text-xs text-emerald-700">{drinksMessage}</div>}
-        </div>
-        <StockSummaryTable summary={drinksSummary} />
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   return (
     <div className="space-y-6 md:space-y-8 p-2 sm:p-0 pb-24 md:pb-8 bg-slate-50">
@@ -813,6 +627,8 @@ export default function Home() {
 
       <KPIGrid />
 
+      <StockLodgementPanels mode="columns" />
+
       <PrimeCostCards />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -820,8 +636,6 @@ export default function Home() {
         <ExpensesV2Tile />
         <VarianceWidget />
       </div>
-
-      <StockLodgementPanels />
 
       <SystemHealthSection />
 
