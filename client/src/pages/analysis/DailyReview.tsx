@@ -1,6 +1,14 @@
 import React, { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { FileText, Download, CheckCircle, AlertTriangle } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
@@ -160,31 +168,24 @@ export default function DailyReview() {
   const renderCell = (value: number | null, testId?: string) => {
     if (value === null || value === undefined) {
       return (
-        <span
-          className="inline-block rounded bg-gray-100 px-2 py-1 text-xs text-gray-400"
-          title="Missing – check form submission or Loyverse sync"
-          data-testid={testId}
-        >
+        <Badge variant="secondary" className="text-xs text-slate-400" data-testid={testId}>
           Missing
-        </span>
+        </Badge>
       );
     }
-    return <span data-testid={testId}>{fmt(value)}</span>;
+    return <span className="text-sm text-slate-700" data-testid={testId}>{fmt(value)}</span>;
   };
 
   const renderDiff = (value: number | null) => {
     if (value === null || value === undefined) {
       return (
-        <span
-          className="inline-block rounded bg-gray-100 px-2 py-1 text-xs text-gray-400"
-          title="Missing – check form submission or Loyverse sync"
-        >
+        <Badge variant="secondary" className="text-xs text-slate-400">
           Missing
-        </span>
+        </Badge>
       );
     }
-    if (value === 0) return <span>{fmt(value)}</span>;
-    return <span className="font-semibold text-red-600">{fmt(value)}</span>;
+    if (value === 0) return <span className="text-sm text-slate-700">{fmt(value)}</span>;
+    return <span className="text-sm font-semibold text-red-600">{fmt(value)}</span>;
   };
 
   const generateApprovalPdf = () => {
@@ -292,237 +293,254 @@ export default function DailyReview() {
   };
 
   return (
-    <div className="mx-auto max-w-[1100px] p-4 space-y-6">
-      <header className="border-b pb-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-sm font-extrabold">Daily Sales & Shift Analysis</h1>
-        <div className="flex items-center gap-3">
-          <label className="text-sm text-gray-600">Month</label>
-          <input
+    <div className="mx-auto max-w-[1100px] p-4 space-y-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold text-slate-800">Daily Sales & Shift Analysis</h1>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm text-slate-600">Month</Label>
+          <Input
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className="border rounded px-2 py-1 text-sm"
+            className="w-auto rounded-[4px] text-sm"
           />
         </div>
-      </header>
+      </div>
 
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs text-gray-600">Selected date</label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(event) => setSelectedDate(event.target.value)}
-            className="border rounded px-2 py-1 text-xs"
-          />
-          {comparison?.shiftWindow && (
-            <span className="text-xs text-gray-500">
-              Shift window: {comparison.shiftWindow}
-            </span>
-          )}
-        </div>
+      <Card className="rounded-[4px] border-slate-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <FileText className="h-4 w-4 text-emerald-600" />
+            Shift Comparison
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <Label className="text-sm text-slate-600">Selected date</Label>
+            <Input
+              type="date"
+              value={selectedDate}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              className="w-auto rounded-[4px] text-sm"
+            />
+            {comparison?.shiftWindow && (
+              <span className="text-xs text-slate-500">
+                Shift window: {comparison.shiftWindow}
+              </span>
+            )}
+          </div>
 
-        {isComparisonLoading && <div className="text-sm text-gray-600">Loading shift comparison…</div>}
-        {!isComparisonLoading && comparison && (
-          <div className="rounded border p-4">
-            <div className="flex flex-col gap-2">
+          {isComparisonLoading && <div className="text-sm text-slate-500">Loading shift comparison...</div>}
+          {!isComparisonLoading && comparison && (
+            <div className="space-y-4">
               {isMessage(comparison.staffData) && (
-                <div className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
-                  Staff form: {comparison.staffData.message}
+                <div className="flex items-center gap-2 rounded-[4px] border border-slate-200 bg-slate-50 p-3">
+                  <AlertTriangle className="h-4 w-4 text-slate-400" />
+                  <span className="text-sm text-slate-500">Staff form: {comparison.staffData.message}</span>
                 </div>
               )}
               {isMessage(comparison.posShiftReport) && (
-                <div className="rounded border border-gray-200 bg-gray-50 p-2 text-xs text-gray-500">
-                  Loyverse shift report: {comparison.posShiftReport.message}
+                <div className="flex items-center gap-2 rounded-[4px] border border-slate-200 bg-slate-50 p-3">
+                  <AlertTriangle className="h-4 w-4 text-slate-400" />
+                  <span className="text-sm text-slate-500">Loyverse shift report: {comparison.posShiftReport.message}</span>
                 </div>
               )}
-            </div>
 
-            <div className="mt-3 overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-left">
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Item</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Staff Form</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Loyverse Shift Report</th>
-                    <th className="px-3 py-2 text-xs font-semibold text-gray-500">Difference</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonRows.map((row) => (
-                    <tr key={row.label} className="border-b">
-                      <td className="px-3 py-2 text-gray-600">{row.label}</td>
-                      <td className="px-3 py-2">{renderCell(row.staff)}</td>
-                      <td className="px-3 py-2">{renderCell(row.pos)}</td>
-                      <td className="px-3 py-2">{renderDiff(row.diff)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="rounded border border-gray-200 p-3">
-                <h3 className="text-xs font-semibold text-gray-500">Staff Daily Sales & Stock v2</h3>
-                <div className="mt-2 text-sm text-gray-700">
-                  <div>Total Sales: {renderCell(staffData?.totalSales ?? null)}</div>
-                  <div>Cash: {renderCell(staffData?.cashSales ?? null)}</div>
-                  <div>Grab: {renderCell(staffData?.grabSales ?? null)}</div>
-                  <div>Scan (QR): {renderCell(staffData?.scanSales ?? null)}</div>
-                  <div>Expenses: {renderCell(staffData?.expensesTotal ?? null)}</div>
-                  <div>Rolls Remaining: {renderCell(staffData?.rollsEnd ?? null)}</div>
-                  <div>Meat Remaining (g): {renderCell(staffData?.meatEnd ?? null)}</div>
-                  <div>Drinks Remaining: {renderCell(staffData?.drinksCount ?? null)}</div>
-                </div>
+              <div className="overflow-x-auto rounded-[4px] border border-slate-200">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="text-xs font-semibold text-slate-600">Item</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600">Staff Form</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600">Loyverse Shift Report</TableHead>
+                      <TableHead className="text-xs font-semibold text-slate-600">Difference</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {comparisonRows.map((row) => (
+                      <TableRow key={row.label}>
+                        <TableCell className="text-sm text-slate-600">{row.label}</TableCell>
+                        <TableCell>{renderCell(row.staff)}</TableCell>
+                        <TableCell>{renderCell(row.pos)}</TableCell>
+                        <TableCell>{renderDiff(row.diff)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-              <div className="rounded border border-gray-200 p-3">
-                <h3 className="text-xs font-semibold text-gray-500">Loyverse Shift Report Totals</h3>
-                <div className="mt-2 text-sm text-gray-700">
-                  <div>Total Sales: {renderCell(posShift?.totalSales ?? null)}</div>
-                  <div>Cash Payments: {renderCell(posShift?.cashPayments ?? null)}</div>
-                  <div>Grab: {renderCell(posShift?.grab ?? null)}</div>
-                  <div>Scan (QR): {renderCell(posShift?.scan ?? null)}</div>
-                  <div>Expenses (Paid Out): {renderCell(posShift?.expenses ?? null)}</div>
-                </div>
-                <div className="mt-3 border-t pt-3 text-sm text-gray-700">
-                  <div>Starting Cash: {renderCell(posShift?.startingCash ?? null)}</div>
-                  <div>Expected Cash: {renderCell(posShift?.expectedCash ?? null)}</div>
-                  <div>Actual Cash: {renderCell(posShift?.actualCash ?? null)}</div>
-                  <div>Difference: {renderCell(posShift?.difference ?? null)}</div>
-                </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <Card className="rounded-[4px] border-slate-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-semibold text-slate-600">Staff Daily Sales & Stock v2</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1 text-sm text-slate-700">
+                    <div>Total Sales: {renderCell(staffData?.totalSales ?? null)}</div>
+                    <div>Cash: {renderCell(staffData?.cashSales ?? null)}</div>
+                    <div>Grab: {renderCell(staffData?.grabSales ?? null)}</div>
+                    <div>Scan (QR): {renderCell(staffData?.scanSales ?? null)}</div>
+                    <div>Expenses: {renderCell(staffData?.expensesTotal ?? null)}</div>
+                    <div>Rolls Remaining: {renderCell(staffData?.rollsEnd ?? null)}</div>
+                    <div>Meat Remaining (g): {renderCell(staffData?.meatEnd ?? null)}</div>
+                    <div>Drinks Remaining: {renderCell(staffData?.drinksCount ?? null)}</div>
+                  </CardContent>
+                </Card>
+                <Card className="rounded-[4px] border-slate-200">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-xs font-semibold text-slate-600">Loyverse Shift Report Totals</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1 text-sm text-slate-700">
+                    <div>Total Sales: {renderCell(posShift?.totalSales ?? null)}</div>
+                    <div>Cash Payments: {renderCell(posShift?.cashPayments ?? null)}</div>
+                    <div>Grab: {renderCell(posShift?.grab ?? null)}</div>
+                    <div>Scan (QR): {renderCell(posShift?.scan ?? null)}</div>
+                    <div>Expenses (Paid Out): {renderCell(posShift?.expenses ?? null)}</div>
+                    <div className="border-t border-slate-200 pt-2 mt-2">Starting Cash: {renderCell(posShift?.startingCash ?? null)}</div>
+                    <div>Expected Cash: {renderCell(posShift?.expectedCash ?? null)}</div>
+                    <div>Actual Cash: {renderCell(posShift?.actualCash ?? null)}</div>
+                    <div>Difference: {renderCell(posShift?.difference ?? null)}</div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
-          </div>
-        )}
-      </section>
-
-      <section className="border-t pt-4">
-        <h2 className="text-sm font-bold mb-3">Manager Review & Sign Off</h2>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          <div className="md:col-span-1">
-            <label className="text-xs text-gray-500">Manager Name</label>
-            <input
-              className="mt-1 w-full rounded border px-2 py-1 text-sm"
-              value={approvedBy}
-              onChange={(event) => setApprovedBy(event.target.value)}
-              placeholder="Manager name"
-            />
-            <div className="mt-2 text-xs text-gray-500">
-              Approval requires manager role.
-            </div>
-          </div>
-          <div className="md:col-span-2">
-            <label className="text-xs text-gray-500">Notes / Explanation</label>
-            <textarea
-              className="mt-1 w-full rounded border p-2 text-sm min-h-[120px]"
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              placeholder="Record findings or explanations for this shift."
-            />
-          </div>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            onClick={approveShift}
-            disabled={!canApprove || approving}
-            className="rounded bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-gray-400"
-          >
-            {approving ? "Approving…" : "Approve & Close Shift"}
-          </button>
-          {!canApprove && (
-            <span className="text-xs text-gray-500">Manager role required to approve.</span>
           )}
-        </div>
-      </section>
+        </CardContent>
+      </Card>
 
-      <section className="border-t pt-6 mt-8">
-        <div className="mb-4">
-          <h2 className="text-sm font-extrabold mb-4">All Shifts Data</h2>
+      <Card className="rounded-[4px] border-slate-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <CheckCircle className="h-4 w-4 text-emerald-600" />
+            Manager Review & Sign Off
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            <div className="md:col-span-1 space-y-2">
+              <Label className="text-sm text-slate-600">Manager Name</Label>
+              <Input
+                className="rounded-[4px] text-sm"
+                value={approvedBy}
+                onChange={(event) => setApprovedBy(event.target.value)}
+                placeholder="Manager name"
+              />
+              <p className="text-xs text-slate-400">Approval requires manager role.</p>
+            </div>
+            <div className="md:col-span-2 space-y-2">
+              <Label className="text-sm text-slate-600">Notes / Explanation</Label>
+              <Textarea
+                className="rounded-[4px] text-sm min-h-[120px]"
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Record findings or explanations for this shift."
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              onClick={approveShift}
+              disabled={!canApprove || approving}
+              className="rounded-[4px] bg-emerald-600 text-sm text-white hover:bg-emerald-700"
+            >
+              {approving ? "Approving..." : "Approve & Close Shift"}
+            </Button>
+            {!canApprove && (
+              <span className="text-xs text-slate-400">Manager role required to approve.</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex items-center gap-2 text-xs sm:text-sm">
-            <input
-              id="export-by-date"
+      <Card className="rounded-[4px] border-slate-200">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Download className="h-4 w-4 text-emerald-600" />
+            All Shifts Data
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="border rounded px-2 py-1"
+              className="w-auto rounded-[4px] text-sm"
             />
-            <button
+            <Button
               onClick={() => selectedDate && window.open(`/api/analysis/daily-sales/export.csv?date=${selectedDate}`, "_blank")}
-              className="border rounded px-3 py-1 bg-emerald-600 text-white hover:bg-emerald-700"
               disabled={!selectedDate}
+              className="rounded-[4px] bg-emerald-600 text-sm text-white hover:bg-emerald-700"
             >
               Export by Date (CSV)
-            </button>
+            </Button>
           </div>
 
-          {isDailySalesLoading && <p className="text-sm mt-4">Loading...</p>}
+          {isDailySalesLoading && <p className="text-sm text-slate-500">Loading...</p>}
           {!isDailySalesLoading && dailySalesRows.length === 0 && (
-            <p className="text-sm text-gray-500 mt-4">No data available</p>
+            <p className="text-sm text-slate-400">No data available</p>
           )}
-        </div>
 
-        {!isDailySalesLoading && dailySalesRows.length > 0 && (
-          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
-            <table className="border-collapse text-xs sm:text-sm" style={{ minWidth: "1400px" }}>
-              <thead>
-                <tr className="bg-gray-100 border-b">
-                  <th className="px-3 py-2 text-left whitespace-nowrap">Date</th>
-                  <th className="px-3 py-2 text-left whitespace-nowrap">Completed By</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Total</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Cash</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">QR</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Grab</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Other</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Exp Cash</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Exp QR</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Exp Total</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Shopping</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Wages</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Other Exp</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Tot Exp</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Rolls</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Meat (g)</th>
-                  <th className="px-3 py-2 text-right whitespace-nowrap">Export</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dailySalesRows.map((r) => (
-                  <tr key={r.id} className="border-b hover:bg-gray-50">
-                    <td className="px-3 py-2 whitespace-nowrap">{r.shift_date}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">{r.completed_by}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.total_sales || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.cash_sales || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.qr_sales || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.grab_sales || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.aroi_sales || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_cash_bank || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_qr_bank || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.expected_total_bank || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.shopping_total || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.wages_total || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.others_total || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{(r.total_expenses || 0).toLocaleString()}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{r.rolls_end || 0}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">{r.meat_end_g || 0}</td>
-                    <td className="px-3 py-2 text-right whitespace-nowrap">
-                      <a
-                        className="underline text-xs text-emerald-600 hover:text-emerald-700"
-                        href={`/api/analysis/daily-sales/export.csv?id=${r.id}`}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Export
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+          {!isDailySalesLoading && dailySalesRows.length > 0 && (
+            <div className="overflow-x-auto rounded-[4px] border border-slate-200" style={{ WebkitOverflowScrolling: "touch" } as React.CSSProperties}>
+              <Table style={{ minWidth: "1400px" }}>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="text-xs font-semibold text-slate-600 whitespace-nowrap">Date</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 whitespace-nowrap">Completed By</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Total</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Cash</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">QR</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Grab</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Other</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Exp Cash</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Exp QR</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Exp Total</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Shopping</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Wages</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Other Exp</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Tot Exp</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Rolls</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Meat (g)</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-600 text-right whitespace-nowrap">Export</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {dailySalesRows.map((r) => (
+                    <TableRow key={r.id} className="hover:bg-slate-50">
+                      <TableCell className="text-sm text-slate-700 whitespace-nowrap">{r.shift_date}</TableCell>
+                      <TableCell className="text-sm text-slate-700 whitespace-nowrap">{r.completed_by}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.total_sales || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.cash_sales || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.qr_sales || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.grab_sales || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.aroi_sales || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.expected_cash_bank || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.expected_qr_bank || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.expected_total_bank || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.shopping_total || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.wages_total || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.others_total || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{(r.total_expenses || 0).toLocaleString()}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{r.rolls_end || 0}</TableCell>
+                      <TableCell className="text-sm text-slate-700 text-right whitespace-nowrap">{r.meat_end_g || 0}</TableCell>
+                      <TableCell className="text-right whitespace-nowrap">
+                        <a
+                          className="text-xs text-emerald-600 hover:text-emerald-700 underline"
+                          href={`/api/analysis/daily-sales/export.csv?id=${r.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Export
+                        </a>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
