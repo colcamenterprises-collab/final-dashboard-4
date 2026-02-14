@@ -3,6 +3,8 @@ import cron from 'node-cron';
 import fetch from 'node-fetch';
 import { computeShiftAll } from '../services/shiftItems.js';
 import { computeAndUpsertRollsLedger } from '../services/rollsLedger.js';
+import { computeAndUpsertMeatLedger } from '../services/meatLedger.js';
+import { computeAndUpsertDrinksLedger } from '../services/drinksLedger.js';
 
 console.log('📊 Ingestion audit + analytics + rolls ledger cron jobs scheduled');
 
@@ -39,24 +41,28 @@ cron.schedule('5 3 * * *', async () => {
   }
 }, { timezone: 'Asia/Bangkok' });
 
-// 03:15 BKK — update rolls ledger for yesterday (uses analytics + forms + expenses)
+// 03:15 BKK — rebuild all stock ledgers for yesterday (parity run)
 cron.schedule('15 3 * * *', async () => {
-  const d = bkkYesterdayISODate();
+  const shiftDate = bkkYesterdayISODate();
   try {
-    const res = await computeAndUpsertRollsLedger(d);
-    console.log(`[CRON] Rolls ledger upserted`, res);
+    await computeAndUpsertRollsLedger(shiftDate);
+    await computeAndUpsertMeatLedger(shiftDate);
+    await computeAndUpsertDrinksLedger(shiftDate);
+    console.log(`[CRON] Ledger parity rebuild complete for ${shiftDate}`);
   } catch (e) {
-    console.error(`[CRON] Rolls ledger failed`, e);
+    console.error(`[CRON] Ledger parity rebuild failed`, e);
   }
 }, { timezone: 'Asia/Bangkok' });
 
-// Hourly safety re-run for today's in-progress shift (keeps ledger fresh if stock form arrives late)
+// Hourly safety re-run for today's in-progress shift
 cron.schedule('0 * * * *', async () => {
-  const now = new Date().toISOString().slice(0,10);
+  const shiftDate = new Date().toISOString().slice(0,10);
   try {
-    await computeAndUpsertRollsLedger(now);
-    console.log(`[CRON] Hourly refresh for ${now}`);
-  } catch (e) {
+    await computeAndUpsertRollsLedger(shiftDate);
+    await computeAndUpsertMeatLedger(shiftDate);
+    await computeAndUpsertDrinksLedger(shiftDate);
+    console.log(`[CRON] Hourly parity refresh for ${shiftDate}`);
+  } catch (_e) {
     // non-fatal
   }
 }, { timezone: 'Asia/Bangkok' });

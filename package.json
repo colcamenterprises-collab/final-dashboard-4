@@ -11,7 +11,8 @@
     "db:push": "drizzle-kit push",
     "seed:burger-universal": "tsx server/scripts/seed_burger_metrics_universal.ts",
     "test:burger-metrics": "tsx server/scripts/run_burger_metrics_test.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test:stock-ledger-smoke": "tsx server/scripts/stock_ledger_smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",
