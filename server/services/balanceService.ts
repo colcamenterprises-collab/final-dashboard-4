@@ -4,35 +4,55 @@ import { loyverse_shifts, dailyStockSales } from "../../shared/schema";
 import { sql, desc } from "drizzle-orm";
 
 export async function getPosBalances(limit = 5) {
-  const rows = await db
-    .select()
-    .from(loyverse_shifts)
-    .orderBy(desc(loyverse_shifts.shiftDate))
-    .limit(limit);
+  const latestRows = await db.execute(sql`
+    WITH shifts AS (
+      SELECT
+        COALESCE(
+          (s->>'closed_at')::timestamptz,
+          (ls.shift_date::timestamp AT TIME ZONE 'Asia/Bangkok')
+        ) AS closed_at,
+        COALESCE(NULLIF(s->>'expected_cash', ''), '0')::numeric AS expected_cash,
+        COALESCE(NULLIF(s->>'actual_cash', ''), '0')::numeric AS actual_cash
+      FROM loyverse_shifts ls
+      CROSS JOIN LATERAL jsonb_array_elements(COALESCE(ls.data->'shifts', '[]'::jsonb)) AS s
+    )
+    SELECT
+      (closed_at AT TIME ZONE 'Asia/Bangkok')::date AS shift_date,
+      expected_cash,
+      actual_cash
+    FROM shifts
+    ORDER BY closed_at DESC
+    LIMIT ${limit}
+  `);
 
-  return rows.map(r => {
+  if (latestRows.rows.length > 0) {
+    return latestRows.rows.map((r: any) => {
+      const expected = Number(r.expected_cash ?? 0);
+      const actual = Number(r.actual_cash ?? 0);
+      const diff = actual - expected;
+      return {
+        date: r.shift_date,
+        expected,
+        actual,
+        difference: diff,
+        status: Math.abs(diff) <= 50 ? "Balanced" : "Anomaly",
+      };
+    });
+  }
+
+  const rows = await db.select().from(loyverse_shifts).orderBy(desc(loyverse_shifts.shiftDate)).limit(limit);
+
+  return rows.map((r) => {
     const data = r.data as any;
-    let expected = 0;
-    let actual = 0;
-    
-    if (data?.['Expected cash amount']) {
-      // CSV format
-      expected = parseFloat(data['Expected cash amount'] || 0);
-      actual = parseFloat(data['Actual cash amount'] || 0);
-    } else if (data?.shifts?.[0]) {
-      // API format
-      const shiftInfo = data.shifts[0];
-      expected = parseFloat(shiftInfo.expected_cash || 0);
-      actual = parseFloat(shiftInfo.actual_cash || 0);
-    }
-    
+    const expected = Number(data?.["Expected cash amount"] ?? 0);
+    const actual = Number(data?.["Actual cash amount"] ?? 0);
     const diff = actual - expected;
     return {
       date: r.shiftDate,
       expected,
       actual,
       difference: diff,
-      status: Math.abs(diff) <= 50 ? "Balanced" : "Anomaly"
+      status: Math.abs(diff) <= 50 ? "Balanced" : "Anomaly",
     };
   });
 }

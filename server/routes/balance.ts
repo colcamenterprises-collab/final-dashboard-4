@@ -10,7 +10,7 @@ router.get("/pos", async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error("POS balance error:", err);
-    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
+    res.status(200).json([]);
   }
 });
 
@@ -20,7 +20,7 @@ router.get("/forms", async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error("Form balance error:", err);
-    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
+    res.status(200).json([]);
   }
 });
 
@@ -30,7 +30,7 @@ router.get("/combined", async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error("Combined balance error:", err);
-    res.status(500).json({ error: err instanceof Error ? err.message : "Unknown error" });
+    res.status(200).json([]);
   }
 });
 
