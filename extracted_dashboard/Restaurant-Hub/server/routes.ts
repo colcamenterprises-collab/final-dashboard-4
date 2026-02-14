@@ -23,7 +23,7 @@ import { loyverseReceiptService } from "./services/loyverseReceipts";
 import { loyverseAPI } from "./loyverseAPI";
 import { loyverseShiftReports, loyverseReceipts, recipes, recipeIngredients, ingredients } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { generateMarketingContent } from "./openai";
 
 // Drink minimum stock levels with package sizes (based on authentic requirements)
@@ -38,6 +38,77 @@ const DRINK_REQUIREMENTS = {
   'Soda Water': { minStock: 18, packageSize: 6, unit: 'bottles' },
   'Bottle Water': { minStock: 24, packageSize: 12, unit: 'bottles' }
 };
+
+const HOME_STOCK_DRINK_ITEMS = Object.keys(DRINK_REQUIREMENTS);
+
+function getBangkokShiftDate(submittedAt = new Date()): Date {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(submittedAt);
+  const getPart = (type: string) => parts.find(part => part.type === type)?.value || '00';
+  const hour = Number(getPart('hour'));
+  const year = Number(getPart('year'));
+  const month = Number(getPart('month'));
+  const day = Number(getPart('day'));
+
+  if (hour <= 2) {
+    return new Date(Date.UTC(year, month - 1, day - 1));
+  }
+
+  return new Date(Date.UTC(year, month - 1, day));
+}
+
+async function ensureHomeStockRegisterTables(): Promise<void> {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS stock_register_drinks (
+      id SERIAL PRIMARY KEY,
+      staff_name TEXT NOT NULL,
+      notes TEXT,
+      submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      shift_date TIMESTAMP NOT NULL
+    )
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS stock_register_drink_lines (
+      id SERIAL PRIMARY KEY,
+      submission_id INTEGER NOT NULL REFERENCES stock_register_drinks(id) ON DELETE CASCADE,
+      drink_name TEXT NOT NULL,
+      end_count INTEGER NOT NULL
+    )
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS stock_register_meat (
+      id SERIAL PRIMARY KEY,
+      staff_name TEXT NOT NULL,
+      purchased_today_kg NUMERIC(10,3) NOT NULL,
+      end_shift_remaining_grams NUMERIC(10,3) NOT NULL,
+      notes TEXT,
+      submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      shift_date TIMESTAMP NOT NULL
+    )
+  `);
+
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS stock_register_rolls (
+      id SERIAL PRIMARY KEY,
+      staff_name TEXT NOT NULL,
+      rolls_purchased_count INTEGER NOT NULL,
+      end_shift_remaining_count INTEGER NOT NULL,
+      notes TEXT,
+      submitted_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      shift_date TIMESTAMP NOT NULL
+    )
+  `);
+}
 
 async function generateShoppingListFromStockForm(formData: any) {
   try {
@@ -186,6 +257,164 @@ async function generateShoppingListFromStockForm(formData: any) {
 import { schedulerService } from "./services/scheduler";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  await ensureHomeStockRegisterTables();
+
+  app.get("/api/stock-register/drinks", async (_req, res) => {
+    res.json(HOME_STOCK_DRINK_ITEMS.map(name => ({ name })));
+  });
+
+  app.post("/api/stock-register/drinks", async (req, res) => {
+    try {
+      const { staffName, notes, counts } = req.body || {};
+
+      if (typeof staffName !== "string" || !staffName.trim()) {
+        return res.status(400).json({ error: "staffName is required" });
+      }
+
+      if (!Array.isArray(counts) || counts.length !== HOME_STOCK_DRINK_ITEMS.length) {
+        return res.status(400).json({ error: "counts must include all drinks" });
+      }
+
+      const normalizedCounts = counts.map((row: any) => ({
+        drinkName: String(row?.drinkName || ""),
+        endCount: Number(row?.endCount),
+      }));
+
+      for (const requiredDrink of HOME_STOCK_DRINK_ITEMS) {
+        const match = normalizedCounts.find(row => row.drinkName === requiredDrink);
+        if (!match || !Number.isInteger(match.endCount) || match.endCount < 0) {
+          return res.status(400).json({ error: `Invalid count for ${requiredDrink}` });
+        }
+      }
+
+      const submittedAt = new Date();
+      const shiftDate = getBangkokShiftDate(submittedAt);
+
+      const parentInsert = await db.execute(sql`
+        INSERT INTO stock_register_drinks (staff_name, notes, submitted_at, shift_date)
+        VALUES (${staffName.trim()}, ${typeof notes === "string" ? notes.trim() : null}, ${submittedAt}, ${shiftDate})
+        RETURNING id, staff_name, submitted_at, shift_date
+      `);
+
+      const submissionId = parentInsert.rows[0].id as number;
+
+      for (const row of normalizedCounts) {
+        await db.execute(sql`
+          INSERT INTO stock_register_drink_lines (submission_id, drink_name, end_count)
+          VALUES (${submissionId}, ${row.drinkName}, ${row.endCount})
+        `);
+      }
+
+      return res.json({
+        success: true,
+        submissionId,
+        submittedAt: parentInsert.rows[0].submitted_at,
+        shiftDate: parentInsert.rows[0].shift_date,
+      });
+    } catch (error: any) {
+      console.error("Error saving stock register drinks submission:", error);
+      return res.status(500).json({ error: "Failed to save drinks register" });
+    }
+  });
+
+  app.post("/api/stock-register/meat", async (req, res) => {
+    try {
+      const { staffName, purchasedTodayKg, endShiftRemainingGrams, notes } = req.body || {};
+
+      if (typeof staffName !== "string" || !staffName.trim()) {
+        return res.status(400).json({ error: "staffName is required" });
+      }
+
+      const purchased = Number(purchasedTodayKg);
+      const remaining = Number(endShiftRemainingGrams);
+
+      if (!Number.isFinite(purchased) || purchased < 0) {
+        return res.status(400).json({ error: "purchasedTodayKg must be a number >= 0" });
+      }
+
+      if (!Number.isFinite(remaining) || remaining < 0) {
+        return res.status(400).json({ error: "endShiftRemainingGrams must be a number >= 0" });
+      }
+
+      const submittedAt = new Date();
+      const shiftDate = getBangkokShiftDate(submittedAt);
+
+      const result = await db.execute(sql`
+        INSERT INTO stock_register_meat (staff_name, purchased_today_kg, end_shift_remaining_grams, notes, submitted_at, shift_date)
+        VALUES (${staffName.trim()}, ${purchased.toString()}, ${remaining.toString()}, ${typeof notes === "string" ? notes.trim() : null}, ${submittedAt}, ${shiftDate})
+        RETURNING id, submitted_at, shift_date
+      `);
+
+      return res.json({
+        success: true,
+        submissionId: result.rows[0].id,
+        submittedAt: result.rows[0].submitted_at,
+        shiftDate: result.rows[0].shift_date,
+      });
+    } catch (error) {
+      console.error("Error saving stock register meat submission:", error);
+      return res.status(500).json({ error: "Failed to save meat register" });
+    }
+  });
+
+  app.post("/api/stock-register/rolls", async (req, res) => {
+    try {
+      const { staffName, rollsPurchasedCount, endShiftRemainingCount, notes } = req.body || {};
+
+      if (typeof staffName !== "string" || !staffName.trim()) {
+        return res.status(400).json({ error: "staffName is required" });
+      }
+
+      const purchasedCount = Number(rollsPurchasedCount);
+      const remainingCount = Number(endShiftRemainingCount);
+
+      if (!Number.isInteger(purchasedCount) || purchasedCount < 0) {
+        return res.status(400).json({ error: "rollsPurchasedCount must be an integer >= 0" });
+      }
+
+      if (!Number.isInteger(remainingCount) || remainingCount < 0) {
+        return res.status(400).json({ error: "endShiftRemainingCount must be an integer >= 0" });
+      }
+
+      const submittedAt = new Date();
+      const shiftDate = getBangkokShiftDate(submittedAt);
+
+      const result = await db.execute(sql`
+        INSERT INTO stock_register_rolls (staff_name, rolls_purchased_count, end_shift_remaining_count, notes, submitted_at, shift_date)
+        VALUES (${staffName.trim()}, ${purchasedCount}, ${remainingCount}, ${typeof notes === "string" ? notes.trim() : null}, ${submittedAt}, ${shiftDate})
+        RETURNING id, submitted_at, shift_date
+      `);
+
+      return res.json({
+        success: true,
+        submissionId: result.rows[0].id,
+        submittedAt: result.rows[0].submitted_at,
+        shiftDate: result.rows[0].shift_date,
+      });
+    } catch (error) {
+      console.error("Error saving stock register rolls submission:", error);
+      return res.status(500).json({ error: "Failed to save rolls register" });
+    }
+  });
+
+  app.get("/api/stock-register/latest", async (_req, res) => {
+    try {
+      const [drinksLatest, meatLatest, rollsLatest] = await Promise.all([
+        db.execute(sql`SELECT id, staff_name, submitted_at, shift_date FROM stock_register_drinks ORDER BY submitted_at DESC LIMIT 1`),
+        db.execute(sql`SELECT id, staff_name, submitted_at, shift_date FROM stock_register_meat ORDER BY submitted_at DESC LIMIT 1`),
+        db.execute(sql`SELECT id, staff_name, submitted_at, shift_date FROM stock_register_rolls ORDER BY submitted_at DESC LIMIT 1`),
+      ]);
+
+      res.json({
+        drinks: drinksLatest.rows[0] || null,
+        meat: meatLatest.rows[0] || null,
+        rolls: rollsLatest.rows[0] || null,
+      });
+    } catch (error) {
+      console.error("Error fetching latest stock register submissions:", error);
+      res.status(500).json({ error: "Failed to fetch latest stock register submissions" });
+    }
+  });
   // Sales heatmap endpoint
   app.get("/api/dashboard/sales-heatmap", async (req, res) => {
     try {

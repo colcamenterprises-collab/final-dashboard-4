@@ -314,6 +314,45 @@ export const recipeIngredients = pgTable("recipe_ingredients", {
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
 });
 
+// Home Stock Register: Drinks parent submission
+export const stockRegisterDrinks = pgTable("stock_register_drinks", {
+  id: serial("id").primaryKey(),
+  staffName: text("staff_name").notNull(),
+  notes: text("notes"),
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  shiftDate: timestamp("shift_date").notNull(),
+});
+
+// Home Stock Register: Drinks line items
+export const stockRegisterDrinkLines = pgTable("stock_register_drink_lines", {
+  id: serial("id").primaryKey(),
+  submissionId: integer("submission_id").notNull().references(() => stockRegisterDrinks.id),
+  drinkName: text("drink_name").notNull(),
+  endCount: integer("end_count").notNull(),
+});
+
+// Home Stock Register: Meat submission
+export const stockRegisterMeat = pgTable("stock_register_meat", {
+  id: serial("id").primaryKey(),
+  staffName: text("staff_name").notNull(),
+  purchasedTodayKg: decimal("purchased_today_kg", { precision: 10, scale: 3 }).notNull(),
+  endShiftRemainingGrams: decimal("end_shift_remaining_grams", { precision: 10, scale: 3 }).notNull(),
+  notes: text("notes"),
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  shiftDate: timestamp("shift_date").notNull(),
+});
+
+// Home Stock Register: Rolls submission
+export const stockRegisterRolls = pgTable("stock_register_rolls", {
+  id: serial("id").primaryKey(),
+  staffName: text("staff_name").notNull(),
+  rollsPurchasedCount: integer("rolls_purchased_count").notNull(),
+  endShiftRemainingCount: integer("end_shift_remaining_count").notNull(),
+  notes: text("notes"),
+  submittedAt: timestamp("submitted_at").notNull().defaultNow(),
+  shiftDate: timestamp("shift_date").notNull(),
+});
+
 // Create insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({ id: true });
 export const insertDailySalesSchema = createInsertSchema(dailySales).omit({ id: true });
@@ -338,6 +377,10 @@ export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales).o
 export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true, lastUpdated: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
+export const insertStockRegisterDrinksSchema = createInsertSchema(stockRegisterDrinks).omit({ id: true, submittedAt: true });
+export const insertStockRegisterDrinkLinesSchema = createInsertSchema(stockRegisterDrinkLines).omit({ id: true });
+export const insertStockRegisterMeatSchema = createInsertSchema(stockRegisterMeat).omit({ id: true, submittedAt: true });
+export const insertStockRegisterRollsSchema = createInsertSchema(stockRegisterRolls).omit({ id: true, submittedAt: true });
 
 // Export types
 export type User = typeof users.$inferSelect;
@@ -378,3 +421,11 @@ export type Recipe = typeof recipes.$inferSelect;
 export type InsertRecipe = z.infer<typeof insertRecipeSchema>;
 export type RecipeIngredient = typeof recipeIngredients.$inferSelect;
 export type InsertRecipeIngredient = z.infer<typeof insertRecipeIngredientSchema>;
+export type StockRegisterDrinks = typeof stockRegisterDrinks.$inferSelect;
+export type InsertStockRegisterDrinks = z.infer<typeof insertStockRegisterDrinksSchema>;
+export type StockRegisterDrinkLines = typeof stockRegisterDrinkLines.$inferSelect;
+export type InsertStockRegisterDrinkLines = z.infer<typeof insertStockRegisterDrinkLinesSchema>;
+export type StockRegisterMeat = typeof stockRegisterMeat.$inferSelect;
+export type InsertStockRegisterMeat = z.infer<typeof insertStockRegisterMeatSchema>;
+export type StockRegisterRolls = typeof stockRegisterRolls.$inferSelect;
+export type InsertStockRegisterRolls = z.infer<typeof insertStockRegisterRollsSchema>;

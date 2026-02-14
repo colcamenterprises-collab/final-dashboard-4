@@ -12,7 +12,7 @@ import ShiftBalanceSummary from "@/components/ShiftBalanceSummary";
 import SalesByPaymentType from "@/components/SalesByPaymentType";
 import CompactShiftReports from "@/components/CompactShiftReports";
 import SalesVsExpensesChart from "@/components/SalesVsExpensesChart";
-
+import HomeStockRegistration from "@/components/HomeStockRegistration";
 
 import { api, mutations } from "@/lib/api";
 import { useRealTimeData } from "@/hooks/useRealTimeData";
@@ -79,6 +79,7 @@ export default function Dashboard() {
 
   return (
     <div className="relative">
+      <HomeStockRegistration />
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 space-y-4 sm:space-y-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Restaurant Operations Hub</h1>
         <div className="flex flex-col xs:flex-row items-start xs:items-center space-y-2 xs:space-y-0 xs:space-x-4">
