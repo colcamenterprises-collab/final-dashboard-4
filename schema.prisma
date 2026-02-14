@@ -457,6 +457,9 @@ model DailySalesV2 {
   othersTotal            Int                  @default(0)
   totalExpenses          Int                  @default(0)
   qrTransfer             Int                  @default(0)
+  grabReceiptCount       Int                  @default(0) @map("grab_receipt_count")
+  cashReceiptCount       Int                  @default(0) @map("cash_receipt_count")
+  qrReceiptCount         Int                  @default(0) @map("qr_receipt_count")
   deletedAt              DateTime?
   staff                  String?
   shift_date             DateTime?            @db.Date

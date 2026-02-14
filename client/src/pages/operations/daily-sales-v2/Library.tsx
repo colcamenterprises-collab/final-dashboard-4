@@ -23,6 +23,14 @@ const thb = (v: unknown): string => {
   return "฿" + n.toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
+const getReceiptCounts = (rec: RecordType) => {
+  const p: any = rec.payload || {};
+  const grab = Number(rec.grabReceiptCount ?? p.grabReceiptCount ?? 0);
+  const cash = Number(rec.cashReceiptCount ?? p.cashReceiptCount ?? 0);
+  const qr = Number(rec.qrReceiptCount ?? p.qrReceiptCount ?? 0);
+  return { grab, cash, qr, total: grab + cash + qr };
+};
+
 type RecordType = {
   id: string;
   date: string;
@@ -33,6 +41,10 @@ type RecordType = {
   drinks?: { name: string; quantity: number }[];
   drinksCount?: number;
   status: string;
+  grabReceiptCount?: number;
+  cashReceiptCount?: number;
+  qrReceiptCount?: number;
+  total_receipts?: number;
   payload?: { 
     balanced?: boolean;
     drinkStock?: { name: string; quantity: number; unit: string }[] | Record<string, number>;
@@ -186,7 +198,15 @@ export default function DailySalesV2Library() {
       doc.setFontSize(10);
       doc.text(`Cash: ฿${(p.cashSales || 0).toLocaleString()}`, 20, yPos); yPos += 6;
       doc.text(`QR: ฿${(p.qrSales || 0).toLocaleString()}`, 20, yPos); yPos += 6;
-      doc.text(`Total: ฿${(p.totalSales || 0).toLocaleString()}`, 20, yPos); yPos += 15;
+      doc.text(`Total: ฿${(p.totalSales || 0).toLocaleString()}`, 20, yPos); yPos += 10;
+
+      // Receipt Summary
+      doc.setFontSize(14); doc.text('Receipt Summary', 20, yPos); yPos += 10;
+      doc.setFontSize(10);
+      doc.text(`Grab Receipts: ${Number(p.grabReceiptCount || 0)}`, 20, yPos); yPos += 6;
+      doc.text(`Cash Receipts: ${Number(p.cashReceiptCount || 0)}`, 20, yPos); yPos += 6;
+      doc.text(`QR Receipts: ${Number(p.qrReceiptCount || 0)}`, 20, yPos); yPos += 6;
+      doc.text(`Total: ${Number(p.grabReceiptCount || 0) + Number(p.cashReceiptCount || 0) + Number(p.qrReceiptCount || 0)}`, 20, yPos); yPos += 9;
       
       // Banking
       doc.setFontSize(14); doc.text('Banking', 20, yPos); yPos += 10;
@@ -308,6 +328,7 @@ export default function DailySalesV2Library() {
               <th className="px-2 py-1 border-b">Rolls</th>
               <th className="px-2 py-1 border-b">Meat</th>
               <th className="px-2 py-1 border-b">Drinks</th>
+              <th className="px-2 py-1 border-b">Receipts</th>
               <th className="px-2 py-1 border-b">Balanced</th>
               <th className="px-2 py-1 border-b">Status</th>
               <th className="px-2 py-1 border-b">Actions</th>
@@ -316,7 +337,7 @@ export default function DailySalesV2Library() {
           <tbody>
             {filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={9} className="p-4 text-center text-gray-500">
+                <td colSpan={10} className="p-4 text-center text-gray-500">
                   No records found
                 </td>
               </tr>
@@ -334,6 +355,9 @@ export default function DailySalesV2Library() {
                     {(rec.drinksCount ?? 0) > 0 
                       ? `${rec.drinksCount} items`
                       : "-"}
+                  </td>
+                  <td className="px-2 py-1 border-b">
+                    {(() => { const r = getReceiptCounts(rec); return `${r.total}`; })()}
                   </td>
                   <td className="px-2 py-1 border-b">
                     {rec.payload?.balanced ? (
@@ -448,6 +472,16 @@ export default function DailySalesV2Library() {
                   ) : null}
                 </div>
               </div>
+
+              {(() => {
+                const receipt = getReceiptCounts(rec);
+                return (
+                  <div className="mb-2 text-[11px] text-gray-700">
+                    <div>Grab: {receipt.grab} | Cash: {receipt.cash} | QR: {receipt.qr}</div>
+                    <div>Total Receipts: {receipt.total}</div>
+                  </div>
+                );
+              })()}
 
               {/* Compact Actions Row */}
               <div className="flex items-center gap-1">

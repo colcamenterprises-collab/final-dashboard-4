@@ -48,6 +48,10 @@ const labels = {
     reimbursement: 'Reimbursement',
     tips: 'Tips',
     totalExpenses: 'Total Expenses',
+    receiptCounts: 'Receipt Counts',
+    grabReceipts: 'Grab Receipts',
+    cashReceipts: 'Cash Receipts',
+    qrReceipts: 'QR Receipts',
     cashBanking: 'Cash & Banking',
     closingCash: 'Closing Cash',
     closingCashHint: 'Enter the total amount of cash that remains in the register after all expenses. Include the starting cash (float amount)',
@@ -122,6 +126,10 @@ const labels = {
     reimbursement: 'เบิกคืน',
     tips: 'ทิป',
     totalExpenses: 'ค่าใช้จ่ายรวม',
+    receiptCounts: 'จำนวนใบเสร็จ',
+    grabReceipts: 'ใบเสร็จ Grab',
+    cashReceipts: 'ใบเสร็จเงินสด',
+    qrReceipts: 'ใบเสร็จ QR',
     cashBanking: 'เงินสดและธนาคาร',
     closingCash: 'เงินสดปิดยอด',
     closingCashHint: 'ใส่จำนวนเงินสดที่เหลือในลิ้นชักหลังหักค่าใช้จ่าย รวมเงินสดเริ่มต้นด้วย',
@@ -252,6 +260,9 @@ export default function DailySales() {
   const [closingCash, setClosingCash] = useState(0);
   const [cashBanked, setCashBanked] = useState(0);
   const [qrBanked, setQrBanked] = useState(0);
+  const [grabReceiptCount, setGrabReceiptCount] = useState(0);
+  const [cashReceiptCount, setCashReceiptCount] = useState(0);
+  const [qrReceiptCount, setQrReceiptCount] = useState(0);
   
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -304,6 +315,9 @@ export default function DailySales() {
           setClosingCash(p.closingCash || 0);
           setCashBanked(p.cashBanked || 0);
           setQrBanked(p.qrTransfer || 0);
+          setGrabReceiptCount(Number(p.grabReceiptCount ?? data.record.grabReceiptCount ?? 0));
+          setCashReceiptCount(Number(p.cashReceiptCount ?? data.record.cashReceiptCount ?? 0));
+          setQrReceiptCount(Number(p.qrReceiptCount ?? data.record.qrReceiptCount ?? 0));
           if (p.refunds) {
             setRefundStatus(p.refunds.status || '');
             setRefundReason(p.refunds.refundReason || "");
@@ -428,6 +442,9 @@ export default function DailySales() {
         setClosingCash(draft.closingCash || 0);
         setCashBanked(draft.cashBanked || 0);
         setQrBanked(draft.qrBanked || 0);
+        setGrabReceiptCount(draft.grabReceiptCount || 0);
+        setCashReceiptCount(draft.cashReceiptCount || 0);
+        setQrReceiptCount(draft.qrReceiptCount || 0);
         setShiftExpenses(draft.shiftExpenses || [{ id: uid(), item: "", cost: 0, shop: "" }]);
         setStaffWages(draft.staffWages || [{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
         setOtherPayments(draft.otherPayments || [{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
@@ -451,6 +468,9 @@ export default function DailySales() {
     setClosingCash(0);
     setCashBanked(0);
     setQrBanked(0);
+    setGrabReceiptCount(0);
+    setCashReceiptCount(0);
+    setQrReceiptCount(0);
     setRefundStatus('');
     setRefundReason("");
     setRefundChannel("");
@@ -473,10 +493,13 @@ export default function DailySales() {
       grabSales: grab,
       otherSales: aroi,
       cashBanked,
-      qrBanked
+      qrBanked,
+      grabReceiptCount,
+      cashReceiptCount,
+      qrReceiptCount
     };
     
-    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashBanked', 'qrBanked'];
+    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashBanked', 'qrBanked', 'grabReceiptCount', 'cashReceiptCount', 'qrReceiptCount'];
     const newErrors = required.filter((f) => {
       const value = formData[f as keyof typeof formData];
       if (f === 'completedBy') return !value || value.toString().trim() === '';
@@ -528,6 +551,9 @@ export default function DailySales() {
         closingCash,
         cashBanked,
         qrTransfer: qrBanked,
+        grabReceiptCount,
+        cashReceiptCount,
+        qrReceiptCount,
         shiftDate: dateToSubmit,
         status: 'submitted'
       };
@@ -604,6 +630,9 @@ export default function DailySales() {
     closingCash,
     cashBanked,
     qrBanked,
+    grabReceiptCount,
+    cashReceiptCount,
+    qrReceiptCount,
     refundStatus,
     refundReason,
     refundChannel
@@ -973,6 +1002,47 @@ export default function DailySales() {
 
             <div className="mt-6 pt-4 border-t text-sm text-right font-bold">
               {L.totalExpenses}: ฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}
+            </div>
+          </section>
+
+
+          {/* Receipt Counts Section */}
+          <section className="rounded-[4px] border bg-white p-5">
+            <h3 className="mb-4 text-sm font-semibold">{L.receiptCounts}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.grabReceipts}</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={grabReceiptCount}
+                  onChange={e=>setGrabReceiptCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('grabReceiptCount') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.cashReceipts}</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={cashReceiptCount}
+                  onChange={e=>setCashReceiptCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashReceiptCount') ? 'border-red-500' : ''}`}
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.qrReceipts}</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={qrReceiptCount}
+                  onChange={e=>setQrReceiptCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrReceiptCount') ? 'border-red-500' : ''}`}
+                />
+              </div>
             </div>
           </section>
 
