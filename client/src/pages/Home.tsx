@@ -26,6 +26,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import axios from "axios";
+import { resolveShiftDate } from "@/utils/resolveShiftDate";
 
 // PATCH 7 — SHIFT ALERT BANNER
 function ShiftAlertBanner() {
@@ -545,6 +546,218 @@ function SystemHealthSection() {
   );
 }
 
+
+
+type StockLedgerSummary = {
+  start: number;
+  purchased: number;
+  used: number;
+  actualEnd: number;
+  variance: number;
+  status: string;
+};
+
+function toStockSummary(row: any, kind: 'rolls' | 'meat' | 'drinks'): StockLedgerSummary | null {
+  if (!row) return null;
+
+  if (kind === 'rolls') {
+    return {
+      start: Number(row.rolls_start ?? 0),
+      purchased: Number(row.rolls_purchased ?? 0),
+      used: Number(row.rolls_used ?? 0),
+      actualEnd: Number(row.actual_rolls_end ?? 0),
+      variance: Number(row.variance ?? 0),
+      status: String(row.status ?? 'PENDING'),
+    };
+  }
+
+  if (kind === 'meat') {
+    return {
+      start: Number(row.meat_start_g ?? 0),
+      purchased: Number(row.meat_purchased_g ?? 0),
+      used: Number(row.meat_used_g ?? 0),
+      actualEnd: Number(row.actual_meat_end_g ?? 0),
+      variance: Number(row.variance_g ?? 0),
+      status: String(row.status ?? 'PENDING'),
+    };
+  }
+
+  return {
+    start: Number(row.drinks_start ?? 0),
+    purchased: Number(row.drinks_purchased ?? 0),
+    used: Number(row.drinks_sold ?? 0),
+    actualEnd: Number(row.actual_drinks_end ?? 0),
+    variance: Number(row.variance ?? 0),
+    status: String(row.status ?? 'PENDING'),
+  };
+}
+
+function varianceStatusClass(status: string): string {
+  const normalized = String(status || '').toUpperCase();
+  if (normalized === 'OK') return 'text-emerald-700';
+  if (normalized === 'WARNING' || normalized === 'ALERT') return 'text-red-700';
+  return 'text-slate-700';
+}
+
+function StockSummaryTable({ summary }: { summary: StockLedgerSummary | null }) {
+  if (!summary) {
+    return <div className="text-xs text-slate-500 mt-2">No ledger snapshot yet.</div>;
+  }
+
+  return (
+    <div className="mt-2 rounded border border-slate-200 p-3 text-xs text-slate-700">
+      <div className="grid grid-cols-2 gap-y-1">
+        <div>Start</div><div className="text-right">{summary.start}</div>
+        <div>Purchased</div><div className="text-right">{summary.purchased}</div>
+        <div>Used</div><div className="text-right">{summary.used}</div>
+        <div>Actual End</div><div className="text-right">{summary.actualEnd}</div>
+        <div>Variance</div><div className="text-right">{summary.variance}</div>
+        <div>Status</div><div className={`text-right font-semibold ${varianceStatusClass(summary.status)}`}>{summary.status}</div>
+      </div>
+    </div>
+  );
+}
+
+function StockLodgementPanels() {
+  const shiftDate = resolveShiftDate();
+  const [rollsStaffName, setRollsStaffName] = useState('');
+  const [rollsPurchased, setRollsPurchased] = useState('');
+  const [meatStaffName, setMeatStaffName] = useState('');
+  const [kilosPurchased, setKilosPurchased] = useState('');
+  const [drinksStaffName, setDrinksStaffName] = useState('');
+  const [drinkQuantities, setDrinkQuantities] = useState<Record<string, string>>({});
+  const [rollsSummary, setRollsSummary] = useState<StockLedgerSummary | null>(null);
+  const [meatSummary, setMeatSummary] = useState<StockLedgerSummary | null>(null);
+  const [drinksSummary, setDrinksSummary] = useState<StockLedgerSummary | null>(null);
+  const [rollsMessage, setRollsMessage] = useState('');
+  const [meatMessage, setMeatMessage] = useState('');
+  const [drinksMessage, setDrinksMessage] = useState('');
+
+  const { data: drinksSkus } = useQuery({
+    queryKey: ['purchasing-drinks-skus'],
+    queryFn: async () => {
+      const res = await axios.get('/api/purchasing', { params: { category: 'Drinks' } });
+      return (res.data?.items || []).map((item: any) => item.sku).filter((sku: string) => Boolean(sku));
+    },
+  });
+
+  const refreshSnapshots = async () => {
+    const [rollsRes, meatRes, drinksRes] = await Promise.all([
+      axios.get('/api/analysis/rolls-ledger', { params: { shiftDate } }),
+      axios.get('/api/analysis/meat-ledger', { params: { shiftDate } }),
+      axios.get('/api/analysis/drinks-ledger', { params: { shiftDate } }),
+    ]);
+    setRollsSummary(toStockSummary(rollsRes.data?.row, 'rolls'));
+    setMeatSummary(toStockSummary(meatRes.data?.row, 'meat'));
+    setDrinksSummary(toStockSummary(drinksRes.data?.row, 'drinks'));
+  };
+
+  useEffect(() => { void refreshSnapshots(); }, []);
+
+  const submitRolls = async () => {
+    setRollsMessage('');
+    await axios.post('/api/stock/lodge/rolls', {
+      shiftDate,
+      staffName: rollsStaffName,
+      rollsPurchased: Number(rollsPurchased),
+    });
+    await refreshSnapshots();
+    setRollsMessage('Rolls lodgement saved.');
+    setRollsPurchased('');
+  };
+
+  const submitMeat = async () => {
+    setMeatMessage('');
+    await axios.post('/api/stock/lodge/meat', {
+      shiftDate,
+      staffName: meatStaffName,
+      kilosPurchased: Number(kilosPurchased),
+    });
+    await refreshSnapshots();
+    setMeatMessage('Meat lodgement saved.');
+    setKilosPurchased('');
+  };
+
+  const submitDrinks = async () => {
+    setDrinksMessage('');
+    const items = Object.entries(drinkQuantities)
+      .map(([sku, quantity]) => ({ sku, quantity: Number(quantity) }))
+      .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0);
+
+    await axios.post('/api/stock/lodge/drinks', {
+      shiftDate,
+      staffName: drinksStaffName,
+      items,
+    });
+
+    await refreshSnapshots();
+    setDrinksMessage('Drinks lodgement saved.');
+    setDrinkQuantities({});
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Rolls Lodgement</h2>
+        <div className="mt-3 space-y-2">
+          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Staff Name" value={rollsStaffName} onChange={(e) => setRollsStaffName(e.target.value)} />
+          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" type="number" min="0" placeholder="Rolls Purchased" value={rollsPurchased} onChange={(e) => setRollsPurchased(e.target.value)} />
+          <Button onClick={submitRolls} className="w-full" disabled={!rollsStaffName.trim() || !Number(rollsPurchased)}>Submit Rolls</Button>
+          {rollsMessage && <div className="text-xs text-emerald-700">{rollsMessage}</div>}
+        </div>
+        <StockSummaryTable summary={rollsSummary} />
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Meat Lodgement</h2>
+        <div className="mt-3 space-y-2">
+          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Staff Name" value={meatStaffName} onChange={(e) => setMeatStaffName(e.target.value)} />
+          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" type="number" min="0" step="0.01" placeholder="Kilos Purchased" value={kilosPurchased} onChange={(e) => setKilosPurchased(e.target.value)} />
+          <Button onClick={submitMeat} className="w-full" disabled={!meatStaffName.trim() || !Number(kilosPurchased)}>Submit Meat</Button>
+          {meatMessage && <div className="text-xs text-emerald-700">{meatMessage}</div>}
+        </div>
+        <StockSummaryTable summary={meatSummary} />
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold text-slate-900">Drinks Lodgement</h2>
+        <div className="mt-3 space-y-2">
+          <input className="w-full rounded border border-slate-300 px-3 py-2 text-sm" placeholder="Staff Name" value={drinksStaffName} onChange={(e) => setDrinksStaffName(e.target.value)} />
+          <div className="rounded border border-slate-200">
+            <div className="grid grid-cols-2 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700">
+              <div>Drink SKU</div>
+              <div className="text-right">Quantity</div>
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+              {(drinksSkus || []).map((sku: string) => (
+                <div key={sku} className="grid grid-cols-2 items-center gap-2 border-t border-slate-100 px-3 py-2 text-sm">
+                  <div className="truncate">{sku}</div>
+                  <input
+                    className="w-full rounded border border-slate-300 px-2 py-1 text-right"
+                    type="number"
+                    min="0"
+                    value={drinkQuantities[sku] || ''}
+                    onChange={(e) => setDrinkQuantities((prev) => ({ ...prev, [sku]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+          <Button
+            onClick={submitDrinks}
+            className="w-full"
+            disabled={!drinksStaffName.trim() || !Object.values(drinkQuantities).some((v) => Number(v) > 0)}
+          >
+            Submit Drinks
+          </Button>
+          {drinksMessage && <div className="text-xs text-emerald-700">{drinksMessage}</div>}
+        </div>
+        <StockSummaryTable summary={drinksSummary} />
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   return (
     <div className="space-y-6 md:space-y-8 p-2 sm:p-0 pb-24 md:pb-8 bg-slate-50">
@@ -561,6 +774,8 @@ export default function Home() {
         <ExpensesV2Tile />
         <VarianceWidget />
       </div>
+
+      <StockLodgementPanels />
 
       <SystemHealthSection />
 

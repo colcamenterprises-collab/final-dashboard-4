@@ -1,5 +1,8 @@
 import { Router } from "express";
 import { db } from "../../lib/prisma";
+import { computeAndUpsertRollsLedger, getRollsLedgerRange } from "../../services/rollsLedger";
+import { computeAndUpsertMeatLedger, getMeatLedgerRange } from "../../services/meatLedger";
+import { computeAndUpsertDrinksLedger, getDrinksLedgerRange } from "../../services/drinksLedger";
 
 const router = Router();
 
@@ -286,6 +289,84 @@ router.post("/drinks", async (req, res) => {
   } catch (error: any) {
     console.error("[STOCK] Drinks log error:", error);
     res.status(500).json({ error: error.message || "Failed to log drinks" });
+  }
+});
+
+router.post('/lodge/rolls', async (req, res) => {
+  try {
+    const prisma = db();
+    const { shiftDate, staffName, rollsPurchased } = req.body;
+
+    if (!shiftDate) return res.status(400).json({ ok: false, error: 'shiftDate is required' });
+    if (!staffName || String(staffName).trim().length === 0) return res.status(400).json({ ok: false, error: 'staffName is required' });
+    if (!Number.isFinite(Number(rollsPurchased)) || Number(rollsPurchased) <= 0) return res.status(400).json({ ok: false, error: 'rollsPurchased must be a positive number' });
+
+    await prisma.$executeRaw`
+      INSERT INTO stock_received_log (shift_date, item_type, item_name, qty, staff_name, source, paid, created_at)
+      VALUES (${shiftDate}::date, 'rolls', 'Burger Buns', ${Number(rollsPurchased)}, ${String(staffName).trim()}, 'stock_lodgement_home', false, NOW())
+    `;
+
+    await computeAndUpsertRollsLedger(shiftDate);
+    const ledgerRows = await getRollsLedgerRange(shiftDate, shiftDate);
+    return res.json({ ok: true, shiftDate, ledger: ledgerRows[0] ?? null });
+  } catch (error: any) {
+    console.error('[STOCK] Rolls lodgement error:', error);
+    return res.status(500).json({ ok: false, error: error.message || 'Failed to lodge rolls' });
+  }
+});
+
+router.post('/lodge/meat', async (req, res) => {
+  try {
+    const prisma = db();
+    const { shiftDate, staffName, kilosPurchased } = req.body;
+
+    if (!shiftDate) return res.status(400).json({ ok: false, error: 'shiftDate is required' });
+    if (!staffName || String(staffName).trim().length === 0) return res.status(400).json({ ok: false, error: 'staffName is required' });
+    if (!Number.isFinite(Number(kilosPurchased)) || Number(kilosPurchased) <= 0) return res.status(400).json({ ok: false, error: 'kilosPurchased must be a positive number' });
+
+    const weightG = Math.round(Number(kilosPurchased) * 1000);
+    await prisma.$executeRaw`
+      INSERT INTO stock_received_log (shift_date, item_type, item_name, qty, weight_g, staff_name, source, paid, created_at)
+      VALUES (${shiftDate}::date, 'meat', 'Meat Lodgement', 1, ${weightG}, ${String(staffName).trim()}, 'stock_lodgement_home', false, NOW())
+    `;
+
+    await computeAndUpsertMeatLedger(shiftDate);
+    const ledgerRows = await getMeatLedgerRange(shiftDate, shiftDate);
+    return res.json({ ok: true, shiftDate, ledger: ledgerRows[0] ?? null });
+  } catch (error: any) {
+    console.error('[STOCK] Meat lodgement error:', error);
+    return res.status(500).json({ ok: false, error: error.message || 'Failed to lodge meat' });
+  }
+});
+
+router.post('/lodge/drinks', async (req, res) => {
+  try {
+    const prisma = db();
+    const { shiftDate, staffName, items } = req.body;
+
+    if (!shiftDate) return res.status(400).json({ ok: false, error: 'shiftDate is required' });
+    if (!staffName || String(staffName).trim().length === 0) return res.status(400).json({ ok: false, error: 'staffName is required' });
+    if (!Array.isArray(items)) return res.status(400).json({ ok: false, error: 'items must be an array' });
+
+    const validItems = items
+      .map((item: any) => ({ sku: String(item?.sku || '').trim(), quantity: Number(item?.quantity) }))
+      .filter((item: { sku: string; quantity: number }) => item.sku.length > 0 && Number.isFinite(item.quantity) && item.quantity > 0);
+
+    if (validItems.length === 0) return res.status(400).json({ ok: false, error: 'At least one drink item with quantity > 0 is required' });
+
+    for (const item of validItems) {
+      await prisma.$executeRaw`
+        INSERT INTO stock_received_log (shift_date, item_type, item_name, qty, staff_name, sku, source, paid, created_at)
+        VALUES (${shiftDate}::date, 'drinks', ${item.sku}, ${item.quantity}, ${String(staffName).trim()}, ${item.sku}, 'stock_lodgement_home', false, NOW())
+      `;
+    }
+
+    await computeAndUpsertDrinksLedger(shiftDate);
+    const ledgerRows = await getDrinksLedgerRange(shiftDate, shiftDate);
+    return res.json({ ok: true, shiftDate, insertedItems: validItems.length, ledger: ledgerRows[0] ?? null });
+  } catch (error: any) {
+    console.error('[STOCK] Drinks lodgement error:', error);
+    return res.status(500).json({ ok: false, error: error.message || 'Failed to lodge drinks' });
   }
 });
 
