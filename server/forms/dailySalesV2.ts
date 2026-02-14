@@ -409,12 +409,36 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
 export async function getDailySalesV2(_req: Request, res: Response) {
   try {
-    const result = await pool.query(
-      `SELECT id, "shiftDate", "completedBy", "createdAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+    const queryText = `SELECT id, "shiftDate", "completedBy", "createdAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
        FROM daily_sales_v2 
        WHERE "deletedAt" IS NULL
-       ORDER BY "createdAt" DESC`
-    );
+         AND COALESCE("shiftDate"::date, "createdAt"::date) >= (CURRENT_DATE - INTERVAL '60 days')
+       ORDER BY COALESCE("shiftDate", "createdAt") DESC`;
+    const result = await pool.query(queryText);
+
+    // Temporary deterministic debug logs for library visibility
+    console.log('[daily-sales-v2/library] SQL where=deletedAt IS NULL + last 60 days');
+    console.log(`[daily-sales-v2/library] row_count=${result.rows.length}`);
+
+    if (result.rows.length === 0) {
+      const tableCount = await pool.query(`SELECT COUNT(*)::int AS count FROM daily_sales_v2`);
+      const deletedNullCount = await pool.query(`SELECT COUNT(*)::int AS count FROM daily_sales_v2 WHERE "deletedAt" IS NULL`);
+      console.log(`[daily-sales-v2/library] fallback table_count=${tableCount.rows[0]?.count || 0}, deleted_null_count=${deletedNullCount.rows[0]?.count || 0}`);
+
+      // Never silently return empty if table has rows: return most recent non-deleted rows as fallback.
+      if ((tableCount.rows[0]?.count || 0) > 0 && (deletedNullCount.rows[0]?.count || 0) > 0) {
+        const fallback = await pool.query(
+          `SELECT id, "shiftDate", "completedBy", "createdAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+           FROM daily_sales_v2
+           WHERE "deletedAt" IS NULL
+           ORDER BY COALESCE("shiftDate", "createdAt") DESC
+           LIMIT 200`
+        );
+        console.log(`[daily-sales-v2/library] fallback_row_count=${fallback.rows.length}`);
+        const records = fallback.rows.map(mapLibraryRow);
+        return res.json({ ok: true, records });
+      }
+    }
 
     // MEGA-PATCH: Use safe mapper that preserves zeros and normalizes drinks
     const records = result.rows.map(mapLibraryRow);
@@ -476,6 +500,18 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     const { id } = req.params;
     const { rollsEnd, meatEnd, requisition, drinkStock } = req.body;
 
+    if (!id || String(id).trim() === '') {
+      return res.status(400).json({ ok: false, error: 'Missing salesId linkage key' });
+    }
+
+    const incomingKeys = Object.keys(req.body || {});
+    console.log(`[daily-sales-v2/form2] incoming_payload_keys=${incomingKeys.join(',')}`);
+
+    const hasStockPayload = typeof rollsEnd !== 'undefined' || typeof meatEnd !== 'undefined' || typeof drinkStock !== 'undefined' || typeof requisition !== 'undefined';
+    if (!hasStockPayload) {
+      return res.status(400).json({ ok: false, error: 'Empty Form 2 payload' });
+    }
+
     // __stock_required_guard__
     const stockPayload = { rollsEnd, meatEnd, drinkStock };
     const stockValidation = await validateStockRequired(stockPayload);
@@ -527,13 +563,41 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       }
     }
 
-    // Update the existing record with stock data including drinks and purchasingJson
+    const existingResult = await pool.query(
+      `SELECT id, "shiftDate", "completedBy", payload
+       FROM daily_sales_v2
+       WHERE id = $1`,
+      [id]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: 'Record not found' });
+    }
+
+    const existingPayload = existingResult.rows[0].payload || {};
+    const normalizedDrinkStock = (drinkStock && typeof drinkStock === 'object' && !Array.isArray(drinkStock))
+      ? Object.fromEntries(Object.entries(drinkStock).map(([k, v]) => [k, Number(v) || 0]))
+      : {};
+
+    const mergedPayload = {
+      ...existingPayload,
+      ...(typeof rollsEnd !== 'undefined' ? { rollsEnd: Number(rollsEnd) || 0 } : {}),
+      ...(typeof meatEnd !== 'undefined' ? { meatEnd: Number(meatEnd) || 0 } : {}),
+      ...(typeof drinkStock !== 'undefined' ? { drinkStock: normalizedDrinkStock } : {}),
+      ...(typeof requisition !== 'undefined' ? { requisition } : {}),
+      purchasingJson,
+    };
+
+    console.log(`[daily-sales-v2/form2] existing_payload_keys=${Object.keys(existingPayload).join(',')}`);
+    console.log(`[daily-sales-v2/form2] persisted_payload_keys=${Object.keys(mergedPayload).join(',')}`);
+
+    // Update existing record with deterministic merged payload
     const result = await pool.query(
-      `UPDATE daily_sales_v2 
-       SET payload = payload || $1
+      `UPDATE daily_sales_v2
+       SET payload = $1
        WHERE id = $2
        RETURNING id, "shiftDate", "completedBy", payload`,
-      [JSON.stringify({ rollsEnd, meatEnd, requisition, drinkStock, purchasingJson }), id]
+      [JSON.stringify(mergedPayload), id]
     );
 
     if (result.rows.length === 0) {
@@ -542,8 +606,8 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
 
     // 🔐 WRITE-TIME FIELD BRIDGE (DO NOT REMOVE)
     // Map form fields to analytics columns for daily_stock_v2
-    const burgerBuns = rollsEnd ?? 0;
-    const meatWeightG = meatEnd ?? 0; // meatEnd already in grams from form
+    const burgerBuns = Number(mergedPayload.rollsEnd ?? 0) || 0;
+    const meatWeightG = Number(mergedPayload.meatEnd ?? 0) || 0; // meatEnd already in grams from form
     
     // Upsert into daily_stock_v2 for purchasing/analytics systems
     await pool.query(
@@ -555,7 +619,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
          "meatWeightG" = EXCLUDED."meatWeightG",
          "drinksJson" = EXCLUDED."drinksJson",
          "purchasingJson" = EXCLUDED."purchasingJson"`,
-      [id, burgerBuns, meatWeightG, JSON.stringify(drinkStock || {}), JSON.stringify(purchasingJson)]
+      [id, burgerBuns, meatWeightG, JSON.stringify(mergedPayload.drinkStock || {}), JSON.stringify(purchasingJson)]
     );
     console.log(`[FIELD BRIDGE] Synced daily_stock_v2: salesId=${id}, burgerBuns=${burgerBuns}, meatWeightG=${meatWeightG}`);
     

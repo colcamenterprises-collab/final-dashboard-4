@@ -4682,6 +4682,52 @@ app.use("/api/bank-imports", bankUploadRouter);
   app.delete(legacyRoutes, (_req, res) => {
     res.status(410).json({ error: "Gone: use /api/forms/daily-sales/v3" });
   });
+
+  // Dev-only utility: repair Form 2 merge into daily_sales_v2.payload for a given record
+  app.post('/api/dev/daily-sales-v2/:id/repair-merge', async (req: Request, res: Response) => {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ ok: false, error: 'Dev-only endpoint disabled in production' });
+    }
+
+    try {
+      const { pool } = await import('./db');
+      const { id } = req.params;
+      const { rollsEnd, meatEnd, drinkStock, requisition } = req.body || {};
+
+      const rowResult = await pool.query(
+        `SELECT id, payload FROM daily_sales_v2 WHERE id = $1`,
+        [id]
+      );
+
+      if (rowResult.rows.length === 0) {
+        return res.status(404).json({ ok: false, error: 'Record not found' });
+      }
+
+      const existingPayload = rowResult.rows[0].payload || {};
+      const normalizedDrinkStock = (drinkStock && typeof drinkStock === 'object' && !Array.isArray(drinkStock))
+        ? Object.fromEntries(Object.entries(drinkStock).map(([k, v]) => [k, Number(v) || 0]))
+        : existingPayload.drinkStock || {};
+
+      const mergedPayload = {
+        ...existingPayload,
+        ...(typeof rollsEnd !== 'undefined' ? { rollsEnd: Number(rollsEnd) || 0 } : {}),
+        ...(typeof meatEnd !== 'undefined' ? { meatEnd: Number(meatEnd) || 0 } : {}),
+        ...(typeof drinkStock !== 'undefined' ? { drinkStock: normalizedDrinkStock } : {}),
+        ...(typeof requisition !== 'undefined' ? { requisition } : {}),
+      };
+
+      await pool.query(
+        `UPDATE daily_sales_v2 SET payload = $1 WHERE id = $2`,
+        [JSON.stringify(mergedPayload), id]
+      );
+
+      console.log(`[dev/repair-merge] repaired id=${id} before_keys=${Object.keys(existingPayload).join(',')} after_keys=${Object.keys(mergedPayload).join(',')}`);
+      res.json({ ok: true, id, beforeKeys: Object.keys(existingPayload), afterKeys: Object.keys(mergedPayload) });
+    } catch (error) {
+      console.error('[dev/repair-merge] failed:', error);
+      res.status(500).json({ ok: false, error: 'Failed to repair merge' });
+    }
+  });
   
   // Register Forms routes
   app.use("/api/forms", dailySalesV2Router);

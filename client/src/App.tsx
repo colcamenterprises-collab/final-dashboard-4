@@ -33,7 +33,6 @@ import PurchasingList from "./pages/operations/PurchasingList";
 import PurchasingFieldMapping from "./pages/operations/PurchasingFieldMapping";
 import PurchasingShiftLog from "./pages/operations/PurchasingShiftLog";
 import PurchasingAnalytics from "./pages/operations/PurchasingAnalytics";
-import ManualStockPurchase from "./pages/operations/ManualStockPurchase";
 import Receipts from "./pages/Receipts";
 import UploadStatements from "./pages/UploadStatements";
 import ProfitLoss from "./pages/ProfitLoss";
@@ -150,7 +149,6 @@ export default function App() {
                 <Route path="/operations/ingredient-purchasing/new" element={<Guard><IngredientPurchasingForm /></Guard>} />
                 <Route path="/operations/ingredient-purchasing/:id" element={<Guard><IngredientPurchasingForm /></Guard>} />
                 {/* PATCH S1: Disabled - stock logging moved to Shopping List modal */}
-                {/* <Route path="/operations/manual-stock-purchase" element={<Guard><ManualStockPurchase /></Guard>} /> */}
                 
                 <Route path="/operations/daily-sales" element={<DailySalesForm />} />
                 <Route path="/operations/daily-sales/edit/:id" element={<DailySalesForm />} />

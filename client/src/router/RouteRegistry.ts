@@ -18,8 +18,6 @@ export const ROUTES = {
   INGREDIENT_PURCHASING: "/operations/ingredient-purchasing",
   INGREDIENT_PURCHASING_NEW: "/operations/ingredient-purchasing/new",
   INGREDIENT_PURCHASING_EDIT: "/operations/ingredient-purchasing/:id",
-  // PATCH S1: Disabled - stock logging moved to Shopping List modal
-  // MANUAL_STOCK_PURCHASE: "/operations/manual-stock-purchase",
   UPLOAD_STATEMENTS: "/operations/analysis/upload",
   RECEIPTS: "/operations/analysis/receipts",
   RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
