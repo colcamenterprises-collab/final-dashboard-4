@@ -49,9 +49,11 @@ const labels = {
     tips: 'Tips',
     totalExpenses: 'Total Expenses',
     receiptCounts: 'Receipt Counts',
+    receiptCountsHint: 'Add the total number of receipts for each of the sales channels',
     grabReceipts: 'Grab Receipts',
     cashReceipts: 'Cash Receipts',
     qrReceipts: 'QR Receipts',
+    directReceipts: 'Direct Sales Receipts',
     cashBanking: 'Cash & Banking',
     closingCash: 'Closing Cash',
     closingCashHint: 'Enter the total amount of cash that remains in the register after all expenses. Include the starting cash (float amount)',
@@ -127,9 +129,11 @@ const labels = {
     tips: 'ทิป',
     totalExpenses: 'ค่าใช้จ่ายรวม',
     receiptCounts: 'จำนวนใบเสร็จ',
+    receiptCountsHint: 'เพิ่มจำนวนใบเสร็จทั้งหมดสำหรับแต่ละช่องทางการขาย',
     grabReceipts: 'ใบเสร็จ Grab',
     cashReceipts: 'ใบเสร็จเงินสด',
     qrReceipts: 'ใบเสร็จ QR',
+    directReceipts: 'ใบเสร็จขายตรง',
     cashBanking: 'เงินสดและธนาคาร',
     closingCash: 'เงินสดปิดยอด',
     closingCashHint: 'ใส่จำนวนเงินสดที่เหลือในลิ้นชักหลังหักค่าใช้จ่าย รวมเงินสดเริ่มต้นด้วย',
@@ -263,6 +267,7 @@ export default function DailySales() {
   const [grabReceiptCount, setGrabReceiptCount] = useState(0);
   const [cashReceiptCount, setCashReceiptCount] = useState(0);
   const [qrReceiptCount, setQrReceiptCount] = useState(0);
+  const [directReceiptCount, setDirectReceiptCount] = useState(0);
   
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -320,6 +325,7 @@ export default function DailySales() {
           setGrabReceiptCount(Number(p.grabReceiptCount ?? data.record.grabReceiptCount ?? 0));
           setCashReceiptCount(Number(p.cashReceiptCount ?? data.record.cashReceiptCount ?? 0));
           setQrReceiptCount(Number(p.qrReceiptCount ?? data.record.qrReceiptCount ?? 0));
+          setDirectReceiptCount(Number(p.directReceiptCount ?? data.record.directReceiptCount ?? 0));
           if (p.refunds) {
             setRefundStatus(p.refunds.status || '');
             setRefundReason(p.refunds.refundReason || "");
@@ -447,6 +453,7 @@ export default function DailySales() {
         setGrabReceiptCount(draft.grabReceiptCount || 0);
         setCashReceiptCount(draft.cashReceiptCount || 0);
         setQrReceiptCount(draft.qrReceiptCount || 0);
+        setDirectReceiptCount(draft.directReceiptCount || 0);
         setShiftExpenses(draft.shiftExpenses || [{ id: uid(), item: "", cost: 0, shop: "" }]);
         setStaffWages(draft.staffWages || [{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
         setOtherPayments(draft.otherPayments || [{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
@@ -494,14 +501,16 @@ export default function DailySales() {
       qrSales: qr,
       grabSales: grab,
       otherSales: aroi,
+      closingCash,
       cashBanked,
       qrBanked,
       grabReceiptCount,
       cashReceiptCount,
-      qrReceiptCount
+      qrReceiptCount,
+      directReceiptCount
     };
     
-    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashBanked', 'qrBanked', 'grabReceiptCount', 'cashReceiptCount', 'qrReceiptCount'];
+    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'closingCash', 'cashBanked', 'qrBanked', 'grabReceiptCount', 'cashReceiptCount', 'qrReceiptCount', 'directReceiptCount'];
     const newErrors = required.filter((f) => {
       const value = formData[f as keyof typeof formData];
       if (f === 'completedBy') return !value || value.toString().trim() === '';
@@ -530,11 +539,13 @@ export default function DailySales() {
         qrSales: 'QR sales amount is missing or invalid',
         grabSales: 'Grab sales amount is missing or invalid',
         otherSales: 'Other sales amount is missing or invalid',
-        cashBanked: 'Cash banked amount is missing or invalid',
-        qrBanked: 'QR transfer amount is missing or invalid',
+        closingCash: 'Closing cash amount is required — enter the cash remaining in the register',
+        cashBanked: 'Cash banked amount is required — enter how much cash was banked',
+        qrBanked: 'QR transfer amount is required — enter how much QR was transferred',
         grabReceiptCount: 'Grab receipt count is required',
         cashReceiptCount: 'Cash receipt count is required',
         qrReceiptCount: 'QR receipt count is required',
+        directReceiptCount: 'Direct sales receipt count is required',
         refundStatus: 'Please select whether any refunds occurred (Yes or No)',
         refundReason: 'Please enter the reason for the refund',
         refundChannel: 'Please select the refund channel',
@@ -579,6 +590,7 @@ export default function DailySales() {
         grabReceiptCount,
         cashReceiptCount,
         qrReceiptCount,
+        directReceiptCount,
         shiftDate: dateToSubmit,
         status: 'submitted'
       };
@@ -658,6 +670,7 @@ export default function DailySales() {
     grabReceiptCount,
     cashReceiptCount,
     qrReceiptCount,
+    directReceiptCount,
     refundStatus,
     refundReason,
     refundChannel
@@ -1033,8 +1046,9 @@ export default function DailySales() {
 
           {/* Receipt Counts Section */}
           <section className="rounded-[4px] border bg-white p-5">
-            <h3 className="mb-4 text-sm font-semibold">{L.receiptCounts}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h3 className="mb-2 text-sm font-semibold">{L.receiptCounts}</h3>
+            <p className="text-xs text-gray-500 mb-4">{L.receiptCountsHint}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <label className="text-sm text-gray-600 block mb-1">{L.grabReceipts}</label>
                 <input
@@ -1068,6 +1082,17 @@ export default function DailySales() {
                   className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrReceiptCount') ? 'border-red-500' : ''}`}
                 />
               </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.directReceipts}</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={directReceiptCount}
+                  onChange={e=>setDirectReceiptCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('directReceiptCount') ? 'border-red-500' : ''}`}
+                />
+              </div>
             </div>
           </section>
 
@@ -1081,7 +1106,7 @@ export default function DailySales() {
                   type="number" 
                   value={closingCash} 
                   onChange={e=>setClosingCash(+e.target.value||0)} 
-                  className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm"
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('closingCash') ? 'border-red-500' : ''}`}
                 />
                 <p className="text-xs text-gray-500 mt-1">{L.closingCashHint}</p>
               </div>
