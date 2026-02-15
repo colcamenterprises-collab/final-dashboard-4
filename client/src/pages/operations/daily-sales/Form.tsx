@@ -270,6 +270,8 @@ export default function DailySales() {
   const [countdown, setCountdown] = useState(4);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
+  const [validationMessages, setValidationMessages] = useState<string[]>([]);
+  const [showValidationDialog, setShowValidationDialog] = useState(false);
   const [lang, setLang] = useState<'en' | 'th'>('en');
   const [loading, setLoading] = useState(isEditMode);
   const [shiftDate, setShiftDate] = useState<string>(new Date().toISOString().split('T')[0]);
@@ -520,8 +522,31 @@ export default function DailySales() {
     
     setErrors(newErrors);
     if (newErrors.length) {
-      setError(`Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas: ${newErrors.join(', ')}`);
-      return; // Block navigation to Form 2
+      const messages: string[] = [];
+      const fieldLabels: Record<string, string> = {
+        completedBy: 'Please enter the name of who completed this form',
+        startingCash: 'Starting cash amount is missing or invalid',
+        cashSales: 'Cash sales amount is missing or invalid',
+        qrSales: 'QR sales amount is missing or invalid',
+        grabSales: 'Grab sales amount is missing or invalid',
+        otherSales: 'Other sales amount is missing or invalid',
+        cashBanked: 'Cash banked amount is missing or invalid',
+        qrBanked: 'QR transfer amount is missing or invalid',
+        grabReceiptCount: 'Grab receipt count is required',
+        cashReceiptCount: 'Cash receipt count is required',
+        qrReceiptCount: 'QR receipt count is required',
+        refundStatus: 'Please select whether any refunds occurred (Yes or No)',
+        refundReason: 'Please enter the reason for the refund',
+        refundChannel: 'Please select the refund channel',
+        expenseSupplier: 'Every expense must have a supplier selected',
+      };
+      for (const err of newErrors) {
+        messages.push(fieldLabels[err] || `Please check: ${err}`);
+      }
+      setValidationMessages(messages);
+      setShowValidationDialog(true);
+      setError(null);
+      return;
     }
     
     setSubmitting(true);
@@ -1191,6 +1216,42 @@ export default function DailySales() {
           {error && (
             <div className="mb-3 rounded-[4px] border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
+            </div>
+          )}
+
+          {showValidationDialog && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowValidationDialog(false)}>
+              <div className="relative mx-4 w-full max-w-md rounded-lg bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  onClick={() => setShowValidationDialog(false)}
+                  className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+                <div className="mb-4 flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100">
+                    <span className="text-lg">⚠️</span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">Please fix the following before submitting</h3>
+                </div>
+                <ul className="mb-5 space-y-2">
+                  {validationMessages.map((msg, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="mt-0.5 shrink-0 text-red-500">•</span>
+                      <span>{msg}</span>
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() => setShowValidationDialog(false)}
+                  className="w-full rounded-[4px] bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+                >
+                  OK, I'll fix these
+                </button>
+              </div>
             </div>
           )}
 
