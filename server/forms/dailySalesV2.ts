@@ -69,9 +69,9 @@ export function mapLibraryRow(row: any) {
   const drinks = normalizeDrinkStock(row?.payload?.drinkStock);
   const drinksCount = drinks.reduce((sum, d) => sum + d.quantity, 0);
 
-  const grabReceiptCount = Number(row?.grab_receipt_count ?? row?.payload?.grabReceiptCount ?? 0);
-  const cashReceiptCount = Number(row?.cash_receipt_count ?? row?.payload?.cashReceiptCount ?? 0);
-  const qrReceiptCount = Number(row?.qr_receipt_count ?? row?.payload?.qrReceiptCount ?? 0);
+  const grabReceiptCount = Number(row?.payload?.grabReceiptCount ?? 0);
+  const cashReceiptCount = Number(row?.payload?.cashReceiptCount ?? 0);
+  const qrReceiptCount = Number(row?.payload?.qrReceiptCount ?? 0);
   const totalReceipts = grabReceiptCount + cashReceiptCount + qrReceiptCount;
 
   return {
@@ -269,11 +269,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
     
     await pool.query(
       `INSERT INTO daily_sales_v2 (
-        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO", payload
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
-        id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt, grabReceiptCount, cashReceiptCount, qrReceiptCount, payload
+        id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt, payload
       ]
     );
     
@@ -429,11 +429,11 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
 export async function getDailySalesV2(_req: Request, res: Response) {
   try {
-    const queryText = `SELECT id, "shiftDate", "completedBy", "createdAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+    const queryText = `SELECT id, "shiftDate", "completedBy", "createdAt", payload
        FROM daily_sales_v2 
        WHERE "deletedAt" IS NULL
          AND COALESCE("shiftDate"::date, "createdAt"::date) >= (CURRENT_DATE - INTERVAL '60 days')
-       ORDER BY COALESCE("shiftDate", "createdAt") DESC`;
+       ORDER BY COALESCE("shiftDate"::timestamp, "createdAt") DESC`;
     const result = await pool.query(queryText);
 
     // Temporary deterministic debug logs for library visibility
@@ -448,10 +448,10 @@ export async function getDailySalesV2(_req: Request, res: Response) {
       // Never silently return empty if table has rows: return most recent non-deleted rows as fallback.
       if ((tableCount.rows[0]?.count || 0) > 0 && (deletedNullCount.rows[0]?.count || 0) > 0) {
         const fallback = await pool.query(
-          `SELECT id, "shiftDate", "completedBy", "createdAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+          `SELECT id, "shiftDate", "completedBy", "createdAt", payload
            FROM daily_sales_v2
            WHERE "deletedAt" IS NULL
-           ORDER BY COALESCE("shiftDate", "createdAt") DESC
+           ORDER BY COALESCE("shiftDate"::timestamp, "createdAt") DESC
            LIMIT 200`
         );
         console.log(`[daily-sales-v2/library] fallback_row_count=${fallback.rows.length}`);
@@ -474,7 +474,7 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT id, "shiftDate", "completedBy", "createdAt", "deletedAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+      `SELECT id, "shiftDate", "completedBy", "createdAt", "deletedAt", payload
        FROM daily_sales_v2 
        WHERE id = $1`,
       [id]
@@ -486,9 +486,9 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
 
     const row = result.rows[0];
     const p = row.payload || {};
-    const grabReceiptCount = Number(row.grab_receipt_count ?? p.grabReceiptCount ?? 0);
-    const cashReceiptCount = Number(row.cash_receipt_count ?? p.cashReceiptCount ?? 0);
-    const qrReceiptCount = Number(row.qr_receipt_count ?? p.qrReceiptCount ?? 0);
+    const grabReceiptCount = Number(p.grabReceiptCount ?? 0);
+    const cashReceiptCount = Number(p.cashReceiptCount ?? 0);
+    const qrReceiptCount = Number(p.qrReceiptCount ?? 0);
 
     const record = {
       id: row.id,
@@ -828,7 +828,7 @@ export async function printDailySalesV2(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT id, "shiftDate", "completedBy", "createdAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+      `SELECT id, "shiftDate", "completedBy", "createdAt", payload
        FROM daily_sales_v2 
        WHERE id = $1`,
       [id]
@@ -840,6 +840,9 @@ export async function printDailySalesV2(req: Request, res: Response) {
 
     const row = result.rows[0];
     const p = row.payload || {};
+    const grabRC = Number(p.grabReceiptCount ?? 0);
+    const cashRC = Number(p.cashReceiptCount ?? 0);
+    const qrRC = Number(p.qrReceiptCount ?? 0);
     
     const html = `
       <!DOCTYPE html>
@@ -874,10 +877,10 @@ export async function printDailySalesV2(req: Request, res: Response) {
         <h2>Receipt Summary</h2>
         <table>
           <tr><th>Channel</th><th>Count</th></tr>
-          <tr><td>Grab Receipts</td><td>${Number(row.grab_receipt_count ?? p.grabReceiptCount ?? 0)}</td></tr>
-          <tr><td>Cash Receipts</td><td>${Number(row.cash_receipt_count ?? p.cashReceiptCount ?? 0)}</td></tr>
-          <tr><td>QR Receipts</td><td>${Number(row.qr_receipt_count ?? p.qrReceiptCount ?? 0)}</td></tr>
-          <tr class="total"><td>Total Receipts</td><td>${Number(row.grab_receipt_count ?? p.grabReceiptCount ?? 0) + Number(row.cash_receipt_count ?? p.cashReceiptCount ?? 0) + Number(row.qr_receipt_count ?? p.qrReceiptCount ?? 0)}</td></tr>
+          <tr><td>Grab Receipts</td><td>${grabRC}</td></tr>
+          <tr><td>Cash Receipts</td><td>${cashRC}</td></tr>
+          <tr><td>QR Receipts</td><td>${qrRC}</td></tr>
+          <tr class="total"><td>Total Receipts</td><td>${grabRC + cashRC + qrRC}</td></tr>
         </table>
 
         <h2>Banking & Cash</h2>
@@ -906,7 +909,7 @@ export async function printDailySalesV2Full(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const result = await pool.query(
-      `SELECT id, "shiftDate", "completedBy", "createdAt", grab_receipt_count, cash_receipt_count, qr_receipt_count, payload
+      `SELECT id, "shiftDate", "completedBy", "createdAt", payload
        FROM daily_sales_v2 
        WHERE id = $1`,
       [id]
@@ -918,6 +921,9 @@ export async function printDailySalesV2Full(req: Request, res: Response) {
 
     const row = result.rows[0];
     const p = row.payload || {};
+    const grabRC2 = Number(p.grabReceiptCount ?? 0);
+    const cashRC2 = Number(p.cashReceiptCount ?? 0);
+    const qrRC2 = Number(p.qrReceiptCount ?? 0);
     
     const html = `
       <!DOCTYPE html>
@@ -982,10 +988,10 @@ export async function printDailySalesV2Full(req: Request, res: Response) {
         <h2>Receipt Summary</h2>
         <table>
           <tr><th>Description</th><th>Count</th></tr>
-          <tr><td>Grab Receipts</td><td>${Number(row.grab_receipt_count ?? p.grabReceiptCount ?? 0)}</td></tr>
-          <tr><td>Cash Receipts</td><td>${Number(row.cash_receipt_count ?? p.cashReceiptCount ?? 0)}</td></tr>
-          <tr><td>QR Receipts</td><td>${Number(row.qr_receipt_count ?? p.qrReceiptCount ?? 0)}</td></tr>
-          <tr class="total"><td>Total Receipts</td><td>${Number(row.grab_receipt_count ?? p.grabReceiptCount ?? 0) + Number(row.cash_receipt_count ?? p.cashReceiptCount ?? 0) + Number(row.qr_receipt_count ?? p.qrReceiptCount ?? 0)}</td></tr>
+          <tr><td>Grab Receipts</td><td>${grabRC2}</td></tr>
+          <tr><td>Cash Receipts</td><td>${cashRC2}</td></tr>
+          <tr><td>QR Receipts</td><td>${qrRC2}</td></tr>
+          <tr class="total"><td>Total Receipts</td><td>${grabRC2 + cashRC2 + qrRC2}</td></tr>
         </table>
 
         <h2>Stock Levels</h2>
