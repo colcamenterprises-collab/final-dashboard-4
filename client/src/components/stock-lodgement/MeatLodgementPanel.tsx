@@ -17,6 +17,29 @@ type MeatForm = z.infer<typeof meatSchema>;
 
 const MEAT_TYPES = ["Topside", "Chuck", "Brisket", "Rump", "Outside", "Mixed", "Other"];
 
+const labels = {
+  en: {
+    staffName: "Staff Name",
+    dateNote: "Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.",
+    meatType: "Meat Type",
+    selectMeatType: "Select meat type",
+    weightKg: "Weight (kg)",
+    cancel: "Cancel",
+    saving: "Saving...",
+    lodgeMeat: "Lodge Meat",
+  },
+  th: {
+    staffName: "ชื่อพนักงาน",
+    dateNote: "วันที่และเวลาจะบันทึกอัตโนมัติ (เวลากรุงเทพฯ) เมื่อส่ง",
+    meatType: "ประเภทเนื้อ",
+    selectMeatType: "เลือกประเภทเนื้อ",
+    weightKg: "น้ำหนัก (กก.)",
+    cancel: "ยกเลิก",
+    saving: "กำลังบันทึก...",
+    lodgeMeat: "บันทึกเนื้อ",
+  },
+};
+
 interface MeatLodgementPanelProps {
   initialValues?: Partial<MeatForm>;
   isSubmitting?: boolean;
@@ -24,9 +47,11 @@ interface MeatLodgementPanelProps {
   submitText?: string;
   onCancel?: () => void;
   onSubmit: (data: MeatForm) => void;
+  lang?: "en" | "th";
 }
 
-export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, submitText = "Lodge Meat", onCancel, onSubmit }: MeatLodgementPanelProps) {
+export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, submitText, onCancel, onSubmit, lang = "en" }: MeatLodgementPanelProps) {
+  const L = labels[lang];
   const form = useForm<MeatForm>({
     resolver: zodResolver(meatSchema),
     defaultValues: {
@@ -49,16 +74,16 @@ export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, su
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField control={form.control} name="staffName" render={({ field }) => (
-          <FormItem><FormLabel>Staff Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>{L.staffName}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
         )} />
 
-        <p className="text-xs text-slate-500">Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.</p>
+        <p className="text-xs text-slate-500">{L.dateNote}</p>
 
         <FormField control={form.control} name="meatType" render={({ field }) => (
           <FormItem>
-            <FormLabel>Meat Type</FormLabel>
+            <FormLabel>{L.meatType}</FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
-              <FormControl><SelectTrigger><SelectValue placeholder="Select meat type" /></SelectTrigger></FormControl>
+              <FormControl><SelectTrigger><SelectValue placeholder={L.selectMeatType} /></SelectTrigger></FormControl>
               <SelectContent>{MEAT_TYPES.map((meat) => <SelectItem key={meat} value={meat}>{meat}</SelectItem>)}</SelectContent>
             </Select>
             <FormMessage />
@@ -67,15 +92,15 @@ export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, su
 
         <FormField control={form.control} name="weightKg" render={({ field }) => (
           <FormItem>
-            <FormLabel>Weight (kg)</FormLabel>
+            <FormLabel>{L.weightKg}</FormLabel>
             <FormControl><Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
 
         <div className="flex gap-3 pt-4">
-          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">Cancel</Button>}
-          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? "Saving..." : submitText}</Button>
+          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">{L.cancel}</Button>}
+          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? L.saving : (submitText || L.lodgeMeat)}</Button>
         </div>
       </form>
     </Form>

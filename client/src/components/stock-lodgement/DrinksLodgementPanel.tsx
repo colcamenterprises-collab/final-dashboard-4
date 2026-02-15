@@ -17,6 +17,31 @@ export interface DrinkIngredient {
   name: string;
 }
 
+const labels = {
+  en: {
+    staffName: "Staff Name",
+    dateNote: "Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.",
+    drinkType: "Drink Type",
+    qty: "Qty",
+    loading: "Loading drinks...",
+    noDrinks: "No drink ingredients found",
+    cancel: "Cancel",
+    saving: "Saving...",
+    lodgeDrinks: "Lodge Drinks",
+  },
+  th: {
+    staffName: "ชื่อพนักงาน",
+    dateNote: "วันที่และเวลาจะบันทึกอัตโนมัติ (เวลากรุงเทพฯ) เมื่อส่ง",
+    drinkType: "ประเภทเครื่องดื่ม",
+    qty: "จำนวน",
+    loading: "กำลังโหลดเครื่องดื่ม...",
+    noDrinks: "ไม่พบรายการเครื่องดื่ม",
+    cancel: "ยกเลิก",
+    saving: "กำลังบันทึก...",
+    lodgeDrinks: "บันทึกเครื่องดื่ม",
+  },
+};
+
 interface DrinksLodgementPanelProps {
   drinkIngredients: DrinkIngredient[];
   drinksLoading?: boolean;
@@ -26,6 +51,7 @@ interface DrinksLodgementPanelProps {
   submitText?: string;
   onCancel?: () => void;
   onSubmit: (data: DrinksForm, drinkCounts: Record<string, number>) => void;
+  lang?: "en" | "th";
 }
 
 export function DrinksLodgementPanel({
@@ -34,10 +60,12 @@ export function DrinksLodgementPanel({
   initialValues,
   isSubmitting,
   showCancel,
-  submitText = "Lodge Drinks",
+  submitText,
   onCancel,
   onSubmit,
+  lang = "en",
 }: DrinksLodgementPanelProps) {
+  const L = labels[lang];
   const [drinkCounts, setDrinkCounts] = useState<Record<string, number>>({});
 
   const form = useForm<DrinksForm>({
@@ -65,22 +93,22 @@ export function DrinksLodgementPanel({
     <Form {...form}>
       <form onSubmit={form.handleSubmit((data) => onSubmit(data, drinkCounts))} className="space-y-4">
         <FormField control={form.control} name="staffName" render={({ field }) => (
-          <FormItem><FormLabel>Staff Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem><FormLabel>{L.staffName}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
         )} />
 
-        <p className="text-xs text-slate-500">Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.</p>
+        <p className="text-xs text-slate-500">{L.dateNote}</p>
 
         <div className="border rounded-lg overflow-hidden">
           {drinksLoading ? (
-            <div className="p-4 text-center text-sm text-slate-500">Loading drinks...</div>
+            <div className="p-4 text-center text-sm text-slate-500">{L.loading}</div>
           ) : drinkIngredients.length === 0 ? (
-            <div className="p-4 text-center text-sm text-slate-500">No drink ingredients found</div>
+            <div className="p-4 text-center text-sm text-slate-500">{L.noDrinks}</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-100 border-b">
-                  <th className="text-left p-2 font-medium text-slate-700">Drink Type</th>
-                  <th className="text-right p-2 font-medium text-slate-700 w-24">Qty</th>
+                  <th className="text-left p-2 font-medium text-slate-700">{L.drinkType}</th>
+                  <th className="text-right p-2 font-medium text-slate-700 w-24">{L.qty}</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,8 +133,8 @@ export function DrinksLodgementPanel({
         </div>
 
         <div className="flex gap-3 pt-4">
-          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">Cancel</Button>}
-          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? "Saving..." : submitText}</Button>
+          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">{L.cancel}</Button>}
+          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? L.saving : (submitText || L.lodgeDrinks)}</Button>
         </div>
       </form>
     </Form>

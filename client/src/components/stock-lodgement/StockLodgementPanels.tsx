@@ -22,18 +22,25 @@ function getBangkokNowIso() {
   return bkk.toISOString();
 }
 
+const tabLabels = {
+  en: { rolls: "Rolls", meat: "Meat", drinks: "Drinks" },
+  th: { rolls: "ขนมปัง", meat: "เนื้อ", drinks: "เครื่องดื่ม" },
+};
+
 interface StockLodgementPanelsProps {
   mode: "tabs" | "columns";
   initialData?: StockInitialData;
   onSuccess?: () => void;
   onCancel?: () => void;
+  lang?: "en" | "th";
 }
 
-export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel }: StockLodgementPanelsProps) {
+export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel, lang = "en" }: StockLodgementPanelsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"rolls" | "meat" | "drinks">(initialData?.type || "rolls");
   const isEditMode = !!initialData?.id;
+  const T = tabLabels[lang];
 
   const { data: drinkIngredients = [], isLoading: drinksLoading } = useQuery<DrinkIngredient[]>({
     queryKey: ["/api/purchasing/drinks"],
@@ -81,18 +88,18 @@ export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel }:
     stockMutation.mutate({ type: "drinks", items, submittedBy: data.staffName, submittedAt: getBangkokNowIso() });
   };
 
-  const panelProps = { isSubmitting: stockMutation.isPending, showCancel: mode === "tabs", onCancel };
+  const panelProps = { isSubmitting: stockMutation.isPending, showCancel: mode === "tabs", onCancel, lang };
 
   if (mode === "columns") {
     return <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="homepage-stock-lodgement-grid">
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">Rolls</h2><RollsLodgementPanel {...panelProps} onSubmit={submitRolls} /></div>
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">Meat</h2><MeatLodgementPanel {...panelProps} onSubmit={submitMeat} /></div>
-      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">Drinks</h2><DrinksLodgementPanel {...panelProps} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} /></div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">{T.rolls}</h2><RollsLodgementPanel {...panelProps} onSubmit={submitRolls} /></div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">{T.meat}</h2><MeatLodgementPanel {...panelProps} onSubmit={submitMeat} /></div>
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">{T.drinks}</h2><DrinksLodgementPanel {...panelProps} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} /></div>
     </div>;
   }
 
   return <>
-    <div className="flex border-b mb-4">{(["rolls", "meat", "drinks"] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-600 hover:text-gray-800"}`}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div>
+    <div className="flex border-b mb-4">{(["rolls", "meat", "drinks"] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-600 hover:text-gray-800"}`}>{T[tab]}</button>)}</div>
     {activeTab === "rolls" && <RollsLodgementPanel {...panelProps} initialValues={initialData?.type === "rolls" ? { quantity: initialData.quantity, cost: initialData.cost, paid: initialData.paid } : undefined} onSubmit={submitRolls} />}
     {activeTab === "meat" && <MeatLodgementPanel {...panelProps} initialValues={initialData?.type === "meat" ? { meatType: initialData.meatType, weightKg: initialData.weightKg } : undefined} onSubmit={submitMeat} />}
     {activeTab === "drinks" && <DrinksLodgementPanel {...panelProps} initialValues={initialData?.type === "drinks" ? {} : undefined} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} />}

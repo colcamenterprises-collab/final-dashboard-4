@@ -16,6 +16,31 @@ const rollsSchema = z.object({
 
 type RollsForm = z.infer<typeof rollsSchema>;
 
+const labels = {
+  en: {
+    staffName: "Staff Name",
+    dateNote: "Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.",
+    quantity: "Quantity (rolls)",
+    amount: "Amount (THB)",
+    paid: "Paid?",
+    paidHint: "Create expense entry if paid",
+    cancel: "Cancel",
+    saving: "Saving...",
+    lodgeRolls: "Lodge Rolls",
+  },
+  th: {
+    staffName: "ชื่อพนักงาน",
+    dateNote: "วันที่และเวลาจะบันทึกอัตโนมัติ (เวลากรุงเทพฯ) เมื่อส่ง",
+    quantity: "จำนวน (ม้วน)",
+    amount: "จำนวนเงิน (บาท)",
+    paid: "จ่ายแล้ว?",
+    paidHint: "สร้างรายการค่าใช้จ่ายถ้าจ่ายแล้ว",
+    cancel: "ยกเลิก",
+    saving: "กำลังบันทึก...",
+    lodgeRolls: "บันทึกขนมปัง",
+  },
+};
+
 interface RollsLodgementPanelProps {
   initialValues?: Partial<RollsForm>;
   isSubmitting?: boolean;
@@ -23,16 +48,19 @@ interface RollsLodgementPanelProps {
   submitText?: string;
   onCancel?: () => void;
   onSubmit: (data: RollsForm) => void;
+  lang?: "en" | "th";
 }
 
 export function RollsLodgementPanel({
   initialValues,
   isSubmitting,
   showCancel,
-  submitText = "Lodge Rolls",
+  submitText,
   onCancel,
   onSubmit,
+  lang = "en",
 }: RollsLodgementPanelProps) {
+  const L = labels[lang];
   const form = useForm<RollsForm>({
     resolver: zodResolver(rollsSchema),
     defaultValues: {
@@ -58,17 +86,17 @@ export function RollsLodgementPanel({
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <FormField control={form.control} name="staffName" render={({ field }) => (
           <FormItem>
-            <FormLabel>Staff Name</FormLabel>
+            <FormLabel>{L.staffName}</FormLabel>
             <FormControl><Input {...field} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
 
-        <p className="text-xs text-slate-500">Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.</p>
+        <p className="text-xs text-slate-500">{L.dateNote}</p>
 
         <FormField control={form.control} name="quantity" render={({ field }) => (
           <FormItem>
-            <FormLabel>Quantity (rolls)</FormLabel>
+            <FormLabel>{L.quantity}</FormLabel>
             <FormControl>
               <Input
                 type="number"
@@ -86,7 +114,7 @@ export function RollsLodgementPanel({
 
         <FormField control={form.control} name="cost" render={({ field }) => (
           <FormItem>
-            <FormLabel>Amount (THB)</FormLabel>
+            <FormLabel>{L.amount}</FormLabel>
             <FormControl>
               <Input type="number" step="0.01" disabled {...field} value={typeof field.value === "number" ? field.value.toFixed(2) : field.value} />
             </FormControl>
@@ -97,8 +125,8 @@ export function RollsLodgementPanel({
         <FormField control={form.control} name="paid" render={({ field }) => (
           <FormItem className="flex items-center justify-between rounded-lg border p-3">
             <div>
-              <FormLabel className="text-base">Paid?</FormLabel>
-              <div className="text-sm text-gray-500">Create expense entry if paid</div>
+              <FormLabel className="text-base">{L.paid}</FormLabel>
+              <div className="text-sm text-gray-500">{L.paidHint}</div>
             </div>
             <FormControl>
               <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -107,8 +135,8 @@ export function RollsLodgementPanel({
         )} />
 
         <div className="flex gap-3 pt-4">
-          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">Cancel</Button>}
-          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? "Saving..." : submitText}</Button>
+          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">{L.cancel}</Button>}
+          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? L.saving : (submitText || L.lodgeRolls)}</Button>
         </div>
       </form>
     </Form>
