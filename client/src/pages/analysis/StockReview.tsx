@@ -9,9 +9,14 @@ const BRANDS = [
 
 type RollsMeat = { prev_end:number; purchased:number; sold:number; expected:number; actual:number; paid:YN };
 type Drink = { brand:string; prev_end:number; purchased:number; sold:number; expected:number; actual:number; variance:number; paid:YN };
+type RollsApiRow = { shiftDate: string; rollsEnd: number | null; source: string | null };
 
 const nz = (v:any)=> Number.isFinite(Number(v)) ? Math.max(0, Math.trunc(Number(v))) : 0;
-const yn = (v:any):YN => v==="Y" ? "Y" : "N";
+const previousDay = (dateStr: string) => {
+  const d = new Date(`${dateStr}T00:00:00`);
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+};
 
 export default function StockReview(){
   /* [SR-TOAST] */
@@ -25,6 +30,7 @@ export default function StockReview(){
   const [savingSection, setSavingSection] = useState<string>("");
   const [showSummary, setShowSummary] = useState(false);
   const [summaryData, setSummaryData] = useState<any[]>([]);
+  const [rollsLast7, setRollsLast7] = useState<RollsApiRow[]>([]);
 
   const [rolls, setRolls] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
   const [meat, setMeat] = useState<RollsMeat>({prev_end:0,purchased:0,sold:0,expected:0,actual:0,paid:"N"});
@@ -35,9 +41,6 @@ export default function StockReview(){
 
   // recompute exp/variance on edit
   useEffect(()=>{
-    setRolls(r => ({...r, expected: nz(r.prev_end) + nz(r.purchased) - nz(r.sold)}));
-  }, [rolls.prev_end, rolls.purchased, rolls.sold]);
-  useEffect(()=>{
     setMeat(m => ({...m, expected: nz(m.prev_end) + nz(m.purchased) - nz(m.sold)}));
   }, [meat.prev_end, meat.purchased, meat.sold]);
   useEffect(()=>{
@@ -47,20 +50,47 @@ export default function StockReview(){
     }));
   }, [JSON.stringify(drinks.map(d=>[d.prev_end,d.purchased,d.sold,d.actual]))]);
 
+  async function fetchRollsAuto(selectedDate: string){
+    const res = await fetch(`/api/stock-review/rolls?endDate=${selectedDate}&days=7`);
+    const data = await res.json();
+    const rows: RollsApiRow[] = Array.isArray(data?.rows) ? data.rows : [];
+    setRollsLast7(rows);
+
+    const current = rows.find((row) => row.shiftDate === selectedDate);
+    const prev = rows.find((row) => row.shiftDate === previousDay(selectedDate));
+    const actual = current?.rollsEnd ?? 0;
+    const prevEnd = prev?.rollsEnd ?? 0;
+    const purchased = 0;
+    const sold = 0;
+    const expected = prevEnd + purchased - sold;
+
+    setRolls((existing) => ({
+      ...existing,
+      prev_end: prevEnd,
+      purchased,
+      sold,
+      expected,
+      actual,
+    }));
+  }
+
   async function load(){
     setLoading(true);
-    const res = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
-    const data = await res.json();
-    if (data?.ok){
-      setRolls(data.rolls);
-      setMeat(data.meat);
-      const map = new Map<string, Drink>(data.drinks.map((r:Drink)=>[r.brand,r]));
-      const drinksData: Drink[] = BRANDS.map(b => 
-        map.get(b) || {brand:b, prev_end:0,purchased:0,sold:0,expected:0,actual:0,variance:0,paid:"N" as YN}
-      );
-      setDrinks(drinksData);
+    try {
+      await fetchRollsAuto(day);
+      const ledgerRes = await fetch(`/api/stock-review/manual-ledger?date=${day}`);
+      const data = await ledgerRes.json();
+      if (data?.ok){
+        setMeat(data.meat);
+        const map = new Map<string, Drink>(data.drinks.map((r:Drink)=>[r.brand,r]));
+        const drinksData: Drink[] = BRANDS.map(b => 
+          map.get(b) || {brand:b, prev_end:0,purchased:0,sold:0,expected:0,actual:0,variance:0,paid:"N" as YN}
+        );
+        setDrinks(drinksData);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   useEffect(()=>{ load(); }, [day]);
@@ -277,22 +307,8 @@ export default function StockReview(){
             onClick={async ()=>{
               try{
                 setBusyRolls(true);
-                const q = encodeURIComponent(day);
-                const res = await fetch(`/api/stock-review/manual-ledger/refresh-rolls?date=${q}`, { 
-                  method:"POST",
-                  headers:{ "Content-Type":"application/json" },
-                  body: JSON.stringify({ day })
-                });
-                const j = await res.json().catch(()=>({ok:false,error:"Bad JSON"}));
-                if(!j?.ok){ toast(j?.error ? `Rolls auto failed: ${j.error}` : `Rolls auto failed`); return; }
-                const r = await fetch(`/api/stock-review/manual-ledger?date=${q}`);
-                const d = await r.json();
-                if(d?.ok){ 
-                  setRolls(d.rolls); 
-                  toast(`Rolls auto-filled for ${day}`);
-                } else {
-                  toast("Reload failed");
-                }
+                await fetchRollsAuto(day);
+                toast(`Rolls auto-filled for ${day}`);
               }catch(e:any){ 
                 toast(`Rolls auto error: ${e?.message||e}`); 
               } finally { 
@@ -311,16 +327,40 @@ export default function StockReview(){
             ["Burgers Sold", "sold"],
             ["Expected", "expected", true],
             ["Actual", "actual"]
-          ].map(([label, key, ro]:any)=>(
+          ].map(([label, key]:any)=>(
             <label key={String(key)} className="text-[12px] text-slate-600">
               <div className="mb-1">{label}</div>
               <input inputMode="numeric" pattern="[0-9]*"
                      value={String((rolls as any)[key])}
                      onChange={e=> setRolls({...rolls, [key]: nz(e.target.value)})}
-                     readOnly={!!ro}
+                     readOnly={true}
                      className="h-10 w-full rounded border px-3 text-sm"/>
             </label>
           ))}
+        </div>
+
+        <div className="mt-4">
+          <h3 className="text-sm font-medium mb-2">Last 7 days</h3>
+          <div className="overflow-x-auto rounded border">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-slate-600">Date</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-600">Actual</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-600">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rollsLast7.map((row) => (
+                  <tr key={row.shiftDate} className="border-t">
+                    <td className="px-3 py-2">{row.shiftDate}</td>
+                    <td className="px-3 py-2">{row.rollsEnd ?? "-"}</td>
+                    <td className="px-3 py-2">{row.rollsEnd === null ? "MISSING" : "OK"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 
