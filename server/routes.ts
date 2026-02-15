@@ -78,6 +78,7 @@ import { rebuildIngredientTruth as rebuildIngredientTruthV2, getIngredientUsage 
 import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
 import { dailyReviewCommentsRouter } from "./routes/dailyReviewComments";
 import stockReviewManual from "./routes/stockReviewManual";
+import stockReviewRouter from "./api/stockReview";
 import receiptsBurgers from "./routes/receiptsBurgers";
 import receiptsDebug from "./routes/receiptsDebug";
 import loyverseSync from "./routes/loyverseSync";
@@ -1152,6 +1153,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Stock Review Manual Ledger - mounted before :date route to avoid conflicts
   app.use("/api/stock-review/manual-ledger", stockReviewManual);
+  app.use("/api/stock-review", stockReviewRouter);
   
   // Burger metrics from receipts
   app.use("/api/receipts", receiptsBurgers);
