@@ -5,11 +5,9 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { convertFromInputDate } from "@/lib/format";
 
 const drinksSchema = z.object({
   staffName: z.string().trim().min(1, "Staff Name is required"),
-  date: z.string().min(1, "Date is required"),
 });
 
 type DrinksForm = z.infer<typeof drinksSchema>;
@@ -40,14 +38,12 @@ export function DrinksLodgementPanel({
   onCancel,
   onSubmit,
 }: DrinksLodgementPanelProps) {
-  const today = new Date().toISOString().split("T")[0];
   const [drinkCounts, setDrinkCounts] = useState<Record<string, number>>({});
 
   const form = useForm<DrinksForm>({
     resolver: zodResolver(drinksSchema),
     defaultValues: {
       staffName: initialValues?.staffName || "",
-      date: initialValues?.date || today,
     },
   });
 
@@ -61,10 +57,9 @@ export function DrinksLodgementPanel({
     if (!initialValues) return;
     form.reset({
       staffName: initialValues.staffName || "",
-      date: initialValues.date || today,
     });
     setDrinkCounts(Object.fromEntries(drinkIngredients.map((d) => [String(d.id), 0])));
-  }, [initialValues, form, today, drinkIngredients]);
+  }, [initialValues, form, drinkIngredients]);
 
   return (
     <Form {...form}>
@@ -73,18 +68,7 @@ export function DrinksLodgementPanel({
           <FormItem><FormLabel>Staff Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
         )} />
 
-        <FormField control={form.control} name="date" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Date</FormLabel>
-            <FormControl>
-              <div className="space-y-1">
-                <Input type="date" {...field} data-testid="input-stock-date" />
-                {field.value && <p className="text-xs text-gray-600">Selected: {convertFromInputDate(field.value)}</p>}
-              </div>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <p className="text-xs text-slate-500">Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.</p>
 
         <div className="border rounded-lg overflow-hidden">
           {drinksLoading ? (

@@ -70,6 +70,20 @@ router.get("/summary/today", async (_req, res) => {
     
     const currentMonthSales = parseFloat(rows[0]?.total_sales || '0');
     const shiftCount = parseInt(rows[0]?.shift_count || '0');
+
+    const bangkokNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+    const expectedCompletedShifts = Math.max(bangkokNow.getDate() - 1, 0);
+    const missingShiftReports = Math.max(expectedCompletedShifts - shiftCount, 0);
+
+    const latestShiftResult = await db.execute(sql`
+      SELECT MAX("businessDate") AS latest_business_date
+      FROM "PosShiftReport"
+      WHERE "businessDate" >= date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok'))::date
+        AND "businessDate" < (date_trunc('month', (now() AT TIME ZONE 'Asia/Bangkok')) + interval '1 month')::date
+        AND "businessDate" IS NOT NULL
+    `);
+
+    const latestBusinessDate = latestShiftResult.rows[0]?.latest_business_date || null;
     
     const shoppingExpenses = parseFloat(expenseResult.rows[0]?.shopping_total || '0');
     const wagesExpenses = parseFloat(expenseResult.rows[0]?.wages_total || '0');
@@ -84,6 +98,13 @@ router.get("/summary/today", async (_req, res) => {
       sales: currentMonthSales,
       currentMonthSales,
       shiftCount,
+      shiftCoverage: {
+        expectedCompletedShifts,
+        syncedShiftReports: shiftCount,
+        missingShiftReports,
+        latestBusinessDate,
+        status: missingShiftReports > 0 ? 'MISSING_SHIFT_REPORTS' : 'OK',
+      },
       expenses: totalExpenses,
       currentMonthExpenses: totalExpenses,
       expenseBreakdown: {
@@ -105,6 +126,13 @@ router.get("/summary/today", async (_req, res) => {
       sales: 0,
       currentMonthSales: 0,
       shiftCount: 0,
+      shiftCoverage: {
+        expectedCompletedShifts: 0,
+        syncedShiftReports: 0,
+        missingShiftReports: 0,
+        latestBusinessDate: null,
+        status: 'MISSING_DATA',
+      },
       expenses: 0,
       currentMonthExpenses: 0,
       expenseBreakdown: {

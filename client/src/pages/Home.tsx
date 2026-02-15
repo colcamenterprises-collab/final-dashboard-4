@@ -1,12 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import BalanceCard from "@/components/BalanceCard";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
+import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { VarianceWidget } from "@/components/widgets/VarianceWidget";
 import { TrendingUp, DollarSign, Activity, Plus, ArrowDownLeft, FileText, AlertTriangle } from "lucide-react";
 import axios from "axios";
-import { StockLodgementPanels } from "@/components/stock-lodgement/StockLodgementPanels";
 
 function ShiftAlertBanner() {
   const { data: report } = useQuery({
@@ -83,13 +83,16 @@ function KPIGrid() {
   const netProfit = Number((financeSummary as any)?.netProfit ?? 0);
   const totalExpenses = Number((financeSummary as any)?.currentMonthExpenses ?? 0);
   const shiftCount = Number((financeSummary as any)?.shiftCount ?? 0);
+  const shiftCoverage = (financeSummary as any)?.shiftCoverage;
+  const expectedCompletedShifts = Number(shiftCoverage?.expectedCompletedShifts ?? shiftCount);
+  const missingShiftReports = Number(shiftCoverage?.missingShiftReports ?? 0);
   const avgPerShift = shiftCount > 0 ? mtdSales / shiftCount : 0;
 
   const kpis = [
     {
       title: "MTD Sales",
       value: isLoading ? "—" : `฿${mtdSales.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-      subtitle: `${shiftCount} shifts`,
+      subtitle: missingShiftReports > 0 ? `${shiftCount} / ${expectedCompletedShifts} shifts synced` : `${shiftCount} shifts`,
       icon: DollarSign,
     },
     {
@@ -107,7 +110,7 @@ function KPIGrid() {
     {
       title: "Avg Per Shift",
       value: isLoading ? "—" : `฿${avgPerShift.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`,
-      subtitle: `${shiftCount} shifts`,
+      subtitle: missingShiftReports > 0 ? `${shiftCount} / ${expectedCompletedShifts} shifts synced` : `${shiftCount} shifts`,
       icon: Activity,
     },
   ];
@@ -126,6 +129,20 @@ function KPIGrid() {
           <p className="text-xs text-slate-500 mt-1">{kpi.subtitle}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function StockLodgementQuickActions() {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="homepage-stock-lodgement-actions">
+      <h2 className="text-sm font-semibold text-slate-900 mb-3">Stock Lodgement</h2>
+      <p className="text-xs text-slate-500 mb-4">Open the Finance &gt; Expenses stock modal to record rolls, meat, and drinks.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <StockLodgmentModal triggerText="Lodge Rolls" triggerClassName="w-full" initialData={{ type: "rolls" }} />
+        <StockLodgmentModal triggerText="Lodge Meat" triggerClassName="w-full" initialData={{ type: "meat" }} />
+        <StockLodgmentModal triggerText="Lodge Drinks" triggerClassName="w-full" initialData={{ type: "drinks" }} />
+      </div>
     </div>
   );
 }
@@ -262,7 +279,7 @@ export default function Home() {
       <ShiftAlertBanner />
       <BalanceHero />
       <KPIGrid />
-      <StockLodgementPanels mode="columns" />
+      <StockLodgementQuickActions />
       <PrimeCostCards />
       <VarianceWidget />
       <CashBalanceSnapshot />

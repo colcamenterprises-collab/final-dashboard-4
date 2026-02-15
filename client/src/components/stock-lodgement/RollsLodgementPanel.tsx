@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { convertFromInputDate } from "@/lib/format";
 
 const rollsSchema = z.object({
   staffName: z.string().trim().min(1, "Staff Name is required"),
-  date: z.string().min(1, "Date is required"),
   quantity: z.number().min(1, "Quantity must be at least 1"),
   cost: z.number().min(0, "Cost must be positive"),
   paid: z.boolean().default(false),
@@ -35,12 +33,10 @@ export function RollsLodgementPanel({
   onCancel,
   onSubmit,
 }: RollsLodgementPanelProps) {
-  const today = new Date().toISOString().split("T")[0];
   const form = useForm<RollsForm>({
     resolver: zodResolver(rollsSchema),
     defaultValues: {
       staffName: initialValues?.staffName || "",
-      date: initialValues?.date || today,
       quantity: initialValues?.quantity || 0,
       cost: initialValues?.cost || 0,
       paid: initialValues?.paid || false,
@@ -51,12 +47,11 @@ export function RollsLodgementPanel({
     if (!initialValues) return;
     form.reset({
       staffName: initialValues.staffName || "",
-      date: initialValues.date || today,
       quantity: initialValues.quantity || 0,
       cost: initialValues.cost || 0,
       paid: initialValues.paid || false,
     });
-  }, [initialValues, form, today]);
+  }, [initialValues, form]);
 
   return (
     <Form {...form}>
@@ -69,18 +64,7 @@ export function RollsLodgementPanel({
           </FormItem>
         )} />
 
-        <FormField control={form.control} name="date" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Date</FormLabel>
-            <FormControl>
-              <div className="space-y-1">
-                <Input type="date" {...field} data-testid="input-stock-date" />
-                {field.value && <p className="text-xs text-gray-600">Selected: {convertFromInputDate(field.value)}</p>}
-              </div>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <p className="text-xs text-slate-500">Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.</p>
 
         <FormField control={form.control} name="quantity" render={({ field }) => (
           <FormItem>
