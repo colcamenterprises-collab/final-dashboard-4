@@ -83,11 +83,11 @@ export function RollsLodgementPanel({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <FormField control={form.control} name="staffName" render={({ field }) => (
           <FormItem>
-            <FormLabel>{L.staffName}</FormLabel>
-            <FormControl><Input {...field} /></FormControl>
+            <FormLabel className="text-xs text-slate-600">{L.staffName}</FormLabel>
+            <FormControl><Input className="h-9 text-sm rounded-[4px]" {...field} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
@@ -96,9 +96,10 @@ export function RollsLodgementPanel({
 
         <FormField control={form.control} name="quantity" render={({ field }) => (
           <FormItem>
-            <FormLabel>{L.quantity}</FormLabel>
+            <FormLabel className="text-xs text-slate-600">{L.quantity}</FormLabel>
             <FormControl>
               <Input
+                className="h-9 text-sm rounded-[4px]"
                 type="number"
                 {...field}
                 onChange={(e) => {
@@ -114,19 +115,19 @@ export function RollsLodgementPanel({
 
         <FormField control={form.control} name="cost" render={({ field }) => (
           <FormItem>
-            <FormLabel>{L.amount}</FormLabel>
+            <FormLabel className="text-xs text-slate-600">{L.amount}</FormLabel>
             <FormControl>
-              <Input type="number" step="0.01" disabled {...field} value={typeof field.value === "number" ? field.value.toFixed(2) : field.value} />
+              <Input className="h-9 text-sm rounded-[4px]" type="number" step="0.01" disabled {...field} value={typeof field.value === "number" ? field.value.toFixed(2) : field.value} />
             </FormControl>
             <FormMessage />
           </FormItem>
         )} />
 
         <FormField control={form.control} name="paid" render={({ field }) => (
-          <FormItem className="flex items-center justify-between rounded-lg border p-3">
+          <FormItem className="flex items-center justify-between rounded-[4px] border border-slate-200 p-3">
             <div>
-              <FormLabel className="text-base">{L.paid}</FormLabel>
-              <div className="text-sm text-gray-500">{L.paidHint}</div>
+              <FormLabel className="text-sm text-slate-700">{L.paid}</FormLabel>
+              <div className="text-xs text-slate-500">{L.paidHint}</div>
             </div>
             <FormControl>
               <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -134,9 +135,9 @@ export function RollsLodgementPanel({
           </FormItem>
         )} />
 
-        <div className="flex gap-3 pt-4">
-          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">{L.cancel}</Button>}
-          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? L.saving : (submitText || L.lodgeRolls)}</Button>
+        <div className="flex gap-3 pt-3">
+          {showCancel && <Button type="button" variant="outline" size="sm" onClick={onCancel} className="flex-1 !h-9 text-sm">{L.cancel}</Button>}
+          <Button type="submit" disabled={isSubmitting} size="sm" className="flex-1 !h-9 text-sm bg-emerald-600 hover:bg-emerald-700 text-white">{isSubmitting ? L.saving : (submitText || L.lodgeRolls)}</Button>
         </div>
       </form>
     </Form>

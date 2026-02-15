@@ -72,19 +72,27 @@ export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, su
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
         <FormField control={form.control} name="staffName" render={({ field }) => (
-          <FormItem><FormLabel>{L.staffName}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem>
+            <FormLabel className="text-xs text-slate-600">{L.staffName}</FormLabel>
+            <FormControl><Input className="h-9 text-sm rounded-[4px]" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
         )} />
 
         <p className="text-xs text-slate-500">{L.dateNote}</p>
 
         <FormField control={form.control} name="meatType" render={({ field }) => (
           <FormItem>
-            <FormLabel>{L.meatType}</FormLabel>
+            <FormLabel className="text-xs text-slate-600">{L.meatType}</FormLabel>
             <Select onValueChange={field.onChange} defaultValue={field.value}>
-              <FormControl><SelectTrigger><SelectValue placeholder={L.selectMeatType} /></SelectTrigger></FormControl>
-              <SelectContent>{MEAT_TYPES.map((meat) => <SelectItem key={meat} value={meat}>{meat}</SelectItem>)}</SelectContent>
+              <FormControl>
+                <SelectTrigger className="h-9 text-sm rounded-[4px]">
+                  <SelectValue placeholder={L.selectMeatType} />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>{MEAT_TYPES.map((meat) => <SelectItem key={meat} value={meat} className="text-sm">{meat}</SelectItem>)}</SelectContent>
             </Select>
             <FormMessage />
           </FormItem>
@@ -92,15 +100,15 @@ export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, su
 
         <FormField control={form.control} name="weightKg" render={({ field }) => (
           <FormItem>
-            <FormLabel>{L.weightKg}</FormLabel>
-            <FormControl><Input type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+            <FormLabel className="text-xs text-slate-600">{L.weightKg}</FormLabel>
+            <FormControl><Input className="h-9 text-sm rounded-[4px]" type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />
 
-        <div className="flex gap-3 pt-4">
-          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">{L.cancel}</Button>}
-          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? L.saving : (submitText || L.lodgeMeat)}</Button>
+        <div className="flex gap-3 pt-3">
+          {showCancel && <Button type="button" variant="outline" size="sm" onClick={onCancel} className="flex-1 !h-9 text-sm">{L.cancel}</Button>}
+          <Button type="submit" disabled={isSubmitting} size="sm" className="flex-1 !h-9 text-sm bg-emerald-600 hover:bg-emerald-700 text-white">{isSubmitting ? L.saving : (submitText || L.lodgeMeat)}</Button>
         </div>
       </form>
     </Form>

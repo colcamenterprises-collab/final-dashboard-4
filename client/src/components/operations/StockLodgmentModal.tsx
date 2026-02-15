@@ -45,7 +45,7 @@ export function StockLodgmentModal({ isOpen: controlledIsOpen, onOpenChange, onS
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <div className="flex items-center justify-between pr-6">
-            <DialogTitle>{initialData?.id ? L.edit : L.lodge} {L.stockPurchase}</DialogTitle>
+            <DialogTitle className="!text-sm font-semibold text-slate-900">{initialData?.id ? L.edit : L.lodge} {L.stockPurchase}</DialogTitle>
             <div className="flex items-center gap-1.5">
               <span className={`text-xs font-medium ${lang === 'en' ? 'text-emerald-600' : 'text-slate-600'}`}>EN</span>
               <button

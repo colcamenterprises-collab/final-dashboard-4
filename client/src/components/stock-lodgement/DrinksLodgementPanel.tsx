@@ -91,37 +91,41 @@ export function DrinksLodgementPanel({
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit((data) => onSubmit(data, drinkCounts))} className="space-y-4">
+      <form onSubmit={form.handleSubmit((data) => onSubmit(data, drinkCounts))} className="space-y-3">
         <FormField control={form.control} name="staffName" render={({ field }) => (
-          <FormItem><FormLabel>{L.staffName}</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+          <FormItem>
+            <FormLabel className="text-xs text-slate-600">{L.staffName}</FormLabel>
+            <FormControl><Input className="h-9 text-sm rounded-[4px]" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
         )} />
 
         <p className="text-xs text-slate-500">{L.dateNote}</p>
 
-        <div className="border rounded-lg overflow-hidden">
+        <div className="border border-slate-200 rounded-[4px] overflow-hidden">
           {drinksLoading ? (
-            <div className="p-4 text-center text-sm text-slate-500">{L.loading}</div>
+            <div className="p-4 text-center text-xs text-slate-500">{L.loading}</div>
           ) : drinkIngredients.length === 0 ? (
-            <div className="p-4 text-center text-sm text-slate-500">{L.noDrinks}</div>
+            <div className="p-4 text-center text-xs text-slate-500">{L.noDrinks}</div>
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-100 border-b">
-                  <th className="text-left p-2 font-medium text-slate-700">{L.drinkType}</th>
-                  <th className="text-right p-2 font-medium text-slate-700 w-24">{L.qty}</th>
+                <tr className="bg-slate-50 border-b border-slate-200">
+                  <th className="text-left p-2 text-xs font-medium text-slate-600">{L.drinkType}</th>
+                  <th className="text-right p-2 text-xs font-medium text-slate-600 w-24">{L.qty}</th>
                 </tr>
               </thead>
               <tbody>
                 {drinkIngredients.map((drink) => (
-                  <tr key={drink.id} className="border-b last:border-b-0 hover:bg-slate-50">
-                    <td className="p-2 text-slate-700">{drink.name}</td>
+                  <tr key={drink.id} className="border-b border-slate-200 last:border-b-0">
+                    <td className="p-2 text-sm text-slate-700">{drink.name}</td>
                     <td className="p-2">
                       <Input
                         type="number"
                         min="0"
                         value={drinkCounts[String(drink.id)] || ""}
                         onChange={(e) => setDrinkCounts((prev) => ({ ...prev, [String(drink.id)]: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-sm text-right w-20 ml-auto"
+                        className="h-8 text-sm text-right w-20 ml-auto rounded-[4px]"
                         data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}
                       />
                     </td>
@@ -132,9 +136,9 @@ export function DrinksLodgementPanel({
           )}
         </div>
 
-        <div className="flex gap-3 pt-4">
-          {showCancel && <Button type="button" variant="outline" onClick={onCancel} className="flex-1">{L.cancel}</Button>}
-          <Button type="submit" disabled={isSubmitting} className="flex-1">{isSubmitting ? L.saving : (submitText || L.lodgeDrinks)}</Button>
+        <div className="flex gap-3 pt-3">
+          {showCancel && <Button type="button" variant="outline" size="sm" onClick={onCancel} className="flex-1 !h-9 text-sm">{L.cancel}</Button>}
+          <Button type="submit" disabled={isSubmitting} size="sm" className="flex-1 !h-9 text-sm bg-emerald-600 hover:bg-emerald-700 text-white">{isSubmitting ? L.saving : (submitText || L.lodgeDrinks)}</Button>
         </div>
       </form>
     </Form>
