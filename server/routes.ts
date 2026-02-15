@@ -2717,14 +2717,14 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const purchaseDate = resolveBangkokDate(req.body.submittedAt, true);
 
       if (req.body.type === "rolls") {
-        const { quantity, cost, paid, submittedBy } = req.body;
+        const { quantity, cost, paid, submittedBy, submittedAt } = req.body;
         
         // Insert into purchase_tally for rolls count (always - this tracks inventory)
         const tallyResult = await db.execute(sql`
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, rolls_pcs)
           VALUES (
             gen_random_uuid(),
-            NOW(),
+            ${submittedAt ? new Date(submittedAt).toISOString() : new Date().toISOString()}::timestamp,
             ${purchaseDate}::date,
             ${submittedBy || null},
             ${'Bakery'},
@@ -2732,7 +2732,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             ${paid ? 'Rolls purchase (paid)' : 'Rolls pickup (unpaid)'},
             ${Number(quantity)}
           )
-          RETURNING id, created_at, date, rolls_pcs, notes as item
+          RETURNING id, created_at, date, staff, rolls_pcs, notes as item
         `);
 
         // ONLY create expense entry if rolls are actually PAID
@@ -2764,7 +2764,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "meat") {
-        const { meatType, weightKg, submittedBy } = req.body;
+        const { meatType, weightKg, submittedBy, submittedAt } = req.body;
         
         // Meat → insert into purchase_tally with proper weight handling
         const weightGrams = Math.round(Number(weightKg) * 1000);
@@ -2774,7 +2774,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, meat_grams)
           VALUES (
             gen_random_uuid(),
-            NOW(),
+            ${submittedAt ? new Date(submittedAt).toISOString() : new Date().toISOString()}::timestamp,
             ${purchaseDate}::date,
             ${submittedBy || null},
             ${'Meat Supplier'},
@@ -2782,35 +2782,48 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             ${meatType},
             ${weightGrams}
           )
-          RETURNING id, created_at, date, meat_grams, notes as item
+          RETURNING id, created_at, date, staff, meat_grams, notes as item
         `);
 
         return res.json({ ok: true, stock: result.rows[0] });
       }
 
       if (req.body.type === "drinks") {
-        const { items, submittedBy } = req.body;
+        const { items, submittedBy, submittedAt } = req.body;
         
-        // Handle multiple drink items - create separate records for each
-        const results = [];
+        const tallyResult = await db.execute(sql`
+          INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes)
+          VALUES (
+            gen_random_uuid(),
+            ${submittedAt ? new Date(submittedAt).toISOString() : new Date().toISOString()}::timestamp,
+            ${purchaseDate}::date,
+            ${submittedBy || null},
+            ${'Drinks Supplier'},
+            0,
+            ${'Drinks stock lodgement'}
+          )
+          RETURNING id, created_at, date, staff, notes as item
+        `);
+        
+        const tallyId = tallyResult.rows[0]?.id;
+        
+        const drinkResults = [];
         for (const item of items) {
-          const result = await db.execute(sql`
-            INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes)
+          const drinkResult = await db.execute(sql`
+            INSERT INTO purchase_tally_drink (id, tally_id, item_name, qty, unit)
             VALUES (
               gen_random_uuid(),
-              NOW(),
-              ${purchaseDate}::date,
-              ${submittedBy || null},
-              NULL,
-              0,
-              ${JSON.stringify({ "drinkType": item.type, "qty": item.quantity, "type": "drinks" })}
+              ${tallyId},
+              ${item.type},
+              ${Number(item.quantity)},
+              ${'pcs'}
             )
-            RETURNING id, created_at, date, notes as item
+            RETURNING id, item_name, qty, unit
           `);
-          results.push(result.rows[0]);
+          drinkResults.push(drinkResult.rows[0]);
         }
 
-        return res.json({ ok: true, stocks: results });
+        return res.json({ ok: true, tally: tallyResult.rows[0], drinks: drinkResults });
       }
 
       res.status(400).json({ ok: false, error: "Invalid stock type" });
@@ -2879,25 +2892,33 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       if (req.body.type === "drinks") {
         const { items, submittedBy } = req.body;
         
-        // For drinks, we update the first item only (since edit is one-to-one)
-        if (items && items.length > 0) {
-          const item = items[0];
-          const result = await db.execute(sql`
-            UPDATE purchase_tally
-            SET 
-              date = COALESCE(${purchaseDate}::date, date),
-              staff = ${submittedBy || null},
-              notes = ${JSON.stringify({ "drinkType": item.type, "qty": item.quantity, "type": "drinks" })}
-            WHERE id = ${id}
-            RETURNING id, created_at, date, notes as item
-          `);
+        const result = await db.execute(sql`
+          UPDATE purchase_tally
+          SET 
+            date = COALESCE(${purchaseDate}::date, date),
+            staff = ${submittedBy || null},
+            supplier = ${'Drinks Supplier'},
+            notes = ${'Drinks stock lodgement'}
+          WHERE id = ${id}
+          RETURNING id, created_at, date, staff, notes as item
+        `);
 
-          if (result.rows.length === 0) {
-            return res.status(404).json({ error: "Stock purchase not found" });
-          }
-
-          return res.json({ ok: true, stock: result.rows[0] });
+        if (result.rows.length === 0) {
+          return res.status(404).json({ error: "Stock purchase not found" });
         }
+
+        await db.execute(sql`DELETE FROM purchase_tally_drink WHERE tally_id = ${id}`);
+        
+        if (items && items.length > 0) {
+          for (const item of items) {
+            await db.execute(sql`
+              INSERT INTO purchase_tally_drink (id, tally_id, item_name, qty, unit)
+              VALUES (gen_random_uuid(), ${id}, ${item.type}, ${Number(item.quantity)}, ${'pcs'})
+            `);
+          }
+        }
+
+        return res.json({ ok: true, tally: result.rows[0] });
       }
 
       res.status(400).json({ ok: false, error: "Invalid stock type or missing data" });
