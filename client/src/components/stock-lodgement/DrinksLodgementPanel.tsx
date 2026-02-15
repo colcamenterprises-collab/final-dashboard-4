@@ -108,24 +108,24 @@ export function DrinksLodgementPanel({
           ) : drinkIngredients.length === 0 ? (
             <div className="p-4 text-center text-xs text-slate-500">{L.noDrinks}</div>
           ) : (
-            <table className="w-full text-sm">
+            <table className="w-full">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left p-2 text-xs font-medium text-slate-600">{L.drinkType}</th>
-                  <th className="text-right p-2 text-xs font-medium text-slate-600 w-24">{L.qty}</th>
+                  <th className="text-left px-2 py-1.5 text-xs font-medium text-slate-600">{L.drinkType}</th>
+                  <th className="text-right px-2 py-1.5 text-xs font-medium text-slate-600 w-20">{L.qty}</th>
                 </tr>
               </thead>
               <tbody>
                 {drinkIngredients.map((drink) => (
                   <tr key={drink.id} className="border-b border-slate-200 last:border-b-0">
-                    <td className="p-2 text-sm text-slate-700">{drink.name}</td>
-                    <td className="p-2">
+                    <td className="px-2 py-1 text-xs text-slate-700">{drink.name}</td>
+                    <td className="px-2 py-1">
                       <Input
                         type="number"
                         min="0"
                         value={drinkCounts[String(drink.id)] || ""}
                         onChange={(e) => setDrinkCounts((prev) => ({ ...prev, [String(drink.id)]: parseInt(e.target.value) || 0 }))}
-                        className="h-8 text-sm text-right w-20 ml-auto rounded-[4px]"
+                        className="!h-7 text-xs text-right w-16 ml-auto rounded-[4px]"
                         data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}
                       />
                     </td>
