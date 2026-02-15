@@ -951,6 +951,7 @@ export default function Expenses() {
     ? purchaseTallyData.entries.filter((item: any) => item.meatGrams != null && item.meatGrams > 0) : [];
   const drinks = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries)) 
     ? purchaseTallyData.entries.filter((item: any) => {
+        if (Array.isArray(item.drinks) && item.drinks.length > 0) return true;
         try {
           const notes = typeof item.notes === 'string' ? JSON.parse(item.notes) : item.notes;
           return notes?.type === 'drinks';
@@ -1381,6 +1382,7 @@ export default function Expenses() {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Staff</th>
               <th className="p-1 border text-left text-xs">Quantity</th>
               <th className="p-1 border text-left text-xs">Paid</th>
               <th className="p-1 border text-right text-xs">Amount</th>
@@ -1389,17 +1391,14 @@ export default function Expenses() {
           </thead>
           <tbody>
             {rolls.map((r,i)=>{
-              // Get quantity directly from rollsPcs field
               const quantity = r.rollsPcs || 0;
               const amount = r.amountTHB || 0;
-              
-              // Note: "paid" status is not currently tracked in purchase_tally
-              // This would need to be added if required
-              const paid = "N/A";
+              const paid = amount > 0 ? "Yes" : "No";
               
               return (
                 <tr key={i} className="hover:bg-gray-50" data-testid={`row-roll-${r.id}`}>
                   <td className="border p-1">{formatDateDDMMYYYY(r.date)}</td>
+                  <td className="border p-1">{r.staff || '-'}</td>
                   <td className="border p-1">{quantity}</td>
                   <td className="border p-1">{paid}</td>
                   <td className="border p-1 text-right">฿{amount.toLocaleString()}</td>
@@ -1460,7 +1459,7 @@ export default function Expenses() {
             })}
             {rolls.length === 0 && (
               <tr>
-                <td colSpan={5} className="border p-4 text-center text-gray-500">No rolls purchases this month</td>
+                <td colSpan={6} className="border p-4 text-center text-gray-500">No rolls purchases this month</td>
               </tr>
             )}
           </tbody>
@@ -1474,6 +1473,7 @@ export default function Expenses() {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Staff</th>
               <th className="p-1 border text-left text-xs">Type</th>
               <th className="p-1 border text-left text-xs">Weight</th>
               <th className="p-1 border text-left text-xs">Supplier</th>
@@ -1484,6 +1484,7 @@ export default function Expenses() {
             {meat.map((m: any, i: number) => (
               <tr key={i} className="hover:bg-gray-50" data-testid={`row-meat-${m.id}`}>
                 <td className="border p-1">{formatDateDDMMYYYY(m.date)}</td>
+                <td className="border p-1">{m.staff || '-'}</td>
                 <td className="border p-1">{m.notes || m.meatType}</td>
                 <td className="border p-1">{m.meatGrams ? (m.meatGrams / 1000).toFixed(2) + ' kg' : 'N/A'}</td>
                 <td className="border p-1">{m.supplier || 'Meat Supplier'}</td>
@@ -1542,7 +1543,7 @@ export default function Expenses() {
             ))}
             {meat.length === 0 && (
               <tr>
-                <td colSpan={5} className="border p-4 text-center text-gray-500">No meat purchases this month</td>
+                <td colSpan={6} className="border p-4 text-center text-gray-500">No meat purchases this month</td>
               </tr>
             )}
           </tbody>
@@ -1556,6 +1557,7 @@ export default function Expenses() {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Staff</th>
               <th className="p-1 border text-left text-xs">Type</th>
               <th className="p-1 border text-left text-xs">Quantity</th>
               <th className="p-1 border text-center text-xs">Actions</th>
@@ -1563,21 +1565,91 @@ export default function Expenses() {
           </thead>
           <tbody>
             {drinks.map((d: any, i: number) => {
-              // Parse the meta JSON to get drink type and quantity
+              const drinkItems = Array.isArray(d.drinks) ? d.drinks : [];
+              
+              if (drinkItems.length > 0) {
+                return drinkItems.map((drink: any, di: number) => (
+                  <tr key={`${d.id}-${di}`} className="hover:bg-gray-50" data-testid={`row-drink-${d.id}-${di}`}>
+                    {di === 0 && (
+                      <>
+                        <td className="border p-1" rowSpan={drinkItems.length}>{formatDateDDMMYYYY(d.date || d.createdAt)}</td>
+                        <td className="border p-1" rowSpan={drinkItems.length}>{d.staff || '-'}</td>
+                      </>
+                    )}
+                    <td className="border p-1">{drink.itemName || drink.item_name || '-'}</td>
+                    <td className="border p-1">{drink.qty || 0}</td>
+                    {di === 0 && (
+                      <td className="border p-1 text-center" rowSpan={drinkItems.length}>
+                        <div className="flex justify-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingStock({
+                                type: 'drinks',
+                                id: d.id,
+                                date: d.date?.split('T')[0] || new Date().toISOString().split('T')[0],
+                                items: drinkItems.map((item: any) => ({
+                                  type: item.itemName || item.item_name,
+                                  quantity: item.qty
+                                }))
+                              });
+                              setShowStockModal(true);
+                            }}
+                            className="h-7 w-7 p-0"
+                          >
+                            <Edit className="h-3 w-3" />
+                          </Button>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                                disabled={deleteStockMutation.isPending}
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete Drink Purchase</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to delete this drinks lodgement? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => deleteStockMutation.mutate(d.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ));
+              }
+              
               let drinkType = "N/A";
-              let quantity = "N/A";
+              let quantity: string | number = "N/A";
               try {
                 const meta = typeof d.notes === 'string' ? JSON.parse(d.notes) : d.notes;
                 drinkType = meta.drinkType || "N/A";
                 quantity = meta.qty || meta.quantity || "N/A";
               } catch (e) {
-                // If parsing fails, use raw notes as fallback
                 drinkType = d.notes || "N/A";
               }
               
               return (
                 <tr key={i} className="hover:bg-gray-50" data-testid={`row-drink-${d.id}`}>
-                  <td className="border p-1">{formatDateDDMMYYYY(d.date || d.created_at)}</td>
+                  <td className="border p-1">{formatDateDDMMYYYY(d.date || d.createdAt)}</td>
+                  <td className="border p-1">{d.staff || '-'}</td>
                   <td className="border p-1">{drinkType}</td>
                   <td className="border p-1">{quantity}</td>
                   <td className="border p-1 text-center">
@@ -1626,7 +1698,7 @@ export default function Expenses() {
             })}
             {drinks.length === 0 && (
               <tr>
-                <td colSpan={4} className="border p-4 text-center text-gray-500">No drinks purchases this month</td>
+                <td colSpan={5} className="border p-4 text-center text-gray-500">No drinks purchases this month</td>
               </tr>
             )}
           </tbody>
