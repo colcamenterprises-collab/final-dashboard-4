@@ -28,6 +28,26 @@ const prisma = new PrismaClient();
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
 const formatTHB = (thb: number) => thb.toLocaleString();
 
+function resolveShiftDate(rawShiftDate: unknown): { shiftDateText: string; shiftDateSql: string } {
+  const fallback = new Date().toISOString().slice(0, 10);
+  if (typeof rawShiftDate !== "string" || rawShiftDate.trim() === "") {
+    return { shiftDateText: fallback, shiftDateSql: fallback };
+  }
+
+  const match = rawShiftDate.trim().match(/^(\d{4}-\d{2}-\d{2})/);
+  if (match) {
+    return { shiftDateText: match[1], shiftDateSql: match[1] };
+  }
+
+  const parsed = new Date(rawShiftDate);
+  if (Number.isNaN(parsed.getTime())) {
+    return { shiftDateText: fallback, shiftDateSql: fallback };
+  }
+
+  const normalized = parsed.toISOString().slice(0, 10);
+  return { shiftDateText: normalized, shiftDateSql: normalized };
+}
+
 // MEGA-PATCH: Normalize drinks + fix falsy zeroes
 export type DrinkStockObject = Record<string, number | null | undefined>;
 
@@ -154,7 +174,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     }
 
     const id = uuidv4();
-    const shiftDate = body.shiftDate || new Date().toISOString().split("T")[0];
+    const { shiftDateText: shiftDate, shiftDateSql } = resolveShiftDate(body.shiftDate);
     const createdAt = new Date().toISOString();
 
     // Totals (whole THB, no cents)
@@ -225,7 +245,7 @@ export async function createDailySalesV2(req: Request, res: Response) {
     payload.bankingAuto = __bankingAuto;
 
     // PATCH A: Write BOTH shiftDate (TEXT for legacy) AND shift_date (DATE for analysis queries)
-    const shiftDateAsDate = new Date(shiftDate);
+    const shiftDateAsDate = shiftDateSql;
     
     // PATCH 13: SHIFT DEDUPLICATION — Check for existing submission before insert
     const existingCheck = await pool.query(

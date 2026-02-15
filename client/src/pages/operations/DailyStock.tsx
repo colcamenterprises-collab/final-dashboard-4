@@ -296,6 +296,10 @@ const DailyStock: React.FC = () => {
 
   const handleSubmit = async () => {
     if (submitting) return;
+    if (!shiftId) {
+      setMessage({ type: "error", text: "Cannot submit stock: missing shift ID. Please submit Form 1 first." });
+      return;
+    }
     
     // V3.2A Stock validation
     const validationErrs: any = {};
@@ -651,7 +655,7 @@ const DailyStock: React.FC = () => {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting}
+          disabled={submitting || !shiftId}
           className="w-full sm:w-auto rounded-[4px] bg-emerald-600 px-5 py-2 text-white text-xs hover:bg-emerald-700 disabled:opacity-60"
         >
           {submitting ? L.submitting : L.submitStock}
