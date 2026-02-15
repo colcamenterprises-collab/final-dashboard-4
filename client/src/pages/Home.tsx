@@ -5,7 +5,7 @@ import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { VarianceWidget } from "@/components/widgets/VarianceWidget";
-import { TrendingUp, DollarSign, Activity, Plus, ArrowDownLeft, FileText, AlertTriangle } from "lucide-react";
+import { TrendingUp, DollarSign, Activity, Plus, ArrowDownLeft, AlertTriangle } from "lucide-react";
 import axios from "axios";
 
 function ShiftAlertBanner() {
@@ -53,14 +53,6 @@ function BalanceHero() {
         </h1>
 
         <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => navigate("/operations/daily-reports")}
-            className="bg-white/10 hover:bg-white/20 text-white border border-white/20 w-full sm:w-auto text-xs font-semibold py-2 px-3 rounded transition-colors flex items-center justify-center gap-2"
-            data-testid="button-view-latest-report"
-          >
-            <FileText className="h-4 w-4" />
-            View Latest Report
-          </button>
           <ExpenseLodgmentModal
             triggerClassName="bg-orange-500 hover:bg-orange-600 text-white border-orange-500 w-full sm:w-auto text-xs font-semibold"
             triggerText="Add Business Expense"
