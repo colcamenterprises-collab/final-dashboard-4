@@ -8,20 +8,20 @@ export async function getPosBalances(limit = 5) {
     WITH shifts AS (
       SELECT
         COALESCE(
-          (s->>'closed_at')::timestamptz,
+          (s->>'opened_at')::timestamptz,
           (ls.shift_date::timestamp AT TIME ZONE 'Asia/Bangkok')
-        ) AS closed_at,
+        ) AS opened_at,
         COALESCE(NULLIF(s->>'expected_cash', ''), '0')::numeric AS expected_cash,
         COALESCE(NULLIF(s->>'actual_cash', ''), '0')::numeric AS actual_cash
       FROM loyverse_shifts ls
       CROSS JOIN LATERAL jsonb_array_elements(COALESCE(ls.data->'shifts', '[]'::jsonb)) AS s
     )
     SELECT
-      (closed_at AT TIME ZONE 'Asia/Bangkok')::date AS shift_date,
+      (opened_at AT TIME ZONE 'Asia/Bangkok')::date AS shift_date,
       expected_cash,
       actual_cash
     FROM shifts
-    ORDER BY closed_at DESC
+    ORDER BY opened_at DESC
     LIMIT ${limit}
   `);
 
