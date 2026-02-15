@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatDateDDMMYYYY } from "@/lib/format";
+import { formatDateDDMMYYYY, formatDateTimeDDMMYYYY } from "@/lib/format";
 
 // Client-side supplier detection utility
 function detectSupplier(description: string): string | null {
@@ -1397,7 +1397,10 @@ export default function Expenses() {
               
               return (
                 <tr key={i} className="hover:bg-gray-50" data-testid={`row-roll-${r.id}`}>
-                  <td className="border p-1">{formatDateDDMMYYYY(r.date)}</td>
+                  <td className="border p-1">
+                    <div>{formatDateDDMMYYYY(r.date)}</div>
+                    {r.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(r.createdAt)}</div>}
+                  </td>
                   <td className="border p-1">{r.staff || '-'}</td>
                   <td className="border p-1">{quantity}</td>
                   <td className="border p-1">{paid}</td>
@@ -1483,7 +1486,10 @@ export default function Expenses() {
           <tbody>
             {meat.map((m: any, i: number) => (
               <tr key={i} className="hover:bg-gray-50" data-testid={`row-meat-${m.id}`}>
-                <td className="border p-1">{formatDateDDMMYYYY(m.date)}</td>
+                <td className="border p-1">
+                  <div>{formatDateDDMMYYYY(m.date)}</div>
+                  {m.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(m.createdAt)}</div>}
+                </td>
                 <td className="border p-1">{m.staff || '-'}</td>
                 <td className="border p-1">{m.notes || m.meatType}</td>
                 <td className="border p-1">{m.meatGrams ? (m.meatGrams / 1000).toFixed(2) + ' kg' : 'N/A'}</td>
@@ -1572,7 +1578,10 @@ export default function Expenses() {
                   <tr key={`${d.id}-${di}`} className="hover:bg-gray-50" data-testid={`row-drink-${d.id}-${di}`}>
                     {di === 0 && (
                       <>
-                        <td className="border p-1" rowSpan={drinkItems.length}>{formatDateDDMMYYYY(d.date || d.createdAt)}</td>
+                        <td className="border p-1" rowSpan={drinkItems.length}>
+                          <div>{formatDateDDMMYYYY(d.date || d.createdAt)}</div>
+                          {d.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(d.createdAt)}</div>}
+                        </td>
                         <td className="border p-1" rowSpan={drinkItems.length}>{d.staff || '-'}</td>
                       </>
                     )}
@@ -1648,7 +1657,10 @@ export default function Expenses() {
               
               return (
                 <tr key={i} className="hover:bg-gray-50" data-testid={`row-drink-${d.id}`}>
-                  <td className="border p-1">{formatDateDDMMYYYY(d.date || d.createdAt)}</td>
+                  <td className="border p-1">
+                    <div>{formatDateDDMMYYYY(d.date || d.createdAt)}</div>
+                    {d.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(d.createdAt)}</div>}
+                  </td>
                   <td className="border p-1">{d.staff || '-'}</td>
                   <td className="border p-1">{drinkType}</td>
                   <td className="border p-1">{quantity}</td>
