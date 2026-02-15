@@ -155,7 +155,6 @@ export class SchedulerService {
     try {
       console.log('🔄 Syncing new shifts to prevent missing data...');
       
-      // Get shifts from the last 3 days to catch any new or missed shifts
       const endTime = new Date();
       const startTime = new Date(endTime.getTime() - (3 * 24 * 60 * 60 * 1000));
       
@@ -167,60 +166,43 @@ export class SchedulerService {
       
       console.log(`📊 Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
       
-      // Import database modules
       const { db } = await import('../db');
-      const { loyverseShiftReports } = await import('../../shared/schema');
+      const { loyverse_shifts } = await import('../../shared/schema');
+      const { eq, sql } = await import('drizzle-orm');
+      
+      const shiftsByDate = new Map<string, any[]>();
+      for (const shift of shiftsResponse.shifts as any[]) {
+        const openedAt = shift.opened_at || shift.opening_time;
+        if (!openedAt) continue;
+        const openingTime = new Date(openedAt);
+        const bangkokOpen = new Date(openingTime.getTime() + (7 * 60 * 60 * 1000));
+        const dateStr = bangkokOpen.toISOString().split('T')[0];
+        
+        if (!shiftsByDate.has(dateStr)) {
+          shiftsByDate.set(dateStr, []);
+        }
+        shiftsByDate.get(dateStr)!.push(shift);
+      }
       
       let newShiftsImported = 0;
       
-      for (const shift of shiftsResponse.shifts) {
-        // Check if this shift is already in our database
-        const { eq } = await import('drizzle-orm');
-        const existingShift = await db.select()
-          .from(loyverseShiftReports)
-          .where(eq(loyverseShiftReports.reportId, `shift-${shift.id}-authentic`))
-          .limit(1);
-        
-        if (existingShift.length === 0) {
-          // This is a new shift - import it
-          const openingTime = new Date(shift.opening_time);
-          const closingTime = shift.closing_time ? new Date(shift.closing_time) : null;
-          const bangkokOpen = new Date(openingTime.getTime() + (7 * 60 * 60 * 1000));
-          
-          console.log(`🆕 Importing new shift ${shift.id}: ${bangkokOpen.toLocaleString()} to ${closingTime ? new Date(closingTime.getTime() + (7 * 60 * 60 * 1000)).toLocaleString() : 'Open'}`);
-          
-          // Create shift report data
-          const shiftData = {
-            reportId: `shift-${shift.id}-authentic`,
-            shiftDate: new Date(bangkokOpen.getFullYear(), bangkokOpen.getMonth(), bangkokOpen.getDate()),
-            shiftStart: openingTime,
-            shiftEnd: closingTime || new Date(),
-            totalSales: (shift.expected_amount - shift.opening_amount).toString(),
-            totalTransactions: 0,
-            cashSales: '0',
-            cardSales: '0',
-            reportData: {
-              shift_number: shift.id.toString(),
-              opening_time: shift.opening_time,
-              closing_time: shift.closing_time,
-              opening_amount: shift.opening_amount,
-              expected_amount: shift.expected_amount,
-              actual_amount: shift.actual_amount,
-              starting_cash: shift.opening_amount,
-              expected_cash: shift.expected_amount,
-              actual_cash: shift.actual_amount || shift.expected_amount,
-              cash_difference: (shift.actual_amount || shift.expected_amount) - shift.expected_amount
-            }
-          };
-          
-          // Insert into database
-          await db.insert(loyverseShiftReports).values(shiftData);
+      for (const [dateStr, shifts] of shiftsByDate) {
+        try {
+          await db.insert(loyverse_shifts).values({
+            shiftDate: dateStr,
+            data: { shifts },
+          }).onConflictDoUpdate({
+            target: loyverse_shifts.shiftDate,
+            set: { data: { shifts } }
+          });
           newShiftsImported++;
+        } catch (insertError: any) {
+          console.error(`Failed to upsert shift for ${dateStr}:`, insertError.message);
         }
       }
       
       if (newShiftsImported > 0) {
-        console.log(`✅ Imported ${newShiftsImported} new shifts during daily sync`);
+        console.log(`✅ Imported/updated ${newShiftsImported} shift dates during daily sync`);
       } else {
         console.log('✅ No new shifts to import - all shifts are up to date');
       }
