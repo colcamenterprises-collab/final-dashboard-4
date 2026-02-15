@@ -2695,16 +2695,27 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
-  // Stock purchase endpoint - handles rolls, meat, drinks  
+  const resolveBangkokDate = (submittedAt?: string, fallbackToNow = true): string | null => {
+    if (submittedAt) {
+      const parsed = new Date(submittedAt);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+      }
+    }
+    if (!fallbackToNow) return null;
+    return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+  };
+
+  // Stock purchase endpoint - handles rolls, meat, drinks
   app.post("/api/expensesV2/stock", async (req: Request, res: Response) => {
     try {
       const { db } = await import("./db");
       const { sql } = await import("drizzle-orm");
       const crypto = await import("crypto");
+      const purchaseDate = resolveBangkokDate(req.body.submittedAt, true);
 
       if (req.body.type === "rolls") {
-        const { date, quantity, cost, paid, submittedBy } = req.body;
-        const purchaseDate = date || new Date().toISOString().split('T')[0];
+        const { quantity, cost, paid, submittedBy } = req.body;
         
         // Insert into purchase_tally for rolls count (always - this tracks inventory)
         const tallyResult = await db.execute(sql`
@@ -2751,8 +2762,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "meat") {
-        const { date, meatType, weightKg, submittedBy } = req.body;
-        const purchaseDate = date || new Date().toISOString().split('T')[0];
+        const { meatType, weightKg, submittedBy } = req.body;
         
         // Meat → insert into purchase_tally with proper weight handling
         const weightGrams = Math.round(Number(weightKg) * 1000);
@@ -2777,8 +2787,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "drinks") {
-        const { date, items, submittedBy } = req.body;
-        const purchaseDate = date || new Date().toISOString().split('T')[0];
+        const { items, submittedBy } = req.body;
         
         // Handle multiple drink items - create separate records for each
         const results = [];
@@ -2815,16 +2824,16 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const { db } = await import("./db");
       const { sql } = await import("drizzle-orm");
       const { id } = req.params;
+      const purchaseDate = req.body.date || resolveBangkokDate(req.body.submittedAt, false);
 
       if (req.body.type === "rolls") {
-        const { date, quantity, cost, submittedBy } = req.body;
-        const purchaseDate = date || new Date().toISOString().split('T')[0];
+        const { quantity, cost, submittedBy } = req.body;
         
         // Update purchase_tally for rolls
         const result = await db.execute(sql`
           UPDATE purchase_tally
           SET 
-            date = ${purchaseDate}::date,
+            date = COALESCE(${purchaseDate}::date, date),
             rolls_pcs = ${Number(quantity)},
             amount_thb = ${Number(cost)},
             staff = ${submittedBy || null},
@@ -2842,15 +2851,14 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "meat") {
-        const { date, meatType, weightKg, submittedBy } = req.body;
-        const purchaseDate = date || new Date().toISOString().split('T')[0];
+        const { meatType, weightKg, submittedBy } = req.body;
         const weightGrams = Math.round(Number(weightKg) * 1000);
         
         // Update purchase_tally for meat
         const result = await db.execute(sql`
           UPDATE purchase_tally
           SET 
-            date = ${purchaseDate}::date,
+            date = COALESCE(${purchaseDate}::date, date),
             meat_grams = ${weightGrams},
             staff = ${submittedBy || null},
             supplier = ${'Meat Supplier'},
@@ -2867,8 +2875,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       if (req.body.type === "drinks") {
-        const { date, items, submittedBy } = req.body;
-        const purchaseDate = date || new Date().toISOString().split('T')[0];
+        const { items, submittedBy } = req.body;
         
         // For drinks, we update the first item only (since edit is one-to-one)
         if (items && items.length > 0) {
@@ -2876,7 +2883,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           const result = await db.execute(sql`
             UPDATE purchase_tally
             SET 
-              date = ${purchaseDate}::date,
+              date = COALESCE(${purchaseDate}::date, date),
               staff = ${submittedBy || null},
               notes = ${JSON.stringify({ "drinkType": item.type, "qty": item.quantity, "type": "drinks" })}
             WHERE id = ${id}

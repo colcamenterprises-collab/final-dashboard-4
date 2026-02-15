@@ -9,12 +9,17 @@ import { useState } from "react";
 interface StockInitialData {
   type: "rolls" | "meat" | "drinks";
   id?: number;
-  date?: string;
   quantity?: number;
   cost?: number;
   paid?: boolean;
   meatType?: string;
   weightKg?: number;
+}
+
+function getBangkokNowIso() {
+  const now = new Date();
+  const bkk = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Bangkok" }));
+  return bkk.toISOString();
 }
 
 interface StockLodgementPanelsProps {
@@ -61,8 +66,8 @@ export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel }:
     },
   });
 
-  const submitRolls = (data: RollsForm) => stockMutation.mutate({ type: "rolls", date: data.date, quantity: data.quantity, cost: data.cost, paid: data.paid, submittedBy: data.staffName });
-  const submitMeat = (data: MeatForm) => stockMutation.mutate({ type: "meat", date: data.date, meatType: data.meatType, weightKg: data.weightKg, submittedBy: data.staffName });
+  const submitRolls = (data: RollsForm) => stockMutation.mutate({ type: "rolls", quantity: data.quantity, cost: data.cost, paid: data.paid, submittedBy: data.staffName, submittedAt: getBangkokNowIso() });
+  const submitMeat = (data: MeatForm) => stockMutation.mutate({ type: "meat", meatType: data.meatType, weightKg: data.weightKg, submittedBy: data.staffName, submittedAt: getBangkokNowIso() });
 
   const submitDrinks = (data: DrinksForm, drinkCounts: Record<string, number>) => {
     const items = Object.entries(drinkCounts).filter(([_, qty]) => qty > 0).map(([ingredientId, quantity]) => {
@@ -73,7 +78,7 @@ export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel }:
       toast({ title: "No drinks entered", description: "Enter at least one drink quantity", variant: "destructive" });
       return;
     }
-    stockMutation.mutate({ type: "drinks", date: data.date, items, submittedBy: data.staffName });
+    stockMutation.mutate({ type: "drinks", items, submittedBy: data.staffName, submittedAt: getBangkokNowIso() });
   };
 
   const panelProps = { isSubmitting: stockMutation.isPending, showCancel: mode === "tabs", onCancel };
@@ -88,8 +93,8 @@ export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel }:
 
   return <>
     <div className="flex border-b mb-4">{(["rolls", "meat", "drinks"] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm ${activeTab === tab ? "border-b-2 border-blue-500 text-blue-600" : "text-gray-600 hover:text-gray-800"}`}>{tab[0].toUpperCase() + tab.slice(1)}</button>)}</div>
-    {activeTab === "rolls" && <RollsLodgementPanel {...panelProps} initialValues={initialData?.type === "rolls" ? { date: initialData.date, quantity: initialData.quantity, cost: initialData.cost, paid: initialData.paid } : undefined} onSubmit={submitRolls} />}
-    {activeTab === "meat" && <MeatLodgementPanel {...panelProps} initialValues={initialData?.type === "meat" ? { date: initialData.date, meatType: initialData.meatType, weightKg: initialData.weightKg } : undefined} onSubmit={submitMeat} />}
-    {activeTab === "drinks" && <DrinksLodgementPanel {...panelProps} initialValues={initialData?.type === "drinks" ? { date: initialData.date } : undefined} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} />}
+    {activeTab === "rolls" && <RollsLodgementPanel {...panelProps} initialValues={initialData?.type === "rolls" ? { quantity: initialData.quantity, cost: initialData.cost, paid: initialData.paid } : undefined} onSubmit={submitRolls} />}
+    {activeTab === "meat" && <MeatLodgementPanel {...panelProps} initialValues={initialData?.type === "meat" ? { meatType: initialData.meatType, weightKg: initialData.weightKg } : undefined} onSubmit={submitMeat} />}
+    {activeTab === "drinks" && <DrinksLodgementPanel {...panelProps} initialValues={initialData?.type === "drinks" ? {} : undefined} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} />}
   </>;
 }

@@ -6,11 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { convertFromInputDate } from "@/lib/format";
 
 const meatSchema = z.object({
   staffName: z.string().trim().min(1, "Staff Name is required"),
-  date: z.string().min(1, "Date is required"),
   meatType: z.string().min(1, "Meat type is required"),
   weightKg: z.number().min(0.01, "Weight must be positive"),
 });
@@ -29,12 +27,10 @@ interface MeatLodgementPanelProps {
 }
 
 export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, submitText = "Lodge Meat", onCancel, onSubmit }: MeatLodgementPanelProps) {
-  const today = new Date().toISOString().split("T")[0];
   const form = useForm<MeatForm>({
     resolver: zodResolver(meatSchema),
     defaultValues: {
       staffName: initialValues?.staffName || "",
-      date: initialValues?.date || today,
       meatType: initialValues?.meatType || "",
       weightKg: initialValues?.weightKg || 0,
     },
@@ -44,11 +40,10 @@ export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, su
     if (!initialValues) return;
     form.reset({
       staffName: initialValues.staffName || "",
-      date: initialValues.date || today,
       meatType: initialValues.meatType || "",
       weightKg: initialValues.weightKg || 0,
     });
-  }, [initialValues, form, today]);
+  }, [initialValues, form]);
 
   return (
     <Form {...form}>
@@ -57,18 +52,7 @@ export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, su
           <FormItem><FormLabel>Staff Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
         )} />
 
-        <FormField control={form.control} name="date" render={({ field }) => (
-          <FormItem>
-            <FormLabel>Date</FormLabel>
-            <FormControl>
-              <div className="space-y-1">
-                <Input type="date" {...field} data-testid="input-stock-date" />
-                {field.value && <p className="text-xs text-gray-600">Selected: {convertFromInputDate(field.value)}</p>}
-              </div>
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )} />
+        <p className="text-xs text-slate-500">Date and timestamp are recorded automatically (Asia/Bangkok) when submitted.</p>
 
         <FormField control={form.control} name="meatType" render={({ field }) => (
           <FormItem>
