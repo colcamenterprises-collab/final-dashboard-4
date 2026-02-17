@@ -23,7 +23,12 @@ type IngredientItem = {
   portions?: number;
 };
 
-type IngredientsResponse = { list: IngredientItem[] };
+type IngredientsResponse = {
+  ok?: boolean;
+  list?: IngredientItem[];
+  warning?: string;
+  error?: { message?: string };
+};
 
 export type CategoryBlock = {
   category: string;
@@ -148,28 +153,79 @@ const DailyStock: React.FC = () => {
 
   const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
   const [syncing, setSyncing] = useState(false);
+  const [syncWarning, setSyncWarning] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
-  const handleSyncFromPurchasing = async () => {
+  const mapPurchasingItemToIngredient = (item: any): IngredientItem => ({
+    id: `purchasing-${item.id}`,
+    name: item.item || `Unnamed item #${item.id}`,
+    category: item.category || "Uncategorized",
+    unit: item.orderUnit || "unit",
+    cost: item.unitCost ? Number(item.unitCost) : 0,
+    supplier: item.supplierName || "Unknown",
+    portions: 1,
+  });
+
+  const loadFallbackItems = useCallback(async () => {
+    try {
+      const fallbackRes = await fetch('/api/purchasing-items?active=true');
+      if (!fallbackRes.ok) {
+        setIngredients([]);
+        return;
+      }
+      const fallbackData = await fallbackRes.json();
+      const fallbackList = Array.isArray(fallbackData?.items)
+        ? fallbackData.items.map(mapPurchasingItemToIngredient)
+        : [];
+      setIngredients(fallbackList);
+    } catch {
+      setIngredients([]);
+    }
+  }, []);
+
+  const runSync = useCallback(async () => {
+    const res = await fetch("/api/purchasing-items/sync-to-daily-stock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ salesId: shiftId }),
+    });
+
+    const data: IngredientsResponse = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data?.error?.message || "Sync request failed");
+    }
+
+    if (data?.ok === false) {
+      setSyncError("Sync failed. You can still enter stock manually. Report to manager.");
+      setSyncWarning(null);
+      await loadFallbackItems();
+      return { count: 0 };
+    }
+
+    setSyncError(null);
+    setSyncWarning(data.warning || null);
+    const syncedList = Array.isArray(data.list) ? data.list : [];
+    setIngredients(syncedList);
+    return { count: syncedList.length };
+  }, [loadFallbackItems, shiftId]);
+
+  const handleSyncFromPurchasing = useCallback(async () => {
     setSyncing(true);
     try {
-      const res = await fetch("/api/purchasing-items/sync-to-daily-stock", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-      const data: IngredientsResponse = await res.json();
-      if (data.list) {
-        setIngredients(data.list);
-        setMessage({ type: "success", text: `Synced ${data.list.length} items from Purchasing List` });
-        setTimeout(() => setMessage(null), 3000);
-      }
-    } catch (e) {
-      console.error("Failed to sync from purchasing list:", e);
+      const { count } = await runSync();
+      setMessage({ type: "success", text: `Synced ${count} items from Purchasing List` });
+      setTimeout(() => setMessage(null), 3000);
+    } catch {
       setMessage({ type: "error", text: "Failed to sync from purchasing list" });
       setTimeout(() => setMessage(null), 3000);
+      setSyncError("Sync failed. You can still enter stock manually. Report to manager.");
+      setSyncWarning(null);
+      await loadFallbackItems();
     } finally {
       setSyncing(false);
     }
-  };
+  }, [loadFallbackItems, runSync]);
 
   /**
    * 🔒 CANONICAL PURCHASING FLOW (AUTO-SYNC)
@@ -180,16 +236,13 @@ const DailyStock: React.FC = () => {
     let mounted = true;
     (async () => {
       try {
-        // Auto-load from purchasing_items (canonical source of truth)
-        const res = await fetch("/api/purchasing-items/sync-to-daily-stock", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-        });
-        const data: IngredientsResponse = await res.json();
         if (!mounted) return;
-        setIngredients(data.list || []);
-      } catch (e) {
-        console.error("Failed to load items from purchasing catalog:", e);
+        await runSync();
+      } catch {
+        if (!mounted) return;
+        setSyncError("Sync failed. You can still enter stock manually. Report to manager.");
+        setSyncWarning(null);
+        await loadFallbackItems();
       } finally {
         if (mounted) setLoading(false);
       }
@@ -197,7 +250,7 @@ const DailyStock: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [loadFallbackItems, runSync]);
 
   // Separate drinks for stock count (not requisition)
   const drinkItems: IngredientItem[] = useMemo(() => {
@@ -498,7 +551,7 @@ const DailyStock: React.FC = () => {
       </div>
 
       {/* Sync button for updating items from purchasing list */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           onClick={handleSyncFromPurchasing}
           disabled={syncing}
@@ -507,12 +560,28 @@ const DailyStock: React.FC = () => {
         >
           {syncing ? L.syncing : L.syncFromPurchasing}
         </button>
+        {syncWarning && (
+          <div className="px-3 py-1 rounded-[4px] text-xs bg-amber-100 text-amber-900">
+            {syncWarning}
+          </div>
+        )}
         {message && (
           <div className={`px-3 py-1 rounded-[4px] text-xs ${message.type === 'success' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
             {message.text}
           </div>
         )}
       </div>
+
+      {syncError && (
+        <div className="rounded-[4px] border border-red-200 bg-red-50 p-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="text-xs text-red-800 font-medium">{syncError}</div>
+            <Button type="button" variant="outline" onClick={handleSyncFromPurchasing} disabled={syncing}>
+              Retry Sync
+            </Button>
+          </div>
+        </div>
+      )}
       
       {/* EXACT LanguageToggle from consolidated patch */}
       <LanguageToggle onChange={setLang} />
