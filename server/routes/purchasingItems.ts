@@ -293,8 +293,54 @@ router.post('/import/csv', async (req, res) => {
 
 // Sync purchasing list items to Daily Stock V2 form (live from DB)
 router.post('/sync-to-daily-stock', async (req, res) => {
+  const salesId = typeof req.body?.salesId === 'string' ? req.body.salesId : undefined;
+  const shiftDate = typeof req.body?.shiftDate === 'string'
+    ? req.body.shiftDate
+    : new Date().toISOString().slice(0, 10);
+
+  const diagnostics = {
+    purchasingItemsTotal: 0,
+    drinksActive: 0,
+    ingredientsActive: 0,
+    rowsWritten: 0,
+  };
+
   try {
-    console.log('[purchasing/sync] Syncing purchasing items to Daily Stock V2...');
+    console.log('[purchasing/sync] Entry', {
+      body: {
+        salesId: req.body?.salesId ?? null,
+        shiftDate: req.body?.shiftDate ?? null,
+      },
+      derived: { salesId: salesId ?? null, shiftDate },
+    });
+
+    if (req.body?.salesId !== undefined && typeof req.body.salesId !== 'string') {
+      return res.status(400).json({
+        ok: false,
+        salesId: salesId ?? null,
+        shiftDate,
+        counts: diagnostics,
+        error: {
+          message: 'Invalid salesId. Expected string.',
+          code: 'VALIDATION_ERROR',
+          where: 'purchasingItems.sync-to-daily-stock',
+        },
+      });
+    }
+
+    if (req.body?.shiftDate !== undefined && typeof req.body.shiftDate !== 'string') {
+      return res.status(400).json({
+        ok: false,
+        salesId: salesId ?? null,
+        shiftDate,
+        counts: diagnostics,
+        error: {
+          message: 'Invalid shiftDate. Expected YYYY-MM-DD string.',
+          code: 'VALIDATION_ERROR',
+          where: 'purchasingItems.sync-to-daily-stock',
+        },
+      });
+    }
     
     // Get all ACTIVE purchasing items from database
     const purchasingItems = await prisma.purchasingItem.findMany({
@@ -306,9 +352,11 @@ router.post('/sync-to-daily-stock', async (req, res) => {
     });
 
     // Transform to match Daily Stock ingredient format (simple names only)
-    const ingredients = purchasingItems.map((item, index) => ({
+    diagnostics.purchasingItemsTotal = purchasingItems.length;
+
+    const ingredients = purchasingItems.map((item) => ({
       id: `purchasing-${item.id}`, // Unique ID for frontend tracking
-      name: item.item, // Simple name only
+      name: item.item || `Unnamed item #${item.id}`,
       category: item.category || 'Uncategorized',
       unit: item.orderUnit || 'unit',
       cost: item.unitCost ? Number(item.unitCost) : 0,
@@ -316,11 +364,68 @@ router.post('/sync-to-daily-stock', async (req, res) => {
       portions: 1 // Default portions for compatibility
     }));
 
+    diagnostics.drinksActive = ingredients.filter((item) => item.category === 'Drinks').length;
+    diagnostics.ingredientsActive = ingredients.filter((item) => item.category !== 'Drinks').length;
+    diagnostics.rowsWritten = ingredients.length;
+
+    console.log('[purchasing/sync] Pre-DB counts', {
+      purchasingItemsTotal: diagnostics.purchasingItemsTotal,
+      drinksActive: diagnostics.drinksActive,
+      ingredientsActive: diagnostics.ingredientsActive,
+    });
+
+    if (ingredients.length === 0) {
+      return res.json({
+        ok: true,
+        salesId: salesId ?? null,
+        shiftDate,
+        list: [],
+        drinks: [],
+        ingredients: [],
+        counts: diagnostics,
+        warning: 'No purchasing items found; rendering manual stock entry',
+      });
+    }
+
     console.log(`[purchasing/sync] Synced ${ingredients.length} items from purchasing list`);
-    res.json({ ok: true, list: ingredients });
-  } catch (error) {
-    console.error('[purchasing/sync] Error syncing to Daily Stock:', error);
-    res.status(500).json({ ok: false, error: 'Failed to sync purchasing items' });
+    return res.json({
+      ok: true,
+      salesId: salesId ?? null,
+      shiftDate,
+      list: ingredients,
+      drinks: ingredients.filter((item) => item.category === 'Drinks'),
+      ingredients: ingredients.filter((item) => item.category !== 'Drinks'),
+      counts: diagnostics,
+      warning: diagnostics.rowsWritten === 0
+        ? 'No rows written; rendering manual stock entry'
+        : undefined,
+    });
+  } catch (error: any) {
+    console.error('[purchasing/sync] Error syncing to Daily Stock', {
+      message: error?.message,
+      code: error?.code,
+      stack: error?.stack,
+      where: 'purchasingItems.sync-to-daily-stock',
+      salesId: salesId ?? null,
+      shiftDate,
+    });
+
+    return res.json({
+      ok: false,
+      salesId: salesId ?? null,
+      shiftDate,
+      list: [],
+      drinks: [],
+      ingredients: [],
+      counts: diagnostics,
+      error: {
+        message: error?.message || 'Failed to sync purchasing items',
+        code: error?.code,
+        where: 'purchasingItems.sync-to-daily-stock',
+        hint: 'Check purchasing_items records and DB connectivity',
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined,
+      },
+    });
   }
 });
 
