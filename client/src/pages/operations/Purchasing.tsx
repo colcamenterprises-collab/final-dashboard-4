@@ -35,6 +35,10 @@ import {
   DialogFooter 
 } from '@/components/ui/dialog';
 import { Plus, Pencil, Trash2, Search, Download, Upload, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import {
+  CANONICAL_PURCHASING_CATEGORIES,
+  isCanonicalPurchasingCategory,
+} from '../../../../shared/purchasingCategories';
 
 type PurchasingItem = {
   id: number;
@@ -56,6 +60,13 @@ type PurchasingItem = {
   updatedAt: string;
 };
 
+
+
+const isLegacyCategory = (category: string | null | undefined): boolean => {
+  if (!category) return false;
+  return !isCanonicalPurchasingCategory(category);
+};
+
 const thb = (v: unknown): string => {
   const n = typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
   return "฿" + n.toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -73,6 +84,7 @@ export default function PurchasingPage() {
   const [showCostWarning, setShowCostWarning] = useState(false);
   const [pendingCostUpdate, setPendingCostUpdate] = useState<{ id: number; oldCost: number | null; newCost: number } | null>(null);
   const [apiWarning, setApiWarning] = useState<string | null>(null);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   // Handle warning from recipe-management redirect
   useEffect(() => {
@@ -203,10 +215,17 @@ export default function PurchasingPage() {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const newCost = formData.get('unitCost') ? parseFloat(formData.get('unitCost') as string) : null;
-    
+    const selectedCategory = (formData.get('category') as string) || '';
+
+    if (!isCanonicalPurchasingCategory(selectedCategory)) {
+      setCategoryError('Please choose a canonical category before saving.');
+      return;
+    }
+    setCategoryError(null);
+
     const data = {
       item: formData.get('item') as string,
-      category: formData.get('category') as string || null,
+      category: selectedCategory,
       supplierName: formData.get('supplierName') as string || null,
       brand: formData.get('brand') as string || null,
       supplierSku: formData.get('supplierSku') as string || null,
@@ -238,9 +257,16 @@ export default function PurchasingPage() {
       const formEl = document.querySelector('form');
       if (formEl) {
         const formData = new FormData(formEl);
+        const selectedCategory = (formData.get('category') as string) || '';
+        if (!isCanonicalPurchasingCategory(selectedCategory)) {
+          setCategoryError('Please choose a canonical category before saving.');
+          return;
+        }
+        setCategoryError(null);
+
         const data = {
           item: formData.get('item') as string,
-          category: formData.get('category') as string || null,
+          category: selectedCategory,
           supplierName: formData.get('supplierName') as string || null,
           brand: formData.get('brand') as string || null,
           supplierSku: formData.get('supplierSku') as string || null,
@@ -339,6 +365,7 @@ export default function PurchasingPage() {
               data-testid="button-add-item"
               onClick={() => {
                 setEditingItem(null);
+                setCategoryError(null);
                 setShowDialog(true);
               }}
               className="bg-emerald-600 hover:bg-emerald-700 text-xs h-8 px-3 rounded-[4px]"
@@ -486,6 +513,7 @@ export default function PurchasingPage() {
                           size="sm"
                           onClick={() => {
                             setEditingItem(item);
+                            setCategoryError(null);
                             setShowDialog(true);
                           }}
                           className="text-[11px] h-7 w-7 p-0 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
@@ -545,12 +573,26 @@ export default function PurchasingPage() {
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-900 mb-1 block">Category</label>
-                <Input
-                  data-testid="input-category"
+                {editingItem && isLegacyCategory(editingItem.category) && (
+                  <p className="text-[11px] text-amber-700 mb-1">
+                    Legacy: {editingItem.category}
+                  </p>
+                )}
+                <select
+                  data-testid="select-category"
                   name="category"
-                  defaultValue={editingItem?.category || ''}
-                  className="text-xs rounded-[4px] border-slate-200"
-                />
+                  defaultValue={editingItem && isCanonicalPurchasingCategory(editingItem.category) ? editingItem.category : ''}
+                  required
+                  className="text-xs h-9 px-2 py-0 border border-slate-200 rounded-[4px] bg-white w-full"
+                >
+                  <option value="" disabled>Select category</option>
+                  {CANONICAL_PURCHASING_CATEGORIES.map((category) => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+                {categoryError && (
+                  <p className="text-[11px] text-red-600 mt-1">{categoryError}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-900 mb-1 block">Supplier</label>
@@ -641,6 +683,7 @@ export default function PurchasingPage() {
                 onClick={() => {
                   setShowDialog(false);
                   setEditingItem(null);
+                  setCategoryError(null);
                 }}
                 className="text-xs rounded-[4px] border-slate-200"
               >

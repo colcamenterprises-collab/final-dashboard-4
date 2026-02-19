@@ -12,6 +12,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
 import { foodCostings } from '../data/foodCostings';
+import {
+  CANONICAL_PURCHASING_CATEGORIES,
+  isCanonicalPurchasingCategory,
+  normalizePurchasingCategory,
+} from '../../shared/purchasingCategories';
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -33,6 +38,25 @@ const purchasingItemSchema = z.object({
   portionSize: z.number().optional().nullable(),
   yield: z.number().optional().nullable(),
 });
+
+const invalidCategoryResponse = {
+  ok: false,
+  error: 'Invalid category',
+  allowed: CANONICAL_PURCHASING_CATEGORIES,
+};
+
+function normalizeCategoryInPayload<T extends { category?: string | null }>(payload: T): T {
+  if (!('category' in payload)) return payload;
+  return {
+    ...payload,
+    category: normalizePurchasingCategory(payload.category),
+  };
+}
+
+function validateCategoryForWrite(payload: { category?: string | null }): boolean {
+  if (!('category' in payload)) return true;
+  return isCanonicalPurchasingCategory(payload.category ?? null);
+}
 
 router.get('/', async (req, res) => {
   try {
@@ -64,8 +88,13 @@ router.post('/', async (req, res) => {
       });
     }
 
+    const normalizedData = normalizeCategoryInPayload(parsed.data);
+    if (!validateCategoryForWrite(normalizedData)) {
+      return res.status(400).json(invalidCategoryResponse);
+    }
+
     const item = await prisma.purchasingItem.create({
-      data: parsed.data,
+      data: normalizedData,
     });
 
     res.json({ ok: true, item });
@@ -91,6 +120,11 @@ router.put('/:id', async (req, res) => {
       });
     }
 
+    const normalizedData = normalizeCategoryInPayload(parsed.data);
+    if (!validateCategoryForWrite(normalizedData)) {
+      return res.status(400).json(invalidCategoryResponse);
+    }
+
     // PATCH F: Production lock guard - block renames if PRODUCTION_LOCK=1
     if (process.env.PRODUCTION_LOCK === '1') {
       // Check if trying to rename
@@ -107,7 +141,7 @@ router.put('/:id', async (req, res) => {
 
     const item = await prisma.purchasingItem.update({
       where: { id },
-      data: parsed.data,
+      data: normalizedData,
     });
 
     res.json({ ok: true, item });
@@ -250,12 +284,17 @@ router.post('/import/csv', async (req, res) => {
         },
       });
       
+      const normalizedCategory = normalizePurchasingCategory(row.category || null);
+      if (!isCanonicalPurchasingCategory(normalizedCategory)) {
+        return res.status(400).json(invalidCategoryResponse);
+      }
+
       if (existing) {
         // Update
         await prisma.purchasingItem.update({
           where: { id: existing.id },
           data: {
-            category: row.category || null,
+            category: normalizedCategory,
             supplierSku: row.supplierSku || null,
             orderUnit: row.orderUnit || null,
             unitDescription: row.unitDescription || null,
@@ -269,7 +308,7 @@ router.post('/import/csv', async (req, res) => {
         await prisma.purchasingItem.create({
           data: {
             item,
-            category: row.category || null,
+            category: normalizedCategory,
             supplierName: supplierName,
             brand: brand,
             supplierSku: row.supplierSku || null,
@@ -354,15 +393,18 @@ router.post('/sync-to-daily-stock', async (req, res) => {
     // Transform to match Daily Stock ingredient format (simple names only)
     diagnostics.purchasingItemsTotal = purchasingItems.length;
 
-    const ingredients = purchasingItems.map((item) => ({
-      id: `purchasing-${item.id}`, // Unique ID for frontend tracking
-      name: item.item || `Unnamed item #${item.id}`,
-      category: item.category || 'Uncategorized',
-      unit: item.orderUnit || 'unit',
-      cost: item.unitCost ? Number(item.unitCost) : 0,
-      supplier: item.supplierName || 'Unknown',
-      portions: 1 // Default portions for compatibility
-    }));
+    const ingredients = purchasingItems.map((item) => {
+      const normalizedCategory = normalizePurchasingCategory(item.category || null);
+      return {
+        id: `purchasing-${item.id}`, // Unique ID for frontend tracking
+        name: item.item || `Unnamed item #${item.id}`,
+        category: normalizedCategory || item.category || 'Uncategorized',
+        unit: item.orderUnit || 'unit',
+        cost: item.unitCost ? Number(item.unitCost) : 0,
+        supplier: item.supplierName || 'Unknown',
+        portions: 1 // Default portions for compatibility
+      };
+    });
 
     diagnostics.drinksActive = ingredients.filter((item) => item.category === 'Drinks').length;
     diagnostics.ingredientsActive = ingredients.filter((item) => item.category !== 'Drinks').length;
@@ -442,6 +484,11 @@ router.post('/populate-catalog', async (req, res) => {
     let updated = 0;
     
     for (const item of foodCostings) {
+      const normalizedCategory = normalizePurchasingCategory(item.category || null);
+      if (!isCanonicalPurchasingCategory(normalizedCategory)) {
+        continue;
+      }
+
       // Parse cost (removes ฿ symbol and commas)
       const costStr = (item.cost || '').replace(/[฿,]/g, '').trim();
       const unitCost = parseFloat(costStr) || null;
@@ -456,7 +503,7 @@ router.post('/populate-catalog', async (req, res) => {
         await prisma.purchasingItem.update({
           where: { id: existing.id },
           data: {
-            category: item.category || null,
+            category: normalizedCategory,
             supplierName: item.supplier || null,
             brand: item.brand || null,
             orderUnit: item.packagingQty || null,
@@ -472,7 +519,7 @@ router.post('/populate-catalog', async (req, res) => {
         await prisma.purchasingItem.create({
           data: {
             item: item.item,
-            category: item.category || null,
+            category: normalizedCategory,
             supplierName: item.supplier || null,
             brand: item.brand || null,
             orderUnit: item.packagingQty || null,
