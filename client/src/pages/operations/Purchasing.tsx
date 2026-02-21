@@ -303,8 +303,8 @@ export default function PurchasingPage() {
         </Alert>
       )}
       <div className="mb-3">
-        <h1 className="text-lg font-bold text-slate-900 mb-0.5">Purchasing List</h1>
-        <p className="text-[11px] text-slate-600">Master control panel for all items. Changes here affect Form 2, Shopping List, and Analytics.</p>
+        <h1 className="text-lg font-bold text-slate-900 mb-0.5">Purchasing Items</h1>
+        <p className="text-[11px] text-slate-600">Master item database. Changes here affect Form 2, Daily Shopping List, and Analytics.</p>
         <p className="text-[11px] text-slate-400 mt-0.5">Source: purchasing_items</p>
       </div>
 
