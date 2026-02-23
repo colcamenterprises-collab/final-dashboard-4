@@ -52,7 +52,6 @@ type PurchasingItem = {
   unitCost: number | null;
   lastReviewDate: string | null;
   active: boolean;
-  isIngredient: boolean;
   portionUnit: string | null;
   portionSize: number | null;
   yield: number | null;
@@ -145,21 +144,6 @@ export default function PurchasingPage() {
         body: JSON.stringify({ active }),
       });
       if (!res.ok) throw new Error('Failed to toggle item');
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
-    },
-  });
-
-  const toggleIngredientMutation = useMutation({
-    mutationFn: async ({ id, isIngredient }: { id: number; isIngredient: boolean }) => {
-      const res = await fetch(`/api/purchasing-items/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isIngredient }),
-      });
-      if (!res.ok) throw new Error('Failed to toggle ingredient status');
       return res.json();
     },
     onSuccess: () => {
@@ -456,7 +440,6 @@ export default function PurchasingPage() {
                   <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Unit Desc</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Last Review</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 w-10 text-center px-1.5 py-2">Active</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 w-10 text-center px-1.5 py-2">Ingr.</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 text-center px-1.5 py-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -494,17 +477,6 @@ export default function PurchasingPage() {
                         className="scale-75"
                       />
                     </TableCell>
-                    <TableCell className="text-center px-1.5 py-1.5">
-                      <Switch
-                        data-testid={`switch-ingredient-${item.id}`}
-                        checked={item.isIngredient || false}
-                        onCheckedChange={(checked) => {
-                          toggleIngredientMutation.mutate({ id: item.id, isIngredient: checked });
-                        }}
-                        disabled={toggleIngredientMutation.isPending}
-                        className="scale-75"
-                      />
-                    </TableCell>
                     <TableCell className="px-1 py-1.5">
                       <div className="flex gap-0.5 justify-center">
                         <Button
@@ -535,7 +507,7 @@ export default function PurchasingPage() {
                 ))}
                 {filteredItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={12} className="text-center text-[11px] text-slate-600 py-6">
+                    <TableCell colSpan={11} className="text-center text-[11px] text-slate-600 py-6">
                       No items found
                     </TableCell>
                   </TableRow>

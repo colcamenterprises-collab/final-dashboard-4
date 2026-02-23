@@ -10,13 +10,6 @@ import { purchasingItems, shoppingPurchaseV2 } from "../schema";
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
-function parseBoolean(value: unknown): boolean {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value === 1;
-  if (typeof value === "string") return ["true", "1", "yes"].includes(value.toLowerCase());
-  return false;
-}
-
 function parseNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const cleaned = String(value).replace(/[^\d.\-]/g, "");
@@ -75,7 +68,6 @@ router.post("/import-purchases", upload.single("file"), async (req, res) => {
       const costValue = parseNumber(row.cost || row.amount || row.price);
       const shop = row.shop || row.store || row.supplier || req.body.shop;
       const supplier = row.supplier || req.body.supplier || "Makro";
-      const isIngredient = parseBoolean(row.isIngredient || row.is_ingredient || req.body.isIngredient);
 
       if (!itemName) {
         summary.errors.push("Missing item name in CSV row.");
@@ -108,7 +100,6 @@ router.post("/import-purchases", upload.single("file"), async (req, res) => {
             supplierName: supplier,
             supplierSku: sku,
             active: true,
-            isIngredient,
           });
           summary.itemsUpserted += 1;
         } else {
@@ -118,7 +109,6 @@ router.post("/import-purchases", upload.single("file"), async (req, res) => {
               item: itemName,
               supplier,
               supplierName: supplier,
-              isIngredient,
               updatedAt: new Date(),
             })
             .where(eq(purchasingItems.id, existingItem[0].id));
