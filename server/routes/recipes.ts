@@ -1,6 +1,11 @@
 // Enhanced Recipes routes with comprehensive functionality
+// ARCHITECTURE CONTRACT:
+// Recipes and Cost Calculator are standalone.
+// Do NOT import or query purchasing tables here.
+// Purchasing is a separate domain.
+
 import { Router } from "express";
-import { Prisma, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { pool } from "../db";
 import multer from 'multer';
 import path from 'path';
@@ -322,55 +327,15 @@ router.get('/:id/ingredients', async (req, res) => {
     where: { recipe_id: recipeId },
   });
 
-  const ingredientIds = rows
-    .map((row) => Number(row.ingredient_id))
-    .filter((value) => Number.isFinite(value));
-
-  const authorityRows = ingredientIds.length
-    ? await prisma.$queryRaw<
-        Array<{
-          id: number;
-          purchase_cost_thb: number | string;
-          purchase_quantity: number | string;
-          conversion_factor: number | string | null;
-          portion_quantity: number | string;
-        }>
-      >`
-        SELECT id, purchase_cost_thb, purchase_quantity, conversion_factor, portion_quantity
-        FROM ingredient_authority
-        WHERE id IN (${Prisma.join(ingredientIds)})
-      `
-    : [];
-
-  const authorityMap = new Map<number, { packCost: number | null; yieldPerPack: number | null }>();
-  for (const row of authorityRows) {
-    const packCost = Number(row.purchase_cost_thb);
-    const purchaseQty = Number(row.purchase_quantity);
-    const conversionFactor = row.conversion_factor === null ? 1 : Number(row.conversion_factor);
-    const portionQuantity = Number(row.portion_quantity);
-    const baseQty = Number.isFinite(purchaseQty) ? purchaseQty * conversionFactor : 0;
-    const yieldPerPack =
-      portionQuantity > 0 && Number.isFinite(baseQty) ? baseQty / portionQuantity : null;
-    authorityMap.set(row.id, {
-      packCost: Number.isFinite(packCost) ? packCost : null,
-      yieldPerPack,
-    });
-  }
-
   let total_cost = 0;
 
   const ingredients = rows.map((ri) => {
     const portionQuantity = Number(ri.qty ?? 0);
     const wastePercentage = Number(ri.waste_percentage ?? 5);
-    const authority = authorityMap.get(Number(ri.ingredient_id));
-    const packCost = authority?.packCost ?? null;
-    const yieldPerPack = authority?.yieldPerPack ?? null;
-    const fallbackCostPerPortion = Number(ri.unit_cost_thb ?? 0);
-    const resolvedCostPerPortion =
-      packCost && yieldPerPack ? packCost / yieldPerPack : fallbackCostPerPortion;
+    const costPerPortion = Number(ri.unit_cost_thb ?? 0);
     const adjustedLineCost =
       portionQuantity > 0
-        ? resolvedCostPerPortion * portionQuantity * (1 + wastePercentage / 100)
+        ? costPerPortion * portionQuantity * (1 + wastePercentage / 100)
         : 0;
     const lineCost = Number(adjustedLineCost.toFixed(2));
     total_cost += lineCost;
@@ -381,16 +346,16 @@ router.get('/:id/ingredients', async (req, res) => {
       name: ri.ingredient_name,
       portion_quantity: portionQuantity,
       portion_unit: ri.unit,
-      cost_per_portion: Number(resolvedCostPerPortion.toFixed(2)),
-      pack_cost: packCost !== null ? Number(packCost.toFixed(2)) : null,
-      yield_per_pack: yieldPerPack !== null ? Number(yieldPerPack.toFixed(2)) : null,
+      cost_per_portion: Number(costPerPortion.toFixed(2)),
+      pack_cost: null,
+      yield_per_pack: null,
       waste_percentage: wastePercentage,
       line_cost: lineCost,
       is_valid:
         Boolean(ri.ingredient_name) &&
         portionQuantity > 0 &&
-        Number.isFinite(resolvedCostPerPortion) &&
-        resolvedCostPerPortion > 0,
+        Number.isFinite(costPerPortion) &&
+        costPerPortion >= 0,
     };
   });
 
@@ -432,43 +397,8 @@ router.patch('/:id/ingredient/:rowId', async (req, res) => {
     return res.status(404).json({ error: 'Ingredient line not found' });
   }
 
-  const ingredientId = Number(line.ingredient_id);
-  const authorityRows = Number.isFinite(ingredientId)
-    ? await prisma.$queryRaw<
-        Array<{
-          id: number;
-          purchase_cost_thb: number | string;
-          purchase_quantity: number | string;
-          conversion_factor: number | string | null;
-          portion_quantity: number | string;
-        }>
-      >`
-        SELECT id, purchase_cost_thb, purchase_quantity, conversion_factor, portion_quantity
-        FROM ingredient_authority
-        WHERE id = ${ingredientId}
-        LIMIT 1
-      `
-    : [];
-
-  const authority = authorityRows[0] ?? null;
-  const packCost = authority ? Number(authority.purchase_cost_thb) : null;
-  const purchaseQty = authority ? Number(authority.purchase_quantity) : null;
-  const conversionFactor =
-    authority?.conversion_factor === null || authority?.conversion_factor === undefined
-      ? 1
-      : Number(authority.conversion_factor);
-  const portionQtyAuthority = authority ? Number(authority.portion_quantity) : null;
-  const baseQty =
-    purchaseQty !== null && Number.isFinite(purchaseQty) ? purchaseQty * conversionFactor : 0;
-  const yieldPerPack =
-    portionQtyAuthority && portionQtyAuthority > 0 && baseQty > 0
-      ? baseQty / portionQtyAuthority
-      : null;
-
   const resolvedWaste = Number.isFinite(wastePercentage) ? wastePercentage : 5;
-  const fallbackCostPerPortion = Number(line.unit_cost_thb ?? 0);
-  const resolvedCostPerPortion =
-    packCost && yieldPerPack ? packCost / yieldPerPack : fallbackCostPerPortion;
+  const resolvedCostPerPortion = Number(line.unit_cost_thb ?? 0);
   const lineCost =
     resolvedCostPerPortion * portionQty * (1 + resolvedWaste / 100);
 
@@ -490,8 +420,8 @@ router.patch('/:id/ingredient/:rowId', async (req, res) => {
     portion_quantity: Number(updated.qty),
     portion_unit: updated.unit,
     cost_per_portion: Number(updated.unit_cost_thb ?? 0),
-    pack_cost: packCost !== null ? Number(packCost.toFixed(2)) : null,
-    yield_per_pack: yieldPerPack !== null ? Number(yieldPerPack.toFixed(2)) : null,
+    pack_cost: null,
+    yield_per_pack: null,
     waste_percentage: Number(updated.waste_percentage ?? resolvedWaste),
     line_cost: Number(updated.cost_thb ?? 0),
   });
@@ -605,9 +535,9 @@ router.post('/', async (req, res) => {
 });
 
 router.post('/:id/ingredients', async (req, res) => {
-  const { ingredient_id, portion_quantity, portion_unit, waste_percentage } = req.body;
+  const { ingredient_name, portion_quantity, portion_unit, waste_percentage, unit_cost_thb } = req.body;
 
-  if (!ingredient_id || !portion_quantity || !portion_unit) {
+  if (!ingredient_name || !portion_quantity || !portion_unit) {
     return res.status(400).json({ error: 'Missing fields' });
   }
 
@@ -626,47 +556,12 @@ router.post('/:id/ingredients', async (req, res) => {
     return res.status(404).json({ error: 'Recipe not found' });
   }
 
-  const ingredientId = Number(ingredient_id);
-  if (!Number.isFinite(ingredientId)) {
-    return res.status(400).json({ error: 'Invalid ingredient' });
-  }
-
   const portionQuantity = Number(portion_quantity);
   if (!Number.isFinite(portionQuantity) || portionQuantity <= 0) {
     return res.status(400).json({ error: 'Invalid portion quantity' });
   }
 
-  const ingredientRows = await prisma.$queryRaw<
-    Array<{
-      id: number;
-      name: string;
-      purchase_quantity: number | string;
-      purchase_cost_thb: number | string;
-      conversion_factor: number | string | null;
-      is_active: boolean;
-    }>
-  >`
-    SELECT id, name, purchase_quantity, purchase_cost_thb, conversion_factor, is_active
-    FROM ingredient_authority
-    WHERE id = ${ingredientId}
-      AND is_active = true
-    LIMIT 1
-  `;
-
-  const ingredient = ingredientRows[0];
-  if (!ingredient) {
-    return res.status(400).json({ error: 'Invalid ingredient' });
-  }
-
-  const purchaseQuantity = Number(ingredient.purchase_quantity);
-  const purchaseCostThb = Number(ingredient.purchase_cost_thb);
-  const conversionFactor =
-    ingredient.conversion_factor === null ? null : Number(ingredient.conversion_factor);
-  const portionQuantityAuthority = Number(ingredient.portion_quantity);
-  const baseQty = purchaseQuantity * (conversionFactor === null ? 1 : conversionFactor ?? 1);
-  const yieldPerPack =
-    portionQuantityAuthority > 0 && baseQty > 0 ? baseQty / portionQuantityAuthority : 0;
-  const costPerPortion = yieldPerPack > 0 ? purchaseCostThb / yieldPerPack : 0;
+  const costPerPortion = Number.isFinite(Number(unit_cost_thb)) ? Number(unit_cost_thb) : 0;
   const wastePercentage = Number.isFinite(Number(waste_percentage))
     ? Number(waste_percentage)
     : 5;
@@ -675,13 +570,14 @@ router.post('/:id/ingredients', async (req, res) => {
   const row = await prisma.recipe_lines.create({
     data: {
       recipe_id: recipe.id,
-      ingredient_id: String(ingredientId),
-      ingredient_name: ingredient.name,
+      ingredient_id: req.body.ingredient_id ? String(req.body.ingredient_id) : null,
+      ingredient_name: String(ingredient_name),
       qty: portionQuantity,
       unit: String(portion_unit),
       unit_cost_thb: Number(costPerPortion.toFixed(2)),
       cost_thb: Number(lineCost.toFixed(2)),
       waste_percentage: Number(wastePercentage.toFixed(2)),
+      supplier: req.body.supplier ? String(req.body.supplier) : null,
     },
   });
 

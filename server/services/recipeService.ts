@@ -2,11 +2,17 @@ import { eq } from "drizzle-orm";
 import { db } from "../db";
 import {
   ingredients,
-  purchasingItems,
   recipe,
   recipeIngredient,
 } from "../schema";
 import { publishToMenu } from "./menuService";
+
+/**
+ * ARCHITECTURE CONTRACT:
+ * Recipes and Cost Calculator are standalone.
+ * Do NOT import or query purchasing tables here.
+ * Purchasing is a separate domain.
+ */
 
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
@@ -123,24 +129,6 @@ export async function createOrUpdateRecipe(data: any) {
         })
         .returning({ id: ingredients.id });
       ingredientId = createdIngredient[0]?.id ?? null;
-
-      if (sku) {
-        const existingPurchasing = await db
-          .select({ id: purchasingItems.id })
-          .from(purchasingItems)
-          .where(eq(purchasingItems.supplierSku, sku))
-          .limit(1);
-        if (existingPurchasing.length === 0) {
-          await db.insert(purchasingItems).values({
-            item: ingredientName,
-            supplier,
-            supplierName: supplier,
-            supplierSku: sku,
-            active: true,
-            isIngredient: true,
-          });
-        }
-      }
     }
 
     if (!ingredientId) {
@@ -154,7 +142,6 @@ export async function createOrUpdateRecipe(data: any) {
       quantity: ingredientRow?.quantity ?? null,
       unit,
       portionUnit: ingredientRow?.portionUnit ?? unit,
-      purchasingItemId: ingredientRow?.purchasingItemId ?? null,
       wastePercentage: wastePercentage.toFixed(2),
     });
   }
@@ -178,12 +165,11 @@ export async function calculateRecipeCost(recipeId: number) {
       ingredientId: recipeIngredient.ingredientId,
       portionQty: recipeIngredient.portionQty,
       wastePercentage: recipeIngredient.wastePercentage,
-      ingredientName: purchasingItems.item,
-      packCost: purchasingItems.packCost,
-      itemYield: purchasingItems.yield,
+      ingredientName: ingredients.name,
+      unitCostPerBase: ingredients.unitCostPerBase,
     })
     .from(recipeIngredient)
-    .leftJoin(purchasingItems, eq(recipeIngredient.purchasingItemId, purchasingItems.id))
+    .leftJoin(ingredients, eq(recipeIngredient.ingredientId, ingredients.id))
     .where(eq(recipeIngredient.recipeId, recipeId));
 
   const missing: string[] = [];
@@ -192,20 +178,19 @@ export async function calculateRecipeCost(recipeId: number) {
   for (const row of ingredientRows) {
     const portionQty = toNumber(row.portionQty);
     const wastePercentage = toNumber(row.wastePercentage) ?? 5;
-    const packCost = toNumber(row.packCost);
-    const itemYield = toNumber(row.itemYield);
+    const unitCostPerBase = toNumber(row.unitCostPerBase);
 
     if (!portionQty) {
       missing.push(`${row.ingredientName ?? "Unknown"}: missing portion quantity`);
       continue;
     }
 
-    if (!packCost || !itemYield) {
-      missing.push(`${row.ingredientName ?? "Unknown"}: missing pack cost or yield`);
+    if (!unitCostPerBase || unitCostPerBase <= 0) {
+      missing.push(`${row.ingredientName ?? "Unknown"}: missing unit cost`);
       continue;
     }
 
-    const lineCost = (packCost / itemYield) * portionQty * (1 + wastePercentage / 100);
+    const lineCost = unitCostPerBase * portionQty * (1 + wastePercentage / 100);
     totalCost += Number(lineCost.toFixed(2));
   }
 

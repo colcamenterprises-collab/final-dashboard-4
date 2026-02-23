@@ -33,7 +33,6 @@ const purchasingItemSchema = z.object({
   packCost: z.number().optional().nullable(),
   lastReviewDate: z.string().optional().nullable(),
   active: z.boolean().optional(),
-  isIngredient: z.boolean().optional(),
   portionUnit: z.string().optional().nullable(),
   portionSize: z.number().optional().nullable(),
   yield: z.number().optional().nullable(),
@@ -173,20 +172,12 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    // PATCH E: Check if item is marked as ingredient (cannot delete)
     const item = await prisma.purchasingItem.findUnique({
       where: { id },
     });
 
     if (!item) {
       return res.status(404).json({ ok: false, error: 'Item not found' });
-    }
-
-    if (item.isIngredient) {
-      return res.status(400).json({
-        ok: false,
-        error: 'Item is in use and cannot be deleted. Unmark as ingredient first, or deactivate it.'
-      });
     }
 
     // Check if item is referenced in purchasing_shift_items (historical data)
