@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,8 +16,29 @@ type RecipeListItem = {
 };
 
 export default function RecipeListPage() {
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [initError, setInitError] = useState<string | null>(null);
+
   useEffect(() => {
-    fetch("/api/recipes/init-templates", { method: "POST" }).catch(() => null);
+    const initialize = async () => {
+      setIsInitializing(true);
+      setInitError(null);
+
+      try {
+        const response = await fetch("/api/recipes/templates/ensure", { method: "POST" });
+        if (!response.ok) {
+          const payload = await response.json().catch(() => ({}));
+          const message = payload?.message || payload?.error || "Failed to initialize templates";
+          throw new Error(`HTTP ${response.status}: ${message}`);
+        }
+      } catch (error: any) {
+        setInitError(error?.message || "Template initialization failed");
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initialize();
   }, []);
 
   const { data, isLoading } = useQuery<RecipeListItem[]>({
@@ -27,6 +48,7 @@ export default function RecipeListPage() {
       if (!response.ok) throw new Error("Failed to fetch recipes");
       return response.json();
     },
+    enabled: !isInitializing && !initError,
   });
 
   const recipes = data ?? [];
@@ -41,11 +63,17 @@ export default function RecipeListPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{recipes.length} Recipes</CardTitle>
+          <CardTitle>{recipes.length} Recipes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {initError && (
+              <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                {initError}
+              </div>
+            )}
+            {isInitializing && <div className="text-sm text-slate-500">Initializing templates…</div>}
             {isLoading && <div className="text-sm text-slate-500">Loading recipes...</div>}
-            {!isLoading && recipes.map((recipe) => (
+            {!isInitializing && !isLoading && !initError && recipes.map((recipe) => (
               <Link key={recipe.id} to={`/menu/recipes/${recipe.id}`} className="block border rounded p-3 hover:bg-slate-50">
                 <div className="flex flex-wrap justify-between gap-2">
                   <div>

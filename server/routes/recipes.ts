@@ -109,6 +109,62 @@ async function seedLockedRecipeTemplates() {
   }
 }
 
+async function ensureLockedRecipeTemplates() {
+  await initTables();
+  let created = 0;
+  let updated = 0;
+
+  for (const template of LOCKED_RECIPE_TEMPLATES) {
+    const notesPayload = buildRecipeMeta({
+      sku: template.sku,
+      servingsThisRecipeMakes: 0,
+      servingsPerProduct: 0,
+      productsMade: 1,
+      ingredients: [],
+      packaging: [],
+      labour: [],
+      other: [],
+      imageUrl: "",
+    });
+
+    const existing = await pool.query(`
+      SELECT id, notes FROM recipes
+      WHERE notes LIKE $1
+      ORDER BY id ASC
+      LIMIT 1
+    `, [`${META_PREFIX}%\"sku\":\"${template.sku}\"%`]);
+
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE recipes
+         SET name = $2, category = $3, suggested_price = $4,
+             notes = CASE WHEN notes LIKE $5 THEN notes ELSE $6 END,
+             updated_at = now(), is_active = true
+         WHERE id = $1`,
+        [existing.rows[0].id, template.name, template.category, template.salePrice, `${META_PREFIX}%`, notesPayload],
+      );
+      updated += 1;
+      continue;
+    }
+
+    await pool.query(
+      `INSERT INTO recipes (
+        name, description, category, yield_quantity, yield_unit, ingredients,
+        total_cost, cost_per_serving, suggested_price, notes, image_url, is_active, created_at, updated_at
+      ) VALUES ($1, '', $2, 1, 'servings', '[]'::jsonb, 0, 0, $3, $4, '', true, now(), now())`,
+      [template.name, template.category, template.salePrice, notesPayload],
+    );
+    created += 1;
+  }
+
+  return {
+    ok: true,
+    ensured: LOCKED_RECIPE_TEMPLATES.length,
+    created,
+    updated,
+  };
+}
+
 // Initialize enhanced recipes table
 async function initTables() {
   await pool.query(`
@@ -328,9 +384,18 @@ router.post('/init-templates', async (_req, res) => {
   }
 });
 
+router.post('/templates/ensure', async (_req, res) => {
+  try {
+    const ensuredResult = await ensureLockedRecipeTemplates();
+    res.json(ensuredResult);
+  } catch (error) {
+    console.error('[recipes/templates/ensure] Error:', error);
+    res.status(500).json({ ok: false, message: 'Failed to ensure recipe templates' });
+  }
+});
+
 router.get('/v2', async (_req, res) => {
   try {
-    await seedLockedRecipeTemplates();
     const rowsResult = await pool.query(`
       SELECT id, name, description, category, suggested_price, notes, image_url, updated_at
       FROM recipes
@@ -338,24 +403,27 @@ router.get('/v2', async (_req, res) => {
       ORDER BY name ASC
     `, [`${META_PREFIX}%`]);
 
-    const recipes = rowsResult.rows
-      .map((row) => {
-        const meta = parseRecipeMeta(row.notes);
-        const sku = meta?.sku;
-        if (!sku || !LOCKED_RECIPE_TEMPLATES.some((t) => t.sku === sku)) {
-          return null;
-        }
-        return {
-          id: row.id,
-          name: row.name,
-          sku,
-          category: row.category,
-          salePrice: Number(row.suggested_price ?? 0),
-          description: row.description ?? '',
-          imageUrl: meta?.imageUrl || row.image_url || '',
-          updatedAt: row.updated_at,
-        };
-      })
+    const allowedSkus = new Set(LOCKED_RECIPE_TEMPLATES.map((template) => template.sku));
+    const recipesBySku = new Map<string, any>();
+
+    for (const row of rowsResult.rows) {
+      const meta = parseRecipeMeta(row.notes);
+      const sku = String(meta?.sku ?? '');
+      if (!allowedSkus.has(sku) || recipesBySku.has(sku)) continue;
+      recipesBySku.set(sku, {
+        id: row.id,
+        name: row.name,
+        sku,
+        category: row.category,
+        salePrice: Number(row.suggested_price ?? 0),
+        description: row.description ?? '',
+        imageUrl: meta?.imageUrl || row.image_url || '',
+        updatedAt: row.updated_at,
+      });
+    }
+
+    const recipes = LOCKED_RECIPE_TEMPLATES
+      .map((template) => recipesBySku.get(template.sku))
       .filter(Boolean);
 
     res.json(recipes);
