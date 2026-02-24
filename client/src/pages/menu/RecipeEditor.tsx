@@ -9,7 +9,21 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const THB = (n: number) => new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 }).format(n || 0);
 const N = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
-type Line = { name: string; packagePrice: number; totalUnits: number; unitType: string; unitsNeeded: number };
+const UNITS = ["kg", "g", "L", "ml", "each"] as const;
+type Unit = typeof UNITS[number] | "";
+
+type Line = {
+  name: string;
+  packagePrice: number;
+  totalUnits: number;
+  unitType: string;
+  unitsNeeded: number;
+  packSize: number;
+  packUnit: Unit;
+  packPrice: number;
+  recipeQty: number;
+  recipeUnit: Unit;
+};
 type LabourLine = { description: string; hours: number; hourlyRate: number; bonus: number };
 type OtherLine = { name: string; cost: number };
 
@@ -30,7 +44,62 @@ type RecipePayload = {
   other: OtherLine[];
 };
 
-const newLine = (): Line => ({ name: "", packagePrice: 0, totalUnits: 0, unitType: "", unitsNeeded: 0 });
+const asUnit = (value: unknown): Unit => (UNITS.includes(value as Unit) ? (value as Unit) : "");
+
+const normalizeLine = (line: Partial<Line>): Line => {
+  const packSize = N(line.packSize ?? line.totalUnits);
+  const packPrice = N(line.packPrice ?? line.packagePrice);
+  const recipeQty = N(line.recipeQty ?? line.unitsNeeded);
+  const fallbackUnit = asUnit(line.unitType);
+  const packUnit = asUnit(line.packUnit) || fallbackUnit;
+  const recipeUnit = asUnit(line.recipeUnit) || fallbackUnit;
+  return {
+    name: line.name ?? "",
+    packagePrice: packPrice,
+    totalUnits: packSize,
+    unitType: (packUnit || recipeUnit || line.unitType || "") as string,
+    unitsNeeded: recipeQty,
+    packSize,
+    packUnit,
+    packPrice,
+    recipeQty,
+    recipeUnit,
+  };
+};
+
+const normalizePayload = (payload: RecipePayload): RecipePayload => ({
+  ...payload,
+  ingredients: (payload.ingredients || []).map(normalizeLine),
+  packaging: (payload.packaging || []).map(normalizeLine),
+});
+
+const newLine = (): Line => normalizeLine({ name: "" });
+
+const toBaseUnit = (qty: number, unit: Unit): { family: "weight" | "volume" | "each" | "none"; value: number } => {
+  if (unit === "kg") return { family: "weight", value: qty * 1000 };
+  if (unit === "g") return { family: "weight", value: qty };
+  if (unit === "L") return { family: "volume", value: qty * 1000 };
+  if (unit === "ml") return { family: "volume", value: qty };
+  if (unit === "each") return { family: "each", value: qty };
+  return { family: "none", value: qty };
+};
+
+const getLineCostPerRecipe = (line: Line) => {
+  const packSize = N(line.packSize);
+  const packPrice = N(line.packPrice);
+  const recipeQty = N(line.recipeQty);
+  if (packSize <= 0 || packPrice <= 0 || recipeQty <= 0) return { costPerRecipe: 0, error: "" };
+  const packBase = toBaseUnit(packSize, line.packUnit);
+  const recipeBase = toBaseUnit(recipeQty, line.recipeUnit);
+  if (packBase.family === "none" || recipeBase.family === "none") {
+    return { costPerRecipe: 0, error: "Select units to calculate" };
+  }
+  if (packBase.family !== recipeBase.family) {
+    return { costPerRecipe: 0, error: "Incompatible units: weight, volume, and each cannot be mixed" };
+  }
+  if (packBase.value <= 0) return { costPerRecipe: 0, error: "Pack size must be greater than 0" };
+  return { costPerRecipe: packPrice * (recipeBase.value / packBase.value), error: "" };
+};
 
 export default function RecipeEditorPage() {
   const { id } = useParams();
@@ -47,16 +116,16 @@ export default function RecipeEditorPage() {
   });
 
   const [state, setState] = useState<RecipePayload | null>(null);
-  React.useEffect(() => { if (data) setState(data); }, [data]);
+  React.useEffect(() => { if (data) setState(normalizePayload(data)); }, [data]);
 
-  const initialState = useMemo(() => data ? JSON.stringify(data) : "", [data]);
+  const initialState = useMemo(() => data ? JSON.stringify(normalizePayload(data)) : "", [data]);
   const currentState = useMemo(() => state ? JSON.stringify(state) : "", [state]);
   const hasChanges = Boolean(state) && initialState !== currentState;
 
   if (isLoading || !state) return <div className="p-6">Loading...</div>;
 
   const productsMade = N(state.productsMade) || 1;
-  const sumLine = (items: Line[]) => items.reduce((a, l) => a + ((N(l.totalUnits) > 0 ? N(l.packagePrice) / N(l.totalUnits) : 0) * N(l.unitsNeeded)), 0);
+  const sumLine = (items: Line[]) => items.reduce((a, l) => a + getLineCostPerRecipe(l).costPerRecipe, 0);
   const ingredientsCost = sumLine(state.ingredients);
   const packagingCost = sumLine(state.packaging);
   const labourCost = state.labour.reduce((a, l) => a + N(l.hours) * N(l.hourlyRate) + N(l.bonus), 0);
@@ -80,7 +149,7 @@ export default function RecipeEditorPage() {
   };
 
   const reset = () => {
-    if (data) setState(data);
+    if (data) setState(normalizePayload(data));
   };
 
   const onUploadImage = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,37 +176,44 @@ export default function RecipeEditorPage() {
 
   const renderLineTable = (title: string, key: "ingredients" | "packaging") => {
     const rows = state[key];
+    const updateRow = (index: number, changes: Partial<Line>) => {
+      const next = [...rows];
+      next[index] = normalizeLine({ ...rows[index], ...changes });
+      setState({ ...state, [key]: next });
+    };
     return (
       <Card>
         <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           <div className="grid grid-cols-8 gap-2 text-xs font-semibold text-slate-600">
-            <div>Item Name</div><div>Package Price</div><div>Total Units in Package</div><div>Unit Type</div><div>Units Needed</div><div>Cost per Unit</div><div>Cost per Recipe</div><div>Actions</div>
+            <div />
+            <div className="col-span-3">What you buy</div>
+            <div className="col-span-2">What the recipe uses</div>
+            <div />
+            <div />
+          </div>
+          <div className="grid grid-cols-8 gap-2 text-xs font-semibold text-slate-600">
+            <div>Item Name</div><div>Pack Size</div><div>Pack Unit</div><div>Pack Price (THB)</div><div>Recipe Qty</div><div>Recipe Unit</div><div>Cost per Recipe</div><div>Actions</div>
           </div>
           {rows.map((row, i) => {
-            const cpu = N(row.totalUnits) > 0 ? N(row.packagePrice) / N(row.totalUnits) : 0;
-            const cpr = cpu * N(row.unitsNeeded);
+            const { costPerRecipe, error } = getLineCostPerRecipe(row);
             return <div key={`${key}-${i}`} className="grid grid-cols-8 gap-2 items-center">
-              <Input value={row.name} onChange={(e) => {
-                const next = [...rows]; next[i] = { ...row, name: e.target.value }; setState({ ...state, [key]: next });
-              }} placeholder="e.g., Brioche Bun" />
-              <Input type="number" value={row.packagePrice} onChange={(e) => {
-                const next = [...rows]; next[i] = { ...row, packagePrice: N(e.target.value) }; setState({ ...state, [key]: next });
-              }} placeholder="e.g., 82" />
-              <Input type="number" value={row.totalUnits} onChange={(e) => {
-                const next = [...rows]; next[i] = { ...row, totalUnits: N(e.target.value) }; setState({ ...state, [key]: next });
-              }} placeholder="e.g., 12" />
-              <Input value={row.unitType} onChange={(e) => {
-                const next = [...rows]; next[i] = { ...row, unitType: e.target.value }; setState({ ...state, [key]: next });
-              }} placeholder="e.g., slices" />
-              <Input type="number" value={row.unitsNeeded} onChange={(e) => {
-                const next = [...rows]; next[i] = { ...row, unitsNeeded: N(e.target.value) }; setState({ ...state, [key]: next });
-              }} placeholder="e.g., 2" />
-              <div className="text-sm">{THB(cpu)}</div>
-              <div className="text-sm">{THB(cpr)}</div>
+              <Input value={row.name} onChange={(e) => updateRow(i, { name: e.target.value })} placeholder="e.g., Lettuce" />
+              <Input type="number" value={row.packSize} onChange={(e) => updateRow(i, { packSize: N(e.target.value) })} placeholder="e.g., 1 (for 1kg/1L)" />
+              <Input value={row.packUnit} onChange={(e) => updateRow(i, { packUnit: asUnit(e.target.value) })} placeholder="e.g., kg / g / L / ml / each" list={`units-${key}`} />
+              <Input type="number" value={row.packPrice} onChange={(e) => updateRow(i, { packPrice: N(e.target.value) })} placeholder="e.g., 100" />
+              <Input type="number" value={row.recipeQty} onChange={(e) => updateRow(i, { recipeQty: N(e.target.value) })} placeholder="e.g., 40 (for 40g/50ml)" />
+              <Input value={row.recipeUnit} onChange={(e) => updateRow(i, { recipeUnit: asUnit(e.target.value) })} placeholder="e.g., g / ml / each" list={`units-${key}`} />
+              <div className="text-sm">
+                {THB(costPerRecipe)}
+                {error && <div className="text-xs text-red-600">{error}</div>}
+              </div>
               <Button variant="outline" size="sm" onClick={() => setState({ ...state, [key]: rows.filter((_, idx) => idx !== i) })}>Remove</Button>
             </div>;
           })}
+          <datalist id={`units-${key}`}>
+            {UNITS.map((unit) => <option key={`${key}-${unit}`} value={unit} />)}
+          </datalist>
           <Button variant="outline" onClick={() => setState({ ...state, [key]: [...rows, newLine()] })}>Add Row</Button>
         </CardContent>
       </Card>
@@ -156,7 +232,7 @@ export default function RecipeEditorPage() {
           <div className="md:col-span-2"><div className="text-sm font-medium mb-1">Description</div><Textarea value={state.description} onChange={(e) => setState({ ...state, description: e.target.value })} placeholder="Add prep notes, serving details, and quality standards" /><div className="text-xs text-slate-500 mt-1">Shown for staff reference.</div></div>
           <div className="md:col-span-2 space-y-2"><div className="text-sm font-medium">Image</div><Input type="file" accept="image/*" onChange={onUploadImage} /><Input value={state.imageUrl} onChange={(e) => setState({ ...state, imageUrl: e.target.value })} placeholder="https://... (optional URL)" /><div className="text-xs text-slate-500">Upload an image file or provide an image URL. Preview updates immediately.</div>{state.imageUrl ? <img src={state.imageUrl} alt="Recipe preview" className="h-36 w-36 object-cover rounded border" /> : <div className="h-36 w-36 rounded border bg-slate-100 flex items-center justify-center text-xs text-slate-500">No image selected</div>}</div>
           <div><div className="text-sm font-medium mb-1">Servings This Recipe Makes</div><Input type="number" value={state.servingsThisRecipeMakes} onChange={(e) => setState({ ...state, servingsThisRecipeMakes: N(e.target.value) })} placeholder="e.g., 10" /></div>
-          <div><div className="text-sm font-medium mb-1">Servings Per Product</div><Input type="number" value={state.servingsPerProduct} onChange={(e) => setState({ ...state, servingsPerProduct: N(e.target.value) })} placeholder="e.g., 1" /></div>
+          <div><div className="text-sm font-medium mb-1">Servings Per Product</div><Input type="number" value={state.servingsPerProduct} onChange={(e) => setState({ ...state, servingsPerProduct: N(e.target.value) })} placeholder="e.g., 1 (for 1kg/1L)" /></div>
           <div><div className="text-sm font-medium mb-1">Products Made (Yield)</div><Input type="number" value={state.productsMade} onChange={(e) => setState({ ...state, productsMade: N(e.target.value) || 1 })} placeholder="e.g., 10" /><div className="text-xs text-slate-500 mt-1">Used for per-product totals.</div></div>
         </div>
       </CardContent></Card>
