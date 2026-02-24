@@ -158,7 +158,7 @@ export default function RecipeEditorPage() {
     const reader = new FileReader();
     reader.onload = () => {
       const result = typeof reader.result === "string" ? reader.result : "";
-      setState({ ...state, imageUrl: result });
+      setState((prev) => prev ? ({ ...prev, imageUrl: result }) : prev);
     };
     reader.readAsDataURL(file);
     event.target.value = "";
