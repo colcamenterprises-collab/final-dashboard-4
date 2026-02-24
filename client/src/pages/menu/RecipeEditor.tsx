@@ -38,6 +38,7 @@ type RecipePayload = {
   servingsThisRecipeMakes: number;
   servingsPerProduct: number;
   productsMade: number;
+  slippagePercent: number;
   ingredients: Line[];
   packaging: Line[];
   labour: LabourLine[];
@@ -46,13 +47,19 @@ type RecipePayload = {
 
 const asUnit = (value: unknown): Unit => (UNITS.includes(value as Unit) ? (value as Unit) : "");
 
+const getDefaultRecipeUnit = (packUnit: Unit): Unit => {
+  if (packUnit === "kg") return "g";
+  if (packUnit === "L") return "ml";
+  return packUnit;
+};
+
 const normalizeLine = (line: Partial<Line>): Line => {
   const packSize = N(line.packSize ?? line.totalUnits);
   const packPrice = N(line.packPrice ?? line.packagePrice);
   const recipeQty = N(line.recipeQty ?? line.unitsNeeded);
   const fallbackUnit = asUnit(line.unitType);
   const packUnit = asUnit(line.packUnit) || fallbackUnit;
-  const recipeUnit = asUnit(line.recipeUnit) || fallbackUnit;
+  const recipeUnit = asUnit(line.recipeUnit) || getDefaultRecipeUnit(packUnit);
   return {
     name: line.name ?? "",
     packagePrice: packPrice,
@@ -69,6 +76,7 @@ const normalizeLine = (line: Partial<Line>): Line => {
 
 const normalizePayload = (payload: RecipePayload): RecipePayload => ({
   ...payload,
+  slippagePercent: N((payload as any).slippagePercent),
   ingredients: (payload.ingredients || []).map(normalizeLine),
   packaging: (payload.packaging || []).map(normalizeLine),
 });
@@ -130,7 +138,10 @@ export default function RecipeEditorPage() {
   const packagingCost = sumLine(state.packaging);
   const labourCost = state.labour.reduce((a, l) => a + N(l.hours) * N(l.hourlyRate) + N(l.bonus), 0);
   const otherCost = state.other.reduce((a, l) => a + N(l.cost), 0);
-  const totalCostPerRecipe = ingredientsCost + packagingCost + labourCost + otherCost;
+  const slippagePercent = N(state.slippagePercent);
+  const baseTotalCostPerRecipe = ingredientsCost + packagingCost + labourCost + otherCost;
+  const slippageAmount = baseTotalCostPerRecipe * (slippagePercent / 100);
+  const totalCostPerRecipe = baseTotalCostPerRecipe + slippageAmount;
   const totalCostPerProduct = productsMade > 0 ? totalCostPerRecipe / productsMade : 0;
   const profitPerProduct = N(state.salePrice) - totalCostPerProduct;
   const ingredientCostPct = N(state.salePrice) > 0 ? (ingredientsCost / productsMade / N(state.salePrice)) * 100 : 0;
@@ -177,8 +188,15 @@ export default function RecipeEditorPage() {
   const renderLineTable = (title: string, key: "ingredients" | "packaging") => {
     const rows = state[key];
     const updateRow = (index: number, changes: Partial<Line>) => {
+      const currentRow = rows[index];
       const next = [...rows];
-      next[index] = normalizeLine({ ...rows[index], ...changes });
+      const hasRecipeUnit = Boolean(asUnit(currentRow.recipeUnit));
+      const nextPackUnit = changes.packUnit !== undefined ? asUnit(changes.packUnit) : asUnit(currentRow.packUnit);
+      const mergedChanges = { ...changes };
+      if (changes.packUnit !== undefined && !hasRecipeUnit) {
+        mergedChanges.recipeUnit = getDefaultRecipeUnit(nextPackUnit);
+      }
+      next[index] = normalizeLine({ ...currentRow, ...mergedChanges });
       setState({ ...state, [key]: next });
     };
     return (
@@ -234,6 +252,7 @@ export default function RecipeEditorPage() {
           <div><div className="text-sm font-medium mb-1">Servings This Recipe Makes</div><Input type="number" value={state.servingsThisRecipeMakes} onChange={(e) => setState({ ...state, servingsThisRecipeMakes: N(e.target.value) })} placeholder="e.g., 10" /></div>
           <div><div className="text-sm font-medium mb-1">Servings Per Product</div><Input type="number" value={state.servingsPerProduct} onChange={(e) => setState({ ...state, servingsPerProduct: N(e.target.value) })} placeholder="e.g., 1 (for 1kg/1L)" /></div>
           <div><div className="text-sm font-medium mb-1">Products Made (Yield)</div><Input type="number" value={state.productsMade} onChange={(e) => setState({ ...state, productsMade: N(e.target.value) || 1 })} placeholder="e.g., 10" /><div className="text-xs text-slate-500 mt-1">Used for per-product totals.</div></div>
+          <div><div className="text-sm font-medium mb-1">Slippage %</div><Input type="number" value={state.slippagePercent} onChange={(e) => setState({ ...state, slippagePercent: N(e.target.value) })} placeholder="e.g., 5" /><div className="text-xs text-slate-500 mt-1">Applied to total recipe cost.</div></div>
         </div>
       </CardContent></Card>
 
@@ -263,6 +282,8 @@ export default function RecipeEditorPage() {
       </CardContent></Card>
 
       <Card><CardHeader><CardTitle>Totals</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-2 text-sm">
+        <div>Base Total per Recipe: {THB(baseTotalCostPerRecipe)}</div>
+        <div>Slippage ({slippagePercent.toFixed(2)}%): {THB(slippageAmount)}</div>
         <div>Total Cost per Recipe: {THB(totalCostPerRecipe)}</div>
         <div>Total Cost per Product: {THB(totalCostPerProduct)}</div>
         <div>Ingredients Total: {THB(ingredientsCost)}</div>
