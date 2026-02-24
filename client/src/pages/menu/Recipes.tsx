@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,16 +16,16 @@ type RecipeListItem = {
 };
 
 export default function RecipeListPage() {
-  useEffect(() => {
-    fetch("/api/recipes/init-templates", { method: "POST" }).catch(() => null);
-  }, []);
-
-  const { data, isLoading } = useQuery<RecipeListItem[]>({
+  const { data, isLoading, error } = useQuery<RecipeListItem[]>({
     queryKey: ["recipes-v2"],
     queryFn: async () => {
       const response = await fetch("/api/recipes/v2");
-      if (!response.ok) throw new Error("Failed to fetch recipes");
-      return response.json();
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const message = payload?.detail || payload?.error || "Failed to fetch recipes";
+        throw new Error(`HTTP ${response.status}: ${message}`);
+      }
+      return payload;
     },
   });
 
@@ -41,11 +41,16 @@ export default function RecipeListPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>{recipes.length} Recipes</CardTitle>
+          <CardTitle>{recipes.length} Recipes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {isLoading && <div className="text-sm text-slate-500">Loading recipes...</div>}
-            {!isLoading && recipes.map((recipe) => (
+            {error && (
+              <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                {(error as Error).message}
+              </div>
+            )}
+            {!isLoading && !error && recipes.map((recipe) => (
               <Link key={recipe.id} to={`/menu/recipes/${recipe.id}`} className="block border rounded p-3 hover:bg-slate-50">
                 <div className="flex flex-wrap justify-between gap-2">
                   <div>
