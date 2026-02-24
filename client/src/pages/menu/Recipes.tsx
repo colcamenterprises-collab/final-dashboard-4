@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 const THB = (n: number) =>
   new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 }).format(n || 0);
@@ -13,6 +14,8 @@ type RecipeListItem = {
   category: string;
   salePrice: number;
   description: string;
+  imageUrl?: string;
+  updatedAt?: string;
 };
 
 export default function RecipeListPage() {
@@ -41,7 +44,7 @@ export default function RecipeListPage() {
 
         <Card>
           <CardHeader>
-          <CardTitle>{recipes.length} Recipes</CardTitle>
+            <CardTitle>{recipes.length} Recipes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {isLoading && <div className="text-sm text-slate-500">Loading recipes...</div>}
@@ -51,15 +54,31 @@ export default function RecipeListPage() {
               </div>
             )}
             {!isLoading && !error && recipes.map((recipe) => (
-              <Link key={recipe.id} to={`/menu/recipes/${recipe.id}`} className="block border rounded p-3 hover:bg-slate-50">
-                <div className="flex flex-wrap justify-between gap-2">
-                  <div>
-                    <div className="font-semibold text-slate-900">{recipe.name}</div>
-                    <div className="text-xs text-slate-600">SKU {recipe.sku} · {recipe.category}</div>
+              <div key={recipe.id} className="border rounded p-3 hover:bg-slate-50 transition-colors">
+                <div className="flex gap-4">
+                  <div className="h-20 w-20 rounded-md border bg-slate-100 overflow-hidden flex-shrink-0">
+                    {recipe.imageUrl ? (
+                      <img src={recipe.imageUrl} alt={recipe.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-[10px] text-slate-500 px-1 text-center">No Image</div>
+                    )}
                   </div>
-                  <div className="text-sm font-medium text-slate-900">{THB(recipe.salePrice)}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-slate-900">{recipe.name}</div>
+                    <div className="text-xs text-slate-600">SKU: {recipe.sku}</div>
+                    <div className="text-xs text-slate-600">Category: {recipe.category}</div>
+                    <div className="text-sm font-medium text-slate-900">Sale Price: {THB(recipe.salePrice)}</div>
+                    {recipe.updatedAt && (
+                      <div className="text-[11px] text-slate-500">Last updated: {new Date(recipe.updatedAt).toLocaleString()}</div>
+                    )}
+                  </div>
+                  <div className="flex items-center">
+                    <Button asChild size="sm">
+                      <Link to={`/menu/recipes/${recipe.id}`}>Open</Link>
+                    </Button>
+                  </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </CardContent>
         </Card>
