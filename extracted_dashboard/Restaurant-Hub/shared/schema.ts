@@ -304,11 +304,12 @@ export const recipes = pgTable("recipes", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Recipe Ingredients junction table
+// Recipe Ingredients table (standalone free-text lines for recipe domain)
 export const recipeIngredients = pgTable("recipe_ingredients", {
   id: serial("id").primaryKey(),
   recipeId: integer("recipe_id").notNull().references(() => recipes.id),
-  ingredientId: integer("ingredient_id").notNull().references(() => ingredients.id),
+  ingredientName: text("ingredient_name"),
+  ingredientId: integer("ingredient_id"), // legacy-only, no purchasing dependency
   quantity: decimal("quantity", { precision: 10, scale: 3 }).notNull(),
   unit: text("unit").notNull(),
   cost: decimal("cost", { precision: 10, scale: 2 }).notNull(),
@@ -376,7 +377,10 @@ export const insertLoyverseShiftReportSchema = createInsertSchema(loyverseShiftR
 export const insertDailyStockSalesSchema = createInsertSchema(dailyStockSales).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertIngredientSchema = createInsertSchema(ingredients).omit({ id: true, createdAt: true, lastUpdated: true });
 export const insertRecipeSchema = createInsertSchema(recipes).omit({ id: true, createdAt: true, updatedAt: true });
-export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true });
+export const insertRecipeIngredientSchema = createInsertSchema(recipeIngredients).omit({ id: true }).extend({
+  ingredientName: z.string().min(1, "Ingredient name is required"),
+  ingredientId: z.number().nullable().optional(),
+});
 export const insertStockRegisterDrinksSchema = createInsertSchema(stockRegisterDrinks).omit({ id: true, submittedAt: true });
 export const insertStockRegisterDrinkLinesSchema = createInsertSchema(stockRegisterDrinkLines).omit({ id: true });
 export const insertStockRegisterMeatSchema = createInsertSchema(stockRegisterMeat).omit({ id: true, submittedAt: true });

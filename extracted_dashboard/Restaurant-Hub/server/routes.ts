@@ -1980,7 +1980,12 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
     }
   });
 
-  // Recipes routes
+  // ARCHITECTURE CONTRACT (LOCKED):
+// Recipes/Costing are standalone.
+// DO NOT import purchasing modules here.
+// DO NOT query/join purchasing tables here.
+// DO NOT add purchasingItemId dependency.
+// Recipes routes
   app.get('/api/recipes', async (req, res) => {
     try {
       const recipeList = await db.select().from(recipes);
@@ -2065,42 +2070,27 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
   app.post('/api/recipe-ingredients', async (req, res) => {
     try {
       const parsed = insertRecipeIngredientSchema.parse(req.body);
-      
-      // Get ingredient cost from database
-      const ingredientResult = await db.select().from(ingredients).where(eq(ingredients.id, parseInt(parsed.ingredientId)));
-      const ingredient = ingredientResult[0];
-      
-      if (!ingredient) {
-        return res.status(404).json({ error: 'Ingredient not found' });
-      }
-      
-      // Calculate cost based on quantity
-      const quantity = parseFloat(parsed.quantity);
-      const unitPrice = parseFloat(ingredient.unitPrice);
-      const cost = (quantity * unitPrice).toFixed(2);
-      
-      // Insert into database
+
       const recipeIngredientData = {
         recipeId: parsed.recipeId,
-        ingredientId: parseInt(parsed.ingredientId),
+        ingredientName: parsed.ingredientName,
+        ingredientId: null,
         quantity: parsed.quantity,
-        unit: parsed.unit || ingredient.unit,
-        cost: cost
+        unit: parsed.unit || 'units',
+        cost: parsed.cost || '0'
       };
-      
+
       const result = await db.insert(recipeIngredients).values(recipeIngredientData).returning();
       const recipeIngredient = result[0];
-      
-      // Recalculate recipe cost
+
       const allIngredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, parsed.recipeId));
       let totalCost = 0;
       for (const ingredient of allIngredients) {
         totalCost += parseFloat(ingredient.cost);
       }
-      
-      // Update recipe with new total cost
+
       await db.update(recipes).set({ totalCost: totalCost.toString() }).where(eq(recipes.id, parsed.recipeId));
-      
+
       res.json(recipeIngredient);
     } catch (error) {
       console.error('Error adding recipe ingredient:', error);
@@ -2114,13 +2104,18 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       if (isNaN(id)) {
         return res.status(400).json({ error: 'Invalid ID format' });
       }
-      const recipeIngredient = await storage.updateRecipeIngredient(id, req.body);
-      
-      // Recalculate recipe cost
-      const totalCost = await storage.calculateRecipeCost(recipeIngredient.recipeId);
-      await storage.updateRecipe(recipeIngredient.recipeId, { totalCost: totalCost.toString() });
-      
-      res.json(recipeIngredient);
+
+      const updatedResult = await db.update(recipeIngredients).set(req.body).where(eq(recipeIngredients.id, id)).returning();
+      const updatedIngredient = updatedResult[0];
+      if (!updatedIngredient) {
+        return res.status(404).json({ error: 'Recipe ingredient not found' });
+      }
+
+      const allIngredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, updatedIngredient.recipeId));
+      const totalCost = allIngredients.reduce((sum, item) => sum + parseFloat(item.cost), 0);
+      await db.update(recipes).set({ totalCost: totalCost.toString() }).where(eq(recipes.id, updatedIngredient.recipeId));
+
+      res.json(updatedIngredient);
     } catch (error) {
       console.error('Error updating recipe ingredient:', error);
       res.status(500).json({ error: 'Failed to update recipe ingredient' });
@@ -2168,7 +2163,8 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
       if (isNaN(recipeId)) {
         return res.status(400).json({ error: 'Invalid recipe ID format' });
       }
-      const cost = await storage.calculateRecipeCost(recipeId);
+      const lines = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
+      const cost = lines.reduce((sum, line) => sum + parseFloat(line.cost), 0);
       res.json({ cost });
     } catch (error) {
       console.error('Error calculating recipe cost:', error);
@@ -2962,13 +2958,9 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
         return res.status(404).json({ error: "Recipe not found" });
       }
 
-      // Get recipe ingredients
+      // Get recipe ingredient names (standalone recipe domain)
       const recipeIngredients = await storage.getRecipeIngredients(recipeId);
-      const allIngredients = await storage.getIngredients();
-      const ingredientNames = recipeIngredients.map(ri => {
-        const ingredient = allIngredients.find(ing => ing.id === ri.ingredientId);
-        return ingredient?.name || `Ingredient ${ri.ingredientId}`;
-      });
+      const ingredientNames = recipeIngredients.map((ri) => ri.ingredientName || (ri.ingredientId ? `Legacy ingredient #${ri.ingredientId}` : 'Unspecified ingredient'));
 
       // Generate marketing content using OpenAI
       const marketingContent = await generateMarketingContent(

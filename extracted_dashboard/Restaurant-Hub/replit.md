@@ -284,3 +284,22 @@ Changelog:
 ```
 Preferred communication style: Simple, everyday language.
 ```
+
+
+## PHASE 1 DOMAIN BOUNDARY CONTRACT (LOCKED)
+
+PHASE 1 DOMAIN BOUNDARY CONTRACT (LOCKED)
+DOMAIN A — PURCHASING
+- Owns: purchasing_items, suppliers/categories, shopping list, Daily Stock v2 Form 2 purchasing items, sync-to-daily-stock
+- Rule: purchasing is “things we buy” ONLY. No “ingredient” concept. No recipe linkage. No FK to recipe tables.
+
+DOMAIN B — RECIPES & COST CALCULATOR
+- Owns: recipes + recipe lines + costing logic
+- Rule: must NOT import purchasing services, must NOT query/join purchasing tables, must NOT require purchasingItemId.
+- Recipe lines are free-text.
+
+HARD BOUNDARY
+- No cross-imports between purchasing and recipes.
+- No FK constraints between purchasing_items and recipe tables.
+- Any “lookup convenience” must be UI-only copy/paste (optional), never a dependency.
+

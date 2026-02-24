@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertRecipeSchema, insertRecipeIngredientSchema, type Recipe, type Ingredient, type RecipeIngredient, type InsertIngredient } from "@shared/schema";
+import { insertRecipeSchema, type Recipe, type Ingredient, type RecipeIngredient, type InsertIngredient } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, ChefHat, Calculator, Trash2, Edit3, Save, X, Sparkles, Copy, FileText, Share2, Megaphone, Edit2, Search, Package, DollarSign, Building2 } from "lucide-react";
@@ -26,12 +26,16 @@ const recipeFormSchema = insertRecipeSchema.extend({
 
 const recipeIngredientFormSchema = z.object({
   recipeId: z.number(),
-  ingredientId: z.string().min(1, "Please select an ingredient"),
+  ingredientName: z.string().min(1, "Ingredient name is required"),
   quantity: z.string().min(1, "Quantity is required").refine((val) => {
     const num = parseFloat(val);
     return !isNaN(num) && num > 0;
   }, "Quantity must be a positive number"),
-  unit: z.string().optional(),
+  unit: z.string().min(1, "Unit is required"),
+  cost: z.string().min(1, "Cost is required").refine((val) => {
+    const num = parseFloat(val);
+    return !isNaN(num) && num >= 0;
+  }, "Cost must be zero or a positive number"),
 });
 
 const ingredientFormSchema = z.object({
@@ -96,7 +100,8 @@ export default function RecipeIngredientManagement() {
   });
 
   const { data: recipeIngredients = [], isLoading: recipeIngredientsLoading } = useQuery({
-    queryKey: ['/api/recipe-ingredients', selectedRecipe?.id],
+    queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'],
+    queryFn: () => apiRequest(`/api/recipes/${selectedRecipe?.id}/ingredients`),
     enabled: !!selectedRecipe?.id,
   });
 
@@ -116,7 +121,7 @@ export default function RecipeIngredientManagement() {
   const addRecipeIngredientMutation = useMutation({
     mutationFn: (data: any) => apiRequest(`/api/recipe-ingredients`, { method: "POST", body: data }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipe-ingredients', selectedRecipe?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
       setIsAddIngredientDialogOpen(false);
       toast({ title: "Success", description: "Ingredient added to recipe!" });
@@ -128,9 +133,9 @@ export default function RecipeIngredientManagement() {
 
   const updateRecipeIngredientMutation = useMutation({
     mutationFn: ({ id, data }: { id: number, data: any }) => 
-      apiRequest(`/api/recipe-ingredients/${id}`, { method: "PATCH", body: data }),
+      apiRequest(`/api/recipe-ingredients/${id}`, { method: "PUT", body: data }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipe-ingredients', selectedRecipe?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
       setEditingRecipeIngredient(null);
       toast({ title: "Success", description: "Ingredient updated!" });
@@ -140,7 +145,7 @@ export default function RecipeIngredientManagement() {
   const removeRecipeIngredientMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/recipe-ingredients/${id}`, { method: "DELETE" }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/recipe-ingredients', selectedRecipe?.id] });
+      queryClient.invalidateQueries({ queryKey: ['/api/recipes', selectedRecipe?.id, 'ingredients'] });
       queryClient.invalidateQueries({ queryKey: ['/api/recipes'] });
       toast({ title: "Success", description: "Ingredient removed from recipe!" });
     },
@@ -213,9 +218,10 @@ export default function RecipeIngredientManagement() {
     resolver: zodResolver(recipeIngredientFormSchema),
     defaultValues: {
       recipeId: selectedRecipe?.id || 0,
-      ingredientId: "",
+      ingredientName: "",
       quantity: "",
-      unit: "",
+      unit: "units",
+      cost: "0",
     },
   });
 
@@ -259,17 +265,15 @@ export default function RecipeIngredientManagement() {
   };
 
   const onAddRecipeIngredient = (data: any) => {
-    const ingredientId = parseInt(data.ingredientId);
-    const ingredient = ingredients.find(i => i.id === ingredientId);
-    
     const ingredientData = {
       recipeId: selectedRecipe?.id,
-      ingredientId,
-      quantity: parseFloat(data.quantity),
-      unit: data.unit || ingredient?.unit || 'units',
-      cost: ingredient ? parseFloat(ingredient.unitPrice) * parseFloat(data.quantity) : 0,
+      ingredientName: data.ingredientName,
+      ingredientId: null,
+      quantity: data.quantity,
+      unit: data.unit,
+      cost: data.cost,
     };
-    
+
     addRecipeIngredientMutation.mutate(ingredientData);
   };
 
@@ -672,29 +676,18 @@ export default function RecipeIngredientManagement() {
                               <form onSubmit={recipeIngredientForm.handleSubmit(onAddRecipeIngredient)} className="space-y-4">
                                 <FormField
                                   control={recipeIngredientForm.control}
-                                  name="ingredientId"
+                                  name="ingredientName"
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel>Ingredient</FormLabel>
-                                      <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select ingredient" />
-                                          </SelectTrigger>
-                                        </FormControl>
-                                        <SelectContent>
-                                          {ingredients.map((ingredient: Ingredient) => (
-                                            <SelectItem key={ingredient.id} value={ingredient.id.toString()}>
-                                              {ingredient.name} ({formatCurrency(ingredient.unitPrice)}/{ingredient.unit})
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
+                                      <FormLabel>Ingredient Name</FormLabel>
+                                      <FormControl>
+                                        <Input placeholder="e.g. Beef Patty" {...field} />
+                                      </FormControl>
                                       <FormMessage />
                                     </FormItem>
                                   )}
                                 />
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-3 gap-4">
                                   <FormField
                                     control={recipeIngredientForm.control}
                                     name="quantity"
@@ -713,11 +706,11 @@ export default function RecipeIngredientManagement() {
                                     name="unit"
                                     render={({ field }) => (
                                       <FormItem>
-                                        <FormLabel>Unit (Optional)</FormLabel>
+                                        <FormLabel>Unit</FormLabel>
                                         <Select onValueChange={field.onChange} value={field.value}>
                                           <FormControl>
                                             <SelectTrigger>
-                                              <SelectValue placeholder="Auto" />
+                                              <SelectValue placeholder="Select unit" />
                                             </SelectTrigger>
                                           </FormControl>
                                           <SelectContent>
@@ -728,6 +721,19 @@ export default function RecipeIngredientManagement() {
                                             ))}
                                           </SelectContent>
                                         </Select>
+                                        <FormMessage />
+                                      </FormItem>
+                                    )}
+                                  />
+                                  <FormField
+                                    control={recipeIngredientForm.control}
+                                    name="cost"
+                                    render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel>Cost (THB)</FormLabel>
+                                        <FormControl>
+                                          <Input placeholder="0.00" {...field} />
+                                        </FormControl>
                                         <FormMessage />
                                       </FormItem>
                                     )}
@@ -760,7 +766,7 @@ export default function RecipeIngredientManagement() {
                           {recipeIngredients.map((ri: RecipeIngredient & { ingredient?: Ingredient }) => (
                             <div key={ri.id} className="flex justify-between items-center p-2 border rounded">
                               <div>
-                                <span className="font-medium">{ri.ingredient?.name || 'Unknown'}</span>
+                                <span className="font-medium">{ri.ingredientName || (ri.ingredientId ? `Legacy ingredient #${ri.ingredientId}` : 'Unknown')}</span>
                                 <span className="text-gray-500 ml-2">
                                   {ri.quantity} {ri.unit} - {formatCurrency(ri.cost || 0)}
                                 </span>
