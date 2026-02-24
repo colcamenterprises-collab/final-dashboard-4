@@ -9,8 +9,7 @@ import {
   insertStaffShiftSchema,
   insertTransactionSchema,
   insertIngredientSchema,
-  insertRecipeSchema,
-  insertRecipeIngredientSchema
+  insertRecipeSchema
 } from "@shared/schema";
 import { 
   analyzeReceipt, 
@@ -2069,27 +2068,73 @@ Focus on restaurant-related transactions and provide detailed analysis with matc
 
   app.post('/api/recipe-ingredients', async (req, res) => {
     try {
-      const parsed = insertRecipeIngredientSchema.parse(req.body);
+      const recipeId = Number(req.body?.recipeId);
+      const quantity = req.body?.quantity;
+      const unit = req.body?.unit || 'units';
+      const cost = req.body?.cost || '0';
+      const ingredientName = typeof req.body?.ingredientName === 'string' ? req.body.ingredientName.trim() : '';
+      const ingredientIdRaw = req.body?.ingredientId;
+      const ingredientId = ingredientIdRaw === null || ingredientIdRaw === undefined || ingredientIdRaw === ''
+        ? null
+        : Number(ingredientIdRaw);
 
-      const recipeIngredientData = {
-        recipeId: parsed.recipeId,
-        ingredientName: parsed.ingredientName,
-        ingredientId: null,
-        quantity: parsed.quantity,
-        unit: parsed.unit || 'units',
-        cost: parsed.cost || '0'
-      };
+      if (!Number.isInteger(recipeId) || recipeId <= 0) {
+        return res.status(400).json({ error: 'recipeId is required and must be a positive integer' });
+      }
 
-      const result = await db.insert(recipeIngredients).values(recipeIngredientData).returning();
+      const schemaColumnsResult = await db.execute(sql`
+        SELECT column_name, is_nullable
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'recipe_ingredients'
+          AND column_name IN ('ingredient_name', 'ingredient_id')
+      `);
+      const schemaColumns = (schemaColumnsResult as any)?.rows || [];
+      const ingredientNameColumn = schemaColumns.find((col: any) => col.column_name === 'ingredient_name');
+      const ingredientIdColumn = schemaColumns.find((col: any) => col.column_name === 'ingredient_id');
+      const ingredientNameExists = !!ingredientNameColumn;
+      const ingredientIdNullable = ingredientIdColumn?.is_nullable === 'YES';
+
+      const requiresLegacyWrite = !ingredientNameExists || !ingredientIdNullable;
+      if (requiresLegacyWrite) {
+        console.log('Legacy recipe_ingredients schema detected; requiring ingredientId.');
+
+        if (!Number.isInteger(ingredientId) || (ingredientId as number) <= 0) {
+          return res.status(400).json({
+            error: 'Legacy recipe_ingredients schema requires ingredientId. Provide a valid ingredientId.'
+          });
+        }
+      } else if (!ingredientName) {
+        return res.status(400).json({ error: 'ingredientName is required for standalone recipe lines' });
+      }
+
+      const recipeIngredientData = requiresLegacyWrite
+        ? {
+            recipeId,
+            ingredientId,
+            quantity,
+            unit,
+            cost,
+          }
+        : {
+            recipeId,
+            ingredientName,
+            ingredientId,
+            quantity,
+            unit,
+            cost,
+          };
+
+      const result = await db.insert(recipeIngredients).values(recipeIngredientData as any).returning();
       const recipeIngredient = result[0];
 
-      const allIngredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, parsed.recipeId));
+      const allIngredients = await db.select().from(recipeIngredients).where(eq(recipeIngredients.recipeId, recipeId));
       let totalCost = 0;
       for (const ingredient of allIngredients) {
         totalCost += parseFloat(ingredient.cost);
       }
 
-      await db.update(recipes).set({ totalCost: totalCost.toString() }).where(eq(recipes.id, parsed.recipeId));
+      await db.update(recipes).set({ totalCost: totalCost.toString() }).where(eq(recipes.id, recipeId));
 
       res.json(recipeIngredient);
     } catch (error) {
