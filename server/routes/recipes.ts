@@ -468,7 +468,7 @@ router.put('/v2/:id', async (req, res) => {
     await seedLockedRecipeTemplates();
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
-    const source = await pool.query('SELECT notes FROM recipes WHERE id = $1 LIMIT 1', [id]);
+    const source = await pool.query('SELECT name, category, notes FROM recipes WHERE id = $1 LIMIT 1', [id]);
     const current = source.rows[0];
     if (!current) return res.status(404).json({ error: 'Not found' });
     const currentMeta = parseRecipeMeta(current.notes);
@@ -497,8 +497,8 @@ router.put('/v2/:id', async (req, res) => {
        WHERE id = $1`,
       [
         id,
-        String(payload.name ?? ''),
-        String(payload.category ?? ''),
+        String(current.name ?? ''),
+        String(current.category ?? ''),
         String(payload.description ?? ''),
         cleanMoney(payload.salePrice ?? 0),
         String(payload.imageUrl ?? ''),
