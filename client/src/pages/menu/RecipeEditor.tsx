@@ -1,118 +1,50 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 
 const THB = (n: number) => new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 }).format(n || 0);
 const N = (v: any) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 const UNITS = ["kg", "g", "L", "ml", "each"] as const;
 type Unit = typeof UNITS[number] | "";
-
-type Line = {
-  name: string;
-  packagePrice: number;
-  totalUnits: number;
-  unitType: string;
-  unitsNeeded: number;
-  packSize: number;
-  packUnit: Unit;
-  packPrice: number;
-  recipeQty: number;
-  recipeUnit: Unit;
-};
+type Line = { name: string; packagePrice: number; totalUnits: number; unitType: string; unitsNeeded: number; packSize: number; packUnit: Unit; packPrice: number; recipeQty: number; recipeUnit: Unit };
 type LabourLine = { description: string; hours: number; hourlyRate: number; bonus: number };
 type OtherLine = { name: string; cost: number };
-
 type RecipePayload = {
-  id: number;
-  name: string;
-  sku: string;
-  category: string;
-  salePrice: number;
-  description: string;
-  imageUrl: string;
-  servingsThisRecipeMakes: number;
-  servingsPerProduct: number;
-  productsMade: number;
-  slippagePercent: number;
-  ingredients: Line[];
-  packaging: Line[];
-  labour: LabourLine[];
-  other: OtherLine[];
+  id: number; name: string; sku: string; category: string; salePrice: number; description: string; imageUrl: string;
+  servingsThisRecipeMakes: number; servingsPerProduct: number; productsMade: number; slippagePercent: number;
+  ingredients: Line[]; packaging: Line[]; labour: LabourLine[]; other: OtherLine[]; published?: boolean;
 };
 
 const asUnit = (value: unknown): Unit => (UNITS.includes(value as Unit) ? (value as Unit) : "");
-
-const getDefaultRecipeUnit = (packUnit: Unit): Unit => {
-  if (packUnit === "kg") return "g";
-  if (packUnit === "L") return "ml";
-  return packUnit;
-};
-
-const normalizeLine = (line: Partial<Line>): Line => {
-  const packSize = N(line.packSize ?? line.totalUnits);
-  const packPrice = N(line.packPrice ?? line.packagePrice);
-  const recipeQty = N(line.recipeQty ?? line.unitsNeeded);
-  const fallbackUnit = asUnit(line.unitType);
-  const packUnit = asUnit(line.packUnit) || fallbackUnit;
-  const recipeUnit = asUnit(line.recipeUnit) || getDefaultRecipeUnit(packUnit);
-  return {
-    name: line.name ?? "",
-    packagePrice: packPrice,
-    totalUnits: packSize,
-    unitType: (packUnit || recipeUnit || line.unitType || "") as string,
-    unitsNeeded: recipeQty,
-    packSize,
-    packUnit,
-    packPrice,
-    recipeQty,
-    recipeUnit,
-  };
-};
-
-const normalizePayload = (payload: RecipePayload): RecipePayload => ({
-  ...payload,
-  slippagePercent: N((payload as any).slippagePercent),
-  ingredients: (payload.ingredients || []).map(normalizeLine),
-  packaging: (payload.packaging || []).map(normalizeLine),
+const normalizeLine = (line: Partial<Line>): Line => ({
+  name: line.name ?? "", packagePrice: N(line.packPrice ?? line.packagePrice), totalUnits: N(line.packSize ?? line.totalUnits), unitType: String(line.unitType ?? ""),
+  unitsNeeded: N(line.recipeQty ?? line.unitsNeeded), packSize: N(line.packSize ?? line.totalUnits), packUnit: asUnit(line.packUnit ?? line.unitType),
+  packPrice: N(line.packPrice ?? line.packagePrice), recipeQty: N(line.recipeQty ?? line.unitsNeeded), recipeUnit: asUnit(line.recipeUnit ?? line.unitType),
 });
-
+const normalizePayload = (payload: RecipePayload): RecipePayload => ({ ...payload, ingredients: (payload.ingredients || []).map(normalizeLine), packaging: (payload.packaging || []).map(normalizeLine) });
 const newLine = (): Line => normalizeLine({ name: "" });
 
-const toBaseUnit = (qty: number, unit: Unit): { family: "weight" | "volume" | "each" | "none"; value: number } => {
-  if (unit === "kg") return { family: "weight", value: qty * 1000 };
-  if (unit === "g") return { family: "weight", value: qty };
-  if (unit === "L") return { family: "volume", value: qty * 1000 };
-  if (unit === "ml") return { family: "volume", value: qty };
-  if (unit === "each") return { family: "each", value: qty };
-  return { family: "none", value: qty };
-};
-
-const getLineCostPerRecipe = (line: Line) => {
-  const packSize = N(line.packSize);
-  const packPrice = N(line.packPrice);
-  const recipeQty = N(line.recipeQty);
-  if (packSize <= 0 || packPrice <= 0 || recipeQty <= 0) return { costPerRecipe: 0, error: "" };
-  const packBase = toBaseUnit(packSize, line.packUnit);
-  const recipeBase = toBaseUnit(recipeQty, line.recipeUnit);
-  if (packBase.family === "none" || recipeBase.family === "none") {
-    return { costPerRecipe: 0, error: "Select units to calculate" };
-  }
-  if (packBase.family !== recipeBase.family) {
-    return { costPerRecipe: 0, error: "Incompatible units: weight, volume, and each cannot be mixed" };
-  }
-  if (packBase.value <= 0) return { costPerRecipe: 0, error: "Pack size must be greater than 0" };
-  return { costPerRecipe: packPrice * (recipeBase.value / packBase.value), error: "" };
+const toBaseUnit = (qty: number, unit: Unit) => unit === "kg" ? { f: "w", v: qty * 1000 } : unit === "g" ? { f: "w", v: qty } : unit === "L" ? { f: "v", v: qty * 1000 } : unit === "ml" ? { f: "v", v: qty } : unit === "each" ? { f: "e", v: qty } : { f: "n", v: qty };
+const getLineCost = (line: Line) => {
+  const packBase = toBaseUnit(N(line.packSize), line.packUnit);
+  const recipeBase = toBaseUnit(N(line.recipeQty), line.recipeUnit);
+  if (packBase.v <= 0 || recipeBase.v <= 0 || packBase.f !== recipeBase.f) return 0;
+  return N(line.packPrice) * (recipeBase.v / packBase.v);
 };
 
 export default function RecipeEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+  const [publishing, setPublishing] = useState(false);
 
   const { data, isLoading, refetch } = useQuery<RecipePayload>({
     queryKey: ["recipe-v2", id],
@@ -126,185 +58,137 @@ export default function RecipeEditorPage() {
   const [state, setState] = useState<RecipePayload | null>(null);
   React.useEffect(() => { if (data) setState(normalizePayload(data)); }, [data]);
 
-  const initialState = useMemo(() => data ? JSON.stringify(normalizePayload(data)) : "", [data]);
-  const currentState = useMemo(() => state ? JSON.stringify(state) : "", [state]);
+  const initialState = useMemo(() => (data ? JSON.stringify(normalizePayload(data)) : ""), [data]);
+  const currentState = useMemo(() => (state ? JSON.stringify(state) : ""), [state]);
   const hasChanges = Boolean(state) && initialState !== currentState;
 
   if (isLoading || !state) return <div className="p-6">Loading...</div>;
 
-  const productsMade = N(state.productsMade) || 1;
-  const sumLine = (items: Line[]) => items.reduce((a, l) => a + getLineCostPerRecipe(l).costPerRecipe, 0);
+  const sumLine = (items: Line[]) => items.reduce((a, l) => a + getLineCost(l), 0);
   const ingredientsCost = sumLine(state.ingredients);
   const packagingCost = sumLine(state.packaging);
   const labourCost = state.labour.reduce((a, l) => a + N(l.hours) * N(l.hourlyRate) + N(l.bonus), 0);
   const otherCost = state.other.reduce((a, l) => a + N(l.cost), 0);
-  const slippagePercent = N(state.slippagePercent);
-  const baseTotalCostPerRecipe = ingredientsCost + packagingCost + labourCost + otherCost;
-  const slippageAmount = baseTotalCostPerRecipe * (slippagePercent / 100);
-  const totalCostPerRecipe = baseTotalCostPerRecipe + slippageAmount;
-  const totalCostPerProduct = productsMade > 0 ? totalCostPerRecipe / productsMade : 0;
+  const baseCost = ingredientsCost + packagingCost + labourCost + otherCost;
+  const totalCost = baseCost + (baseCost * N(state.slippagePercent)) / 100;
+  const totalCostPerProduct = totalCost / (N(state.productsMade) || 1);
   const profitPerProduct = N(state.salePrice) - totalCostPerProduct;
-  const ingredientCostPct = N(state.salePrice) > 0 ? (ingredientsCost / productsMade / N(state.salePrice)) * 100 : 0;
-  const totalCostPct = N(state.salePrice) > 0 ? (totalCostPerProduct / N(state.salePrice)) * 100 : 0;
-  const profitMarginPct = N(state.salePrice) > 0 ? (profitPerProduct / N(state.salePrice)) * 100 : 0;
+  const costPct = N(state.salePrice) > 0 ? (totalCostPerProduct / N(state.salePrice)) * 100 : 0;
+  const marginPct = N(state.salePrice) > 0 ? (profitPerProduct / N(state.salePrice)) * 100 : 0;
+
+  const breakdownData = [
+    { name: "Ingredients", value: ingredientsCost, color: "#0f766e" },
+    { name: "Packaging", value: packagingCost, color: "#2563eb" },
+    { name: "Labour", value: labourCost, color: "#7c3aed" },
+    { name: "Other", value: otherCost, color: "#ca8a04" },
+  ];
 
   const save = async () => {
     setSaving(true);
-    const response = await fetch(`/api/recipes/v2/${state.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state),
-    });
-    setSaving(false);
-    if (response.ok) refetch();
+    try {
+      const res = await fetch(`/api/recipes/v2/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(state) });
+      if (!res.ok) throw new Error("Save failed");
+      alert("Recipe saved");
+      await refetch();
+    } catch (e: any) { alert(e?.message || "Save failed"); }
+    finally { setSaving(false); }
   };
 
-  const reset = () => {
-    if (data) setState(normalizePayload(data));
+  const publish = async () => {
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/online/products/upsert-from-recipe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipeId: state.id }) });
+      if (!res.ok) throw new Error("Publish failed");
+      alert("Published to online ordering");
+      await refetch();
+    } catch (e: any) { alert(e?.message || "Publish failed"); }
+    finally { setPublishing(false); }
   };
 
-  const onUploadImage = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : "";
-      setState((prev) => prev ? ({ ...prev, imageUrl: result }) : prev);
-    };
-    reader.readAsDataURL(file);
-    event.target.value = "";
+  const unpublish = async () => {
+    setPublishing(true);
+    try {
+      const res = await fetch("/api/online/products/unpublish-from-recipe", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ recipeId: state.id }) });
+      if (!res.ok) throw new Error("Unpublish failed");
+      alert("Unpublished from online ordering");
+      await refetch();
+    } catch (e: any) { alert(e?.message || "Unpublish failed"); }
+    finally { setPublishing(false); }
   };
 
-  const download = () => {
+  const downloadJson = () => {
     const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
-    a.download = `${state.sku}-${state.name.replace(/\s+/g, "-").toLowerCase()}.json`;
+    a.href = URL.createObjectURL(blob);
+    a.download = `${state.sku || state.id}-recipe.json`;
     a.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(a.href);
   };
 
-  const renderLineTable = (title: string, key: "ingredients" | "packaging") => {
-    const rows = state[key];
-    const updateRow = (index: number, changes: Partial<Line>) => {
-      const currentRow = rows[index];
-      const next = [...rows];
-      const hasRecipeUnit = Boolean(asUnit(currentRow.recipeUnit));
-      const nextPackUnit = changes.packUnit !== undefined ? asUnit(changes.packUnit) : asUnit(currentRow.packUnit);
-      const mergedChanges = { ...changes };
-      if (changes.packUnit !== undefined && !hasRecipeUnit) {
-        mergedChanges.recipeUnit = getDefaultRecipeUnit(nextPackUnit);
-      }
-      next[index] = normalizeLine({ ...currentRow, ...mergedChanges });
-      setState({ ...state, [key]: next });
-    };
-    return (
-      <Card>
-        <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
-          <div className="grid grid-cols-8 gap-2 text-xs font-semibold text-slate-600">
-            <div />
-            <div className="col-span-3">What you buy</div>
-            <div className="col-span-2">What the recipe uses</div>
-            <div />
-            <div />
+  const renderLineTable = (title: string, key: "ingredients" | "packaging") => (
+    <Card>
+      <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+      <CardContent className="space-y-2">
+        <div className="grid grid-cols-8 gap-2 text-xs font-semibold text-slate-600"><div>Name</div><div>Pack Size</div><div>Pack Unit</div><div>Pack Price</div><div>Recipe Qty</div><div>Recipe Unit</div><div>Cost</div><div /></div>
+        {state[key].map((row, i) => (
+          <div key={i} className="grid grid-cols-8 gap-2 items-center">
+            <Input value={row.name} placeholder="Item name" onChange={(e) => { const next = [...state[key]]; next[i] = { ...row, name: e.target.value }; setState({ ...state, [key]: next }); }} />
+            <Input type="number" value={row.packSize} placeholder="0" onChange={(e) => { const next = [...state[key]]; next[i] = { ...row, packSize: N(e.target.value) }; setState({ ...state, [key]: next }); }} />
+            <select className="h-10 rounded-md border border-input px-2 text-sm" value={row.packUnit} onChange={(e) => { const next = [...state[key]]; next[i] = { ...row, packUnit: asUnit(e.target.value) }; setState({ ...state, [key]: next }); }}>{UNITS.map((u) => <option key={u} value={u}>{u}</option>)}</select>
+            <Input type="number" value={row.packPrice} placeholder="0" onChange={(e) => { const next = [...state[key]]; next[i] = { ...row, packPrice: N(e.target.value) }; setState({ ...state, [key]: next }); }} />
+            <Input type="number" value={row.recipeQty} placeholder="0" onChange={(e) => { const next = [...state[key]]; next[i] = { ...row, recipeQty: N(e.target.value) }; setState({ ...state, [key]: next }); }} />
+            <select className="h-10 rounded-md border border-input px-2 text-sm" value={row.recipeUnit} onChange={(e) => { const next = [...state[key]]; next[i] = { ...row, recipeUnit: asUnit(e.target.value) }; setState({ ...state, [key]: next }); }}>{UNITS.map((u) => <option key={u} value={u}>{u}</option>)}</select>
+            <div className="text-sm">{THB(getLineCost(row))}</div>
+            <Button size="sm" variant="outline" onClick={() => setState({ ...state, [key]: state[key].filter((_, idx) => idx !== i) })}>Remove</Button>
           </div>
-          <div className="grid grid-cols-8 gap-2 text-xs font-semibold text-slate-600">
-            <div>Item Name</div><div>Pack Size</div><div>Pack Unit</div><div>Pack Price (THB)</div><div>Recipe Qty</div><div>Recipe Unit</div><div>Cost per Recipe</div><div>Actions</div>
-          </div>
-          {rows.map((row, i) => {
-            const { costPerRecipe, error } = getLineCostPerRecipe(row);
-            return <div key={`${key}-${i}`} className="grid grid-cols-8 gap-2 items-center">
-              <Input value={row.name} onChange={(e) => updateRow(i, { name: e.target.value })} placeholder="e.g., Lettuce" />
-              <Input type="number" value={row.packSize} onChange={(e) => updateRow(i, { packSize: N(e.target.value) })} placeholder="e.g., 1 (for 1kg/1L)" />
-              <Input value={row.packUnit} onChange={(e) => updateRow(i, { packUnit: asUnit(e.target.value) })} placeholder="e.g., kg / g / L / ml / each" list={`units-${key}`} />
-              <Input type="number" value={row.packPrice} onChange={(e) => updateRow(i, { packPrice: N(e.target.value) })} placeholder="e.g., 100" />
-              <Input type="number" value={row.recipeQty} onChange={(e) => updateRow(i, { recipeQty: N(e.target.value) })} placeholder="e.g., 40 (for 40g/50ml)" />
-              <Input value={row.recipeUnit} onChange={(e) => updateRow(i, { recipeUnit: asUnit(e.target.value) })} placeholder="e.g., g / ml / each" list={`units-${key}`} />
-              <div className="text-sm">
-                {THB(costPerRecipe)}
-                {error && <div className="text-xs text-red-600">{error}</div>}
+        ))}
+        <Button variant="outline" onClick={() => setState({ ...state, [key]: [...state[key], newLine()] })}>Add Row</Button>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="bg-slate-50 pb-24">
+      <div className="mx-auto max-w-7xl space-y-4 p-6">
+        <Card>
+          <CardContent className="grid gap-4 p-6 lg:grid-cols-[1fr_260px]">
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-bold">{state.name}</h1>
+                <Badge variant={state.published ? "default" : "secondary"}>{state.published ? "Published" : "Draft"}</Badge>
               </div>
-              <Button variant="outline" size="sm" onClick={() => setState({ ...state, [key]: rows.filter((_, idx) => idx !== i) })}>Remove</Button>
-            </div>;
-          })}
-          <datalist id={`units-${key}`}>
-            {UNITS.map((unit) => <option key={`${key}-${unit}`} value={unit} />)}
-          </datalist>
-          <Button variant="outline" onClick={() => setState({ ...state, [key]: [...rows, newLine()] })}>Add Row</Button>
-        </CardContent>
-      </Card>
-    );
-  };
+              <div className="text-sm text-slate-600">SKU {state.sku} · {state.category || "Unmapped"} · {THB(state.salePrice)}</div>
+              <Textarea value={state.description} onChange={(e) => setState({ ...state, description: e.target.value })} placeholder="Recipe description" />
+            </div>
+            <div className="space-y-2">
+              {state.imageUrl ? <img src={state.imageUrl} alt={state.name} className="h-40 w-full rounded-md border object-cover" /> : <div className="flex h-40 items-center justify-center rounded-md border bg-slate-100 text-xs text-slate-500">No image</div>}
+              <Input value={state.imageUrl} onChange={(e) => setState({ ...state, imageUrl: e.target.value })} placeholder="Image URL" />
+            </div>
+          </CardContent>
+        </Card>
 
-  return <div className="min-h-screen px-6 py-6">
-    <div className="max-w-6xl mx-auto space-y-4 pb-28">
-      <div className="flex gap-2"><Button variant="outline" onClick={() => navigate('/menu/recipes')}>Back</Button><Button variant="outline" onClick={download}>Download JSON</Button></div>
-      <Card><CardHeader><CardTitle>Recipe Header</CardTitle></CardHeader><CardContent className="space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <div><div className="text-sm font-medium mb-1">Recipe Name</div><Input value={state.name} disabled placeholder="Locked template name" /><div className="text-xs text-slate-500 mt-1">Locked template field (read-only).</div></div>
-          <div><div className="text-sm font-medium mb-1">SKU</div><Input value={state.sku} disabled placeholder="Locked template SKU" /><div className="text-xs text-slate-500 mt-1">Locked template field (read-only).</div></div>
-          <div><div className="text-sm font-medium mb-1">Category</div><Input value={state.category} disabled placeholder="Locked template category" /><div className="text-xs text-slate-500 mt-1">Locked template field (read-only).</div></div>
-          <div><div className="text-sm font-medium mb-1">Sale Price</div><Input type="number" value={state.salePrice} onChange={(e) => setState({ ...state, salePrice: N(e.target.value) })} placeholder="e.g., 159" /><div className="text-xs text-slate-500 mt-1">Selling price per product in THB.</div></div>
-          <div className="md:col-span-2"><div className="text-sm font-medium mb-1">Description</div><Textarea value={state.description} onChange={(e) => setState({ ...state, description: e.target.value })} placeholder="Add prep notes, serving details, and quality standards" /><div className="text-xs text-slate-500 mt-1">Shown for staff reference.</div></div>
-          <div className="md:col-span-2 space-y-2"><div className="text-sm font-medium">Image</div><Input type="file" accept="image/*" onChange={onUploadImage} /><Input value={state.imageUrl} onChange={(e) => setState({ ...state, imageUrl: e.target.value })} placeholder="https://... (optional URL)" /><div className="text-xs text-slate-500">Upload an image file or provide an image URL. Preview updates immediately.</div>{state.imageUrl ? <img src={state.imageUrl} alt="Recipe preview" className="h-36 w-36 object-cover rounded border" /> : <div className="h-36 w-36 rounded border bg-slate-100 flex items-center justify-center text-xs text-slate-500">No image selected</div>}</div>
-          <div><div className="text-sm font-medium mb-1">Servings This Recipe Makes</div><Input type="number" value={state.servingsThisRecipeMakes} onChange={(e) => setState({ ...state, servingsThisRecipeMakes: N(e.target.value) })} placeholder="e.g., 10" /></div>
-          <div><div className="text-sm font-medium mb-1">Servings Per Product</div><Input type="number" value={state.servingsPerProduct} onChange={(e) => setState({ ...state, servingsPerProduct: N(e.target.value) })} placeholder="e.g., 1 (for 1kg/1L)" /></div>
-          <div><div className="text-sm font-medium mb-1">Products Made (Yield)</div><Input type="number" value={state.productsMade} onChange={(e) => setState({ ...state, productsMade: N(e.target.value) || 1 })} placeholder="e.g., 10" /><div className="text-xs text-slate-500 mt-1">Used for per-product totals.</div></div>
-          <div><div className="text-sm font-medium mb-1">Slippage %</div><Input type="number" value={state.slippagePercent} onChange={(e) => setState({ ...state, slippagePercent: N(e.target.value) })} placeholder="e.g., 5" /><div className="text-xs text-slate-500 mt-1">Applied to total recipe cost.</div></div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card><CardHeader><CardTitle>Breakdown</CardTitle></CardHeader><CardContent className="h-60"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={breakdownData} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80}>{breakdownData.map((d) => <Cell key={d.name} fill={d.color} />)}</Pie><Tooltip formatter={(v: any) => THB(Number(v))} /></PieChart></ResponsiveContainer></CardContent></Card>
+          <Card><CardHeader><CardTitle>Profit vs Cost</CardTitle></CardHeader><CardContent className="h-60"><ResponsiveContainer width="100%" height="100%"><BarChart data={[{ name: "Per Product", cost: totalCostPerProduct, profit: Math.max(profitPerProduct, 0) }]}><XAxis dataKey="name" /><YAxis /><Tooltip formatter={(v: any) => THB(Number(v))} /><Bar dataKey="cost" fill="#ef4444" /><Bar dataKey="profit" fill="#22c55e" /></BarChart></ResponsiveContainer></CardContent></Card>
+          <Card><CardHeader><CardTitle>Margins</CardTitle></CardHeader><CardContent className="space-y-4"><div><div className="mb-1 text-sm">Cost %</div><Progress value={Math.max(0, Math.min(100, costPct))} /><div className="mt-1 text-xs text-slate-500">{costPct.toFixed(2)}%</div></div><div><div className="mb-1 text-sm">Profit Margin</div><Progress value={Math.max(0, Math.min(100, marginPct))} /><div className="mt-1 text-xs text-slate-500">{marginPct.toFixed(2)}%</div></div></CardContent></Card>
         </div>
-      </CardContent></Card>
 
-      {renderLineTable("Ingredients", "ingredients")}
-      {renderLineTable("Packaging", "packaging")}
+        <Card><CardHeader><CardTitle>Recipe Details</CardTitle></CardHeader><CardContent className="grid gap-3 md:grid-cols-3"><div><label className="mb-1 block text-sm">Category</label><Input value={state.category} placeholder="Category" onChange={(e) => setState({ ...state, category: e.target.value })} /></div><div><label className="mb-1 block text-sm">Sale Price</label><Input type="number" value={state.salePrice} placeholder="0" onChange={(e) => setState({ ...state, salePrice: N(e.target.value) })} /></div><div><label className="mb-1 block text-sm">Products Made</label><Input type="number" value={state.productsMade} placeholder="1" onChange={(e) => setState({ ...state, productsMade: N(e.target.value) || 1 })} /></div></CardContent></Card>
 
-      <Card><CardHeader><CardTitle>Labour</CardTitle></CardHeader><CardContent className="space-y-2">
-        <div className="grid grid-cols-5 gap-2 text-xs font-semibold text-slate-600"><div>Item Name</div><div>Hours</div><div>Hourly Rate</div><div>Bonus</div><div>Actions</div></div>
-        {state.labour.map((row, i) => <div key={i} className="grid grid-cols-5 gap-2 items-center">
-          <Input value={row.description} onChange={(e) => { const next=[...state.labour]; next[i]={...row,description:e.target.value}; setState({...state, labour:next}); }} placeholder="e.g., Grill prep" />
-          <Input type="number" value={row.hours} onChange={(e) => { const next=[...state.labour]; next[i]={...row,hours:N(e.target.value)}; setState({...state, labour:next}); }} placeholder="e.g., 1.5" />
-          <Input type="number" value={row.hourlyRate} onChange={(e) => { const next=[...state.labour]; next[i]={...row,hourlyRate:N(e.target.value)}; setState({...state, labour:next}); }} placeholder="e.g., 120" />
-          <Input type="number" value={row.bonus} onChange={(e) => { const next=[...state.labour]; next[i]={...row,bonus:N(e.target.value)}; setState({...state, labour:next}); }} placeholder="e.g., 20" />
-          <Button variant="outline" size="sm" onClick={() => setState({ ...state, labour: state.labour.filter((_, idx) => idx !== i) })}>Remove</Button>
-        </div>)}
-        <Button variant="outline" onClick={() => setState({ ...state, labour: [...state.labour, { description: "", hours: 0, hourlyRate: 0, bonus: 0 }] })}>Add Row</Button>
-      </CardContent></Card>
+        {renderLineTable("Ingredients", "ingredients")}
+        {renderLineTable("Packaging", "packaging")}
+      </div>
 
-      <Card><CardHeader><CardTitle>Other</CardTitle></CardHeader><CardContent className="space-y-2">
-        <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-slate-600"><div>Item Name</div><div>Cost</div><div>Actions</div></div>
-        {state.other.map((row, i) => <div key={i} className="grid grid-cols-3 gap-2 items-center">
-          <Input value={row.name} onChange={(e) => { const next=[...state.other]; next[i]={...row,name:e.target.value}; setState({...state, other:next}); }} placeholder="e.g., Cleaning materials" />
-          <Input type="number" value={row.cost} onChange={(e) => { const next=[...state.other]; next[i]={...row,cost:N(e.target.value)}; setState({...state, other:next}); }} placeholder="e.g., 15" />
-          <Button variant="outline" size="sm" onClick={() => setState({ ...state, other: state.other.filter((_, idx) => idx !== i) })}>Remove</Button>
-        </div>)}
-        <Button variant="outline" onClick={() => setState({ ...state, other: [...state.other, { name: "", cost: 0 }] })}>Add Row</Button>
-      </CardContent></Card>
-
-      <Card><CardHeader><CardTitle>Totals</CardTitle></CardHeader><CardContent className="grid grid-cols-2 gap-2 text-sm">
-        <div>Base Total per Recipe: {THB(baseTotalCostPerRecipe)}</div>
-        <div>Slippage ({slippagePercent.toFixed(2)}%): {THB(slippageAmount)}</div>
-        <div>Total Cost per Recipe: {THB(totalCostPerRecipe)}</div>
-        <div>Total Cost per Product: {THB(totalCostPerProduct)}</div>
-        <div>Ingredients Total: {THB(ingredientsCost)}</div>
-        <div>Packaging Total: {THB(packagingCost)}</div>
-        <div>Labour Total: {THB(labourCost)}</div>
-        <div>Other Total: {THB(otherCost)}</div>
-        <div>Profit per Product: {THB(profitPerProduct)}</div>
-        <div>Ingredient Cost %: {ingredientCostPct.toFixed(2)}%</div>
-        <div>Total Cost %: {totalCostPct.toFixed(2)}%</div>
-        <div>Profit Margin %: {profitMarginPct.toFixed(2)}%</div>
-      </CardContent></Card>
-
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-white/95 backdrop-blur p-3">
-        <div className="max-w-6xl mx-auto flex flex-wrap gap-2 items-center justify-between">
-          <div className="text-sm text-slate-600">Templates cannot be deleted.</div>
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-white/95 p-3 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2">
+          <Button variant="outline" onClick={() => navigate("/menu/recipes")}>Back</Button>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={reset} disabled={!hasChanges || saving}>Reset/Discard</Button>
-            <Button onClick={save} disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+            <Button variant="outline" onClick={downloadJson}>Download JSON</Button>
+            <Button variant="secondary" onClick={state.published ? unpublish : publish} disabled={publishing}>{publishing ? "Working..." : state.published ? "Unpublish" : "Publish"}</Button>
+            <Button onClick={save} disabled={saving || !hasChanges}>{saving ? "Saving..." : "Save"}</Button>
           </div>
         </div>
       </div>
     </div>
-  </div>;
+  );
 }

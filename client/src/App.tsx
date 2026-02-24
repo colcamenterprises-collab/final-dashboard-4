@@ -42,7 +42,6 @@ import Ingredients from "./pages/Ingredients";
 import Expenses from "./pages/Expenses";
 import ExpensesImport from "./pages/finance/ExpensesImport";
 import ExpensesV2 from "./pages/expenses/ExpensesV2";
-import MenuManager from "./pages/menu/MenuManager";
 import MenuManagement from "./pages/menu/MenuManagement";
 import MenuImport from "./pages/menu/MenuImport";
 import DescriptionTool from "./pages/menu/DescriptionTool";
@@ -205,7 +204,7 @@ export default function App() {
                 <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
                 <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
                 <Route path="/menu/ingredients/edit/:id" element={<Guard><IngredientEdit /></Guard>} />
-                <Route path={ROUTES.MENU_MGR} element={<Guard><MenuManager /></Guard>} />
+                <Route path={ROUTES.MENU_MGR} element={<Navigate to="/menu/recipes" replace />} />
                 <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
                 <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
                 <Route path={ROUTES.RECIPE_MANAGEMENT} element={<Navigate to="/menu/recipes" replace />} />

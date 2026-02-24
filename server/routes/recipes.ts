@@ -408,6 +408,8 @@ router.get('/v2', async (_req, res) => {
         salePrice: Number(row.suggested_price ?? 0),
         description: row.description ?? '',
         imageUrl: meta?.imageUrl || row.image_url || '',
+        published: Boolean(meta?.onlinePublishing?.published),
+        publishedAt: meta?.onlinePublishing?.publishedAt || null,
         updatedAt: row.updated_at,
       });
     }
@@ -449,6 +451,8 @@ router.get('/v2/:id', async (req, res) => {
       salePrice: Number(row.suggested_price ?? 0),
       description: row.description ?? '',
       imageUrl: meta.imageUrl || row.image_url || '',
+      published: Boolean(meta?.onlinePublishing?.published),
+      publishedAt: meta?.onlinePublishing?.publishedAt || null,
       servingsThisRecipeMakes: Number(meta.servingsThisRecipeMakes ?? 0),
       servingsPerProduct: Number(meta.servingsPerProduct ?? 0),
       productsMade: Number(meta.productsMade ?? 1) || 1,

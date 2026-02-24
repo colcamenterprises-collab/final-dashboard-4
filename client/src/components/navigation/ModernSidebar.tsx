@@ -125,8 +125,7 @@ const navigationGroups: NavGroup[] = [
     title: "Menu Management",
     items: [
       { to: "/recipe-management", label: "Recipe Management", icon: ChefHat, testId: "nav-recipe-management" },
-      { to: "/menu/manager", label: "Menu Manager", icon: ChefHat, testId: "nav-menu-manager" },
-      { to: "/menu-management/ingredients", label: "Ingredients", icon: ChefHat, testId: "nav-ingredients" }
+            { to: "/menu-management/ingredients", label: "Ingredients", icon: ChefHat, testId: "nav-ingredients" }
     ]
   },
   {

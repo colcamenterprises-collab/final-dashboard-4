@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { getLegacyMenuFromOnlineProducts, getOnlineProductsFlat, getOnlineProductsGrouped } from "../services/onlineProductFeed";
+import { pool } from "../db";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -17,6 +18,188 @@ const parseTimestamp = (value: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
+
+const RECIPE_META_PREFIX = "RECIPE_CALC_V2:";
+
+const parseRecipeMeta = (notes: string | null | undefined): Record<string, any> => {
+  if (!notes || !notes.startsWith(RECIPE_META_PREFIX)) return {};
+  try {
+    return JSON.parse(notes.slice(RECIPE_META_PREFIX.length));
+  } catch {
+    return {};
+  }
+};
+
+const buildRecipeMeta = (meta: Record<string, any>) => `${RECIPE_META_PREFIX}${JSON.stringify(meta ?? {})}`;
+
+const cleanMoney = (value: unknown) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+async function loadRecipeForPublish(recipeId: number) {
+  const result = await pool.query(
+    `SELECT id, name, description, category, suggested_price, image_url, notes
+     FROM recipes
+     WHERE id = $1
+     LIMIT 1`,
+    [recipeId],
+  );
+
+  if (!result.rows[0]) return null;
+  const row = result.rows[0];
+  const meta = parseRecipeMeta(row.notes);
+  const sku = String(meta?.sku ?? "").trim();
+  if (!sku) return null;
+
+  return {
+    id: Number(row.id),
+    name: String(row.name ?? ""),
+    description: String(row.description ?? ""),
+    category: String(row.category ?? "Unmapped"),
+    price: cleanMoney(row.suggested_price),
+    imageUrl: String(meta?.imageUrl || row.image_url || ""),
+    notes: String(row.notes ?? ""),
+    meta,
+    sku,
+  };
+}
+
+router.post("/online/products/upsert-from-recipe", async (req, res) => {
+  try {
+    const recipeId = Number(req.body?.recipeId);
+    if (!Number.isFinite(recipeId)) {
+      return res.status(400).json({ error: "recipeId is required" });
+    }
+
+    const recipe = await loadRecipeForPublish(recipeId);
+    if (!recipe) {
+      return res.status(404).json({ error: "Recipe not found or missing SKU" });
+    }
+
+    const publishedMeta = recipe.meta?.onlinePublishing ?? {};
+    const existingProductId = Number(publishedMeta?.productId ?? 0);
+
+    let productId = existingProductId;
+    let action: "created" | "updated" = "updated";
+
+    if (existingProductId > 0) {
+      const updated = await pool.query(
+        `UPDATE product
+         SET name = $2,
+             description = $3,
+             image_url = $4,
+             category = $5,
+             price_online = $6,
+             visible_online = true,
+             active = true
+         WHERE id = $1
+         RETURNING id`,
+        [existingProductId, recipe.name, recipe.description, recipe.imageUrl, recipe.category, recipe.price],
+      );
+
+      if (updated.rows[0]) {
+        productId = Number(updated.rows[0].id);
+      } else {
+        action = "created";
+      }
+    } else {
+      action = "created";
+    }
+
+    if (action === "created") {
+      const inserted = await pool.query(
+        `INSERT INTO product (
+           name,
+           description,
+           image_url,
+           category,
+           price_online,
+           visible_online,
+           active
+         )
+         VALUES ($1, $2, $3, $4, $5, true, true)
+         RETURNING id`,
+        [recipe.name, recipe.description, recipe.imageUrl, recipe.category, recipe.price],
+      );
+      productId = Number(inserted.rows[0].id);
+    }
+
+    const nextMeta = {
+      ...recipe.meta,
+      onlinePublishing: {
+        sku: recipe.sku,
+        productId,
+        published: true,
+        publishedAt: new Date().toISOString(),
+      },
+    };
+
+    await pool.query(
+      `UPDATE recipes
+       SET notes = $2,
+           updated_at = now()
+       WHERE id = $1`,
+      [recipe.id, buildRecipeMeta(nextMeta)],
+    );
+
+    res.json({ ok: true, productId, action });
+  } catch (error) {
+    console.error("Error upserting online product from recipe:", error);
+    res.status(500).json({ error: "Failed to publish recipe to online ordering" });
+  }
+});
+
+router.post("/online/products/unpublish-from-recipe", async (req, res) => {
+  try {
+    const recipeId = Number(req.body?.recipeId);
+    if (!Number.isFinite(recipeId)) {
+      return res.status(400).json({ error: "recipeId is required" });
+    }
+
+    const recipe = await loadRecipeForPublish(recipeId);
+    if (!recipe) {
+      return res.status(404).json({ error: "Recipe not found or missing SKU" });
+    }
+
+    const publishedMeta = recipe.meta?.onlinePublishing ?? {};
+    const productId = Number(publishedMeta?.productId ?? 0);
+
+    if (productId > 0) {
+      await pool.query(
+        `UPDATE product
+         SET active = false,
+             visible_online = false
+         WHERE id = $1`,
+        [productId],
+      );
+    }
+
+    const nextMeta = {
+      ...recipe.meta,
+      onlinePublishing: {
+        sku: recipe.sku,
+        productId: productId || null,
+        published: false,
+        publishedAt: recipe.meta?.onlinePublishing?.publishedAt ?? null,
+        unpublishedAt: new Date().toISOString(),
+      },
+    };
+
+    await pool.query(
+      `UPDATE recipes
+       SET notes = $2,
+           updated_at = now()
+       WHERE id = $1`,
+      [recipe.id, buildRecipeMeta(nextMeta)],
+    );
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Error unpublishing recipe from online ordering:", error);
+    res.status(500).json({ error: "Failed to unpublish recipe from online ordering" });
+  }
+});
 
 router.get("/online/products", async (_req, res) => {
   try {
