@@ -8,10 +8,7 @@ import {
 import { publishToMenu } from "./menuService";
 
 /**
- * ARCHITECTURE CONTRACT:
- * Recipes and Cost Calculator are standalone.
- * Do NOT import or query purchasing tables here.
- * Purchasing is a separate domain.
+ * ARCHITECTURE CONTRACT (LOCKED): Recipes/Costing are standalone. Do not import/query purchasing.
  */
 
 function toNumber(value: unknown): number | null {

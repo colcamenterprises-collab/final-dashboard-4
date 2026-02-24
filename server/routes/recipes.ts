@@ -1,8 +1,5 @@
 // Enhanced Recipes routes with comprehensive functionality
-// ARCHITECTURE CONTRACT:
-// Recipes and Cost Calculator are standalone.
-// Do NOT import or query purchasing tables here.
-// Purchasing is a separate domain.
+// ARCHITECTURE CONTRACT (LOCKED): Recipes/Costing are standalone. Do not import/query purchasing.
 
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
@@ -36,6 +33,80 @@ function cleanMoney(v: any) {
   const s = String(v).replace(/[^\d.\-]/g, "");
   const n = Number(s);
   return isFinite(n) ? n : 0;
+}
+
+const LOCKED_RECIPE_TEMPLATES = [
+  { name: "Cheesy Bacon Fries", sku: "10010", category: "Side Orders", salePrice: 119 },
+  { name: "Coleslaw with Bacon", sku: "10025", category: "Side Orders", salePrice: 99 },
+  { name: "Crispy Chicken Fillet Burger", sku: "10066", category: "Smash Burgers", salePrice: 169 },
+  { name: "Dirty Fries", sku: "10045", category: "Side Orders", salePrice: 249 },
+  { name: "Karaage Chicken Burger", sku: "10070", category: "Smash Burgers", salePrice: 249 },
+  { name: "Kids Double Cheeseburger", sku: "10017", category: "Kids Will Love This", salePrice: 189 },
+  { name: "Kids Single Cheeseburger", sku: "10015", category: "Kids Will Love This", salePrice: 149 },
+  { name: "Loaded Fries (Original)", sku: "10035", category: "Side Orders", salePrice: 170 },
+  { name: "Single Smash Burger", sku: "10004", category: "Smash Burgers", salePrice: 170 },
+  { name: "Super Double Bacon and Cheese", sku: "10019", category: "Smash Burgers", salePrice: 240 },
+  { name: "Triple Smash Burger", sku: "10009", category: "Smash Burgers", salePrice: 320 },
+  { name: "Ultimate Double", sku: "10006", category: "Smash Burgers", salePrice: 220 },
+] as const;
+
+const META_PREFIX = "RECIPE_CALC_V2:";
+
+function parseRecipeMeta(notes: string | null | undefined) {
+  if (!notes || !notes.startsWith(META_PREFIX)) return {} as any;
+  try {
+    return JSON.parse(notes.slice(META_PREFIX.length));
+  } catch {
+    return {} as any;
+  }
+}
+
+function buildRecipeMeta(meta: any) {
+  return `${META_PREFIX}${JSON.stringify(meta ?? {})}`;
+}
+
+async function seedLockedRecipeTemplates() {
+  await initTables();
+  for (const template of LOCKED_RECIPE_TEMPLATES) {
+    const notesPayload = buildRecipeMeta({
+      sku: template.sku,
+      servingsThisRecipeMakes: 0,
+      servingsPerProduct: 0,
+      productsMade: 1,
+      ingredients: [],
+      packaging: [],
+      labour: [],
+      other: [],
+      imageUrl: "",
+    });
+
+    const existing = await pool.query(`
+      SELECT id, notes FROM recipes
+      WHERE notes LIKE $1
+      ORDER BY id ASC
+      LIMIT 1
+    `, [`${META_PREFIX}%\"sku\":\"${template.sku}\"%`]);
+
+    if (existing.rows.length > 0) {
+      await pool.query(
+        `UPDATE recipes
+         SET name = $2, category = $3, suggested_price = $4,
+             notes = CASE WHEN notes LIKE $5 THEN notes ELSE $6 END,
+             updated_at = now(), is_active = true
+         WHERE id = $1`,
+        [existing.rows[0].id, template.name, template.category, template.salePrice, `${META_PREFIX}%`, notesPayload],
+      );
+      continue;
+    }
+
+    await pool.query(
+      `INSERT INTO recipes (
+        name, description, category, yield_quantity, yield_unit, ingredients,
+        total_cost, cost_per_serving, suggested_price, notes, image_url, is_active, created_at, updated_at
+      ) VALUES ($1, '', $2, 1, 'servings', '[]'::jsonb, 0, 0, $3, $4, '', true, now(), now())`,
+      [template.name, template.category, template.salePrice, notesPayload],
+    );
+  }
 }
 
 // Initialize enhanced recipes table
@@ -244,6 +315,142 @@ router.get('/card-generate/:id', async (req, res) => {
   } catch (error) {
     console.error('[/api/recipes/card-generate] Error:', error);
     res.status(500).json({ ok: false, error: 'Failed to generate recipe card' });
+  }
+});
+
+router.post('/init-templates', async (_req, res) => {
+  try {
+    await seedLockedRecipeTemplates();
+    res.json({ ok: true, count: LOCKED_RECIPE_TEMPLATES.length });
+  } catch (error) {
+    console.error('[recipes/init-templates] Error:', error);
+    res.status(500).json({ ok: false, error: 'Failed to initialize templates' });
+  }
+});
+
+router.get('/v2', async (_req, res) => {
+  try {
+    await seedLockedRecipeTemplates();
+    const rowsResult = await pool.query(`
+      SELECT id, name, description, category, suggested_price, notes, image_url, updated_at
+      FROM recipes
+      WHERE notes LIKE $1
+      ORDER BY name ASC
+    `, [`${META_PREFIX}%`]);
+
+    const recipes = rowsResult.rows
+      .map((row) => {
+        const meta = parseRecipeMeta(row.notes);
+        const sku = meta?.sku;
+        if (!sku || !LOCKED_RECIPE_TEMPLATES.some((t) => t.sku === sku)) {
+          return null;
+        }
+        return {
+          id: row.id,
+          name: row.name,
+          sku,
+          category: row.category,
+          salePrice: Number(row.suggested_price ?? 0),
+          description: row.description ?? '',
+          imageUrl: meta?.imageUrl || row.image_url || '',
+          updatedAt: row.updated_at,
+        };
+      })
+      .filter(Boolean);
+
+    res.json(recipes);
+  } catch (error) {
+    console.error('[recipes/v2] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch recipes v2' });
+  }
+});
+
+router.get('/v2/:id', async (req, res) => {
+  try {
+    await seedLockedRecipeTemplates();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+    const result = await pool.query(`
+      SELECT id, name, description, category, suggested_price, notes, image_url
+      FROM recipes
+      WHERE id = $1
+      LIMIT 1
+    `, [id]);
+    const row = result.rows[0];
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    const meta = parseRecipeMeta(row.notes);
+    if (!meta?.sku || !LOCKED_RECIPE_TEMPLATES.some((t) => t.sku === meta.sku)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+    res.json({
+      id: row.id,
+      name: row.name,
+      sku: meta.sku,
+      category: row.category,
+      salePrice: Number(row.suggested_price ?? 0),
+      description: row.description ?? '',
+      imageUrl: meta.imageUrl || row.image_url || '',
+      servingsThisRecipeMakes: Number(meta.servingsThisRecipeMakes ?? 0),
+      servingsPerProduct: Number(meta.servingsPerProduct ?? 0),
+      productsMade: Number(meta.productsMade ?? 1) || 1,
+      ingredients: Array.isArray(meta.ingredients) ? meta.ingredients : [],
+      packaging: Array.isArray(meta.packaging) ? meta.packaging : [],
+      labour: Array.isArray(meta.labour) ? meta.labour : [],
+      other: Array.isArray(meta.other) ? meta.other : [],
+    });
+  } catch (error) {
+    console.error('[recipes/v2/:id] Error:', error);
+    res.status(500).json({ error: 'Failed to fetch recipe v2' });
+  }
+});
+
+router.put('/v2/:id', async (req, res) => {
+  try {
+    await seedLockedRecipeTemplates();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
+    const source = await pool.query('SELECT notes FROM recipes WHERE id = $1 LIMIT 1', [id]);
+    const current = source.rows[0];
+    if (!current) return res.status(404).json({ error: 'Not found' });
+    const currentMeta = parseRecipeMeta(current.notes);
+    if (!currentMeta?.sku || !LOCKED_RECIPE_TEMPLATES.some((t) => t.sku === currentMeta.sku)) {
+      return res.status(404).json({ error: 'Not found' });
+    }
+
+    const payload = req.body ?? {};
+    const nextMeta = {
+      ...currentMeta,
+      sku: currentMeta.sku,
+      imageUrl: String(payload.imageUrl ?? currentMeta.imageUrl ?? ''),
+      servingsThisRecipeMakes: Number(payload.servingsThisRecipeMakes ?? currentMeta.servingsThisRecipeMakes ?? 0),
+      servingsPerProduct: Number(payload.servingsPerProduct ?? currentMeta.servingsPerProduct ?? 0),
+      productsMade: Number(payload.productsMade ?? currentMeta.productsMade ?? 1) || 1,
+      ingredients: Array.isArray(payload.ingredients) ? payload.ingredients : (currentMeta.ingredients ?? []),
+      packaging: Array.isArray(payload.packaging) ? payload.packaging : (currentMeta.packaging ?? []),
+      labour: Array.isArray(payload.labour) ? payload.labour : (currentMeta.labour ?? []),
+      other: Array.isArray(payload.other) ? payload.other : (currentMeta.other ?? []),
+    };
+
+    await pool.query(
+      `UPDATE recipes
+       SET name = $2, category = $3, description = $4, suggested_price = $5,
+           image_url = $6, notes = $7, updated_at = now()
+       WHERE id = $1`,
+      [
+        id,
+        String(payload.name ?? ''),
+        String(payload.category ?? ''),
+        String(payload.description ?? ''),
+        cleanMoney(payload.salePrice ?? 0),
+        String(payload.imageUrl ?? ''),
+        buildRecipeMeta(nextMeta),
+      ],
+    );
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('[recipes/v2/:id] Save error:', error);
+    res.status(500).json({ error: 'Failed to save recipe v2' });
   }
 });
 
