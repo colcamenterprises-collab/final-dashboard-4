@@ -1128,16 +1128,9 @@ export class MemStorage implements IStorage {
     let totalCost = 0;
 
     for (const ri of recipeIngredients) {
-      const ingredient = this.ingredients.get(ri.ingredientId);
-      if (ingredient) {
-        const unitPrice = parseFloat(ingredient.unitPrice);
-        const packageSize = parseFloat(ingredient.packageSize);
-        const quantity = parseFloat(ri.quantity);
-        
-        // Calculate cost per unit
-        const costPerUnit = unitPrice / packageSize;
-        const ingredientCost = costPerUnit * quantity;
-        totalCost += ingredientCost;
+      const lineCost = parseFloat(ri.cost);
+      if (!isNaN(lineCost)) {
+        totalCost += lineCost;
       }
     }
 
