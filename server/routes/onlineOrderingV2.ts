@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
-import { getLegacyMenuFromOnlineProducts, getOnlineProductsFlat, getOnlineProductsGrouped } from "../services/onlineProductFeed";
+import { getLegacyMenuFromOnlineProducts } from "../services/onlineProductFeed";
 import { pool } from "../db";
+import { listPublishedCatalogItems } from "../services/onlineCatalogService";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -241,7 +242,26 @@ router.post("/online/products/unpublish-from-recipe", async (req, res) => {
 
 router.get("/online/products", async (_req, res) => {
   try {
-    const categories = await getOnlineProductsGrouped();
+    const items = await listPublishedCatalogItems();
+    const grouped = new Map<string, Array<any>>();
+    for (const item of items) {
+      const category = (item.category || "Unmapped").trim() || "Unmapped";
+      const existing = grouped.get(category) || [];
+      existing.push({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        image: item.imageUrl,
+        price: item.price,
+        category,
+      });
+      grouped.set(category, existing);
+    }
+
+    const categories = Array.from(grouped.entries()).map(([name, categoryItems]) => ({
+      name,
+      items: categoryItems,
+    }));
     res.json({ categories });
   } catch (error) {
     console.error("Error fetching online products:", error);
@@ -270,7 +290,7 @@ router.post("/online/orders", async (req, res) => {
       return res.status(400).json({ error: "timestamp must be a valid ISO string" });
     }
 
-    const onlineProducts = await getOnlineProductsFlat();
+    const onlineProducts = await listPublishedCatalogItems();
     const productMap = new Map<number, (typeof onlineProducts)[number]>();
     for (const product of onlineProducts) {
       productMap.set(product.id, product);
@@ -306,12 +326,12 @@ router.post("/online/orders", async (req, res) => {
         continue;
       }
 
-      if (!Number.isFinite(product.priceOnline)) {
+      if (!Number.isFinite(product.price)) {
         errors.push({ productId, error: "Online price is invalid" });
         continue;
       }
 
-      const priceOnline = product.priceOnline as number;
+      const priceOnline = product.price as number;
       if (!Number.isFinite(priceAtTime) || priceAtTime !== priceOnline) {
         errors.push({ productId, error: "Price mismatch. Refresh menu before checkout." });
         continue;

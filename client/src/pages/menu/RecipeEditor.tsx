@@ -106,7 +106,7 @@ export default function RecipeEditorPage() {
   const imageUploadRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
-  const [publishing, setPublishing] = useState(false);
+  const [addingToCatalog, setAddingToCatalog] = useState(false);
 
   const { data, isLoading, refetch } = useQuery<RecipePayload>({
     queryKey: ["recipe-v2", id],
@@ -174,56 +174,29 @@ export default function RecipeEditorPage() {
     }
   };
 
-  const publish = async () => {
-    setPublishing(true);
+  const addToOnlineCatalog = async () => {
+    setAddingToCatalog(true);
     try {
-      const res = await fetch("/api/online/products/upsert-from-recipe", {
+      const res = await fetch(`/api/catalog/from-recipe/${state.id}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ recipeId: state.id }),
       });
       const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error || "Publish failed");
-
-      const verifyRes = await fetch("/api/online/products");
-      const verifyPayload = await verifyRes.json().catch(() => ({}));
-      if (!verifyRes.ok) throw new Error(verifyPayload?.error || "Unable to verify online products");
-
-      const categories = Array.isArray(verifyPayload?.categories) ? verifyPayload.categories : [];
-      const found = categories.some((cat: any) => Array.isArray(cat?.items) && cat.items.some((item: any) => Number(item?.id) === Number(payload?.productId)));
-      if (!found) throw new Error("Published product did not appear in /api/online/products");
-
-      console.log("[Recipe Publish] Product synced", { productId: payload?.productId, action: payload?.action, recipeId: state.id });
-      setState({ ...state, published: true });
+      if (!res.ok) throw new Error(payload?.error || "Failed to add recipe to online catalog");
       toast({
-        title: "Recipe Published",
-        description: "Recipe is now live in Online Ordering.",
+        title: "Added to Online Catalog",
+        description: "Recipe has been synced to Online Ordering Catalog.",
         variant: "success" as any,
-        duration: 3500,
+        duration: 3000,
       });
     } catch (e: any) {
-      toast({ title: "Publish Failed", description: e?.message || "Publish failed", variant: "destructive", duration: 4000 });
-    } finally {
-      setPublishing(false);
-    }
-  };
-
-  const unpublish = async () => {
-    setPublishing(true);
-    try {
-      const res = await fetch(`/api/recipes/v2/${id}/publish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ published: false }),
+      toast({
+        title: "Add to Catalog Failed",
+        description: e?.message || "Failed to add recipe to online catalog",
+        variant: "destructive",
+        duration: 4000,
       });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error || "Unpublish failed");
-      setState({ ...state, published: false });
-      toast({ title: "Recipe unpublished", description: "Recipe is no longer visible online.", duration: 3000 });
-    } catch (e: any) {
-      toast({ title: "Unpublish failed", description: e?.message || "Unpublish failed", variant: "destructive" });
     } finally {
-      setPublishing(false);
+      setAddingToCatalog(false);
     }
   };
 
@@ -359,10 +332,10 @@ export default function RecipeEditorPage() {
             <Button
               variant="secondary"
               className="rounded-xl bg-indigo-700 text-white hover:bg-indigo-600 disabled:bg-indigo-300 disabled:text-white"
-              onClick={state.published ? unpublish : publish}
-              disabled={publishing}
+              onClick={addToOnlineCatalog}
+              disabled={addingToCatalog}
             >
-              {publishing ? "Working..." : state.published ? "Unpublish" : "Publish"}
+              {addingToCatalog ? "Working..." : "Add to Online Catalog"}
             </Button>
             <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400 disabled:text-white" onClick={save} disabled={saving || !hasChanges}>{saving ? "Saving..." : "Save"}</Button>
           </div>
@@ -375,8 +348,8 @@ export default function RecipeEditorPage() {
             <div className="space-y-4">
               <div className="flex flex-wrap items-start gap-3">
                 <h1 className="text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">{state.name}</h1>
-                <Badge className={`rounded-full px-3 py-1 ${state.published ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                  {state.published ? "Published" : "Draft"}
+                <Badge className="rounded-full px-3 py-1 bg-slate-100 text-slate-700">
+                  Online Catalog Source: Recipe
                 </Badge>
                 <Badge variant="outline" className="rounded-full border-slate-300 bg-slate-50 px-3 py-1 text-slate-700">{state.category || "Unmapped"}</Badge>
               </div>
