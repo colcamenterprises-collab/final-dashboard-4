@@ -57,7 +57,7 @@ async function loadRecipeForPublish(recipeId: number) {
     name: String(row.name ?? ""),
     description: String(row.description ?? ""),
     category: String(row.category ?? "Unmapped"),
-    price: cleanMoney(row.suggested_price),
+    price: cleanMoney(meta?.pricing?.directPrice ?? row.suggested_price),
     imageUrl: String(meta?.imageUrl || row.image_url || ""),
     notes: String(row.notes ?? ""),
     meta,
@@ -91,6 +91,7 @@ router.post("/online/products/upsert-from-recipe", async (req, res) => {
              image_url = $4,
              category = $5,
              price_online = $6,
+             price_in_store = $6,
              visible_online = true,
              active = true
          WHERE id = $1
@@ -123,7 +124,43 @@ router.post("/online/products/upsert-from-recipe", async (req, res) => {
         [recipe.name, recipe.description, recipe.imageUrl, recipe.category, recipe.price],
       );
       productId = Number(inserted.rows[0].id);
+
+      await pool.query(
+        `UPDATE product
+         SET price_in_store = $2
+         WHERE id = $1`,
+        [productId, recipe.price],
+      );
     }
+
+    await pool.query(
+      `UPDATE product_price
+       SET price = $3
+       WHERE product_id = $1 AND channel = $2`,
+      [productId, 'ONLINE', recipe.price],
+    );
+
+    await pool.query(
+      `INSERT INTO product_price (product_id, channel, price)
+       SELECT $1, 'ONLINE', $2
+       WHERE NOT EXISTS (SELECT 1 FROM product_price WHERE product_id = $1 AND channel = 'ONLINE')`,
+      [productId, recipe.price],
+    );
+
+    await pool.query(
+      `UPDATE product_menu
+       SET category = $2,
+           visible_online = true
+       WHERE product_id = $1`,
+      [productId, recipe.category],
+    );
+
+    await pool.query(
+      `INSERT INTO product_menu (product_id, category, sort_order, visible_in_store, visible_grab, visible_online)
+       SELECT $1, $2, 0, false, false, true
+       WHERE NOT EXISTS (SELECT 1 FROM product_menu WHERE product_id = $1)`,
+      [productId, recipe.category],
+    );
 
     const nextMeta = {
       ...recipe.meta,
@@ -143,6 +180,7 @@ router.post("/online/products/upsert-from-recipe", async (req, res) => {
       [recipe.id, buildRecipeMeta(nextMeta)],
     );
 
+    console.log("[online/products/upsert-from-recipe] synced", { recipeId, productId, action });
     res.json({ ok: true, productId, action });
   } catch (error) {
     console.error("Error upserting online product from recipe:", error);

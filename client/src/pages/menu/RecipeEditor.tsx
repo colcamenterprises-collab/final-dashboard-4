@@ -1,11 +1,12 @@
 import React, { useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Pie, PieChart, ResponsiveContainer, Tooltip, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 const THB = (n: number) => new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 }).format(n || 0);
 const N = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -42,6 +43,9 @@ type RecipePayload = {
   packaging: Line[];
   labour: LabourLine[];
   other: OtherLine[];
+  grabPrice?: number;
+  grabFeePercent?: number;
+  directPrice?: number;
   published?: boolean;
 };
 
@@ -71,6 +75,9 @@ const normalizePayload = (payload: RecipePayload): RecipePayload => ({
   packaging: (payload.packaging || []).map(normalizeLine),
   labour: payload.labour || [],
   other: payload.other || [],
+  directPrice: N(payload.directPrice ?? payload.salePrice),
+  grabPrice: N(payload.grabPrice),
+  grabFeePercent: N(payload.grabFeePercent),
 });
 
 const newLine = (): Line => normalizeLine({ name: "" });
@@ -97,6 +104,7 @@ export default function RecipeEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const imageUploadRef = useRef<HTMLInputElement | null>(null);
+  const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
 
@@ -134,6 +142,12 @@ export default function RecipeEditorPage() {
   const totalCostPct = N(state.salePrice) > 0 ? (totalCostPerProduct / N(state.salePrice)) * 100 : 0;
   const marginPct = N(state.salePrice) > 0 ? (profitPerProduct / N(state.salePrice)) * 100 : 0;
 
+  const directPrice = N(state.directPrice ?? state.salePrice);
+  const grabPrice = N(state.grabPrice);
+  const grabFeePercent = N(state.grabFeePercent);
+  const netGrabAfterFees = grabPrice * (1 - grabFeePercent / 100);
+  const netDirectAfterFees = directPrice;
+
   const breakdownData = [
     { name: "Ingredients", value: ingredientsCost, color: "#0f766e" },
     { name: "Packaging", value: packagingCost, color: "#2563eb" },
@@ -147,13 +161,14 @@ export default function RecipeEditorPage() {
       const res = await fetch(`/api/recipes/v2/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(state),
+        body: JSON.stringify({ ...state, salePrice: directPrice, directPrice }),
       });
-      if (!res.ok) throw new Error("Save failed");
-      alert("Recipe saved");
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Save failed");
+      toast({ title: "Recipe saved", description: "Your recipe changes have been saved.", variant: "success" as any, duration: 3000 });
       await refetch();
     } catch (e: any) {
-      alert(e?.message || "Save failed");
+      toast({ title: "Save failed", description: e?.message || "Save failed", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -167,11 +182,27 @@ export default function RecipeEditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ recipeId: state.id }),
       });
-      if (!res.ok) throw new Error("Publish failed");
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Publish failed");
+
+      const verifyRes = await fetch("/api/online/products");
+      const verifyPayload = await verifyRes.json().catch(() => ({}));
+      if (!verifyRes.ok) throw new Error(verifyPayload?.error || "Unable to verify online products");
+
+      const categories = Array.isArray(verifyPayload?.categories) ? verifyPayload.categories : [];
+      const found = categories.some((cat: any) => Array.isArray(cat?.items) && cat.items.some((item: any) => Number(item?.id) === Number(payload?.productId)));
+      if (!found) throw new Error("Published product did not appear in /api/online/products");
+
+      console.log("[Recipe Publish] Product synced", { productId: payload?.productId, action: payload?.action, recipeId: state.id });
       setState({ ...state, published: true });
-      alert("Published successfully");
+      toast({
+        title: "Recipe Published",
+        description: "Recipe is now live in Online Ordering.",
+        variant: "success" as any,
+        duration: 3500,
+      });
     } catch (e: any) {
-      alert(e?.message || "Publish failed");
+      toast({ title: "Publish Failed", description: e?.message || "Publish failed", variant: "destructive", duration: 4000 });
     } finally {
       setPublishing(false);
     }
@@ -185,11 +216,12 @@ export default function RecipeEditorPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ published: false }),
       });
-      if (!res.ok) throw new Error("Unpublish failed");
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Unpublish failed");
       setState({ ...state, published: false });
-      alert("Unpublished successfully");
+      toast({ title: "Recipe unpublished", description: "Recipe is no longer visible online.", duration: 3000 });
     } catch (e: any) {
-      alert(e?.message || "Unpublish failed");
+      toast({ title: "Unpublish failed", description: e?.message || "Unpublish failed", variant: "destructive" });
     } finally {
       setPublishing(false);
     }
@@ -221,19 +253,19 @@ export default function RecipeEditorPage() {
           <h3 className="text-xl font-semibold text-slate-900">{title}</h3>
           <p className="mt-1 text-xs text-slate-500">Pack unit = what you buy. Recipe unit = what you use in the recipe.</p>
         </div>
-        <Button variant="outline" className="rounded-xl" onClick={() => setState({ ...state, [key]: [...state[key], newLine()] })}>
+        <Button variant="outline" className="rounded-xl text-slate-800" onClick={() => setState({ ...state, [key]: [...state[key], newLine()] })}>
           Add row
         </Button>
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
-        <table className="w-full min-w-[980px] border-collapse text-sm">
+        <table className="w-full min-w-[1100px] border-collapse text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
-              <th className="px-3 py-3 text-left">Name</th>
+              <th className="min-w-[240px] px-3 py-3 text-left">Name</th>
               <th className="px-3 py-3 text-left">Pack size</th>
               <th className="px-3 py-3 text-left">Pack unit</th>
-              <th className="px-3 py-3 text-left">Pack price</th>
+              <th className="px-3 py-3 text-left">Pack price (THB)</th>
               <th className="px-3 py-3 text-left">Recipe qty</th>
               <th className="px-3 py-3 text-left">Recipe unit</th>
               <th className="px-3 py-3 text-left">Cost</th>
@@ -243,20 +275,25 @@ export default function RecipeEditorPage() {
           <tbody>
             {state[key].map((row, i) => (
               <tr key={`${title}-${i}`} className="border-t border-slate-100 even:bg-slate-50/50">
-                <td className="p-2">
-                  <Input value={row.name} placeholder="Ingredient name" onChange={(e) => {
+                <td className="p-2 min-w-[240px]">
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Ingredient name</label>
+                  <Input value={row.name} placeholder="e.g. Cheese" onChange={(e) => {
                     const next = [...state[key]];
                     next[i] = { ...row, name: e.target.value };
                     setState({ ...state, [key]: next });
                   }} className="h-10 rounded-xl" />
                 </td>
-                <td className="p-2"><Input type="number" value={row.packSize} placeholder="0" onChange={(e) => {
-                  const next = [...state[key]];
-                  next[i] = { ...row, packSize: N(e.target.value) };
-                  setState({ ...state, [key]: next });
-                }} className="h-10 rounded-xl" /></td>
                 <td className="p-2">
-                  <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3" value={row.packUnit} onChange={(e) => {
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Pack size</label>
+                  <Input type="number" value={row.packSize} placeholder="e.g. 1000" onChange={(e) => {
+                    const next = [...state[key]];
+                    next[i] = { ...row, packSize: N(e.target.value) };
+                    setState({ ...state, [key]: next });
+                  }} className="h-10 rounded-xl" />
+                </td>
+                <td className="p-2">
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Pack unit</label>
+                  <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-slate-800" value={row.packUnit} onChange={(e) => {
                     const next = [...state[key]];
                     next[i] = { ...row, packUnit: asUnit(e.target.value) };
                     setState({ ...state, [key]: next });
@@ -265,18 +302,25 @@ export default function RecipeEditorPage() {
                     {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
                   </select>
                 </td>
-                <td className="p-2"><Input type="number" value={row.packPrice} placeholder="0" onChange={(e) => {
-                  const next = [...state[key]];
-                  next[i] = { ...row, packPrice: N(e.target.value) };
-                  setState({ ...state, [key]: next });
-                }} className="h-10 rounded-xl" /></td>
-                <td className="p-2"><Input type="number" value={row.recipeQty} placeholder="0" onChange={(e) => {
-                  const next = [...state[key]];
-                  next[i] = { ...row, recipeQty: N(e.target.value) };
-                  setState({ ...state, [key]: next });
-                }} className="h-10 rounded-xl" /></td>
                 <td className="p-2">
-                  <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3" value={row.recipeUnit} onChange={(e) => {
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Pack price</label>
+                  <Input type="number" value={row.packPrice} placeholder="e.g. 220" onChange={(e) => {
+                    const next = [...state[key]];
+                    next[i] = { ...row, packPrice: N(e.target.value) };
+                    setState({ ...state, [key]: next });
+                  }} className="h-10 rounded-xl" />
+                </td>
+                <td className="p-2">
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Recipe qty</label>
+                  <Input type="number" value={row.recipeQty} placeholder="e.g. 50" onChange={(e) => {
+                    const next = [...state[key]];
+                    next[i] = { ...row, recipeQty: N(e.target.value) };
+                    setState({ ...state, [key]: next });
+                  }} className="h-10 rounded-xl" />
+                </td>
+                <td className="p-2">
+                  <label className="mb-1 block text-[11px] font-medium text-slate-500">Recipe unit</label>
+                  <select className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-slate-800" value={row.recipeUnit} onChange={(e) => {
                     const next = [...state[key]];
                     next[i] = { ...row, recipeUnit: asUnit(e.target.value) };
                     setState({ ...state, [key]: next });
@@ -287,7 +331,7 @@ export default function RecipeEditorPage() {
                 </td>
                 <td className="p-2 text-sm font-semibold text-slate-700">{THB(getLineCost(row))}</td>
                 <td className="p-2">
-                  <Button size="sm" variant="outline" onClick={() => setState({ ...state, [key]: state[key].filter((_, idx) => idx !== i) })}>
+                  <Button size="sm" variant="outline" className="text-slate-800" onClick={() => setState({ ...state, [key]: state[key].filter((_, idx) => idx !== i) })}>
                     Remove
                   </Button>
                 </td>
@@ -304,18 +348,23 @@ export default function RecipeEditorPage() {
       <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
           <div className="flex items-center gap-2 text-sm">
-            <Button variant="outline" className="rounded-xl" onClick={() => navigate("/menu/recipes")}>Back</Button>
+            <Button variant="outline" className="rounded-xl text-slate-800 hover:text-slate-900" onClick={() => navigate("/menu/recipes")}>Back</Button>
             <span className="text-slate-400">/</span>
             <span className="text-slate-500">Recipes</span>
             <span className="text-slate-400">/</span>
             <span className="font-medium text-slate-800">{state.sku || state.name}</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" className="rounded-xl" onClick={downloadJson}>Download</Button>
-            <Button variant="secondary" className="rounded-xl" onClick={state.published ? unpublish : publish} disabled={publishing}>
+            <Button variant="outline" className="rounded-xl border-slate-300 bg-white text-slate-800 hover:bg-slate-100" onClick={downloadJson}>Download</Button>
+            <Button
+              variant="secondary"
+              className="rounded-xl bg-indigo-700 text-white hover:bg-indigo-600 disabled:bg-indigo-300 disabled:text-white"
+              onClick={state.published ? unpublish : publish}
+              disabled={publishing}
+            >
               {publishing ? "Working..." : state.published ? "Unpublish" : "Publish"}
             </Button>
-            <Button className="rounded-xl" onClick={save} disabled={saving || !hasChanges}>{saving ? "Saving..." : "Save"}</Button>
+            <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400 disabled:text-white" onClick={save} disabled={saving || !hasChanges}>{saving ? "Saving..." : "Save"}</Button>
           </div>
         </div>
       </div>
@@ -345,13 +394,13 @@ export default function RecipeEditorPage() {
 
             <div className="space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               {state.imageUrl ? (
-                <img src={state.imageUrl} alt={state.name} className="h-52 w-full rounded-xl border border-slate-200 object-cover" />
+                <img src={state.imageUrl} alt={state.name} className="aspect-[16/10] w-full max-w-[420px] rounded-xl border border-slate-200 object-cover" />
               ) : (
-                <div className="flex h-52 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-xs text-slate-500">No image</div>
+                <div className="aspect-[16/10] w-full max-w-[420px] flex items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-xs text-slate-500">No image</div>
               )}
               <div className="grid gap-2 sm:grid-cols-2">
-                <Button type="button" variant="outline" className="rounded-xl" onClick={() => imageUploadRef.current?.click()}>Upload image</Button>
-                <Button type="button" variant="outline" className="rounded-xl" onClick={() => setState({ ...state, imageUrl: "" })}>Clear image</Button>
+                <Button type="button" variant="outline" className="rounded-xl text-slate-800" onClick={() => imageUploadRef.current?.click()}>Upload image</Button>
+                <Button type="button" variant="outline" className="rounded-xl text-slate-800" onClick={() => setState({ ...state, imageUrl: "" })}>Clear image</Button>
               </div>
               <input ref={imageUploadRef} type="file" className="hidden" accept="image/*" onChange={(e) => onUploadImage(e.target.files?.[0])} />
               <div>
@@ -362,22 +411,109 @@ export default function RecipeEditorPage() {
           </div>
         </section>
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          {[
-            { label: "Total Cost per Product", value: THB(totalCostPerProduct) },
-            { label: "Profit per Product", value: THB(profitPerProduct) },
-            { label: "Margin %", value: `${marginPct.toFixed(2)}%` },
-            { label: "Ingredient Cost %", value: `${ingredientCostPct.toFixed(2)}%` },
-            { label: "Total Cost %", value: `${totalCostPct.toFixed(2)}%` },
-          ].map((item) => (
-            <div key={item.label} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</div>
-              <div className="mt-2 text-2xl font-bold text-slate-900">{item.value}</div>
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <h3 className="text-xl font-semibold text-slate-900">Recipe settings</h3>
+          <p className="mt-1 text-xs text-slate-500">Slippage % is applied globally on top of the total recipe cost.</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Category</label>
+              <Input value={state.category} onChange={(e) => setState({ ...state, category: e.target.value })} className="h-10 rounded-xl" placeholder="e.g. Burgers" />
             </div>
-          ))}
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Sale price (Direct price base)</label>
+              <Input type="number" value={state.salePrice} onChange={(e) => setState({ ...state, salePrice: N(e.target.value), directPrice: N(e.target.value) })} className="h-10 rounded-xl" placeholder="e.g. 199" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Products made / yield</label>
+              <Input type="number" value={state.productsMade} onChange={(e) => setState({ ...state, productsMade: N(e.target.value) || 1 })} className="h-10 rounded-xl" placeholder="e.g. 10" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Slippage % (global)</label>
+              <Input type="number" value={state.slippagePercent} onChange={(e) => setState({ ...state, slippagePercent: N(e.target.value) })} className="h-10 rounded-xl" placeholder="e.g. 3" />
+            </div>
+          </div>
         </section>
 
-        <section className="grid gap-4 xl:grid-cols-3">
+        {renderLineTable("Ingredients", "ingredients")}
+        {renderLineTable("Packaging", "packaging")}
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-slate-900">Labour</h3>
+            <Button variant="outline" className="rounded-xl text-slate-800" onClick={() => setState({ ...state, labour: [...state.labour, newLabourLine()] })}>Add row</Button>
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Description</th><th className="px-3 py-3 text-left">Hours</th><th className="px-3 py-3 text-left">Hourly rate</th><th className="px-3 py-3 text-left">Bonus</th><th className="px-3 py-3 text-left">Cost</th><th className="px-3 py-3 text-left">Action</th></tr></thead>
+              <tbody>
+                {state.labour.map((line, i) => (
+                  <tr key={`labour-${i}`} className="border-t border-slate-100 even:bg-slate-50/50">
+                    <td className="p-2"><Input value={line.description} onChange={(e) => { const next=[...state.labour]; next[i]={...line,description:e.target.value}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" placeholder="e.g. Prep shift" /></td>
+                    <td className="p-2"><Input type="number" value={line.hours} onChange={(e) => { const next=[...state.labour]; next[i]={...line,hours:N(e.target.value)}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" placeholder="e.g. 1.5" /></td>
+                    <td className="p-2"><Input type="number" value={line.hourlyRate} onChange={(e) => { const next=[...state.labour]; next[i]={...line,hourlyRate:N(e.target.value)}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" placeholder="e.g. 120" /></td>
+                    <td className="p-2"><Input type="number" value={line.bonus} onChange={(e) => { const next=[...state.labour]; next[i]={...line,bonus:N(e.target.value)}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" placeholder="e.g. 0" /></td>
+                    <td className="p-2 font-semibold">{THB(N(line.hours) * N(line.hourlyRate) + N(line.bonus))}</td>
+                    <td className="p-2"><Button size="sm" variant="outline" className="text-slate-800" onClick={() => setState({ ...state, labour: state.labour.filter((_, idx) => idx !== i) })}>Remove</Button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <h3 className="text-xl font-semibold text-slate-900">Pricing & Fees</h3>
+          <p className="mt-1 text-xs text-slate-500">Compare channel pricing so net values align after platform fees.</p>
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <h4 className="text-base font-semibold text-slate-900">GrabFood</h4>
+              <div className="mt-3 grid gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Grab price (THB)</label>
+                  <Input type="number" value={state.grabPrice ?? 0} onChange={(e) => setState({ ...state, grabPrice: N(e.target.value) })} placeholder="e.g. 229" className="h-10 rounded-xl bg-white" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Grab fee %</label>
+                  <Input type="number" value={state.grabFeePercent ?? 0} onChange={(e) => setState({ ...state, grabFeePercent: N(e.target.value) })} placeholder="e.g. 30" className="h-10 rounded-xl bg-white" />
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Net after fees</div>
+                  <div className="mt-1 text-lg font-bold text-slate-900">{THB(netGrabAfterFees)}</div>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <h4 className="text-base font-semibold text-slate-900">Direct</h4>
+              <div className="mt-3 grid gap-3">
+                <div>
+                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Direct price (THB)</label>
+                  <Input type="number" value={state.directPrice ?? state.salePrice} onChange={(e) => setState({ ...state, directPrice: N(e.target.value), salePrice: N(e.target.value) })} placeholder="e.g. 199" className="h-10 rounded-xl bg-white" />
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Net after fees</div>
+                  <div className="mt-1 text-lg font-bold text-slate-900">{THB(netDirectAfterFees)}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            {[
+              { label: "Total Cost per Product", value: THB(totalCostPerProduct) },
+              { label: "Profit per Product", value: THB(profitPerProduct) },
+              { label: "Margin %", value: `${marginPct.toFixed(2)}%` },
+              { label: "Ingredient Cost %", value: `${ingredientCostPct.toFixed(2)}%` },
+              { label: "Total Cost %", value: `${totalCostPct.toFixed(2)}%` },
+            ].map((item) => (
+              <div key={item.label} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</div>
+                <div className="mt-2 text-2xl font-bold text-slate-900">{item.value}</div>
+              </div>
+            ))}
+          </div>
+
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
             <h3 className="text-lg font-semibold text-slate-900">Cost breakdown</h3>
             <div className="mt-3 h-64">
@@ -390,121 +526,6 @@ export default function RecipeEditorPage() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
-              {breakdownData.map((item) => (
-                <div key={item.name} className="flex items-center gap-2 rounded-lg bg-slate-50 p-2">
-                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span>{item.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Profit vs Cost</h3>
-            <div className="mt-3 h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[{ name: "Per Product", cost: totalCostPerProduct, profit: Math.max(profitPerProduct, 0) }]} margin={{ left: 0, right: 8, top: 8, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" tick={{ fill: "#475569", fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fill: "#475569", fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v: any) => THB(Number(v))} />
-                  <Bar dataKey="cost" fill="#f97316" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="profit" fill="#10b981" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h3 className="text-lg font-semibold text-slate-900">Performance bars</h3>
-            <div className="mt-4 space-y-4">
-              {[
-                { label: "Cost %", value: totalCostPct, color: "#f97316" },
-                { label: "Profit Margin %", value: marginPct, color: "#10b981" },
-              ].map((bar) => (
-                <div key={bar.label}>
-                  <div className="mb-1 flex items-center justify-between text-sm text-slate-600">
-                    <span>{bar.label}</span>
-                    <span className="font-semibold text-slate-800">{bar.value.toFixed(2)}%</span>
-                  </div>
-                  <div className="h-3 rounded-full bg-slate-200">
-                    <div className="h-3 rounded-full" style={{ width: `${Math.max(0, Math.min(100, bar.value))}%`, backgroundColor: bar.color }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <h3 className="text-xl font-semibold text-slate-900">Recipe settings</h3>
-          <p className="mt-1 text-xs text-slate-500">Slippage % is applied globally on top of the total recipe cost.</p>
-          <div className="mt-4 grid gap-4 md:grid-cols-4">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Category</label>
-              <Input value={state.category} onChange={(e) => setState({ ...state, category: e.target.value })} className="h-10 rounded-xl" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Sale Price</label>
-              <Input type="number" value={state.salePrice} onChange={(e) => setState({ ...state, salePrice: N(e.target.value) })} className="h-10 rounded-xl" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Products Made</label>
-              <Input type="number" value={state.productsMade} onChange={(e) => setState({ ...state, productsMade: N(e.target.value) || 1 })} className="h-10 rounded-xl" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Slippage %</label>
-              <Input type="number" value={state.slippagePercent} onChange={(e) => setState({ ...state, slippagePercent: N(e.target.value) })} className="h-10 rounded-xl" />
-            </div>
-          </div>
-        </section>
-
-        {renderLineTable("Ingredients", "ingredients")}
-        {renderLineTable("Packaging", "packaging")}
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-slate-900">Labour</h3>
-            <Button variant="outline" className="rounded-xl" onClick={() => setState({ ...state, labour: [...state.labour, newLabourLine()] })}>Add row</Button>
-          </div>
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Description</th><th className="px-3 py-3 text-left">Hours</th><th className="px-3 py-3 text-left">Hourly rate</th><th className="px-3 py-3 text-left">Bonus</th><th className="px-3 py-3 text-left">Cost</th><th className="px-3 py-3 text-left">Action</th></tr></thead>
-              <tbody>
-                {state.labour.map((line, i) => (
-                  <tr key={`labour-${i}`} className="border-t border-slate-100 even:bg-slate-50/50">
-                    <td className="p-2"><Input value={line.description} onChange={(e) => { const next=[...state.labour]; next[i]={...line,description:e.target.value}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" /></td>
-                    <td className="p-2"><Input type="number" value={line.hours} onChange={(e) => { const next=[...state.labour]; next[i]={...line,hours:N(e.target.value)}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" /></td>
-                    <td className="p-2"><Input type="number" value={line.hourlyRate} onChange={(e) => { const next=[...state.labour]; next[i]={...line,hourlyRate:N(e.target.value)}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" /></td>
-                    <td className="p-2"><Input type="number" value={line.bonus} onChange={(e) => { const next=[...state.labour]; next[i]={...line,bonus:N(e.target.value)}; setState({ ...state, labour: next }); }} className="h-10 rounded-xl" /></td>
-                    <td className="p-2 font-semibold">{THB(N(line.hours) * N(line.hourlyRate) + N(line.bonus))}</td>
-                    <td className="p-2"><Button size="sm" variant="outline" onClick={() => setState({ ...state, labour: state.labour.filter((_, idx) => idx !== i) })}>Remove</Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-slate-900">Other</h3>
-            <Button variant="outline" className="rounded-xl" onClick={() => setState({ ...state, other: [...state.other, newOtherLine()] })}>Add row</Button>
-          </div>
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-slate-200">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500"><tr><th className="px-3 py-3 text-left">Name</th><th className="px-3 py-3 text-left">Cost</th><th className="px-3 py-3 text-left">Action</th></tr></thead>
-              <tbody>
-                {state.other.map((line, i) => (
-                  <tr key={`other-${i}`} className="border-t border-slate-100 even:bg-slate-50/50">
-                    <td className="p-2"><Input value={line.name} onChange={(e) => { const next=[...state.other]; next[i]={...line,name:e.target.value}; setState({ ...state, other: next }); }} className="h-10 rounded-xl" /></td>
-                    <td className="p-2"><Input type="number" value={line.cost} onChange={(e) => { const next=[...state.other]; next[i]={...line,cost:N(e.target.value)}; setState({ ...state, other: next }); }} className="h-10 rounded-xl" /></td>
-                    <td className="p-2"><Button size="sm" variant="outline" onClick={() => setState({ ...state, other: state.other.filter((_, idx) => idx !== i) })}>Remove</Button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </section>
       </div>
