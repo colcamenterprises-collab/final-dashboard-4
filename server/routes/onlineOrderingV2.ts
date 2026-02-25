@@ -1,6 +1,5 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
-import { getLegacyMenuFromOnlineProducts } from "../services/onlineProductFeed";
 import { pool } from "../db";
 import { listPublishedCatalogItems } from "../services/onlineCatalogService";
 
@@ -439,8 +438,29 @@ router.patch("/online/orders/:id/status", async (req, res) => {
 
 router.get("/ordering/menu", async (_req, res) => {
   try {
-    const menu = await getLegacyMenuFromOnlineProducts();
-    res.json({ deprecated: true, ...menu });
+    const items = await listPublishedCatalogItems();
+    const grouped = new Map<string, Array<any>>();
+
+    for (const item of items) {
+      const category = (item.category || "Unmapped").trim() || "Unmapped";
+      const existing = grouped.get(category) || [];
+      existing.push({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        image_url: item.imageUrl,
+        price: item.price,
+        category,
+      });
+      grouped.set(category, existing);
+    }
+
+    const categories = Array.from(grouped.entries()).map(([name, categoryItems]) => ({
+      name,
+      items: categoryItems,
+    }));
+
+    res.json({ deprecated: true, categories });
   } catch (error) {
     console.error("Error fetching ordering menu (deprecated):", error);
     res.status(500).json({ error: "Menu not found" });

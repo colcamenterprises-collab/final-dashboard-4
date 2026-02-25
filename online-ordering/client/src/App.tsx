@@ -3,6 +3,21 @@ import type { CartItem, OnlineCategory, OnlineProduct, OrderPayload } from "./ty
 
 type OnlineCatalogItem = OnlineProduct;
 type OnlineCatalogResponse = { items: OnlineCatalogItem[] };
+
+type OnlineOptionItem = {
+  id: number;
+  name: string;
+  price_delta: number;
+};
+
+type OnlineOptionGroup = {
+  id: number;
+  name: string;
+  min: number;
+  max: number;
+  required: boolean;
+  options: OnlineOptionItem[];
+};
 const SBB_YELLOW = "#FFEB00";
 const THB = (n: number) => `THB ${n.toFixed(2)}`;
 const loadLS = <T,>(k: string, f: T) => {
@@ -24,6 +39,9 @@ export default function App() {
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [cardQty, setCardQty] = useState<Record<number, number>>({});
+  const [selectedProduct, setSelectedProduct] = useState<OnlineProduct | null>(null);
+  const [optionGroups, setOptionGroups] = useState<OnlineOptionGroup[]>([]);
+  const [loadingOptions, setLoadingOptions] = useState(false);
 
   const fontInjected = useRef(false);
 
@@ -86,7 +104,13 @@ export default function App() {
       if (!response.ok) {
         throw new Error("Online menu request failed.");
       }
-      const nextCategories = buildCategories(Array.isArray(data.items) ? data.items : []);
+      const normalizedItems = Array.isArray(data.items)
+        ? data.items.map((item) => ({
+            ...item,
+            image_url: item.image_url ?? (item as any).image ?? null,
+          }))
+        : [];
+      const nextCategories = buildCategories(normalizedItems);
       setCategories(nextCategories);
       if ((!activeCategory || !nextCategories.some((c) => c.name === activeCategory)) && nextCategories.length > 0) {
         setActiveCategory(nextCategories[0].name);
@@ -107,6 +131,22 @@ export default function App() {
       ...prev,
       [productId]: Math.max(1, value),
     }));
+  };
+
+
+  const openProductOptions = async (product: OnlineProduct) => {
+    setSelectedProduct(product);
+    setLoadingOptions(true);
+    try {
+      const response = await fetch(`/api/online/catalog/${product.id}/options`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || "Failed to load options");
+      setOptionGroups(Array.isArray(data?.option_groups) ? data.option_groups : []);
+    } catch {
+      setOptionGroups([]);
+    } finally {
+      setLoadingOptions(false);
+    }
   };
 
   const addToCart = (product: OnlineProduct) => {
@@ -300,8 +340,8 @@ export default function App() {
               <div key={product.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
                 <div className="flex items-center gap-4">
                   <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
-                    {product.image ? (
-                      <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                    {product.image_url ? (
+                      <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
                     ) : null}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -332,12 +372,12 @@ export default function App() {
                       </button>
                     </div>
                     <button
-                      onClick={() => addToCart(product)}
+                      onClick={() => openProductOptions(product)}
                       className="rounded-xl px-3 py-2 text-sm font-semibold text-black"
                       style={{ background: SBB_YELLOW, opacity: isAvailable ? 1 : 0.5 }}
                       disabled={!isAvailable}
                     >
-                      Add to cart
+                      Select options
                     </button>
                   </div>
                 </div>
@@ -348,6 +388,52 @@ export default function App() {
 
         <div className="h-28" />
       </div>
+
+
+      {selectedProduct && (
+        <div className="fixed inset-0 z-[70] bg-black/70 flex items-end md:items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
+          <div className="w-full max-w-[560px] rounded-2xl border border-white/10 bg-black p-4" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold">{selectedProduct.name}</h3>
+              <button className="text-sm underline text-white/70" onClick={() => setSelectedProduct(null)}>Close</button>
+            </div>
+            {loadingOptions ? (
+              <div className="mt-3 text-sm text-white/70">Loading options...</div>
+            ) : optionGroups.length === 0 ? (
+              <div className="mt-3 text-sm text-white/70">No option groups configured for this item.</div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {optionGroups.map((group) => (
+                  <div key={group.id} className="rounded-xl border border-white/10 p-3">
+                    <div className="font-semibold">{group.name}</div>
+                    <div className="text-xs text-white/60">min {group.min} · max {group.max} · {group.required ? "required" : "optional"}</div>
+                    <div className="mt-2 space-y-1">
+                      {group.options.map((option) => (
+                        <div key={option.id} className="text-sm text-white/80 flex items-center justify-between">
+                          <span>{option.name}</span>
+                          <span>{option.price_delta > 0 ? `+ ${THB(option.price_delta)}` : THB(0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button
+              className="mt-4 rounded-xl px-4 py-3 text-sm font-semibold text-black"
+              style={{ background: SBB_YELLOW }}
+              onClick={() => {
+                addToCart(selectedProduct);
+                setSelectedProduct(null);
+              }}
+            >
+              Add to cart
+            </button>
+          </div>
+        </div>
+      )}
+
 
       <div className="fixed inset-x-0 bottom-0 z-50">
         <div className="mx-auto w-full max-w-[900px] px-3 pb-4">

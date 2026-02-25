@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { ensureOnlineCatalogTable, listAllCatalogItems, listPublishedCatalogItems } from "../services/onlineCatalogService";
+import { ensureOnlineCatalogOptionTables, listCatalogItemOptionGroups } from "../services/onlineCatalogOptionsService";
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.get("/online/catalog", async (_req, res) => {
         id: item.id,
         name: item.name,
         description: item.description,
+        image_url: item.imageUrl,
         image: item.imageUrl,
         category: item.category || "Unmapped",
         price: item.price,
@@ -25,6 +27,35 @@ router.get("/online/catalog", async (_req, res) => {
   } catch (error) {
     console.error("[catalog] failed to fetch published items", error);
     res.status(500).json({ error: "Failed to fetch online catalog" });
+  }
+});
+
+
+router.get("/online/catalog/:id/options", async (req, res) => {
+  try {
+    await ensureOnlineCatalogOptionTables();
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid id" });
+
+    const optionGroups = await listCatalogItemOptionGroups(id);
+    return res.json({
+      item_id: id,
+      option_groups: optionGroups.map((group) => ({
+        id: group.id,
+        name: group.name,
+        min: group.min,
+        max: group.max,
+        required: group.required,
+        options: group.options.map((option) => ({
+          id: option.id,
+          name: option.name,
+          price_delta: option.priceDelta,
+        })),
+      })),
+    });
+  } catch (error) {
+    console.error("[catalog] failed to fetch item options", error);
+    return res.status(500).json({ error: "Failed to fetch item option groups" });
   }
 });
 
