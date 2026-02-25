@@ -119,16 +119,17 @@ export default function OnlineOrderingPage() {
   }, []);
 
   // PATCH O1 — Fetch menu from menu-ordering API
-  const { data: menuData, isLoading: menuLoading } = useQuery<Array<any>>({
+  const { data: menuData, isLoading: menuLoading } = useQuery<{ categories?: Array<any> }>({
     queryKey: ["/api/menu-ordering/full"],
     enabled: !getParam("admin"), // Only fetch if NOT in admin mode
   });
 
   // PATCH O1 — Transform API menu to flat structure (from /api/menu-ordering/full)
   const apiMenu: MenuData = useMemo(() => {
-    if (!menuData || !Array.isArray(menuData) || menuData.length === 0) return { items: [] };
+    const categories = Array.isArray(menuData?.categories) ? menuData.categories : [];
+    if (categories.length === 0) return { items: [] };
     const items: MenuItem[] = [];
-    menuData.forEach((cat: any) => {
+    categories.forEach((cat: any) => {
       (cat.items || []).forEach((item: any) => {
         items.push({
           id: item.id,
@@ -136,7 +137,7 @@ export default function OnlineOrderingPage() {
           name: item.name,
           description: item.description,
           price: item.price,
-          category: cat.slug,
+          category: cat.name,
           image: item.imageUrl,
           groups: item.groups?.map((g: any) => ({
             id: g.id || uid("grp"),

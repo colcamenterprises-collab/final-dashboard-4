@@ -1,6 +1,5 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
-import { isMenuEligible } from "./productMenuView";
 
 export type OnlineProductRow = {
   id: number;
@@ -10,7 +9,6 @@ export type OnlineProductRow = {
   category: string | null;
   visibleOnline: boolean | null;
   priceOnline: number | null;
-  active: boolean;
 };
 
 export type OnlineProduct = {
@@ -63,10 +61,13 @@ export async function fetchOnlineProductRows(): Promise<OnlineProductRow[]> {
       image_url,
       category,
       visible_online,
-      price_online,
-      active
+      price_online
     FROM product
-    WHERE active = true
+    WHERE visible_online = true
+      AND price_online IS NOT NULL
+      AND price_online > 0
+      AND active = true
+    ORDER BY category ASC NULLS LAST, name ASC
   `);
 
   const rows = (result.rows || result) as Array<Record<string, any>>;
@@ -78,7 +79,6 @@ export async function fetchOnlineProductRows(): Promise<OnlineProductRow[]> {
     category: row.category ?? null,
     visibleOnline: row.visible_online ?? null,
     priceOnline: row.price_online ?? null,
-    active: Boolean(row.active),
   }));
 }
 
@@ -86,16 +86,6 @@ export async function getOnlineProductsFlat(): Promise<OnlineProduct[]> {
   const rows = await fetchOnlineProductRows();
 
   return rows
-    .filter((row) =>
-      isMenuEligible(
-        {
-          active: row.active,
-          visibleOnline: row.visibleOnline,
-          price: row.priceOnline,
-        },
-        "ONLINE",
-      ),
-    )
     .sort((a, b) => {
       const categoryA = normalizeCategory(a.category);
       const categoryB = normalizeCategory(b.category);
