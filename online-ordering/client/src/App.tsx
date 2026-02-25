@@ -99,7 +99,7 @@ export default function App() {
     setLoading(true);
     setErrorMessage("");
     try {
-      const response = await fetch("/api/online/catalog");
+      const response = await fetch("/api/online/catalog", { cache: "no-store" });
       const data: OnlineCatalogResponse = await response.json();
       if (!response.ok) {
         throw new Error("Online menu request failed.");
@@ -192,7 +192,7 @@ export default function App() {
     setSubmitting(true);
 
     try {
-      const refreshResponse = await fetch("/api/online/catalog");
+      const refreshResponse = await fetch("/api/online/catalog", { cache: "no-store" });
       const refreshData: OnlineCatalogResponse = await refreshResponse.json();
       if (!refreshResponse.ok) {
         throw new Error("Unable to refresh product feed.");

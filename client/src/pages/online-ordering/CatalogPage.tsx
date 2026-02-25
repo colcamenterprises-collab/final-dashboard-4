@@ -92,6 +92,9 @@ export default function OnlineOrderingCatalogPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error || "Update failed");
+      if (patch.isPublished === true) {
+        toast({ title: "Published to online ordering", variant: "success" as any });
+      }
       await load();
     } catch (error: any) {
       toast({ title: "Update failed", description: error?.message || "Request failed", variant: "destructive" });
@@ -141,7 +144,7 @@ export default function OnlineOrderingCatalogPage() {
               <th className="p-3 text-left">Name</th>
               <th className="p-3 text-left">Category</th>
               <th className="p-3 text-left">Price</th>
-              <th className="p-3 text-left">Published</th>
+              <th className="p-3 text-left">Online Ordering</th>
               <th className="p-3 text-left">Source</th>
               <th className="p-3 text-left">Edit</th>
               <th className="p-3 text-left">Delete</th>
@@ -158,12 +161,14 @@ export default function OnlineOrderingCatalogPage() {
                 <td className="p-3">{item.category || "Unmapped"}</td>
                 <td className="p-3">{Number(item.price || 0).toFixed(2)}</td>
                 <td className="p-3">
-                  <input
-                    type="checkbox"
-                    checked={item.isPublished}
-                    onChange={(e) => updateItem(item.id, { isPublished: e.target.checked })}
-                    disabled={saving === item.id}
-                  />
+                  <Button
+                    size="sm"
+                    variant={item.isPublished ? "secondary" : "default"}
+                    onClick={() => updateItem(item.id, { isPublished: true })}
+                    disabled={saving === item.id || item.isPublished}
+                  >
+                    {item.isPublished ? "Published" : "Add to Online Ordering"}
+                  </Button>
                 </td>
                 <td className="p-3">{item.sourceType}{item.sourceId ? ` #${item.sourceId}` : ""}</td>
                 <td className="p-3">

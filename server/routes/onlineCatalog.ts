@@ -13,11 +13,16 @@ const cleanMoney = (value: unknown) => {
 router.get("/online/catalog", async (_req, res) => {
   try {
     const items = await listPublishedCatalogItems();
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     res.json({
       items: items.map((item) => ({
         id: item.id,
+        sku: item.sku,
         name: item.name,
         description: item.description,
+        imageUrl: item.imageUrl,
         image_url: item.imageUrl,
         image: item.imageUrl,
         category: item.category || "Unmapped",
@@ -185,8 +190,8 @@ router.post("/catalog/from-recipe/:recipeId", async (req, res) => {
 
     const upserted = await pool.query(
       `INSERT INTO online_catalog_items
-        (source_type, source_id, name, description, image_url, category, price)
-       VALUES ('recipe', $1, $2, $3, $4, $5, $6)
+        (source_type, source_id, name, description, image_url, category, price, is_published)
+       VALUES ('recipe', $1, $2, $3, $4, $5, $6, true)
        ON CONFLICT (source_type, source_id)
        WHERE source_type = 'recipe' AND source_id IS NOT NULL
        DO UPDATE
@@ -195,6 +200,7 @@ router.post("/catalog/from-recipe/:recipeId", async (req, res) => {
              image_url = EXCLUDED.image_url,
              category = EXCLUDED.category,
              price = EXCLUDED.price,
+             is_published = true,
              updated_at = now()
        RETURNING *`,
       [recipeId, row.name, row.description, row.image_url, row.category, cleanMoney(row.suggested_price)],
