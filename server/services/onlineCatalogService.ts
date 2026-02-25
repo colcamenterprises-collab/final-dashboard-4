@@ -4,6 +4,7 @@ export type CatalogSourceType = "recipe" | "manual";
 
 export type OnlineCatalogItem = {
   id: number;
+  sku: string | null;
   sourceType: CatalogSourceType;
   sourceId: number | null;
   name: string;
@@ -26,6 +27,7 @@ const toNumber = (value: unknown) => {
 
 const mapRow = (row: any): OnlineCatalogItem => ({
   id: Number(row.id),
+  sku: row.sku == null ? null : String(row.sku),
   sourceType: row.source_type,
   sourceId: row.source_id == null ? null : Number(row.source_id),
   name: String(row.name || ""),
@@ -92,9 +94,23 @@ export async function listPublishedCatalogItems() {
   await ensureOnlineCatalogTable();
   if (!pool) return [];
   const result = await pool.query(
-    `SELECT *
-     FROM online_catalog_items
-     WHERE is_published = true
+    `SELECT
+       i.*,
+       CASE WHEN i.source_type = 'recipe' THEN r.name ELSE i.name END AS name,
+       CASE WHEN i.source_type = 'recipe' THEN r.description ELSE i.description END AS description,
+       CASE WHEN i.source_type = 'recipe' THEN r.image_url ELSE i.image_url END AS image_url,
+       CASE WHEN i.source_type = 'recipe' THEN r.category ELSE i.category END AS category,
+       CASE WHEN i.source_type = 'recipe' THEN COALESCE(r.suggested_price, i.price) ELSE i.price END AS price,
+       NULL::text AS sku
+     FROM online_catalog_items i
+     LEFT JOIN recipes r
+       ON i.source_type = 'recipe'
+      AND i.source_id = r.id
+     WHERE i.is_published = true
+       AND (
+         (i.source_type = 'recipe' AND COALESCE(r.is_active, false) = true)
+         OR i.source_type = 'manual'
+       )
      ORDER BY category ASC NULLS LAST, sort_order ASC, id ASC`,
   );
 

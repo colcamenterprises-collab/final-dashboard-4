@@ -183,14 +183,14 @@ export default function RecipeEditorPage() {
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error || "Failed to add recipe to online catalog");
       toast({
-        title: "Added to Online Catalog",
-        description: "Recipe has been synced to Online Ordering Catalog.",
+        title: "Added to Online Ordering",
+        description: "Recipe is now published to Online Ordering.",
         variant: "success" as any,
         duration: 3000,
       });
     } catch (e: any) {
       toast({
-        title: "Add to Catalog Failed",
+        title: "Add to Online Ordering Failed",
         description: e?.message || "Failed to add recipe to online catalog",
         variant: "destructive",
         duration: 4000,
@@ -335,7 +335,7 @@ export default function RecipeEditorPage() {
               onClick={addToOnlineCatalog}
               disabled={addingToCatalog}
             >
-              {addingToCatalog ? "Working..." : "Add to Online Catalog"}
+              {addingToCatalog ? "Working..." : "Add to Online Ordering"}
             </Button>
             <Button className="rounded-xl bg-slate-900 text-white hover:bg-slate-800 disabled:bg-slate-400 disabled:text-white" onClick={save} disabled={saving || !hasChanges}>{saving ? "Saving..." : "Save"}</Button>
           </div>
