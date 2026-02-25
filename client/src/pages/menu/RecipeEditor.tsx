@@ -177,13 +177,15 @@ export default function RecipeEditorPage() {
   const addToOnlineCatalog = async () => {
     setAddingToCatalog(true);
     try {
-      const res = await fetch(`/api/catalog/from-recipe/${state.id}`, {
+      const res = await fetch(`/api/online/products/upsert-from-recipe`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipeId: state.id }),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(payload?.error || "Failed to add recipe to online catalog");
       toast({
-        title: "Added to Online Ordering",
+        title: "Now live in Online Ordering",
         description: "Recipe is now published to Online Ordering.",
         variant: "success" as any,
         duration: 3000,
@@ -191,7 +193,7 @@ export default function RecipeEditorPage() {
     } catch (e: any) {
       toast({
         title: "Add to Online Ordering Failed",
-        description: e?.message || "Failed to add recipe to online catalog",
+        description: e?.message || "Failed to add recipe to online ordering",
         variant: "destructive",
         duration: 4000,
       });

@@ -47,31 +47,8 @@ router.get("/items/:categoryId", async (req, res) => {
 // GET FULL MENU (PRODUCT TABLE ONLY)
 router.get("/full", async (req, res) => {
   try {
-    const productCategories = await getOnlineProductsGrouped();
-
-    // Return product-backed categories in legacy-compatible shape for portal rendering
-    const productCategoriesFormatted = productCategories.map((cat, idx) => ({
-      id: `product-${cat.name.toLowerCase().replace(/\s+/g, '-')}`,
-      name: cat.name,
-      slug: cat.name.toLowerCase().replace(/\s+/g, '-'),
-      description: "",
-      position: 100 + idx,
-      items: cat.items.map(item => ({
-        id: String(item.id),
-        name: item.name,
-        description: item.description || "",
-        price: item.price,
-        imageUrl: item.image,
-        online_category: cat.name,
-        price_online: item.priceOnline,
-        visible_online: true,
-        sku: null,
-        available: true,
-        groups: [],
-      })),
-    }));
-
-    res.json(productCategoriesFormatted);
+    const categories = await getOnlineProductsGrouped();
+    res.json({ categories });
   } catch (err) {
     console.error("MENU FULL ERROR:", err);
     res.status(500).json({ error: "Failed to load full menu" });

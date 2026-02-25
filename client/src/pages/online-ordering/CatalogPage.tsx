@@ -47,8 +47,12 @@ export default function OnlineOrderingCatalogPage() {
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (payload?.error === "Missing Online Price") {
-          toast({ title: "Missing Online Price", variant: "destructive" });
+        if (payload?.error === "Online price required") {
+          toast({ title: "Online price required", variant: "destructive" });
+          return;
+        }
+        if (payload?.error === "Missing category") {
+          toast({ title: "Missing category", variant: "destructive" });
           return;
         }
         throw new Error(payload?.error || "Update failed");
@@ -115,13 +119,18 @@ export default function OnlineOrderingCatalogPage() {
                 </td>
                 <td className="p-3">
                   {item.visible_online ? (
-                    <Button size="sm" variant="secondary" disabled>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => patchProduct(item.id, { visible_online: false }, "Removed from Online Ordering")}
+                      disabled={savingId === item.id}
+                    >
                       Live
                     </Button>
                   ) : (
                     <Button
                       size="sm"
-                      onClick={() => patchProduct(item.id, { visible_online: true, price_online: item.price_online }, "Published to Online Ordering")}
+                      onClick={() => patchProduct(item.id, { visible_online: true, price_online: item.price_online, online_category: item.online_category }, "Now live in Online Ordering")}
                       disabled={savingId === item.id}
                     >
                       Add to Online Ordering

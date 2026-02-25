@@ -49,8 +49,6 @@ async function loadRecipeForPublish(recipeId: number) {
   if (!result.rows[0]) return null;
   const row = result.rows[0];
   const meta = parseRecipeMeta(row.notes);
-  const sku = String(meta?.sku ?? "").trim();
-  if (!sku) return null;
 
   return {
     id: Number(row.id),
@@ -61,7 +59,6 @@ async function loadRecipeForPublish(recipeId: number) {
     imageUrl: String(meta?.imageUrl || row.image_url || ""),
     notes: String(row.notes ?? ""),
     meta,
-    sku,
   };
 }
 
@@ -74,98 +71,58 @@ router.post("/online/products/upsert-from-recipe", async (req, res) => {
 
     const recipe = await loadRecipeForPublish(recipeId);
     if (!recipe) {
-      return res.status(404).json({ error: "Recipe not found or missing SKU" });
+      return res.status(404).json({ error: "Recipe not found" });
     }
 
-    const publishedMeta = recipe.meta?.onlinePublishing ?? {};
-    const existingProductId = Number(publishedMeta?.productId ?? 0);
+    const existing = await pool.query(
+      `SELECT id
+       FROM product
+       WHERE recipe_id = $1
+       LIMIT 1`,
+      [recipeId],
+    );
 
-    let productId = existingProductId;
+    let productId = 0;
     let action: "created" | "updated" = "updated";
 
-    if (existingProductId > 0) {
-      const updated = await pool.query(
+    if (existing.rows[0]) {
+      productId = Number(existing.rows[0].id);
+      await pool.query(
         `UPDATE product
          SET name = $2,
              description = $3,
              image_url = $4,
              category = $5,
              price_online = $6,
-             price_in_store = $6,
              visible_online = true,
-             active = true
-         WHERE id = $1
-         RETURNING id`,
-        [existingProductId, recipe.name, recipe.description, recipe.imageUrl, recipe.category, recipe.price],
+             active = true,
+             updated_at = now()
+         WHERE id = $1`,
+        [productId, recipe.name, recipe.description, recipe.imageUrl, recipe.category, recipe.price],
       );
-
-      if (updated.rows[0]) {
-        productId = Number(updated.rows[0].id);
-      } else {
-        action = "created";
-      }
     } else {
       action = "created";
-    }
-
-    if (action === "created") {
       const inserted = await pool.query(
         `INSERT INTO product (
            name,
            description,
            image_url,
+           recipe_id,
            category,
            price_online,
            visible_online,
            active
          )
-         VALUES ($1, $2, $3, $4, $5, true, true)
+         VALUES ($1, $2, $3, $4, $5, $6, true, true)
          RETURNING id`,
-        [recipe.name, recipe.description, recipe.imageUrl, recipe.category, recipe.price],
+        [recipe.name, recipe.description, recipe.imageUrl, recipe.id, recipe.category, recipe.price],
       );
       productId = Number(inserted.rows[0].id);
-
-      await pool.query(
-        `UPDATE product
-         SET price_in_store = $2
-         WHERE id = $1`,
-        [productId, recipe.price],
-      );
     }
-
-    await pool.query(
-      `UPDATE product_price
-       SET price = $3
-       WHERE product_id = $1 AND channel = $2`,
-      [productId, 'ONLINE', recipe.price],
-    );
-
-    await pool.query(
-      `INSERT INTO product_price (product_id, channel, price)
-       SELECT $1, 'ONLINE', $2
-       WHERE NOT EXISTS (SELECT 1 FROM product_price WHERE product_id = $1 AND channel = 'ONLINE')`,
-      [productId, recipe.price],
-    );
-
-    await pool.query(
-      `UPDATE product_menu
-       SET category = $2,
-           visible_online = true
-       WHERE product_id = $1`,
-      [productId, recipe.category],
-    );
-
-    await pool.query(
-      `INSERT INTO product_menu (product_id, category, sort_order, visible_in_store, visible_grab, visible_online)
-       SELECT $1, $2, 0, false, false, true
-       WHERE NOT EXISTS (SELECT 1 FROM product_menu WHERE product_id = $1)`,
-      [productId, recipe.category],
-    );
 
     const nextMeta = {
       ...recipe.meta,
       onlinePublishing: {
-        sku: recipe.sku,
         productId,
         published: true,
         publishedAt: new Date().toISOString(),
@@ -197,17 +154,24 @@ router.post("/online/products/unpublish-from-recipe", async (req, res) => {
 
     const recipe = await loadRecipeForPublish(recipeId);
     if (!recipe) {
-      return res.status(404).json({ error: "Recipe not found or missing SKU" });
+      return res.status(404).json({ error: "Recipe not found" });
     }
 
-    const publishedMeta = recipe.meta?.onlinePublishing ?? {};
-    const productId = Number(publishedMeta?.productId ?? 0);
+    const existing = await pool.query(
+      `SELECT id
+       FROM product
+       WHERE recipe_id = $1
+       LIMIT 1`,
+      [recipeId],
+    );
+
+    const productId = existing.rows[0] ? Number(existing.rows[0].id) : 0;
 
     if (productId > 0) {
       await pool.query(
         `UPDATE product
-         SET active = false,
-             visible_online = false
+         SET visible_online = false,
+             updated_at = now()
          WHERE id = $1`,
         [productId],
       );
@@ -216,7 +180,6 @@ router.post("/online/products/unpublish-from-recipe", async (req, res) => {
     const nextMeta = {
       ...recipe.meta,
       onlinePublishing: {
-        sku: recipe.sku,
         productId: productId || null,
         published: false,
         publishedAt: recipe.meta?.onlinePublishing?.publishedAt ?? null,
@@ -245,12 +208,14 @@ router.get("/online/products", async (_req, res) => {
       `SELECT id, name, description, image_url, category, price_online, visible_online
        FROM product
        WHERE active = true
+         AND visible_online = true
+         AND price_online IS NOT NULL
+         AND price_online > 0
        ORDER BY category ASC NULLS LAST, name ASC`,
     );
 
     const grouped = new Map<string, Array<any>>();
     for (const row of itemsResult.rows) {
-      if (row.visible_online !== true) continue;
       const category = String(row.category ?? "UNMAPPED").trim() || "UNMAPPED";
       const existing = grouped.get(category) || [];
       existing.push({
@@ -350,7 +315,11 @@ router.patch("/online/products/:id", async (req, res) => {
       : current.visible_online === true;
 
     if (visibleOnline && (!(typeof priceOnline === "number") || priceOnline <= 0)) {
-      return res.status(400).json({ error: "Missing Online Price" });
+      return res.status(400).json({ error: "Online price required" });
+    }
+
+    if (visibleOnline && (!onlineCategory || !String(onlineCategory).trim())) {
+      return res.status(400).json({ error: "Missing category" });
     }
 
     const updated = await pool.query(
