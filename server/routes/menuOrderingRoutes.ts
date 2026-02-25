@@ -44,33 +44,12 @@ router.get("/items/:categoryId", async (req, res) => {
   }
 });
 
-// GET FULL MENU (ALL CATEGORIES + ITEMS + MODIFIERS)
-// Now includes products from the new product table merged with legacy menu
+// GET FULL MENU (PRODUCT TABLE ONLY)
 router.get("/full", async (req, res) => {
   try {
-    const prisma = db();
-    
-    // Fetch legacy menu categories
-    const legacyCategories = await prisma.menuCategory.findMany({
-      orderBy: { position: "asc" },
-      include: {
-        items: {
-          orderBy: { position: "asc" },
-          include: {
-            groups: {
-              include: {
-                options: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Fetch products from new product table
     const productCategories = await getOnlineProductsGrouped();
-    
-    // Merge product categories into response format
+
+    // Return product-backed categories in legacy-compatible shape for portal rendering
     const productCategoriesFormatted = productCategories.map((cat, idx) => ({
       id: `product-${cat.name.toLowerCase().replace(/\s+/g, '-')}`,
       name: cat.name,
@@ -78,21 +57,21 @@ router.get("/full", async (req, res) => {
       description: "",
       position: 100 + idx,
       items: cat.items.map(item => ({
-        id: `product-${item.id}`,
+        id: String(item.id),
         name: item.name,
         description: item.description || "",
         price: item.price,
         imageUrl: item.image,
+        online_category: cat.name,
+        price_online: item.priceOnline,
+        visible_online: true,
         sku: null,
         available: true,
         groups: [],
       })),
     }));
 
-    // Combine legacy and product categories
-    const allCategories = [...legacyCategories, ...productCategoriesFormatted];
-    
-    res.json(allCategories);
+    res.json(productCategoriesFormatted);
   } catch (err) {
     console.error("MENU FULL ERROR:", err);
     res.status(500).json({ error: "Failed to load full menu" });
