@@ -2,7 +2,7 @@ export type OnlineProduct = {
   id: number;
   name: string;
   description: string | null;
-  image: string | null;
+  image_url: string | null;
   price: number;
   category: string;
 };
