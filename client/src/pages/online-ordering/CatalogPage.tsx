@@ -3,46 +3,31 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
-type CatalogItem = {
+type ProductItem = {
   id: number;
-  sourceType: "recipe" | "manual";
-  sourceId: number | null;
   name: string;
   description: string | null;
   imageUrl: string | null;
-  category: string | null;
-  price: number;
-  isPublished: boolean;
-  sortOrder: number;
+  online_category: string | null;
+  price_online: number | null;
+  visible_online: boolean;
 };
-
-type ManualForm = {
-  name: string;
-  category: string;
-  price: string;
-  description: string;
-  imageUrl: string;
-};
-
-const emptyForm: ManualForm = { name: "", category: "", price: "", description: "", imageUrl: "" };
 
 export default function OnlineOrderingCatalogPage() {
-  const [items, setItems] = useState<CatalogItem[]>([]);
+  const [items, setItems] = useState<ProductItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<number | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState<ManualForm>(emptyForm);
+  const [savingId, setSavingId] = useState<number | null>(null);
   const { toast } = useToast();
 
   const load = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/catalog");
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload?.error || "Failed to load catalog");
+      const res = await fetch("/api/online/products/catalog");
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(payload?.error || "Failed to load products");
       setItems(Array.isArray(payload?.items) ? payload.items : []);
     } catch (error: any) {
-      toast({ title: "Failed to load catalog", description: error?.message || "Request failed", variant: "destructive" });
+      toast({ title: "Failed to load products", description: error?.message || "Request failed", variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -52,143 +37,112 @@ export default function OnlineOrderingCatalogPage() {
     load();
   }, []);
 
-  const onCreateManual = async () => {
-    if (!form.name.trim()) {
-      toast({ title: "Name is required", variant: "destructive" });
-      return;
-    }
-    setCreating(true);
+  const patchProduct = async (id: number, patch: Record<string, unknown>, successTitle = "Updated successfully") => {
+    setSavingId(id);
     try {
-      const res = await fetch("/api/catalog/manual", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          category: form.category.trim() || null,
-          description: form.description.trim() || null,
-          imageUrl: form.imageUrl.trim() || null,
-          price: Number(form.price) || 0,
-        }),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error || "Failed to create manual item");
-      setForm(emptyForm);
-      toast({ title: "Catalog item added", variant: "success" as any });
-      await load();
-    } catch (error: any) {
-      toast({ title: "Create failed", description: error?.message || "Request failed", variant: "destructive" });
-    } finally {
-      setCreating(false);
-    }
-  };
-
-  const updateItem = async (id: number, patch: Record<string, unknown>) => {
-    setSaving(id);
-    try {
-      const res = await fetch(`/api/catalog/${id}`, {
-        method: "PUT",
+      const res = await fetch(`/api/online/products/${id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
       });
       const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error || "Update failed");
-      if (patch.isPublished === true) {
-        toast({ title: "Published to online ordering", variant: "success" as any });
+      if (!res.ok) {
+        if (payload?.error === "Missing Online Price") {
+          toast({ title: "Missing Online Price", variant: "destructive" });
+          return;
+        }
+        throw new Error(payload?.error || "Update failed");
       }
+
+      toast({ title: successTitle, variant: "success" as any });
       await load();
     } catch (error: any) {
       toast({ title: "Update failed", description: error?.message || "Request failed", variant: "destructive" });
     } finally {
-      setSaving(null);
+      setSavingId(null);
     }
   };
 
-  const deleteItem = async (id: number) => {
-    setSaving(id);
-    try {
-      const res = await fetch(`/api/catalog/${id}`, { method: "DELETE" });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload?.error || "Delete failed");
-      toast({ title: "Catalog item deleted", variant: "success" as any });
-      await load();
-    } catch (error: any) {
-      toast({ title: "Delete failed", description: error?.message || "Request failed", variant: "destructive" });
-    } finally {
-      setSaving(null);
-    }
+  const updateDraft = (id: number, patch: Partial<ProductItem>) => {
+    setItems((curr) => curr.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
   return (
     <div className="mx-auto max-w-7xl p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-slate-900">Online Ordering Catalog</h1>
-        <p className="text-sm text-slate-600 mt-1">Source of truth for online ordering items.</p>
+        <p className="text-sm text-slate-600 mt-1">Edit products and publish them directly to Online Ordering.</p>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-        <h2 className="font-medium text-slate-900">Add Item (Manual)</h2>
-        <div className="grid gap-3 md:grid-cols-5">
-          <Input placeholder="Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
-          <Input placeholder="Price" type="number" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
-          <Input placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <Input placeholder="Image URL" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} />
-        </div>
-        <Button onClick={onCreateManual} disabled={creating}>{creating ? "Adding..." : "Add Item"}</Button>
-      </section>
-
       <section className="rounded-xl border border-slate-200 bg-white overflow-x-auto">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[1200px] text-sm">
           <thead className="bg-slate-50 text-slate-600">
             <tr>
               <th className="p-3 text-left">Name</th>
+              <th className="p-3 text-left">Description</th>
               <th className="p-3 text-left">Category</th>
-              <th className="p-3 text-left">Price</th>
-              <th className="p-3 text-left">Online Ordering</th>
-              <th className="p-3 text-left">Source</th>
-              <th className="p-3 text-left">Edit</th>
-              <th className="p-3 text-left">Delete</th>
+              <th className="p-3 text-left">Online Price</th>
+              <th className="p-3 text-left">Image URL</th>
+              <th className="p-3 text-left">Publish</th>
+              <th className="p-3 text-left">Save</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr><td colSpan={7} className="p-4">Loading...</td></tr>
             ) : items.length === 0 ? (
-              <tr><td colSpan={7} className="p-4">No catalog items.</td></tr>
+              <tr><td colSpan={7} className="p-4">No products available.</td></tr>
             ) : items.map((item) => (
-              <tr key={item.id} className="border-t border-slate-100">
-                <td className="p-3">{item.name}</td>
-                <td className="p-3">{item.category || "Unmapped"}</td>
-                <td className="p-3">{Number(item.price || 0).toFixed(2)}</td>
-                <td className="p-3">
-                  <Button
-                    size="sm"
-                    variant={item.isPublished ? "secondary" : "default"}
-                    onClick={() => updateItem(item.id, { isPublished: true })}
-                    disabled={saving === item.id || item.isPublished}
-                  >
-                    {item.isPublished ? "Published" : "Add to Online Ordering"}
-                  </Button>
+              <tr key={item.id} className="border-t border-slate-100 align-top">
+                <td className="p-3 min-w-[180px]">
+                  <Input value={item.name || ""} onChange={(e) => updateDraft(item.id, { name: e.target.value })} />
                 </td>
-                <td className="p-3">{item.sourceType}{item.sourceId ? ` #${item.sourceId}` : ""}</td>
+                <td className="p-3 min-w-[260px]">
+                  <Input value={item.description || ""} onChange={(e) => updateDraft(item.id, { description: e.target.value })} />
+                </td>
+                <td className="p-3 min-w-[170px]">
+                  <Input value={item.online_category || ""} onChange={(e) => updateDraft(item.id, { online_category: e.target.value })} />
+                </td>
+                <td className="p-3 min-w-[130px]">
+                  <Input
+                    type="number"
+                    value={item.price_online ?? ""}
+                    onChange={(e) => updateDraft(item.id, { price_online: e.target.value === "" ? null : Number(e.target.value) })}
+                  />
+                </td>
+                <td className="p-3 min-w-[220px]">
+                  <Input value={item.imageUrl || ""} onChange={(e) => updateDraft(item.id, { imageUrl: e.target.value })} />
+                </td>
+                <td className="p-3">
+                  {item.visible_online ? (
+                    <Button size="sm" variant="secondary" disabled>
+                      Live
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => patchProduct(item.id, { visible_online: true, price_online: item.price_online }, "Published to Online Ordering")}
+                      disabled={savingId === item.id}
+                    >
+                      Add to Online Ordering
+                    </Button>
+                  )}
+                </td>
                 <td className="p-3">
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      const price = window.prompt("Price", String(item.price ?? 0));
-                      const category = window.prompt("Category", item.category || "");
-                      const name = window.prompt("Name", item.name || "");
-                      if (name == null || price == null || category == null) return;
-                      updateItem(item.id, { name, price: Number(price) || 0, category });
-                    }}
-                    disabled={saving === item.id}
+                    onClick={() => patchProduct(item.id, {
+                      name: item.name,
+                      description: item.description,
+                      online_category: item.online_category,
+                      price_online: item.price_online,
+                      imageUrl: item.imageUrl,
+                    })}
+                    disabled={savingId === item.id}
                   >
-                    Edit
+                    Save
                   </Button>
-                </td>
-                <td className="p-3">
-                  <Button size="sm" variant="destructive" onClick={() => deleteItem(item.id)} disabled={saving === item.id}>Delete</Button>
                 </td>
               </tr>
             ))}

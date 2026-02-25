@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import CartBar from "../components/CartBar";
+import { useToast } from "@/hooks/use-toast";
 
 // SBB — Online Ordering (VEV exact replica)
 // Spec:
@@ -67,113 +68,9 @@ type CartLine = {
 type MenuData = { items: MenuItem[] };
 
 // ---------- Defaults ----------
-const DEFAULT_MENU: MenuData = { 
-  items: [ 
-    { 
-      id: "set-single", 
-      sku: "SKU_SET_SINGLE", 
-      name: "Single Smash Burger Meal Set", 
-      description: "The original single smash burger with French fries and your choice of soft drink.", 
-      price: 209, 
-      category: "sets", 
-      image: "/images/items/single-set.jpg", 
-      groups: [
-        { 
-          id: "drink", 
-          name: "Choose Drink", 
-          type: "single", 
-          required: true, 
-          options: [
-            { id: "coke", name: "Coke", priceDelta: 0, defaultSelected: true }, 
-            { id: "sprite", name: "Sprite", priceDelta: 0 }, 
-            { id: "water", name: "Water", priceDelta: 0 }
-          ] 
-        }
-      ] 
-    }, 
-    { 
-      id: "set-double", 
-      sku: "SKU_SET_DOUBLE", 
-      name: "Ultimate Double Smash Burger Meal Set", 
-      description: "Double-smash burger with 150g fries, coleslaw and a drink.", 
-      price: 289, 
-      category: "sets", 
-      image: "/images/items/double-set.jpg" 
-    }, 
-    { 
-      id: "single-burger", 
-      sku: "SKU_SINGLE", 
-      name: "Single Smash Burger", 
-      description: "90g patty, cheese, pickles, onions, SBB sauce.", 
-      price: 149, 
-      category: "burgers", 
-      image: "/images/items/single.jpg", 
-      groups: [
-        { 
-          id: "patty", 
-          name: "Patty", 
-          type: "single", 
-          required: true, 
-          options: [
-            { id: "single", name: "Single (90g)", priceDelta: 0, defaultSelected: true }, 
-            { id: "double", name: "Double (2x90g)", priceDelta: 60 }
-          ] 
-        }, 
-        { 
-          id: "extras", 
-          name: "Extras", 
-          type: "multi", 
-          maxSelections: 3, 
-          options: [
-            { id: "bacon", name: "Bacon", priceDelta: 35 }, 
-            { id: "cheese", name: "Extra Cheese", priceDelta: 20 }
-          ] 
-        }
-      ] 
-    }, 
-    { 
-      id: "fries", 
-      sku: "SKU_FRIES", 
-      name: "Classic French Fries", 
-      description: "Classic shoestring fries.", 
-      price: 79, 
-      category: "sides", 
-      image: "/images/items/fries.jpg" 
-    }, 
-    { 
-      id: "dirty-fries", 
-      sku: "SKU_DIRTY", 
-      name: "Cheesy Bacon Fries", 
-      description: "American cheese, bacon bits, crispy onions.", 
-      price: 119, 
-      category: "sides", 
-      image: "/images/items/dirty-fries.jpg" 
-    }, 
-    { 
-      id: "coke", 
-      sku: "SKU_COKE", 
-      name: "Coke Can", 
-      price: 35, 
-      category: "drinks", 
-      image: "/images/items/coke.jpg" 
-    }, 
-    { 
-      id: "sprite", 
-      sku: "SKU_SPRITE", 
-      name: "Sprite Can", 
-      price: 35, 
-      category: "drinks", 
-      image: "/images/items/sprite.jpg" 
-    }
-  ] 
+const DEFAULT_MENU: MenuData = {
+  items: [],
 };
-
-const CATEGORIES = [ 
-  { id: "sets", name: "BURGER MEAL SETS" }, 
-  { id: "sides", name: "SIDE ORDERS" }, 
-  { id: "burgers", name: "ORIGINAL SMASH BURGERS" }, 
-  { id: "drinks", name: "DRINKS" }, 
-] as const;
 
 // ---------- Utils ----------
 const THB = (n: number) => `฿${n.toFixed(2)}`;
@@ -210,6 +107,8 @@ const LS_MENU = "sbb_menu_json_v1";
 const LS_CART = "sbb_cart_v1";
 
 export default function OnlineOrderingPage() {
+  const { toast } = useToast();
+
   // PATCH O7 — CAPTURE PARTNER CODE FROM URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -227,7 +126,7 @@ export default function OnlineOrderingPage() {
 
   // PATCH O1 — Transform API menu to flat structure (from /api/menu-ordering/full)
   const apiMenu: MenuData = useMemo(() => {
-    if (!menuData || !Array.isArray(menuData) || menuData.length === 0) return DEFAULT_MENU;
+    if (!menuData || !Array.isArray(menuData) || menuData.length === 0) return { items: [] };
     const items: MenuItem[] = [];
     menuData.forEach((cat: any) => {
       (cat.items || []).forEach((item: any) => {
@@ -277,7 +176,30 @@ export default function OnlineOrderingPage() {
     }
   }, [apiMenu]);
 
-  const [activeCat, setActiveCat] = useState<(typeof CATEGORIES)[number]["id"]>("sets");
+  const [activeCat, setActiveCat] = useState("");
+
+  const categoryTabs = useMemo(() => {
+    const seen = new Set<string>();
+    const tabs: Array<{ id: string; name: string }> = [];
+    for (const item of menu.items) {
+      const category = String(item.category || "UNMAPPED").trim() || "UNMAPPED";
+      if (seen.has(category)) continue;
+      seen.add(category);
+      tabs.push({ id: category, name: category.toUpperCase() });
+    }
+    return tabs;
+  }, [menu]);
+
+  useEffect(() => {
+    if (categoryTabs.length === 0) {
+      setActiveCat("");
+      return;
+    }
+    if (!categoryTabs.some((c) => c.id === activeCat)) {
+      setActiveCat(categoryTabs[0].id);
+    }
+  }, [categoryTabs, activeCat]);
+
   const [search, setSearch] = useState("");
   const [cart, setCart] = useState<CartLine[]>(() => { 
     try { 
@@ -307,7 +229,7 @@ export default function OnlineOrderingPage() {
 
   const filteredMenu = useMemo(() => { 
     const q = search.trim().toLowerCase(); 
-    return menu.items.filter((m) => m.category === activeCat && (!q || m.name.toLowerCase().includes(q))); 
+    return menu.items.filter((m) => (!activeCat || m.category === activeCat) && (!q || m.name.toLowerCase().includes(q))); 
   }, [menu, activeCat, search]);
 
   const subtotal = useMemo(() => cart.reduce((s, l) => s + lineTotal(l), 0), [cart]);
@@ -410,10 +332,10 @@ export default function OnlineOrderingPage() {
       const json = JSON.parse(draftJSON) as MenuData; 
       setMenu(json); 
       localStorage.setItem(LS_MENU, JSON.stringify(json)); 
-      alert("Menu saved."); 
+      toast({ title: "Updated successfully", variant: "success" as any }); 
     } catch(e:unknown){ 
       const msg = e instanceof Error ? e.message : String(e);
-      alert("Invalid JSON: " + msg); 
+      toast({ title: "Invalid JSON", description: msg, variant: "destructive" }); 
     } 
   }
   
@@ -452,7 +374,7 @@ export default function OnlineOrderingPage() {
       <div className="w-full bg-black">
         <div className="mx-auto max-w-[720px] px-4">
           <nav className="flex gap-6 py-4 justify-start md:justify-start">
-            {CATEGORIES.map((c) => (
+            {categoryTabs.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setActiveCat(c.id)}
@@ -473,7 +395,7 @@ export default function OnlineOrderingPage() {
       <main className="mx-auto max-w-[720px] px-4">
         <div className="mt-4">
           <h2 className="text-[22px] font-extrabold">
-            {CATEGORIES.find(c => c.id === activeCat)?.name.replace("_", " ")}
+            {categoryTabs.find(c => c.id === activeCat)?.name || "MENU"}
           </h2>
           <p className="mt-1 text-[14px] text-white/70">They are worth it!</p>
         </div>

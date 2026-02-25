@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { PrismaClient } from "@prisma/client";
 import { pool } from "../db";
-import { listPublishedCatalogItems } from "../services/onlineCatalogService";
+import { getOnlineProductsFlat } from "../services/onlineProductFeed";
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -241,18 +241,28 @@ router.post("/online/products/unpublish-from-recipe", async (req, res) => {
 
 router.get("/online/products", async (_req, res) => {
   try {
-    const items = await listPublishedCatalogItems();
+    const itemsResult = await pool.query(
+      `SELECT id, name, description, image_url, category, price_online, visible_online
+       FROM product
+       WHERE active = true
+       ORDER BY category ASC NULLS LAST, name ASC`,
+    );
+
     const grouped = new Map<string, Array<any>>();
-    for (const item of items) {
-      const category = (item.category || "Unmapped").trim() || "Unmapped";
+    for (const row of itemsResult.rows) {
+      if (row.visible_online !== true) continue;
+      const category = String(row.category ?? "UNMAPPED").trim() || "UNMAPPED";
       const existing = grouped.get(category) || [];
       existing.push({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        image: item.imageUrl,
-        price: item.price,
-        category,
+        id: Number(row.id),
+        name: String(row.name ?? ""),
+        description: row.description == null ? null : String(row.description),
+        image: row.image_url == null ? null : String(row.image_url),
+        imageUrl: row.image_url == null ? null : String(row.image_url),
+        price: row.price_online == null ? null : Number(row.price_online),
+        price_online: row.price_online == null ? null : Number(row.price_online),
+        online_category: category,
+        visible_online: true,
       });
       grouped.set(category, existing);
     }
@@ -261,10 +271,117 @@ router.get("/online/products", async (_req, res) => {
       name,
       items: categoryItems,
     }));
+
     res.json({ categories });
   } catch (error) {
     console.error("Error fetching online products:", error);
     res.status(500).json({ error: "Failed to fetch online products" });
+  }
+});
+
+router.get("/online/products/catalog", async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, description, image_url, category, price_online, visible_online, active
+       FROM product
+       WHERE active = true
+       ORDER BY category ASC NULLS LAST, name ASC`,
+    );
+
+    const items = result.rows.map((row) => ({
+      id: Number(row.id),
+      name: String(row.name ?? ""),
+      description: row.description == null ? null : String(row.description),
+      imageUrl: row.image_url == null ? null : String(row.image_url),
+      online_category: row.category == null ? null : String(row.category),
+      price_online: row.price_online == null ? null : Number(row.price_online),
+      visible_online: row.visible_online === true,
+      active: row.active === true,
+    }));
+
+    res.json({ items });
+  } catch (error) {
+    console.error("Error fetching online product catalog:", error);
+    res.status(500).json({ error: "Failed to fetch online product catalog" });
+  }
+});
+
+router.patch("/online/products/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return res.status(400).json({ error: "Invalid product id" });
+    }
+
+    const body = req.body ?? {};
+    const allowedKeys = ["visible_online", "price_online", "online_category", "description", "imageUrl", "name"] as const;
+
+    const hasAnyAllowedField = allowedKeys.some((key) => Object.prototype.hasOwnProperty.call(body, key));
+    if (!hasAnyAllowedField) {
+      return res.status(400).json({ error: "No supported fields in payload" });
+    }
+
+    const currentResult = await pool.query(
+      `SELECT id, name, description, image_url, category, price_online, visible_online
+       FROM product
+       WHERE id = $1
+       LIMIT 1`,
+      [id],
+    );
+
+    const current = currentResult.rows[0];
+    if (!current) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    const name = Object.prototype.hasOwnProperty.call(body, "name") ? String(body.name ?? "").trim() : String(current.name ?? "");
+    const description = Object.prototype.hasOwnProperty.call(body, "description") ? (body.description == null ? null : String(body.description)) : current.description;
+    const imageUrl = Object.prototype.hasOwnProperty.call(body, "imageUrl") ? (body.imageUrl == null ? null : String(body.imageUrl)) : current.image_url;
+    const onlineCategory = Object.prototype.hasOwnProperty.call(body, "online_category") ? (body.online_category == null ? null : String(body.online_category).trim()) : current.category;
+
+    let priceOnline = current.price_online == null ? null : Number(current.price_online);
+    if (Object.prototype.hasOwnProperty.call(body, "price_online")) {
+      const parsed = Number(body.price_online);
+      priceOnline = Number.isFinite(parsed) ? parsed : null;
+    }
+
+    const visibleOnline = Object.prototype.hasOwnProperty.call(body, "visible_online")
+      ? Boolean(body.visible_online)
+      : current.visible_online === true;
+
+    if (visibleOnline && (!(typeof priceOnline === "number") || priceOnline <= 0)) {
+      return res.status(400).json({ error: "Missing Online Price" });
+    }
+
+    const updated = await pool.query(
+      `UPDATE product
+       SET name = $2,
+           description = $3,
+           image_url = $4,
+           category = $5,
+           price_online = $6,
+           visible_online = $7,
+           updated_at = now()
+       WHERE id = $1
+       RETURNING id, name, description, image_url, category, price_online, visible_online`,
+      [id, name, description, imageUrl, onlineCategory, priceOnline, visibleOnline],
+    );
+
+    const row = updated.rows[0];
+    return res.json({
+      item: {
+        id: Number(row.id),
+        name: String(row.name ?? ""),
+        description: row.description == null ? null : String(row.description),
+        imageUrl: row.image_url == null ? null : String(row.image_url),
+        online_category: row.category == null ? null : String(row.category),
+        price_online: row.price_online == null ? null : Number(row.price_online),
+        visible_online: row.visible_online === true,
+      },
+    });
+  } catch (error) {
+    console.error("Error updating online product:", error);
+    return res.status(500).json({ error: "Failed to update online product" });
   }
 });
 
@@ -289,7 +406,7 @@ router.post("/online/orders", async (req, res) => {
       return res.status(400).json({ error: "timestamp must be a valid ISO string" });
     }
 
-    const onlineProducts = await listPublishedCatalogItems();
+    const onlineProducts = await getOnlineProductsFlat();
     const productMap = new Map<number, (typeof onlineProducts)[number]>();
     for (const product of onlineProducts) {
       productMap.set(product.id, product);
@@ -438,7 +555,7 @@ router.patch("/online/orders/:id/status", async (req, res) => {
 
 router.get("/ordering/menu", async (_req, res) => {
   try {
-    const items = await listPublishedCatalogItems();
+    const items = await getOnlineProductsFlat();
     const grouped = new Map<string, Array<any>>();
 
     for (const item of items) {
@@ -448,7 +565,7 @@ router.get("/ordering/menu", async (_req, res) => {
         id: item.id,
         name: item.name,
         description: item.description,
-        image_url: item.imageUrl,
+        image_url: item.image,
         price: item.price,
         category,
       });
