@@ -146,7 +146,7 @@ export default function RecipeListPage() {
           {recipes.map((recipe) => (
             <Link to={`/menu/recipes/${recipe.id}`} key={recipe.id}>
               <Card className="h-full overflow-hidden rounded-3xl border-slate-200 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-lg">
-                <div className="aspect-[16/10] bg-slate-100">
+                <div className="aspect-[16/10] max-h-52 bg-slate-100">
                   {recipe.imageUrl ? (
                     <img src={recipe.imageUrl} alt={recipe.name} className="h-full w-full object-cover" />
                   ) : (

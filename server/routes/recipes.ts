@@ -449,6 +449,9 @@ router.get('/v2/:id', async (req, res) => {
       sku: meta.sku,
       category: row.category,
       salePrice: Number(row.suggested_price ?? 0),
+      directPrice: Number(meta?.pricing?.directPrice ?? row.suggested_price ?? 0),
+      grabPrice: Number(meta?.pricing?.grabPrice ?? 0),
+      grabFeePercent: Number(meta?.pricing?.grabFeePercent ?? 0),
       description: row.description ?? '',
       imageUrl: meta.imageUrl || row.image_url || '',
       published: Boolean(meta?.onlinePublishing?.published),
@@ -482,10 +485,17 @@ router.put('/v2/:id', async (req, res) => {
     }
 
     const payload = req.body ?? {};
+    const directPrice = cleanMoney(payload.directPrice ?? payload.salePrice ?? 0);
     const nextMeta = {
       ...currentMeta,
       sku: currentMeta.sku,
       imageUrl: String(payload.imageUrl ?? currentMeta.imageUrl ?? ''),
+      pricing: {
+        ...(currentMeta.pricing ?? {}),
+        directPrice,
+        grabPrice: cleanMoney(payload.grabPrice ?? currentMeta?.pricing?.grabPrice ?? 0),
+        grabFeePercent: cleanMoney(payload.grabFeePercent ?? currentMeta?.pricing?.grabFeePercent ?? 0),
+      },
       servingsThisRecipeMakes: Number(payload.servingsThisRecipeMakes ?? currentMeta.servingsThisRecipeMakes ?? 0),
       servingsPerProduct: Number(payload.servingsPerProduct ?? currentMeta.servingsPerProduct ?? 0),
       productsMade: Number(payload.productsMade ?? currentMeta.productsMade ?? 1) || 1,
@@ -506,7 +516,7 @@ router.put('/v2/:id', async (req, res) => {
         String(current.name ?? ''),
         String(current.category ?? ''),
         String(payload.description ?? ''),
-        cleanMoney(payload.salePrice ?? 0),
+        directPrice,
         String(payload.imageUrl ?? ''),
         buildRecipeMeta(nextMeta),
       ],
