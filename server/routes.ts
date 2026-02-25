@@ -94,6 +94,7 @@ import expensesV2Routes from "./routes/expensesV2Routes";
 import menuOrderingRoutes from "./routes/menuOrderingRoutes";
 import ordersV2Routes from "./routes/ordersV2Routes";
 import onlineOrderingV2Router from "./routes/onlineOrderingV2";
+import onlineCatalogRouter from "./routes/onlineCatalog";
 import loyverseMapRoutes from "./routes/loyverseMapRoutes";
 import qrRoutes from "./routes/qrRoutes";
 import scbRoutes from "./routes/payments/scbRoutes";
@@ -1171,6 +1172,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Online Ordering v2 API (product-driven)
   app.use("/api", onlineOrderingV2Router);
+  app.use("/api", onlineCatalogRouter);
 
   // Serve static uploaded menu item images
   const uploadsDir = path.join(process.cwd(), "uploads");
@@ -1178,12 +1180,21 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     app.use("/uploads", express.static(uploadsDir));
   }
 
-  // Serve the online ordering SPA
+  // Serve the online ordering SPA (exclude dashboard route /online-ordering/catalog)
   if (fs.existsSync(orderingDist)) {
-    app.use("/online-ordering", express.static(orderingDist));
-    app.get("/online-ordering/*", (_, res) =>
-      res.sendFile(path.join(orderingDist, "index.html"))
-    );
+    const orderingStatic = express.static(orderingDist);
+    app.use("/online-ordering", (req, res, next) => {
+      if (req.path === "/catalog" || req.path.startsWith("/catalog/")) {
+        return next();
+      }
+      return orderingStatic(req, res, next);
+    });
+    app.get("/online-ordering/*", (req, res, next) => {
+      if (req.path === "/online-ordering/catalog" || req.path.startsWith("/online-ordering/catalog/")) {
+        return next();
+      }
+      return res.sendFile(path.join(orderingDist, "index.html"));
+    });
   }
 
   // Register daily review routes BEFORE catch-all :date route

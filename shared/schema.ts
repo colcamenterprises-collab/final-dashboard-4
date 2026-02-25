@@ -17,6 +17,7 @@ export const expenseSourceEnum = pgEnum('expense_source', ['BANK_UPLOAD', 'PARTN
 
 // Enum for External SKU Mapping - Sales Channels
 export const salesChannelEnum = pgEnum('sales_channel', ['pos', 'grab', 'foodpanda', 'house', 'other']);
+export const onlineCatalogSourceTypeEnum = pgEnum('online_catalog_source_type', ['recipe', 'manual']);
 
 // Users table
 export const users = pgTable("users", {
@@ -96,6 +97,23 @@ export const dailyStockSales = pgTable("daily_stock_sales", {
   status: text("status"),
   notes: text("notes"),
   discrepancyNotes: text("discrepancy_notes"),
+});
+
+
+// Online Ordering Catalog (source of truth for portal)
+export const onlineCatalogItems = pgTable("online_catalog_items", {
+  id: serial("id").primaryKey(),
+  sourceType: onlineCatalogSourceTypeEnum("source_type").notNull(),
+  sourceId: integer("source_id"),
+  name: text("name").notNull(),
+  description: text("description"),
+  imageUrl: text("image_url"),
+  category: text("category"),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull().default('0'),
+  isPublished: boolean("is_published").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Menu Items table

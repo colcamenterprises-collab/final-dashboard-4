@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import type { CartItem, OnlineCategory, OnlineProduct, OrderPayload } from "./types";
 
-type OnlineProductsResponse = { categories: OnlineCategory[] };
+type OnlineCatalogItem = OnlineProduct;
+type OnlineCatalogResponse = { items: OnlineCatalogItem[] };
 const SBB_YELLOW = "#FFEB00";
 const THB = (n: number) => `THB ${n.toFixed(2)}`;
 const loadLS = <T,>(k: string, f: T) => {
@@ -64,16 +65,28 @@ export default function App() {
     fontInjected.current = true;
   }, []);
 
+  const buildCategories = (items: OnlineCatalogItem[]): OnlineCategory[] => {
+    const grouped = new Map<string, OnlineProduct[]>();
+    for (const item of items) {
+      const category = (item.category || "Unmapped").trim() || "Unmapped";
+      const existing = grouped.get(category) || [];
+      existing.push(item);
+      grouped.set(category, existing);
+    }
+
+    return Array.from(grouped.entries()).map(([name, categoryItems]) => ({ name, items: categoryItems }));
+  };
+
   const fetchProducts = async () => {
     setLoading(true);
     setErrorMessage("");
     try {
-      const response = await fetch("/api/online/products");
-      const data: OnlineProductsResponse = await response.json();
+      const response = await fetch("/api/online/catalog");
+      const data: OnlineCatalogResponse = await response.json();
       if (!response.ok) {
         throw new Error("Online menu request failed.");
       }
-      const nextCategories = data.categories || [];
+      const nextCategories = buildCategories(Array.isArray(data.items) ? data.items : []);
       setCategories(nextCategories);
       if ((!activeCategory || !nextCategories.some((c) => c.name === activeCategory)) && nextCategories.length > 0) {
         setActiveCategory(nextCategories[0].name);
@@ -139,14 +152,15 @@ export default function App() {
     setSubmitting(true);
 
     try {
-      const refreshResponse = await fetch("/api/online/products");
-      const refreshData: OnlineProductsResponse = await refreshResponse.json();
+      const refreshResponse = await fetch("/api/online/catalog");
+      const refreshData: OnlineCatalogResponse = await refreshResponse.json();
       if (!refreshResponse.ok) {
         throw new Error("Unable to refresh product feed.");
       }
 
       const refreshedMap = new Map<number, OnlineProduct>();
-      for (const category of refreshData.categories || []) {
+      const refreshedCategories = buildCategories(Array.isArray(refreshData.items) ? refreshData.items : []);
+      for (const category of refreshedCategories) {
         for (const product of category.items) {
           refreshedMap.set(product.id, product);
         }

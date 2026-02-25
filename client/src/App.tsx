@@ -68,6 +68,7 @@ import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 import StockLedgers from "./pages/analysis/StockLedgers";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
+import OnlineOrderingCatalogPage from "./pages/online-ordering/CatalogPage";
 import MarketingMachine from "./pages/marketing/MarketingMachine";
 import PurchasingLive from "./pages/ops/PurchasingLive";
 import IngredientPurchasingList from "./pages/ops/IngredientPurchasingList";
@@ -222,6 +223,7 @@ export default function App() {
                 <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
 
                 <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
+                <Route path="/online-ordering/catalog" element={<Guard><OnlineOrderingCatalogPage /></Guard>} />
                 <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
                 <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
                 <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
