@@ -767,20 +767,20 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       }
     `;
     
-    console.log('Attempting to send updated email...');
-    try {
-      const emailResult = await workingEmailService.sendEmail(
-        "smashbrothersburgersth@gmail.com",
-        `Daily Sales & Stock COMPLETE – ${shiftDate}`,
-        updatedHtml
-      );
-      console.log(`Updated email result: ${emailResult ? 'SUCCESS' : 'FAILED'}`);
-    } catch (emailErr) {
-      console.error("Email send failed (non-blocking):", emailErr);
-      // Continue - do not throw
-    }
-    
+    // Respond immediately — all data is synced; email is non-blocking
     res.json({ ok: true, id });
+
+    // Fire-and-forget email (after response already sent)
+    console.log('Attempting to send updated email (background)...');
+    workingEmailService.sendEmail(
+      "smashbrothersburgersth@gmail.com",
+      `Daily Sales & Stock COMPLETE – ${shiftDate}`,
+      updatedHtml
+    ).then(emailResult => {
+      console.log(`Updated email result: ${emailResult ? 'SUCCESS' : 'FAILED'}`);
+    }).catch(emailErr => {
+      console.error("Email send failed (non-blocking):", emailErr);
+    });
   } catch (err) {
     console.error("Error updating daily sales with stock:", err);
     res.status(500).json({ ok: false, error: "Failed to update with stock data" });

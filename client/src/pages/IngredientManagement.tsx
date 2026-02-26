@@ -455,6 +455,7 @@ export default function IngredientManagement() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
       {/* Search and Filter */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
