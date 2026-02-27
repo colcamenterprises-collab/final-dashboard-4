@@ -1,10 +1,27 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet } from "react-router-dom";
 import { ModernHeader, ModernSidebar, BottomNav } from "@/components/navigation";
 import DataConfidenceBanner from "@/components/DataConfidenceBanner";
+import { cn } from "@/lib/utils";
 
 export default function PageShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    const savedState = window.localStorage.getItem("sidebarCollapsed");
+    if (savedState === "true") {
+      setIsSidebarCollapsed(true);
+    }
+  }, []);
+
+  const handleSidebarCollapseToggle = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      window.localStorage.setItem("sidebarCollapsed", String(next));
+      return next;
+    });
+  };
 
   return (
     <div className="h-dvh bg-slate-50 dark:bg-slate-900">
@@ -12,10 +29,17 @@ export default function PageShell() {
       <ModernSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        isCollapsed={isSidebarCollapsed}
+        onCollapseToggle={handleSidebarCollapseToggle}
       />
 
       {/* Modern layout shell */}
-      <div className="flex h-dvh lg:ml-64">
+      <div
+        className={cn(
+          "flex h-dvh transition-[margin] duration-300",
+          isSidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-64"
+        )}
+      >
         {/* Main content area */}
         <div className="flex min-h-0 flex-1 flex-col">
           {/* Modern Header */}
