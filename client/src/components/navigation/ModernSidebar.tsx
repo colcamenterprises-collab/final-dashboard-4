@@ -154,10 +154,12 @@ const navigationGroups: NavGroup[] = [
 interface ModernSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onCollapseToggle?: () => void;
   className?: string;
 }
 
-export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps) {
+export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapseToggle, className }: ModernSidebarProps) {
   const location = useLocation();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(
@@ -252,29 +254,46 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
           // Mobile visibility
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
           // Desktop: always visible, positioned normally
-          "lg:fixed lg:w-64 lg:z-auto",
+          isCollapsed ? "lg:w-[72px]" : "lg:w-64",
+          "lg:fixed lg:z-auto",
           className
         )}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-800">
+        <div className={cn(
+          "flex items-center border-b border-slate-200 dark:border-slate-800",
+          isCollapsed ? "justify-between p-3" : "justify-between p-6"
+        )}>
           <div className="flex items-center gap-3">
             <img 
               src="/attached_assets/Yellow Circle - Black Logo_1757766401641.png" 
               alt="Logo" 
-              className="w-[46px] h-[46px]"
+              className={cn("w-[46px] h-[46px]", isCollapsed && "w-9 h-9")}
             />
           </div>
-          
-          <ModernButton
-            variant="ghost"
-            size="sm"
-            onClick={onClose}
-            className="lg:hidden"
-            data-testid="button-close-sidebar"
-          >
-            <X className="h-4 w-4" />
-          </ModernButton>
+
+          <div className="flex items-center gap-2">
+            <ModernButton
+              variant="ghost"
+              size="sm"
+              onClick={onCollapseToggle}
+              className={cn(isCollapsed ? "inline-flex" : "hidden lg:inline-flex")}
+              data-testid="button-toggle-sidebar-collapse"
+              aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            >
+              {isCollapsed ? ">" : "<"}
+            </ModernButton>
+
+            <ModernButton
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="lg:hidden"
+              data-testid="button-close-sidebar"
+            >
+              <X className="h-4 w-4" />
+            </ModernButton>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -293,10 +312,10 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                       className="w-full flex items-center px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
                       data-testid="nav-dashboard-home"
                     >
-                      <span className="uppercase tracking-wider">{group.title}</span>
+                      <span className="uppercase tracking-wider">{isCollapsed ? "Home" : group.title}</span>
                     </NavLink>
                   ) : null
-                ) : !group.isStandalone && (
+                ) : !group.isStandalone && !isCollapsed && (
                   <button
                     onClick={() => toggleGroup(group.title)}
                     className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
@@ -315,7 +334,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                 )}
 
                 {/* Group items */}
-                {((group.isStandalone && group.items.length > 0) || (!group.isStandalone && isGroupOpen)) && (
+                {((group.isStandalone && group.items.length > 0) || (!group.isStandalone && (isGroupOpen || isCollapsed))) && (
                   <div 
                     className={cn(
                       "space-y-1",
@@ -337,6 +356,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                               rel="noopener noreferrer"
                               className={cn(
                                 "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
+                                isCollapsed && "lg:justify-center lg:px-2",
                                 item.isButton 
                                   ? "bg-black text-white hover:bg-gray-800 rounded-[4px]"
                                   : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -347,7 +367,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                 "h-4 w-4 transition-colors",
                                 item.isButton ? "text-white" : "text-slate-500"
                               )} />
-                              <span className="truncate">{item.label}</span>
+                              <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
                             </a>
                           ) : (
                           <NavLink
@@ -355,6 +375,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                             onClick={onClose}
                             className={cn(
                               "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
+                              isCollapsed && "lg:justify-center lg:px-2",
                               item.isButton
                                 ? "bg-black text-white hover:bg-gray-800 rounded-[4px]"
                                 : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -365,7 +386,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                               "h-4 w-4 transition-colors",
                               item.isButton ? "text-white" : "text-slate-500"
                             )} />
-                            <span className="truncate">{item.label}</span>
+                            <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
                           </NavLink>
                           )}
                           
@@ -382,6 +403,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                       onClick={onClose}
                                       className={cn(
                                         "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
+                                isCollapsed && "lg:justify-center lg:px-2",
                                         subActive
                                           ? "bg-black text-white rounded-[4px]"
                                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -392,7 +414,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                         "h-3 w-3 transition-colors",
                                         subActive ? "text-white" : "text-slate-400"
                                       )} />
-                                      <span className="truncate">{subItem.label}</span>
+                                      <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{subItem.label}</span>
                                     </NavLink>
                                     
                                     {/* Nested sub-items (third level) */}
@@ -408,6 +430,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                               onClick={onClose}
                                               className={cn(
                                                 "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
+                                isCollapsed && "lg:justify-center lg:px-2",
                                                 nestedActive
                                                   ? "bg-black text-white rounded-[4px]"
                                                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -418,7 +441,7 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
                                                 "h-3 w-3 transition-colors",
                                                 nestedActive ? "text-white" : "text-slate-400"
                                               )} />
-                                              <span className="truncate">{nestedItem.label}</span>
+                                              <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{nestedItem.label}</span>
                                             </NavLink>
                                           );
                                         })}
@@ -440,10 +463,12 @@ export function ModernSidebar({ isOpen, onClose, className }: ModernSidebarProps
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-          <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
-            v2.0.1 • Modern Dashboard
-          </div>
+        <div className={cn("p-4 border-t border-slate-200 dark:border-slate-800", isCollapsed && "px-2")}>
+          {!isCollapsed && (
+            <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
+              v2.0.1 • Modern Dashboard
+            </div>
+          )}
         </div>
       </div>
     </>
