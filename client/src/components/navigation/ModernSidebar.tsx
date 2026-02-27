@@ -277,7 +277,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
               variant="ghost"
               size="sm"
               onClick={onCollapseToggle}
-              className="hidden lg:inline-flex"
+              className={cn(isCollapsed ? "inline-flex" : "hidden lg:inline-flex")}
               data-testid="button-toggle-sidebar-collapse"
               aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
             >
@@ -312,7 +312,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                       className="w-full flex items-center px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
                       data-testid="nav-dashboard-home"
                     >
-                      <span className={cn("uppercase tracking-wider", isCollapsed && "hidden")}>{group.title}</span>
+                      <span className="uppercase tracking-wider">{isCollapsed ? "Home" : group.title}</span>
                     </NavLink>
                   ) : null
                 ) : !group.isStandalone && !isCollapsed && (
@@ -356,7 +356,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                               rel="noopener noreferrer"
                               className={cn(
                                 "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
-                                isCollapsed && "justify-center px-2",
+                                isCollapsed && "lg:justify-center lg:px-2",
                                 item.isButton 
                                   ? "bg-black text-white hover:bg-gray-800 rounded-[4px]"
                                   : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -367,7 +367,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                                 "h-4 w-4 transition-colors",
                                 item.isButton ? "text-white" : "text-slate-500"
                               )} />
-                              <span className={cn("truncate", isCollapsed && "hidden")}>{item.label}</span>
+                              <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
                             </a>
                           ) : (
                           <NavLink
@@ -375,7 +375,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                             onClick={onClose}
                             className={cn(
                               "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
-                              isCollapsed && "justify-center px-2",
+                              isCollapsed && "lg:justify-center lg:px-2",
                               item.isButton
                                 ? "bg-black text-white hover:bg-gray-800 rounded-[4px]"
                                 : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -386,7 +386,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                               "h-4 w-4 transition-colors",
                               item.isButton ? "text-white" : "text-slate-500"
                             )} />
-                            <span className={cn("truncate", isCollapsed && "hidden")}>{item.label}</span>
+                            <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
                           </NavLink>
                           )}
                           
@@ -403,7 +403,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                                       onClick={onClose}
                                       className={cn(
                                         "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
-                                isCollapsed && "justify-center px-2",
+                                isCollapsed && "lg:justify-center lg:px-2",
                                         subActive
                                           ? "bg-black text-white rounded-[4px]"
                                           : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -414,7 +414,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                                         "h-3 w-3 transition-colors",
                                         subActive ? "text-white" : "text-slate-400"
                                       )} />
-                                      <span className={cn("truncate", isCollapsed && "hidden")}>{subItem.label}</span>
+                                      <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{subItem.label}</span>
                                     </NavLink>
                                     
                                     {/* Nested sub-items (third level) */}
@@ -430,7 +430,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                                               onClick={onClose}
                                               className={cn(
                                                 "flex items-center gap-3 px-3 py-2 text-xs font-medium transition-all duration-200",
-                                isCollapsed && "justify-center px-2",
+                                isCollapsed && "lg:justify-center lg:px-2",
                                                 nestedActive
                                                   ? "bg-black text-white rounded-[4px]"
                                                   : "text-slate-600 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-white dark:hover:bg-slate-800 rounded-lg"
@@ -441,7 +441,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                                                 "h-3 w-3 transition-colors",
                                                 nestedActive ? "text-white" : "text-slate-400"
                                               )} />
-                                              <span className={cn("truncate", isCollapsed && "hidden")}>{nestedItem.label}</span>
+                                              <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{nestedItem.label}</span>
                                             </NavLink>
                                           );
                                         })}
