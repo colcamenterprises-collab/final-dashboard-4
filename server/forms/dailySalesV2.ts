@@ -499,7 +499,10 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
 export async function updateDailySalesV2WithStock(req: Request, res: Response) {
   try {
     const { id } = req.params;
+    const salesId = id;
     const { rollsEnd, meatEnd, requisition, drinkStock } = req.body;
+
+    console.log("[DAILY_STOCK_PATCH] start", { salesId, time: new Date().toISOString() });
 
     if (!id || String(id).trim() === '') {
       return res.status(400).json({ ok: false, error: 'Missing salesId linkage key' });
@@ -605,6 +608,8 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       return res.status(404).json({ ok: false, error: "Record not found" });
     }
 
+    console.log("[DAILY_STOCK_PATCH] db_saved", { salesId });
+
     // 🔐 WRITE-TIME FIELD BRIDGE (DO NOT REMOVE)
     // Map form fields to analytics columns for daily_stock_v2
     const burgerBuns = Number(mergedPayload.rollsEnd ?? 0) || 0;
@@ -670,7 +675,8 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
         }
       });
     }
-    
+
+    console.log("[DAILY_STOCK_PATCH] purchasing_synced", { salesId, count: allActiveItems.length });
     console.log(`[PATCH C] Synced ${allActiveItems.length} items to purchasing_shift_items (including zeros)`);
 
     console.log(`Updated daily sales record ${id} with stock data`);
@@ -768,6 +774,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     `;
     
     // Respond immediately — all data is synced; email is non-blocking
+    console.log("[DAILY_STOCK_PATCH] responding_ok", { salesId });
     res.json({ ok: true, id });
 
     // Fire-and-forget email (after response already sent)
@@ -782,8 +789,71 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       console.error("Email send failed (non-blocking):", emailErr);
     });
   } catch (err) {
-    console.error("Error updating daily sales with stock:", err);
+    const { id } = req.params;
+    const salesId = id;
+    console.error("[DAILY_STOCK_PATCH] error", { salesId, err });
     res.status(500).json({ ok: false, error: "Failed to update with stock data" });
+  }
+}
+
+export async function getDailySalesV2LatestProof(_req: Request, res: Response) {
+  try {
+    const latestSalesResult = await pool.query(
+      `SELECT id, "createdAt", "completedBy", "shiftDate", payload
+       FROM daily_sales_v2
+       WHERE "deletedAt" IS NULL
+       ORDER BY "createdAt" DESC
+       LIMIT 1`
+    );
+
+    if (latestSalesResult.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: 'No sales records found' });
+    }
+
+    const latestSales = latestSalesResult.rows[0];
+    const stockResult = await pool.query(
+      `SELECT "burgerBuns", "meatWeightG", "drinksJson", "purchasingJson", "updatedAt", "createdAt"
+       FROM daily_stock_v2
+       WHERE "salesId" = $1
+       ORDER BY COALESCE("updatedAt", "createdAt") DESC
+       LIMIT 1`,
+      [latestSales.id]
+    );
+
+    const stock = stockResult.rows[0];
+    const drinksJson = stock?.drinksJson && typeof stock.drinksJson === 'object' ? stock.drinksJson : {};
+    const drinksEndCount = Object.values(drinksJson as Record<string, unknown>)
+      .reduce((sum, qty) => sum + (Number(qty) || 0), 0);
+
+    return res.json({
+      ok: true,
+      latestSales: {
+        id: latestSales.id,
+        createdAt: latestSales.createdAt,
+        completedBy: latestSales.completedBy,
+        shiftDate: latestSales.shiftDate,
+      },
+      hasStock: Boolean(stock),
+      stockFields: stock
+        ? {
+            rollsEnd: stock.burgerBuns ?? null,
+            meatEnd: stock.meatWeightG ?? null,
+            drinksEndCount,
+            drinksJson,
+            purchasingJson: stock.purchasingJson ?? null,
+          }
+        : {
+            rollsEnd: null,
+            meatEnd: null,
+            drinksEndCount: null,
+            drinksJson: null,
+            purchasingJson: null,
+          },
+      lastStockUpdatedAt: stock ? (stock.updatedAt ?? stock.createdAt ?? null) : null,
+    });
+  } catch (err) {
+    console.error('[daily-sales-v2/latest-proof] error', err);
+    res.status(500).json({ ok: false, error: 'Failed to load latest proof' });
   }
 }
 
@@ -1006,6 +1076,7 @@ import express from "express";
 export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
+dailySalesV2Router.get("/daily-sales-v2/latest-proof", getDailySalesV2LatestProof);
 dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
 dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id/print", printDailySalesV2);

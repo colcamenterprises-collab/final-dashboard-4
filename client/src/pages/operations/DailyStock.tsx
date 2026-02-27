@@ -424,6 +424,7 @@ const DailyStock: React.FC = () => {
     };
 
     try {
+      console.log("[DAILY_STOCK_UI] saving", { salesId: shiftId, payloadPreview: payload });
       const res = await fetch(`/api/forms/daily-sales/v2/${shiftId}/stock`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

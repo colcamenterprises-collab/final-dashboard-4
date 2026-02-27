@@ -4772,6 +4772,10 @@ app.use("/api/bank-imports", bankUploadRouter);
   
   // Register Forms routes
   app.use("/api/forms", dailySalesV2Router);
+  app.get('/api/daily-sales-v2/latest-proof', async (req: Request, res: Response) => {
+    const { getDailySalesV2LatestProof } = await import('./forms/dailySalesV2.js');
+    return getDailySalesV2LatestProof(req, res);
+  });
   app.use('/api/forms', formsRouter);
   
   // Register Ingredients routes
