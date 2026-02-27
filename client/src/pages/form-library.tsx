@@ -9,7 +9,6 @@ type Row = {
   totalSales: number;
   meatGrams: number;
   burgerBuns: number;
-  drinks: Record<string, number>;
   shoppingListCount: number;
   shoppingPreview: string[];
 };
@@ -64,7 +63,6 @@ export default function FormLibrary() {
               <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm">Completed By</th>
               <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm">Total Sales</th>
               <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm hidden md:table-cell">Stock (Meat/Buns)</th>
-              <th className="p-2 md:p-3 border text-xs md:text-sm hidden lg:table-cell">Drinks</th>
               <th className="p-2 md:p-3 border text-xs md:text-sm hidden lg:table-cell">Shopping Items</th>
               <th className="p-2 md:p-3 text-left font-semibold text-xs md:text-sm">Actions</th>
             </tr>
@@ -95,15 +93,6 @@ export default function FormLibrary() {
                   <div className="text-green-600 font-medium">
                     {r.meatGrams}g • {r.burgerBuns}
                   </div>
-                </td>
-                <td className="p-2 md:p-3 border text-xs text-gray-700 leading-5 hidden lg:table-cell">
-                  {r.drinks
-                    ? Object.entries(r.drinks).slice(0, 3).map(([k, v], i) => (
-                        <div key={k} className="truncate">
-                          {k}: {v}
-                        </div>
-                      ))
-                    : '—'}
                 </td>
                 <td className="p-2 md:p-3 border text-xs md:text-sm hidden lg:table-cell" title={(r.shoppingPreview || []).join(', ')}>
                   {r.shoppingListCount ?? 0}
