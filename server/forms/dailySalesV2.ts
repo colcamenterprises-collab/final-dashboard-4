@@ -48,6 +48,42 @@ function resolveShiftDate(rawShiftDate: unknown): { shiftDateText: string; shift
   return { shiftDateText: normalized, shiftDateSql: normalized };
 }
 
+type AuditActionType =
+  | "CREATE_FORM1"
+  | "CREATE_FORM2"
+  | "UPDATE_FORM1"
+  | "UPDATE_FORM2"
+  | "RECOVERY_UPDATE";
+
+function getActorFromReq(req: Request): { actor: string; actorType: string } {
+  const sessionUser = (req as any)?.user?.username || (req as any)?.user?.id;
+  const headerUser = req.header("x-user-id") || req.header("x-user");
+  const ip = req.ip || req.socket?.remoteAddress || "unknown-ip";
+  const ua = req.header("user-agent") || "unknown-ua";
+  const actor = sessionUser || headerUser || `unknown|ip:${ip}|ua:${ua.slice(0, 80)}`;
+  return { actor, actorType: sessionUser || headerUser ? "user" : "unknown" };
+}
+
+function diffFields(before: Record<string, any>, after: Record<string, any>, keys: string[]) {
+  return keys
+    .filter((key) => JSON.stringify(before?.[key] ?? null) !== JSON.stringify(after?.[key] ?? null))
+    .map((key) => ({ field: key, from: before?.[key] ?? null, to: after?.[key] ?? null }));
+}
+
+async function appendAuditLog(
+  salesId: string,
+  req: Request,
+  actionType: AuditActionType,
+  changedFields: Array<{ field: string; from: any; to: any }>
+) {
+  const { actor, actorType } = getActorFromReq(req);
+  await pool.query(
+    `INSERT INTO daily_sales_stock_audit (id, "salesId", actor, "actorType", "actionType", "changedFields", "createdAt")
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())`,
+    [uuidv4(), salesId, actor, actorType, actionType, JSON.stringify(changedFields || [])]
+  );
+}
+
 // MEGA-PATCH: Normalize drinks + fix falsy zeroes
 export type DrinkStockObject = Record<string, number | null | undefined>;
 
@@ -85,6 +121,7 @@ export function mapLibraryRow(row: any) {
     meat: meatEnd ?? "-",    // 0 shows as 0, not "-"
     drinks,                  // normalized array
     drinksCount,             // sum of all drink quantities
+    hasStock: Boolean(row?.hasStock),
     status: "Submitted",
     payload: row.payload || {},
     grabReceiptCount,
@@ -257,6 +294,10 @@ export async function createDailySalesV2(req: Request, res: Response) {
         id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt, payload
       ]
     );
+
+    await appendAuditLog(id, req, "CREATE_FORM1", [
+      { field: "payload", from: null, to: payload }
+    ]);
     
     const linkedPurchases = (expenses || []).filter((e: any) => e.purchasingLinked);
     for (const expense of linkedPurchases) {
@@ -410,11 +451,12 @@ export async function createDailySalesV2(req: Request, res: Response) {
 
 export async function getDailySalesV2(_req: Request, res: Response) {
   try {
-    const queryText = `SELECT id, "shiftDate", "completedBy", "createdAt", payload
-       FROM daily_sales_v2 
-       WHERE "deletedAt" IS NULL
-         AND COALESCE("shiftDate"::date, "createdAt"::date) >= (CURRENT_DATE - INTERVAL '60 days')
-       ORDER BY COALESCE("shiftDate"::timestamp, "createdAt") DESC`;
+    const queryText = `SELECT d.id, d."shiftDate", d."completedBy", d."createdAt", d.payload, d."deletedAt",
+              EXISTS (SELECT 1 FROM daily_stock_v2 s WHERE s."salesId" = d.id) AS "hasStock"
+       FROM daily_sales_v2 d
+       WHERE d."deletedAt" IS NULL
+         AND COALESCE(d."shiftDate"::date, d."createdAt"::date) >= (CURRENT_DATE - INTERVAL '60 days')
+       ORDER BY COALESCE(d."shiftDate"::timestamp, d."createdAt") DESC`;
     const result = await pool.query(queryText);
 
     // Temporary deterministic debug logs for library visibility
@@ -429,10 +471,11 @@ export async function getDailySalesV2(_req: Request, res: Response) {
       // Never silently return empty if table has rows: return most recent non-deleted rows as fallback.
       if ((tableCount.rows[0]?.count || 0) > 0 && (deletedNullCount.rows[0]?.count || 0) > 0) {
         const fallback = await pool.query(
-          `SELECT id, "shiftDate", "completedBy", "createdAt", payload
-           FROM daily_sales_v2
-           WHERE "deletedAt" IS NULL
-           ORDER BY COALESCE("shiftDate"::timestamp, "createdAt") DESC
+          `SELECT d.id, d."shiftDate", d."completedBy", d."createdAt", d.payload, d."deletedAt",
+                  EXISTS (SELECT 1 FROM daily_stock_v2 s WHERE s."salesId" = d.id) AS "hasStock"
+           FROM daily_sales_v2 d
+           WHERE d."deletedAt" IS NULL
+           ORDER BY COALESCE(d."shiftDate"::timestamp, d."createdAt") DESC
            LIMIT 200`
         );
         console.log(`[daily-sales-v2/library] fallback_row_count=${fallback.rows.length}`);
@@ -467,6 +510,13 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
 
     const row = result.rows[0];
     const p = row.payload || {};
+    const auditResult = await pool.query(
+      `SELECT id, "salesId", actor, "actorType", "actionType", "changedFields", "createdAt"
+       FROM daily_sales_stock_audit
+       WHERE "salesId" = $1
+       ORDER BY "createdAt" DESC`,
+      [id]
+    );
     const grabReceiptCount = Number(p.grabReceiptCount ?? 0);
     const cashReceiptCount = Number(p.cashReceiptCount ?? 0);
     const qrReceiptCount = Number(p.qrReceiptCount ?? 0);
@@ -486,13 +536,71 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
       grabReceiptCount,
       cashReceiptCount,
       qrReceiptCount,
-      total_receipts: grabReceiptCount + cashReceiptCount + qrReceiptCount
+      total_receipts: grabReceiptCount + cashReceiptCount + qrReceiptCount,
+      audit: auditResult.rows
     };
 
     res.json({ ok: true, record });
   } catch (err) {
     console.error("Error fetching daily sales V2 record:", err);
     res.status(500).json({ ok: false, error: "Database error" });
+  }
+}
+
+export async function updateDailySalesV2Form1(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const body = req.body || {};
+    const existingResult = await pool.query(
+      `SELECT id, payload FROM daily_sales_v2 WHERE id = $1`,
+      [id]
+    );
+
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+
+    const existingPayload = existingResult.rows[0].payload || {};
+    const nextPayload = {
+      ...existingPayload,
+      ...(typeof body.completedBy !== 'undefined' ? { completedBy: body.completedBy } : {}),
+      ...(typeof body.startingCash !== 'undefined' ? { startingCash: toTHB(body.startingCash) } : {}),
+      ...(typeof body.cashSales !== 'undefined' ? { cashSales: toTHB(body.cashSales) } : {}),
+      ...(typeof body.qrSales !== 'undefined' ? { qrSales: toTHB(body.qrSales) } : {}),
+      ...(typeof body.grabSales !== 'undefined' ? { grabSales: toTHB(body.grabSales) } : {}),
+      ...(typeof body.otherSales !== 'undefined' ? { otherSales: toTHB(body.otherSales) } : {}),
+      ...(typeof body.expenses !== 'undefined' ? { expenses: body.expenses } : {}),
+      ...(typeof body.wages !== 'undefined' ? { wages: body.wages } : {}),
+      ...(typeof body.closingCash !== 'undefined' ? { closingCash: toTHB(body.closingCash) } : {}),
+      ...(typeof body.cashBanked !== 'undefined' ? { cashBanked: toTHB(body.cashBanked) } : {}),
+      ...(typeof body.qrTransfer !== 'undefined' ? { qrTransfer: toTHB(body.qrTransfer) } : {}),
+      ...(typeof body.grabReceiptCount !== 'undefined' ? { grabReceiptCount: Number(body.grabReceiptCount) || 0 } : {}),
+      ...(typeof body.cashReceiptCount !== 'undefined' ? { cashReceiptCount: Number(body.cashReceiptCount) || 0 } : {}),
+      ...(typeof body.qrReceiptCount !== 'undefined' ? { qrReceiptCount: Number(body.qrReceiptCount) || 0 } : {}),
+      ...(typeof body.directReceiptCount !== 'undefined' ? { directReceiptCount: Number(body.directReceiptCount) || 0 } : {}),
+      ...(typeof body.refunds !== 'undefined' ? { refunds: body.refunds } : {}),
+    } as Record<string, any>;
+
+    nextPayload.totalSales =
+      toTHB(nextPayload.cashSales ?? 0) +
+      toTHB(nextPayload.qrSales ?? 0) +
+      toTHB(nextPayload.grabSales ?? 0) +
+      toTHB(nextPayload.otherSales ?? 0);
+
+    await pool.query(
+      `UPDATE daily_sales_v2 SET payload = $1 WHERE id = $2`,
+      [JSON.stringify(nextPayload), id]
+    );
+
+    const changedFields = diffFields(existingPayload, nextPayload, [
+      'completedBy','startingCash','cashSales','qrSales','grabSales','otherSales','expenses','wages','closingCash','cashBanked','qrTransfer','grabReceiptCount','cashReceiptCount','qrReceiptCount','directReceiptCount','refunds','totalSales'
+    ]);
+    await appendAuditLog(id, req, 'UPDATE_FORM1', changedFields);
+
+    return res.json({ ok: true, id });
+  } catch (err) {
+    console.error('Update Daily Sales V2 Form 1 error', err);
+    return res.status(500).json({ ok: false, error: 'Failed to update record' });
   }
 }
 
@@ -579,6 +687,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
     }
 
     const existingPayload = existingResult.rows[0].payload || {};
+    const hadForm2Data = typeof existingPayload.rollsEnd !== 'undefined' || typeof existingPayload.meatEnd !== 'undefined' || (existingPayload.drinkStock && Object.keys(existingPayload.drinkStock).length > 0);
     const normalizedDrinkStock = (drinkStock && typeof drinkStock === 'object' && !Array.isArray(drinkStock))
       ? Object.fromEntries(Object.entries(drinkStock).map(([k, v]) => [k, Number(v) || 0]))
       : {};
@@ -589,6 +698,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       ...(typeof meatEnd !== 'undefined' ? { meatEnd: Number(meatEnd) || 0 } : {}),
       ...(typeof drinkStock !== 'undefined' ? { drinkStock: normalizedDrinkStock } : {}),
       ...(typeof requisition !== 'undefined' ? { requisition } : {}),
+      ...(hadForm2Data ? {} : { recoveredAt: new Date().toISOString() }),
       purchasingJson,
     };
 
@@ -773,6 +883,9 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       }
     `;
     
+    const changedFields = diffFields(existingPayload, mergedPayload, ['rollsEnd', 'meatEnd', 'drinkStock', 'requisition', 'notes', 'purchasingJson']);
+    await appendAuditLog(id, req, hadForm2Data ? 'UPDATE_FORM2' : 'RECOVERY_UPDATE', changedFields);
+
     // Respond immediately — all data is synced; email is non-blocking
     console.log("[DAILY_STOCK_PATCH] responding_ok", { salesId });
     res.json({ ok: true, id });
@@ -1078,6 +1191,7 @@ dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
 dailySalesV2Router.get("/daily-sales-v2/latest-proof", getDailySalesV2LatestProof);
 dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
+dailySalesV2Router.patch("/daily-sales/v2/:id", updateDailySalesV2Form1);
 dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id/print", printDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id/print-full", printDailySalesV2Full);
