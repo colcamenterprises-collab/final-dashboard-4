@@ -458,6 +458,10 @@ async function checkSchema() {
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
   app.use('/api/system-health', systemHealthRouter);
 
+  // AI Ops Control Room routes
+  const aiOpsControlRouter = (await import('./routes/aiOpsControl')).default;
+  app.use('/api/ops/ai', aiOpsControlRouter);
+
   // Ingredient Master route (PACK F)
   const ingredientMasterRouter = (await import('./routes/ingredientMaster')).default;
   app.use('/api/ingredient-master', ingredientMasterRouter);
