@@ -41,6 +41,7 @@ type RecordType = {
   drinks?: { name: string; quantity: number }[];
   drinksCount?: number;
   status: string;
+  hasStock?: boolean;
   grabReceiptCount?: number;
   cashReceiptCount?: number;
   qrReceiptCount?: number;
@@ -62,6 +63,7 @@ type FullRecord = {
   banking: any;
   stock: any;
   shoppingList: { name: string; qty: number; unit: string; category?: string }[];
+  audit?: Array<{ id: string; actor: string; actionType: string; changedFields: Array<{ field: string; from: any; to: any }>; createdAt: string }>;
 };
 
 // Drinks Requisition Component with costs from ingredient_v2
@@ -284,7 +286,8 @@ export default function DailySalesV2Library() {
           meat: p.meatEnd ?? 0,
           drinks: drinksArray
         },
-        shoppingList: p.requisition || []
+        shoppingList: p.requisition || [],
+        audit: Array.isArray(record.audit) ? record.audit : []
       };
       
       setSelected(transformedRecord);
@@ -294,6 +297,13 @@ export default function DailySalesV2Library() {
   function editRecord(id: string) {
     window.location.href = `/operations/daily-sales/edit/${id}`;
   }
+
+  function completeStockRecord(id: string) {
+    window.location.href = `/operations/daily-stock?shift=${id}`;
+  }
+
+  const hasForm2Data = (rec: RecordType) => Boolean(rec.hasStock);
+
 
   const filteredRecords = showArchived
     ? records.filter((r) => r.deletedAt)
@@ -406,6 +416,14 @@ export default function DailySalesV2Library() {
                       </button>
                       {!rec.deletedAt && (
                         <>
+                          {!hasForm2Data(rec) && (
+                            <button
+                              className="px-1.5 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-[Poppins] rounded text-[10px] md:text-xs"
+                              onClick={() => completeStockRecord(rec.id)}
+                            >
+                              Complete Stock (Form 2)
+                            </button>
+                          )}
                           <button
                             className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 text-black font-[Poppins] rounded text-[10px] md:text-xs"
                             onClick={() => editRecord(rec.id)}
@@ -513,6 +531,14 @@ export default function DailySalesV2Library() {
                 </button>
                 {!rec.deletedAt && (
                   <>
+                    {!hasForm2Data(rec) && (
+                      <button
+                        className="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded text-[10px] sm:text-xs"
+                        onClick={() => completeStockRecord(rec.id)}
+                      >
+                        Complete Stock (Form 2)
+                      </button>
+                    )}
                     <button
                       className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-black rounded text-[10px] sm:text-xs"
                       onClick={() => editRecord(rec.id)}
@@ -696,6 +722,29 @@ export default function DailySalesV2Library() {
                 {/* Drinks Requisition Section */}
                 <DrinksRequisitionSection requisition={selected.shoppingList} />
               </div>
+            </div>
+
+
+            <div className="mt-4 border-t pt-4">
+              <details className="cursor-pointer">
+                <summary className="font-semibold text-gray-700 text-xs">Audit</summary>
+                <div className="mt-2 space-y-2">
+                  {(selected.audit || []).length === 0 ? (
+                    <p className="text-xs text-gray-500">No audit entries</p>
+                  ) : (
+                    (selected.audit || []).map((entry) => (
+                      <div key={entry.id} className="bg-gray-50 border border-gray-200 rounded p-2 text-xs">
+                        <p><strong>{entry.actionType}</strong> • {new Date(entry.createdAt).toLocaleString()} • {entry.actor}</p>
+                        <ul className="list-disc ml-4 mt-1">
+                          {(entry.changedFields || []).map((f, idx) => (
+                            <li key={`${entry.id}-${idx}`}>{f.field}: {String(f.from ?? 'null')} → {String(f.to ?? 'null')}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </details>
             </div>
 
             {/* Raw Data Section (for debugging) */}
