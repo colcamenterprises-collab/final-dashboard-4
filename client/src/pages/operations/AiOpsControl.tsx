@@ -155,9 +155,12 @@ export default function AiOpsControlPage() {
         <p className="text-sm text-slate-600">Task queue, assignment control, and audit trail for multi-agent operations.</p>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
         {AGENT_OVERVIEW.map((agent) => (
-          <article key={agent.name} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
+          <article
+            key={agent.name}
+            className="rounded-lg border border-slate-200 bg-white p-4 transition-all hover:border-slate-300 hover:shadow-sm"
+          >
             <p className="text-base font-semibold text-slate-900">{agent.name}</p>
             <p className="text-xs uppercase tracking-wide text-slate-500">{agent.title}</p>
             <p className="mt-2 text-sm text-slate-600">{agent.description}</p>
