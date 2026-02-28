@@ -77,6 +77,7 @@ import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
 import DailySummaryReportsPage from "./pages/operations/daily-reports";
 import SystemHealthPage from "./pages/operations/system-health";
+import AiOpsControlPage from "./pages/operations/AiOpsControl";
 import ShiftReportDashboard from "./pages/reports/shift-report";
 import ShiftReportHistory from "./pages/reports/shift-report/history";
 import ShiftReportDetail from "./pages/reports/shift-report/view/ShiftReportDetail";
@@ -162,6 +163,7 @@ export default function App() {
                 
                 <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
                 <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
+                <Route path="/operations/ai-ops-control" element={<Guard><AiOpsControlPage /></Guard>} />
                 <Route path="/operations/purchase-history" element={<Guard><PurchaseHistory /></Guard>} />
                 <Route path="/operations/health-safety-audit" element={<Guard><HealthSafetyAuditPage /></Guard>} />
                 <Route path="/operations/health-safety-audit/questions" element={<Guard><HealthSafetyQuestionManager /></Guard>} />

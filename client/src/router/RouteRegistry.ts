@@ -33,6 +33,7 @@ export const ROUTES = {
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",
   SYSTEM_HEALTH: "/operations/system-health",
+  AI_OPS_CONTROL: "/operations/ai-ops-control",
   PURCHASE_HISTORY: "/operations/purchase-history",
   HEALTH_SAFETY_AUDIT: "/operations/health-safety-audit",
   HEALTH_SAFETY_QUESTIONS: "/operations/health-safety-audit/questions",

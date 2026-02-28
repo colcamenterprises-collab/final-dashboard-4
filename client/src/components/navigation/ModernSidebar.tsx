@@ -91,6 +91,7 @@ const navigationGroups: NavGroup[] = [
         ]
       },
       { to: "/operations/system-health", label: "System Health Test", icon: Settings, testId: "nav-system-health" },
+      { to: "/operations/ai-ops-control", label: "AI Ops Control", icon: Bot, testId: "nav-ai-ops-control" },
       { to: "/operations/health-safety-audit", label: "Health & Safety Audit", icon: Settings, testId: "nav-health-safety" }
     ]
   },
