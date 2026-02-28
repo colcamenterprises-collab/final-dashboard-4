@@ -310,38 +310,40 @@ export default function DailySalesV2Library() {
     : records.filter((r) => !r.deletedAt);
 
   return (
-    <div className="p-3 md:p-6">
-      {/* Header - Mobile Responsive */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-4 gap-2">
-        <h1 className="text-xl md:text-2xl font-extrabold font-[Poppins]">
-          Daily Sales Library (V2)
-        </h1>
-        <button
-          className="px-2 py-1 sm:px-3 sm:py-2 bg-gray-200 hover:bg-gray-300 rounded text-xs sm:text-sm"
-          onClick={() => setShowArchived(!showArchived)}
-        >
-          {showArchived ? "Show Active" : "Show Archived"}
-        </button>
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900 font-[Poppins]">Daily Sales Library (V2)</h1>
+            <p className="mt-1 text-sm text-slate-600">Full-width operations archive with cleaner spacing for tablet and desktop review.</p>
+          </div>
+          <button
+            className="h-11 rounded-lg border border-slate-300 bg-slate-100 px-4 text-sm font-medium text-slate-700 hover:bg-slate-200"
+            onClick={() => setShowArchived(!showArchived)}
+          >
+            {showArchived ? "Show Active" : "Show Archived"}
+          </button>
+        </div>
       </div>
 
       {loading && <p className="text-center py-4">Loading...</p>}
       {error && <p className="text-red-500 text-center py-4">{error}</p>}
       
       {/* Desktop Table - Hidden on Mobile */}
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="min-w-full bg-white border border-gray-200 rounded-lg">
+      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+        <table className="min-w-full bg-white border border-slate-200 rounded-xl overflow-hidden">
           <thead>
-            <tr className="bg-gray-100 text-left text-xs md:text-sm font-semibold font-[Poppins]">
-              <th className="px-2 py-1 border-b">Date</th>
-              <th className="px-2 py-1 border-b">Staff</th>
-              <th className="px-2 py-1 border-b">Total Sales</th>
-              <th className="px-2 py-1 border-b">Rolls</th>
-              <th className="px-2 py-1 border-b">Meat</th>
-              <th className="px-2 py-1 border-b">Drinks</th>
-              <th className="px-2 py-1 border-b">Receipts</th>
-              <th className="px-2 py-1 border-b">Balanced</th>
-              <th className="px-2 py-1 border-b">Status</th>
-              <th className="px-2 py-1 border-b">Actions</th>
+            <tr className="bg-slate-100 text-left text-sm font-semibold font-[Poppins] text-slate-700">
+              <th className="px-4 py-3 border-b">Date</th>
+              <th className="px-4 py-3 border-b">Staff</th>
+              <th className="px-4 py-3 border-b">Total Sales</th>
+              <th className="px-4 py-3 border-b">Rolls</th>
+              <th className="px-4 py-3 border-b">Meat</th>
+              <th className="px-4 py-3 border-b">Drinks</th>
+              <th className="px-4 py-3 border-b">Receipts</th>
+              <th className="px-4 py-3 border-b">Balanced</th>
+              <th className="px-4 py-3 border-b">Status</th>
+              <th className="px-4 py-3 border-b">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -353,23 +355,23 @@ export default function DailySalesV2Library() {
               </tr>
             ) : (
               filteredRecords.map((rec) => (
-                <tr key={rec.id} className="text-xs md:text-sm font-[Poppins] hover:bg-gray-50">
-                  <td className="px-2 py-1 border-b whitespace-nowrap">
+                <tr key={rec.id} className="text-sm font-[Poppins] hover:bg-slate-50">
+                  <td className="px-4 py-3 border-b whitespace-nowrap">
                     {new Date(rec.date).toLocaleDateString()}
                   </td>
-                  <td className="px-2 py-1 border-b">{rec.staff}</td>
-                  <td className="px-2 py-1 border-b whitespace-nowrap">{thb(rec.totalSales)}</td>
-                  <td className="px-2 py-1 border-b">{rec.buns ?? "-"}</td>
-                  <td className="px-2 py-1 border-b">{rec.meat ?? "-"}</td>
-                  <td className="px-2 py-1 border-b">
+                  <td className="px-4 py-3 border-b">{rec.staff}</td>
+                  <td className="px-4 py-3 border-b whitespace-nowrap">{thb(rec.totalSales)}</td>
+                  <td className="px-4 py-3 border-b">{rec.buns ?? "-"}</td>
+                  <td className="px-4 py-3 border-b">{rec.meat ?? "-"}</td>
+                  <td className="px-4 py-3 border-b">
                     {(rec.drinksCount ?? 0) > 0 
                       ? `${rec.drinksCount} items`
                       : "-"}
                   </td>
-                  <td className="px-2 py-1 border-b">
+                  <td className="px-4 py-3 border-b">
                     {(() => { const r = getReceiptCounts(rec); return `${r.total}`; })()}
                   </td>
-                  <td className="px-2 py-1 border-b">
+                  <td className="px-4 py-3 border-b">
                     {rec.payload?.balanced ? (
                       <span className="px-1.5 py-0.5 text-[10px] md:text-xs font-semibold rounded bg-green-100 text-green-700">
                         Balanced
@@ -380,7 +382,7 @@ export default function DailySalesV2Library() {
                       </span>
                     )}
                   </td>
-                  <td className="px-2 py-1 border-b">
+                  <td className="px-4 py-3 border-b">
                     {rec.deletedAt ? (
                       <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[10px] md:text-xs whitespace-nowrap">
                         Archived
@@ -391,24 +393,24 @@ export default function DailySalesV2Library() {
                       </span>
                     )}
                   </td>
-                  <td className="px-2 py-1 border-b">
+                  <td className="px-4 py-3 border-b">
                     <div className="flex flex-wrap gap-0.5">
                       <button
-                        className="p-1 hover:bg-gray-100 text-black rounded"
+                        className="p-1 hover:bg-slate-100 text-black rounded"
                         onClick={() => viewRecord(rec.id)}
                         title="View"
                       >
                         <Eye size={14} />
                       </button>
                       <button
-                        className="p-1 hover:bg-gray-100 text-black rounded"
+                        className="p-1 hover:bg-slate-100 text-black rounded"
                         onClick={() => printRecord(rec.id)}
                         title="Print"
                       >
                         <Printer size={14} />
                       </button>
                       <button
-                        className="p-1 hover:bg-gray-100 text-black rounded"
+                        className="p-1 hover:bg-slate-100 text-black rounded"
                         onClick={() => downloadRecord(rec)}
                         title="Download"
                       >
@@ -425,7 +427,7 @@ export default function DailySalesV2Library() {
                             </button>
                           )}
                           <button
-                            className="px-1.5 py-0.5 bg-gray-100 hover:bg-gray-200 text-black font-[Poppins] rounded text-[10px] md:text-xs"
+                            className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-[Poppins] rounded text-[10px] md:text-xs"
                             onClick={() => editRecord(rec.id)}
                           >
                             Edit
@@ -456,14 +458,14 @@ export default function DailySalesV2Library() {
       </div>
 
       {/* Mobile Card Layout - Shown on Small Screens */}
-      <div className="lg:hidden space-y-2">
+      <div className="lg:hidden space-y-3">
         {filteredRecords.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
             No records found
           </div>
         ) : (
           filteredRecords.map((rec) => (
-            <div key={rec.id} className="bg-white border border-gray-200 rounded-lg p-2 sm:p-3 shadow-sm">
+            <div key={rec.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
               {/* Compact Info Row */}
               <div className="flex items-center justify-between gap-2 mb-2">
                 <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
@@ -504,21 +506,21 @@ export default function DailySalesV2Library() {
               {/* Compact Actions Row */}
               <div className="flex items-center gap-1">
                 <button
-                  className="p-1 hover:bg-gray-100 text-black rounded"
+                  className="p-1 hover:bg-slate-100 text-black rounded"
                   onClick={() => viewRecord(rec.id)}
                   title="View"
                 >
                   <Eye size={14} />
                 </button>
                 <button
-                  className="p-1 hover:bg-gray-100 text-black rounded"
+                  className="p-1 hover:bg-slate-100 text-black rounded"
                   onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/print-full`, "_blank")}
                   title="Print"
                 >
                   <Printer size={14} />
                 </button>
                 <button
-                  className="p-1 hover:bg-gray-100 text-black rounded"
+                  className="p-1 hover:bg-slate-100 text-black rounded"
                   onClick={() => {
                     const link = document.createElement("a");
                     link.href = `/api/forms/daily-sales/v2/${rec.id}/pdf`;
@@ -540,7 +542,7 @@ export default function DailySalesV2Library() {
                       </button>
                     )}
                     <button
-                      className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-black rounded text-[10px] sm:text-xs"
+                      className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded text-[10px] sm:text-xs"
                       onClick={() => editRecord(rec.id)}
                     >
                       Edit
