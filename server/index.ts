@@ -461,6 +461,7 @@ async function checkSchema() {
   // AI Ops Control Room routes
   const aiOpsControlRouter = (await import('./routes/aiOpsControl')).default;
   app.use('/api/ops/ai', aiOpsControlRouter);
+  app.use('/api/ai-ops', aiOpsControlRouter);
 
   // Ingredient Master route (PACK F)
   const ingredientMasterRouter = (await import('./routes/ingredientMaster')).default;
