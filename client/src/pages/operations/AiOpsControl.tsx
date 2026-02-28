@@ -41,6 +41,34 @@ const PRIORITY_OPTIONS: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const FREQUENCY_OPTIONS: TaskFrequency[] = ["once", "daily", "weekly", "monthly", "ad-hoc"];
 const AGENT_OPTIONS: TaskAgent[] = ["bob", "jussi", "sally", "supplier", "codex"];
 
+const AGENT_OVERVIEW = [
+  {
+    name: "Bob",
+    title: "AI Operations Manager",
+    description: "Orchestrates tasks, assigns specialists, enforces thresholds, and maintains the audit trail.",
+  },
+  {
+    name: "Jussi",
+    title: "Operations Analyst",
+    description: "Reconciles sales, flags stock variances, and analyses items and modifiers per shift.",
+  },
+  {
+    name: "Sally",
+    title: "Financial Controller",
+    description: "Audits wages, shift expenses, and rolling 24-hour business costs.",
+  },
+  {
+    name: "Supplier",
+    title: "Procurement Coordinator",
+    description: "Generates supplier-ready orders, confirms acknowledgements, and books deliveries.",
+  },
+  {
+    name: "Codex",
+    title: "Software Engineer",
+    description: "Implements fixes, migrations, and system enhancements.",
+  },
+] as const;
+
 export default function AiOpsControlPage() {
   const queryClient = useQueryClient();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -126,6 +154,16 @@ export default function AiOpsControlPage() {
         <h1 className="text-2xl font-semibold text-slate-900">AI Ops Control</h1>
         <p className="text-sm text-slate-600">Task queue, assignment control, and audit trail for multi-agent operations.</p>
       </div>
+
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        {AGENT_OVERVIEW.map((agent) => (
+          <article key={agent.name} className="rounded-lg border border-slate-200 bg-white p-4 transition-colors hover:border-slate-300">
+            <p className="text-base font-semibold text-slate-900">{agent.name}</p>
+            <p className="text-xs uppercase tracking-wide text-slate-500">{agent.title}</p>
+            <p className="mt-2 text-sm text-slate-600">{agent.description}</p>
+          </article>
+        ))}
+      </section>
 
       <section className="rounded-lg border bg-white p-4">
         <h2 className="text-base font-semibold mb-3">Create Task</h2>
