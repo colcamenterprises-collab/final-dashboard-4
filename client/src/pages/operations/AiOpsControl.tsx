@@ -46,6 +46,39 @@ const FREQUENCY_OPTIONS: TaskFrequency[] = ["once", "daily", "weekly", "monthly"
 const AGENT_OPTIONS: TaskAgent[] = ["bob", "jussi", "sally", "supplier", "codex"];
 const AGENT_IMAGES: Record<string, string | null> = { bob: "/src/assets/agents/bob.png", jussi: null, sally: null, supplier: null, codex: null };
 
+const AGENT_OVERVIEW: Array<Pick<AgentItem, "agent" | "name" | "role" | "description">> = [
+  {
+    agent: "bob",
+    name: "Bob",
+    role: "AI Operations Manager",
+    description: "Orchestrates tasks, assigns specialists, and maintains audit trail.",
+  },
+  {
+    agent: "jussi",
+    name: "Jussi",
+    role: "Operations Analyst",
+    description: "Reconciles sales, stock variances, and item/modifier performance.",
+  },
+  {
+    agent: "sally",
+    name: "Sally",
+    role: "Financial Controller",
+    description: "Audits wages, shift expenses, and 24-hour business costs.",
+  },
+  {
+    agent: "supplier",
+    name: "Supplier",
+    role: "Procurement Coordinator",
+    description: "Prepares supplier orders and manages acknowledgements/deliveries.",
+  },
+  {
+    agent: "codex",
+    name: "Codex",
+    role: "Software Engineer",
+    description: "Implements fixes, migrations, and system enhancements.",
+  },
+];
+
 const statusPillClass: Record<AgentStatus, string> = {
   idle: "bg-slate-100 text-slate-700 ring-slate-200",
   running: "bg-emerald-100 text-emerald-800 ring-emerald-200",
@@ -78,6 +111,18 @@ export default function AiOpsControlPage() {
   }, [statusFilter, agentFilter, publishFilter, search]);
 
   const agentsQuery = useQuery<{ items: AgentItem[] }>({ queryKey: ["/api/ai-ops/agents"] });
+  const normalizedAgents = useMemo<AgentItem[]>(() => {
+    const dbAgents = agentsQuery.data?.items;
+    if (dbAgents && dbAgents.length) {
+      return dbAgents;
+    }
+
+    return AGENT_OVERVIEW.map((agent) => ({
+      ...agent,
+      status: "idle",
+      statusMessage: "INSUFFICIENT DATA",
+    }));
+  }, [agentsQuery.data?.items]);
   const tasksQuery = useQuery<{ items: Task[] }>({ queryKey: [`/api/ai-ops/tasks${taskQueryString}`] });
   const detailQuery = useQuery<TaskDetail>({
     queryKey: selectedTaskId ? [`/api/ai-ops/tasks/${selectedTaskId}`] : ["/api/ai-ops/tasks/noop"],
@@ -156,8 +201,8 @@ export default function AiOpsControlPage() {
         <p className="text-sm text-slate-600">Task queue, assignment control, threaded collaboration, reviews, and audit trail.</p>
       </div>
 
-      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {(agentsQuery.data?.items || []).map((agent) => (
+      <section className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+        {normalizedAgents.map((agent) => (
           <article key={agent.agent} className="rounded-lg border border-slate-200 bg-white p-4 text-center">
             <div className="mx-auto mb-3 h-[90px] w-[90px] overflow-hidden rounded-full border border-slate-200 shadow-sm ring-1 ring-slate-100">
               {AGENT_IMAGES[agent.agent] && !failedAgentImages[agent.agent] ? (
