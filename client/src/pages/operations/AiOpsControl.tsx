@@ -250,6 +250,9 @@ export default function AiOpsControlPage() {
   const [ideaDescription, setIdeaDescription] = useState('');
   const [ideaCategory, setIdeaCategory] = useState<IdeaCategory>('ops');
   const [convertIssueSeverity, setConvertIssueSeverity] = useState<IssueSeverity>('medium');
+  const [queueView, setQueueView] = useState<'list' | 'timeline'>('list');
+  const [detailTab, setDetailTab] = useState<'details' | 'activity' | 'notes'>('details');
+  const [teamImage, setTeamImage] = useState<string | null>(null);
 
   const taskQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -424,13 +427,62 @@ export default function AiOpsControlPage() {
     if (selectedIssue) setIssuePlan(selectedIssue.planMd || '');
   }, [selectedIssue]);
 
+  const tasks = tasksQuery.data?.items || [];
+  const issues = issuesQuery.data?.items || [];
+  const ideas = ideasQuery.data?.items || [];
+  const openTasks = tasks.filter((task) => !['done', 'cancelled'].includes(task.status)).length;
+  const openIssues = issues.filter((issue) => !['done', 'closed', 'rejected'].includes(issue.status)).length;
+  const dueToday = tasks.filter((task) => {
+    if (!task.dueAt) return false;
+    return new Date(task.dueAt).toDateString() === new Date().toDateString();
+  }).length;
+  const totalQueue = openTasks + openIssues + ideas.length;
+
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold text-slate-900">AI Ops Control</h1>
-        <p className="text-sm text-slate-600">
-          Central command for AI task execution, incident workflow, and idea intake.
-        </p>
+    <div className="space-y-6">
+      <header className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-xl md:p-6">
+        <div className="grid gap-5 lg:grid-cols-[minmax(320px,1.2fr)_minmax(0,2fr)] lg:items-stretch">
+          <div className="space-y-3 rounded-xl border border-slate-700/60 bg-slate-800/70 p-4">
+            <div className="flex items-center justify-between">
+              <h1 className="text-2xl font-semibold">AI Ops Control</h1>
+              <label className="cursor-pointer rounded-lg border border-slate-600 px-3 py-2 text-xs">
+                Upload team image
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) setTeamImage(URL.createObjectURL(file));
+                  }}
+                />
+              </label>
+            </div>
+            <p className="text-sm text-slate-200">
+              Central command for AI task execution, incident workflow, and idea intake.
+            </p>
+            <div className="h-44 overflow-hidden rounded-xl border border-slate-700 bg-slate-700/50">
+              <img
+                src={teamImage || 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80'}
+                alt="Operations team"
+                className="h-full w-full object-cover"
+              />
+            </div>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              { label: 'Today Queue', value: totalQueue },
+              { label: 'Open Issues', value: openIssues },
+              { label: 'Tasks Due Today', value: dueToday },
+              { label: 'Live Agents', value: (agentsQuery.data?.items || []).length },
+            ].map((item) => (
+              <article key={item.label} className="rounded-xl border border-slate-700/60 bg-slate-800/60 p-4">
+                <p className="text-xs uppercase tracking-wider text-slate-300">{item.label}</p>
+                <p className="mt-3 text-3xl font-semibold">{item.value}</p>
+              </article>
+            ))}
+          </div>
+        </div>
       </header>
 
       <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -458,19 +510,45 @@ export default function AiOpsControlPage() {
                   <p className="line-clamp-1 text-xs text-slate-600">{agent.role}</p>
                 </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span
-                  className={`rounded-full border px-2 py-1 text-xs font-medium ${statusMeta.className}`}
-                >
-                  {statusMeta.label}
-                </span>
-              </div>
+              <span
+                className={`rounded-full border px-2 py-1 text-xs font-medium ${statusMeta.className}`}
+              >
+                {statusMeta.label}
+              </span>
             </article>
           );
         })}
       </section>
 
-      <section className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="inline-flex rounded-lg border border-slate-300 p-1">
+          <button type="button" className={`rounded-md px-3 py-2 text-sm ${queueView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-700'}`} onClick={() => setQueueView('list')}>
+            Queue List
+          </button>
+          <button type="button" className={`rounded-md px-3 py-2 text-sm ${queueView === 'timeline' ? 'bg-slate-900 text-white' : 'text-slate-700'}`} onClick={() => setQueueView('timeline')}>
+            Timeline View
+          </button>
+        </div>
+      </div>
+
+      {queueView === 'timeline' && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-slate-900">Timeline</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {[...tasks, ...issues.map((issue) => ({ ...issue, dueAt: null, frequency: 'ad-hoc' as TaskFrequency }))]
+              .slice(0, 9)
+              .map((item: any, index) => (
+                <div key={`${item.id}-${index}`} className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500">{item.status}</p>
+                  <p className="text-sm font-medium text-slate-900">{item.title}</p>
+                  <p className="mt-2 text-xs text-slate-500">{item.dueAt ? new Date(item.dueAt).toLocaleDateString() : 'No due date'}</p>
+                </div>
+              ))}
+          </div>
+        </section>
+      )}
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,1.1fr)_minmax(0,1.5fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
             <h2 className="text-lg font-semibold text-slate-900">Tasks</h2>
@@ -490,13 +568,13 @@ export default function AiOpsControlPage() {
               className="grid gap-2 rounded-lg border border-slate-200 p-3"
             >
               <input
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
                 placeholder="New task title"
               />
               <textarea
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 rows={2}
                 value={taskDescription}
                 onChange={(e) => setTaskDescription(e.target.value)}
@@ -504,7 +582,7 @@ export default function AiOpsControlPage() {
               />
               <div className="grid gap-2 sm:grid-cols-3">
                 <select
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                   value={taskPriority}
                   onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
                 >
@@ -515,7 +593,7 @@ export default function AiOpsControlPage() {
                   ))}
                 </select>
                 <select
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                   value={taskFrequency}
                   onChange={(e) => setTaskFrequency(e.target.value as TaskFrequency)}
                 >
@@ -528,7 +606,7 @@ export default function AiOpsControlPage() {
                   )}
                 </select>
                 <select
-                  className="rounded border border-slate-300 px-2 py-1 text-sm"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                   value={taskAssignee}
                   onChange={(e) => setTaskAssignee(e.target.value as TaskAgent | '')}
                 >
@@ -542,7 +620,7 @@ export default function AiOpsControlPage() {
                 </select>
               </div>
               <button
-                className="w-fit rounded border border-slate-300 px-3 py-1 text-sm"
+                className="w-fit rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
                 type="submit"
               >
                 Create Task
@@ -551,7 +629,7 @@ export default function AiOpsControlPage() {
 
             <div className="grid gap-2 text-sm sm:grid-cols-3">
               <select
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={taskStatusFilter}
                 onChange={(e) => setTaskStatusFilter(e.target.value)}
               >
@@ -563,7 +641,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <select
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={taskAgentFilter}
                 onChange={(e) => setTaskAgentFilter(e.target.value)}
               >
@@ -575,7 +653,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <input
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 placeholder="Search"
                 value={taskSearch}
                 onChange={(e) => setTaskSearch(e.target.value)}
@@ -633,22 +711,22 @@ export default function AiOpsControlPage() {
             >
               <input
                 name="issueTitle"
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 placeholder="New issue title"
               />
               <textarea
                 name="issueDescription"
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 rows={2}
                 placeholder="Description"
               />
-              <button className="rounded border border-slate-300 px-3 py-1 text-sm" type="submit">
+              <button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm" type="submit">
                 Create Issue
               </button>
             </form>
             <div className="grid gap-2 text-sm sm:grid-cols-4">
               <select
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={issueStatusFilter}
                 onChange={(e) => setIssueStatusFilter(e.target.value)}
               >
@@ -660,7 +738,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <select
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={issueSeverityFilter}
                 onChange={(e) => setIssueSeverityFilter(e.target.value)}
               >
@@ -672,7 +750,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <select
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={issueAssigneeFilter}
                 onChange={(e) => setIssueAssigneeFilter(e.target.value)}
               >
@@ -684,7 +762,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <input
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 placeholder="Search"
                 value={issueSearch}
                 onChange={(e) => setIssueSearch(e.target.value)}
@@ -733,20 +811,20 @@ export default function AiOpsControlPage() {
               className="space-y-2 rounded-lg border border-slate-200 p-3"
             >
               <input
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 value={ideaTitle}
                 onChange={(e) => setIdeaTitle(e.target.value)}
                 placeholder="Idea title"
               />
               <textarea
-                className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 rows={2}
                 value={ideaDescription}
                 onChange={(e) => setIdeaDescription(e.target.value)}
                 placeholder="Idea description"
               />
               <select
-                className="rounded border border-slate-300 px-2 py-1 text-sm"
+                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                 value={ideaCategory}
                 onChange={(e) => setIdeaCategory(e.target.value as IdeaCategory)}
               >
@@ -756,14 +834,14 @@ export default function AiOpsControlPage() {
                   </option>
                 ))}
               </select>
-              <button className="rounded border border-slate-300 px-3 py-1 text-sm" type="submit">
+              <button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm" type="submit">
                 Add Idea
               </button>
             </form>
 
             <div className="grid gap-2 text-sm sm:grid-cols-3">
               <select
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={ideaStatusFilter}
                 onChange={(e) => setIdeaStatusFilter(e.target.value)}
               >
@@ -775,7 +853,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <select
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={ideaCategoryFilter}
                 onChange={(e) => setIdeaCategoryFilter(e.target.value)}
               >
@@ -787,7 +865,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <input
-                className="rounded border border-slate-300 px-2 py-1"
+                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 value={ideaSearch}
                 onChange={(e) => setIdeaSearch(e.target.value)}
                 placeholder="Search"
@@ -820,11 +898,24 @@ export default function AiOpsControlPage() {
         </div>
 
         <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 h-fit">
+          <div className="mb-4 inline-flex w-full rounded-lg border border-slate-300 p-1">
+            {(['details', 'activity', 'notes'] as const).map((tab) => (
+              <button
+                type="button"
+                key={tab}
+                className={`flex-1 rounded-md px-3 py-2 text-sm capitalize ${detailTab === tab ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                onClick={() => setDetailTab(tab)}
+              >
+                {tab}
+              </button>
+            ))}
+          </div>
+
           {!selectedItem && (
             <p className="text-sm text-slate-500">Select an item to view details.</p>
           )}
 
-          {selectedItem?.type === 'task' && (
+          {detailTab === 'details' && selectedItem?.type === 'task' && (
             <div className="space-y-3">
               {!selectedTask ? (
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
@@ -836,7 +927,7 @@ export default function AiOpsControlPage() {
                   </p>
                   <div className="flex gap-2">
                     <select
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       value={selectedTask.status}
                       onChange={(e) =>
                         updateTaskMutation.mutate({
@@ -852,7 +943,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <select
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       value={selectedTask.assignedTo || ''}
                       onChange={(e) =>
                         updateTaskMutation.mutate({
@@ -892,13 +983,13 @@ export default function AiOpsControlPage() {
                     className="flex gap-2"
                   >
                     <input
-                      className="flex-1 rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="flex-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
                       placeholder="Add note"
                     />
                     <button
-                      className="rounded border border-slate-300 px-3 py-1 text-sm"
+                      className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
                       type="submit"
                     >
                       Send
@@ -906,14 +997,14 @@ export default function AiOpsControlPage() {
                   </form>
 
                   <textarea
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                     rows={2}
                     value={reviewNote}
                     onChange={(e) => setReviewNote(e.target.value)}
                     placeholder="Review request note"
                   />
                   <button
-                    className="rounded border border-slate-300 px-3 py-1 text-sm"
+                    className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
                     onClick={() =>
                       reviewTaskMutation.mutate({ id: selectedTask.id, note: reviewNote })
                     }
@@ -921,7 +1012,7 @@ export default function AiOpsControlPage() {
                     Request Review
                   </button>
                   <textarea
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                     rows={2}
                     value={reviewDecisionNote}
                     onChange={(e) => setReviewDecisionNote(e.target.value)}
@@ -929,7 +1020,7 @@ export default function AiOpsControlPage() {
                   />
                   <div className="flex flex-wrap gap-2 text-sm">
                     <button
-                      className="rounded border border-slate-300 px-2 py-1"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       onClick={() =>
                         decisionTaskMutation.mutate({
                           id: selectedTask.id,
@@ -941,7 +1032,7 @@ export default function AiOpsControlPage() {
                       Approve
                     </button>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       onClick={() =>
                         decisionTaskMutation.mutate({
                           id: selectedTask.id,
@@ -953,7 +1044,7 @@ export default function AiOpsControlPage() {
                       Changes Requested
                     </button>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1"
+                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                       onClick={() =>
                         decisionTaskMutation.mutate({
                           id: selectedTask.id,
@@ -970,7 +1061,7 @@ export default function AiOpsControlPage() {
             </div>
           )}
 
-          {selectedItem?.type === 'issue' && (
+          {detailTab === 'details' && selectedItem?.type === 'issue' && (
             <div className="space-y-3">
               {!selectedIssue ? (
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
@@ -978,7 +1069,7 @@ export default function AiOpsControlPage() {
                 <>
                   <h3 className="text-base font-semibold text-slate-900">Issue Detail</h3>
                   <input
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                     value={selectedIssue.title}
                     onChange={(e) =>
                       updateIssueMutation.mutate({
@@ -988,32 +1079,32 @@ export default function AiOpsControlPage() {
                     }
                   />
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded border border-slate-300 px-2 py-1">
+                    <span className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
                       Severity: {selectedIssue.severity}
                     </span>
-                    <span className="rounded border border-slate-300 px-2 py-1">
+                    <span className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
                       Status: {selectedIssue.status}
                     </span>
-                    <span className="rounded border border-slate-300 px-2 py-1">
+                    <span className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
                       Created By: {selectedIssue.createdBy}
                     </span>
                   </div>
                   <textarea
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                     rows={4}
                     value={issuePlan}
                     onChange={(e) => setIssuePlan(e.target.value)}
                     placeholder="Bob Plan"
                   />
                   <textarea
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                     rows={2}
                     value={issueApprovalNote}
                     onChange={(e) => setIssueApprovalNote(e.target.value)}
                     placeholder="Approval note (optional)"
                   />
                   <button
-                    className="rounded border border-slate-300 px-3 py-1 text-sm"
+                    className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
                     onClick={() =>
                       issueActionMutation.mutate({
                         path: `/api/ai-ops/issues/${selectedIssue.id}/plan`,
@@ -1030,7 +1121,7 @@ export default function AiOpsControlPage() {
 
                   <div className="flex gap-2 items-center">
                     <select
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       value={issueActor}
                       onChange={(e) => setIssueActor(e.target.value)}
                     >
@@ -1041,7 +1132,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/approve`,
@@ -1052,7 +1143,7 @@ export default function AiOpsControlPage() {
                       Approve
                     </button>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/reject`,
@@ -1064,7 +1155,7 @@ export default function AiOpsControlPage() {
                     </button>
                   </div>
                   <textarea
-                    className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                     rows={2}
                     value={issueDecisionNote}
                     onChange={(e) => setIssueDecisionNote(e.target.value)}
@@ -1073,7 +1164,7 @@ export default function AiOpsControlPage() {
 
                   <div className="flex flex-wrap gap-2 items-center">
                     <select
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       value={issueAssignee}
                       onChange={(e) => setIssueAssignee(e.target.value)}
                     >
@@ -1084,7 +1175,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/assign`,
@@ -1095,7 +1186,7 @@ export default function AiOpsControlPage() {
                       Assign
                     </button>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/complete`,
@@ -1106,7 +1197,7 @@ export default function AiOpsControlPage() {
                       Mark completed
                     </button>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/close`,
@@ -1144,13 +1235,13 @@ export default function AiOpsControlPage() {
                     className="flex gap-2"
                   >
                     <input
-                      className="rounded border border-slate-300 px-2 py-1 text-sm flex-1"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm flex-1"
                       value={issueComment}
                       onChange={(e) => setIssueComment(e.target.value)}
                       placeholder="Add comment"
                     />
                     <button
-                      className="rounded border border-slate-300 px-3 py-1 text-sm"
+                      className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
                       type="submit"
                     >
                       Send
@@ -1169,7 +1260,7 @@ export default function AiOpsControlPage() {
             </div>
           )}
 
-          {selectedItem?.type === 'idea' && (
+          {detailTab === 'details' && selectedItem?.type === 'idea' && (
             <div className="space-y-3">
               {!selectedIdea ? (
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
@@ -1180,7 +1271,7 @@ export default function AiOpsControlPage() {
                   <p className="text-sm">{selectedIdea.description || '-'}</p>
                   <div className="flex flex-wrap gap-2 items-center">
                     <select
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       value={selectedIdea.status}
                       onChange={(e) =>
                         ideaActionMutation.mutate({
@@ -1197,7 +1288,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <select
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       value={convertIssueSeverity}
                       onChange={(e) => setConvertIssueSeverity(e.target.value as IssueSeverity)}
                     >
@@ -1208,7 +1299,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       onClick={() =>
                         ideaActionMutation.mutate({
                           path: `/api/ai-ops/ideas/${selectedIdea.id}/convert-to-issue`,
@@ -1223,7 +1314,7 @@ export default function AiOpsControlPage() {
                       Convert to Issue
                     </button>
                     <button
-                      className="rounded border border-slate-300 px-2 py-1 text-sm"
+                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
                       onClick={() =>
                         ideaActionMutation.mutate({
                           path: `/api/ai-ops/ideas/${selectedIdea.id}/convert-to-task`,
@@ -1251,6 +1342,66 @@ export default function AiOpsControlPage() {
               )}
             </div>
           )}
+
+
+          {detailTab === 'activity' && selectedItem?.type === 'task' && selectedTask && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">Task Activity</h3>
+              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-xs space-y-2">
+                {selectedTask.activity.map((entry) => (
+                  <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {detailTab === 'activity' && selectedItem?.type === 'issue' && selectedIssue && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">Issue Activity</h3>
+              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-xs space-y-2">
+                {selectedIssue.activity.map((entry) => (
+                  <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {detailTab === 'activity' && selectedItem?.type === 'idea' && selectedIdea && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">Idea Activity</h3>
+              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-xs space-y-2">
+                {selectedIdea.activity.map((entry) => (
+                  <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {detailTab === 'notes' && selectedItem?.type === 'task' && selectedTask && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">Task Notes</h3>
+              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-sm space-y-2">
+                {selectedTask.messages.map((m) => <p key={m.id}><strong>{m.actor}</strong>: {m.message}</p>)}
+              </div>
+            </div>
+          )}
+
+          {detailTab === 'notes' && selectedItem?.type === 'issue' && selectedIssue && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">Issue Notes</h3>
+              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-sm space-y-2">
+                {selectedIssue.comments.map((c) => <p key={c.id}><strong>{c.author}</strong>: {c.message}</p>)}
+              </div>
+            </div>
+          )}
+
+          {detailTab === 'notes' && selectedItem?.type === 'idea' && selectedIdea && (
+            <div className="space-y-2">
+              <h3 className="text-base font-semibold text-slate-900">Idea Notes</h3>
+              <p className="rounded border border-slate-200 p-3 text-sm text-slate-700">{selectedIdea.description || 'No notes available.'}</p>
+            </div>
+          )}
+
         </aside>
       </section>
     </div>

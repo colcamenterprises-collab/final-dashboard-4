@@ -5,7 +5,7 @@ import DataConfidenceBanner from "@/components/DataConfidenceBanner";
 import { cn } from "@/lib/utils";
 
 export default function PageShell() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   useEffect(() => {
