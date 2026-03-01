@@ -459,9 +459,16 @@ async function checkSchema() {
   app.use('/api/system-health', systemHealthRouter);
 
   // AI Ops Control Room routes
-  const aiOpsControlRouter = (await import('./routes/aiOpsControl')).default;
+  const aiOpsModule = await import('./routes/aiOpsControl');
+  const aiOpsControlRouter = aiOpsModule.default;
+  const { chatAliasRouter } = aiOpsModule;
   app.use('/api/ops/ai', aiOpsControlRouter);
   app.use('/api/ai-ops', aiOpsControlRouter);
+
+  // /api/ai/chat — simple chat alias endpoints + idempotent table setup
+  const { ensureAiChatTables } = await import('./db');
+  await ensureAiChatTables();
+  app.use('/api/ai/chat', chatAliasRouter);
 
   // Ingredient Master route (PACK F)
   const ingredientMasterRouter = (await import('./routes/ingredientMaster')).default;

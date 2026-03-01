@@ -53,6 +53,147 @@ process.on('SIGINT', async () => {
   process.exit(0);
 });
 
+// Idempotent table setup for AI Chat
+export async function ensureAiChatTables(): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_chat_threads (
+        id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        title       TEXT        NOT NULL,
+        created_by  TEXT        NOT NULL DEFAULT 'user',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        last_message_at TIMESTAMPTZ
+      );
+      CREATE TABLE IF NOT EXISTS ai_chat_messages (
+        id             UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+        thread_id      UUID        NOT NULL REFERENCES ai_chat_threads(id) ON DELETE CASCADE,
+        role           TEXT        NOT NULL CHECK (role IN ('user','assistant','system')),
+        content        TEXT        NOT NULL,
+        token_estimate INTEGER     NOT NULL DEFAULT 0,
+        created_by     TEXT        NOT NULL DEFAULT 'user',
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS ai_chat_msg_thread_idx
+        ON ai_chat_messages(thread_id, created_at);
+    `);
+    // ai_tasks + supporting tables
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_tasks (
+        id            SERIAL      PRIMARY KEY,
+        task_number   TEXT,
+        title         TEXT        NOT NULL,
+        description   TEXT,
+        frequency     TEXT        NOT NULL DEFAULT 'once',
+        priority      TEXT        NOT NULL DEFAULT 'medium',
+        status        TEXT        NOT NULL DEFAULT 'draft',
+        assigned_to   TEXT,
+        publish       BOOLEAN     NOT NULL DEFAULT FALSE,
+        due_at        TIMESTAMPTZ,
+        created_by    TEXT        NOT NULL DEFAULT 'user',
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        completed_at  TIMESTAMPTZ
+      );
+      CREATE TABLE IF NOT EXISTS ai_task_activity (
+        id         SERIAL      PRIMARY KEY,
+        task_id    INT         NOT NULL REFERENCES ai_tasks(id) ON DELETE CASCADE,
+        action     TEXT        NOT NULL,
+        actor      TEXT        NOT NULL,
+        note       TEXT,
+        payload    JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS ai_task_messages (
+        id         SERIAL      PRIMARY KEY,
+        task_id    INT         NOT NULL REFERENCES ai_tasks(id) ON DELETE CASCADE,
+        actor      TEXT        NOT NULL,
+        message    TEXT        NOT NULL,
+        visibility TEXT        NOT NULL DEFAULT 'internal',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS ai_task_reviews (
+        id            SERIAL      PRIMARY KEY,
+        task_id       INT         NOT NULL REFERENCES ai_tasks(id) ON DELETE CASCADE,
+        requested_by  TEXT        NOT NULL,
+        request_note  TEXT,
+        requested_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        decision      TEXT,
+        decision_note TEXT,
+        decided_by    TEXT,
+        decided_at    TIMESTAMPTZ,
+        created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    // ai_issues + supporting tables
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_issues (
+        id             SERIAL      PRIMARY KEY,
+        title          TEXT        NOT NULL,
+        description    TEXT,
+        severity       TEXT        NOT NULL DEFAULT 'medium',
+        status         TEXT        NOT NULL DEFAULT 'draft',
+        created_by     TEXT        NOT NULL DEFAULT 'user',
+        owner_agent    TEXT,
+        assignee       TEXT,
+        plan_md        TEXT,
+        approval_note  TEXT,
+        approved_by    TEXT,
+        approved_at    TIMESTAMPTZ,
+        completed_by   TEXT,
+        completed_at   TIMESTAMPTZ,
+        closed_by      TEXT,
+        closed_at      TIMESTAMPTZ,
+        visibility     TEXT        NOT NULL DEFAULT 'internal',
+        created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS ai_issue_activity (
+        id         SERIAL      PRIMARY KEY,
+        issue_id   INT         NOT NULL REFERENCES ai_issues(id) ON DELETE CASCADE,
+        actor      TEXT        NOT NULL,
+        action     TEXT        NOT NULL,
+        meta       JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS ai_issue_comments (
+        id         SERIAL      PRIMARY KEY,
+        issue_id   INT         NOT NULL REFERENCES ai_issues(id) ON DELETE CASCADE,
+        author     TEXT        NOT NULL,
+        visibility TEXT        NOT NULL DEFAULT 'internal',
+        message    TEXT        NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    // ai_ideas + supporting tables
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS ai_ideas (
+        id          SERIAL      PRIMARY KEY,
+        title       TEXT        NOT NULL,
+        description TEXT,
+        category    TEXT,
+        status      TEXT        NOT NULL DEFAULT 'new',
+        created_by  TEXT        NOT NULL DEFAULT 'user',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS ai_idea_activity (
+        id         SERIAL      PRIMARY KEY,
+        idea_id    INT         NOT NULL REFERENCES ai_ideas(id) ON DELETE CASCADE,
+        actor      TEXT        NOT NULL,
+        action     TEXT        NOT NULL,
+        meta       JSONB,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    console.log('[aiChat] Tables ready: ai_chat_threads, ai_chat_messages');
+  } catch (err) {
+    console.error('[aiChat] ensureAiChatTables failed:', (err as Error).message);
+  }
+}
+
 // Database health check function
 export async function checkDatabaseHealth(): Promise<boolean> {
   if (!databaseAvailable || !pool) {

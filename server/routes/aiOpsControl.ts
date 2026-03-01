@@ -233,7 +233,8 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
   const apiKey = process.env.OPENCLAW_API_KEY;
   const model = process.env.OPENCLAW_MODEL || "openclaw/orchestrator";
   if (!baseUrl || !apiKey) {
-    throw new Error("Missing OPENCLAW_BASE_URL or OPENCLAW_API_KEY");
+    console.warn("[Bob] Orchestrator not configured — returning offline message");
+    return "Bob is currently offline (AI orchestrator not configured). Your message has been saved.";
   }
 
   const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/chat/completions`, {
@@ -1624,3 +1625,76 @@ router.post("/ideas/:id/convert-to-task", async (req, res) => {
 });
 
 export default router;
+
+// ── /api/ai/chat — simple alias routes ───────────────────────────────────────
+// These three endpoints serve the frontend's Send/thread flow.
+// The existing /api/ai-ops/chat/threads routes remain unchanged.
+export const chatAliasRouter = Router();
+
+chatAliasRouter.post("/", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const { title, createdBy = "user", content } = req.body;
+  const threadTitle = (title || (typeof content === "string" ? content.slice(0, 80) : "New Thread")).trim();
+  if (!threadTitle) return res.status(400).json({ message: "title or content required" });
+  try {
+    const { rows } = await pool.query(
+      `INSERT INTO ai_chat_threads (id, title, created_by)
+       VALUES ($1, $2, $3)
+       RETURNING id, title, created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", last_message_at AS "lastMessageAt"`,
+      [randomUUID(), threadTitle, createdBy],
+    );
+    console.log("[aiChat] Thread created:", rows[0].id, "title:", threadTitle);
+    return res.status(201).json({ ok: true, threadId: rows[0].id, thread: rows[0] });
+  } catch (err) {
+    console.error("[aiChat] POST / error:", (err as Error).message);
+    return res.status(500).json({ message: "Failed to create thread" });
+  }
+});
+
+chatAliasRouter.get("/:threadId", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const threadId = req.params.threadId;
+  try {
+    const threadRes = await pool.query(
+      `SELECT id, title, created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", last_message_at AS "lastMessageAt"
+       FROM ai_chat_threads WHERE id = $1`,
+      [threadId],
+    );
+    if (!threadRes.rows.length) return res.status(404).json({ message: "Thread not found" });
+    const msgRes = await pool.query(
+      `SELECT id, thread_id AS "threadId", role, content, token_estimate AS "tokenEstimate", created_by AS "createdBy", created_at AS "createdAt"
+       FROM ai_chat_messages WHERE thread_id = $1 ORDER BY created_at ASC, id ASC`,
+      [threadId],
+    );
+    return res.json({ ok: true, thread: threadRes.rows[0], messages: msgRes.rows });
+  } catch (err) {
+    console.error("[aiChat] GET /:threadId error:", (err as Error).message);
+    return res.status(500).json({ message: "Failed to fetch thread" });
+  }
+});
+
+chatAliasRouter.post("/:threadId/messages", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const threadId = req.params.threadId;
+  const { content, createdBy = "user", role = "user" } = req.body;
+  if (!content?.trim()) return res.status(400).json({ message: "content required" });
+  try {
+    const threadRes = await pool.query(`SELECT id FROM ai_chat_threads WHERE id = $1`, [threadId]);
+    if (!threadRes.rows.length) return res.status(404).json({ message: "Thread not found" });
+    const { rows } = await pool.query(
+      `INSERT INTO ai_chat_messages (id, thread_id, role, content, token_estimate, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, thread_id AS "threadId", role, content, token_estimate AS "tokenEstimate", created_by AS "createdBy", created_at AS "createdAt"`,
+      [randomUUID(), threadId, role, content.trim(), Math.ceil(content.length / 4), createdBy],
+    );
+    await pool.query(
+      `UPDATE ai_chat_threads SET updated_at = NOW(), last_message_at = NOW() WHERE id = $1`,
+      [threadId],
+    );
+    console.log("[aiChat] Message saved to thread:", threadId);
+    return res.status(201).json({ ok: true, message: rows[0] });
+  } catch (err) {
+    console.error("[aiChat] POST /:threadId/messages error:", (err as Error).message);
+    return res.status(500).json({ message: "Failed to save message" });
+  }
+});
