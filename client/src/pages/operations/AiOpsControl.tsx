@@ -189,28 +189,48 @@ const IDEA_STATUS_OPTIONS: IdeaStatus[] = [
 ];
 const IDEA_CATEGORY_OPTIONS: IdeaCategory[] = ['ops', 'finance', 'marketing', 'tech', 'product'];
 
-const AGENT_HEADSHOTS: Partial<Record<TaskAgent, string>> = {};
-
-const agentStatusStyles: Record<
-  string,
-  { label: 'Online' | 'Busy' | 'Offline'; className: string }
-> = {
-  idle: { label: 'Online', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  running: { label: 'Busy', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  waiting: { label: 'Busy', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  blocked: { label: 'Busy', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-  error: { label: 'Offline', className: 'bg-rose-50 text-rose-700 border-rose-200' },
-  offline: { label: 'Offline', className: 'bg-slate-100 text-slate-600 border-slate-200' },
-};
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((part) => part[0])
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();
-}
+const AGENT_SUMMARY_CARDS = [
+  {
+    id: 'bob',
+    name: 'Bob',
+    role: 'AI Ops Orchestrator',
+    summary: 'Oversees cross-team queue flow, escalations, and end-to-end handoffs in active service windows.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=crop&w=240&q=80',
+  },
+  {
+    id: 'jussi',
+    name: 'Jussi',
+    role: 'Systems Reliability Agent',
+    summary: 'Monitors incidents and recovery progress, with focus on blocker removal and runtime stability.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80',
+  },
+  {
+    id: 'sally',
+    name: 'Sally',
+    role: 'Operations Planning Agent',
+    summary: 'Tracks shift-level execution tasks and keeps recurring operational priorities on schedule.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=240&q=80',
+  },
+  {
+    id: 'ramsay',
+    name: 'Ramsay',
+    role: 'Quality & Compliance Agent',
+    summary: 'Reviews completion quality, policy adherence, and exception notes before closure.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=240&q=80',
+  },
+  {
+    id: 'opsbot',
+    name: 'OpsBot',
+    role: 'Automation Support Agent',
+    summary: 'Handles routine automations, status updates, and queue synchronization across workflows.',
+    imageUrl:
+      'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=240&q=80',
+  },
+] as const;
 
 export default function AiOpsControlPage() {
   const queryClient = useQueryClient();
@@ -252,8 +272,6 @@ export default function AiOpsControlPage() {
   const [convertIssueSeverity, setConvertIssueSeverity] = useState<IssueSeverity>('medium');
   const [queueView, setQueueView] = useState<'list' | 'timeline'>('list');
   const [detailTab, setDetailTab] = useState<'details' | 'activity' | 'notes'>('details');
-  const [teamImage, setTeamImage] = useState<string | null>(null);
-
   const taskQuery = useMemo(() => {
     const params = new URLSearchParams();
     if (taskStatusFilter) params.set('status', taskStatusFilter);
@@ -443,31 +461,10 @@ export default function AiOpsControlPage() {
       <header className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-xl md:p-6">
         <div className="grid gap-5 lg:grid-cols-[minmax(320px,1.2fr)_minmax(0,2fr)] lg:items-stretch">
           <div className="space-y-3 rounded-xl border border-slate-700/60 bg-slate-800/70 p-4">
-            <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-semibold">AI Ops Control</h1>
-              <label className="cursor-pointer rounded-lg border border-slate-600 px-3 py-2 text-xs">
-                Upload team image
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) setTeamImage(URL.createObjectURL(file));
-                  }}
-                />
-              </label>
-            </div>
+            <h1 className="text-2xl font-semibold">AI Ops Control</h1>
             <p className="text-sm text-slate-200">
               Central command for AI task execution, incident workflow, and idea intake.
             </p>
-            <div className="h-44 overflow-hidden rounded-xl border border-slate-700 bg-slate-700/50">
-              <img
-                src={teamImage || 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=format&fit=crop&w=1200&q=80'}
-                alt="Operations team"
-                className="h-full w-full object-cover"
-              />
-            </div>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
@@ -485,39 +482,22 @@ export default function AiOpsControlPage() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        {(agentsQuery.data?.items || []).map((agent) => {
-          const statusMeta = agentStatusStyles[agent.status] || agentStatusStyles.offline;
-          return (
-            <article
-              key={agent.agent}
-              className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-            >
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-slate-900">AI Agents</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          {AGENT_SUMMARY_CARDS.map((agent) => (
+            <article key={agent.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
-                {AGENT_HEADSHOTS[agent.agent] ? (
-                  <img
-                    src={AGENT_HEADSHOTS[agent.agent]}
-                    alt={agent.name}
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-sm font-semibold text-slate-700">
-                    {getInitials(agent.name)}
-                  </div>
-                )}
+                <img src={agent.imageUrl} alt={agent.name} className="h-12 w-12 rounded-full object-cover" />
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{agent.name}</p>
-                  <p className="line-clamp-1 text-xs text-slate-600">{agent.role}</p>
+                  <p className="text-xs text-slate-600">{agent.role}</p>
                 </div>
               </div>
-              <span
-                className={`rounded-full border px-2 py-1 text-xs font-medium ${statusMeta.className}`}
-              >
-                {statusMeta.label}
-              </span>
+              <p className="text-sm text-slate-700">{agent.summary}</p>
             </article>
-          );
-        })}
+          ))}
+        </div>
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
