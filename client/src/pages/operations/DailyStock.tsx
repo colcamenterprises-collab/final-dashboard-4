@@ -27,7 +27,14 @@ type IngredientsResponse = {
   ok?: boolean;
   list?: IngredientItem[];
   warning?: string;
-  error?: { message?: string };
+  error?: { message?: string; code?: string; hint?: string };
+};
+
+type SyncApiResponse = IngredientsResponse & {
+  counts?: {
+    purchasingItemsTotal?: number;
+    drinksActive?: number;
+  };
 };
 
 export type CategoryBlock = {
@@ -156,70 +163,88 @@ const DailyStock: React.FC = () => {
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
+  const normalizeCategory = (rawCategory: string | null | undefined): string => {
+    const trimmed = (rawCategory || '').trim();
+    if (!trimmed) return 'Uncategorized';
+    const normalized = trimmed.toLowerCase().replace(/[^a-z]/g, '');
+    if (normalized === 'drink' || normalized === 'drinks' || normalized === 'beverage' || normalized === 'beverages') {
+      return 'Drinks';
+    }
+    if (normalized === 'meat' || normalized === 'meats') {
+      return 'Meat';
+    }
+    return trimmed;
+  };
+
   const mapPurchasingItemToIngredient = (item: any): IngredientItem => ({
     id: `purchasing-${item.id}`,
     name: item.item || `Unnamed item #${item.id}`,
-    category: item.category || "Uncategorized",
+    category: normalizeCategory(item.category),
     unit: item.orderUnit || "unit",
     cost: item.unitCost ? Number(item.unitCost) : 0,
     supplier: item.supplierName || "Unknown",
     portions: 1,
   });
 
+  const fetchLatestPurchasingItems = useCallback(async () => {
+    const latestRes = await fetch('/api/purchasing-items?active=true');
+    const latestData = await latestRes.json();
+    if (!latestRes.ok || latestData?.ok === false) {
+      throw new Error(latestData?.error || 'Failed to fetch latest purchasing items');
+    }
+    const latestList = Array.isArray(latestData?.items)
+      ? latestData.items.map(mapPurchasingItemToIngredient)
+      : [];
+    return latestList;
+  }, []);
+
   const loadFallbackItems = useCallback(async () => {
     try {
-      const fallbackRes = await fetch('/api/purchasing-items?active=true');
-      if (!fallbackRes.ok) {
-        setIngredients([]);
-        return;
-      }
-      const fallbackData = await fallbackRes.json();
-      const fallbackList = Array.isArray(fallbackData?.items)
-        ? fallbackData.items.map(mapPurchasingItemToIngredient)
-        : [];
+      const fallbackList = await fetchLatestPurchasingItems();
       setIngredients(fallbackList);
     } catch {
       setIngredients([]);
     }
-  }, []);
+  }, [fetchLatestPurchasingItems]);
 
   const runSync = useCallback(async () => {
+    const payload = shiftId ? { salesId: shiftId } : {};
     const res = await fetch("/api/purchasing-items/sync-to-daily-stock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ salesId: shiftId }),
+      body: JSON.stringify(payload),
     });
 
-    const data: IngredientsResponse = await res.json();
+    const data: SyncApiResponse = await res.json();
+    const syncErrorMessage = data?.error?.message || data?.warning || 'Sync request failed';
 
-    if (!res.ok) {
-      throw new Error(data?.error?.message || "Sync request failed");
+    if (!res.ok || data?.ok === false) {
+      throw new Error(syncErrorMessage);
     }
 
-    if (data?.ok === false) {
-      setSyncError("Sync failed. You can still enter stock manually. Report to manager.");
-      setSyncWarning(null);
-      await loadFallbackItems();
-      return { count: 0 };
-    }
+    const latestItems = await fetchLatestPurchasingItems();
+    const syncedList = latestItems.length > 0 ? latestItems : (Array.isArray(data.list) ? data.list : []);
+    const drinkCount = syncedList.filter((item) => normalizeCategory(item.category) === 'Drinks').length;
 
     setSyncError(null);
-    setSyncWarning(data.warning || null);
-    const syncedList = Array.isArray(data.list) ? data.list : [];
+    setSyncWarning(drinkCount === 0
+      ? 'No drink items found in purchasing items. Check category values (expected Drinks/Drink).'
+      : (data.warning || null));
     setIngredients(syncedList);
-    return { count: syncedList.length };
-  }, [loadFallbackItems, shiftId]);
+    return { count: syncedList.length, drinkCount };
+  }, [fetchLatestPurchasingItems, shiftId]);
 
   const handleSyncFromPurchasing = useCallback(async () => {
     setSyncing(true);
     try {
-      const { count } = await runSync();
-      setMessage({ type: "success", text: `Synced ${count} items from Purchasing List` });
+      const { drinkCount } = await runSync();
+      setMessage({ type: "success", text: `Synced ${drinkCount} drink items from purchasing list.` });
       setTimeout(() => setMessage(null), 3000);
-    } catch {
-      setMessage({ type: "error", text: "Failed to sync from purchasing list" });
+    } catch (error: any) {
+      const reason = error?.message || 'Failed to sync from purchasing list';
+      setMessage({ type: "error", text: reason });
       setTimeout(() => setMessage(null), 3000);
-      setSyncError("Sync failed. You can still enter stock manually. Report to manager.");
+      setSyncError(reason);
       setSyncWarning(null);
       await loadFallbackItems();
     } finally {
@@ -238,9 +263,9 @@ const DailyStock: React.FC = () => {
       try {
         if (!mounted) return;
         await runSync();
-      } catch {
+      } catch (error: any) {
         if (!mounted) return;
-        setSyncError("Sync failed. You can still enter stock manually. Report to manager.");
+        setSyncError(error?.message || 'Failed to sync from purchasing list');
         setSyncWarning(null);
         await loadFallbackItems();
       } finally {
