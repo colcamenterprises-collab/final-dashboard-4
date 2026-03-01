@@ -77,11 +77,16 @@ async function appendAuditLog(
   changedFields: Array<{ field: string; from: any; to: any }>
 ) {
   const { actor, actorType } = getActorFromReq(req);
-  await pool.query(
-    `INSERT INTO daily_sales_stock_audit (id, "salesId", actor, "actorType", "actionType", "changedFields", "createdAt")
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())`,
-    [uuidv4(), salesId, actor, actorType, actionType, JSON.stringify(changedFields || [])]
-  );
+  try {
+    await pool.query(
+      `INSERT INTO daily_sales_stock_audit (id, "salesId", actor, "actorType", "actionType", "changedFields", "createdAt")
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())`,
+      [uuidv4(), salesId, actor, actorType, actionType, JSON.stringify(changedFields || [])]
+    );
+  } catch (auditErr) {
+    // Audit log is supplementary — never block the main form save
+    console.warn("[dailySalesV2] appendAuditLog skipped (table may not exist):", (auditErr as Error).message);
+  }
 }
 
 // MEGA-PATCH: Normalize drinks + fix falsy zeroes
