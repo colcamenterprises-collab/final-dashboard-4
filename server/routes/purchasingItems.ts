@@ -420,6 +420,10 @@ router.post('/sync-to-daily-stock', async (req, res) => {
       });
     }
 
+    const drinkWarning = diagnostics.drinksActive === 0
+      ? 'No drink items found (category mismatch likely). Ensure purchasing_items.category uses Drinks/Drink.'
+      : undefined;
+
     console.log(`[purchasing/sync] Synced ${ingredients.length} items from purchasing list`);
     return res.json({
       ok: true,
@@ -429,9 +433,9 @@ router.post('/sync-to-daily-stock', async (req, res) => {
       drinks: ingredients.filter((item) => item.category === 'Drinks'),
       ingredients: ingredients.filter((item) => item.category !== 'Drinks'),
       counts: diagnostics,
-      warning: diagnostics.rowsWritten === 0
+      warning: drinkWarning || (diagnostics.rowsWritten === 0
         ? 'No rows written; rendering manual stock entry'
-        : undefined,
+        : undefined),
     });
   } catch (error: any) {
     console.error('[purchasing/sync] Error syncing to Daily Stock', {
@@ -443,7 +447,7 @@ router.post('/sync-to-daily-stock', async (req, res) => {
       shiftDate,
     });
 
-    return res.json({
+    return res.status(500).json({
       ok: false,
       salesId: salesId ?? null,
       shiftDate,
