@@ -194,6 +194,32 @@ export async function ensureAiChatTables(): Promise<void> {
   }
 }
 
+// Idempotent table setup for Daily Sales Stock Audit
+// Columns match the exact INSERT in server/forms/dailySalesV2.ts → appendAuditLog():
+//   INSERT INTO daily_sales_stock_audit (id, "salesId", actor, "actorType", "actionType", "changedFields", "createdAt")
+export async function ensureDailySalesAuditTable(): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS daily_sales_stock_audit (
+        id             TEXT        NOT NULL,
+        "salesId"      TEXT        NOT NULL,
+        actor          TEXT        NOT NULL DEFAULT 'unknown',
+        "actorType"    TEXT        NOT NULL DEFAULT 'system',
+        "actionType"   TEXT        NOT NULL,
+        "changedFields" JSONB      NOT NULL DEFAULT '[]'::jsonb,
+        "createdAt"    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        PRIMARY KEY (id)
+      );
+      CREATE INDEX IF NOT EXISTS dssa_sales_id_idx  ON daily_sales_stock_audit("salesId");
+      CREATE INDEX IF NOT EXISTS dssa_created_at_idx ON daily_sales_stock_audit("createdAt");
+    `);
+    console.log('[dailySalesAudit] Table ready: daily_sales_stock_audit');
+  } catch (err) {
+    console.error('[dailySalesAudit] ensureDailySalesAuditTable failed:', (err as Error).message);
+  }
+}
+
 // Database health check function
 export async function checkDatabaseHealth(): Promise<boolean> {
   if (!databaseAvailable || !pool) {

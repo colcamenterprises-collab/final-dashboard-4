@@ -466,8 +466,9 @@ async function checkSchema() {
   app.use('/api/ai-ops', aiOpsControlRouter);
 
   // /api/ai/chat — simple chat alias endpoints + idempotent table setup
-  const { ensureAiChatTables } = await import('./db');
+  const { ensureAiChatTables, ensureDailySalesAuditTable } = await import('./db');
   await ensureAiChatTables();
+  await ensureDailySalesAuditTable();
   app.use('/api/ai/chat', chatAliasRouter);
 
   // Ingredient Master route (PACK F)
