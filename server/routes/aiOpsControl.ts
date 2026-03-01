@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { pool } from "../db";
 import { z } from "zod";
+import { randomUUID } from "crypto";
 
 const router = Router();
 
@@ -9,7 +10,7 @@ const priorityEnum = z.enum(["low", "medium", "high", "urgent"]);
 const taskStatusEnum = z.enum(["draft", "not_assigned", "assigned", "in_progress", "blocked", "done", "cancelled", "needs_review", "approved", "changes_requested", "rejected"]);
 const reviewDecisionEnum = z.enum(["approved", "changes_requested", "rejected"]);
 const assignedToEnum = z.enum(["bob", "jussi", "sally", "supplier", "codex"]);
-const agentStatusEnum = z.enum(["idle", "running", "waiting", "blocked", "error", "offline"]);
+const agentStatusEnum = z.enum(["online", "offline", "busy"]);
 const activityActionEnum = z.enum(["CREATED", "ASSIGNED", "STATUS_CHANGED", "MESSAGE_ADDED", "REVIEW_REQUESTED", "REVIEW_DECIDED", "UPDATED_FIELDS"]);
 const issueSeverityEnum = z.enum(["low", "medium", "high", "critical"]);
 const issueStatusEnum = z.enum(["draft", "triage", "plan_pending", "approval_requested", "approved", "in_progress", "needs_review", "done", "closed", "rejected"]);
@@ -18,6 +19,7 @@ const issueActivityActionEnum = z.enum(["CREATED", "STATUS_CHANGED", "PLAN_UPDAT
 const ideaStatusEnum = z.enum(["new", "triage", "accepted", "converted", "rejected", "archived"]);
 const ideaCategoryEnum = z.enum(["ops", "finance", "marketing", "tech", "product"]);
 const ideaActivityActionEnum = z.enum(["CREATED", "STATUS_CHANGED", "CONVERTED_TO_ISSUE", "CONVERTED_TO_TASK", "COMMENT"]);
+const chatRoleEnum = z.enum(["user", "assistant", "system"]);
 
 type ActivityAction = z.infer<typeof activityActionEnum>;
 type IssueActivityAction = z.infer<typeof issueActivityActionEnum>;
@@ -177,8 +179,87 @@ const convertIdeaToTaskSchema = z.object({
 
 const issueIdSchema = z.string().uuid();
 const ideaIdSchema = z.string().uuid();
+const threadIdSchema = z.string().uuid();
 
 const taskIdSchema = z.string().uuid();
+
+const chatThreadCreateSchema = z.object({
+  title: z.string().trim().min(1).max(255),
+  createdBy: z.string().trim().min(1).max(120).default("Bob"),
+});
+
+const chatMessageCreateSchema = z.object({
+  content: z.string().trim().min(1).max(12000),
+  createdBy: z.string().trim().min(1).max(120).default("Bob"),
+});
+
+function parseThreadId(rawId: string) {
+  const parsed = threadIdSchema.safeParse(rawId);
+  if (!parsed.success) return null;
+  return parsed.data;
+}
+
+function ensureIssueStatus(currentStatus: string, allowed: string[], action: string) {
+  if (!allowed.includes(currentStatus)) {
+    return { ok: false as const, message: `Issue cannot ${action} from status '${currentStatus}'` };
+  }
+  return { ok: true as const };
+}
+
+function estimateTokens(text: string) {
+  return Math.ceil(text.length / 4);
+}
+
+function buildCappedContext(
+  rows: Array<{ role: string; content: string }>,
+  maxTokens: number,
+): Array<{ role: "user" | "assistant" | "system"; content: string }> {
+  const selected: Array<{ role: "user" | "assistant" | "system"; content: string }> = [];
+  let runningTokens = 0;
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const row = rows[i];
+    const role = chatRoleEnum.safeParse(row.role);
+    if (!role.success) continue;
+    const cost = estimateTokens(row.content);
+    if (runningTokens + cost > maxTokens) break;
+    selected.push({ role: role.data, content: row.content });
+    runningTokens += cost;
+  }
+  return selected.reverse();
+}
+
+async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>) {
+  const baseUrl = process.env.OPENCLAW_BASE_URL;
+  const apiKey = process.env.OPENCLAW_API_KEY;
+  const model = process.env.OPENCLAW_MODEL || "openclaw/orchestrator";
+  if (!baseUrl || !apiKey) {
+    throw new Error("Missing OPENCLAW_BASE_URL or OPENCLAW_API_KEY");
+  }
+
+  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      messages: [
+        { role: "system", content: "You are Bob, the AI Ops orchestrator. Respond with deterministic, auditable, and concise operational actions." },
+        ...contextMessages,
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`OpenClaw error ${response.status}: ${text}`);
+  }
+
+  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return payload.choices?.[0]?.message?.content?.trim() || "No response";
+}
 
 function parseTaskId(rawId: string) {
   const parsed = taskIdSchema.safeParse(rawId);
@@ -222,16 +303,26 @@ async function writeIdeaActivity(client: { query: (sql: string, params?: unknown
 router.get("/agents", async (_req, res) => {
   if (!pool) return res.status(503).json({ message: "Database unavailable" });
 
+  const profileResult = await pool.query(
+    `SELECT agent_name AS "agent", name, role, summary, image_url AS "imageUrl" FROM ai_agent_profiles ORDER BY sort_order ASC, agent_name ASC`,
+  );
   const stateResult = await pool.query(
     `SELECT agent_name AS "agent", status, status_message AS "statusMessage", last_seen_at AS "lastSeenAt", updated_at AS "updatedAt" FROM ai_agent_state`,
   );
   const stateMap = new Map(stateResult.rows.map((row) => [String(row.agent), row]));
+  const profileMap = new Map(profileResult.rows.map((row) => [String(row.agent), row]));
 
   const items = AGENTS.map((agent) => {
     const state = stateMap.get(agent.agent);
+    const profile = profileMap.get(agent.agent);
+    const hasHeartbeat = Boolean(state?.lastSeenAt);
     return {
       ...agent,
-      status: state?.status ?? "idle",
+      name: profile?.name ?? agent.name,
+      role: profile?.role ?? agent.role,
+      description: profile?.summary ?? agent.description,
+      imageUrl: profile?.imageUrl ?? null,
+      status: hasHeartbeat ? (state?.status ?? "offline") : "offline",
       statusMessage: state?.statusMessage ?? null,
       lastSeenAt: state?.lastSeenAt ?? null,
       updatedAt: state?.updatedAt ?? null,
@@ -264,6 +355,114 @@ router.put("/agents/:agent/state", async (req, res) => {
 
   if (!result.rows.length) return res.status(404).json({ message: "Agent state not found" });
   return res.json(result.rows[0]);
+});
+
+router.get("/chat/threads", async (_req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const result = await pool.query(
+    `SELECT id, title, created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", last_message_at AS "lastMessageAt"
+     FROM ai_chat_threads
+     ORDER BY COALESCE(last_message_at, created_at) DESC
+     LIMIT 200`,
+  );
+  return res.json({ ok: true, items: result.rows });
+});
+
+router.post("/chat/threads", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const parsed = chatThreadCreateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Invalid payload", errors: parsed.error.flatten() });
+  const payload = parsed.data;
+
+  const result = await pool.query(
+    `INSERT INTO ai_chat_threads (id, title, created_by)
+     VALUES ($1, $2, $3)
+     RETURNING id, title, created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", last_message_at AS "lastMessageAt"`,
+    [randomUUID(), payload.title, payload.createdBy],
+  );
+  return res.status(201).json({ ok: true, item: result.rows[0] });
+});
+
+router.get("/chat/threads/:id/messages", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const threadId = parseThreadId(req.params.id);
+  if (!threadId) return res.status(400).json({ message: "Invalid thread id" });
+
+  const threadResult = await pool.query(`SELECT id FROM ai_chat_threads WHERE id = $1`, [threadId]);
+  if (!threadResult.rows.length) return res.status(404).json({ message: "Thread not found" });
+
+  const result = await pool.query(
+    `SELECT id, thread_id AS "threadId", role, content, token_estimate AS "tokenEstimate", created_by AS "createdBy", created_at AS "createdAt"
+     FROM ai_chat_messages
+     WHERE thread_id = $1
+     ORDER BY created_at ASC, id ASC`,
+    [threadId],
+  );
+  return res.json({ ok: true, items: result.rows });
+});
+
+router.post("/chat/threads/:id/messages", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const threadId = parseThreadId(req.params.id);
+  if (!threadId) return res.status(400).json({ message: "Invalid thread id" });
+
+  const parsed = chatMessageCreateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: "Invalid payload", errors: parsed.error.flatten() });
+  const payload = parsed.data;
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const threadResult = await client.query(`SELECT id FROM ai_chat_threads WHERE id = $1`, [threadId]);
+    if (!threadResult.rows.length) {
+      await client.query("ROLLBACK");
+      return res.status(404).json({ message: "Thread not found" });
+    }
+
+    await client.query(
+      `INSERT INTO ai_chat_messages (thread_id, role, content, token_estimate, created_by)
+       VALUES ($1, 'user', $2, $3, $4)`,
+      [threadId, payload.content, estimateTokens(payload.content), payload.createdBy],
+    );
+
+    const contextRows = await client.query(
+      `SELECT role, content
+       FROM ai_chat_messages
+       WHERE thread_id = $1
+       ORDER BY created_at ASC, id ASC`,
+      [threadId],
+    );
+    const context = buildCappedContext(contextRows.rows, 2400);
+    const assistantReply = await callBobOrchestrator(context);
+
+    await client.query(
+      `INSERT INTO ai_chat_messages (thread_id, role, content, token_estimate, created_by)
+       VALUES ($1, 'assistant', $2, $3, 'Bob')`,
+      [threadId, assistantReply, estimateTokens(assistantReply)],
+    );
+    await client.query(
+      `UPDATE ai_chat_threads SET updated_at = NOW(), last_message_at = NOW() WHERE id = $1`,
+      [threadId],
+    );
+
+    await client.query("COMMIT");
+
+    const messageResult = await pool.query(
+      `SELECT id, thread_id AS "threadId", role, content, token_estimate AS "tokenEstimate", created_by AS "createdBy", created_at AS "createdAt"
+       FROM ai_chat_messages
+       WHERE thread_id = $1
+       ORDER BY created_at DESC, id DESC
+       LIMIT 2`,
+      [threadId],
+    );
+
+    return res.status(201).json({ ok: true, items: messageResult.rows.reverse() });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 router.get("/tasks", async (req, res) => {
@@ -827,6 +1026,23 @@ router.put("/issues/:id/status", async (req, res) => {
     }
 
     const currentStatus = currentResult.rows[0].status;
+    const allowedTransitions: Record<string, string[]> = {
+      draft: ["triage", "plan_pending", "rejected"],
+      triage: ["plan_pending", "rejected"],
+      plan_pending: ["approval_requested", "rejected"],
+      approval_requested: ["approved", "rejected"],
+      approved: ["in_progress"],
+      in_progress: ["needs_review"],
+      needs_review: ["closed", "rejected"],
+      done: ["closed"],
+      closed: [],
+      rejected: [],
+    };
+    if (!allowedTransitions[currentStatus]?.includes(payload.status)) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: `Invalid status transition from '${currentStatus}' to '${payload.status}'` });
+    }
+
     const updateResult = await client.query(
       `UPDATE ai_issues
        SET status = $2,
@@ -867,6 +1083,12 @@ router.post("/issues/:id/plan", async (req, res) => {
     if (!currentResult.rows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Issue not found" });
+    }
+
+    const planGuard = ensureIssueStatus(currentResult.rows[0].status, ["draft", "triage", "plan_pending"], "set plan");
+    if (!planGuard.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: planGuard.message });
     }
 
     const updateResult = await client.query(
@@ -917,6 +1139,12 @@ router.post("/issues/:id/approve", async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
+    const approvalGuard = ensureIssueStatus(currentResult.rows[0].status, ["approval_requested"], "be approved");
+    if (!approvalGuard.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: approvalGuard.message });
+    }
+
     const updateResult = await client.query(
       `UPDATE ai_issues
        SET status = 'approved',
@@ -961,6 +1189,12 @@ router.post("/issues/:id/reject", async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
+    const rejectGuard = ensureIssueStatus(currentResult.rows[0].status, ["approval_requested", "needs_review", "triage", "plan_pending"], "be rejected");
+    if (!rejectGuard.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: rejectGuard.message });
+    }
+
     const updateResult = await client.query(
       `UPDATE ai_issues
        SET status = 'rejected',
@@ -1001,6 +1235,12 @@ router.post("/issues/:id/assign", async (req, res) => {
     if (!currentResult.rows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Issue not found" });
+    }
+
+    const assignGuard = ensureIssueStatus(currentResult.rows[0].status, ["approved"], "be assigned");
+    if (!assignGuard.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: assignGuard.message });
     }
 
     const updateResult = await client.query(
@@ -1046,6 +1286,12 @@ router.post("/issues/:id/complete", async (req, res) => {
       return res.status(404).json({ message: "Issue not found" });
     }
 
+    const completeGuard = ensureIssueStatus(currentResult.rows[0].status, ["in_progress"], "be completed");
+    if (!completeGuard.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: completeGuard.message });
+    }
+
     const updateResult = await client.query(
       `UPDATE ai_issues
        SET status = 'needs_review',
@@ -1088,6 +1334,12 @@ router.post("/issues/:id/close", async (req, res) => {
     if (!currentResult.rows.length) {
       await client.query("ROLLBACK");
       return res.status(404).json({ message: "Issue not found" });
+    }
+
+    const closeGuard = ensureIssueStatus(currentResult.rows[0].status, ["needs_review", "done"], "be closed");
+    if (!closeGuard.ok) {
+      await client.query("ROLLBACK");
+      return res.status(409).json({ message: closeGuard.message });
     }
 
     const updateResult = await client.query(

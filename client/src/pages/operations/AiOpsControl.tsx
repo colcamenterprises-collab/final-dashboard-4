@@ -141,13 +141,34 @@ type IdeaActivity = {
 };
 type IdeaDetail = Idea & { activity: IdeaActivity[] };
 
+type AgentStatus = 'online' | 'offline' | 'busy';
 type AgentItem = {
   agent: TaskAgent;
   name: string;
   role: string;
   description: string;
-  status: string;
+  imageUrl: string | null;
+  status: AgentStatus;
   statusMessage: string | null;
+};
+
+type ChatThread = {
+  id: string;
+  title: string;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
+  lastMessageAt: string | null;
+};
+
+type ChatMessage = {
+  id: string;
+  threadId: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  tokenEstimate: number;
+  createdBy: string;
+  createdAt: string;
 };
 type SelectedItem = { type: 'task' | 'issue' | 'idea'; id: string } | null;
 
@@ -189,48 +210,7 @@ const IDEA_STATUS_OPTIONS: IdeaStatus[] = [
 ];
 const IDEA_CATEGORY_OPTIONS: IdeaCategory[] = ['ops', 'finance', 'marketing', 'tech', 'product'];
 
-const AGENT_SUMMARY_CARDS = [
-  {
-    id: 'bob',
-    name: 'Bob',
-    role: 'AI Ops Orchestrator',
-    summary: 'Oversees cross-team queue flow, escalations, and end-to-end handoffs in active service windows.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1568602471122-7832951cc4c5?auto=format&fit=crop&w=240&q=80',
-  },
-  {
-    id: 'jussi',
-    name: 'Jussi',
-    role: 'Systems Reliability Agent',
-    summary: 'Monitors incidents and recovery progress, with focus on blocker removal and runtime stability.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=240&q=80',
-  },
-  {
-    id: 'sally',
-    name: 'Sally',
-    role: 'Operations Planning Agent',
-    summary: 'Tracks shift-level execution tasks and keeps recurring operational priorities on schedule.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?auto=format&fit=crop&w=240&q=80',
-  },
-  {
-    id: 'ramsay',
-    name: 'Ramsay',
-    role: 'Quality & Compliance Agent',
-    summary: 'Reviews completion quality, policy adherence, and exception notes before closure.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?auto=format&fit=crop&w=240&q=80',
-  },
-  {
-    id: 'opsbot',
-    name: 'OpsBot',
-    role: 'Automation Support Agent',
-    summary: 'Handles routine automations, status updates, and queue synchronization across workflows.',
-    imageUrl:
-      'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?auto=format&fit=crop&w=240&q=80',
-  },
-] as const;
+
 
 export default function AiOpsControlPage() {
   const queryClient = useQueryClient();
@@ -270,7 +250,9 @@ export default function AiOpsControlPage() {
   const [ideaDescription, setIdeaDescription] = useState('');
   const [ideaCategory, setIdeaCategory] = useState<IdeaCategory>('ops');
   const [convertIssueSeverity, setConvertIssueSeverity] = useState<IssueSeverity>('medium');
-  const [queueView, setQueueView] = useState<'list' | 'timeline'>('list');
+  const [chatThreadTitle, setChatThreadTitle] = useState('');
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+  const [chatMessageText, setChatMessageText] = useState('');
   const [detailTab, setDetailTab] = useState<'details' | 'activity' | 'notes'>('details');
   const taskQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -320,6 +302,12 @@ export default function AiOpsControlPage() {
     enabled: Boolean(selectedIdeaId),
   });
 
+  const chatThreadsQuery = useQuery<{ ok: true; items: ChatThread[] }>({ queryKey: ['/api/ai-ops/chat/threads'] });
+  const chatMessagesQuery = useQuery<{ ok: true; items: ChatMessage[] }>({
+    queryKey: selectedThreadId ? [`/api/ai-ops/chat/threads/${selectedThreadId}/messages`] : ['noop-chat'],
+    enabled: Boolean(selectedThreadId),
+  });
+
   const refreshTasks = () =>
     queryClient.invalidateQueries({
       predicate: (q) => String(q.queryKey[0]).startsWith('/api/ai-ops/tasks'),
@@ -331,6 +319,10 @@ export default function AiOpsControlPage() {
   const refreshIdeas = () =>
     queryClient.invalidateQueries({
       predicate: (q) => String(q.queryKey[0]).startsWith('/api/ai-ops/ideas'),
+    });
+  const refreshChat = () =>
+    queryClient.invalidateQueries({
+      predicate: (q) => String(q.queryKey[0]).startsWith('/api/ai-ops/chat/threads'),
     });
 
   const createTaskMutation = useMutation({
@@ -437,6 +429,31 @@ export default function AiOpsControlPage() {
     },
   });
 
+  const createChatThreadMutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      apiRequest('/api/ai-ops/chat/threads', { method: 'POST', body: JSON.stringify(payload) }),
+    onSuccess: (data: { ok: true; item: ChatThread }) => {
+      setChatThreadTitle('');
+      setSelectedThreadId(data.item.id);
+      refreshChat();
+    },
+  });
+
+  const sendChatMessageMutation = useMutation({
+    mutationFn: ({ threadId, content }: { threadId: string; content: string }) =>
+      apiRequest(`/api/ai-ops/chat/threads/${threadId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ content, createdBy: 'Bob' }),
+      }),
+    onSuccess: () => {
+      setChatMessageText('');
+      refreshChat();
+      if (selectedThreadId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/ai-ops/chat/threads/${selectedThreadId}/messages`] });
+      }
+    },
+  });
+
   const selectedTask = taskDetailQuery.data;
   const selectedIssue = issueDetailQuery.data?.item;
   const selectedIdea = ideaDetailQuery.data?.item;
@@ -444,6 +461,12 @@ export default function AiOpsControlPage() {
   useEffect(() => {
     if (selectedIssue) setIssuePlan(selectedIssue.planMd || '');
   }, [selectedIssue]);
+
+  useEffect(() => {
+    if (!selectedThreadId && (chatThreadsQuery.data?.items?.length || 0) > 0) {
+      setSelectedThreadId(chatThreadsQuery.data!.items[0].id);
+    }
+  }, [chatThreadsQuery.data, selectedThreadId]);
 
   const tasks = tasksQuery.data?.items || [];
   const issues = issuesQuery.data?.items || [];
@@ -485,48 +508,71 @@ export default function AiOpsControlPage() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-slate-900">AI Agents</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-          {AGENT_SUMMARY_CARDS.map((agent) => (
-            <article key={agent.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          {(agentsQuery.data?.items || []).map((agent) => (
+            <article key={agent.agent} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
-                <img src={agent.imageUrl} alt={agent.name} className="h-12 w-12 rounded-full object-cover" />
+                <img src={agent.imageUrl || 'https://placehold.co/128x128'} alt={agent.name} className="h-12 w-12 rounded-md object-cover" />
                 <div>
                   <p className="text-sm font-semibold text-slate-900">{agent.name}</p>
                   <p className="text-xs text-slate-600">{agent.role}</p>
                 </div>
+                <span
+                  className={`ml-auto inline-flex h-2.5 w-2.5 rounded-full ${agent.status === 'online' ? 'bg-emerald-500' : agent.status === 'busy' ? 'bg-amber-500' : 'bg-slate-400'}`}
+                  title={agent.status}
+                />
               </div>
-              <p className="text-sm text-slate-700">{agent.summary}</p>
+              <p className="text-sm text-slate-700">{agent.description}</p>
             </article>
           ))}
         </div>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="inline-flex rounded-lg border border-slate-300 p-1">
-          <button type="button" className={`rounded-md px-3 py-2 text-sm ${queueView === 'list' ? 'bg-slate-900 text-white' : 'text-slate-700'}`} onClick={() => setQueueView('list')}>
-            Queue List
-          </button>
-          <button type="button" className={`rounded-md px-3 py-2 text-sm ${queueView === 'timeline' ? 'bg-slate-900 text-white' : 'text-slate-700'}`} onClick={() => setQueueView('timeline')}>
-            Timeline View
-          </button>
-        </div>
-      </div>
 
-      {queueView === 'timeline' && (
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-lg font-semibold text-slate-900">Timeline</h2>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {[...tasks, ...issues.map((issue) => ({ ...issue, dueAt: null, frequency: 'ad-hoc' as TaskFrequency }))]
-              .slice(0, 9)
-              .map((item: any, index) => (
-                <div key={`${item.id}-${index}`} className="rounded-lg border border-slate-200 p-3">
-                  <p className="text-xs text-slate-500">{item.status}</p>
-                  <p className="text-sm font-medium text-slate-900">{item.title}</p>
-                  <p className="mt-2 text-xs text-slate-500">{item.dueAt ? new Date(item.dueAt).toLocaleDateString() : 'No due date'}</p>
-                </div>
-              ))}
+      <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-slate-900">Bob Chat (Orchestrator)</h2>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!chatThreadTitle.trim()) return;
+              createChatThreadMutation.mutate({ title: chatThreadTitle.trim(), createdBy: 'Bob' });
+            }}
+            className="space-y-2"
+          >
+            <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" value={chatThreadTitle} onChange={(e) => setChatThreadTitle(e.target.value)} placeholder="New thread title" />
+            <button type="submit" className="h-10 rounded-lg bg-slate-900 px-3 text-sm text-white">Create Thread</button>
+          </form>
+          <div className="max-h-64 space-y-2 overflow-auto">
+            {(chatThreadsQuery.data?.items || []).map((thread) => (
+              <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full rounded-lg border p-2 text-left text-sm ${selectedThreadId === thread.id ? 'border-slate-900 bg-slate-50' : 'border-slate-200'}`}>
+                <p className="font-medium text-slate-900">{thread.title}</p>
+                <p className="text-xs text-slate-500">{thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString() : 'No messages yet'}</p>
+              </button>
+            ))}
           </div>
-        </section>
-      )}
+        </div>
+        <div className="space-y-3">
+          <div className="max-h-72 space-y-2 overflow-auto rounded-lg border border-slate-200 p-3">
+            {(chatMessagesQuery.data?.items || []).map((msg) => (
+              <div key={msg.id} className={`rounded-lg p-2 text-sm ${msg.role === 'assistant' ? 'bg-blue-50' : 'bg-slate-100'}`}>
+                <p className="text-xs uppercase text-slate-500">{msg.role}</p>
+                <p className="whitespace-pre-wrap text-slate-800">{msg.content}</p>
+              </div>
+            ))}
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!selectedThreadId || !chatMessageText.trim()) return;
+              sendChatMessageMutation.mutate({ threadId: selectedThreadId, content: chatMessageText.trim() });
+            }}
+            className="space-y-2"
+          >
+            <textarea className="w-full rounded-lg border border-slate-300 p-3 text-sm" rows={3} value={chatMessageText} onChange={(e) => setChatMessageText(e.target.value)} placeholder="Message Bob orchestrator" />
+            <button type="submit" className="h-10 rounded-lg bg-slate-900 px-3 text-sm text-white" disabled={!selectedThreadId}>Send</button>
+          </form>
+        </div>
+      </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,1.1fr)_minmax(0,1.5fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
