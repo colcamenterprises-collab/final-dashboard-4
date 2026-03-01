@@ -328,198 +328,78 @@ export default function DailySalesV2Library() {
       {loading && <p className="text-center py-4">Loading...</p>}
       {error && <p className="text-red-500 text-center py-4">{error}</p>}
       
-      {/* Desktop Table - Hidden on Mobile */}
-      <div className="hidden lg:block overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-        <table className="min-w-full bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <thead>
-            <tr className="bg-slate-100 text-left text-sm font-semibold font-[Poppins] text-slate-700">
-              <th className="px-4 py-3 border-b">Date</th>
-              <th className="px-4 py-3 border-b">Staff</th>
-              <th className="px-4 py-3 border-b">Total Sales</th>
-              <th className="px-4 py-3 border-b">Rolls</th>
-              <th className="px-4 py-3 border-b">Meat</th>
-              <th className="px-4 py-3 border-b">Receipts</th>
-              <th className="px-4 py-3 border-b">Balanced</th>
-              <th className="px-4 py-3 border-b">Status</th>
-              <th className="px-4 py-3 border-b">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRecords.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="p-4 text-center text-gray-500">
-                  No records found
-                </td>
-              </tr>
-            ) : (
-              filteredRecords.map((rec) => (
-                <tr key={rec.id} className="text-sm font-[Poppins] hover:bg-slate-50">
-                  <td className="px-4 py-3 border-b whitespace-nowrap">
-                    {new Date(rec.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-3 border-b">{rec.staff}</td>
-                  <td className="px-4 py-3 border-b whitespace-nowrap">{thb(rec.totalSales)}</td>
-                  <td className="px-4 py-3 border-b">{rec.buns ?? "-"}</td>
-                  <td className="px-4 py-3 border-b">{rec.meat ?? "-"}</td>
-                  <td className="px-4 py-3 border-b">
-                    {(() => { const r = getReceiptCounts(rec); return `${r.total}`; })()}
-                  </td>
-                  <td className="px-4 py-3 border-b">
-                    {rec.payload?.balanced ? (
-                      <span className="px-1.5 py-0.5 text-[10px] md:text-xs font-semibold rounded bg-green-100 text-green-700">
-                        Balanced
-                      </span>
-                    ) : (
-                      <span className="px-1.5 py-0.5 text-[10px] md:text-xs font-semibold rounded bg-red-100 text-red-700">
-                        Not Balanced
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 border-b">
-                    {rec.deletedAt ? (
-                      <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[10px] md:text-xs whitespace-nowrap">
-                        Archived
-                      </span>
-                    ) : (
-                      <span className="bg-green-100 text-green-800 px-1.5 py-0.5 rounded text-[10px] md:text-xs whitespace-nowrap">
-                        {rec.status}
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 border-b">
-                    <div className="flex flex-wrap gap-0.5">
-                      <button
-                        className="p-1 hover:bg-slate-100 text-black rounded"
-                        onClick={() => viewRecord(rec.id)}
-                        title="View"
-                      >
-                        <Eye size={14} />
-                      </button>
-                      <button
-                        className="p-1 hover:bg-slate-100 text-black rounded"
-                        onClick={() => printRecord(rec.id)}
-                        title="Print"
-                      >
-                        <Printer size={14} />
-                      </button>
-                      <button
-                        className="p-1 hover:bg-slate-100 text-black rounded"
-                        onClick={() => downloadRecord(rec)}
-                        title="Download"
-                      >
-                        <Download size={14} />
-                      </button>
-                      {!rec.deletedAt && (
-                        <>
-                          {!hasForm2Data(rec) && (
-                            <button
-                              className="px-1.5 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-[Poppins] rounded text-[10px] md:text-xs"
-                              onClick={() => completeStockRecord(rec.id)}
-                            >
-                              Complete Stock (Form 2)
-                            </button>
-                          )}
-                          <button
-                            className="px-1.5 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-[Poppins] rounded text-[10px] md:text-xs"
-                            onClick={() => editRecord(rec.id)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="px-1.5 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 font-[Poppins] rounded text-[10px] md:text-xs"
-                            onClick={() => confirmDeleteRecord(rec.id)}
-                          >
-                            Delete
-                          </button>
-                        </>
-                      )}
-                      {rec.deletedAt && (
-                        <button
-                          className="px-1.5 py-0.5 bg-green-100 hover:bg-green-200 text-green-700 font-[Poppins] rounded text-[10px] md:text-xs"
-                          onClick={() => restoreRecord(rec.id)}
-                        >
-                          Restore
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile Card Layout - Shown on Small Screens */}
-      <div className="lg:hidden space-y-3">
+      {/* Stacked 2-row library layout (tablet + desktop friendly) */}
+      <div className="space-y-3">
         {filteredRecords.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
             No records found
           </div>
         ) : (
           filteredRecords.map((rec) => (
-            <div key={rec.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-              {/* Compact Info Row */}
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
-                  <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">
-                    {new Date(rec.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}
-                  </span>
-                  <span className="text-gray-600 text-xs truncate">{rec.staff}</span>
-                  <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">{thb(rec.totalSales)}</span>
-                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">R:{rec.buns ?? "-"}</span>
-                  <span className="text-gray-500 text-[10px] sm:text-xs whitespace-nowrap">M:{rec.meat ?? "-"}</span>
+            <div key={rec.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Date</p>
+                    <p className="font-semibold text-slate-900 whitespace-nowrap">{new Date(rec.date).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Staff</p>
+                    <p className="font-medium text-slate-800 truncate">{rec.staff}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Total Sales</p>
+                    <p className="font-semibold text-slate-900 whitespace-nowrap">{thb(rec.totalSales)}</p>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {/* Balance Status - Styled Badge like Home Screen */}
-                  {rec.payload?.balanced ? (
-                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-green-500 text-white whitespace-nowrap w-[85px] sm:w-[95px] text-center">Balanced</span>
-                  ) : (
-                    <span className="px-2 py-1 text-[10px] sm:text-xs font-semibold rounded-full bg-red-500 text-white whitespace-nowrap w-[85px] sm:w-[95px] text-center">Unbalanced</span>
-                  )}
-                  {/* Only show Draft status - submitted is default */}
+
+                <div className="flex items-center gap-2 lg:justify-end">
                   {rec.deletedAt ? (
-                    <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">Arc</span>
-                  ) : rec.status === 'Draft' ? (
-                    <span className="bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">Draft</span>
-                  ) : null}
+                    <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs whitespace-nowrap font-medium">
+                      Archived
+                    </span>
+                  ) : (
+                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs whitespace-nowrap font-medium">
+                      {rec.status}
+                    </span>
+                  )}
+                  {rec.payload?.balanced ? (
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-green-100 text-green-700 whitespace-nowrap">Balanced</span>
+                  ) : (
+                    <span className="px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-700 whitespace-nowrap">Not Balanced</span>
+                  )}
                 </div>
               </div>
 
-              {(() => {
-                const receipt = getReceiptCounts(rec);
-                return (
-                  <div className="mb-2 text-[11px] text-gray-700">
-                    <div>Grab: {receipt.grab} | Cash: {receipt.cash} | QR: {receipt.qr}</div>
-                    <div>Total Receipts: {receipt.total}</div>
-                  </div>
-                );
-              })()}
+              <div className="border-t border-slate-100 pt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                {(() => {
+                  const receipt = getReceiptCounts(rec);
+                  return (
+                    <div className="text-sm text-slate-700">
+                      <p className="font-medium">Rolls: {rec.buns ?? "-"} | Meat: {rec.meat ?? "-"} | Receipts: {receipt.total}</p>
+                      <p className="text-xs text-slate-500">Grab: {receipt.grab} | Cash: {receipt.cash} | QR: {receipt.qr}</p>
+                    </div>
+                  );
+                })()}
 
-              {/* Compact Actions Row */}
-              <div className="flex items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
                 <button
-                  className="p-1 hover:bg-slate-100 text-black rounded"
+                  className="p-1.5 hover:bg-slate-100 text-black rounded"
                   onClick={() => viewRecord(rec.id)}
                   title="View"
                 >
                   <Eye size={14} />
                 </button>
                 <button
-                  className="p-1 hover:bg-slate-100 text-black rounded"
-                  onClick={() => window.open(`/api/forms/daily-sales/v2/${rec.id}/print-full`, "_blank")}
+                  className="p-1.5 hover:bg-slate-100 text-black rounded"
+                  onClick={() => printRecord(rec.id)}
                   title="Print"
                 >
                   <Printer size={14} />
                 </button>
                 <button
-                  className="p-1 hover:bg-slate-100 text-black rounded"
-                  onClick={() => {
-                    const link = document.createElement("a");
-                    link.href = `/api/forms/daily-sales/v2/${rec.id}/pdf`;
-                    link.download = `daily-sales-${rec.id}.pdf`;
-                    link.click();
-                  }}
+                  className="p-1.5 hover:bg-slate-100 text-black rounded"
+                  onClick={() => downloadRecord(rec)}
                   title="Download"
                 >
                   <Download size={14} />
@@ -556,6 +436,7 @@ export default function DailySalesV2Library() {
                     Restore
                   </button>
                 )}
+                </div>
               </div>
             </div>
           ))
