@@ -230,16 +230,16 @@ function buildCappedContext(
 
 async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>) {
   const baseUrl = process.env.OPENCLAW_BASE_URL;
-  const apiKey = process.env.OPENCLAW_API_KEY;
+  const apiKey = process.env.OPENCLAW_GATEWAY_TOKEN;
   const model = process.env.OPENCLAW_MODEL || "openclaw/orchestrator";
-  // TEMP diagnostic — remove once secrets are confirmed
-  console.log("[Bob] ENV CHECK — OPENCLAW_BASE_URL defined:", Boolean(baseUrl), "| OPENCLAW_GATEWAY_TOKEN defined:", Boolean(process.env.OPENCLAW_GATEWAY_TOKEN));
   if (!baseUrl || !apiKey) {
     console.warn("[Bob] Orchestrator not configured — returning offline message");
     return "Bob is currently offline (AI orchestrator not configured). Your message has been saved.";
   }
 
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/v1/chat/completions`, {
+  const endpoint = `${baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
+  console.log("[Bob] Calling endpoint:", endpoint, "| model:", model);
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -257,6 +257,7 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
 
   if (!response.ok) {
     const text = await response.text();
+    console.error(`[Bob] API error ${response.status} at ${endpoint}:`, text);
     throw new Error(`OpenClaw error ${response.status}: ${text}`);
   }
 
@@ -436,7 +437,13 @@ router.post("/chat/threads/:id/messages", async (req, res) => {
       [threadId],
     );
     const context = buildCappedContext(contextRows.rows, 2400);
-    const assistantReply = await callBobOrchestrator(context);
+    let assistantReply: string;
+    try {
+      assistantReply = await callBobOrchestrator(context);
+    } catch (bobErr) {
+      console.error("[Bob] Orchestrator call failed, using fallback:", bobErr instanceof Error ? bobErr.message : String(bobErr));
+      assistantReply = "Bob encountered an issue reaching the AI service. Your message has been saved — please try again shortly.";
+    }
 
     await client.query(
       `INSERT INTO ai_chat_messages (thread_id, role, content, token_estimate, created_by)
