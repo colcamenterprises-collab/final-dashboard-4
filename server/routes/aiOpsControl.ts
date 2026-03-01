@@ -232,6 +232,8 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
   const baseUrl = process.env.OPENCLAW_BASE_URL;
   const apiKey = process.env.OPENCLAW_API_KEY;
   const model = process.env.OPENCLAW_MODEL || "openclaw/orchestrator";
+  // TEMP diagnostic — remove once secrets are confirmed
+  console.log("[Bob] ENV CHECK — OPENCLAW_BASE_URL defined:", Boolean(baseUrl), "| OPENCLAW_GATEWAY_TOKEN defined:", Boolean(process.env.OPENCLAW_GATEWAY_TOKEN));
   if (!baseUrl || !apiKey) {
     console.warn("[Bob] Orchestrator not configured — returning offline message");
     return "Bob is currently offline (AI orchestrator not configured). Your message has been saved.";
