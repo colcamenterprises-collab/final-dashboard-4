@@ -561,15 +561,43 @@ export default function AiOpsControlPage() {
             ))}
           </div>
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e: FormEvent) => {
               e.preventDefault();
-              if (!selectedThreadId || !chatMessageText.trim()) return;
-              sendChatMessageMutation.mutate({ threadId: selectedThreadId, content: chatMessageText.trim() });
+              const text = chatMessageText.trim();
+              if (!text) return;
+
+              let threadId = selectedThreadId;
+
+              if (!threadId) {
+                const title = text.length > 50 ? text.slice(0, 47) + '...' : text;
+                const result = await createChatThreadMutation.mutateAsync({ title, createdBy: 'Bob' });
+                threadId = (result as { ok: true; item: ChatThread }).item.id;
+              }
+
+              sendChatMessageMutation.mutate({ threadId, content: text });
             }}
             className="space-y-2"
           >
-            <textarea className="w-full rounded-lg border border-slate-300 p-3 text-sm" rows={3} value={chatMessageText} onChange={(e) => setChatMessageText(e.target.value)} placeholder="Message Bob orchestrator" />
-            <button type="submit" className="h-10 rounded-lg bg-slate-900 px-3 text-sm text-white" disabled={!selectedThreadId}>Send</button>
+            <textarea
+              className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+              rows={3}
+              value={chatMessageText}
+              onChange={(e) => setChatMessageText(e.target.value)}
+              placeholder="Type a message — a thread is created automatically if needed"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  (e.currentTarget.form as HTMLFormElement)?.requestSubmit();
+                }
+              }}
+            />
+            <button
+              type="submit"
+              disabled={sendChatMessageMutation.isPending || createChatThreadMutation.isPending}
+              className="h-10 w-full rounded-lg bg-slate-900 px-4 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
+            >
+              {sendChatMessageMutation.isPending || createChatThreadMutation.isPending ? 'Sending…' : 'Send'}
+            </button>
           </form>
         </div>
       </section>
