@@ -15,7 +15,6 @@ import { ConfirmDialog, SuccessDialog } from '@/components/ui/confirm-dialog';
 
 // MEGA PATCH V3: Safe number helpers
 const safeNumber = (v: any) => (v === 0 || typeof v === "number") ? v : (Number(v) || 0);
-const sumDrinks = (m: any) => Object.values(m || {}).map(Number).reduce((a, b) => a + (b || 0), 0);
 
 // THB formatting helper
 const thb = (v: unknown): string => {
@@ -339,7 +338,6 @@ export default function DailySalesV2Library() {
               <th className="px-4 py-3 border-b">Total Sales</th>
               <th className="px-4 py-3 border-b">Rolls</th>
               <th className="px-4 py-3 border-b">Meat</th>
-              <th className="px-4 py-3 border-b">Drinks</th>
               <th className="px-4 py-3 border-b">Receipts</th>
               <th className="px-4 py-3 border-b">Balanced</th>
               <th className="px-4 py-3 border-b">Status</th>
@@ -349,7 +347,7 @@ export default function DailySalesV2Library() {
           <tbody>
             {filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={10} className="p-4 text-center text-gray-500">
+                <td colSpan={9} className="p-4 text-center text-gray-500">
                   No records found
                 </td>
               </tr>
@@ -363,11 +361,6 @@ export default function DailySalesV2Library() {
                   <td className="px-4 py-3 border-b whitespace-nowrap">{thb(rec.totalSales)}</td>
                   <td className="px-4 py-3 border-b">{rec.buns ?? "-"}</td>
                   <td className="px-4 py-3 border-b">{rec.meat ?? "-"}</td>
-                  <td className="px-4 py-3 border-b">
-                    {(rec.drinksCount ?? 0) > 0 
-                      ? `${rec.drinksCount} items`
-                      : "-"}
-                  </td>
                   <td className="px-4 py-3 border-b">
                     {(() => { const r = getReceiptCounts(rec); return `${r.total}`; })()}
                   </td>
