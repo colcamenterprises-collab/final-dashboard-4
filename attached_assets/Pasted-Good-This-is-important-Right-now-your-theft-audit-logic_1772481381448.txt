@@ -1,0 +1,102 @@
+Good. This is important.
+Right now your theft audit logic depends on accurate historical stock entries, and if purchases are locked to “now()”, you cannot reconstruct last week properly.
+We fix this cleanly.
+🎯 What Needs To Change
+Currently:
+Rolls / Meat / Drinks purchases are auto-timestamped at submission.
+No ability to set a historical date.
+That breaks backdated reconciliation.
+You need:
+Ability to manually override the purchase date (Asia/Bangkok timezone), while still defaulting to automatic timestamp.
+✅ Correct Approach (Safe + Controlled)
+We do NOT remove auto timestamp.
+We add:
+1️⃣ Optional "Effective Date" field
+On the Lodge Stock Purchase modal:
+Add a date picker:
+Label: “Effective Date (Optional)”
+Default: today (Asia/Bangkok)
+Can be manually changed for backdating
+If left unchanged → system behaves exactly as now.
+If changed → record entry as that date.
+2️⃣ Backend Change
+Instead of always:
+Ts
+Copy code
+created_at = now()
+We store:
+created_at = actual submission time
+effective_date (DATE) = chosen business date
+All reconciliation should use:
+Sql
+Copy code
+effective_date
+NOT created_at.
+That preserves:
+Audit trail integrity
+Forensic clarity
+No tampering ambiguity
+🔒 Important
+Never overwrite created_at.
+You want to know:
+When it was entered
+What date it applies to
+If staff ever try to abuse backdating, you’ll see it.
+🛠 Replit Agent Instruction (Copy/Paste)
+Enable Backdating for Rolls / Meat / Drinks Purchases
+Objective
+Allow backdating of stock purchase entries while preserving original submission timestamp.
+1️⃣ Database
+For:
+rolls purchases
+meat purchases
+drinks purchases
+Add column:
+Sql
+Copy code
+effective_date DATE NOT NULL DEFAULT (CURRENT_DATE AT TIME ZONE 'Asia/Bangkok')
+Do not remove existing created_at.
+Ensure:
+Existing rows default correctly.
+Index on (effective_date).
+2️⃣ Backend API
+Modify stock purchase endpoints:
+Accept optional effectiveDate
+If provided → store as DATE
+If not → default to today's Asia/Bangkok date
+Never allow future dates.
+Validate:
+effectiveDate ≤ today
+Must be valid date
+3️⃣ Frontend (Modal)
+In “Lodge Stock Purchase” modal:
+Add below Staff Name:
+Tsx
+Copy code
+Label: Effective Date (Optional)
+Input type: date
+Default: today (Asia/Bangkok)
+Small helper text:
+"Leave as today unless entering historical stock."
+Keep layout clean.
+4️⃣ Reconciliation Adjustment
+Ensure variance engine uses:
+Sql
+Copy code
+WHERE effective_date = target_business_date
+Not created_at.
+Deliverables
+Full updated backend files
+Full updated modal file
+Proof:
+Backdated entry for yesterday
+Correctly reflected in daily calculations
+created_at still shows current timestamp
+🧠 Why This Matters
+Right now: You cannot audit properly.
+With this change: You can reconstruct last week. You can see variance trends. You can isolate suspicious days.
+Now quick confirmation:
+Do you want:
+Backdating unlimited (any past date) OR
+Backdating limited to last 14 days?
+Because unlimited backdating can be abused later.
