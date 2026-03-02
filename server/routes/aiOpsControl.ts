@@ -2,8 +2,39 @@ import { Router } from "express";
 import { pool } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import crypto from "crypto";
 
 const router = Router();
+
+// ---------------------------------------------------------------------------
+// Ed25519 device key — generated once per server instance, used for OpenClaw
+// authentication. The device is self-certifying: the server verifies the
+// signature using the included public key.
+// ---------------------------------------------------------------------------
+const _deviceKeyPair = crypto.generateKeyPairSync("ed25519");
+const _devicePublicKeyRaw = _deviceKeyPair.publicKey.export({ type: "spki", format: "der" }).slice(-32);
+const _deviceId = crypto.createHash("sha256").update(_devicePublicKeyRaw).digest("hex");
+
+function _b64url(bytes: Buffer | Uint8Array): string {
+  return Buffer.from(bytes).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function _buildDevice(challengeNonce: string, token: string): Record<string, unknown> {
+  const signedAtMs = Date.now();
+  const clientId = "openclaw-control-ui";
+  const clientMode = "webchat";
+  const role = "operator";
+  const scopes = ["operator.admin", "operator.approvals", "operator.pairing"];
+  const message = ["v2", _deviceId, clientId, clientMode, role, scopes.join(","), String(signedAtMs), token, challengeNonce].join("|");
+  const signature = crypto.sign(null, Buffer.from(message), _deviceKeyPair.privateKey);
+  return {
+    id: _deviceId,
+    publicKey: _b64url(_devicePublicKeyRaw),
+    signature: _b64url(signature),
+    signedAt: signedAtMs,
+    nonce: challengeNonce,
+  };
+}
 
 const frequencyEnum = z.enum(["once", "daily", "weekly", "monthly", "ad-hoc"]);
 const priorityEnum = z.enum(["low", "medium", "high", "urgent"]);
@@ -230,39 +261,164 @@ function buildCappedContext(
 
 async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>) {
   const baseUrl = process.env.OPENCLAW_BASE_URL;
-  const apiKey = process.env.OPENCLAW_GATEWAY_TOKEN;
-  const model = process.env.OPENCLAW_MODEL || "openclaw/orchestrator";
-  if (!baseUrl || !apiKey) {
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (!baseUrl || !token) {
     console.warn("[Bob] Orchestrator not configured — returning offline message");
     return "Bob is currently offline (AI orchestrator not configured). Your message has been saved.";
   }
 
-  const endpoint = `${baseUrl.replace(/\/$/, "")}/v1/chat/completions`;
-  console.log("[Bob] Calling endpoint:", endpoint, "| model:", model);
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0,
-      messages: [
-        { role: "system", content: "You are Bob, the AI Ops orchestrator. Respond with deterministic, auditable, and concise operational actions." },
-        ...contextMessages,
-      ],
-    }),
+  // Convert http(s):// to ws(s)://
+  const wsUrl = baseUrl.replace(/\/$/, "").replace(/^https:/, "wss:").replace(/^http:/, "ws:");
+  const sessionKey = "agent:main:main";
+
+  // The last user message to send to Bob
+  const lastUserMsg = [...contextMessages].reverse().find(m => m.role === "user")?.content ?? "hello";
+
+  console.log(`[Bob] Connecting via WebSocket: ${wsUrl} | session: ${sessionKey}`);
+
+  return new Promise<string>((resolve, reject) => {
+    // Dynamically import ws to keep ESM-friendly
+    import("ws").then(({ default: WS }) => {
+      // Set Origin to the gateway host — the server checks this header
+      const gatewayOrigin = baseUrl.replace(/^wss?:\/\//, "http://").replace(/\/$/, "");
+      const ws = new WS(wsUrl, { headers: { Origin: gatewayOrigin } });
+      let answered = false;
+      const pending = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
+
+      const finish = (result: string) => {
+        if (!answered) {
+          answered = true;
+          clearTimeout(hardTimeout);
+          try { ws.close(); } catch (_) {}
+          resolve(result);
+        }
+      };
+      const fail = (err: Error) => {
+        if (!answered) {
+          answered = true;
+          clearTimeout(hardTimeout);
+          try { ws.close(); } catch (_) {}
+          reject(err);
+        }
+      };
+
+      const hardTimeout = setTimeout(() => {
+        fail(new Error("OpenClaw WebSocket timeout (30s)"));
+      }, 30_000);
+
+      function sendReq(method: string, params: Record<string, unknown>): Promise<unknown> {
+        const id = crypto.randomUUID();
+        const wire = JSON.stringify({ type: "req", id, method, params });
+        console.log(`[Bob] → ${method} | url: ${wsUrl}`);
+        ws.send(wire);
+        return new Promise((res, rej) => pending.set(id, { resolve: res, reject: rej }));
+      }
+
+      ws.on("message", async (raw: Buffer | string) => {
+        let msg: Record<string, any>;
+        try { msg = JSON.parse(raw.toString()); } catch { return; }
+
+        // Handle RPC responses
+        if (msg.type === "res") {
+          const p = pending.get(msg.id);
+          if (!p) return;
+          pending.delete(msg.id);
+          if (msg.ok) p.resolve(msg.payload);
+          else p.reject(new Error(msg.error?.message ?? "request failed"));
+          return;
+        }
+
+        // Handle server-pushed events
+        if (msg.type === "event") {
+          // Step 1: authenticate after challenge
+          if (msg.event === "connect.challenge") {
+            const nonce: string | undefined = msg.payload?.nonce;
+            console.log(`[Bob] connect.challenge received | nonce: ${nonce ?? "none"}`);
+            try {
+              const device = _buildDevice(nonce ?? "", token);
+              const hello = await sendReq("connect", {
+                minProtocol: 3,
+                maxProtocol: 3,
+                client: { id: "openclaw-control-ui", version: "dev", platform: "web", mode: "webchat" },
+                role: "operator",
+                scopes: ["operator.admin", "operator.approvals", "operator.pairing"],
+                device,
+                caps: [],
+                auth: { token, password: "" },
+                userAgent: "Node.js/Dashboard",
+                locale: "en-US",
+              });
+              console.log(`[Bob] connected OK | hello keys: ${Object.keys(hello as object).join(", ")}`);
+
+              // Step 2: send the chat message
+              const idempotencyKey = crypto.randomUUID();
+              await sendReq("chat.send", {
+                sessionKey,
+                message: lastUserMsg,
+                deliver: false,
+                idempotencyKey,
+                attachments: [],
+              });
+              console.log("[Bob] chat.send dispatched — waiting for final event");
+            } catch (e: any) {
+              console.error("[Bob] connect/send failed:", e.message);
+              fail(e);
+            }
+            return;
+          }
+
+          // Step 3: receive streaming chat events
+          if (msg.event === "chat") {
+            const payload = msg.payload ?? {};
+            const state: string = payload.state ?? "";
+            const evtSession: string = payload.sessionKey ?? "";
+
+            // Accept events for our session or any session (server may echo without sessionKey)
+            if (evtSession && evtSession !== sessionKey) return;
+
+            if (state === "delta") {
+              const partial = extractText(payload.message);
+              if (partial) process.stdout.write(`[Bob delta] ${partial.slice(0, 40)}\r`);
+            }
+
+            if (state === "final") {
+              const text = extractText(payload.message);
+              const preview = (text ?? "").slice(0, 200);
+              console.log(`[Bob] final event received | status: ${msg.type} | preview: ${preview}`);
+              finish(text || "No response from Bob");
+            }
+          }
+        }
+      });
+
+      ws.on("error", (err: Error) => {
+        console.error("[Bob] WebSocket error:", err.message);
+        fail(err);
+      });
+
+      ws.on("close", (code: number, reason: Buffer) => {
+        const r = reason?.toString() ?? "";
+        console.log(`[Bob] WebSocket closed: code=${code} reason=${r}`);
+        if (!answered) fail(new Error(`WebSocket closed (${code}): ${r}`));
+      });
+    }).catch(reject);
   });
+}
 
-  if (!response.ok) {
-    const text = await response.text();
-    console.error(`[Bob] API error ${response.status} at ${endpoint}:`, text);
-    throw new Error(`OpenClaw error ${response.status}: ${text}`);
+/** Extract plain text from an OpenClaw message object (Anthropic-style or plain string) */
+function extractText(message: unknown): string {
+  if (!message) return "";
+  if (typeof message === "string") return message.trim();
+  const m = message as Record<string, unknown>;
+  if (typeof m.content === "string") return m.content.trim();
+  if (Array.isArray(m.content)) {
+    return (m.content as Array<{ type?: string; text?: string }>)
+      .filter(b => b.type === "text")
+      .map(b => b.text ?? "")
+      .join("")
+      .trim();
   }
-
-  const payload = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  return payload.choices?.[0]?.message?.content?.trim() || "No response";
+  return "";
 }
 
 function parseTaskId(rawId: string) {
