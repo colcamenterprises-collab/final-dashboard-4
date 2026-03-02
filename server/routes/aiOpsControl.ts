@@ -8,7 +8,10 @@ const router = Router();
 
 // ---------------------------------------------------------------------------
 // app_kv — tiny persistent key/value table for storing generated secrets
+// Creates the table exactly once at module load (memoized promise).
 // ---------------------------------------------------------------------------
+let _appKvReady: Promise<void> | null = null;
+
 async function ensureAppKvTable(): Promise<void> {
   if (!pool) return;
   await pool.query(`
@@ -19,6 +22,14 @@ async function ensureAppKvTable(): Promise<void> {
     )
   `);
 }
+
+function getAppKvReady(): Promise<void> {
+  if (!_appKvReady) _appKvReady = ensureAppKvTable().catch(e => console.warn("[appKv] table init failed:", e.message));
+  return _appKvReady;
+}
+
+// Run once at startup — non-blocking
+getAppKvReady();
 
 async function kvGet(key: string): Promise<string | null> {
   if (!pool) return null;
@@ -63,7 +74,7 @@ async function loadOrCreateDevice(): Promise<DeviceIdentity> {
       console.warn("[Bob] Failed to load device from env, falling back to DB:", (e as Error).message);
     }
   }
-  await ensureAppKvTable();
+  await getAppKvReady();
   const [storedId, storedPrivKey, storedPubKey] = await Promise.all([
     kvGet("openclaw_device_id"),
     kvGet("openclaw_device_privkey"),
@@ -380,11 +391,17 @@ function buildChatSendPayload(input: {
 }
 
 // ---------------------------------------------------------------------------
-// Bob connection health (exposed via /api/ai-ops/bob/health)
+// Bob connection health (exposed via /api/ai-ops/bob/health and /api/bob/health)
+// gatewayUrl is the WS URL (ws:// or wss://) — never exposes secrets
 // ---------------------------------------------------------------------------
+const _rawGatewayBase = process.env.OPENCLAW_BASE_URL ?? null;
+const _wsGatewayUrl = _rawGatewayBase
+  ? _rawGatewayBase.replace(/\/$/, "").replace(/^https:/, "wss:").replace(/^http:/, "ws:")
+  : null;
+
 const bobHealth = {
   connected: false,
-  gatewayUrl: (process.env.OPENCLAW_BASE_URL ?? null) as string | null,
+  gatewayUrl: _wsGatewayUrl,
   protocol: 3,
   lastConnectedAt: null as string | null,
   lastMessageAt: null as string | null,
@@ -393,14 +410,21 @@ const bobHealth = {
 
 // ---------------------------------------------------------------------------
 // Persistent BobConnectionManager — heartbeat + exponential-backoff reconnect
+//
+// Concurrency model: chat messages are processed one at a time via a FIFO
+// queue.  Only a single chat.send can be in-flight on a given WS session, so
+// the incoming "final" event is unambiguously paired with the single active
+// waiter — no idempotency-key matching needed.
 // ---------------------------------------------------------------------------
 type WsType = import("ws").WebSocket;
 
-interface ChatWaiter {
+interface QueueItem {
+  message: string;
+  sessionKey: string;
+  idempotencyKey: string;
   resolve: (text: string) => void;
   reject: (e: Error) => void;
   timer: NodeJS.Timeout;
-  sessionKey: string;
 }
 
 class BobConnectionManager {
@@ -408,7 +432,9 @@ class BobConnectionManager {
   private WS: (new (url: string, opts?: any) => WsType) | null = null;
   private state: "disconnected" | "connecting" | "authenticated" = "disconnected";
   private pending = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
-  private chatWaiters = new Map<string, ChatWaiter>();
+  // Sequential queue — only one chat.send in flight at a time
+  private chatQueue: QueueItem[] = [];
+  private chatInFlight: QueueItem | null = null;
   private reconnectAttempt = 0;
   private readonly BACKOFF = [1000, 2000, 5000, 10000, 20000, 30000];
   private reconnectTimer: NodeJS.Timeout | null = null;
@@ -489,7 +515,6 @@ class BobConnectionManager {
         if (msg.event === "chat") {
           const payload = msg.payload ?? {};
           const state: string = payload.state ?? "";
-          const evtSession: string = payload.sessionKey ?? "";
 
           if (state === "delta") {
             const partial = extractText(payload.message);
@@ -499,13 +524,13 @@ class BobConnectionManager {
           if (state === "final") {
             const text = extractText(payload.message);
             console.log(`[Bob] final | preview: ${(text ?? "").slice(0, 150)}`);
-            for (const [key, waiter] of this.chatWaiters) {
-              if (!evtSession || evtSession === waiter.sessionKey || evtSession === "agent:main:main") {
-                clearTimeout(waiter.timer);
-                this.chatWaiters.delete(key);
-                waiter.resolve(text || "No response from Bob");
-                return;
-              }
+            // Resolve the single in-flight waiter — queue ensures only one exists
+            const inFlight = this.chatInFlight;
+            if (inFlight) {
+              clearTimeout(inFlight.timer);
+              this.chatInFlight = null;
+              inFlight.resolve(text || "No response from Bob");
+              this.drainQueue();
             }
           }
         }
@@ -523,11 +548,18 @@ class BobConnectionManager {
       this.ws = null;
       bobHealth.connected = false;
       this.stopHeartbeat();
-      for (const [key, waiter] of this.chatWaiters) {
-        clearTimeout(waiter.timer);
-        this.chatWaiters.delete(key);
-        waiter.reject(new Error(`WebSocket closed (${code})`));
+      // Reject the in-flight item and any queued items
+      const err = new Error(`WebSocket closed (${code})`);
+      if (this.chatInFlight) {
+        clearTimeout(this.chatInFlight.timer);
+        this.chatInFlight.reject(err);
+        this.chatInFlight = null;
       }
+      for (const item of this.chatQueue) {
+        clearTimeout(item.timer);
+        item.reject(err);
+      }
+      this.chatQueue = [];
       const delay = this.BACKOFF[Math.min(this.reconnectAttempt, this.BACKOFF.length - 1)];
       this.reconnectAttempt++;
       console.log(`[Bob] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`);
@@ -556,8 +588,12 @@ class BobConnectionManager {
     if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
   }
 
+  // Enqueue a chat message.  Returns a promise that resolves when Bob's
+  // "final" event arrives for this specific message.  Messages are sent
+  // one-at-a-time so there is never ambiguity about which response belongs
+  // to which request.
   async sendChat(message: string, sessionKey = "agent:main:main"): Promise<string> {
-    // Wait up to 15s for connection if still connecting
+    // Wait up to 15s for auth before even queuing
     if (this.state !== "authenticated") {
       await new Promise<void>((res, rej) => {
         const check = setInterval(() => {
@@ -566,22 +602,46 @@ class BobConnectionManager {
         const giveUp = setTimeout(() => { clearInterval(check); rej(new Error("Bob not yet authenticated")); }, 15_000);
       });
     }
-    const ws = this.ws;
-    if (!ws || (ws as any).readyState !== 1) throw new Error("Bob WS not open");
 
-    const idempotencyKey = crypto.randomUUID();
     return new Promise<string>((resolve, reject) => {
+      const idempotencyKey = crypto.randomUUID();
       const timer = setTimeout(() => {
-        this.chatWaiters.delete(idempotencyKey);
+        // Remove from queue if still waiting, or clear in-flight slot
+        const qi = this.chatQueue.indexOf(item);
+        if (qi !== -1) this.chatQueue.splice(qi, 1);
+        if (this.chatInFlight === item) this.chatInFlight = null;
         reject(new Error("Bob chat.send timeout (60s)"));
+        this.drainQueue();
       }, 60_000);
-      this.chatWaiters.set(idempotencyKey, { resolve, reject, timer, sessionKey });
-      this.sendReq(ws, "chat.send", buildChatSendPayload({ sessionKey, message, idempotencyKey }))
-        .catch(e => {
-          clearTimeout(timer);
-          this.chatWaiters.delete(idempotencyKey);
-          reject(e);
-        });
+      const item: QueueItem = { message, sessionKey, idempotencyKey, resolve, reject, timer };
+      this.chatQueue.push(item);
+      this.drainQueue();
+    });
+  }
+
+  // Send the next queued item if nothing is currently in flight
+  private drainQueue(): void {
+    if (this.chatInFlight) return;
+    const item = this.chatQueue.shift();
+    if (!item) return;
+
+    const ws = this.ws;
+    if (!ws || (ws as any).readyState !== 1) {
+      clearTimeout(item.timer);
+      item.reject(new Error("Bob WS not open"));
+      return;
+    }
+
+    this.chatInFlight = item;
+    this.sendReq(ws, "chat.send", buildChatSendPayload({
+      sessionKey: item.sessionKey,
+      message: item.message,
+      idempotencyKey: item.idempotencyKey,
+    })).catch(e => {
+      clearTimeout(item.timer);
+      if (this.chatInFlight === item) this.chatInFlight = null;
+      item.reject(e);
+      this.drainQueue();
     });
   }
 }
@@ -675,16 +735,26 @@ async function ensureAgentTables(): Promise<void> {
 // Run on module load — non-blocking, logs on failure
 ensureAgentTables().catch(e => console.warn("[aiOps] ensureAgentTables failed:", e.message));
 
-router.get("/bob/health", (_req, res) => {
-  return res.json({
+function bobHealthPayload() {
+  return {
     connected: bobHealth.connected,
     gatewayUrl: bobHealth.gatewayUrl,
     protocol: bobHealth.protocol,
     lastConnectedAt: bobHealth.lastConnectedAt,
     lastMessageAt: bobHealth.lastMessageAt,
     lastError: bobHealth.lastError,
-  });
-});
+  };
+}
+
+// Mounted at /api/ai-ops/bob/health and /api/ops/ai/bob/health
+router.get("/bob/health", (_req, res) => res.json(bobHealthPayload()));
+
+// ---------------------------------------------------------------------------
+// Alias router — mounted at /api/bob in server/index.ts
+// Provides /api/bob/health without importing the full aiOps router twice
+// ---------------------------------------------------------------------------
+export const bobAliasRouter = Router();
+bobAliasRouter.get("/health", (_req, res) => res.json(bobHealthPayload()));
 
 router.get("/agents", async (_req, res) => {
   if (!pool) return res.status(503).json({ message: "Database unavailable" });

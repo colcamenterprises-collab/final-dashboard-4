@@ -461,9 +461,11 @@ async function checkSchema() {
   // AI Ops Control Room routes
   const aiOpsModule = await import('./routes/aiOpsControl');
   const aiOpsControlRouter = aiOpsModule.default;
-  const { chatAliasRouter } = aiOpsModule;
+  const { chatAliasRouter, bobAliasRouter } = aiOpsModule;
   app.use('/api/ops/ai', aiOpsControlRouter);
   app.use('/api/ai-ops', aiOpsControlRouter);
+  // /api/bob — alias prefix (e.g. /api/bob/health mirrors /api/ai-ops/bob/health)
+  app.use('/api/bob', bobAliasRouter);
 
   // /api/ai/chat — simple chat alias endpoints + idempotent table setup
   const { ensureAiChatTables, ensureDailySalesAuditTable } = await import('./db');
