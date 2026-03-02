@@ -2719,13 +2719,32 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
   };
 
+  const validateEffectiveDate = (effectiveDate?: string): { date: string; error?: string } => {
+    const todayBkk = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    if (!effectiveDate) return { date: todayBkk };
+    const parsed = new Date(effectiveDate);
+    if (Number.isNaN(parsed.getTime())) return { date: todayBkk, error: 'Invalid effective date' };
+    const dateStr = effectiveDate.slice(0, 10);
+    if (dateStr > todayBkk) return { date: todayBkk, error: 'Effective date cannot be in the future' };
+    const minDate = new Date();
+    minDate.setDate(minDate.getDate() - 14);
+    const minDateStr = minDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+    if (dateStr < minDateStr) return { date: todayBkk, error: 'Effective date cannot be more than 14 days in the past' };
+    return { date: dateStr };
+  };
+
   // Stock purchase endpoint - handles rolls, meat, drinks
   app.post("/api/expensesV2/stock", async (req: Request, res: Response) => {
     try {
       const { db } = await import("./db");
       const { sql } = await import("drizzle-orm");
       const crypto = await import("crypto");
-      const purchaseDate = resolveBangkokDate(req.body.submittedAt, true);
+
+      const effectiveDateResult = validateEffectiveDate(req.body.effectiveDate);
+      if (effectiveDateResult.error) {
+        return res.status(400).json({ ok: false, error: effectiveDateResult.error });
+      }
+      const purchaseDate = effectiveDateResult.date;
 
       if (req.body.type === "rolls") {
         const { quantity, cost, paid, submittedBy, submittedAt } = req.body;
@@ -2755,7 +2774,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
             VALUES (
               ${expenseId},
-              ${'cmes916fj0000pio20tvofd44'},
+              ${'cmixfople0000la9o74c5cpcj'},
               NOW(),
               ${'Bakery'},
               ${Number(cost)},
