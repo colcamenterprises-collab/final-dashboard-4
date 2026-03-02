@@ -1,31 +1,37 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '@/lib/queryClient';
 
 type TaskStatus =
   | 'draft'
+  | 'in_review'
   | 'not_assigned'
   | 'assigned'
   | 'in_progress'
   | 'blocked'
+  | 'completed'
+  | 'archived'
   | 'done'
   | 'cancelled'
   | 'needs_review'
   | 'approved'
   | 'changes_requested'
   | 'rejected';
-type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
+type TaskPriority = 'low' | 'medium' | 'high' | 'urgent' | 'critical';
 type TaskFrequency = 'once' | 'daily' | 'weekly' | 'monthly' | 'ad-hoc';
-type TaskAgent = 'bob' | 'jussi' | 'sally' | 'supplier' | 'codex';
+type TaskAgent = 'bob' | 'jussi' | 'sally' | 'supplier' | 'codex' | 'cam' | 'staff';
+type TaskArea = 'operations' | 'finance' | 'purchasing' | 'marketing' | 'dev' | 'compliance';
 
 type Task = {
-  id: string;
+  id: number;
   taskNumber: string | null;
   title: string;
   description: string | null;
   frequency: TaskFrequency;
   priority: TaskPriority;
   status: TaskStatus;
+  area: TaskArea | null;
   assignedTo: TaskAgent | null;
   publish: boolean;
   dueAt: string | null;
@@ -33,6 +39,7 @@ type Task = {
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;
+  deletedAt: string | null;
 };
 
 type TaskMessage = {
@@ -170,10 +177,11 @@ type ChatMessage = {
   createdBy: string;
   createdAt: string;
 };
-type SelectedItem = { type: 'task' | 'issue' | 'idea'; id: string } | null;
+type SelectedItem = { type: 'task'; id: number } | { type: 'issue' | 'idea'; id: string } | null;
 
 const STATUS_OPTIONS: TaskStatus[] = [
   'draft',
+  'in_review',
   'not_assigned',
   'assigned',
   'in_progress',
@@ -183,9 +191,13 @@ const STATUS_OPTIONS: TaskStatus[] = [
   'changes_requested',
   'rejected',
   'done',
+  'completed',
   'cancelled',
+  'archived',
 ];
-const AGENT_OPTIONS: TaskAgent[] = ['bob', 'jussi', 'sally', 'supplier', 'codex'];
+const PRIORITY_OPTIONS: TaskPriority[] = ['low', 'medium', 'high', 'urgent', 'critical'];
+const AREA_OPTIONS: TaskArea[] = ['operations', 'finance', 'purchasing', 'marketing', 'dev', 'compliance'];
+const AGENT_OPTIONS: TaskAgent[] = ['bob', 'jussi', 'sally', 'supplier', 'codex', 'cam', 'staff'];
 const ISSUE_STATUS_OPTIONS: IssueStatus[] = [
   'draft',
   'triage',
@@ -214,6 +226,7 @@ const IDEA_CATEGORY_OPTIONS: IdeaCategory[] = ['ops', 'finance', 'marketing', 't
 
 export default function AiOpsControlPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedItem, setSelectedItem] = useState<SelectedItem>(null);
 
   const selectedTaskId = selectedItem?.type === 'task' ? selectedItem.id : null;
@@ -222,12 +235,16 @@ export default function AiOpsControlPage() {
 
   const [taskStatusFilter, setTaskStatusFilter] = useState('');
   const [taskAgentFilter, setTaskAgentFilter] = useState('');
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState('');
+  const [taskAreaFilter, setTaskAreaFilter] = useState('');
   const [taskSearch, setTaskSearch] = useState('');
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [taskTitle, setTaskTitle] = useState('');
   const [taskDescription, setTaskDescription] = useState('');
   const [taskPriority, setTaskPriority] = useState<TaskPriority>('medium');
   const [taskFrequency, setTaskFrequency] = useState<TaskFrequency>('ad-hoc');
   const [taskAssignee, setTaskAssignee] = useState<TaskAgent | ''>('');
+  const [taskAreaInput, setTaskAreaInput] = useState<TaskArea | ''>('');
   const [messageText, setMessageText] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [reviewDecisionNote, setReviewDecisionNote] = useState('');
@@ -260,9 +277,12 @@ export default function AiOpsControlPage() {
     const params = new URLSearchParams();
     if (taskStatusFilter) params.set('status', taskStatusFilter);
     if (taskAgentFilter) params.set('assignedTo', taskAgentFilter);
+    if (taskPriorityFilter) params.set('priority', taskPriorityFilter);
+    if (taskAreaFilter) params.set('area', taskAreaFilter);
     if (taskSearch.trim()) params.set('q', taskSearch.trim());
+    if (includeArchived) params.set('includeArchived', 'true');
     return params.toString() ? `?${params.toString()}` : '';
-  }, [taskStatusFilter, taskAgentFilter, taskSearch]);
+  }, [taskStatusFilter, taskAgentFilter, taskPriorityFilter, taskAreaFilter, taskSearch, includeArchived]);
 
   const issueQuery = useMemo(() => {
     const params = new URLSearchParams();
@@ -353,16 +373,27 @@ export default function AiOpsControlPage() {
       setTaskPriority('medium');
       setTaskFrequency('ad-hoc');
       setTaskAssignee('');
+      setTaskAreaInput('');
       refreshTasks();
     },
   });
   const updateTaskMutation = useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Record<string, unknown> }) =>
+    mutationFn: ({ id, payload }: { id: number; payload: Record<string, unknown> }) =>
       apiRequest(`/api/ai-ops/tasks/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
     onSuccess: refreshTasks,
   });
+  const archiveTaskMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest(`/api/ai-ops/tasks/${id}/archive`, { method: 'POST', body: JSON.stringify({ actor: 'Cameron' }) }),
+    onSuccess: refreshTasks,
+  });
+  const restoreTaskMutation = useMutation({
+    mutationFn: (id: number) =>
+      apiRequest(`/api/ai-ops/tasks/${id}/restore`, { method: 'POST', body: JSON.stringify({ actor: 'Cameron' }) }),
+    onSuccess: refreshTasks,
+  });
   const messageTaskMutation = useMutation({
-    mutationFn: ({ id, message }: { id: string; message: string }) =>
+    mutationFn: ({ id, message }: { id: number; message: string }) =>
       apiRequest(`/api/ai-ops/tasks/${id}/messages`, {
         method: 'POST',
         body: JSON.stringify({ actor: 'Cameron', message, visibility: 'internal' }),
@@ -373,7 +404,7 @@ export default function AiOpsControlPage() {
     },
   });
   const reviewTaskMutation = useMutation({
-    mutationFn: ({ id, note }: { id: string; note: string }) =>
+    mutationFn: ({ id, note }: { id: number; note: string }) =>
       apiRequest(`/api/ai-ops/tasks/${id}/review-request`, {
         method: 'POST',
         body: JSON.stringify({ actor: 'Cameron', note }),
@@ -389,7 +420,7 @@ export default function AiOpsControlPage() {
       decision,
       note,
     }: {
-      id: string;
+      id: number;
       decision: 'approved' | 'changes_requested' | 'rejected';
       note: string;
     }) =>
@@ -705,7 +736,11 @@ export default function AiOpsControlPage() {
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,1.1fr)_minmax(0,1.5fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-lg font-semibold text-slate-900">Tasks</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-900">Work Register</h2>
+              <span className="text-xs text-slate-400">{tasksQuery.data?.items?.length ?? 0} tasks</span>
+            </div>
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -715,6 +750,7 @@ export default function AiOpsControlPage() {
                   description: taskDescription.trim() || null,
                   priority: taskPriority,
                   frequency: taskFrequency,
+                  area: taskAreaInput || null,
                   assignedTo: taskAssignee || null,
                   createdBy: 'Cameron',
                 });
@@ -722,120 +758,197 @@ export default function AiOpsControlPage() {
               className="grid gap-2 rounded-lg border border-slate-200 p-3"
             >
               <input
-                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-sm"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
                 placeholder="New task title"
               />
               <textarea
-                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                className="w-full rounded-[4px] border border-slate-300 bg-white px-3 py-2 text-sm"
                 rows={2}
                 value={taskDescription}
                 onChange={(e) => setTaskDescription(e.target.value)}
-                placeholder="Description"
+                placeholder="Description (optional)"
               />
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                 <select
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                  className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-2 text-xs"
                   value={taskPriority}
                   onChange={(e) => setTaskPriority(e.target.value as TaskPriority)}
                 >
-                  {(['low', 'medium', 'high', 'urgent'] as TaskPriority[]).map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
+                  {PRIORITY_OPTIONS.map((p) => (
+                    <option key={p} value={p}>{p}</option>
                   ))}
                 </select>
                 <select
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                  className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-2 text-xs"
                   value={taskFrequency}
                   onChange={(e) => setTaskFrequency(e.target.value as TaskFrequency)}
                 >
-                  {(['once', 'daily', 'weekly', 'monthly', 'ad-hoc'] as TaskFrequency[]).map(
-                    (f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    )
-                  )}
+                  {(['once', 'daily', 'weekly', 'monthly', 'ad-hoc'] as TaskFrequency[]).map((f) => (
+                    <option key={f} value={f}>{f}</option>
+                  ))}
                 </select>
                 <select
-                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                  className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-2 text-xs"
+                  value={taskAreaInput}
+                  onChange={(e) => setTaskAreaInput(e.target.value as TaskArea | '')}
+                >
+                  <option value="">No area</option>
+                  {AREA_OPTIONS.map((a) => (
+                    <option key={a} value={a}>{a}</option>
+                  ))}
+                </select>
+                <select
+                  className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-2 text-xs col-span-2 sm:col-span-3"
                   value={taskAssignee}
                   onChange={(e) => setTaskAssignee(e.target.value as TaskAgent | '')}
                 >
-                  {' '}
                   <option value="">Unassigned</option>
                   {AGENT_OPTIONS.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
+                    <option key={a} value={a}>{a}</option>
                   ))}
                 </select>
               </div>
               <button
-                className="w-fit rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
+                className="w-fit rounded-[4px] border border-slate-300 bg-slate-50 px-4 py-1.5 text-xs font-medium hover:bg-slate-100"
                 type="submit"
+                disabled={createTaskMutation.isPending}
               >
-                Create Task
+                {createTaskMutation.isPending ? 'Creating…' : '+ Create Task'}
               </button>
             </form>
 
-            <div className="grid gap-2 text-sm sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-2 py-1.5 text-xs"
                 value={taskStatusFilter}
                 onChange={(e) => setTaskStatusFilter(e.target.value)}
               >
                 <option value="">All statuses</option>
                 {STATUS_OPTIONS.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
+                  <option key={s} value={s}>{s}</option>
                 ))}
               </select>
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-2 py-1.5 text-xs"
+                value={taskPriorityFilter}
+                onChange={(e) => setTaskPriorityFilter(e.target.value)}
+              >
+                <option value="">All priorities</option>
+                {PRIORITY_OPTIONS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+              <select
+                className="rounded-[4px] border border-slate-300 px-2 py-1.5 text-xs"
+                value={taskAreaFilter}
+                onChange={(e) => setTaskAreaFilter(e.target.value)}
+              >
+                <option value="">All areas</option>
+                {AREA_OPTIONS.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
+              <select
+                className="rounded-[4px] border border-slate-300 px-2 py-1.5 text-xs"
                 value={taskAgentFilter}
                 onChange={(e) => setTaskAgentFilter(e.target.value)}
               >
                 <option value="">All assignees</option>
                 {AGENT_OPTIONS.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
+                  <option key={a} value={a}>{a}</option>
                 ))}
               </select>
               <input
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                placeholder="Search"
+                className="col-span-2 rounded-[4px] border border-slate-300 px-2 py-1.5 text-xs"
+                placeholder="Search tasks…"
                 value={taskSearch}
                 onChange={(e) => setTaskSearch(e.target.value)}
               />
             </div>
 
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left">
-                  <th className="py-2">Title</th>
-                  <th>Status</th>
-                  <th>Assigned</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(tasksQuery.data?.items || []).map((task) => (
-                  <tr
-                    key={task.id}
-                    className={`cursor-pointer border-b border-slate-100 ${selectedTaskId === task.id ? 'bg-slate-100' : ''}`}
-                    onClick={() => setSelectedItem({ type: 'task', id: task.id })}
-                  >
-                    <td className="py-2">{task.title}</td>
-                    <td>{task.status}</td>
-                    <td>{task.assignedTo || '-'}</td>
+            <label className="flex items-center gap-2 text-xs text-slate-500 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={includeArchived}
+                onChange={(e) => setIncludeArchived(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Show archived
+            </label>
+
+            <div className="overflow-x-auto rounded-[4px] border border-slate-200">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50">
+                  <tr className="border-b border-slate-200 text-left">
+                    <th className="px-2 py-2 font-medium text-slate-600">Title</th>
+                    <th className="px-2 py-2 font-medium text-slate-600 whitespace-nowrap">Priority</th>
+                    <th className="px-2 py-2 font-medium text-slate-600">Status</th>
+                    <th className="px-2 py-2 font-medium text-slate-600">Area</th>
+                    <th className="px-2 py-2 font-medium text-slate-600">Assigned</th>
+                    <th className="px-2 py-2 font-medium text-slate-600"></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {tasksQuery.isLoading && (
+                    <tr><td colSpan={6} className="px-2 py-4 text-center text-slate-400">Loading…</td></tr>
+                  )}
+                  {!tasksQuery.isLoading && (tasksQuery.data?.items || []).length === 0 && (
+                    <tr><td colSpan={6} className="px-2 py-4 text-center text-slate-400">No tasks found</td></tr>
+                  )}
+                  {(tasksQuery.data?.items || []).map((task) => (
+                    <tr
+                      key={task.id}
+                      className={`border-b border-slate-100 hover:bg-slate-50 ${task.deletedAt ? 'opacity-60' : ''}`}
+                    >
+                      <td className="px-2 py-2 max-w-[180px]">
+                        <button
+                          className="text-left text-emerald-700 hover:underline font-medium truncate block w-full"
+                          onClick={() => navigate(`/operations/tasks/${task.id}`)}
+                        >
+                          {task.title}
+                        </button>
+                        {task.dueAt && (
+                          <span className="text-slate-400 text-[10px]">
+                            Due {new Date(task.dueAt).toLocaleDateString('en-GB')}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize
+                          ${task.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                            task.priority === 'urgent' ? 'bg-orange-100 text-orange-700' :
+                            task.priority === 'high' ? 'bg-yellow-100 text-yellow-700' :
+                            task.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
+                            'bg-slate-100 text-slate-600'}`}
+                        >
+                          {task.priority}
+                        </span>
+                      </td>
+                      <td className="px-2 py-2 text-slate-600 capitalize whitespace-nowrap">{task.status.replace(/_/g, ' ')}</td>
+                      <td className="px-2 py-2 text-slate-500 capitalize">{task.area ?? '—'}</td>
+                      <td className="px-2 py-2 text-slate-500 capitalize">{task.assignedTo ?? '—'}</td>
+                      <td className="px-2 py-2">
+                        {task.deletedAt ? (
+                          <button
+                            className="text-[10px] text-emerald-600 hover:underline"
+                            onClick={() => restoreTaskMutation.mutate(task.id)}
+                            disabled={restoreTaskMutation.isPending}
+                          >Restore</button>
+                        ) : (
+                          <button
+                            className="text-[10px] text-slate-400 hover:text-slate-600"
+                            onClick={() => archiveTaskMutation.mutate(task.id)}
+                            disabled={archiveTaskMutation.isPending}
+                          >Archive</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </article>
 
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">

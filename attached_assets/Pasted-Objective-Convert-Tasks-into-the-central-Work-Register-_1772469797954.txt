@@ -1,0 +1,149 @@
+Objective: Convert Tasks into the central Work Register (view/edit/assign/track/refine) and implement core Monitoring rules that automatically create tasks (and assign them) so Bob becomes proactive. Keep everything tidy inside the dashboard.
+Hard Rules
+Minimal, additive changes only.
+Do not break existing forms, shopping list, or Bob gateway.
+No new “task systems” elsewhere — this becomes the single source of truth.
+Deliver FULL contents of every changed file (copy/paste ready).
+Add soft delete (archive), not hard delete.
+PART A — TASKS → WORK REGISTER (Foundation)
+A1) Upgrade DB schema (idempotent)
+Modify/extend the existing tasks table (or create if it’s missing) to support a proper register.
+Required fields:
+id (uuid pk)
+title (text)
+description (text)  must support long multi-line
+status (text) enum-like: draft | in_review | approved | in_progress | blocked | completed | archived
+priority (text): low | medium | high | critical
+area (text): operations | finance | purchasing | marketing | dev | compliance
+assignee (text) (e.g. bob | codex | replit | cam | staff)
+created_at timestamptz default now
+updated_at timestamptz default now
+due_at timestamptz nullable
+deleted_at timestamptz nullable (soft delete)
+Indexes:
+(status, updated_at)
+(assignee, status)
+(area, status)
+(deleted_at)
+If the current description is a short varchar, upgrade to TEXT.
+A2) Task Activity Log (audit trail)
+Create table task_activity (idempotent):
+id uuid pk
+task_id uuid fk
+created_at timestamptz default now
+actor text (bob/cam/replit/codex/system)
+type text (created|updated|comment|status_change|assigned|archived|restored)
+message text
+payload jsonb default {}
+Every create/update/status change should write an activity entry.
+A3) Comments (refinement)
+Create table task_comments (idempotent):
+id uuid pk
+task_id uuid fk
+created_at timestamptz default now
+author text
+body text
+A4) API endpoints
+Add/upgrade endpoints (use existing routing conventions under /api/...):
+GET /api/tasks
+filters: status, priority, area, assignee, q(search), includeArchived
+default exclude deleted_at IS NOT NULL
+POST /api/tasks
+creates task + activity log
+GET /api/tasks/:id
+returns full task + activity + comments
+PUT /api/tasks/:id
+update fields + activity entries
+POST /api/tasks/:id/comment
+add comment + activity entry
+POST /api/tasks/:id/archive
+set deleted_at=now, status=archived, activity entry
+POST /api/tasks/:id/restore
+set deleted_at=null, restore prior status or draft, activity entry
+No hard delete.
+A5) UI upgrades (Work Register)
+Wherever tasks currently live:
+Make description input a <textarea rows={6}> minimum (resizable).
+Task list must be a real register:
+Columns: Title (clickable), Status, Priority, Area, Assignee, Updated, Due
+Filters: status, area, assignee, priority
+Search box
+Toggle: Active / Archived
+Task detail view (required)
+Create page/route:
+/operations/tasks/:id (or existing pattern)
+It must show:
+Full multi-line description (preserve line breaks)
+Editable fields (status/priority/area/assignee/due) when not archived
+Comments section
+Activity timeline (latest first)
+Archive/Restore buttons
+PART B — MONITORING ENGINE → AUTO-CREATE TASKS (Proactive CEO)
+B1) Monitoring rules (v1)
+Implement a server-side “monitor runner” that creates tasks when conditions occur. Use idempotency: don’t create duplicates for the same day/shift.
+Create table monitor_events (idempotent) to prevent spam:
+id uuid pk
+monitor_key text
+event_date date
+fingerprint text unique
+created_at timestamptz default now
+Fingerprint example: ${monitor_key}:${event_date}:${shift_id||'na'}
+Monitors to implement now:
+Missing Daily Sales Form 1
+If no Form 1 exists for yesterday’s shift by 13:00 BKK → create task
+Title: Missing Daily Sales Form 1 — {date}
+Area: operations
+Priority: high
+Assignee: staff (or cam) depending on your system
+Status: in_progress
+Missing Daily Stock Form 2
+If Form 1 exists but Form 2 missing by 13:00 BKK → create task
+Title: Missing Daily Stock Form 2 — {date}
+Area: operations
+Priority: high
+Assignee: staff
+Variance breach (Rolls / Meat / Drinks)
+Use your existing thresholds:
+Rolls ±5
+Meat ±500g
+Drinks ±3
+When breach detected → create task
+Title: Stock Variance Alert — {date} ({item})
+Area: operations
+Priority: critical if large breach else high
+Assignee: bob
+Include payload in description (expected vs actual)
+Grab Daily Upload Missing (since you want daily Grab audit)
+At 13:00 BKK, if yesterday’s Grab CSV not uploaded → create task
+Title: Grab Report Needed — Upload CSV for {date}
+Area: finance
+Priority: medium
+Assignee: cam
+This is your “Bob pings Cam” mechanism via tasks until messaging is added.
+B2) Scheduler
+Schedule the monitor runner:
+Daily at 13:00 Asia/Bangkok
+It runs the checks above and creates tasks as needed.
+Also allow manual run endpoint:
+POST /api/monitors/run?date=YYYY-MM-DD (optional)
+B3) Where tasks appear
+Monitoring-created tasks appear in the same Work Register:
+Clearly labeled via activity log: actor=system and payload includes monitor_key.
+VERIFICATION (agent must run and paste proof)
+Show description textarea is 6 rows and multi-line persists.
+Show task detail view works and includes comments + activity.
+Show archive/restore works and “Archived view” displays.
+Trigger monitor runner (manual or time simulation) and show:
+a task created for “Grab Report Needed”
+a task created for missing Form 2 (if you simulate missing)
+no duplicates on second run (monitor_events prevents spam)
+Deliver:
+Screenshots of Work Register list + task detail
+API outputs (one example per endpoint)
+List of files changed
+Default assignments
+Monitoring tasks:
+Missing forms → assignee: staff
+Variance alerts → assignee: bob
+Grab upload request → assignee: cam
+Do NOT invent new roles.

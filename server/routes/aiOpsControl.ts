@@ -3,6 +3,7 @@ import { pool } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import crypto from "crypto";
+import { runMonitors, startMonitorScheduler } from "../services/monitorEngine";
 
 const router = Router();
 
@@ -179,10 +180,11 @@ async function _buildDevice(challengeNonce: string, token: string): Promise<Reco
 }
 
 const frequencyEnum = z.enum(["once", "daily", "weekly", "monthly", "ad-hoc"]);
-const priorityEnum = z.enum(["low", "medium", "high", "urgent"]);
-const taskStatusEnum = z.enum(["draft", "not_assigned", "assigned", "in_progress", "blocked", "done", "cancelled", "needs_review", "approved", "changes_requested", "rejected"]);
+const priorityEnum = z.enum(["low", "medium", "high", "urgent", "critical"]);
+const taskStatusEnum = z.enum(["draft", "in_review", "not_assigned", "assigned", "in_progress", "blocked", "completed", "archived", "done", "cancelled", "needs_review", "approved", "changes_requested", "rejected"]);
 const reviewDecisionEnum = z.enum(["approved", "changes_requested", "rejected"]);
-const assignedToEnum = z.enum(["bob", "jussi", "sally", "supplier", "codex"]);
+const assignedToEnum = z.enum(["bob", "jussi", "sally", "supplier", "codex", "cam", "staff"]);
+const areaEnum = z.enum(["operations", "finance", "purchasing", "marketing", "dev", "compliance"]);
 const agentStatusEnum = z.enum(["online", "offline", "busy"]);
 const activityActionEnum = z.enum(["CREATED", "ASSIGNED", "STATUS_CHANGED", "MESSAGE_ADDED", "REVIEW_REQUESTED", "REVIEW_DECIDED", "UPDATED_FIELDS"]);
 const issueSeverityEnum = z.enum(["low", "medium", "high", "critical"]);
@@ -213,6 +215,7 @@ const taskCreateSchema = z.object({
   frequency: frequencyEnum.default("ad-hoc"),
   priority: priorityEnum.default("medium"),
   status: taskStatusEnum.default("draft"),
+  area: areaEnum.optional().nullable(),
   assignedTo: assignedToEnum.optional().nullable(),
   publish: z.boolean().default(false),
   dueAt: z.string().datetime().optional().nullable(),
@@ -225,6 +228,7 @@ const taskUpdateSchema = z.object({
   frequency: frequencyEnum.optional(),
   priority: priorityEnum.optional(),
   status: taskStatusEnum.optional(),
+  area: areaEnum.optional().nullable(),
   assignedTo: assignedToEnum.optional().nullable(),
   publish: z.boolean().optional(),
   dueAt: z.string().datetime().optional().nullable(),
@@ -354,7 +358,7 @@ const issueIdSchema = z.string().uuid();
 const ideaIdSchema = z.string().uuid();
 const threadIdSchema = z.string().uuid();
 
-const taskIdSchema = z.string().uuid();
+const taskIdSchema = z.coerce.number().int().positive();
 
 const chatThreadCreateSchema = z.object({
   title: z.string().trim().min(1).max(255),
@@ -1440,12 +1444,18 @@ router.get("/tasks", async (req, res) => {
 
   const status = typeof req.query.status === "string" ? req.query.status : undefined;
   const assignedTo = typeof req.query.assignedTo === "string" ? req.query.assignedTo : undefined;
+  const priority = typeof req.query.priority === "string" ? req.query.priority : undefined;
+  const area = typeof req.query.area === "string" ? req.query.area : undefined;
   const publish = typeof req.query.publish === "string" ? req.query.publish : undefined;
   const q = typeof req.query.q === "string" ? req.query.q.trim() : undefined;
+  const includeArchived = req.query.includeArchived === "true";
 
   const params: Array<string | boolean> = [];
   const where: string[] = [];
 
+  if (!includeArchived) {
+    where.push(`deleted_at IS NULL`);
+  }
   if (status) {
     params.push(status);
     where.push(`status = $${params.length}`);
@@ -1453,6 +1463,14 @@ router.get("/tasks", async (req, res) => {
   if (assignedTo) {
     params.push(assignedTo);
     where.push(`assigned_to = $${params.length}`);
+  }
+  if (priority) {
+    params.push(priority);
+    where.push(`priority = $${params.length}`);
+  }
+  if (area) {
+    params.push(area);
+    where.push(`area = $${params.length}`);
   }
   if (publish === "true" || publish === "false") {
     params.push(publish === "true");
@@ -1464,11 +1482,13 @@ router.get("/tasks", async (req, res) => {
   }
 
   const result = await pool.query(
-    `SELECT id, task_number AS "taskNumber", title, description, frequency, priority, status, assigned_to AS "assignedTo", publish,
-            due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", completed_at AS "completedAt"
+    `SELECT id, task_number AS "taskNumber", title, description, frequency, priority, status, area,
+            assigned_to AS "assignedTo", publish,
+            due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt",
+            updated_at AS "updatedAt", completed_at AS "completedAt", deleted_at AS "deletedAt"
      FROM ai_tasks
      ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
-     ORDER BY created_at DESC
+     ORDER BY updated_at DESC
      LIMIT 300`,
     params,
   );
@@ -1486,10 +1506,12 @@ router.post("/tasks", async (req, res) => {
   try {
     await client.query("BEGIN");
     const insertResult = await client.query(
-      `INSERT INTO ai_tasks (task_number, title, description, frequency, priority, status, assigned_to, publish, due_at, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, assigned_to AS "assignedTo", publish,
-                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", completed_at AS "completedAt"`,
+      `INSERT INTO ai_tasks (task_number, title, description, frequency, priority, status, area, assigned_to, publish, due_at, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, area,
+                 assigned_to AS "assignedTo", publish,
+                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt",
+                 updated_at AS "updatedAt", completed_at AS "completedAt", deleted_at AS "deletedAt"`,
       [
         payload.taskNumber ?? null,
         payload.title,
@@ -1497,6 +1519,7 @@ router.post("/tasks", async (req, res) => {
         payload.frequency,
         payload.priority,
         payload.status,
+        payload.area ?? null,
         payload.assignedTo ?? null,
         payload.publish,
         payload.dueAt ? new Date(payload.dueAt) : null,
@@ -1546,14 +1569,17 @@ router.put("/tasks/:id", async (req, res) => {
            frequency = COALESCE($4, frequency),
            priority = COALESCE($5, priority),
            status = COALESCE($6, status),
-           assigned_to = CASE WHEN $7::text IS NULL AND $8 THEN NULL ELSE COALESCE($7, assigned_to) END,
-           publish = COALESCE($9, publish),
-           due_at = CASE WHEN $10::timestamptz IS NULL AND $11 THEN NULL ELSE COALESCE($10, due_at) END,
+           area = CASE WHEN $7::text IS NULL AND $8 THEN NULL ELSE COALESCE($7, area) END,
+           assigned_to = CASE WHEN $9::text IS NULL AND $10 THEN NULL ELSE COALESCE($9, assigned_to) END,
+           publish = COALESCE($11, publish),
+           due_at = CASE WHEN $12::timestamptz IS NULL AND $13 THEN NULL ELSE COALESCE($12, due_at) END,
            updated_at = NOW(),
-           completed_at = CASE WHEN $6 = 'done' AND $12 <> 'done' THEN NOW() WHEN $6 IS NOT NULL AND $6 <> 'done' THEN NULL ELSE completed_at END
+           completed_at = CASE WHEN $6 IN ('done','completed') AND $14 NOT IN ('done','completed') THEN NOW() WHEN $6 IS NOT NULL AND $6 NOT IN ('done','completed') THEN NULL ELSE completed_at END
        WHERE id = $1
-       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, assigned_to AS "assignedTo", publish,
-                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", completed_at AS "completedAt"`,
+       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, area,
+                 assigned_to AS "assignedTo", publish,
+                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt",
+                 updated_at AS "updatedAt", completed_at AS "completedAt", deleted_at AS "deletedAt"`,
       [
         taskId,
         body.title ?? null,
@@ -1561,6 +1587,8 @@ router.put("/tasks/:id", async (req, res) => {
         body.frequency ?? null,
         body.priority ?? null,
         body.status ?? null,
+        body.area ?? null,
+        Object.prototype.hasOwnProperty.call(body, "area"),
         body.assignedTo ?? null,
         Object.prototype.hasOwnProperty.call(body, "assignedTo"),
         body.publish,
@@ -1615,10 +1643,12 @@ router.put("/tasks/:id/status", async (req, res) => {
       `UPDATE ai_tasks
        SET status = $2,
            updated_at = NOW(),
-           completed_at = CASE WHEN $2 = 'done' AND $3 <> 'done' THEN NOW() WHEN $2 <> 'done' THEN NULL ELSE completed_at END
+           completed_at = CASE WHEN $2 IN ('done','completed') AND $3 NOT IN ('done','completed') THEN NOW() WHEN $2 NOT IN ('done','completed') THEN NULL ELSE completed_at END
        WHERE id = $1
-       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, assigned_to AS "assignedTo", publish,
-                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", completed_at AS "completedAt"`,
+       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, area,
+                 assigned_to AS "assignedTo", publish,
+                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt",
+                 updated_at AS "updatedAt", completed_at AS "completedAt", deleted_at AS "deletedAt"`,
       [taskId, payload.status, currentStatus],
     );
 
@@ -1639,8 +1669,10 @@ router.get("/tasks/:id", async (req, res) => {
   if (!taskId) return res.status(400).json({ message: "Invalid task id" });
 
   const taskResult = await pool.query(
-    `SELECT id, task_number AS "taskNumber", title, description, frequency, priority, status, assigned_to AS "assignedTo", publish,
-            due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt", updated_at AS "updatedAt", completed_at AS "completedAt"
+    `SELECT id, task_number AS "taskNumber", title, description, frequency, priority, status, area,
+            assigned_to AS "assignedTo", publish,
+            due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt",
+            updated_at AS "updatedAt", completed_at AS "completedAt", deleted_at AS "deletedAt"
      FROM ai_tasks
      WHERE id = $1`,
     [taskId],
@@ -1819,6 +1851,112 @@ router.post("/tasks/:id/review-decision", async (req, res) => {
   }
 });
 
+
+router.post("/tasks/:id/archive", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const taskId = parseTaskId(req.params.id);
+  if (!taskId) return res.status(400).json({ message: "Invalid task id" });
+  const actor = typeof req.body?.actor === "string" ? req.body.actor.trim() || "Cameron" : "Cameron";
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(`SELECT id, status FROM ai_tasks WHERE id = $1`, [taskId]);
+    if (!r.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Task not found" }); }
+    if (r.rows[0].deleted_at) { await client.query("ROLLBACK"); return res.status(409).json({ message: "Task is already archived" }); }
+    const updated = await client.query(
+      `UPDATE ai_tasks SET deleted_at = NOW(), status = 'archived', updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, area,
+                 assigned_to AS "assignedTo", publish,
+                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt",
+                 updated_at AS "updatedAt", completed_at AS "completedAt", deleted_at AS "deletedAt"`,
+      [taskId],
+    );
+    await writeActivity(client, taskId, "STATUS_CHANGED", actor, null, { from: r.rows[0].status, to: "archived" });
+    await client.query("COMMIT");
+    return res.json(updated.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
+router.post("/tasks/:id/restore", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const taskId = parseTaskId(req.params.id);
+  if (!taskId) return res.status(400).json({ message: "Invalid task id" });
+  const actor = typeof req.body?.actor === "string" ? req.body.actor.trim() || "Cameron" : "Cameron";
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(`SELECT id, deleted_at FROM ai_tasks WHERE id = $1`, [taskId]);
+    if (!r.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Task not found" }); }
+    if (!r.rows[0].deleted_at) { await client.query("ROLLBACK"); return res.status(409).json({ message: "Task is not archived" }); }
+    const updated = await client.query(
+      `UPDATE ai_tasks SET deleted_at = NULL, status = 'draft', updated_at = NOW()
+       WHERE id = $1
+       RETURNING id, task_number AS "taskNumber", title, description, frequency, priority, status, area,
+                 assigned_to AS "assignedTo", publish,
+                 due_at AS "dueAt", created_by AS "createdBy", created_at AS "createdAt",
+                 updated_at AS "updatedAt", completed_at AS "completedAt", deleted_at AS "deletedAt"`,
+      [taskId],
+    );
+    await writeActivity(client, taskId, "STATUS_CHANGED", actor, null, { from: "archived", to: "draft" });
+    await client.query("COMMIT");
+    return res.json(updated.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
+router.get("/tasks/:id/activity", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const taskId = parseTaskId(req.params.id);
+  if (!taskId) return res.status(400).json({ message: "Invalid task id" });
+  const result = await pool.query(
+    `SELECT id, task_id AS "taskId", action, actor, note, payload, created_at AS "createdAt"
+     FROM ai_task_activity WHERE task_id = $1 ORDER BY created_at DESC LIMIT 500`,
+    [taskId],
+  );
+  return res.json({ items: result.rows });
+});
+
+router.get("/monitors", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const limit = Math.min(parseInt(String(req.query.limit || "100"), 10), 500);
+  const key = typeof req.query.key === "string" ? req.query.key : undefined;
+  const params: string[] = [];
+  const where: string[] = [];
+  if (key) { params.push(key); where.push(`monitor_key = $${params.length}`); }
+  const result = await pool.query(
+    `SELECT id, monitor_key AS "monitorKey", event_date AS "eventDate", fingerprint, severity, message, payload, fired_at AS "firedAt"
+     FROM monitor_events
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY fired_at DESC LIMIT $${params.length + 1}`,
+    [...params, limit],
+  );
+  return res.json({ items: result.rows });
+});
+
+router.post("/monitors/run", async (req, res) => {
+  const dateOverride = typeof req.body?.date === "string" ? req.body.date : undefined;
+  try {
+    const results = await runMonitors(dateOverride);
+    return res.json({ results });
+  } catch (e) {
+    return res.status(500).json({ message: "Monitor run failed", error: (e as Error).message });
+  }
+});
+
+// Start daily scheduler (non-blocking, idempotent)
+startMonitorScheduler();
 
 router.get("/issues", async (req, res) => {
   if (!pool) return res.status(503).json({ message: "Database unavailable" });

@@ -34,6 +34,7 @@ export const ROUTES = {
   DAILY_REPORTS: "/operations/daily-reports",
   SYSTEM_HEALTH: "/operations/system-health",
   AI_OPS_CONTROL: "/operations/ai-ops-control",
+  TASK_DETAIL: "/operations/tasks/:id",
   PURCHASE_HISTORY: "/operations/purchase-history",
   HEALTH_SAFETY_AUDIT: "/operations/health-safety-audit",
   HEALTH_SAFETY_QUESTIONS: "/operations/health-safety-audit/questions",

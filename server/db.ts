@@ -220,6 +220,39 @@ export async function ensureDailySalesAuditTable(): Promise<void> {
   }
 }
 
+// Idempotent Work Register migrations: extends ai_tasks with area/deleted_at,
+// adds performance indexes, and creates monitor_events for the monitoring engine.
+export async function ensureWorkRegisterTables(): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(`
+      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS area        TEXT;
+      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
+
+      CREATE INDEX IF NOT EXISTS ai_tasks_status_updated_idx  ON ai_tasks(status, updated_at DESC);
+      CREATE INDEX IF NOT EXISTS ai_tasks_assignee_status_idx ON ai_tasks(assigned_to, status);
+      CREATE INDEX IF NOT EXISTS ai_tasks_area_status_idx     ON ai_tasks(area, status);
+      CREATE INDEX IF NOT EXISTS ai_tasks_deleted_at_idx      ON ai_tasks(deleted_at) WHERE deleted_at IS NOT NULL;
+
+      CREATE TABLE IF NOT EXISTS monitor_events (
+        id           SERIAL       PRIMARY KEY,
+        monitor_key  TEXT         NOT NULL,
+        event_date   DATE         NOT NULL,
+        fingerprint  TEXT         NOT NULL UNIQUE,
+        severity     TEXT         NOT NULL DEFAULT 'warning',
+        message      TEXT         NOT NULL,
+        payload      JSONB,
+        fired_at     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS monitor_events_fired_at_idx ON monitor_events(fired_at DESC);
+      CREATE INDEX IF NOT EXISTS monitor_events_key_date_idx ON monitor_events(monitor_key, event_date DESC);
+    `);
+    console.log('[workRegister] Tables/columns ready: ai_tasks(area, deleted_at), monitor_events');
+  } catch (err) {
+    console.error('[workRegister] ensureWorkRegisterTables failed:', (err as Error).message);
+  }
+}
+
 // Database health check function
 export async function checkDatabaseHealth(): Promise<boolean> {
   if (!databaseAvailable || !pool) {
