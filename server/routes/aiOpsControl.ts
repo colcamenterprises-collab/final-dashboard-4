@@ -49,6 +49,52 @@ async function kvSet(key: string, value: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// CEO Charter — stored in bob_documents, cached in memory
+// ---------------------------------------------------------------------------
+const CEO_CHARTER_SEED = `Mission: Maximize profitability, integrity, and operational efficiency of Smash Brothers Burgers.
+
+Core Objectives:
+- Protect Profit
+- Protect Integrity
+- Improve Efficiency
+
+Primary KPIs:
+- Prime Cost %
+- Wage % of Sales
+- Food Cost Variance
+- Stock Variance (Rolls ±5, Meat ±500g, Drinks ±3)
+- Sales Discrepancies
+- Missing Shift Submissions
+
+Authority Model: BOB may:
+- Generate alerts
+- Create recommendations
+- Draft operational patches
+- Draft pricing changes
+- Draft SOP updates
+
+BOB may NOT:
+- Modify schemas without approval
+- Delete data
+- Deploy code
+- Change live pricing
+- Restart infrastructure
+- Override Cam
+
+Escalation Rule: Any structural or financial impact change requires Cam approval.
+
+Reporting Cadence: Daily Executive Report at 04:00 BKK. Immediate alert if:
+- Prime Cost exceeds threshold
+- Wage % exceeds threshold
+- Stock variance exceeds tolerance`;
+
+// Charter cache — refreshed from DB every 6 hours
+let cachedCharterContent: string | null = null;
+let cachedCharterVersion: number | null = null;
+let cachedCharterUpdatedAt: string | null = null;
+let cachedCharterLoadedAt: Date | null = null;
+
+// ---------------------------------------------------------------------------
 // Ed25519 device identity — persisted across restarts via env vars or DB
 // ---------------------------------------------------------------------------
 interface DeviceIdentity {
@@ -678,7 +724,25 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
     return "Bob is currently offline (AI orchestrator not configured). Your message has been saved.";
   }
   const lastUserMsg = [...contextMessages].reverse().find(m => m.role === "user")?.content ?? "hello";
-  return bobManager.sendChat(lastUserMsg);
+
+  // Prepend CEO Charter if cached (refresh from DB on-demand if cache is empty)
+  if (!cachedCharterContent) {
+    await loadCharterFromDb().catch(() => {});
+  }
+  let messageToSend = lastUserMsg;
+  if (cachedCharterContent && cachedCharterVersion != null && cachedCharterUpdatedAt) {
+    const dateStr = cachedCharterUpdatedAt.slice(0, 10);
+    const MAX_CHARTER_CHARS = 8000;
+    const charterBody = cachedCharterContent.length > MAX_CHARTER_CHARS
+      ? cachedCharterContent.slice(0, MAX_CHARTER_CHARS) + "\n[... charter truncated ...]"
+      : cachedCharterContent;
+    messageToSend =
+      `[BOB CEO CHARTER v${cachedCharterVersion} | updated ${dateStr}]\n` +
+      charterBody +
+      `\n[END CHARTER]\n\nUser message:\n${lastUserMsg}`;
+  }
+
+  return bobManager.sendChat(messageToSend);
 }
 
 function parseTaskId(rawId: string) {
@@ -747,10 +811,54 @@ async function ensureAgentTables(): Promise<void> {
       updated_at timestamptz DEFAULT NOW()
     )
   `);
+  // bob_documents — versioned governance docs (CEO Charter etc.)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bob_documents (
+      key TEXT PRIMARY KEY,
+      content TEXT NOT NULL,
+      version INT NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  // Seed CEO Charter if missing — DO NOT overwrite existing content
+  await pool.query(
+    `INSERT INTO bob_documents (key, content, version)
+     VALUES ('CEO_CHARTER', $1, 1)
+     ON CONFLICT (key) DO NOTHING`,
+    [CEO_CHARTER_SEED],
+  );
 }
 
 // Run on module load — non-blocking, logs on failure
-ensureAgentTables().catch(e => console.warn("[aiOps] ensureAgentTables failed:", e.message));
+ensureAgentTables()
+  .then(() => loadCharterFromDb())
+  .catch(e => console.warn("[aiOps] ensureAgentTables/charter load failed:", e.message));
+
+// ---------------------------------------------------------------------------
+// Charter: load from DB + 6-hour auto-refresh
+// ---------------------------------------------------------------------------
+async function loadCharterFromDb(): Promise<void> {
+  if (!pool) return;
+  try {
+    const r = await pool.query(
+      `SELECT content, version, updated_at FROM bob_documents WHERE key = 'CEO_CHARTER'`,
+    );
+    if (r.rows.length > 0) {
+      const row = r.rows[0];
+      cachedCharterContent = row.content as string;
+      cachedCharterVersion = row.version as number;
+      cachedCharterUpdatedAt = row.updated_at instanceof Date
+        ? row.updated_at.toISOString()
+        : String(row.updated_at);
+      cachedCharterLoadedAt = new Date();
+    }
+  } catch (e: any) {
+    console.warn("[Bob] Charter load failed:", e.message);
+  }
+}
+
+// Refresh every 6 hours — fires-and-forgets silently
+setInterval(() => loadCharterFromDb().catch(() => {}), 6 * 60 * 60 * 1000);
 
 function bobHealthPayload() {
   return {
@@ -766,12 +874,45 @@ function bobHealthPayload() {
 // Mounted at /api/ai-ops/bob/health and /api/ops/ai/bob/health
 router.get("/bob/health", (_req, res) => res.json(bobHealthPayload()));
 
+// GET /api/ai-ops/bob/charter — returns the CEO Charter from DB
+router.get("/bob/charter", async (_req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const r = await pool.query(
+      `SELECT key, content, version, updated_at FROM bob_documents WHERE key = 'CEO_CHARTER'`,
+    );
+    if (!r.rows.length) return res.status(404).json({ ok: false, error: "CEO_CHARTER not found" });
+    const row = r.rows[0];
+    return res.json({
+      key: row.key,
+      version: row.version,
+      updated_at: row.updated_at,
+      content: row.content,
+    });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: "Failed to load charter" });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Alias router — mounted at /api/bob in server/index.ts
-// Provides /api/bob/health without importing the full aiOps router twice
+// Provides /api/bob/health and /api/bob/charter without the full aiOps router
 // ---------------------------------------------------------------------------
 export const bobAliasRouter = Router();
 bobAliasRouter.get("/health", (_req, res) => res.json(bobHealthPayload()));
+bobAliasRouter.get("/charter", async (_req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const r = await pool.query(
+      `SELECT key, content, version, updated_at FROM bob_documents WHERE key = 'CEO_CHARTER'`,
+    );
+    if (!r.rows.length) return res.status(404).json({ ok: false, error: "CEO_CHARTER not found" });
+    const row = r.rows[0];
+    return res.json({ key: row.key, version: row.version, updated_at: row.updated_at, content: row.content });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: "Failed to load charter" });
+  }
+});
 
 router.get("/agents", async (_req, res) => {
   if (!pool) return res.status(503).json({ message: "Database unavailable" });

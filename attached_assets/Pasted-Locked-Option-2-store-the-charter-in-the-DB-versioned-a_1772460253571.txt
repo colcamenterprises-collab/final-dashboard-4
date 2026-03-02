@@ -1,0 +1,114 @@
+Locked. Option 2 = store the charter in the DB (versioned, auditable). No reliance on Replit filesystem.
+Here’s the exact Replit Agent instruction to paste.
+Replit Agent Instruction — Store Bob CEO Charter in DB (Versioned) + Use It
+Objective: Bob must load his CEO Charter from the database (single source of truth), cache it, and prepend it to every chat.send. Provide an internal endpoint to view it. No filesystem dependency.
+Rules
+Minimal changes, no refactors outside Bob/AI Ops Control.
+Do not break existing Bob chat.
+Deliver FULL contents of every changed file (copy/paste ready).
+No logging of secrets.
+1) Create DB table: bob_documents
+Create table (idempotent: create-if-missing):
+key TEXT PRIMARY KEY
+content TEXT NOT NULL
+version INT NOT NULL DEFAULT 1
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+This table will hold CEO Charter and future governance docs.
+2) Seed the CEO Charter row (create if missing)
+Insert a row if it does not already exist:
+key = 'CEO_CHARTER'
+content = <the charter markdown text>
+version = 1
+If it already exists, DO NOT overwrite.
+Use an UPSERT pattern that preserves existing content.
+3) Add endpoint to retrieve the charter
+Add:
+GET /api/ai-ops/bob/charter
+Returns JSON:
+Json
+Copy code
+{
+  "key": "CEO_CHARTER",
+  "version": 1,
+  "updated_at": "...",
+  "content": "..."
+}
+Must never throw; if missing, return 404 with:
+Json
+Copy code
+{ "ok": false, "error": "CEO_CHARTER not found" }
+4) Load + cache the charter in memory
+In the Bob integration module (same file where BobConnectionManager / callBobOrchestrator lives):
+On module load (or server start), load CEO_CHARTER from DB into memory.
+Cache structure:
+cachedCharterContent
+cachedCharterVersion
+cachedCharterUpdatedAt
+cachedCharterLoadedAt
+Refresh policy:
+refresh automatically every 6 hours
+also refresh on-demand if cache is empty
+If DB is temporarily unavailable:
+Do not crash server
+Continue operating with last cached charter
+If no cached charter exists, proceed without charter but set lastError so /health shows warning.
+5) Prepend charter to EVERY chat send
+Every chat.send must include the charter.
+Format (prepend once per outbound message):
+Copy code
+
+[BOB CEO CHARTER v{version} | updated {updated_at}]
+{content}
+
+[END CHARTER]
+
+User message:
+{actual user message}
+Important:
+Do NOT exceed gateway limits—if there is a known max payload, truncate charter safely (keep header + first N chars).
+Keep attachments: [] unchanged.
+Keep queue logic unchanged.
+6) Verification (agent must run and paste proof)
+Hit:
+GET /api/ai-ops/bob/charter → paste JSON output
+Send a chat message “ping” and prove (via safe log or internal debug response) that the outbound message includes the charter header:
+Must show: BOB CEO CHARTER v
+Must NOT leak any secrets
+Do NOT add permanent debug logging. If you temporarily log, remove it before final output.
+7) Deliverables
+Full contents of all changed files
+Proof outputs from verification steps
+CEO Charter Content to seed (use exactly this)
+Content (store as markdown in DB)
+Mission: Maximize profitability, integrity, and operational efficiency of Smash Brothers Burgers.
+Core Objectives:
+Protect Profit
+Protect Integrity
+Improve Efficiency
+Primary KPIs:
+Prime Cost %
+Wage % of Sales
+Food Cost Variance
+Stock Variance (Rolls ±5, Meat ±500g, Drinks ±3)
+Sales Discrepancies
+Missing Shift Submissions
+Authority Model: BOB may:
+Generate alerts
+Create recommendations
+Draft operational patches
+Draft pricing changes
+Draft SOP updates
+BOB may NOT:
+Modify schemas without approval
+Delete data
+Deploy code
+Change live pricing
+Restart infrastructure
+Override Cam
+Escalation Rule: Any structural or financial impact change requires Cam approval.
+Reporting Cadence: Daily Executive Report at 04:00 BKK. Immediate alert if:
+Prime Cost exceeds threshold
+Wage % exceeds threshold
+Stock variance exceeds tolerance
+Paste that to the agent.
+When they respond with the updated files + proof, drop it here and I’ll sanity-check it fast.
