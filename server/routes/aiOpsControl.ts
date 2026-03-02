@@ -7,29 +7,114 @@ import crypto from "crypto";
 const router = Router();
 
 // ---------------------------------------------------------------------------
-// Ed25519 device key — generated once per server instance, used for OpenClaw
-// authentication. The device is self-certifying: the server verifies the
-// signature using the included public key.
+// app_kv — tiny persistent key/value table for storing generated secrets
 // ---------------------------------------------------------------------------
-const _deviceKeyPair = crypto.generateKeyPairSync("ed25519");
-const _devicePublicKeyRaw = _deviceKeyPair.publicKey.export({ type: "spki", format: "der" }).slice(-32);
-const _deviceId = crypto.createHash("sha256").update(_devicePublicKeyRaw).digest("hex");
+async function ensureAppKvTable(): Promise<void> {
+  if (!pool) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_kv (
+      key text PRIMARY KEY,
+      value text NOT NULL,
+      updated_at timestamptz DEFAULT NOW()
+    )
+  `);
+}
+
+async function kvGet(key: string): Promise<string | null> {
+  if (!pool) return null;
+  try {
+    const r = await pool.query(`SELECT value FROM app_kv WHERE key = $1`, [key]);
+    return r.rows[0]?.value ?? null;
+  } catch { return null; }
+}
+
+async function kvSet(key: string, value: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO app_kv (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [key, value],
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Ed25519 device identity — persisted across restarts via env vars or DB
+// ---------------------------------------------------------------------------
+interface DeviceIdentity {
+  deviceId: string;
+  privateKey: crypto.KeyObject;
+  publicKeyRaw: Buffer;
+}
+
+let _deviceInitPromise: Promise<DeviceIdentity> | null = null;
+
+async function loadOrCreateDevice(): Promise<DeviceIdentity> {
+  const envId = process.env.OPENCLAW_DEVICE_ID;
+  const envPrivKey = process.env.OPENCLAW_DEVICE_PRIVATE_KEY;
+  if (envId && envPrivKey) {
+    try {
+      const privKeyBuf = Buffer.from(envPrivKey, "base64");
+      const privateKey = crypto.createPrivateKey({ key: privKeyBuf, format: "der", type: "pkcs8" });
+      const pubKeyDer = crypto.createPublicKey(privateKey).export({ type: "spki", format: "der" });
+      const publicKeyRaw = Buffer.from(pubKeyDer).slice(-32);
+      console.log(`[Bob] Device identity loaded from env | id: ${envId.slice(0, 12)}...`);
+      return { deviceId: envId, privateKey, publicKeyRaw };
+    } catch (e) {
+      console.warn("[Bob] Failed to load device from env, falling back to DB:", (e as Error).message);
+    }
+  }
+  await ensureAppKvTable();
+  const [storedId, storedPrivKey, storedPubKey] = await Promise.all([
+    kvGet("openclaw_device_id"),
+    kvGet("openclaw_device_privkey"),
+    kvGet("openclaw_device_pubkey"),
+  ]);
+  if (storedId && storedPrivKey && storedPubKey) {
+    try {
+      const privKeyBuf = Buffer.from(storedPrivKey, "base64");
+      const privateKey = crypto.createPrivateKey({ key: privKeyBuf, format: "der", type: "pkcs8" });
+      const publicKeyRaw = Buffer.from(storedPubKey, "hex");
+      console.log(`[Bob] Device identity loaded from DB | id: ${storedId.slice(0, 12)}...`);
+      return { deviceId: storedId, privateKey, publicKeyRaw };
+    } catch (e) {
+      console.warn("[Bob] Failed to load device from DB, generating new:", (e as Error).message);
+    }
+  }
+  const kp = crypto.generateKeyPairSync("ed25519");
+  const pubKeyDer = kp.publicKey.export({ type: "spki", format: "der" });
+  const publicKeyRaw = Buffer.from(pubKeyDer).slice(-32);
+  const deviceId = crypto.createHash("sha256").update(publicKeyRaw).digest("hex");
+  const privKeyDer = Buffer.from(kp.privateKey.export({ type: "pkcs8", format: "der" }));
+  await Promise.all([
+    kvSet("openclaw_device_id", deviceId),
+    kvSet("openclaw_device_privkey", privKeyDer.toString("base64")),
+    kvSet("openclaw_device_pubkey", publicKeyRaw.toString("hex")),
+  ]);
+  console.log(`[Bob] Device identity generated and persisted | id: ${deviceId.slice(0, 12)}...`);
+  return { deviceId, privateKey: kp.privateKey, publicKeyRaw };
+}
+
+function getDevice(): Promise<DeviceIdentity> {
+  if (!_deviceInitPromise) _deviceInitPromise = loadOrCreateDevice();
+  return _deviceInitPromise;
+}
 
 function _b64url(bytes: Buffer | Uint8Array): string {
   return Buffer.from(bytes).toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-function _buildDevice(challengeNonce: string, token: string): Record<string, unknown> {
+async function _buildDevice(challengeNonce: string, token: string): Promise<Record<string, unknown>> {
+  const dev = await getDevice();
   const signedAtMs = Date.now();
   const clientId = "openclaw-control-ui";
   const clientMode = "webchat";
   const role = "operator";
   const scopes = ["operator.admin", "operator.approvals", "operator.pairing"];
-  const message = ["v2", _deviceId, clientId, clientMode, role, scopes.join(","), String(signedAtMs), token, challengeNonce].join("|");
-  const signature = crypto.sign(null, Buffer.from(message), _deviceKeyPair.privateKey);
+  const message = ["v2", dev.deviceId, clientId, clientMode, role, scopes.join(","), String(signedAtMs), token, challengeNonce].join("|");
+  const signature = crypto.sign(null, Buffer.from(message), dev.privateKey);
   return {
-    id: _deviceId,
-    publicKey: _b64url(_devicePublicKeyRaw),
+    id: dev.deviceId,
+    publicKey: _b64url(dev.publicKeyRaw),
     signature: _b64url(signature),
     signedAt: signedAtMs,
     nonce: challengeNonce,
@@ -259,151 +344,9 @@ function buildCappedContext(
   return selected.reverse();
 }
 
-async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>) {
-  const baseUrl = process.env.OPENCLAW_BASE_URL;
-  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
-  if (!baseUrl || !token) {
-    console.warn("[Bob] Orchestrator not configured — returning offline message");
-    return "Bob is currently offline (AI orchestrator not configured). Your message has been saved.";
-  }
-
-  // Convert http(s):// to ws(s)://
-  const wsUrl = baseUrl.replace(/\/$/, "").replace(/^https:/, "wss:").replace(/^http:/, "ws:");
-  const sessionKey = "agent:main:main";
-
-  // The last user message to send to Bob
-  const lastUserMsg = [...contextMessages].reverse().find(m => m.role === "user")?.content ?? "hello";
-
-  console.log(`[Bob] Connecting via WebSocket: ${wsUrl} | session: ${sessionKey}`);
-
-  return new Promise<string>((resolve, reject) => {
-    // Dynamically import ws to keep ESM-friendly
-    import("ws").then(({ default: WS }) => {
-      // Set Origin to the gateway host — the server checks this header
-      const gatewayOrigin = baseUrl.replace(/^wss?:\/\//, "http://").replace(/\/$/, "");
-      const ws = new WS(wsUrl, { headers: { Origin: gatewayOrigin } });
-      let answered = false;
-      const pending = new Map<string, { resolve: (v: any) => void; reject: (e: any) => void }>();
-
-      const finish = (result: string) => {
-        if (!answered) {
-          answered = true;
-          clearTimeout(hardTimeout);
-          try { ws.close(); } catch (_) {}
-          resolve(result);
-        }
-      };
-      const fail = (err: Error) => {
-        if (!answered) {
-          answered = true;
-          clearTimeout(hardTimeout);
-          try { ws.close(); } catch (_) {}
-          reject(err);
-        }
-      };
-
-      const hardTimeout = setTimeout(() => {
-        fail(new Error("OpenClaw WebSocket timeout (30s)"));
-      }, 30_000);
-
-      function sendReq(method: string, params: Record<string, unknown>): Promise<unknown> {
-        const id = crypto.randomUUID();
-        const wire = JSON.stringify({ type: "req", id, method, params });
-        console.log(`[Bob] → ${method} | url: ${wsUrl}`);
-        ws.send(wire);
-        return new Promise((res, rej) => pending.set(id, { resolve: res, reject: rej }));
-      }
-
-      ws.on("message", async (raw: Buffer | string) => {
-        let msg: Record<string, any>;
-        try { msg = JSON.parse(raw.toString()); } catch { return; }
-
-        // Handle RPC responses
-        if (msg.type === "res") {
-          const p = pending.get(msg.id);
-          if (!p) return;
-          pending.delete(msg.id);
-          if (msg.ok) p.resolve(msg.payload);
-          else p.reject(new Error(msg.error?.message ?? "request failed"));
-          return;
-        }
-
-        // Handle server-pushed events
-        if (msg.type === "event") {
-          // Step 1: authenticate after challenge
-          if (msg.event === "connect.challenge") {
-            const nonce: string | undefined = msg.payload?.nonce;
-            console.log(`[Bob] connect.challenge received | nonce: ${nonce ?? "none"}`);
-            try {
-              const device = _buildDevice(nonce ?? "", token);
-              const hello = await sendReq("connect", {
-                minProtocol: 3,
-                maxProtocol: 3,
-                client: { id: "openclaw-control-ui", version: "dev", platform: "web", mode: "webchat" },
-                role: "operator",
-                scopes: ["operator.admin", "operator.approvals", "operator.pairing"],
-                device,
-                caps: [],
-                auth: { token, password: "" },
-                userAgent: "Node.js/Dashboard",
-                locale: "en-US",
-              });
-              console.log(`[Bob] connected OK | hello keys: ${Object.keys(hello as object).join(", ")}`);
-
-              // Step 2: send the chat message
-              const idempotencyKey = crypto.randomUUID();
-              await sendReq("chat.send", {
-                sessionKey,
-                message: lastUserMsg,
-                deliver: false,
-                idempotencyKey,
-                attachments: [],
-              });
-              console.log("[Bob] chat.send dispatched — waiting for final event");
-            } catch (e: any) {
-              console.error("[Bob] connect/send failed:", e.message);
-              fail(e);
-            }
-            return;
-          }
-
-          // Step 3: receive streaming chat events
-          if (msg.event === "chat") {
-            const payload = msg.payload ?? {};
-            const state: string = payload.state ?? "";
-            const evtSession: string = payload.sessionKey ?? "";
-
-            // Accept events for our session or any session (server may echo without sessionKey)
-            if (evtSession && evtSession !== sessionKey) return;
-
-            if (state === "delta") {
-              const partial = extractText(payload.message);
-              if (partial) process.stdout.write(`[Bob delta] ${partial.slice(0, 40)}\r`);
-            }
-
-            if (state === "final") {
-              const text = extractText(payload.message);
-              const preview = (text ?? "").slice(0, 200);
-              console.log(`[Bob] final event received | status: ${msg.type} | preview: ${preview}`);
-              finish(text || "No response from Bob");
-            }
-          }
-        }
-      });
-
-      ws.on("error", (err: Error) => {
-        console.error("[Bob] WebSocket error:", err.message);
-        fail(err);
-      });
-
-      ws.on("close", (code: number, reason: Buffer) => {
-        const r = reason?.toString() ?? "";
-        console.log(`[Bob] WebSocket closed: code=${code} reason=${r}`);
-        if (!answered) fail(new Error(`WebSocket closed (${code}): ${r}`));
-      });
-    }).catch(reject);
-  });
-}
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /** Extract plain text from an OpenClaw message object (Anthropic-style or plain string) */
 function extractText(message: unknown): string {
@@ -419,6 +362,246 @@ function extractText(message: unknown): string {
       .trim();
   }
   return "";
+}
+
+/** Schema-safe chat.send payload — attachments always [], no nulls */
+function buildChatSendPayload(input: {
+  sessionKey: string;
+  message: string;
+  idempotencyKey: string;
+}): Record<string, unknown> {
+  return {
+    sessionKey: input.sessionKey,
+    message: input.message,
+    deliver: false,
+    idempotencyKey: input.idempotencyKey,
+    attachments: [],
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Bob connection health (exposed via /api/ai-ops/bob/health)
+// ---------------------------------------------------------------------------
+const bobHealth = {
+  connected: false,
+  gatewayUrl: (process.env.OPENCLAW_BASE_URL ?? null) as string | null,
+  protocol: 3,
+  lastConnectedAt: null as string | null,
+  lastMessageAt: null as string | null,
+  lastError: null as string | null,
+};
+
+// ---------------------------------------------------------------------------
+// Persistent BobConnectionManager — heartbeat + exponential-backoff reconnect
+// ---------------------------------------------------------------------------
+type WsType = import("ws").WebSocket;
+
+interface ChatWaiter {
+  resolve: (text: string) => void;
+  reject: (e: Error) => void;
+  timer: NodeJS.Timeout;
+  sessionKey: string;
+}
+
+class BobConnectionManager {
+  private ws: WsType | null = null;
+  private WS: (new (url: string, opts?: any) => WsType) | null = null;
+  private state: "disconnected" | "connecting" | "authenticated" = "disconnected";
+  private pending = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+  private chatWaiters = new Map<string, ChatWaiter>();
+  private reconnectAttempt = 0;
+  private readonly BACKOFF = [1000, 2000, 5000, 10000, 20000, 30000];
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private heartbeatTimer: NodeJS.Timeout | null = null;
+
+  start(): void {
+    import("ws").then(({ default: WSClass }) => {
+      this.WS = WSClass as any;
+      this.scheduleConnect(0);
+    }).catch(e => console.error("[Bob] Failed to import ws:", e.message));
+  }
+
+  private scheduleConnect(delayMs: number): void {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => this.connect(), delayMs);
+  }
+
+  private connect(): void {
+    const baseUrl = process.env.OPENCLAW_BASE_URL;
+    const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+    if (!baseUrl || !token || !this.WS) return;
+
+    this.state = "connecting";
+    const wsUrl = baseUrl.replace(/\/$/, "").replace(/^https:/, "wss:").replace(/^http:/, "ws:");
+    const gatewayOrigin = baseUrl.replace(/^wss?:\/\//, "http://").replace(/\/$/, "");
+
+    const ws = new this.WS!(wsUrl, { headers: { Origin: gatewayOrigin } });
+    this.ws = ws;
+
+    (ws as any).on("message", async (raw: Buffer | string) => {
+      let msg: Record<string, any>;
+      try { msg = JSON.parse(raw.toString()); } catch { return; }
+
+      bobHealth.lastMessageAt = new Date().toISOString();
+
+      if (msg.type === "res") {
+        const p = this.pending.get(msg.id);
+        if (!p) return;
+        this.pending.delete(msg.id);
+        if (msg.ok) p.resolve(msg.payload);
+        else p.reject(new Error(msg.error?.message ?? "request failed"));
+        return;
+      }
+
+      if (msg.type === "event") {
+        if (msg.event === "connect.challenge") {
+          const nonce: string = msg.payload?.nonce ?? "";
+          console.log(`[Bob] connect.challenge | nonce: ${nonce.slice(0, 8)}...`);
+          try {
+            const device = await _buildDevice(nonce, token);
+            const hello = await this.sendReq(ws, "connect", {
+              minProtocol: 3,
+              maxProtocol: 3,
+              client: { id: "openclaw-control-ui", version: "dev", platform: "web", mode: "webchat" },
+              role: "operator",
+              scopes: ["operator.admin", "operator.approvals", "operator.pairing"],
+              device,
+              caps: [],
+              auth: { token, password: "" },
+              userAgent: "Node.js/Dashboard",
+              locale: "en-US",
+            });
+            console.log(`[Bob] connected OK | hello keys: ${Object.keys(hello as object).join(", ")}`);
+            this.state = "authenticated";
+            this.reconnectAttempt = 0;
+            bobHealth.connected = true;
+            bobHealth.lastConnectedAt = new Date().toISOString();
+            bobHealth.lastError = null;
+            this.startHeartbeat(ws);
+          } catch (e: any) {
+            console.error("[Bob] handshake failed:", e.message);
+            bobHealth.lastError = e.message;
+            try { ws.close(); } catch (_) {}
+          }
+          return;
+        }
+
+        if (msg.event === "chat") {
+          const payload = msg.payload ?? {};
+          const state: string = payload.state ?? "";
+          const evtSession: string = payload.sessionKey ?? "";
+
+          if (state === "delta") {
+            const partial = extractText(payload.message);
+            if (partial) process.stdout.write(`[Bob delta] ${partial.slice(0, 40)}\r`);
+          }
+
+          if (state === "final") {
+            const text = extractText(payload.message);
+            console.log(`[Bob] final | preview: ${(text ?? "").slice(0, 150)}`);
+            for (const [key, waiter] of this.chatWaiters) {
+              if (!evtSession || evtSession === waiter.sessionKey || evtSession === "agent:main:main") {
+                clearTimeout(waiter.timer);
+                this.chatWaiters.delete(key);
+                waiter.resolve(text || "No response from Bob");
+                return;
+              }
+            }
+          }
+        }
+      }
+    });
+
+    (ws as any).on("error", (err: Error) => {
+      console.error("[Bob] WS error:", err.message);
+      bobHealth.lastError = err.message;
+    });
+
+    (ws as any).on("close", (code: number) => {
+      console.log(`[Bob] WS closed code=${code}`);
+      this.state = "disconnected";
+      this.ws = null;
+      bobHealth.connected = false;
+      this.stopHeartbeat();
+      for (const [key, waiter] of this.chatWaiters) {
+        clearTimeout(waiter.timer);
+        this.chatWaiters.delete(key);
+        waiter.reject(new Error(`WebSocket closed (${code})`));
+      }
+      const delay = this.BACKOFF[Math.min(this.reconnectAttempt, this.BACKOFF.length - 1)];
+      this.reconnectAttempt++;
+      console.log(`[Bob] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempt})`);
+      this.scheduleConnect(delay);
+    });
+  }
+
+  private sendReq(ws: WsType, method: string, params: Record<string, unknown>): Promise<unknown> {
+    const id = crypto.randomUUID();
+    const wire = JSON.stringify({ type: "req", id, method, params });
+    console.log(`[Bob] → ${method}`);
+    (ws as any).send(wire);
+    return new Promise((res, rej) => this.pending.set(id, { resolve: res, reject: rej }));
+  }
+
+  private startHeartbeat(ws: WsType): void {
+    this.stopHeartbeat();
+    this.heartbeatTimer = setInterval(() => {
+      if ((ws as any).readyState === 1) {
+        try { (ws as any).ping(); } catch (_) {}
+      }
+    }, 28_000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
+  }
+
+  async sendChat(message: string, sessionKey = "agent:main:main"): Promise<string> {
+    // Wait up to 15s for connection if still connecting
+    if (this.state !== "authenticated") {
+      await new Promise<void>((res, rej) => {
+        const check = setInterval(() => {
+          if (this.state === "authenticated") { clearInterval(check); clearTimeout(giveUp); res(); }
+        }, 200);
+        const giveUp = setTimeout(() => { clearInterval(check); rej(new Error("Bob not yet authenticated")); }, 15_000);
+      });
+    }
+    const ws = this.ws;
+    if (!ws || (ws as any).readyState !== 1) throw new Error("Bob WS not open");
+
+    const idempotencyKey = crypto.randomUUID();
+    return new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.chatWaiters.delete(idempotencyKey);
+        reject(new Error("Bob chat.send timeout (60s)"));
+      }, 60_000);
+      this.chatWaiters.set(idempotencyKey, { resolve, reject, timer, sessionKey });
+      this.sendReq(ws, "chat.send", buildChatSendPayload({ sessionKey, message, idempotencyKey }))
+        .catch(e => {
+          clearTimeout(timer);
+          this.chatWaiters.delete(idempotencyKey);
+          reject(e);
+        });
+    });
+  }
+}
+
+const bobManager = new BobConnectionManager();
+
+// Kick off the persistent connection as soon as config is available
+if (process.env.OPENCLAW_BASE_URL && process.env.OPENCLAW_GATEWAY_TOKEN) {
+  // Pre-load device identity and start connection
+  getDevice().catch(e => console.error("[Bob] Device init error:", e.message));
+  bobManager.start();
+}
+
+async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>) {
+  if (!process.env.OPENCLAW_BASE_URL || !process.env.OPENCLAW_GATEWAY_TOKEN) {
+    console.warn("[Bob] Orchestrator not configured — returning offline message");
+    return "Bob is currently offline (AI orchestrator not configured). Your message has been saved.";
+  }
+  const lastUserMsg = [...contextMessages].reverse().find(m => m.role === "user")?.content ?? "hello";
+  return bobManager.sendChat(lastUserMsg);
 }
 
 function parseTaskId(rawId: string) {
@@ -460,17 +643,69 @@ async function writeIdeaActivity(client: { query: (sql: string, params?: unknown
   );
 }
 
+// ---------------------------------------------------------------------------
+// Ensure agent tables exist (create-if-missing, no destructive ops)
+// ---------------------------------------------------------------------------
+async function ensureAgentTables(): Promise<void> {
+  if (!pool) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_agent_profiles (
+      id serial PRIMARY KEY,
+      agent_name text NOT NULL UNIQUE,
+      name text NOT NULL,
+      role text,
+      summary text,
+      image_url text,
+      sort_order int DEFAULT 0,
+      created_at timestamptz DEFAULT NOW()
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_agent_state (
+      id serial PRIMARY KEY,
+      agent_name text NOT NULL UNIQUE,
+      status text NOT NULL DEFAULT 'offline',
+      status_message text,
+      last_seen_at timestamptz,
+      updated_at timestamptz DEFAULT NOW()
+    )
+  `);
+}
+
+// Run on module load — non-blocking, logs on failure
+ensureAgentTables().catch(e => console.warn("[aiOps] ensureAgentTables failed:", e.message));
+
+router.get("/bob/health", (_req, res) => {
+  return res.json({
+    connected: bobHealth.connected,
+    gatewayUrl: bobHealth.gatewayUrl,
+    protocol: bobHealth.protocol,
+    lastConnectedAt: bobHealth.lastConnectedAt,
+    lastMessageAt: bobHealth.lastMessageAt,
+    lastError: bobHealth.lastError,
+  });
+});
+
 router.get("/agents", async (_req, res) => {
   if (!pool) return res.status(503).json({ message: "Database unavailable" });
 
-  const profileResult = await pool.query(
-    `SELECT agent_name AS "agent", name, role, summary, image_url AS "imageUrl" FROM ai_agent_profiles ORDER BY sort_order ASC, agent_name ASC`,
-  );
-  const stateResult = await pool.query(
-    `SELECT agent_name AS "agent", status, status_message AS "statusMessage", last_seen_at AS "lastSeenAt", updated_at AS "updatedAt" FROM ai_agent_state`,
-  );
-  const stateMap = new Map(stateResult.rows.map((row) => [String(row.agent), row]));
-  const profileMap = new Map(profileResult.rows.map((row) => [String(row.agent), row]));
+  let profileRows: any[] = [];
+  let stateRows: any[] = [];
+  try {
+    const r = await pool.query(
+      `SELECT agent_name AS "agent", name, role, summary, image_url AS "imageUrl" FROM ai_agent_profiles ORDER BY sort_order ASC, agent_name ASC`,
+    );
+    profileRows = r.rows;
+  } catch { /* table may not exist yet — safe fallback */ }
+  try {
+    const r = await pool.query(
+      `SELECT agent_name AS "agent", status, status_message AS "statusMessage", last_seen_at AS "lastSeenAt", updated_at AS "updatedAt" FROM ai_agent_state`,
+    );
+    stateRows = r.rows;
+  } catch { /* table may not exist yet — safe fallback */ }
+
+  const stateMap = new Map(stateRows.map((row) => [String(row.agent), row]));
+  const profileMap = new Map(profileRows.map((row) => [String(row.agent), row]));
 
   const items = AGENTS.map((agent) => {
     const state = stateMap.get(agent.agent);

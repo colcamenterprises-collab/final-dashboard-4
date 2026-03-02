@@ -1,0 +1,75 @@
+Replit Agent Instruction (copy/paste)
+Objective: Harden the OpenClaw (BOB) WebSocket integration so it survives restarts, never fails schema validation, and has a health check. Do this with minimal footprint and no breaking changes.
+Rules
+Do not change any existing routes/ports unrelated to Bob/OpenClaw.
+Do not refactor unrelated code.
+Do not create new files unless absolutely necessary. Prefer editing existing files only.
+Deliver FULL CONTENTS of every changed file (copy/paste ready), not snippets.
+Add logs that are useful but never log secrets (password/token/private key).
+1) Persist device identity (STOP generating new key each restart)
+Right now Bob connects using Ed25519 “device signing”. The device keypair MUST persist across restarts.
+Implement:
+Read from env first:
+OPENCLAW_DEVICE_ID
+OPENCLAW_DEVICE_PRIVATE_KEY (base64 or hex — match what current code uses)
+If missing:
+Generate once
+Save it to a persistent location without requiring shell work:
+Preferred: update .env (if the project already uses dotenv and .env exists in repo)
+If .env is not writable/available, store in DB table kv_settings (or equivalent) if it exists; otherwise create one tiny table app_kv (key text primary key, value text, updated_at timestamptz) and use it only for these keys.
+End result:
+Restart server → device ID + key stay the same → gateway accepts without re-enrollment.
+2) Enforce schema-safe payload builder (NO NULLS)
+Fix all outbound chat.send payloads to comply with gateway schema:
+attachments must always be an array: [] (never null)
+Any required objects must default to {} (never null)
+Any required arrays must default to []
+Implementation requirement:
+Add ONE helper function like buildChatSendPayload(input) and make all sends go through it.
+3) Add heartbeat + auto-reconnect (production stability)
+Add:
+Heartbeat every 25–30s (ping/pong or app-level heartbeat message depending on current library)
+Auto-reconnect with exponential backoff:
+1s → 2s → 5s → 10s → 20s → max 30s
+On reconnect:
+Re-run the exact connect handshake
+Confirm “hello/connected OK” before marking connected
+Also add:
+“in-flight request timeout” so a chat.send doesn’t hang forever (e.g., 60s) and returns a clean error.
+4) Add GET /api/bob/health
+Create an endpoint that returns JSON:
+Json
+Copy code
+{
+  "connected": true,
+  "gatewayUrl": "ws://76.13.189.158:55039",
+  "protocol": 3,
+  "lastConnectedAt": "...",
+  "lastMessageAt": "...",
+  "lastError": null
+}
+This endpoint must:
+Never throw
+Reflect real socket state
+Not expose secrets
+5) Fix the ai_agent_profiles missing-table crash (cleanly)
+Wherever the server currently errors due to missing ai_agent_profiles:
+Add a migration / create-if-missing step so the table exists
+Ensure the app handles empty table gracefully (no crash)
+Minimum schema is fine:
+id (pk)
+name
+created_at (Add other fields only if the code expects them.)
+6) Testing (must be done before marking complete)
+Provide proof in the Replit Agent message:
+Server boot log shows Bob connected (“connected OK / hello …”)
+Send a test message through the code path (or a small internal test route) and confirm:
+it streams and ends with state: "final" (or equivalent) and returns text
+Restart server and confirm:
+device identity stays the same
+reconnect succeeds automatically
+Hit /api/bob/health and paste the JSON output
+Deliverables
+List of files changed
+Full contents of each changed file
+Proof outputs from the Testing section above
