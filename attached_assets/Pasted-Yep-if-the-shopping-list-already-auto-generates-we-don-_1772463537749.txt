@@ -1,0 +1,85 @@
+Yep — if the shopping list already auto-generates, we don’t build another one. Bob’s job is to understand it, validate it, and act on anomalies.
+What you’re asking for is “CEO onboarding”: Bob needs familiarity + a map of how your app actually works before he starts pulling levers.
+What we do first
+1) Make Bob learn the system
+We create a Process Registry inside the app (DB + UI). This is Bob’s “company handbook”, but operational:
+What flows exist (Daily Sales, Daily Stock, Purchasing, Ingredients, Library, AI Ops, etc.)
+What triggers what
+What tables/endpoints are source-of-truth
+What outputs are produced (shopping list, emails, PDFs, alerts)
+What failure modes exist (common break points)
+2) Make Bob observe, not invent
+For the shopping list:
+Bob reads the existing generated shopping list
+Bob checks if it makes sense given sales/stock
+Bob creates an action when something looks off
+Bob does not generate a competing list
+Exact Replit Agent Instruction (copy/paste)
+Goal: Add “System Familiarity Layer” so Bob can understand the app flows and safely operate as CEO without duplicating existing processes.
+Rules
+Do NOT change existing shopping list logic.
+Minimal changes, additive only.
+Full files only.
+1) Create DB table: process_registry
+Create-if-missing:
+id UUID PK
+key TEXT UNIQUE NOT NULL (e.g. daily_sales_v2_flow)
+name TEXT NOT NULL
+description TEXT NOT NULL
+inputs JSONB NOT NULL DEFAULT '{}'
+outputs JSONB NOT NULL DEFAULT '{}'
+dependencies JSONB NOT NULL DEFAULT '{}'
+owner TEXT NOT NULL DEFAULT 'SYSTEM'
+status TEXT NOT NULL DEFAULT 'active'  // active | deprecated
+updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+2) Seed the registry with the core flows (create-if-missing, do not overwrite)
+Seed at least these entries (fill with real app details from the codebase):
+Daily Sales V2 submission flow
+Daily Stock V2 submission flow
+Shopping List auto-generation flow (IMPORTANT)
+Form Library flow
+Ingredients management flow
+Purchasing flow
+AI Ops Control flow (Bob gateway integration)
+Email/PDF generation flow (if present)
+Variance/threshold logic flow (rolls/meat/drinks)
+Each registry entry must include:
+Inputs (forms/tables/endpoints)
+Outputs (tables/pages/emails/shopping list)
+Dependencies (what it relies on)
+3) Add endpoints
+GET /api/ai-ops/process-registry (list)
+GET /api/ai-ops/process-registry/:key (detail)
+POST /api/ai-ops/process-registry/:key (update content)
+(optional: restrict updates to admin/cam later — for now keep simple)
+4) Add UI page under AI Ops Control: “System Map”
+List all processes
+Click to view detail JSON (inputs/outputs/dependencies)
+No icons/emojis
+5) Add Bob “Onboarding Context” endpoint
+Add:
+GET /api/ai-ops/bob/onboarding-context
+Returns a single JSON payload that includes:
+CEO Charter (from bob_documents)
+Process Registry (all active processes)
+Current thresholds (rolls/meat/drinks)
+Links/keys to where the shopping list is stored/viewed
+6) Update Bob message prepend (lightweight)
+When calling Bob, prepend:
+Charter header (already done)
+A short “system map excerpt”:
+The names of the main processes + the shopping list process
+And a rule: “Do not duplicate shopping list generation; only observe and propose actions.”
+Keep it short to avoid payload bloat.
+7) Proof
+Screenshot of “System Map” UI
+Response from /api/ai-ops/bob/onboarding-context
+Why this is the right first move
+Bob stops guessing.
+He gets a living map of your workflows.
+You prevent “CEO creates a second shopping list system” chaos.
+Once this is in, Bob can start issuing actions like:
+“Shopping list looks wrong because buns variance doesn’t match sales”
+“Daily stock missing; alert needed”
+“Purchasing item data out of date; propose fix”
+If you want, next message tell me the main pages/flows you consider “core” (even just names like “Daily Sales V2 → Daily Stock V2 → Purchasing page”) and I’ll tighten the seed list so the agent can’t miss anything.

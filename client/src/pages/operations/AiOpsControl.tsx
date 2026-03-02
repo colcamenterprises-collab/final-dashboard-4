@@ -254,6 +254,8 @@ export default function AiOpsControlPage() {
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [chatMessageText, setChatMessageText] = useState('');
   const [detailTab, setDetailTab] = useState<'details' | 'activity' | 'notes'>('details');
+  const [selectedProcessKey, setSelectedProcessKey] = useState<string | null>(null);
+  const [systemMapOpen, setSystemMapOpen] = useState(false);
   const taskQuery = useMemo(() => {
     const params = new URLSearchParams();
     if (taskStatusFilter) params.set('status', taskStatusFilter);
@@ -307,6 +309,23 @@ export default function AiOpsControlPage() {
     queryKey: selectedThreadId ? [`/api/ai-ops/chat/threads/${selectedThreadId}/messages`] : ['noop-chat'],
     enabled: Boolean(selectedThreadId),
   });
+
+  type ProcessEntry = {
+    id: string;
+    key: string;
+    name: string;
+    description: string;
+    inputs: Record<string, unknown>;
+    outputs: Record<string, unknown>;
+    dependencies: Record<string, unknown>;
+    owner: string;
+    status: string;
+    updated_at: string;
+  };
+  const processRegistryQuery = useQuery<{ ok: true; items: ProcessEntry[] }>({
+    queryKey: ['/api/ai-ops/process-registry'],
+  });
+  const selectedProcess = (processRegistryQuery.data?.items || []).find(p => p.key === selectedProcessKey) ?? null;
 
   const refreshTasks = () =>
     queryClient.invalidateQueries({
@@ -600,6 +619,87 @@ export default function AiOpsControlPage() {
             </button>
           </form>
         </div>
+      </section>
+
+      {/* System Map — Bob's process familiarity layer */}
+      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div
+          role="button"
+          tabIndex={0}
+          data-testid="system-map-toggle"
+          onClick={() => setSystemMapOpen(v => !v)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setSystemMapOpen(v => !v); }}
+          className="flex w-full cursor-pointer items-center justify-between p-4 text-left select-none"
+        >
+          <div>
+            <p className="text-lg font-semibold text-slate-900">System Map</p>
+            <p className="text-xs text-slate-500 mt-0.5">Bob's operational process registry — {(processRegistryQuery.data?.items || []).length} processes loaded</p>
+          </div>
+          <span
+            data-testid="system-map-toggle-label"
+            className="text-xs font-medium text-slate-600 border border-slate-200 rounded px-2 py-1 pointer-events-none"
+          >
+            {systemMapOpen ? 'Collapse' : 'Expand'}
+          </span>
+        </div>
+
+        {systemMapOpen && (
+          <div className="border-t border-slate-200 p-4">
+            {processRegistryQuery.isLoading && (
+              <p className="text-sm text-slate-500">Loading process registry...</p>
+            )}
+            {!processRegistryQuery.isLoading && (
+              <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+                {/* Process list */}
+                <div className="space-y-1">
+                  {(processRegistryQuery.data?.items || []).map(proc => (
+                    <button
+                      key={proc.key}
+                      type="button"
+                      onClick={() => setSelectedProcessKey(prev => prev === proc.key ? null : proc.key)}
+                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                        selectedProcessKey === proc.key
+                          ? 'border-slate-900 bg-slate-900 text-white'
+                          : 'border-slate-200 text-slate-800 hover:border-slate-400'
+                      }`}
+                    >
+                      <p className="font-medium leading-tight">{proc.name}</p>
+                      <p className={`text-xs mt-0.5 ${selectedProcessKey === proc.key ? 'text-slate-300' : 'text-slate-500'}`}>
+                        {proc.owner} — {proc.status}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Process detail */}
+                <div className="rounded-lg border border-slate-200 p-4">
+                  {!selectedProcess ? (
+                    <p className="text-sm text-slate-500">Select a process to view its inputs, outputs, and dependencies.</p>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900">{selectedProcess.name}</h3>
+                        <p className="text-xs text-slate-500 mt-0.5">{selectedProcess.key} — {selectedProcess.owner} — {selectedProcess.status}</p>
+                        <p className="text-sm text-slate-700 mt-2">{selectedProcess.description}</p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        {(['inputs', 'outputs', 'dependencies'] as const).map(section => (
+                          <div key={section}>
+                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">{section}</p>
+                            <pre className="rounded bg-slate-50 border border-slate-200 p-2 text-xs text-slate-700 overflow-auto max-h-48 whitespace-pre-wrap">
+                              {JSON.stringify(selectedProcess[section], null, 2)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-400">Updated: {new Date(selectedProcess.updated_at).toLocaleString()}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,1.1fr)_minmax(0,1.5fr)_minmax(320px,1fr)]">

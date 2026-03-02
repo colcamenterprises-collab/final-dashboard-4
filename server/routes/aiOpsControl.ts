@@ -718,6 +718,19 @@ if (process.env.OPENCLAW_BASE_URL && process.env.OPENCLAW_GATEWAY_TOKEN) {
   bobManager.start();
 }
 
+// Cached process registry names for lightweight system map excerpt (refreshed with charter)
+let cachedProcessNames: string[] = [];
+
+async function loadProcessNamesFromDb(): Promise<void> {
+  if (!pool) return;
+  try {
+    const r = await pool.query(`SELECT name FROM process_registry WHERE status = 'active' ORDER BY name`);
+    cachedProcessNames = r.rows.map((row: { name: string }) => row.name);
+  } catch {
+    // silent — non-critical
+  }
+}
+
 async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>) {
   if (!process.env.OPENCLAW_BASE_URL || !process.env.OPENCLAW_GATEWAY_TOKEN) {
     console.warn("[Bob] Orchestrator not configured — returning offline message");
@@ -729,6 +742,11 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
   if (!cachedCharterContent) {
     await loadCharterFromDb().catch(() => {});
   }
+  // Load process names on-demand if empty
+  if (!cachedProcessNames.length) {
+    await loadProcessNamesFromDb().catch(() => {});
+  }
+
   let messageToSend = lastUserMsg;
   if (cachedCharterContent && cachedCharterVersion != null && cachedCharterUpdatedAt) {
     const dateStr = cachedCharterUpdatedAt.slice(0, 10);
@@ -736,10 +754,18 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
     const charterBody = cachedCharterContent.length > MAX_CHARTER_CHARS
       ? cachedCharterContent.slice(0, MAX_CHARTER_CHARS) + "\n[... charter truncated ...]"
       : cachedCharterContent;
+
+    // Lightweight system map excerpt — process names only, no payload bloat
+    const systemMapExcerpt = cachedProcessNames.length > 0
+      ? `\n[SYSTEM MAP — Core Processes]\n${cachedProcessNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\nRule: Shopping List is auto-generated on Form 2 submit. Bob must OBSERVE and VALIDATE only — never duplicate.\nFull map: GET /api/ai-ops/process-registry\n[END SYSTEM MAP]`
+      : "";
+
     messageToSend =
       `[BOB CEO CHARTER v${cachedCharterVersion} | updated ${dateStr}]\n` +
       charterBody +
-      `\n[END CHARTER]\n\nUser message:\n${lastUserMsg}`;
+      `\n[END CHARTER]` +
+      systemMapExcerpt +
+      `\n\nUser message:\n${lastUserMsg}`;
   }
 
   return bobManager.sendChat(messageToSend);
@@ -827,11 +853,211 @@ async function ensureAgentTables(): Promise<void> {
      ON CONFLICT (key) DO NOTHING`,
     [CEO_CHARTER_SEED],
   );
+
+  // process_registry — Bob's system familiarity map
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS process_registry (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      key TEXT UNIQUE NOT NULL,
+      name TEXT NOT NULL,
+      description TEXT NOT NULL,
+      inputs JSONB NOT NULL DEFAULT '{}',
+      outputs JSONB NOT NULL DEFAULT '{}',
+      dependencies JSONB NOT NULL DEFAULT '{}',
+      owner TEXT NOT NULL DEFAULT 'SYSTEM',
+      status TEXT NOT NULL DEFAULT 'active',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  // Seed core process entries — ON CONFLICT DO NOTHING (never overwrites)
+  const registryEntries = [
+    {
+      key: "daily_sales_v2_flow",
+      name: "Daily Sales V2 — Form 1 Submission",
+      description: "Entry point for each shift. Staff submit cash/card/delivery sales, expenses (wages, shopping, other), and opening stock counts for rolls and meat. Creates the salesId that anchors all subsequent shift data.",
+      inputs: {
+        page: "/daily-stock-sales",
+        form_fields: ["cashSales", "qrSales", "grabSales", "other_sales", "wages", "shopping", "other_expenses", "rollsStart", "meatStart", "drinkStock"],
+        endpoint: "POST /api/forms/daily-sales-v2",
+      },
+      outputs: {
+        tables: ["daily_sales_v2"],
+        returns: "salesId (UUID) — used to link Form 2 (Daily Stock)",
+        linked_tables: ["shopping_purchase_v2", "wage_entry_v2", "other_expense_v2"],
+      },
+      dependencies: {},
+      owner: "SYSTEM",
+      status: "active",
+    },
+    {
+      key: "daily_stock_v2_flow",
+      name: "Daily Stock V2 — Form 2 Submission",
+      description: "Captures end-of-shift stock counts (rollsEnd, meatEnd, drinkStock) and stock purchased. Updates the existing daily_sales_v2 payload. Triggers shopping list generation and ledger variance calculations.",
+      inputs: {
+        page: "/daily-stock-sales",
+        form_fields: ["rollsEnd", "meatEnd", "drinkStock", "requisition"],
+        endpoint: "POST /api/forms/daily-stock",
+        requires: "salesId from daily_sales_v2_flow",
+      },
+      outputs: {
+        tables: ["daily_sales_v2 (payload update)", "shopping_list_v2", "purchasing_shift_items"],
+        triggers: ["shopping_list_flow", "variance_threshold_flow"],
+      },
+      dependencies: { requires: ["daily_sales_v2_flow"] },
+      owner: "SYSTEM",
+      status: "active",
+    },
+    {
+      key: "shopping_list_flow",
+      name: "Shopping List — Auto-generation (READ-ONLY for Bob)",
+      description: "CRITICAL: Bob must NOT duplicate or replace this flow. The shopping list is auto-generated when Form 2 is submitted, by syncing purchasing_shift_items from the requisition array. It is a read-only output for Bob to observe and validate.",
+      inputs: {
+        trigger: "POST /api/forms/daily-stock (automatic)",
+        tables_read: ["purchasing_items (master catalog)", "purchasing_field_map", "daily_stock_v2", "daily_sales_v2"],
+      },
+      outputs: {
+        tables_written: ["shopping_list_v2", "purchasing_shift_items"],
+        endpoints: [
+          "GET /api/purchasing-list/latest — full shopping list for latest shift",
+          "GET /api/purchasing-list/latest/csv — CSV download",
+          "GET /api/purchasing-list/system-purchases — system-calculated needs (meat/rolls)",
+        ],
+        page: "/shopping-list",
+      },
+      dependencies: { requires: ["daily_stock_v2_flow"] },
+      owner: "SYSTEM",
+      status: "active",
+      bob_rule: "OBSERVE ONLY — never generate a competing shopping list",
+    },
+    {
+      key: "purchasing_flow",
+      name: "Purchasing — Canonical Item Catalog",
+      description: "purchasing_items is the single source of truth for all buyable goods (ingredients, drinks, packaging). It stores supplier, SKU, unit cost, and pack size. purchasing_field_map links form field names to purchasing_items. purchasing_shift_items logs per-shift quantities.",
+      inputs: {
+        tables: ["purchasing_items (master)", "purchasing_field_map", "purchasing_shift_items"],
+        admin_page: "/purchasing",
+        endpoints: ["GET /api/purchasing-items", "POST /api/purchasing/plan"],
+      },
+      outputs: {
+        purchasing_plan: "JSON with items to buy, pack quantities, estimated costs",
+        feeds_into: ["shopping_list_flow", "ingredients_flow", "variance_threshold_flow"],
+      },
+      dependencies: {},
+      owner: "SYSTEM",
+      status: "active",
+    },
+    {
+      key: "ingredients_flow",
+      name: "Ingredients Management — Recipe Cost Layer",
+      description: "Canonical ingredients table decoupled from purchasing_items. Each ingredient has a baseUnit (g, ml, each) and unitCostPerBase. Yield method is DIRECT (exact pack yield) or ESTIMATED (avgPortionSize + variancePct). Recipe costs are derived from this layer.",
+      inputs: {
+        tables: ["ingredients", "ingredient_authority", "recipe", "recipe_ingredient"],
+        endpoints: ["GET /api/ingredients/management", "PUT /api/ingredients/:id", "POST /api/ingredients/sync-all"],
+        sync_source: "purchasing_items",
+      },
+      outputs: {
+        tables_written: ["ingredients (unit costs, yield)", "recipe_ingredient (linked costs)"],
+        pages: ["/menu-management/ingredients", "/menu-management/recipes"],
+      },
+      dependencies: { requires: ["purchasing_flow"] },
+      owner: "SYSTEM",
+      status: "active",
+    },
+    {
+      key: "variance_threshold_flow",
+      name: "Variance & Threshold — Rolls / Meat / Drinks Ledger",
+      description: "Compares expected closing stock (opening + purchases - sales) against actual manager count. Writes status (OK/ALERT/WARNING) to ledger tables. Thresholds: Rolls ±4 units, Meat ±200g, Drinks ±2 units.",
+      inputs: {
+        tables_read: ["analytics_shift_item (sales)", "expenses / purchase_tally (purchases)", "daily_sales_v2.payload (actual counts: rollsEnd, meatEnd, drinkStock)"],
+        services: ["server/services/rollsLedger.ts", "server/services/meatLedger.ts", "server/services/drinksLedger.ts"],
+      },
+      outputs: {
+        tables_written: ["rolls_ledger", "meat_ledger", "drinks_ledger"],
+        statuses: { ok: "within threshold", warning: "up to 2x threshold (drinks only)", alert: "exceeds threshold — action required" },
+        thresholds: { rolls: "±4 units", meat: "±200g", drinks: "±2 units" },
+        page: "/analysis/stock-reconciliation",
+      },
+      dependencies: { requires: ["daily_stock_v2_flow", "purchasing_flow"] },
+      owner: "SYSTEM",
+      status: "active",
+    },
+    {
+      key: "email_pdf_flow",
+      name: "Email & PDF — Daily Report Generation",
+      description: "Compiles a full daily shift report from sales, stock, shopping list, and variance data. Generates a PDF and emails it to management. Triggered after Form 2 submission or on-demand.",
+      inputs: {
+        trigger: "POST /api/reports/daily/generate",
+        tables_read: ["daily_sales_v2", "daily_stock_v2", "shopping_list_v2", "rolls_ledger", "meat_ledger", "drinks_ledger"],
+        services: ["compileDailyReportV2", "buildDailyReportPDF", "sendDailyReportEmailV2"],
+      },
+      outputs: {
+        email_to: "smashbrothersburgersth@gmail.com",
+        endpoints: ["GET /api/reports/daily/:date/pdf"],
+        tables_written: ["daily_reports_v2"],
+      },
+      dependencies: { requires: ["daily_stock_v2_flow", "variance_threshold_flow"] },
+      owner: "SYSTEM",
+      status: "active",
+    },
+    {
+      key: "ai_ops_flow",
+      name: "AI Ops Control — Bob Gateway Integration",
+      description: "Bob communicates via WebSocket to the OpenClaw gateway. Every message is prepended with the CEO Charter and a system map excerpt. Bob can read tasks, issues, and ideas, and propose actions. Bob must observe existing processes — not duplicate them.",
+      inputs: {
+        gateway: "ws://76.13.189.158:55039",
+        endpoints: ["POST /api/ai-ops/chat/threads/:id/messages", "GET /api/ai-ops/process-registry", "GET /api/ai-ops/bob/onboarding-context"],
+        governance: "CEO Charter from bob_documents table (auto-prepended to every message)",
+      },
+      outputs: {
+        responses: "Bob replies saved to chat_messages table",
+        proposed_actions: ["Tasks in ai_tasks", "Issues in ai_issues", "Ideas in ai_ideas"],
+        pages: ["/ai-ops-control"],
+      },
+      dependencies: { reads: ["process_registry", "bob_documents", "shopping_list_flow (observe-only)"] },
+      owner: "BOB",
+      status: "active",
+    },
+    {
+      key: "form_library_flow",
+      name: "Form Library — Historical Submission Viewer",
+      description: "Read-only library of past daily shift submissions. Allows review of Form 1 and Form 2 history without editing. Linked to the same /daily-stock-sales page via the Library tab.",
+      inputs: {
+        page: "/daily-stock-sales (Library tab)",
+        tables_read: ["daily_sales_v2", "daily_stock_v2"],
+        endpoints: ["GET /api/forms/daily-sales-v2/history"],
+      },
+      outputs: {
+        display: "Historical read-only card view of past submissions",
+      },
+      dependencies: { requires: ["daily_sales_v2_flow"] },
+      owner: "SYSTEM",
+      status: "active",
+    },
+  ];
+
+  for (const entry of registryEntries) {
+    await pool.query(
+      `INSERT INTO process_registry (key, name, description, inputs, outputs, dependencies, owner, status)
+       VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6::jsonb, $7, $8)
+       ON CONFLICT (key) DO NOTHING`,
+      [
+        entry.key,
+        entry.name,
+        entry.description,
+        JSON.stringify(entry.inputs),
+        JSON.stringify(entry.outputs),
+        JSON.stringify(entry.dependencies),
+        entry.owner,
+        entry.status,
+      ],
+    );
+  }
 }
 
 // Run on module load — non-blocking, logs on failure
 ensureAgentTables()
-  .then(() => loadCharterFromDb())
+  .then(() => Promise.all([loadCharterFromDb(), loadProcessNamesFromDb()]))
   .catch(e => console.warn("[aiOps] ensureAgentTables/charter load failed:", e.message));
 
 // ---------------------------------------------------------------------------
@@ -891,6 +1117,116 @@ router.get("/bob/charter", async (_req, res) => {
     });
   } catch (e: any) {
     return res.status(500).json({ ok: false, error: "Failed to load charter" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Process Registry endpoints — Bob's system familiarity map
+// ---------------------------------------------------------------------------
+
+// GET /api/ai-ops/process-registry — list all processes
+router.get("/process-registry", async (_req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const r = await pool.query(
+      `SELECT id, key, name, description, inputs, outputs, dependencies, owner, status, updated_at
+       FROM process_registry ORDER BY status, name`,
+    );
+    return res.json({ ok: true, items: r.rows });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: "Failed to load process registry" });
+  }
+});
+
+// GET /api/ai-ops/process-registry/:key — single process detail
+router.get("/process-registry/:key", async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const r = await pool.query(
+      `SELECT id, key, name, description, inputs, outputs, dependencies, owner, status, updated_at
+       FROM process_registry WHERE key = $1`,
+      [req.params.key],
+    );
+    if (!r.rows.length) return res.status(404).json({ ok: false, error: "Process not found" });
+    return res.json({ ok: true, item: r.rows[0] });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: "Failed to load process" });
+  }
+});
+
+// POST /api/ai-ops/process-registry/:key — update process content
+router.post("/process-registry/:key", async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const { name, description, inputs, outputs, dependencies, owner, status } = req.body as Record<string, unknown>;
+    const r = await pool.query(
+      `UPDATE process_registry
+       SET name = COALESCE($2, name),
+           description = COALESCE($3, description),
+           inputs = COALESCE($4::jsonb, inputs),
+           outputs = COALESCE($5::jsonb, outputs),
+           dependencies = COALESCE($6::jsonb, dependencies),
+           owner = COALESCE($7, owner),
+           status = COALESCE($8, status),
+           updated_at = NOW()
+       WHERE key = $1
+       RETURNING *`,
+      [
+        req.params.key,
+        name ?? null,
+        description ?? null,
+        inputs ? JSON.stringify(inputs) : null,
+        outputs ? JSON.stringify(outputs) : null,
+        dependencies ? JSON.stringify(dependencies) : null,
+        owner ?? null,
+        status ?? null,
+      ],
+    );
+    if (!r.rows.length) return res.status(404).json({ ok: false, error: "Process not found" });
+    return res.json({ ok: true, item: r.rows[0] });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: "Failed to update process" });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/ai-ops/bob/onboarding-context — full onboarding payload for Bob
+// ---------------------------------------------------------------------------
+router.get("/bob/onboarding-context", async (_req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const [charterResult, registryResult] = await Promise.all([
+      pool.query(`SELECT key, content, version, updated_at FROM bob_documents WHERE key = 'CEO_CHARTER'`),
+      pool.query(`SELECT key, name, description, inputs, outputs, dependencies, owner, status FROM process_registry WHERE status = 'active' ORDER BY name`),
+    ]);
+
+    const charter = charterResult.rows[0] ?? null;
+    const processes = registryResult.rows;
+
+    const shoppingListProcess = processes.find(p => p.key === "shopping_list_flow");
+    const thresholds = {
+      rolls: { unit: "buns", threshold: "±4 units", status_ok: "within 4", status_alert: "exceeds 4", ledger_table: "rolls_ledger" },
+      meat: { unit: "grams", threshold: "±200g", status_ok: "within 200g", status_alert: "exceeds 200g", ledger_table: "meat_ledger" },
+      drinks: { unit: "cans/bottles", threshold: "±2 units", warning_at: "±4 units", status_ok: "within 2", status_alert: "exceeds 4", ledger_table: "drinks_ledger" },
+    };
+
+    return res.json({
+      ok: true,
+      generated_at: new Date().toISOString(),
+      ceo_charter: charter,
+      process_registry: processes,
+      thresholds,
+      shopping_list: {
+        bob_rule: "OBSERVE ONLY — never generate a competing shopping list",
+        view_endpoint: "/api/purchasing-list/latest",
+        csv_endpoint: "/api/purchasing-list/latest/csv",
+        source_table: "purchasing_shift_items",
+        master_catalog: "purchasing_items",
+        process_detail: shoppingListProcess ?? null,
+      },
+    });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: "Failed to build onboarding context" });
   }
 });
 

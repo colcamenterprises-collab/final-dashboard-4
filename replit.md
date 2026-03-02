@@ -47,6 +47,7 @@ Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashbo
 ### Feature Specifications
 - **Core Operations**: Daily Shift Form (sales, expenses, cash, inventory), Recipe Management (costing, PDF), Inventory Management (tracking, shopping list), Comprehensive Daily Forms System (dual-form with draft/submit).
 - **AI-Powered Features**: Multi-agent system for receipt analysis, anomaly detection, ingredient calculation, stock recommendations, financial variance analysis, and marketing content generation.
+- **Bob Orchestrator System**: CEO Charter stored in `bob_documents` table, prepended to every outbound message. Process Registry (`process_registry` table, 9 seeded entries) gives Bob a living map of all app workflows. System Map UI at `/operations/ai-ops-control` (collapsible section). Onboarding context endpoint at `GET /api/ai-ops/bob/onboarding-context`. Bob is governed to OBSERVE shopping list — never duplicate it.
 - **POS Integration**: Loyverse POS for daily receipt sync, shift reports, and webhook handling.
 - **Analytics & Reporting**: Sales Heatmap, Email Notifications, Data-Driven Dashboard (real-time snapshot, variance, payment data), F&B Analysis Enhanced Metrics, Stock Reconciliation & Security.
 - **Management Tools**: Manager Checklist System, Source-Based Expense Management, Banking Reconciliation System, Online Ordering System, Membership System, Rolls & Meat Ledger System.
