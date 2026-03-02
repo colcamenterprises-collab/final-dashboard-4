@@ -427,18 +427,25 @@ interface QueueItem {
   timer: NodeJS.Timeout;
 }
 
+const MAX_CHAT_QUEUE = 25;
+
 class BobConnectionManager {
   private ws: WsType | null = null;
   private WS: (new (url: string, opts?: any) => WsType) | null = null;
   private state: "disconnected" | "connecting" | "authenticated" = "disconnected";
   private pending = new Map<string, { resolve: (v: any) => void; reject: (e: Error) => void }>();
-  // Sequential queue — only one chat.send in flight at a time
+  // Sequential FIFO queue — only one chat.send in flight at a time; capped at MAX_CHAT_QUEUE
   private chatQueue: QueueItem[] = [];
   private chatInFlight: QueueItem | null = null;
   private reconnectAttempt = 0;
   private readonly BACKOFF = [1000, 2000, 5000, 10000, 20000, 30000];
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
+
+  /** Total items currently occupying queue capacity (waiting + in-flight). */
+  get queueSize(): number {
+    return this.chatQueue.length + (this.chatInFlight ? 1 : 0);
+  }
 
   start(): void {
     import("ws").then(({ default: WSClass }) => {
@@ -604,6 +611,16 @@ class BobConnectionManager {
     }
 
     return new Promise<string>((resolve, reject) => {
+      // Cap check runs synchronously — Node.js is single-threaded so no TOCTOU risk
+      if (this.chatQueue.length >= MAX_CHAT_QUEUE) {
+        const err = Object.assign(
+          new Error("Bob busy, try again"),
+          { status: 429 },
+        );
+        reject(err);
+        return;
+      }
+
       const idempotencyKey = crypto.randomUUID();
       const timer = setTimeout(() => {
         // Remove from queue if still waiting, or clear in-flight slot
@@ -901,7 +918,12 @@ router.post("/chat/threads/:id/messages", async (req, res) => {
     let assistantReply: string;
     try {
       assistantReply = await callBobOrchestrator(context);
-    } catch (bobErr) {
+    } catch (bobErr: any) {
+      if (bobErr?.status === 429) {
+        await client.query("ROLLBACK");
+        client.release();
+        return res.status(429).json({ ok: false, error: "Bob busy, try again" });
+      }
       console.error("[Bob] Orchestrator call failed, using fallback:", bobErr instanceof Error ? bobErr.message : String(bobErr));
       assistantReply = "Bob encountered an issue reaching the AI service. Your message has been saved — please try again shortly.";
     }
