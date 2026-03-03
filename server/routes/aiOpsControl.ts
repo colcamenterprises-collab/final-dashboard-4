@@ -1510,16 +1510,24 @@ const TASK_SELECT_COLS = `
 
 async function notifyBobOfTask(taskId: number, task: Record<string, unknown>): Promise<void> {
   if (!pool) return;
-  const msg = `[TASK ASSIGNED TO BOB]\nTask #${task.taskNumber ?? taskId}: ${task.title}\nStatus: ${task.status} | Priority: ${task.priority} | Area: ${task.area ?? "unset"}\nDue: ${task.dueAt ?? "not set"}\n${task.description ? `\nDescription:\n${task.description}` : ""}`;
+  const msg = `[TASK ASSIGNED TO BOB]\nTask #${task.taskNumber ?? taskId}: ${task.title}\nStatus: ${task.status} | Priority: ${task.priority} | Area: ${task.area ?? "unset"}\nDue: ${task.dueAt ?? "not set"}\n${task.description ? `\nDescription:\n${task.description}` : ""}\n\nPlease acknowledge this task, state whether you can action it, and provide your initial assessment or next steps.`;
   const nc = await pool.connect();
   try {
-    await callBobOrchestrator([{ role: "user", content: msg }]);
+    const bobReply = await callBobOrchestrator([{ role: "user", content: msg }]);
     await nc.query(`UPDATE ai_tasks SET bob_notified_at = NOW(), bob_last_error = NULL WHERE id = $1`, [taskId]);
-    await writeActivity(nc, taskId, "SENT_TO_BOB", "system", null, { notifiedAt: new Date().toISOString() });
+    await writeActivity(nc, taskId as unknown as string, "SENT_TO_BOB", "system", null, { notifiedAt: new Date().toISOString() });
+    // Store Bob's response as a message on the task so it's visible in the Comments tab
+    if (bobReply && typeof bobReply === "string" && bobReply.trim()) {
+      await nc.query(
+        `INSERT INTO ai_task_messages (task_id, actor, message, visibility) VALUES ($1, $2, $3, 'internal')`,
+        [taskId, "Bob (Orchestrator)", bobReply.trim()],
+      );
+    }
   } catch (err: unknown) {
     const errMsg = err instanceof Error ? err.message : String(err);
+    console.error(`[notifyBobOfTask] Task ${taskId} failed:`, errMsg);
     await nc.query(`UPDATE ai_tasks SET bob_last_error = $1 WHERE id = $2`, [errMsg.slice(0, 500), taskId]).catch(() => {});
-    await writeActivity(nc, taskId, "SEND_BOB_FAILED", "system", errMsg.slice(0, 500), null).catch(() => {});
+    await writeActivity(nc, taskId as unknown as string, "SEND_BOB_FAILED", "system", errMsg.slice(0, 500), null).catch(() => {});
   } finally {
     nc.release();
   }
@@ -1931,6 +1939,46 @@ router.post("/tasks/:id/restore", async (req, res) => {
     await writeActivity(client, taskId, "STATUS_CHANGED", actor, null, { from: "archived", to: "draft" });
     await client.query("COMMIT");
     return res.json(updated.rows[0]);
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+});
+
+// Submit task: draft → assigned (if has assignee) | in_progress (otherwise)
+// Also triggers Bob notification if assigned to bob
+router.post("/tasks/:id/submit", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const taskId = parseTaskId(req.params.id);
+  if (!taskId) return res.status(400).json({ message: "Invalid task id" });
+  const actor = typeof req.body?.actor === "string" ? req.body.actor.trim() || "Cameron" : "Cameron";
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const r = await client.query(`SELECT * FROM ai_tasks WHERE id = $1`, [taskId]);
+    if (!r.rows.length) { await client.query("ROLLBACK"); return res.status(404).json({ message: "Task not found" }); }
+    const current = r.rows[0];
+    if (current.deleted_at) { await client.query("ROLLBACK"); return res.status(409).json({ message: "Cannot submit an archived task" }); }
+    if (current.status !== "draft") { await client.query("ROLLBACK"); return res.status(409).json({ message: `Task is already ${current.status} — only draft tasks can be submitted` }); }
+
+    const newStatus = current.assigned_to ? "assigned" : "in_progress";
+    const updated = await client.query(
+      `UPDATE ai_tasks SET status = $1, updated_at = NOW() WHERE id = $2 RETURNING ${TASK_SELECT_COLS}`,
+      [newStatus, taskId],
+    );
+    await writeActivity(client, taskId, "STATUS_CHANGED", actor, "Task submitted", { from: "draft", to: newStatus });
+    await client.query("COMMIT");
+
+    const task = updated.rows[0];
+    // Notify Bob if assigned to him
+    if (task.assignedTo === "bob") {
+      notifyBobOfTask(taskId, task).catch(() => {});
+    }
+
+    return res.json(task);
   } catch (err) {
     await client.query("ROLLBACK");
     throw err;
