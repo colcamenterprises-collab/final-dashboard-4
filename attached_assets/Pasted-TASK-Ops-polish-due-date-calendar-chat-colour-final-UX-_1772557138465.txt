@@ -1,0 +1,43 @@
+TASK: Ops polish — due_date + calendar + chat colour + final UX checks
+
+Scope (single patch):
+1) Database/API
+  - Ensure `due_at TIMESTAMP WITH TIME ZONE NULL` exists on `ai_tasks`.
+  - Add/confirm API: GET /api/tasks supports `from=YYYY-MM-DD&to=YYYY-MM-DD` returning tasks with `due_at` in range (exclude archived unless includeArchived=true).
+  - Add validation on task create/update to accept `dueAt` (ISO8601 or YYYY-MM-DD). Reject future dates > 365d.
+
+2) Backend: notifyBob flow (idempotent)
+  - If task.assignee === 'bob' and status transitions draft→in_progress or adds assignee bob, call `notifyBobOfTask(task)`. `notifyBobOfTask` must:
+    - send chat via existing bob client
+    - wait for `final` or `ack` response up to 60s
+    - persist the assistant response as `task_comments` with actor=bot and link to task_id
+    - log `task_activity` {type:'sent_to_bob'|'send_failed'} with metadata
+  - Ensure failures do not break API: return 202 if queued, 200 if completed.
+
+3) Frontend (AiOpsControl + TaskDetail + Chat)
+  - Task form: add `Due date` date-picker (localized to Asia/Bangkok). Default to today.
+  - Task create/edit and quick-action rows must include due date.
+  - Add Calendar view under Analysis -> Tasks: Week-view with days header and tasks stacked. Clicking a task opens TaskDetail.
+  - Chat bubble: assistant messages use class `bg-[soft-green]` (or `bg-green-50`) while user remains `bg-gray-50`. No layout changes.
+  - Add `View` action button in task table rows (opens detail).
+  - Ensure Archive/Restore and Mark Draft actions present; archived tasks excluded from default list and calendar.
+
+4) Tests & Proof
+  - Create a task assigned to bob with a due date tomorrow; submit and screenshot:
+    - Task list showing due date
+    - TaskDetail showing Bob notified badge + Bob's comment
+    - Calendar view showing the task on the correct day
+    - Chat window screenshot showing assistant bubble in new colour
+  - Provide short test script (3 steps) showing how to reproduce.
+
+Deliverables:
+- Full changed file list (paths) and unified patch / diff (single commit).
+- 4 screenshots as specified above.
+- Short test result: PASS/FAIL per step.
+
+Constraints:
+- Do NOT change unrelated forms or the Daily Sales structure.
+- Do not auto-assign or auto-escalate anything beyond already agreed rules.
+- Keep UI styles minimal and consistent with current design tokens.
+
+Priority: High. One patch only. Run local e2e smoke tests and attach logs.

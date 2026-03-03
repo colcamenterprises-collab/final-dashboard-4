@@ -218,7 +218,18 @@ const taskCreateSchema = z.object({
   area: areaEnum.optional().nullable(),
   assignedTo: assignedToEnum.optional().nullable(),
   publish: z.boolean().default(false),
-  dueAt: z.string().datetime().optional().nullable(),
+  dueAt: z.union([
+    z.string().datetime(),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).transform((s) => new Date(s).toISOString()),
+  ]).optional().nullable().superRefine((val, ctx) => {
+    if (val == null) return;
+    const d = new Date(val);
+    const maxFuture = new Date();
+    maxFuture.setDate(maxFuture.getDate() + 365);
+    if (d > maxFuture) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Due date cannot be more than 365 days in the future" });
+    }
+  }),
   followUpRequired: z.boolean().default(false),
   createdBy: z.string().trim().min(1).max(120).default("Cameron"),
 });
@@ -232,7 +243,18 @@ const taskUpdateSchema = z.object({
   area: areaEnum.optional().nullable(),
   assignedTo: assignedToEnum.optional().nullable(),
   publish: z.boolean().optional(),
-  dueAt: z.string().datetime().optional().nullable(),
+  dueAt: z.union([
+    z.string().datetime(),
+    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).transform((s) => new Date(s).toISOString()),
+  ]).optional().nullable().superRefine((val, ctx) => {
+    if (val == null) return;
+    const d = new Date(val);
+    const maxFuture = new Date();
+    maxFuture.setDate(maxFuture.getDate() + 365);
+    if (d > maxFuture) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Due date cannot be more than 365 days in the future" });
+    }
+  }),
   followUpRequired: z.boolean().optional(),
   actor: z.string().trim().min(1).max(120).default("Cameron"),
 }).refine((body) => Object.keys(body).some((key) => key !== "actor"), {
@@ -1451,6 +1473,8 @@ router.get("/tasks", async (req, res) => {
   const publish = typeof req.query.publish === "string" ? req.query.publish : undefined;
   const q = typeof req.query.q === "string" ? req.query.q.trim() : undefined;
   const includeArchived = req.query.includeArchived === "true";
+  const fromDate = typeof req.query.from === "string" ? req.query.from : undefined;
+  const toDate = typeof req.query.to === "string" ? req.query.to : undefined;
 
   const params: Array<string | boolean> = [];
   const where: string[] = [];
@@ -1481,6 +1505,15 @@ router.get("/tasks", async (req, res) => {
   if (q) {
     params.push(`%${q}%`);
     where.push(`(title ILIKE $${params.length} OR COALESCE(description,'') ILIKE $${params.length})`);
+  }
+  // Date range filter on due_at
+  if (fromDate && /^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
+    params.push(fromDate);
+    where.push(`due_at >= $${params.length}::date`);
+  }
+  if (toDate && /^\d{4}-\d{2}-\d{2}$/.test(toDate)) {
+    params.push(toDate);
+    where.push(`due_at < ($${params.length}::date + interval '1 day')`);
   }
 
   const result = await pool.query(
@@ -1570,7 +1603,8 @@ router.post("/tasks", async (req, res) => {
 
     await client.query("COMMIT");
 
-    if (task.assignedTo === "bob" && task.status !== "archived") {
+    // Only notify Bob when task is active (not draft) — drafts must be submitted first
+    if (task.assignedTo === "bob" && !["draft", "archived"].includes(task.status)) {
       notifyBobOfTask(task.id, task).catch(() => {});
     }
 
@@ -1652,7 +1686,8 @@ router.put("/tasks/:id", async (req, res) => {
 
     await client.query("COMMIT");
 
-    if (assignedToChanged && updated.assignedTo === "bob" && updated.status !== "archived") {
+    // Notify Bob only if newly assigned to him, task is active (not draft/archived), and not already notified
+    if (assignedToChanged && updated.assignedTo === "bob" && !["draft", "archived"].includes(updated.status) && !updated.bobNotifiedAt) {
       notifyBobOfTask(taskId, updated).catch(() => {});
     }
 
@@ -1973,8 +2008,8 @@ router.post("/tasks/:id/submit", async (req, res) => {
     await client.query("COMMIT");
 
     const task = updated.rows[0];
-    // Notify Bob if assigned to him
-    if (task.assignedTo === "bob") {
+    // Notify Bob if assigned to him and not already notified (idempotent)
+    if (task.assignedTo === "bob" && !task.bobNotifiedAt) {
       notifyBobOfTask(taskId, task).catch(() => {});
     }
 
