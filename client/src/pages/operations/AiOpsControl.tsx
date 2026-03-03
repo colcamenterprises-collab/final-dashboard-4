@@ -40,6 +40,9 @@ type Task = {
   updatedAt: string;
   completedAt: string | null;
   deletedAt: string | null;
+  followUpRequired: boolean;
+  bobNotifiedAt: string | null;
+  bobLastError: string | null;
 };
 
 type TaskMessage = {
@@ -245,6 +248,9 @@ export default function AiOpsControlPage() {
   const [taskFrequency, setTaskFrequency] = useState<TaskFrequency>('ad-hoc');
   const [taskAssignee, setTaskAssignee] = useState<TaskAgent | ''>('');
   const [taskAreaInput, setTaskAreaInput] = useState<TaskArea | ''>('');
+  const [taskDueAt, setTaskDueAt] = useState('');
+  const [taskFollowUpRequired, setTaskFollowUpRequired] = useState(false);
+  const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar'>('list');
   const [messageText, setMessageText] = useState('');
   const [reviewNote, setReviewNote] = useState('');
   const [reviewDecisionNote, setReviewDecisionNote] = useState('');
@@ -604,8 +610,8 @@ export default function AiOpsControlPage() {
         <div className="space-y-3">
           <div className="max-h-72 space-y-2 overflow-auto rounded-lg border border-slate-200 p-3">
             {(chatMessagesQuery.data?.items || []).map((msg) => (
-              <div key={msg.id} className={`rounded-lg p-2 text-sm ${msg.role === 'assistant' ? 'bg-blue-50' : 'bg-slate-100'}`}>
-                <p className="text-xs uppercase text-slate-500">{msg.role}</p>
+              <div key={msg.id} className={`rounded-lg p-2.5 text-sm ${msg.role === 'assistant' ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-slate-200'}`}>
+                <p className={`text-[10px] font-semibold uppercase mb-1 ${msg.role === 'assistant' ? 'text-emerald-600' : 'text-slate-500'}`}>{msg.role === 'assistant' ? 'Bob' : 'You'}</p>
                 <p className="whitespace-pre-wrap text-slate-800">{msg.content}</p>
               </div>
             ))}
@@ -752,8 +758,11 @@ export default function AiOpsControlPage() {
                   frequency: taskFrequency,
                   area: taskAreaInput || null,
                   assignedTo: taskAssignee || null,
+                  dueAt: taskDueAt ? new Date(taskDueAt).toISOString() : null,
+                  followUpRequired: taskFollowUpRequired,
                   createdBy: 'Cameron',
                 });
+                setTaskTitle(''); setTaskDescription(''); setTaskDueAt(''); setTaskFollowUpRequired(false);
               }}
               className="grid gap-2 rounded-lg border border-slate-200 p-3"
             >
@@ -809,6 +818,26 @@ export default function AiOpsControlPage() {
                     <option key={a} value={a}>{a}</option>
                   ))}
                 </select>
+                <div className="col-span-2 sm:col-span-3 flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="block text-[10px] text-slate-500 mb-0.5">Due date</label>
+                    <input
+                      type="date"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-2 text-xs"
+                      value={taskDueAt}
+                      onChange={(e) => setTaskDueAt(e.target.value)}
+                    />
+                  </div>
+                  <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer mt-4 whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={taskFollowUpRequired}
+                      onChange={(e) => setTaskFollowUpRequired(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Follow-up required
+                  </label>
+                </div>
               </div>
               <button
                 className="w-fit rounded-[4px] border border-slate-300 bg-slate-50 px-4 py-1.5 text-xs font-medium hover:bg-slate-100"
@@ -878,6 +907,19 @@ export default function AiOpsControlPage() {
               Show archived
             </label>
 
+            <div className="flex items-center gap-2 mb-1">
+              {(['list', 'calendar'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setTaskViewMode(mode)}
+                  className={`rounded-[4px] px-3 py-1 text-xs font-medium border transition-colors capitalize ${taskViewMode === mode ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-200 text-slate-500 hover:text-slate-700'}`}
+                >
+                  {mode === 'calendar' ? '📅 Calendar' : '☰ List'}
+                </button>
+              ))}
+            </div>
+
+            {taskViewMode === 'list' && (
             <div className="overflow-x-auto rounded-[4px] border border-slate-200">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50">
@@ -909,18 +951,24 @@ export default function AiOpsControlPage() {
                         >
                           {task.title}
                         </button>
-                        {task.dueAt && (
-                          <span className="text-slate-400 text-[10px]">
-                            Due {new Date(task.dueAt).toLocaleDateString('en-GB')}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {task.dueAt && (
+                            <span className="text-slate-400 text-[10px]">Due {new Date(task.dueAt).toLocaleDateString('en-GB')}</span>
+                          )}
+                          {task.followUpRequired && (
+                            <span className="inline-block rounded-full bg-amber-100 text-amber-700 px-1.5 py-0 text-[10px] font-medium">Follow-up</span>
+                          )}
+                          {task.bobNotifiedAt && (
+                            <span className="inline-block rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0 text-[10px] font-medium">Bob ✓</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-2 py-2">
                         <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize
                           ${task.priority === 'critical' ? 'bg-red-100 text-red-700' :
                             task.priority === 'urgent' ? 'bg-orange-100 text-orange-700' :
                             task.priority === 'high' ? 'bg-yellow-100 text-yellow-700' :
-                            task.priority === 'medium' ? 'bg-blue-100 text-blue-700' :
+                            task.priority === 'medium' ? 'bg-indigo-100 text-indigo-700' :
                             'bg-slate-100 text-slate-600'}`}
                         >
                           {task.priority}
@@ -929,26 +977,92 @@ export default function AiOpsControlPage() {
                       <td className="px-2 py-2 text-slate-600 capitalize whitespace-nowrap">{task.status.replace(/_/g, ' ')}</td>
                       <td className="px-2 py-2 text-slate-500 capitalize">{task.area ?? '—'}</td>
                       <td className="px-2 py-2 text-slate-500 capitalize">{task.assignedTo ?? '—'}</td>
-                      <td className="px-2 py-2">
-                        {task.deletedAt ? (
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
                           <button
-                            className="text-[10px] text-emerald-600 hover:underline"
-                            onClick={() => restoreTaskMutation.mutate(task.id)}
-                            disabled={restoreTaskMutation.isPending}
-                          >Restore</button>
-                        ) : (
-                          <button
-                            className="text-[10px] text-slate-400 hover:text-slate-600"
-                            onClick={() => archiveTaskMutation.mutate(task.id)}
-                            disabled={archiveTaskMutation.isPending}
-                          >Archive</button>
-                        )}
+                            className="text-[10px] font-medium text-emerald-600 hover:underline"
+                            onClick={() => navigate(`/operations/tasks/${task.id}`)}
+                          >View</button>
+                          {task.deletedAt ? (
+                            <button
+                              className="text-[10px] text-emerald-600 hover:underline"
+                              onClick={() => restoreTaskMutation.mutate(task.id)}
+                              disabled={restoreTaskMutation.isPending}
+                            >Restore</button>
+                          ) : (
+                            <button
+                              className="text-[10px] text-slate-400 hover:text-slate-600"
+                              onClick={() => archiveTaskMutation.mutate(task.id)}
+                              disabled={archiveTaskMutation.isPending}
+                            >Archive</button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            )}
+
+            {taskViewMode === 'calendar' && (() => {
+              const today = new Date();
+              const startOfWeek = new Date(today);
+              startOfWeek.setDate(today.getDate() - today.getDay() + 1);
+              const days = Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(startOfWeek);
+                d.setDate(startOfWeek.getDate() + i);
+                return d;
+              });
+              const tasksWithDue = (tasksQuery.data?.items || []).filter((t) => t.dueAt && !t.deletedAt);
+              const getDateKey = (d: Date) => d.toISOString().slice(0, 10);
+              const tasksByDay: Record<string, Task[]> = {};
+              tasksWithDue.forEach((t) => {
+                const key = t.dueAt!.slice(0, 10);
+                if (!tasksByDay[key]) tasksByDay[key] = [];
+                tasksByDay[key].push(t);
+              });
+              return (
+                <div className="rounded-[4px] border border-slate-200 overflow-hidden">
+                  <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-200">
+                    {['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((d) => (
+                      <div key={d} className="text-center text-[10px] font-medium text-slate-500 py-1.5 border-r border-slate-200 last:border-r-0">{d}</div>
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-7 min-h-[120px]">
+                    {days.map((day) => {
+                      const key = getDateKey(day);
+                      const dayTasks = tasksByDay[key] || [];
+                      const isToday = getDateKey(day) === getDateKey(today);
+                      return (
+                        <div key={key} className={`border-r border-b border-slate-100 last:border-r-0 p-1 min-h-[80px] ${isToday ? 'bg-emerald-50' : ''}`}>
+                          <p className={`text-[10px] font-semibold mb-1 ${isToday ? 'text-emerald-700' : 'text-slate-400'}`}>
+                            {day.getDate()}
+                          </p>
+                          {dayTasks.map((t) => (
+                            <button
+                              key={t.id}
+                              onClick={() => navigate(`/operations/tasks/${t.id}`)}
+                              className={`w-full text-left text-[10px] rounded px-1 py-0.5 mb-0.5 truncate block
+                                ${t.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                                  t.priority === 'urgent' ? 'bg-orange-100 text-orange-700' :
+                                  t.priority === 'high' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-emerald-100 text-emerald-700'}`}
+                              title={t.title}
+                            >
+                              {t.title}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-slate-400 px-2 py-1 border-t border-slate-100">
+                    Week of {days[0].toLocaleDateString('en-GB')} — tasks with due dates only
+                  </p>
+                </div>
+              );
+            })()}
           </article>
 
           <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">

@@ -226,8 +226,11 @@ export async function ensureWorkRegisterTables(): Promise<void> {
   if (!pool) return;
   try {
     await pool.query(`
-      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS area        TEXT;
-      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS deleted_at  TIMESTAMPTZ;
+      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS area               TEXT;
+      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS deleted_at          TIMESTAMPTZ;
+      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS follow_up_required  BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS bob_notified_at     TIMESTAMPTZ;
+      ALTER TABLE ai_tasks ADD COLUMN IF NOT EXISTS bob_last_error      TEXT;
 
       CREATE INDEX IF NOT EXISTS ai_tasks_status_updated_idx  ON ai_tasks(status, updated_at DESC);
       CREATE INDEX IF NOT EXISTS ai_tasks_assignee_status_idx ON ai_tasks(assigned_to, status);

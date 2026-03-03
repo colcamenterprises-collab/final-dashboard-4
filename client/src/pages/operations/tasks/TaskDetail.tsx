@@ -29,6 +29,9 @@ interface Task {
   updatedAt: string;
   completedAt: string | null;
   deletedAt: string | null;
+  followUpRequired: boolean;
+  bobNotifiedAt: string | null;
+  bobLastError: string | null;
 }
 
 interface TaskMessage {
@@ -145,6 +148,24 @@ export default function TaskDetailPage() {
     onSuccess: () => { setCommentText(''); invalidate(); },
   });
 
+  const markDraftMutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/ai-ops/tasks/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ status: 'draft', actor: 'Cameron' }),
+      }),
+    onSuccess: invalidate,
+  });
+
+  const toggleFollowUpMutation = useMutation({
+    mutationFn: (val: boolean) =>
+      apiRequest(`/api/ai-ops/tasks/${taskId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ followUpRequired: val, actor: 'Cameron' }),
+      }),
+    onSuccess: invalidate,
+  });
+
   function startEdit() {
     if (!task) return;
     setEditTitle(task.title);
@@ -214,7 +235,38 @@ export default function TaskDetailPage() {
               <p className="mt-1 text-sm text-slate-600">{task.description}</p>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {task.followUpRequired && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
+                Follow-up required
+              </span>
+            )}
+            {task.bobNotifiedAt && (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200" title={`Bob notified ${new Date(task.bobNotifiedAt).toLocaleString('en-GB')}`}>
+                Bob notified ✓
+              </span>
+            )}
+            {task.bobLastError && !task.bobNotifiedAt && (
+              <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 border border-red-200" title={task.bobLastError}>
+                Bob unreachable
+              </span>
+            )}
+            <button
+              className={`rounded-[4px] border px-3 py-1.5 text-xs font-medium ${task.followUpRequired ? 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+              onClick={() => toggleFollowUpMutation.mutate(!task.followUpRequired)}
+              disabled={toggleFollowUpMutation.isPending}
+            >
+              {task.followUpRequired ? 'Remove Follow-up' : 'Flag Follow-up'}
+            </button>
+            {task.status !== 'draft' && !task.deletedAt && (
+              <button
+                className="rounded-[4px] border border-slate-200 px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-50"
+                onClick={() => markDraftMutation.mutate()}
+                disabled={markDraftMutation.isPending}
+              >
+                Mark Draft
+              </button>
+            )}
             {task.deletedAt ? (
               <button
                 className="rounded-[4px] border border-emerald-300 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
@@ -376,6 +428,15 @@ export default function TaskDetailPage() {
                 />
               </div>
             </div>
+            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={editMode ? (task.followUpRequired) : false}
+                onChange={(e) => toggleFollowUpMutation.mutate(e.target.checked)}
+                className="rounded border-slate-300"
+              />
+              Follow-up required
+            </label>
             <div className="flex gap-2">
               <button
                 type="submit"
