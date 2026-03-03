@@ -539,7 +539,7 @@ export default function AiOpsControlPage() {
     <div className="space-y-6">
       <header className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-xl md:p-6">
         <div className="grid gap-5 lg:grid-cols-[minmax(320px,1.2fr)_minmax(0,2fr)] lg:items-stretch">
-          <div className="space-y-3 rounded-xl border border-slate-700/60 bg-slate-800/70 p-4">
+          <div className="space-y-3 rounded-[4px] border border-slate-700/60 bg-slate-800/70 p-4">
             <h1 className="text-2xl font-semibold">AI Ops Control</h1>
             <p className="text-sm text-slate-200">
               Central command for AI task execution, incident workflow, and idea intake.
@@ -552,7 +552,7 @@ export default function AiOpsControlPage() {
               { label: 'Tasks Due Today', value: dueToday },
               { label: 'Live Agents', value: (agentsQuery.data?.items || []).length },
             ].map((item) => (
-              <article key={item.label} className="rounded-xl border border-slate-700/60 bg-slate-800/60 p-4">
+              <article key={item.label} className="rounded-[4px] border border-slate-700/60 bg-slate-800/60 p-4">
                 <p className="text-xs uppercase tracking-wider text-slate-300">{item.label}</p>
                 <p className="mt-3 text-3xl font-semibold">{item.value}</p>
               </article>
@@ -562,14 +562,14 @@ export default function AiOpsControlPage() {
       </header>
 
       <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-slate-900">AI Agents</h2>
+        <h2 className="text-sm font-semibold text-slate-900">AI Agents</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           {(agentsQuery.data?.items || []).map((agent) => (
-            <article key={agent.agent} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <article key={agent.agent} className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm">
               <div className="mb-3 flex items-center gap-3">
-                <img src={agent.imageUrl || 'https://placehold.co/128x128'} alt={agent.name} className="h-12 w-12 rounded-md object-cover" />
+                <img src={agent.imageUrl || 'https://placehold.co/128x128'} alt={agent.name} className="h-12 w-12 rounded-[4px] object-cover" />
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">{agent.name}</p>
+                  <p className="text-xs font-semibold text-slate-900">{agent.name}</p>
                   <p className="text-xs text-slate-600">{agent.role}</p>
                 </div>
                 <span
@@ -577,16 +577,16 @@ export default function AiOpsControlPage() {
                   title={agent.status}
                 />
               </div>
-              <p className="text-sm text-slate-700">{agent.description}</p>
+              <p className="text-xs text-slate-600">{agent.description}</p>
             </article>
           ))}
         </div>
       </section>
 
 
-      <section className="grid gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[280px_minmax(0,1fr)]">
+      <section className="grid gap-4 rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-slate-900">Bob Chat (Orchestrator)</h2>
+          <h2 className="text-sm font-semibold text-slate-900">Bob Chat (Orchestrator)</h2>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -595,12 +595,12 @@ export default function AiOpsControlPage() {
             }}
             className="space-y-2"
           >
-            <input className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm" value={chatThreadTitle} onChange={(e) => setChatThreadTitle(e.target.value)} placeholder="New thread title" />
-            <button type="submit" className="h-10 rounded-lg bg-slate-900 px-3 text-sm text-white">Create Thread</button>
+            <input className="h-9 w-full rounded-[4px] border border-slate-300 px-3 text-xs" value={chatThreadTitle} onChange={(e) => setChatThreadTitle(e.target.value)} placeholder="New thread title" />
+            <button type="submit" className="h-9 rounded-[4px] border border-slate-300 px-3 text-xs text-slate-700 font-medium hover:bg-slate-50">Create Thread</button>
           </form>
           <div className="max-h-64 space-y-2 overflow-auto">
             {(chatThreadsQuery.data?.items || []).map((thread) => (
-              <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full rounded-lg border p-2 text-left text-sm ${selectedThreadId === thread.id ? 'border-slate-900 bg-slate-50' : 'border-slate-200'}`}>
+              <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full rounded-[4px] border p-2 text-left text-xs ${selectedThreadId === thread.id ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200'}`}>
                 <p className="font-medium text-slate-900">{thread.title}</p>
                 <p className="text-xs text-slate-500">{thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString() : 'No messages yet'}</p>
               </button>
@@ -608,11 +608,11 @@ export default function AiOpsControlPage() {
           </div>
         </div>
         <div className="space-y-3">
-          <div className="max-h-72 space-y-2 overflow-auto rounded-lg border border-slate-200 p-3">
+          <div className="max-h-72 space-y-2 overflow-auto rounded-[4px] border border-slate-200 p-3">
             {(chatMessagesQuery.data?.items || []).map((msg) => (
-              <div key={msg.id} className={`rounded-lg p-2.5 text-sm ${msg.role === 'assistant' ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-slate-200'}`}>
+              <div key={msg.id} className={`rounded-[4px] p-2.5 text-sm ${msg.role === 'assistant' ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-slate-200'}`}>
                 <p className={`text-[10px] font-semibold uppercase mb-1 ${msg.role === 'assistant' ? 'text-emerald-600' : 'text-slate-500'}`}>{msg.role === 'assistant' ? 'Bob' : 'You'}</p>
-                <p className="whitespace-pre-wrap text-slate-800">{msg.content}</p>
+                <p className="whitespace-pre-wrap text-xs text-slate-800">{msg.content}</p>
               </div>
             ))}
           </div>
@@ -635,7 +635,7 @@ export default function AiOpsControlPage() {
             className="space-y-2"
           >
             <textarea
-              className="w-full rounded-lg border border-slate-300 p-3 text-sm"
+              className="w-full rounded-[4px] border border-slate-300 p-3 text-xs"
               rows={3}
               value={chatMessageText}
               onChange={(e) => setChatMessageText(e.target.value)}
@@ -650,7 +650,7 @@ export default function AiOpsControlPage() {
             <button
               type="submit"
               disabled={sendChatMessageMutation.isPending || createChatThreadMutation.isPending}
-              className="h-10 w-full rounded-lg bg-slate-900 px-4 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
+              className="h-9 rounded-[4px] border border-emerald-300 bg-emerald-50 px-4 text-xs font-medium text-emerald-700 disabled:opacity-60 hover:bg-emerald-100"
             >
               {sendChatMessageMutation.isPending || createChatThreadMutation.isPending ? 'Sending…' : 'Send'}
             </button>
@@ -659,7 +659,7 @@ export default function AiOpsControlPage() {
       </section>
 
       {/* System Map — Bob's process familiarity layer */}
-      <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="rounded-[4px] border border-slate-200 bg-white shadow-sm">
         <div
           role="button"
           tabIndex={0}
@@ -669,12 +669,12 @@ export default function AiOpsControlPage() {
           className="flex w-full cursor-pointer items-center justify-between p-4 text-left select-none"
         >
           <div>
-            <p className="text-lg font-semibold text-slate-900">System Map</p>
+            <p className="text-sm font-semibold text-slate-900">System Map</p>
             <p className="text-xs text-slate-500 mt-0.5">Bob's operational process registry — {(processRegistryQuery.data?.items || []).length} processes loaded</p>
           </div>
           <span
             data-testid="system-map-toggle-label"
-            className="text-xs font-medium text-slate-600 border border-slate-200 rounded px-2 py-1 pointer-events-none"
+            className="text-xs font-medium text-slate-600 border border-slate-200 rounded-[4px] px-2 py-1 pointer-events-none"
           >
             {systemMapOpen ? 'Collapse' : 'Expand'}
           </span>
@@ -694,7 +694,7 @@ export default function AiOpsControlPage() {
                       key={proc.key}
                       type="button"
                       onClick={() => setSelectedProcessKey(prev => prev === proc.key ? null : proc.key)}
-                      className={`w-full rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                      className={`w-full rounded-[4px] border px-3 py-2 text-left text-xs transition-colors ${
                         selectedProcessKey === proc.key
                           ? 'border-slate-900 bg-slate-900 text-white'
                           : 'border-slate-200 text-slate-800 hover:border-slate-400'
@@ -709,13 +709,13 @@ export default function AiOpsControlPage() {
                 </div>
 
                 {/* Process detail */}
-                <div className="rounded-lg border border-slate-200 p-4">
+                <div className="rounded-[4px] border border-slate-200 p-4">
                   {!selectedProcess ? (
                     <p className="text-sm text-slate-500">Select a process to view its inputs, outputs, and dependencies.</p>
                   ) : (
                     <div className="space-y-4">
                       <div>
-                        <h3 className="text-base font-semibold text-slate-900">{selectedProcess.name}</h3>
+                        <h3 className="text-sm font-semibold text-slate-900">{selectedProcess.name}</h3>
                         <p className="text-xs text-slate-500 mt-0.5">{selectedProcess.key} — {selectedProcess.owner} — {selectedProcess.status}</p>
                         <p className="text-sm text-slate-700 mt-2">{selectedProcess.description}</p>
                       </div>
@@ -723,7 +723,7 @@ export default function AiOpsControlPage() {
                         {(['inputs', 'outputs', 'dependencies'] as const).map(section => (
                           <div key={section}>
                             <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1">{section}</p>
-                            <pre className="rounded bg-slate-50 border border-slate-200 p-2 text-xs text-slate-700 overflow-auto max-h-48 whitespace-pre-wrap">
+                            <pre className="rounded-[4px] bg-slate-50 border border-slate-200 p-2 text-xs text-slate-700 overflow-auto max-h-48 whitespace-pre-wrap">
                               {JSON.stringify(selectedProcess[section], null, 2)}
                             </pre>
                           </div>
@@ -741,9 +741,9 @@ export default function AiOpsControlPage() {
 
       <section className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(280px,1.1fr)_minmax(0,1.5fr)_minmax(320px,1fr)]">
         <div className="space-y-6">
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+          <article className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-900">Work Register</h2>
+              <h2 className="text-sm font-semibold text-slate-900">Work Register</h2>
               <span className="text-xs text-slate-400">{tasksQuery.data?.items?.length ?? 0} tasks</span>
             </div>
 
@@ -764,16 +764,16 @@ export default function AiOpsControlPage() {
                 });
                 setTaskTitle(''); setTaskDescription(''); setTaskDueAt(''); setTaskFollowUpRequired(false);
               }}
-              className="grid gap-2 rounded-lg border border-slate-200 p-3"
+              className="grid gap-2 rounded-[4px] border border-slate-200 p-3"
             >
               <input
-                className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-sm"
+                className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                 value={taskTitle}
                 onChange={(e) => setTaskTitle(e.target.value)}
                 placeholder="New task title"
               />
               <textarea
-                className="w-full rounded-[4px] border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="w-full rounded-[4px] border border-slate-300 bg-white px-3 py-2 text-xs"
                 rows={2}
                 value={taskDescription}
                 onChange={(e) => setTaskDescription(e.target.value)}
@@ -956,15 +956,15 @@ export default function AiOpsControlPage() {
                             <span className="text-slate-400 text-[10px]">Due {new Date(task.dueAt).toLocaleDateString('en-GB')}</span>
                           )}
                           {task.followUpRequired && (
-                            <span className="inline-block rounded-full bg-amber-100 text-amber-700 px-1.5 py-0 text-[10px] font-medium">Follow-up</span>
+                            <span className="inline-block rounded-[4px] bg-amber-100 text-amber-700 px-1.5 py-0.5 text-[10px] font-medium">Follow-up</span>
                           )}
                           {task.bobNotifiedAt && (
-                            <span className="inline-block rounded-full bg-emerald-100 text-emerald-700 px-1.5 py-0 text-[10px] font-medium">Bob ✓</span>
+                            <span className="inline-block rounded-[4px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 text-[10px] font-medium">Bob ✓</span>
                           )}
                         </div>
                       </td>
                       <td className="px-2 py-2">
-                        <span className={`inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium capitalize
+                        <span className={`inline-block rounded-[4px] px-1.5 py-0.5 text-[10px] font-medium capitalize
                           ${task.priority === 'critical' ? 'bg-red-100 text-red-700' :
                             task.priority === 'urgent' ? 'bg-orange-100 text-orange-700' :
                             task.priority === 'high' ? 'bg-yellow-100 text-yellow-700' :
@@ -1043,7 +1043,7 @@ export default function AiOpsControlPage() {
                             <button
                               key={t.id}
                               onClick={() => navigate(`/operations/tasks/${t.id}`)}
-                              className={`w-full text-left text-[10px] rounded px-1 py-0.5 mb-0.5 truncate block
+                              className={`w-full text-left text-[10px] rounded-[4px] px-1 py-0.5 mb-0.5 truncate block
                                 ${t.priority === 'critical' ? 'bg-red-100 text-red-700' :
                                   t.priority === 'urgent' ? 'bg-orange-100 text-orange-700' :
                                   t.priority === 'high' ? 'bg-yellow-100 text-yellow-700' :
@@ -1065,8 +1065,8 @@ export default function AiOpsControlPage() {
             })()}
           </article>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-lg font-semibold text-slate-900">Issues Register</h2>
+          <article className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+            <h2 className="text-sm font-semibold text-slate-900">Issues Register</h2>
             <form
               onSubmit={(e: FormEvent) => {
                 e.preventDefault();
@@ -1088,26 +1088,26 @@ export default function AiOpsControlPage() {
                 });
                 form.reset();
               }}
-              className="space-y-2 rounded-lg border border-slate-200 p-3"
+              className="space-y-2 rounded-[4px] border border-slate-200 p-3"
             >
               <input
                 name="issueTitle"
-                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                 placeholder="New issue title"
               />
               <textarea
                 name="issueDescription"
-                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                 rows={2}
                 placeholder="Description"
               />
-              <button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm" type="submit">
+              <button className="rounded-[4px] border border-slate-300 px-4 py-2.5 text-xs" type="submit">
                 Create Issue
               </button>
             </form>
-            <div className="grid gap-2 text-sm sm:grid-cols-4">
+            <div className="grid gap-2 text-xs sm:grid-cols-4">
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                 value={issueStatusFilter}
                 onChange={(e) => setIssueStatusFilter(e.target.value)}
               >
@@ -1119,7 +1119,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                 value={issueSeverityFilter}
                 onChange={(e) => setIssueSeverityFilter(e.target.value)}
               >
@@ -1131,7 +1131,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                 value={issueAssigneeFilter}
                 onChange={(e) => setIssueAssigneeFilter(e.target.value)}
               >
@@ -1143,13 +1143,13 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <input
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                 placeholder="Search"
                 value={issueSearch}
                 onChange={(e) => setIssueSearch(e.target.value)}
               />
             </div>
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-left">
                   <th className="py-2">Title</th>
@@ -1176,8 +1176,8 @@ export default function AiOpsControlPage() {
             </table>
           </article>
 
-          <article className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-lg font-semibold text-slate-900">Ideas Register</h2>
+          <article className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+            <h2 className="text-sm font-semibold text-slate-900">Ideas Register</h2>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1189,23 +1189,23 @@ export default function AiOpsControlPage() {
                   createdBy: 'Bob',
                 });
               }}
-              className="space-y-2 rounded-lg border border-slate-200 p-3"
+              className="space-y-2 rounded-[4px] border border-slate-200 p-3"
             >
               <input
-                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                 value={ideaTitle}
                 onChange={(e) => setIdeaTitle(e.target.value)}
                 placeholder="Idea title"
               />
               <textarea
-                className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                 rows={2}
                 value={ideaDescription}
                 onChange={(e) => setIdeaDescription(e.target.value)}
                 placeholder="Idea description"
               />
               <select
-                className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                 value={ideaCategory}
                 onChange={(e) => setIdeaCategory(e.target.value as IdeaCategory)}
               >
@@ -1215,14 +1215,14 @@ export default function AiOpsControlPage() {
                   </option>
                 ))}
               </select>
-              <button className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm" type="submit">
+              <button className="rounded-[4px] border border-slate-300 px-4 py-2.5 text-xs" type="submit">
                 Add Idea
               </button>
             </form>
 
-            <div className="grid gap-2 text-sm sm:grid-cols-3">
+            <div className="grid gap-2 text-xs sm:grid-cols-3">
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                 value={ideaStatusFilter}
                 onChange={(e) => setIdeaStatusFilter(e.target.value)}
               >
@@ -1234,7 +1234,7 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <select
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                 value={ideaCategoryFilter}
                 onChange={(e) => setIdeaCategoryFilter(e.target.value)}
               >
@@ -1246,14 +1246,14 @@ export default function AiOpsControlPage() {
                 ))}
               </select>
               <input
-                className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                 value={ideaSearch}
                 onChange={(e) => setIdeaSearch(e.target.value)}
                 placeholder="Search"
               />
             </div>
 
-            <table className="w-full text-sm">
+            <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-left">
                   <th className="py-2">Title</th>
@@ -1278,13 +1278,13 @@ export default function AiOpsControlPage() {
           </article>
         </div>
 
-        <aside className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 h-fit">
-          <div className="mb-4 inline-flex w-full rounded-lg border border-slate-300 p-1">
+        <aside className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm lg:sticky lg:top-4 h-fit">
+          <div className="mb-4 inline-flex w-full rounded-[4px] border border-slate-200 p-0.5 bg-slate-50">
             {(['details', 'activity', 'notes'] as const).map((tab) => (
               <button
                 type="button"
                 key={tab}
-                className={`flex-1 rounded-md px-3 py-2 text-sm capitalize ${detailTab === tab ? 'bg-slate-900 text-white' : 'text-slate-600'}`}
+                className={`flex-1 rounded-[4px] px-3 py-1.5 text-xs capitalize ${detailTab === tab ? 'bg-white text-slate-900 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-700'}`}
                 onClick={() => setDetailTab(tab)}
               >
                 {tab}
@@ -1302,13 +1302,13 @@ export default function AiOpsControlPage() {
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
               ) : (
                 <>
-                  <h3 className="text-base font-semibold text-slate-900">Task Detail</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Task Detail</h3>
                   <p className="text-sm">
                     <span className="font-medium">Title:</span> {selectedTask.title}
                   </p>
                   <div className="flex gap-2">
                     <select
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       value={selectedTask.status}
                       onChange={(e) =>
                         updateTaskMutation.mutate({
@@ -1324,7 +1324,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <select
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       value={selectedTask.assignedTo || ''}
                       onChange={(e) =>
                         updateTaskMutation.mutate({
@@ -1342,7 +1342,7 @@ export default function AiOpsControlPage() {
                     </select>
                   </div>
 
-                  <div className="max-h-28 space-y-1 overflow-auto rounded border border-slate-200 p-2 text-sm">
+                  <div className="max-h-28 space-y-1 overflow-auto rounded-[4px] border border-slate-200 p-2 text-sm">
                     {selectedTask.messages.map((m) => (
                       <p key={m.id}>
                         <strong>{m.actor}</strong>: {m.message}
@@ -1364,13 +1364,13 @@ export default function AiOpsControlPage() {
                     className="flex gap-2"
                   >
                     <input
-                      className="flex-1 h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="flex-1 h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
                       placeholder="Add note"
                     />
                     <button
-                      className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
+                      className="rounded-[4px] border border-slate-300 px-4 py-2.5 text-xs"
                       type="submit"
                     >
                       Send
@@ -1378,14 +1378,14 @@ export default function AiOpsControlPage() {
                   </form>
 
                   <textarea
-                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                    className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                     rows={2}
                     value={reviewNote}
                     onChange={(e) => setReviewNote(e.target.value)}
                     placeholder="Review request note"
                   />
                   <button
-                    className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
+                    className="rounded-[4px] border border-slate-300 px-4 py-2.5 text-xs"
                     onClick={() =>
                       reviewTaskMutation.mutate({ id: selectedTask.id, note: reviewNote })
                     }
@@ -1393,15 +1393,15 @@ export default function AiOpsControlPage() {
                     Request Review
                   </button>
                   <textarea
-                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                    className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                     rows={2}
                     value={reviewDecisionNote}
                     onChange={(e) => setReviewDecisionNote(e.target.value)}
                     placeholder="Review decision note"
                   />
-                  <div className="flex flex-wrap gap-2 text-sm">
+                  <div className="flex flex-wrap gap-2 text-xs">
                     <button
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                       onClick={() =>
                         decisionTaskMutation.mutate({
                           id: selectedTask.id,
@@ -1413,7 +1413,7 @@ export default function AiOpsControlPage() {
                       Approve
                     </button>
                     <button
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                       onClick={() =>
                         decisionTaskMutation.mutate({
                           id: selectedTask.id,
@@ -1425,7 +1425,7 @@ export default function AiOpsControlPage() {
                       Changes Requested
                     </button>
                     <button
-                      className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                      className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs"
                       onClick={() =>
                         decisionTaskMutation.mutate({
                           id: selectedTask.id,
@@ -1448,9 +1448,9 @@ export default function AiOpsControlPage() {
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
               ) : (
                 <>
-                  <h3 className="text-base font-semibold text-slate-900">Issue Detail</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Issue Detail</h3>
                   <input
-                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                    className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                     value={selectedIssue.title}
                     onChange={(e) =>
                       updateIssueMutation.mutate({
@@ -1460,32 +1460,32 @@ export default function AiOpsControlPage() {
                     }
                   />
                   <div className="flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <span className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs">
                       Severity: {selectedIssue.severity}
                     </span>
-                    <span className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <span className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs">
                       Status: {selectedIssue.status}
                     </span>
-                    <span className="rounded-lg border border-slate-300 px-3 py-2 text-sm">
+                    <span className="rounded-[4px] border border-slate-300 px-3 py-2 text-xs">
                       Created By: {selectedIssue.createdBy}
                     </span>
                   </div>
                   <textarea
-                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                    className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                     rows={4}
                     value={issuePlan}
                     onChange={(e) => setIssuePlan(e.target.value)}
                     placeholder="Bob Plan"
                   />
                   <textarea
-                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                    className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                     rows={2}
                     value={issueApprovalNote}
                     onChange={(e) => setIssueApprovalNote(e.target.value)}
                     placeholder="Approval note (optional)"
                   />
                   <button
-                    className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
+                    className="rounded-[4px] border border-slate-300 px-4 py-2.5 text-xs"
                     onClick={() =>
                       issueActionMutation.mutate({
                         path: `/api/ai-ops/issues/${selectedIssue.id}/plan`,
@@ -1502,7 +1502,7 @@ export default function AiOpsControlPage() {
 
                   <div className="flex gap-2 items-center">
                     <select
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       value={issueActor}
                       onChange={(e) => setIssueActor(e.target.value)}
                     >
@@ -1513,7 +1513,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <button
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/approve`,
@@ -1524,7 +1524,7 @@ export default function AiOpsControlPage() {
                       Approve
                     </button>
                     <button
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/reject`,
@@ -1536,7 +1536,7 @@ export default function AiOpsControlPage() {
                     </button>
                   </div>
                   <textarea
-                    className="w-full h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                    className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                     rows={2}
                     value={issueDecisionNote}
                     onChange={(e) => setIssueDecisionNote(e.target.value)}
@@ -1545,7 +1545,7 @@ export default function AiOpsControlPage() {
 
                   <div className="flex flex-wrap gap-2 items-center">
                     <select
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       value={issueAssignee}
                       onChange={(e) => setIssueAssignee(e.target.value)}
                     >
@@ -1556,7 +1556,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <button
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/assign`,
@@ -1567,7 +1567,7 @@ export default function AiOpsControlPage() {
                       Assign
                     </button>
                     <button
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/complete`,
@@ -1578,7 +1578,7 @@ export default function AiOpsControlPage() {
                       Mark completed
                     </button>
                     <button
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       onClick={() =>
                         issueActionMutation.mutate({
                           path: `/api/ai-ops/issues/${selectedIssue.id}/close`,
@@ -1590,7 +1590,7 @@ export default function AiOpsControlPage() {
                     </button>
                   </div>
 
-                  <div className="max-h-24 overflow-auto rounded border border-slate-200 p-2 text-sm space-y-1">
+                  <div className="max-h-24 overflow-auto rounded-[4px] border border-slate-200 p-2 text-sm space-y-1">
                     {selectedIssue.comments.map((c) => (
                       <p key={c.id}>
                         <strong>{c.author}</strong>: {c.message}
@@ -1616,20 +1616,20 @@ export default function AiOpsControlPage() {
                     className="flex gap-2"
                   >
                     <input
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm flex-1"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-sm flex-1"
                       value={issueComment}
                       onChange={(e) => setIssueComment(e.target.value)}
                       placeholder="Add comment"
                     />
                     <button
-                      className="rounded-lg border border-slate-300 px-4 py-2.5 text-sm"
+                      className="rounded-[4px] border border-slate-300 px-4 py-2.5 text-xs"
                       type="submit"
                     >
                       Send
                     </button>
                   </form>
 
-                  <div className="max-h-28 overflow-auto rounded border border-slate-200 p-2 text-xs space-y-1">
+                  <div className="max-h-28 overflow-auto rounded-[4px] border border-slate-200 p-2 text-xs space-y-1">
                     {selectedIssue.activity.map((a) => (
                       <p key={a.id}>
                         {new Date(a.createdAt).toLocaleString()} · {a.action} · {a.actor}
@@ -1647,12 +1647,12 @@ export default function AiOpsControlPage() {
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
               ) : (
                 <>
-                  <h3 className="text-base font-semibold text-slate-900">Idea Detail</h3>
+                  <h3 className="text-sm font-semibold text-slate-900">Idea Detail</h3>
                   <p className="text-sm font-medium">{selectedIdea.title}</p>
                   <p className="text-sm">{selectedIdea.description || '-'}</p>
                   <div className="flex flex-wrap gap-2 items-center">
                     <select
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       value={selectedIdea.status}
                       onChange={(e) =>
                         ideaActionMutation.mutate({
@@ -1669,7 +1669,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <select
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       value={convertIssueSeverity}
                       onChange={(e) => setConvertIssueSeverity(e.target.value as IssueSeverity)}
                     >
@@ -1680,7 +1680,7 @@ export default function AiOpsControlPage() {
                       ))}
                     </select>
                     <button
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       onClick={() =>
                         ideaActionMutation.mutate({
                           path: `/api/ai-ops/ideas/${selectedIdea.id}/convert-to-issue`,
@@ -1695,7 +1695,7 @@ export default function AiOpsControlPage() {
                       Convert to Issue
                     </button>
                     <button
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm"
+                      className="h-9 w-full rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                       onClick={() =>
                         ideaActionMutation.mutate({
                           path: `/api/ai-ops/ideas/${selectedIdea.id}/convert-to-task`,
@@ -1712,7 +1712,7 @@ export default function AiOpsControlPage() {
                       Convert to Task
                     </button>
                   </div>
-                  <div className="max-h-40 overflow-auto rounded border border-slate-200 p-2 text-xs space-y-1">
+                  <div className="max-h-40 overflow-auto rounded-[4px] border border-slate-200 p-2 text-xs space-y-1">
                     {selectedIdea.activity.map((a) => (
                       <p key={a.id}>
                         {new Date(a.createdAt).toLocaleString()} · {a.action} · {a.actor}
@@ -1727,8 +1727,8 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'activity' && selectedItem?.type === 'task' && selectedTask && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-slate-900">Task Activity</h3>
-              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-xs space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">Task Activity</h3>
+              <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-xs space-y-2">
                 {selectedTask.activity.map((entry) => (
                   <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
                 ))}
@@ -1738,8 +1738,8 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'activity' && selectedItem?.type === 'issue' && selectedIssue && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-slate-900">Issue Activity</h3>
-              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-xs space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">Issue Activity</h3>
+              <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-xs space-y-2">
                 {selectedIssue.activity.map((entry) => (
                   <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
                 ))}
@@ -1749,8 +1749,8 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'activity' && selectedItem?.type === 'idea' && selectedIdea && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-slate-900">Idea Activity</h3>
-              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-xs space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">Idea Activity</h3>
+              <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-xs space-y-2">
                 {selectedIdea.activity.map((entry) => (
                   <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
                 ))}
@@ -1760,8 +1760,8 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'notes' && selectedItem?.type === 'task' && selectedTask && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-slate-900">Task Notes</h3>
-              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-sm space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">Task Notes</h3>
+              <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-sm space-y-2">
                 {selectedTask.messages.map((m) => <p key={m.id}><strong>{m.actor}</strong>: {m.message}</p>)}
               </div>
             </div>
@@ -1769,8 +1769,8 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'notes' && selectedItem?.type === 'issue' && selectedIssue && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-slate-900">Issue Notes</h3>
-              <div className="max-h-72 overflow-auto rounded border border-slate-200 p-3 text-sm space-y-2">
+              <h3 className="text-sm font-semibold text-slate-900">Issue Notes</h3>
+              <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-sm space-y-2">
                 {selectedIssue.comments.map((c) => <p key={c.id}><strong>{c.author}</strong>: {c.message}</p>)}
               </div>
             </div>
@@ -1778,8 +1778,8 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'notes' && selectedItem?.type === 'idea' && selectedIdea && (
             <div className="space-y-2">
-              <h3 className="text-base font-semibold text-slate-900">Idea Notes</h3>
-              <p className="rounded border border-slate-200 p-3 text-sm text-slate-700">{selectedIdea.description || 'No notes available.'}</p>
+              <h3 className="text-sm font-semibold text-slate-900">Idea Notes</h3>
+              <p className="rounded-[4px] border border-slate-200 p-3 text-xs text-slate-700">{selectedIdea.description || 'No notes available.'}</p>
             </div>
           )}
 
