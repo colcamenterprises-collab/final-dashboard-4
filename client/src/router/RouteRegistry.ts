@@ -40,6 +40,7 @@ export const ROUTES = {
   HEALTH_SAFETY_QUESTIONS: "/operations/health-safety-audit/questions",
   INGREDIENTS_MASTER: "/operations/ingredients-master",
   RECIPE_MAPPING: "/operations/recipe-mapping",
+  VARIANCE_MONITOR: "/operations/variance-monitor",
   OPS_PURCHASING_LIVE: "/ops/purchasing-live",
   PRODUCTS: "/products",
   PRODUCT_NEW: "/products/new",

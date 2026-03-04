@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import BalanceCard from "@/components/BalanceCard";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
+import { LogRefundModal } from "@/components/operations/LogRefundModal";
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { VarianceWidget } from "@/components/widgets/VarianceWidget";
@@ -128,7 +129,10 @@ function KPIGrid() {
 function StockLodgementQuickActions() {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="homepage-stock-lodgement-actions">
-      <h2 className="text-sm font-semibold text-slate-900 mb-3">Stock Lodgement</h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-semibold text-slate-900">Stock Lodgement</h2>
+        <LogRefundModal />
+      </div>
       <p className="text-xs text-slate-500 mb-4">Open the Finance &gt; Expenses stock modal to record rolls, meat, and drinks.</p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StockLodgmentModal triggerText="Lodge Rolls" triggerClassName="w-full" initialData={{ type: "rolls" }} />

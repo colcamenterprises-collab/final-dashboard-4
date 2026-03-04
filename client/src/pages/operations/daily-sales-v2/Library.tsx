@@ -336,20 +336,20 @@ export default function DailySalesV2Library() {
           </div>
         ) : (
           filteredRecords.map((rec) => (
-            <div key={rec.id} className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3">
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Date</p>
-                    <p className="font-semibold text-slate-900 whitespace-nowrap">{new Date(rec.date).toLocaleDateString()}</p>
+            <div key={rec.id} className="bg-white border border-slate-200 rounded-[4px] p-4 shadow-sm space-y-3">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 leading-tight">Date</p>
+                    <p className="font-semibold text-slate-900 whitespace-nowrap leading-snug">{new Date(rec.date).toLocaleDateString()}</p>
                   </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Staff</p>
-                    <p className="font-medium text-slate-800 truncate">{rec.staff}</p>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 leading-tight">Staff</p>
+                    <p className="font-medium text-slate-800 truncate leading-snug">{rec.staff}</p>
                   </div>
-                  <div>
-                    <p className="text-[11px] uppercase tracking-wide text-slate-500">Total Sales</p>
-                    <p className="font-semibold text-slate-900 whitespace-nowrap">{thb(rec.totalSales)}</p>
+                  <div className="space-y-0.5">
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 leading-tight">Total Sales</p>
+                    <p className="font-semibold text-slate-900 whitespace-nowrap leading-snug">{thb(rec.totalSales)}</p>
                   </div>
                 </div>
 

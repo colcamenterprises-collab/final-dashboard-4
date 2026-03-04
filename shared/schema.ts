@@ -2380,3 +2380,95 @@ export const insertIngredientAuthorityVersionSchema = createInsertSchema(ingredi
 
 export type IngredientAuthorityVersion = typeof ingredientAuthorityVersions.$inferSelect;
 export type InsertIngredientAuthorityVersion = z.infer<typeof insertIngredientAuthorityVersionSchema>;
+
+// ============================================================
+// SECURITY & ACCOUNTABILITY LAYER — PATCH SA-1
+// ============================================================
+
+// 1) REFUND LOGS
+export const refundLogs = pgTable("refund_logs", {
+  id: serial("id").primaryKey(),
+  shiftId: text("shift_id"),
+  shiftDate: date("shift_date"),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason").notNull(),
+  platform: text("platform").notNull().default("cash"),
+  loggedBy: text("logged_by").notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRefundLogSchema = createInsertSchema(refundLogs).omit({ id: true, createdAt: true });
+export type RefundLog = typeof refundLogs.$inferSelect;
+export type InsertRefundLog = z.infer<typeof insertRefundLogSchema>;
+
+// 2) SHIFT REVIEW / MANAGER SIGN-OFF
+export const shiftReview = pgTable("shift_review", {
+  id: serial("id").primaryKey(),
+  shiftId: text("shift_id").notNull(),
+  managerName: text("manager_name").notNull(),
+  cashBanked: decimal("cash_banked", { precision: 10, scale: 2 }),
+  scanQrActual: decimal("scan_qr_actual", { precision: 10, scale: 2 }),
+  refundReviewed: boolean("refund_reviewed").default(false),
+  refundFindings: text("refund_findings"),
+  signedOff: boolean("signed_off").default(false),
+  signedAt: timestamp("signed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertShiftReviewSchema = createInsertSchema(shiftReview).omit({ id: true, createdAt: true });
+export type ShiftReview = typeof shiftReview.$inferSelect;
+export type InsertShiftReview = z.infer<typeof insertShiftReviewSchema>;
+
+// 3) STOCK BASELINE
+export const stockBaseline = pgTable("stock_baseline", {
+  id: serial("id").primaryKey(),
+  itemName: text("item_name").notNull(),
+  category: text("category").notNull(),
+  expectedQty: decimal("expected_qty", { precision: 10, scale: 3 }).notNull(),
+  unit: text("unit").notNull().default("unit"),
+  warnThreshold: decimal("warn_threshold", { precision: 10, scale: 3 }),
+  criticalThreshold: decimal("critical_threshold", { precision: 10, scale: 3 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStockBaselineSchema = createInsertSchema(stockBaseline).omit({ id: true, createdAt: true, updatedAt: true });
+export type StockBaseline = typeof stockBaseline.$inferSelect;
+export type InsertStockBaseline = z.infer<typeof insertStockBaselineSchema>;
+
+// 4) STOCK SNAPSHOT (per shift)
+export const stockSnapshot = pgTable("stock_snapshot", {
+  id: serial("id").primaryKey(),
+  shiftId: text("shift_id"),
+  shiftDate: date("shift_date").notNull(),
+  itemName: text("item_name").notNull(),
+  category: text("category").notNull(),
+  actualQty: decimal("actual_qty", { precision: 10, scale: 3 }).notNull(),
+  unit: text("unit").notNull().default("unit"),
+  source: text("source").notNull().default("form2"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStockSnapshotSchema = createInsertSchema(stockSnapshot).omit({ id: true, createdAt: true });
+export type StockSnapshot = typeof stockSnapshot.$inferSelect;
+export type InsertStockSnapshot = z.infer<typeof insertStockSnapshotSchema>;
+
+// 5) STOCK VARIANCE (computed after form 2 submit)
+export const stockVariance = pgTable("stock_variance", {
+  id: serial("id").primaryKey(),
+  shiftId: text("shift_id"),
+  shiftDate: date("shift_date").notNull(),
+  itemName: text("item_name").notNull(),
+  category: text("category").notNull(),
+  expectedQty: decimal("expected_qty", { precision: 10, scale: 3 }),
+  actualQty: decimal("actual_qty", { precision: 10, scale: 3 }).notNull(),
+  varianceQty: decimal("variance_qty", { precision: 10, scale: 3 }),
+  unit: text("unit").notNull().default("unit"),
+  severity: text("severity").notNull().default("ok"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStockVarianceSchema = createInsertSchema(stockVariance).omit({ id: true, createdAt: true });
+export type StockVariance = typeof stockVariance.$inferSelect;
+export type InsertStockVariance = z.infer<typeof insertStockVarianceSchema>;

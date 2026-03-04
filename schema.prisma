@@ -1673,14 +1673,12 @@ model PurchasingItem {
   id              Int      @id @default(autoincrement())
   item            String
   category        String?
-  supplier        String   @default("Makro")
   supplierName    String?
   brand           String?
   supplierSku     String?
   orderUnit       String?
   unitDescription String?
   unitCost        Decimal? @db.Decimal(10, 2)
-  packCost        Float?   @map("pack_cost")
   lastReviewDate  String?
   active          Boolean  @default(true)
   isIngredient    Boolean  @default(false) @map("is_ingredient")

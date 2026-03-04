@@ -131,6 +131,9 @@ import productActivationRouter from "./routes/productActivation";
 import purchasesRouter from "./routes/purchases";
 import lineNotifyRouter from "./routes/lineNotify";
 import varianceHistoryRouter from "./routes/varianceHistory";
+import refundsRouter from "./routes/refunds";
+import shiftReviewRouter from "./routes/shiftReview";
+import stockBaselineRouter from "./routes/stockBaseline";
 // Email functionality will be added when needed
 
 
@@ -3786,6 +3789,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/menu-v3', menuV3Routes);
   app.use('/api/stock', stockRoutes);
   app.use('/api/stock/variance', varianceRoutes);
+  app.use('/api/stock', stockBaselineRouter);
+  app.use('/api/refunds', refundsRouter);
+  app.use('/api/shift-review', shiftReviewRouter);
   app.use('/api/analytics/ingredients', ingredientUsageRoutes);
   app.use('/api/admin/import', loyverseMenuImportRouter);
   app.use('/api/admin/backup', adminBackupRouter);

@@ -1,0 +1,64 @@
+Cam — got it. Same instruction set, but rewrite the “deliverables” so it fits Replit-only (no PR/commit). Paste this instead:
+REPLIT AGENT — EXECUTE NOW (NO QUESTIONS)
+Rules (non-negotiable)
+Implement the full Security & Accountability Layer patch in ONE pass.
+Do NOT ask me to confirm anything.
+Do NOT change Daily Sales & Stock V2 form schema, field order, or workflow. (Fort Knox locked)
+Additive only: new tables, endpoints, UI modules.
+If something is missing, make the safest production-ready choice and continue.
+Scope (do all)
+1) Refund Logs
+Create DB table: refund_logs
+API:
+POST /api/refunds/log
+GET /api/refunds (support filters: shiftId, from, to if easy)
+Home screen: “Log Refund” button → modal → saves to refund_logs
+Daily Sales & Stock V2: show refund log section (read-only display) for the shift window
+2) Manager Review / Sign-off
+Add manager review inputs exactly:
+Name
+Cash banked (actual)
+Scan/QR figure (actual)
+Refund reviewed + findings
+Sign off button (persisted) Store via shift_review table + endpoint:
+POST /api/shift-review
+GET /api/shift-review?shiftId=...
+3) Stock Baseline + Snapshot
+Create stock_baseline table
+Create stock_snapshot table
+Endpoint POST /api/stock/baseline to seed baseline
+4) Variance Engine
+Create stock_variance table
+Compute variances after Form 2 submit (preferred), or nightly job if safer
+Thresholds:
+Buns: >5 warn, >10 critical
+Meat: >500g warn, >1000g critical
+Persist variances to stock_variance
+5) Variance Monitor Page
+New page under Operations: Variance Monitor
+Show:
+Refund Count Today + Refund Total
+Stock variance table with severity highlighting
+6) Library fixes (must stick)
+Remove “Drinks” total column from Daily Sales Library (V2) table permanently.
+Ensure Edit/Delete actions exist in the library (restore if missing).
+Fix library row spacing: two-line cell layout + proper padding/line-height so it’s not bunched.
+7) Form 2 sync robustness (critical)
+Fix the runtime error:
+Invalid prisma.purchasingItem.findMany(): column purchasing_items.supplier does not exist Do NOT “guess delete” blindly.
+Find where supplier is queried.
+Either:
+add a DB migration to create supplier if truly required, OR
+remove the select/include safely if not required. Outcome required:
+“Sync from Purchasing List” works
+Drink Stock shows items (not “No drink items available”)
+Replit Deliverables (NO PR)
+List of files changed (exact paths)
+DB changes applied (exact SQL/migration steps used)
+Evidence pack
+Screenshots: Home refund modal, variance monitor page, library (no Drinks column + Edit/Delete visible)
+API proof: sample request/response for refund log + variance list
+PASS/FAIL checklist for each scope item above
+Leave the app running and confirm routes return 200.
+No more chatter
+Build it. Test it. Ship it.

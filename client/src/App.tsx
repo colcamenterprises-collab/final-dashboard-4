@@ -79,6 +79,7 @@ import DailySummaryReportsPage from "./pages/operations/daily-reports";
 import SystemHealthPage from "./pages/operations/system-health";
 import AiOpsControlPage from "./pages/operations/AiOpsControl";
 import TaskDetailPage from "./pages/operations/tasks/TaskDetail";
+import VarianceMonitorPage from "./pages/operations/VarianceMonitor";
 import ShiftReportDashboard from "./pages/reports/shift-report";
 import ShiftReportHistory from "./pages/reports/shift-report/history";
 import ShiftReportDetail from "./pages/reports/shift-report/view/ShiftReportDetail";
@@ -171,6 +172,7 @@ export default function App() {
                 <Route path="/operations/health-safety-audit/questions" element={<Guard><HealthSafetyQuestionManager /></Guard>} />
                 <Route path="/operations/ingredients-master" element={<Guard><IngredientsMaster /></Guard>} />
                 <Route path="/operations/recipe-mapping" element={<Guard><RecipeMappingPage /></Guard>} />
+                <Route path="/operations/variance-monitor" element={<Guard><VarianceMonitorPage /></Guard>} />
                 
                 <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
                   <Route index element={null} />
