@@ -992,3 +992,71 @@ h1, h2, h3 { color: inherit !important; }
     display: none !important;
   }
 }
+
+/* ============================================================
+   AI OPS CONTROL PAGE — Style Guide Override
+   Scope: [data-page="ops"] — overrides global !important rules
+   so all inputs, buttons, and text match the 4px / text-xs guide
+   ============================================================ */
+
+/* Section headers (now <div>) — text-sm */
+[data-page="ops"] div.text-sm.font-semibold,
+[data-page="ops"] p.text-sm.font-semibold {
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+
+/* All p tags inherit parent size inside ops page */
+[data-page="ops"] p {
+  font-size: inherit !important;
+}
+
+/* Inputs / selects / textareas — text-xs, h-9, 4px radius */
+[data-page="ops"] input,
+[data-page="ops"] select,
+[data-page="ops"] textarea {
+  font-size: 0.75rem !important;
+  min-height: 36px !important;
+  border-radius: 4px !important;
+  padding: 0.25rem 0.75rem !important;
+  width: auto !important;
+}
+
+/* Full-width inputs inside ops page */
+[data-page="ops"] input.w-full,
+[data-page="ops"] select.w-full,
+[data-page="ops"] textarea.w-full {
+  width: 100% !important;
+}
+
+/* Placeholders — text-xs */
+[data-page="ops"] ::placeholder {
+  font-size: 0.75rem !important;
+  color: #94a3b8 !important;
+}
+
+/* Buttons — text-xs, h-9 (36px), 4px radius */
+[data-page="ops"] button {
+  font-size: 0.75rem !important;
+  min-height: 36px !important;
+  border-radius: 4px !important;
+  padding: 0.25rem 0.75rem !important;
+  min-width: unset !important;
+  width: auto !important;
+}
+
+/* Date input native UI fix */
+[data-page="ops"] input[type="date"] {
+  font-size: 0.75rem !important;
+  padding: 0.25rem 0.5rem !important;
+}
+
+/* Checkboxes — keep native look, small */
+[data-page="ops"] input[type="checkbox"] {
+  min-height: unset !important;
+  width: 1rem !important;
+  height: 1rem !important;
+  padding: 0 !important;
+  border-radius: 3px !important;
+}

@@ -562,7 +562,7 @@ export default function AiOpsControlPage() {
       </header>
 
       <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-slate-900">AI Agents</h2>
+        <div className="text-sm font-semibold text-slate-900">AI Agents</div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
           {(agentsQuery.data?.items || []).map((agent) => (
             <article key={agent.agent} className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -586,7 +586,7 @@ export default function AiOpsControlPage() {
 
       <section className="grid gap-4 rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-slate-900">Bob Chat (Orchestrator)</h2>
+          <div className="text-sm font-semibold text-slate-900">Bob Chat (Orchestrator)</div>
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -601,7 +601,7 @@ export default function AiOpsControlPage() {
           <div className="max-h-64 space-y-2 overflow-auto">
             {(chatThreadsQuery.data?.items || []).map((thread) => (
               <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full rounded-[4px] border p-2 text-left text-xs ${selectedThreadId === thread.id ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200'}`}>
-                <p className="font-medium text-slate-900">{thread.title}</p>
+                <p className="text-xs font-medium text-slate-900">{thread.title}</p>
                 <p className="text-xs text-slate-500">{thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString() : 'No messages yet'}</p>
               </button>
             ))}
@@ -715,7 +715,7 @@ export default function AiOpsControlPage() {
                   ) : (
                     <div className="space-y-4">
                       <div>
-                        <h3 className="text-sm font-semibold text-slate-900">{selectedProcess.name}</h3>
+                        <div className="text-sm font-semibold text-slate-900">{selectedProcess.name}</div>
                         <p className="text-xs text-slate-500 mt-0.5">{selectedProcess.key} — {selectedProcess.owner} — {selectedProcess.status}</p>
                         <p className="text-sm text-slate-700 mt-2">{selectedProcess.description}</p>
                       </div>
@@ -743,7 +743,7 @@ export default function AiOpsControlPage() {
         <div className="space-y-6">
           <article className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-slate-900">Work Register</h2>
+              <div className="text-sm font-semibold text-slate-900">Work Register</div>
               <span className="text-xs text-slate-400">{tasksQuery.data?.items?.length ?? 0} tasks</span>
             </div>
 
@@ -1066,7 +1066,7 @@ export default function AiOpsControlPage() {
           </article>
 
           <article className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-sm font-semibold text-slate-900">Issues Register</h2>
+            <div className="text-sm font-semibold text-slate-900">Issues Register</div>
             <form
               onSubmit={(e: FormEvent) => {
                 e.preventDefault();
@@ -1177,7 +1177,7 @@ export default function AiOpsControlPage() {
           </article>
 
           <article className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm space-y-3">
-            <h2 className="text-sm font-semibold text-slate-900">Ideas Register</h2>
+            <div className="text-sm font-semibold text-slate-900">Ideas Register</div>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1302,7 +1302,7 @@ export default function AiOpsControlPage() {
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
               ) : (
                 <>
-                  <h3 className="text-sm font-semibold text-slate-900">Task Detail</h3>
+                  <div className="text-sm font-semibold text-slate-900">Task Detail</div>
                   <p className="text-sm">
                     <span className="font-medium">Title:</span> {selectedTask.title}
                   </p>
@@ -1448,7 +1448,7 @@ export default function AiOpsControlPage() {
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
               ) : (
                 <>
-                  <h3 className="text-sm font-semibold text-slate-900">Issue Detail</h3>
+                  <div className="text-sm font-semibold text-slate-900">Issue Detail</div>
                   <input
                     className="w-full h-9 rounded-[4px] border border-slate-300 bg-white px-3 text-xs"
                     value={selectedIssue.title}
@@ -1647,7 +1647,7 @@ export default function AiOpsControlPage() {
                 <p className="text-sm text-slate-500">Select an item to view details.</p>
               ) : (
                 <>
-                  <h3 className="text-sm font-semibold text-slate-900">Idea Detail</h3>
+                  <div className="text-sm font-semibold text-slate-900">Idea Detail</div>
                   <p className="text-sm font-medium">{selectedIdea.title}</p>
                   <p className="text-sm">{selectedIdea.description || '-'}</p>
                   <div className="flex flex-wrap gap-2 items-center">
@@ -1727,7 +1727,7 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'activity' && selectedItem?.type === 'task' && selectedTask && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Task Activity</h3>
+              <div className="text-sm font-semibold text-slate-900">Task Activity</div>
               <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-xs space-y-2">
                 {selectedTask.activity.map((entry) => (
                   <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
@@ -1738,7 +1738,7 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'activity' && selectedItem?.type === 'issue' && selectedIssue && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Issue Activity</h3>
+              <div className="text-sm font-semibold text-slate-900">Issue Activity</div>
               <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-xs space-y-2">
                 {selectedIssue.activity.map((entry) => (
                   <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
@@ -1749,7 +1749,7 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'activity' && selectedItem?.type === 'idea' && selectedIdea && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Idea Activity</h3>
+              <div className="text-sm font-semibold text-slate-900">Idea Activity</div>
               <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-xs space-y-2">
                 {selectedIdea.activity.map((entry) => (
                   <p key={entry.id}>{new Date(entry.createdAt).toLocaleString()} · {entry.action} · {entry.actor}</p>
@@ -1760,7 +1760,7 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'notes' && selectedItem?.type === 'task' && selectedTask && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Task Notes</h3>
+              <div className="text-sm font-semibold text-slate-900">Task Notes</div>
               <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-sm space-y-2">
                 {selectedTask.messages.map((m) => <p key={m.id}><strong>{m.actor}</strong>: {m.message}</p>)}
               </div>
@@ -1769,7 +1769,7 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'notes' && selectedItem?.type === 'issue' && selectedIssue && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Issue Notes</h3>
+              <div className="text-sm font-semibold text-slate-900">Issue Notes</div>
               <div className="max-h-72 overflow-auto rounded-[4px] border border-slate-200 p-3 text-sm space-y-2">
                 {selectedIssue.comments.map((c) => <p key={c.id}><strong>{c.author}</strong>: {c.message}</p>)}
               </div>
@@ -1778,7 +1778,7 @@ export default function AiOpsControlPage() {
 
           {detailTab === 'notes' && selectedItem?.type === 'idea' && selectedIdea && (
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-slate-900">Idea Notes</h3>
+              <div className="text-sm font-semibold text-slate-900">Idea Notes</div>
               <p className="rounded-[4px] border border-slate-200 p-3 text-xs text-slate-700">{selectedIdea.description || 'No notes available.'}</p>
             </div>
           )}

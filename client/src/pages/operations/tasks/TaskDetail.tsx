@@ -233,7 +233,7 @@ export default function TaskDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
+    <div data-page="ops" className="mx-auto max-w-3xl space-y-4 p-4 sm:p-6">
       <div className="flex items-center gap-3">
         <button
           className="text-xs text-emerald-600 hover:underline"
@@ -377,10 +377,10 @@ export default function TaskDetailPage() {
 
       {editMode && (
         <div className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-sm font-semibold text-slate-900 mb-3">Edit Task</h2>
+          <div className="text-sm font-semibold text-slate-900 mb-3">Edit Task</div>
           <form onSubmit={submitEdit} className="space-y-3">
             <input
-              className="w-full h-9 rounded-[4px] border border-slate-300 px-3 text-sm bg-white"
+              className="w-full h-9 rounded-[4px] border border-slate-300 px-3 text-xs bg-white"
               value={editTitle}
               onChange={(e) => setEditTitle(e.target.value)}
               placeholder="Title"
