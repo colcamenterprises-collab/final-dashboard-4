@@ -47,6 +47,7 @@ import authRoutes from "./routes/auth/authRoutes";
 import providerRoutes from "./routes/payments/providerRoutes";
 import paymentProcessRoutes from "./routes/payments/processRoutes";
 import legacyBridgeRoutes from "./routes/legacyBridge";
+import { checkPurchasingItemsSchemaGuard } from './services/purchasingItemsSchemaGuard';
 
 // PATCH 2 — SYSTEM TRIPWIRE
 // Prevent ANY module except dailyStockV2Routes from triggering shopping list generation.
@@ -182,6 +183,15 @@ async function checkSchema() {
     
     if (!columns.includes('id')) {
       console.warn('⚠️ daily_sales_v2 missing id column');
+    }
+
+    const purchasingGuard = await checkPurchasingItemsSchemaGuard(pool);
+    if (!purchasingGuard.ok) {
+      console.error('[FATAL SCHEMA WARNING] purchasing_items field mismatch detected.', {
+        checkedFields: purchasingGuard.checkedFields,
+        warning: purchasingGuard.warning,
+        impact: 'Form 2 (Daily Stock) sync may be degraded until schema and code are aligned.',
+      });
     }
     
     console.log('✓ Database schema validation passed');
