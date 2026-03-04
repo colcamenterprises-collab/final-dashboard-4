@@ -368,6 +368,14 @@ export default function DailySalesV2Library() {
                   ) : (
                     <span className="px-2 py-1 text-xs font-semibold rounded bg-red-100 text-red-700 whitespace-nowrap">Not Balanced</span>
                   )}
+                  {(() => {
+                    const refunds = (rec as any).payload?.refunds;
+                    if (!refunds || refunds.status !== 'YES') {
+                      return <span className="px-2 py-1 text-xs font-semibold rounded bg-slate-100 text-slate-500 whitespace-nowrap">Refunds: N</span>;
+                    }
+                    const count = Array.isArray(refunds.rows) ? refunds.rows.length : 0;
+                    return <span className={`px-2 py-1 text-xs font-semibold rounded whitespace-nowrap ${count > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>Refunds: {count}</span>;
+                  })()}
                 </div>
               </div>
 

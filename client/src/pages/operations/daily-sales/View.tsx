@@ -277,6 +277,61 @@ export default function ViewDailySales() {
           </div>
         </div>
 
+        {/* Refunds Section */}
+        {(() => {
+          const refundsData = salesData?.payload?.refunds ?? salesData?.refunds;
+          const status = refundsData?.status;
+          const rows: any[] = Array.isArray(refundsData?.rows) ? refundsData.rows : [];
+          return (
+            <div className="bg-white rounded-lg border p-6">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4 font-['Poppins']">Refunds</h2>
+              {!status ? (
+                <p className="text-sm text-gray-500">No refund data recorded.</p>
+              ) : status === 'NO' ? (
+                <p className="text-sm text-gray-600">No refunds occurred this shift.</p>
+              ) : rows.length === 0 ? (
+                <p className="text-sm text-amber-600">Refunds marked Yes but no rows recorded.</p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border border-slate-200 rounded-[4px]">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="p-2 text-left font-medium text-slate-600">#</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Receipt No.</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Amount</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Payment Type</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Reason</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Notes</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Approved By</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Evidence Note</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row: any, idx: number) => (
+                          <tr key={idx} className="border-t border-slate-100">
+                            <td className="p-2 text-slate-500">{idx + 1}</td>
+                            <td className="p-2">{row.receiptNumber || '-'}</td>
+                            <td className="p-2 font-medium">฿{Number(row.amount || 0).toLocaleString()}</td>
+                            <td className="p-2">{row.paymentType || '-'}</td>
+                            <td className="p-2">{row.reason || '-'}</td>
+                            <td className="p-2 text-slate-500">{row.notes || '-'}</td>
+                            <td className="p-2">{row.approvedBy || '-'}</td>
+                            <td className="p-2 text-slate-500">{row.evidenceNote || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Total refunded: ฿{rows.reduce((s: number, r: any) => s + Number(r.amount || 0), 0).toLocaleString()} across {rows.length} {rows.length === 1 ? 'transaction' : 'transactions'}
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Manager Sign Off Section */}
         <div className="bg-white rounded-lg border border-t-4 border-t-emerald-600 p-6">
           <h2 className="text-xl font-semibold text-gray-900 mb-4 font-['Poppins']">Manager Sign Off</h2>

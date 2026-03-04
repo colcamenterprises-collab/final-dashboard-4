@@ -9,6 +9,28 @@ import { queryClient } from "@/lib/queryClient";
 
 const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
 
+type RefundRow = {
+  id: string;
+  receiptNumber: string;
+  amount: string;
+  paymentType: string;
+  reason: string;
+  notes: string;
+  approvedBy: string;
+  evidenceNote: string;
+};
+
+const newRefundRow = (): RefundRow => ({
+  id: Math.random().toString(36).slice(2),
+  receiptNumber: "",
+  amount: "",
+  paymentType: "",
+  reason: "",
+  notes: "",
+  approvedBy: "",
+  evidenceNote: "",
+});
+
 // EXACT Language labels from consolidated patch (inline, no new file)
 const labels = {
   en: {
@@ -281,8 +303,7 @@ export default function DailySales() {
   const [loading, setLoading] = useState(isEditMode);
   const [shiftDate, setShiftDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [refundStatus, setRefundStatus] = useState<'YES' | 'NO' | ''>('');
-  const [refundReason, setRefundReason] = useState("");
-  const [refundChannel, setRefundChannel] = useState("");
+  const [refundRows, setRefundRows] = useState<RefundRow[]>([]);
   const [expenseSuppliers, setExpenseSuppliers] = useState<string[]>([]);
   const [purchaseItems, setPurchaseItems] = useState<Array<{ name: string; category: string; unit: string; supplier: string }>>([]);
 
@@ -328,8 +349,7 @@ export default function DailySales() {
           setDirectReceiptCount(Number(p.directReceiptCount ?? data.record.directReceiptCount ?? 0));
           if (p.refunds) {
             setRefundStatus(p.refunds.status || '');
-            setRefundReason(p.refunds.refundReason || "");
-            setRefundChannel(p.refunds.refundChannel || p.refunds.channel || "");
+            setRefundRows(Array.isArray(p.refunds.rows) ? p.refunds.rows : []);
           }
           
           // Load shift date for editing
@@ -458,8 +478,7 @@ export default function DailySales() {
         setStaffWages(draft.staffWages || [{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
         setOtherPayments(draft.otherPayments || [{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
         setRefundStatus(draft.refundStatus || '');
-        setRefundReason(draft.refundReason || "");
-        setRefundChannel(draft.refundChannel || "");
+        setRefundRows(draft.refundRows || []);
       }
     } catch {}
   }, [isEditMode]);
@@ -481,8 +500,7 @@ export default function DailySales() {
     setCashReceiptCount(0);
     setQrReceiptCount(0);
     setRefundStatus('');
-    setRefundReason("");
-    setRefundChannel("");
+    setRefundRows([]);
     setErrors([]);
     setError(null);
     setShiftDate(new Date().toISOString().split('T')[0]);
@@ -520,8 +538,14 @@ export default function DailySales() {
     if (!refundStatus) {
       newErrors.push('refundStatus');
     } else if (refundStatus === 'YES') {
-      if (!refundReason.trim()) newErrors.push('refundReason');
-      if (!refundChannel.trim()) newErrors.push('refundChannel');
+      if (refundRows.length === 0) {
+        newErrors.push('refundRows');
+      } else {
+        const hasInvalidRow = refundRows.some(
+          r => !r.receiptNumber.trim() || !r.amount || !r.paymentType || !r.reason.trim() || !r.approvedBy.trim()
+        );
+        if (hasInvalidRow) newErrors.push('refundRowFields');
+      }
     }
     
     const invalidSuppliers = shiftExpenses.some((row) => !row.shop || row.shop.trim() === '');
@@ -547,8 +571,8 @@ export default function DailySales() {
         qrReceiptCount: 'QR receipt count is required',
         directReceiptCount: 'Direct sales receipt count is required',
         refundStatus: 'Please select whether any refunds occurred (Yes or No)',
-        refundReason: 'Please enter the reason for the refund',
-        refundChannel: 'Please select the refund channel',
+        refundRows: 'You selected Yes for refunds — please add at least one refund row',
+        refundRowFields: 'Each refund row must have: Receipt Number, Amount, Payment Type, Reason, and Approved By',
         expenseSupplier: 'Every expense must have a supplier selected',
       };
       for (const err of newErrors) {
@@ -579,8 +603,8 @@ export default function DailySales() {
         totalSales: cash + qr + grab + aroi,
         refunds: {
           status: refundStatus,
-          refundReason: refundReason.trim(),
-          refundChannel: refundChannel.trim()
+          rows: refundStatus === 'YES' ? refundRows : [],
+          totalAmount: refundStatus === 'YES' ? refundRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0) : 0,
         },
         expenses: shiftExpenses,
         wages: [...staffWages, ...otherPayments],
@@ -628,7 +652,31 @@ export default function DailySales() {
       
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
-      
+
+      // Log each refund row to refund_logs table
+      if (refundStatus === 'YES' && refundRows.length > 0) {
+        const shiftDateStr = submitData.shiftDate.slice(0, 10);
+        await Promise.allSettled(refundRows.map(row =>
+          fetch('/api/refunds/log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              shiftId: String(shiftId),
+              shiftDate: shiftDateStr,
+              amount: String(parseFloat(row.amount) || 0),
+              reason: row.reason,
+              platform: row.paymentType,
+              paymentType: row.paymentType,
+              loggedBy: completedBy,
+              approvedBy: row.approvedBy,
+              notes: row.notes || null,
+              receiptNumber: row.receiptNumber,
+              evidenceNote: row.evidenceNote || null,
+            }),
+          })
+        ));
+      }
+
       if (isEditMode) {
         // In edit mode, navigate back to library
         setTimeout(() => {
@@ -672,8 +720,7 @@ export default function DailySales() {
     qrReceiptCount,
     directReceiptCount,
     refundStatus,
-    refundReason,
-    refundChannel
+    refundRows,
   });
 
   const handleSaveDraft = () => {
@@ -1145,10 +1192,7 @@ export default function DailySales() {
                   onChange={(e) => {
                     const value = e.target.value as 'YES' | 'NO' | '';
                     setRefundStatus(value);
-                    if (value === 'NO') {
-                      setRefundReason("");
-                      setRefundChannel("");
-                    }
+                    if (value === 'NO') setRefundRows([]);
                   }}
                 >
                   <option value="">{L.requiredField}</option>
@@ -1157,28 +1201,135 @@ export default function DailySales() {
                 </select>
               </div>
             </div>
+
             {refundStatus === 'YES' && (
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">{L.refundReason}</label>
-                  <input
-                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundReason') ? 'border-red-500' : ''}`}
-                    value={refundReason}
-                    onChange={(e) => setRefundReason(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-gray-600 block mb-1">{L.refundChannel}</label>
-                  <select
-                    className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('refundChannel') ? 'border-red-500' : ''}`}
-                    value={refundChannel}
-                    onChange={(e) => setRefundChannel(e.target.value)}
+              <div className="mt-4 space-y-3">
+                {(errors.includes('refundRows') || errors.includes('refundRowFields')) && (
+                  <p className="text-xs text-red-600">
+                    {errors.includes('refundRows')
+                      ? 'Add at least one refund row below.'
+                      : 'Each row requires: Receipt No., Amount, Payment Type, Reason, and Approved By.'}
+                  </p>
+                )}
+
+                {refundRows.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border border-slate-200 rounded-[4px]">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="p-2 text-left font-medium text-slate-600">Receipt No. *</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Amount (฿) *</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Payment Type *</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Reason *</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Notes</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Approved By *</th>
+                          <th className="p-2 text-left font-medium text-slate-600">Evidence Note</th>
+                          <th className="p-2"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {refundRows.map((row, idx) => (
+                          <tr key={row.id} className="border-t border-slate-100">
+                            <td className="p-1">
+                              <input
+                                className="w-full border rounded-[4px] px-2 py-1 h-8 text-xs"
+                                placeholder="e.g. 0001"
+                                value={row.receiptNumber}
+                                onChange={e => setRefundRows(prev => prev.map((r, i) => i === idx ? { ...r, receiptNumber: e.target.value } : r))}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <input
+                                type="number"
+                                min="0"
+                                step="1"
+                                className="w-24 border rounded-[4px] px-2 py-1 h-8 text-xs"
+                                placeholder="0"
+                                value={row.amount}
+                                onChange={e => setRefundRows(prev => prev.map((r, i) => i === idx ? { ...r, amount: e.target.value } : r))}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <select
+                                className="w-full border rounded-[4px] px-2 py-1 h-8 text-xs"
+                                value={row.paymentType}
+                                onChange={e => setRefundRows(prev => prev.map((r, i) => i === idx ? { ...r, paymentType: e.target.value } : r))}
+                              >
+                                <option value="">Select</option>
+                                <option value="Cash">Cash</option>
+                                <option value="QR">QR</option>
+                                <option value="Grab">Grab</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </td>
+                            <td className="p-1">
+                              <select
+                                className="w-full border rounded-[4px] px-2 py-1 h-8 text-xs"
+                                value={row.reason}
+                                onChange={e => setRefundRows(prev => prev.map((r, i) => i === idx ? { ...r, reason: e.target.value } : r))}
+                              >
+                                <option value="">Select</option>
+                                <option value="Wrong order">Wrong order</option>
+                                <option value="Quality issue">Quality issue</option>
+                                <option value="Customer complaint">Customer complaint</option>
+                                <option value="Staff error">Staff error</option>
+                                <option value="Other">Other</option>
+                              </select>
+                            </td>
+                            <td className="p-1">
+                              <input
+                                className="w-full border rounded-[4px] px-2 py-1 h-8 text-xs"
+                                placeholder="Optional"
+                                value={row.notes}
+                                onChange={e => setRefundRows(prev => prev.map((r, i) => i === idx ? { ...r, notes: e.target.value } : r))}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <input
+                                className="w-full border rounded-[4px] px-2 py-1 h-8 text-xs"
+                                placeholder="Manager name"
+                                value={row.approvedBy}
+                                onChange={e => setRefundRows(prev => prev.map((r, i) => i === idx ? { ...r, approvedBy: e.target.value } : r))}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <input
+                                className="w-full border rounded-[4px] px-2 py-1 h-8 text-xs"
+                                placeholder="Optional"
+                                value={row.evidenceNote}
+                                onChange={e => setRefundRows(prev => prev.map((r, i) => i === idx ? { ...r, evidenceNote: e.target.value } : r))}
+                              />
+                            </td>
+                            <td className="p-1">
+                              <button
+                                type="button"
+                                onClick={() => setRefundRows(prev => prev.filter((_, i) => i !== idx))}
+                                className="px-2 py-1 text-xs border border-red-200 text-red-600 rounded-[4px] hover:bg-red-50"
+                              >
+                                Remove
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setRefundRows(prev => [...prev, newRefundRow()])}
+                    className="px-3 py-1.5 text-xs border border-slate-300 rounded-[4px] hover:bg-slate-50"
                   >
-                    <option value="">{L.requiredField}</option>
-                    <option value="CASH">{L.refundChannelCash}</option>
-                    <option value="QR">{L.refundChannelQr}</option>
-                    <option value="GRAB">{L.refundChannelGrab}</option>
-                  </select>
+                    + Add Refund
+                  </button>
+                  {refundRows.length > 0 && (
+                    <span className="text-xs text-slate-500">
+                      Total: ฿{refundRows.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0).toLocaleString()}
+                      &nbsp;({refundRows.length} {refundRows.length === 1 ? 'row' : 'rows'})
+                    </span>
+                  )}
                 </div>
               </div>
             )}

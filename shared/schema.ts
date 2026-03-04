@@ -2395,6 +2395,10 @@ export const refundLogs = pgTable("refund_logs", {
   platform: text("platform").notNull().default("cash"),
   loggedBy: text("logged_by").notNull(),
   notes: text("notes"),
+  receiptNumber: text("receipt_number"),
+  paymentType: text("payment_type"),
+  approvedBy: text("approved_by"),
+  evidenceNote: text("evidence_note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

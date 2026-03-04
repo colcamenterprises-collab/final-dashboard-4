@@ -1,13 +1,16 @@
 import { Router, Request, Response } from "express";
 import { db } from "../db";
 import { refundLogs } from "../../shared/schema";
-import { eq, and, gte, lte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 
 const router = Router();
 
 router.post("/log", async (req: Request, res: Response) => {
   try {
-    const { shiftId, shiftDate, amount, reason, platform, loggedBy, notes } = req.body;
+    const {
+      shiftId, shiftDate, amount, reason, platform, loggedBy, notes,
+      receiptNumber, paymentType, approvedBy, evidenceNote
+    } = req.body;
     if (!amount || !reason || !loggedBy) {
       return res.status(400).json({ error: "amount, reason, and loggedBy are required" });
     }
@@ -16,9 +19,13 @@ router.post("/log", async (req: Request, res: Response) => {
       shiftDate: shiftDate || null,
       amount: String(amount),
       reason,
-      platform: platform || "cash",
+      platform: platform || paymentType || "cash",
       loggedBy,
       notes: notes || null,
+      receiptNumber: receiptNumber || null,
+      paymentType: paymentType || platform || null,
+      approvedBy: approvedBy || loggedBy || null,
+      evidenceNote: evidenceNote || null,
     }).returning();
     return res.json({ ok: true, refund: row });
   } catch (err: any) {

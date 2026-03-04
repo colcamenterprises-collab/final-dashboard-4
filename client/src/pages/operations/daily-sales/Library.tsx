@@ -200,12 +200,13 @@ export default function DailySalesLibrary() {
             <th className="p-2 border-b">Meat (End)</th>
             <th className="p-2 border-b">Status</th>
             <th className="p-2 border-b">Balanced</th>
+            <th className="p-2 border-b">Refunds</th>
           </tr>
         </thead>
         <tbody>
           {records.length === 0 ? (
             <tr>
-              <td colSpan={10} className="p-4 text-center text-gray-500">
+              <td colSpan={11} className="p-4 text-center text-gray-500">
                 No records found
               </td>
             </tr>
@@ -240,6 +241,18 @@ export default function DailySalesLibrary() {
                       Not Balanced
                     </span>
                   )}
+                </td>
+                <td className="p-2 border-b text-center">
+                  {(() => {
+                    const refunds = (rec as any).payload?.refunds;
+                    if (!refunds || refunds.status !== 'YES') return <span className="text-xs text-gray-400">N</span>;
+                    const count = Array.isArray(refunds.rows) ? refunds.rows.length : 0;
+                    return (
+                      <span className={`px-2 py-1 text-xs font-semibold rounded ${count > 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {count}
+                      </span>
+                    );
+                  })()}
                 </td>
               </tr>
             ))

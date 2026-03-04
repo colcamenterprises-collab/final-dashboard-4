@@ -1,0 +1,70 @@
+PATCH: Upgrade Refunds section in Daily Sales & Stock V2 (Form 1) — MUST visibly change UI
+Rules
+One patch only
+No redesign of the entire form
+No icons/emojis
+Do not break existing form submission
+If refund tables/endpoints already exist, reuse them. If not, create minimally.
+A) Frontend — Replace Refunds section UI (Form 1)
+Locate the Daily Sales V2 Form page component (the one that contains “Cash & Banking” and “Refunds” as shown in screenshot).
+Replace the current refunds block with:
+Dropdown: “Did any refunds occur?” (Yes/No)
+If Yes:
+Render a table-style repeater with rows and an “Add Refund” button
+Each row fields:
+receiptNumber (required)
+amount (required, number)
+paymentType (required: Cash/QR/Grab/Other)
+reason (required: Wrong order/Quality issue/Customer complaint/Staff error/Other)
+notes (optional)
+approvedBy (required)
+evidenceNote (optional text OR checkbox)
+“Remove” button per row
+Validation:
+If Yes and zero rows => block submit
+Each row must pass required fields
+Total refund amount auto-calculated and shown (read-only)
+B) Backend — Persist refund rows linked to shiftId
+On submit of Form 1:
+Write each refund row to refund_logs with:
+shiftId (or salesId, but shiftId preferred)
+receiptNumber, amount, paymentType, reason, notes, approvedBy
+createdAt, createdBy
+If refund_logs table already exists: use it
+If not: create it (idempotent CREATE TABLE IF NOT EXISTS on server boot)
+C) Library + Review surfaces
+In Daily Sales Library row, add a “Refunds” indicator as:
+0 or N (count of refunds) — NOT amounts
+In the shift view page (existing view), show the refund entries list.
+Acceptance test (must screenshot)
+Open Daily Sales form
+Select “Yes” for refunds
+Add 1 refund row, leave receiptNumber blank => submit blocked
+Fill all required fields => submit succeeds
+Open saved record view => refund row visible
+Library shows refunds count column populated
+Deliver: screenshots of:
+Refund section before submit
+Validation blocking
+Successful submit
+Saved view showing refund rows
+Loyverse “accountability” setup (quick, practical)
+You’re already doing the right thing by removing “Perform refunds” for cashier.
+Next steps:
+Create separate logins:
+Staff PINs (cashier)
+Manager PINs (supervisors)
+Only manager role gets:
+View all receipts
+Perform refunds (if you ever re-enable)
+Reprint/resend receipts (optional)
+Staff role:
+Accept payments ✅
+Discounts ✅ (you’re monitoring)
+No shift report
+No refunds
+No reprint/resend
+And because refunds are currently disabled:
+Your dashboard refund log becomes the enforced process:
+If staff want a refund: they must call manager
+Manager completes it (or records it) and signs it
