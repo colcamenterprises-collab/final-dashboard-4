@@ -563,9 +563,9 @@ export default function AiOpsControlPage() {
 
       <section className="space-y-3">
         <div className="text-sm font-semibold text-slate-900">AI Agents</div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <div className="overflow-x-auto -mx-1 px-1"><div className="grid grid-cols-5 gap-3" style={{minWidth: '600px'}}>
           {(agentsQuery.data?.items || []).map((agent) => (
-            <article key={agent.agent} className="rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm">
+            <article key={agent.agent} className="rounded-[4px] border border-slate-200 bg-white p-3 shadow-sm flex flex-col h-full">
               <div className="mb-3 flex items-center gap-3">
                 <img src={agent.imageUrl || 'https://placehold.co/128x128'} alt={agent.name} className="h-12 w-12 rounded-[4px] object-cover" />
                 <div>
@@ -577,10 +577,10 @@ export default function AiOpsControlPage() {
                   title={agent.status}
                 />
               </div>
-              <p className="text-xs text-slate-600">{agent.description}</p>
+              <p className="text-xs text-slate-600 mt-auto pt-2">{agent.description}</p>
             </article>
           ))}
-        </div>
+        </div></div>
       </section>
 
 

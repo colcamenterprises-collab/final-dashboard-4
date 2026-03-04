@@ -1,0 +1,259 @@
+REPLIT AGENT PATCH
+Title: SBB Security & Accountability Layer (Refund Logs + Stock Baseline + Variance Engine)
+Objective
+Implement the operational control layer required for Smash Brothers Burgers:
+Refund accountability system
+Independent refund logging button
+Stock baseline table (Day Zero inventory)
+Variance detection engine for theft prevention
+Manager sign-off confirmation fields
+Analytics page to review refunds + stock anomalies
+This patch must not modify existing Daily Sales & Stock V2 form schema or workflow.
+Only additive changes are allowed.
+1 DATABASE TABLES
+Add the following Prisma models.
+Refund Log Table
+Ts
+Copy code
+model refund_logs {
+  id            String   @id @default(uuid())
+  receiptNumber String
+  amount        Float
+  paymentMethod String
+  reason        String
+  managerName   String
+  createdAt     DateTime @default(now())
+
+  linkedSalesId String?
+}
+Stock Baseline Table
+This stores the Day Zero inventory snapshot Cam recorded.
+Ts
+Copy code
+model stock_baseline {
+  id        String   @id @default(uuid())
+  itemName  String
+  quantity  Float
+  unit      String
+  createdAt DateTime @default(now())
+}
+Daily Stock Snapshot
+Records stock counts from the Daily Stock form.
+Ts
+Copy code
+model stock_snapshot {
+  id        String   @id @default(uuid())
+  itemName  String
+  quantity  Float
+  unit      String
+  source    String
+  createdAt DateTime @default(now())
+}
+Source values:
+Copy code
+
+baseline
+daily_form
+purchase
+Variance Detection Table
+This stores detected stock anomalies.
+Ts
+Copy code
+model stock_variance {
+  id            String   @id @default(uuid())
+  itemName      String
+  expectedQty   Float
+  actualQty     Float
+  variance      Float
+  severity      String
+  createdAt     DateTime @default(now())
+}
+Severity rules:
+Copy code
+
+OK
+WARNING
+CRITICAL
+2 REFUND SYSTEM
+New Endpoint
+Copy code
+
+POST /api/refunds/log
+Body:
+Copy code
+
+receiptNumber
+amount
+paymentMethod
+reason
+managerName
+Store in refund_logs.
+Refund List Endpoint
+Copy code
+
+GET /api/refunds
+Returns all refunds ordered by newest first.
+3 DASHBOARD BUTTON
+Add Home Page button
+Copy code
+
+Log Refund
+Opens modal:
+Fields:
+Copy code
+
+Receipt Number
+Refund Amount
+Payment Method
+Reason
+Manager Name
+Submit
+Submit → /api/refunds/log
+4 DAILY FORM INTEGRATION
+When the Daily Sales & Stock V2 form loads:
+Fetch refunds for the current shift window.
+Copy code
+
+GET /api/refunds?shift=today
+Display under:
+Copy code
+
+Refund Log
+Table columns:
+Copy code
+
+Receipt
+Amount
+Payment Method
+Reason
+Manager
+Time
+5 MANAGER SIGN-OFF FIELDS
+Extend the Owner / Manager Review section of the analysis page.
+Add fields:
+Copy code
+
+Manager Name
+Cash Banked (actual)
+QR Transfer Amount
+Refunds Reviewed (checkbox)
+Notes / Findings
+Add button:
+Copy code
+
+Confirm Review
+Endpoint:
+Copy code
+
+POST /api/shift-review
+Store result in database.
+6 STOCK BASELINE SYSTEM
+Create endpoint:
+Copy code
+
+POST /api/stock/baseline
+Used once to load Cam’s Day Zero counts.
+Example payload:
+Copy code
+
+[
+ { itemName: "burger_buns", quantity: 140, unit: "each" },
+ { itemName: "beef_meat", quantity: 12600, unit: "grams" },
+ { itemName: "bacon_short", quantity: 1000, unit: "grams" },
+ { itemName: "bacon_long", quantity: 1000, unit: "grams" },
+ { itemName: "fries", quantity: 5000, unit: "grams" },
+ { itemName: "sweet_potato_fries", quantity: 3000, unit: "grams" },
+ { itemName: "nuggets", quantity: 2000, unit: "grams" },
+ { itemName: "onion_rings", quantity: 2000, unit: "grams" }
+]
+7 VARIANCE ENGINE
+Create service:
+Copy code
+
+/server/services/varianceEngine.ts
+Runs nightly after form submission.
+Logic:
+Copy code
+
+expectedStock =
+baseline
++ purchases
+- calculated usage from receipts
+Compare against actual stock snapshot.
+Insert into stock_variance.
+Variance thresholds
+Burger buns:
+Copy code
+
+variance > 5 → WARNING
+variance > 10 → CRITICAL
+Meat:
+Copy code
+
+variance > 500g → WARNING
+variance > 1000g → CRITICAL
+8 ANALYTICS PAGE
+Add new dashboard section:
+Copy code
+
+Operations → Variance Monitor
+Cards:
+Refund Activity
+Copy code
+
+Refund Count Today
+Refund Total
+Stock Variance
+Table:
+Copy code
+
+Item
+Expected
+Actual
+Variance
+Severity
+Highlight rows:
+Copy code
+
+WARNING → yellow
+CRITICAL → red
+9 SECURITY RULES
+Agent must ensure:
+Copy code
+
+Existing Daily Sales & Stock V2 schema is untouched
+Existing form workflow unchanged
+No fields removed
+No existing API routes modified
+Only additive changes
+10 TESTING REQUIRED
+Agent must verify:
+Refund system
+Copy code
+
+Create refund
+View refund in list
+Refund appears in daily form
+Variance detection
+Simulate:
+Copy code
+
+Expected buns = 120
+Actual buns = 110
+Variance stored correctly.
+Dashboard
+Confirm:
+Copy code
+
+Refund table renders
+Variance table renders
+No form errors
+Result
+After this patch the system will provide:
+• Full refund accountability
+• Manager review confirmation
+• Day-zero stock baseline
+• Variance detection for theft
+• Refund analytics
+• Stock anomaly monitoring
+This becomes the operational security layer for Smash Brothers Burgers.
