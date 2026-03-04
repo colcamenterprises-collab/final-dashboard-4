@@ -2,11 +2,13 @@ import { Router } from "express";
 import { db as drizzleDb, pool } from "../db";
 import { dailySalesV2, dailyStockV2, ingredients } from "../../shared/schema";
 import { sql, desc } from "drizzle-orm";
+import { checkPurchasingItemsSchemaGuard } from "../services/purchasingItemsSchemaGuard";
 
 const router = Router();
 
 router.get("/", async (_req, res) => {
   const checks: Record<string, number> = {};
+  const warnings: string[] = [];
 
   const tables = [
     'daily_stock_v2',
@@ -22,10 +24,18 @@ router.get("/", async (_req, res) => {
     checks[table] = r.rows[0].count;
   }
 
+  const purchasingGuard = await checkPurchasingItemsSchemaGuard(pool);
+  if (!purchasingGuard.ok) {
+    warnings.push(
+      `purchasing_items schema mismatch on required fields (${purchasingGuard.checkedFields.join(', ')}): ${purchasingGuard.warning}`,
+    );
+  }
+
   res.json({
-    status: 'OK',
+    status: warnings.length > 0 ? 'WARN' : 'OK',
     productionLock: process.env.PRODUCTION_LOCK === '1',
     tables: checks,
+    warnings,
   });
 });
 

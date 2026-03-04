@@ -21,6 +21,27 @@ import {
 const router = Router();
 const prisma = new PrismaClient();
 
+const purchasingItemSafeSelect = {
+  id: true,
+  item: true,
+  category: true,
+  supplierName: true,
+  brand: true,
+  supplierSku: true,
+  orderUnit: true,
+  unitDescription: true,
+  unitCost: true,
+  packCost: true,
+  lastReviewDate: true,
+  active: true,
+  isIngredient: true,
+  portionUnit: true,
+  portionSize: true,
+  yield: true,
+  createdAt: true,
+  updatedAt: true,
+} as const;
+
 const purchasingItemSchema = z.object({
   item: z.string().min(1, 'Item name is required'),
   category: z.string().optional().nullable(),
@@ -64,6 +85,7 @@ router.get('/', async (req, res) => {
     
     const items = await prisma.purchasingItem.findMany({
       where: whereClause,
+      select: purchasingItemSafeSelect,
       orderBy: [
         { category: 'asc' },
         { item: 'asc' },
@@ -210,6 +232,7 @@ router.delete('/:id', async (req, res) => {
 router.get('/export/csv', async (req, res) => {
   try {
     const items = await prisma.purchasingItem.findMany({
+      select: purchasingItemSafeSelect,
       orderBy: [
         { category: 'asc' },
         { item: 'asc' },
@@ -375,6 +398,7 @@ router.post('/sync-to-daily-stock', async (req, res) => {
     // Get all ACTIVE purchasing items from database
     const purchasingItems = await prisma.purchasingItem.findMany({
       where: { active: true },
+      select: purchasingItemSafeSelect,
       orderBy: [
         { category: 'asc' },
         { item: 'asc' },
