@@ -1141,6 +1141,12 @@ export default function DailySales() {
                 />
               </div>
             </div>
+            <div className="mt-4 flex items-center gap-3 pt-3 border-t border-slate-100">
+              <span className="text-sm text-gray-600">Total Receipts:</span>
+              <span className="text-sm font-semibold text-slate-900">
+                {grabReceiptCount + cashReceiptCount + qrReceiptCount + directReceiptCount}
+              </span>
+            </div>
           </section>
 
           {/* Banking Section */}
