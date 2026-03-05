@@ -304,6 +304,8 @@ export default function DailySales() {
   const [shiftDate, setShiftDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [refundStatus, setRefundStatus] = useState<'YES' | 'NO' | ''>('');
   const [refundRows, setRefundRows] = useState<RefundRow[]>([]);
+  const [posReceiptCount, setPosReceiptCount] = useState<number | null>(null);
+  const [posReceiptLoading, setPosReceiptLoading] = useState(false);
   const [expenseSuppliers, setExpenseSuppliers] = useState<string[]>([]);
   const [purchaseItems, setPurchaseItems] = useState<Array<{ name: string; category: string; unit: string; supplier: string }>>([]);
 
@@ -322,6 +324,23 @@ export default function DailySales() {
     }, 1000);
     return () => clearInterval(t);
   }, [showSuccess, shiftId, navigate]);
+
+  // Fetch POS transaction count for the selected shift date (display-only cross-check)
+  useEffect(() => {
+    if (!shiftDate) return;
+    let cancelled = false;
+    setPosReceiptLoading(true);
+    setPosReceiptCount(null);
+    fetch(`/api/receipts/count?date=${shiftDate}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setPosReceiptCount(data.ok ? (data.count ?? 0) : 0);
+      })
+      .catch(() => { if (!cancelled) setPosReceiptCount(null); })
+      .finally(() => { if (!cancelled) setPosReceiptLoading(false); });
+    return () => { cancelled = true; };
+  }, [shiftDate]);
 
   // Load existing form data when editing
   useEffect(() => {
@@ -1141,11 +1160,31 @@ export default function DailySales() {
                 />
               </div>
             </div>
-            <div className="mt-4 flex items-center gap-3 pt-3 border-t border-slate-100">
-              <span className="text-sm text-gray-600">Total Receipts:</span>
-              <span className="text-sm font-semibold text-slate-900">
-                {grabReceiptCount + cashReceiptCount + qrReceiptCount + directReceiptCount}
-              </span>
+            <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600">Total Receipts:</span>
+                <span className="text-sm font-semibold text-slate-900">
+                  {grabReceiptCount + cashReceiptCount + qrReceiptCount + directReceiptCount}
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-600">Transactions Recorded:</span>
+                <span className="text-sm font-semibold text-slate-900">
+                  {posReceiptLoading ? "…" : posReceiptCount === null ? "—" : posReceiptCount}
+                </span>
+              </div>
+              {!posReceiptLoading && posReceiptCount !== null && (() => {
+                const total = grabReceiptCount + cashReceiptCount + qrReceiptCount + directReceiptCount;
+                const diff = total - posReceiptCount;
+                return (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-gray-600">Difference:</span>
+                    <span className={`text-sm font-semibold ${diff === 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {diff > 0 ? `+${diff}` : String(diff)}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </section>
 
