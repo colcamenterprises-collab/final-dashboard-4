@@ -659,7 +659,7 @@ export default function AiOpsControlPage() {
                   type="button"
                   title="Delete thread"
                   onClick={(e) => { e.stopPropagation(); setConfirmDeleteThreadId(thread.id); }}
-                  className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-opacity"
+                  className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded text-slate-400 hover:bg-red-50 hover:text-red-500"
                 >
                   ×
                 </button>
@@ -683,9 +683,9 @@ export default function AiOpsControlPage() {
                   })
                 : '';
               return (
-                <div key={msg.id} className={`rounded-[4px] p-2.5 ${msg.role === 'assistant' ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-slate-200'}`}>
+                <div key={msg.id} className={`text-xs rounded-[4px] p-2.5 ${msg.role === 'assistant' ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-slate-200'}`}>
                   <p className={`text-[10px] font-semibold uppercase mb-1 ${msg.role === 'assistant' ? 'text-emerald-600' : 'text-slate-500'}`}>{msg.role === 'assistant' ? 'Bob' : 'You'}</p>
-                  <p className="whitespace-pre-wrap text-xs text-slate-800">{msg.content}</p>
+                  <p className="whitespace-pre-wrap text-slate-800">{msg.content}</p>
                   {ts && <p className="text-[10px] text-slate-400 mt-1.5 text-right">{ts}</p>}
                 </div>
               );
