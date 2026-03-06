@@ -82,6 +82,7 @@ import stockReviewRouter from "./api/stockReview";
 import receiptsBurgers from "./routes/receiptsBurgers";
 import receiptsDebug from "./routes/receiptsDebug";
 import receiptCount from "./routes/receiptCount";
+import internalReports from "./routes/internalReports";
 import loyverseSync from "./routes/loyverseSync";
 import loyverseShiftReportRouter from "./routes/loyverseShiftReport";
 import { registerOnlineMenuRoutes } from "./routes/onlineMenu";
@@ -1164,6 +1165,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use("/api/receipts", receiptsBurgers);
   app.use("/api/receipts", receiptsDebug);
   app.use("/api/receipts", receiptCount);
+  app.use("/internal/api/reports", internalReports);
 
   // Loyverse sync and cache builder
   app.use("/api/loyverse", loyverseSync);
