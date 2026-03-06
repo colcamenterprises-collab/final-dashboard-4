@@ -538,11 +538,19 @@ export default function AiOpsControlPage() {
     }
   }, [chatThreadsQuery.data, selectedThreadId]);
 
-  // Auto-scroll chat to bottom when messages change or thread is opened
+  // Auto-scroll chat to bottom when messages change or thread is opened.
+  // Double-RAF pattern: outer RAF waits for React paint, inner RAF waits for
+  // browser layout calculation (scrollHeight is correct only after layout).
   useEffect(() => {
-    if (chatScrollRef.current) {
-      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
-    }
+    const raf1 = requestAnimationFrame(() => {
+      const raf2 = requestAnimationFrame(() => {
+        if (chatScrollRef.current) {
+          chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+        }
+      });
+      return () => cancelAnimationFrame(raf2);
+    });
+    return () => cancelAnimationFrame(raf1);
   }, [chatMessagesQuery.data, selectedThreadId]);
 
   const tasks = tasksQuery.data?.items || [];
