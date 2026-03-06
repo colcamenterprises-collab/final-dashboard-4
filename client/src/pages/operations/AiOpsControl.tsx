@@ -536,7 +536,7 @@ export default function AiOpsControlPage() {
   const totalQueue = openTasks + openIssues + ideas.length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-page="ops">
       <header className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-xl md:p-6">
         <div className="grid gap-5 lg:grid-cols-[minmax(320px,1.2fr)_minmax(0,2fr)] lg:items-stretch">
           <div className="space-y-3 rounded-[4px] border border-slate-700/60 bg-slate-800/70 p-4">
