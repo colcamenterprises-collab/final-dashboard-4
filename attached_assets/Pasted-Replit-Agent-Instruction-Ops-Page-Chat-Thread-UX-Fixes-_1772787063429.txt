@@ -1,0 +1,57 @@
+Replit Agent Instruction — Ops Page Chat Thread UX Fixes
+Objective: Improve the AI Ops chat/thread experience so it works like a proper message console.
+Required changes
+1) Delete threads
+Add the ability to delete a thread from the Ops page.
+Requirements:
+Add a Delete Thread action for each thread
+Use soft delete if thread records are important for audit, otherwise hard delete is acceptable only if current system already treats threads as disposable
+If soft delete:
+hide deleted threads from normal list
+If hard delete:
+also remove associated messages for that thread
+Add confirmation before delete:
+Delete this thread? This cannot be undone.
+2) Chat order = newest at bottom
+Current chat should behave like a normal messaging interface:
+Requirements:
+Oldest messages at top
+Newest messages at bottom
+New replies append to the bottom
+Do not reverse the visual order in a confusing way
+3) Always show latest message in viewport
+When:
+opening a thread
+receiving a new message
+sending a message
+The chat window should automatically scroll to the bottom so the latest message is visible.
+Requirements:
+Smooth scroll is fine
+Do not force weird jumping if user is manually reading older messages unless the thread is newly opened or the user has just sent a message
+4) Show timestamp on each chat bubble
+Every message bubble should show:
+date + time, or at minimum time if same day
+preferred format:
+02 Mar 2026, 13:42
+place timestamp subtly under or beside the message content
+must appear on both:
+user messages
+agent/Bob messages
+5) Keep current different bubble colours
+Do not remove the existing improvement where:
+assistant/Bob messages use a distinct colour
+user messages use a different colour
+6) Preserve current functionality
+Do not break:
+thread creation
+sending messages
+Bob responses
+task-to-Bob notification flow
+Deliverables
+Return:
+Full changed files
+Screenshot showing:
+thread delete action
+chat with timestamps
+newest message visible at bottom
+Brief proof that deleting a thread works and latest messages auto-scroll correctly

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '@/lib/queryClient';
@@ -276,6 +276,8 @@ export default function AiOpsControlPage() {
   const [chatThreadTitle, setChatThreadTitle] = useState('');
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [chatMessageText, setChatMessageText] = useState('');
+  const [confirmDeleteThreadId, setConfirmDeleteThreadId] = useState<string | null>(null);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
   const [detailTab, setDetailTab] = useState<'details' | 'activity' | 'notes'>('details');
   const [selectedProcessKey, setSelectedProcessKey] = useState<string | null>(null);
   const [systemMapOpen, setSystemMapOpen] = useState(false);
@@ -510,6 +512,18 @@ export default function AiOpsControlPage() {
     },
   });
 
+  const deleteThreadMutation = useMutation({
+    mutationFn: (threadId: string) =>
+      apiRequest(`/api/ai-ops/chat/threads/${threadId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      setConfirmDeleteThreadId(null);
+      queryClient.invalidateQueries({ queryKey: ['/api/ai-ops/chat/threads'] });
+      if (confirmDeleteThreadId === selectedThreadId) {
+        setSelectedThreadId(null);
+      }
+    },
+  });
+
   const selectedTask = taskDetailQuery.data;
   const selectedIssue = issueDetailQuery.data?.item;
   const selectedIdea = ideaDetailQuery.data?.item;
@@ -523,6 +537,13 @@ export default function AiOpsControlPage() {
       setSelectedThreadId(chatThreadsQuery.data!.items[0].id);
     }
   }, [chatThreadsQuery.data, selectedThreadId]);
+
+  // Auto-scroll chat to bottom when messages change or thread is opened
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [chatMessagesQuery.data, selectedThreadId]);
 
   const tasks = tasksQuery.data?.items || [];
   const issues = issuesQuery.data?.items || [];
@@ -584,6 +605,31 @@ export default function AiOpsControlPage() {
       </section>
 
 
+      {/* Delete thread confirmation dialog */}
+      {confirmDeleteThreadId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-80 rounded-[4px] border border-slate-200 bg-white p-5 shadow-xl">
+            <p className="text-sm font-semibold text-slate-900 mb-2">Delete this thread?</p>
+            <p className="text-xs text-slate-500 mb-4">This cannot be undone. All messages in this thread will be permanently removed.</p>
+            <div className="flex gap-2 justify-end">
+              <button
+                className="h-8 rounded-[4px] border border-slate-200 px-3 text-xs text-slate-600 hover:bg-slate-50"
+                onClick={() => setConfirmDeleteThreadId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="h-8 rounded-[4px] bg-red-600 px-3 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60"
+                disabled={deleteThreadMutation.isPending}
+                onClick={() => deleteThreadMutation.mutate(confirmDeleteThreadId)}
+              >
+                {deleteThreadMutation.isPending ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <section className="grid gap-4 rounded-[4px] border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[280px_minmax(0,1fr)]">
         <div className="space-y-3">
           <div className="text-sm font-semibold text-slate-900">Bob Chat (Orchestrator)</div>
@@ -600,21 +646,50 @@ export default function AiOpsControlPage() {
           </form>
           <div className="max-h-64 space-y-2 overflow-auto">
             {(chatThreadsQuery.data?.items || []).map((thread) => (
-              <button key={thread.id} type="button" onClick={() => setSelectedThreadId(thread.id)} className={`w-full rounded-[4px] border p-2 text-left text-xs ${selectedThreadId === thread.id ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200'}`}>
-                <p className="text-xs font-medium text-slate-900">{thread.title}</p>
-                <p className="text-xs text-slate-500">{thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString() : 'No messages yet'}</p>
-              </button>
+              <div key={thread.id} className={`group relative flex items-start rounded-[4px] border ${selectedThreadId === thread.id ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50'}`}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedThreadId(thread.id)}
+                  className="flex-1 p-2 text-left text-xs min-w-0"
+                >
+                  <p className="text-xs font-medium text-slate-900 truncate pr-5">{thread.title}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{thread.lastMessageAt ? new Date(thread.lastMessageAt).toLocaleString() : 'No messages yet'}</p>
+                </button>
+                <button
+                  type="button"
+                  title="Delete thread"
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteThreadId(thread.id); }}
+                  className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-opacity"
+                >
+                  ×
+                </button>
+              </div>
             ))}
           </div>
         </div>
         <div className="space-y-3">
-          <div className="max-h-72 space-y-2 overflow-auto rounded-[4px] border border-slate-200 p-3">
-            {(chatMessagesQuery.data?.items || []).map((msg) => (
-              <div key={msg.id} className={`rounded-[4px] p-2.5 text-sm ${msg.role === 'assistant' ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-slate-200'}`}>
-                <p className={`text-[10px] font-semibold uppercase mb-1 ${msg.role === 'assistant' ? 'text-emerald-600' : 'text-slate-500'}`}>{msg.role === 'assistant' ? 'Bob' : 'You'}</p>
-                <p className="whitespace-pre-wrap text-xs text-slate-800">{msg.content}</p>
-              </div>
-            ))}
+          <div
+            ref={chatScrollRef}
+            className="max-h-96 space-y-2 overflow-y-auto rounded-[4px] border border-slate-200 p-3 scroll-smooth"
+          >
+            {(chatMessagesQuery.data?.items || []).length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-4">No messages yet. Send one below.</p>
+            )}
+            {(chatMessagesQuery.data?.items || []).map((msg) => {
+              const ts = msg.createdAt
+                ? new Date(msg.createdAt).toLocaleString('en-GB', {
+                    day: '2-digit', month: 'short', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit', hour12: false,
+                  })
+                : '';
+              return (
+                <div key={msg.id} className={`rounded-[4px] p-2.5 ${msg.role === 'assistant' ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-slate-200'}`}>
+                  <p className={`text-[10px] font-semibold uppercase mb-1 ${msg.role === 'assistant' ? 'text-emerald-600' : 'text-slate-500'}`}>{msg.role === 'assistant' ? 'Bob' : 'You'}</p>
+                  <p className="whitespace-pre-wrap text-xs text-slate-800">{msg.content}</p>
+                  {ts && <p className="text-[10px] text-slate-400 mt-1.5 text-right">{ts}</p>}
+                </div>
+              );
+            })}
           </div>
           <form
             onSubmit={async (e: FormEvent) => {

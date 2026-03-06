@@ -1388,6 +1388,20 @@ router.get("/chat/threads/:id/messages", async (req, res) => {
   return res.json({ ok: true, items: result.rows });
 });
 
+router.delete("/chat/threads/:id", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  const threadId = parseThreadId(req.params.id);
+  if (!threadId) return res.status(400).json({ message: "Invalid thread id" });
+
+  const threadResult = await pool.query(`SELECT id FROM ai_chat_threads WHERE id = $1`, [threadId]);
+  if (!threadResult.rows.length) return res.status(404).json({ message: "Thread not found" });
+
+  await pool.query(`DELETE FROM ai_chat_messages WHERE thread_id = $1`, [threadId]);
+  await pool.query(`DELETE FROM ai_chat_threads WHERE id = $1`, [threadId]);
+
+  return res.json({ ok: true });
+});
+
 router.post("/chat/threads/:id/messages", async (req, res) => {
   if (!pool) return res.status(503).json({ message: "Database unavailable" });
   const threadId = parseThreadId(req.params.id);
