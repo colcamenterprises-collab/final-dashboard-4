@@ -201,11 +201,11 @@ type IssueActivityAction = z.infer<typeof issueActivityActionEnum>;
 type IdeaActivityAction = z.infer<typeof ideaActivityActionEnum>;
 
 const AGENTS = [
-  { agent: "bob", name: "Bob", role: "AI Operations Manager", description: "Orchestrates tasks, assigns specialists, and maintains audit trail." },
-  { agent: "jussi", name: "Jussi", role: "Operations Analyst", description: "Reconciles sales, stock variances, and item/modifier performance." },
-  { agent: "sally", name: "Sally", role: "Financial Controller", description: "Audits wages, shift expenses, and 24-hour business costs." },
-  { agent: "supplier", name: "Supplier", role: "Procurement Coordinator", description: "Prepares supplier orders and manages acknowledgements/deliveries." },
-  { agent: "codex", name: "Codex", role: "Software Engineer", description: "Implements fixes, migrations, and system enhancements." },
+  { agent: "bob", name: "Bob", role: "AI Operations Manager", description: "Assigns tasks, flags issues, keeps things moving." },
+  { agent: "jussi", name: "Jussi", role: "Operations Analyst", description: "Checks sales, stock, and menu data." },
+  { agent: "sally", name: "Sally", role: "Financial Controller", description: "Reviews wages, expenses, and shift costs." },
+  { agent: "supplier", name: "Supplier", role: "Procurement Coordinator", description: "Orders stock and tracks deliveries." },
+  { agent: "codex", name: "Codex", role: "Software Engineer", description: "Fixes bugs and rolls out updates." },
 ] as const;
 
 const taskCreateSchema = z.object({

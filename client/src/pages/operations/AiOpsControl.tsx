@@ -569,9 +569,9 @@ export default function AiOpsControlPage() {
       <header className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-4 text-white shadow-xl md:p-6">
         <div className="grid gap-5 lg:grid-cols-[minmax(320px,1.2fr)_minmax(0,2fr)] lg:items-stretch">
           <div className="space-y-3 rounded-[4px] border border-slate-700/60 bg-slate-800/70 p-4">
-            <h1 className="text-2xl font-semibold">AI Ops Control</h1>
-            <p className="text-sm text-slate-200">
-              Central command for AI task execution, incident workflow, and idea intake.
+            <h1 className="text-lg font-semibold">AI Ops Control</h1>
+            <p className="text-xs text-slate-300">
+              Tasks, issues, and AI agents — all in one place.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -596,7 +596,11 @@ export default function AiOpsControlPage() {
           {(agentsQuery.data?.items || []).map((agent) => (
             <article key={agent.agent} className="rounded-[4px] border border-slate-200 bg-white p-3 shadow-sm flex flex-col h-full">
               <div className="mb-3 flex items-center gap-3">
-                <img src={agent.imageUrl || 'https://placehold.co/128x128'} alt={agent.name} className="h-12 w-12 rounded-[4px] object-cover" />
+                <img
+                  src={agent.agent === 'bob' ? '/bob-avatar.jpg' : (agent.imageUrl || 'https://placehold.co/128x128')}
+                  alt={agent.name}
+                  className="h-12 w-12 rounded-[4px] object-cover"
+                />
                 <div>
                   <p className="text-xs font-semibold text-slate-900">{agent.name}</p>
                   <p className="text-xs text-slate-600">{agent.role}</p>
