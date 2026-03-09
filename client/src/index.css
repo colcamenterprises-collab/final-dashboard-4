@@ -1007,9 +1007,31 @@ h1, h2, h3 { color: inherit !important; }
   margin: 0 !important;
 }
 
-/* All p tags inherit parent size inside ops page */
+/* All p tags — fixed at text-xs (12px) inside ops page */
 [data-page="ops"] p {
-  font-size: inherit !important;
+  font-size: 0.75rem !important;
+}
+
+/* Headings inside ops page — override the global h1/h2/h3 !important rules */
+[data-page="ops"] h1 {
+  font-size: 1.125rem !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+  line-height: 1.4 !important;
+}
+[data-page="ops"] h2 {
+  font-size: 0.875rem !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
+}
+[data-page="ops"] h3 {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+  line-height: 1.4 !important;
+  margin: 0 !important;
 }
 
 /* Inputs / selects / textareas — text-xs, h-9, 4px radius */
