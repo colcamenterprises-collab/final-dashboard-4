@@ -1382,7 +1382,7 @@ router.get("/chat/threads/:id/messages", async (req, res) => {
     `SELECT id, thread_id AS "threadId", role, content, token_estimate AS "tokenEstimate", created_by AS "createdBy", created_at AS "createdAt"
      FROM ai_chat_messages
      WHERE thread_id = $1
-     ORDER BY created_at ASC, id ASC`,
+     ORDER BY created_at ASC, CASE WHEN role = 'user' THEN 1 ELSE 2 END ASC, id ASC`,
     [threadId],
   );
   return res.json({ ok: true, items: result.rows });
@@ -1421,8 +1421,8 @@ router.post("/chat/threads/:id/messages", async (req, res) => {
     }
 
     await client.query(
-      `INSERT INTO ai_chat_messages (thread_id, role, content, token_estimate, created_by)
-       VALUES ($1, 'user', $2, $3, $4)`,
+      `INSERT INTO ai_chat_messages (thread_id, role, content, token_estimate, created_by, created_at)
+       VALUES ($1, 'user', $2, $3, $4, clock_timestamp())`,
       [threadId, payload.content, estimateTokens(payload.content), payload.createdBy],
     );
 
@@ -1430,7 +1430,7 @@ router.post("/chat/threads/:id/messages", async (req, res) => {
       `SELECT role, content
        FROM ai_chat_messages
        WHERE thread_id = $1
-       ORDER BY created_at ASC, id ASC`,
+       ORDER BY created_at ASC, CASE WHEN role = 'user' THEN 1 ELSE 2 END ASC, id ASC`,
       [threadId],
     );
     const context = buildCappedContext(contextRows.rows, 2400);
@@ -1448,8 +1448,8 @@ router.post("/chat/threads/:id/messages", async (req, res) => {
     }
 
     await client.query(
-      `INSERT INTO ai_chat_messages (thread_id, role, content, token_estimate, created_by)
-       VALUES ($1, 'assistant', $2, $3, 'Bob')`,
+      `INSERT INTO ai_chat_messages (thread_id, role, content, token_estimate, created_by, created_at)
+       VALUES ($1, 'assistant', $2, $3, 'Bob', clock_timestamp())`,
       [threadId, assistantReply, estimateTokens(assistantReply)],
     );
     await client.query(
