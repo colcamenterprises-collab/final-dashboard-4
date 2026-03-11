@@ -477,6 +477,10 @@ async function checkSchema() {
   // /api/bob — alias prefix (e.g. /api/bob/health mirrors /api/ai-ops/bob/health)
   app.use('/api/bob', bobAliasRouter);
 
+  // /api/bob/read — Bob read-only API layer (token-protected, GET only)
+  const bobReadRouter = (await import('./routes/bobRead')).default;
+  app.use('/api/bob/read', bobReadRouter);
+
   // /api/ai/chat — simple chat alias endpoints + idempotent table setup
   const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables } = await import('./db');
   await ensureAiChatTables();
