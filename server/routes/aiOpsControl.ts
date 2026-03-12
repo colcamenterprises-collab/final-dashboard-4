@@ -930,18 +930,29 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
     // (gateway proxies through 127.0.0.1:18789 which doesn't forward to our server)
     const liveSnapshot = await buildLiveDataSnapshot(lastUserMsg).catch(() => "");
 
-    // Bob's API access block — canonical deployed URL for outbound calls
+    // Bob's API access block — token embedded directly in URL (gateway doesn't forward headers)
     const bobToken = process.env.BOB_READONLY_TOKEN ?? "";
     const dataAccessBlock = bobToken
       ? `\n[BOB API ACCESS — SINGLE CANONICAL ENDPOINT]\n` +
-        `Base URL: ${BOB_API_BASE_URL}\n` +
-        `Auth: Authorization: Bearer ${bobToken}\n` +
-        `Endpoint: GET ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=<module>\n` +
-        `Modules: health | reports/item-sales | reports/modifier-sales | reports/category-totals | forms/daily-sales | forms/daily-stock | purchases | tasks | audits\n` +
-        `Params: date=YYYY-MM-DD (reports/forms), limit=N, status/area (tasks), type=baseline|snapshot (audits)\n` +
-        `Example: GET ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=reports/item-sales&date=2026-03-11\n` +
-        `Token injected: YES. All requests logged to bob_read_logs (timestamp, route, status, duration).\n` +
-        `Note: Live data is ALSO pre-injected below in [LIVE DATA SNAPSHOT] — use that first, then call API only for specific date/detail queries.\n` +
+        `IMPORTANT: The token is embedded directly in the URL query string (?token=...) because the\n` +
+        `gateway does not forward Authorization headers. Do NOT use the Authorization header.\n` +
+        `\n` +
+        `Base URL: ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read\n` +
+        `Token: included as ?token=${bobToken} in every request URL\n` +
+        `\n` +
+        `HEALTH CHECK:\n` +
+        `  GET ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=health&token=${bobToken}\n` +
+        `\n` +
+        `EXAMPLE DATA CALLS (copy these exact URLs):\n` +
+        `  ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=reports/item-sales&date=2026-03-02&token=${bobToken}\n` +
+        `  ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=forms/daily-sales&limit=7&token=${bobToken}\n` +
+        `  ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=purchases&limit=100&token=${bobToken}\n` +
+        `  ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=tasks&token=${bobToken}\n` +
+        `  ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=audits&type=baseline&token=${bobToken}\n` +
+        `\n` +
+        `MODULES: health | reports/item-sales | reports/modifier-sales | reports/category-totals | forms/daily-sales | forms/daily-stock | purchases | tasks | audits\n` +
+        `DATE PARAMS: date=YYYY-MM-DD (specific day), omit for recent data, date=all same as omitting\n` +
+        `All requests logged to bob_read_logs table (timestamp, module, ip, status, duration_ms).\n` +
         `[END BOB API ACCESS]`
       : "";
 
@@ -1536,18 +1547,26 @@ router.get("/bob/proxy-read", async (req, res) => {
   );
 
   // ── Auth ──
+  // Accept token via: (1) Authorization: Bearer header, OR (2) ?token= query param.
+  // Query param fallback needed because the OpenClaw gateway does not forward
+  // Authorization headers on Bob's outbound HTTP calls.
   const expectedToken = process.env.BOB_READONLY_TOKEN;
   if (!expectedToken) {
     return res.status(503).json({ ok: false, status: "error", error: "BOB_READONLY_TOKEN not configured" });
   }
   const authHeader = (req.headers.authorization || "") as string;
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const queryToken = (req.query.token as string) || (req.query.api_key as string) || null;
+  const token = headerToken || queryToken;
   if (!token || token !== expectedToken) {
     return res.status(401).json({ ok: false, status: "unauthorized", error: "Unauthorized" });
   }
 
+  // Strip the token from query params before passing to modules (don't leak it in logs)
+  const { token: _t, api_key: _ak, ...safeQuery } = req.query as Record<string, string>;
+
   // ── Module routing ──
-  const modulePath = (req.query.path as string || "").replace(/^\/+/, "");
+  const modulePath = ((safeQuery.path as string) || "").replace(/^\/+/, "");
   if (!modulePath) {
     return res.json({
       ok: true,
@@ -1569,7 +1588,8 @@ router.get("/bob/proxy-read", async (req, res) => {
   }
 
   // Normalise date=all → omit (modules handle missing date by returning recent records)
-  const queryParams = { ...req.query } as Record<string, unknown>;
+  // Use safeQuery (token fields already stripped)
+  const queryParams = { ...safeQuery } as Record<string, unknown>;
   if (queryParams.date === "all") delete queryParams.date;
 
   const start = Date.now();
