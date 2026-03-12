@@ -788,28 +788,16 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
       ? `\n[SYSTEM MAP — Core Processes]\n${cachedProcessNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\nRule: Shopping List is auto-generated on Form 2 submit. Bob must OBSERVE and VALIDATE only — never duplicate.\nFull map: GET /api/ai-ops/process-registry\n[END SYSTEM MAP]`
       : "";
 
-    // Build Bob data-access block — proxy URL + token injected server-side
-    const appDomain = process.env.REPLIT_DOMAINS
-      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
-      : "http://localhost:5000";
-    const bobToken = process.env.BOB_READONLY_TOKEN ?? "";
-    const bobDataBlock = bobToken
-      ? `\n[BOB DATA ACCESS]\n` +
-        `Proxy endpoint: GET ${appDomain}/api/ai-ops/bob/proxy-read?path=<module>\n` +
-        `Auth header: Authorization: Bearer ${bobToken}\n` +
-        `Available modules: health | reports/item-sales | reports/modifier-sales | reports/category-totals | forms/daily-sales | forms/daily-stock | purchases | tasks | audits\n` +
-        `Optional params: date=YYYY-MM-DD (for reports/forms), limit=N, status=..., area=... (for tasks), type=baseline|snapshot (for audits)\n` +
-        `Example: GET ${appDomain}/api/ai-ops/bob/proxy-read?path=reports/item-sales&date=2026-03-11\n` +
-        `Note: Use this endpoint — NOT /api/bob/read/* — to avoid SPA routing interference.\n` +
-        `[END BOB DATA ACCESS]`
-      : "";
+    // Pre-fetch live data and inject it inline — Bob cannot call outbound URLs
+    // (gateway proxies through 127.0.0.1:18789 which doesn't forward to our server)
+    const liveSnapshot = await buildLiveDataSnapshot(lastUserMsg).catch(() => "");
 
     messageToSend =
       `[BOB CEO CHARTER v${cachedCharterVersion} | updated ${dateStr}]\n` +
       charterBody +
       `\n[END CHARTER]` +
       systemMapExcerpt +
-      bobDataBlock +
+      liveSnapshot +
       `\n\nUser message:\n${lastUserMsg}`;
   }
 

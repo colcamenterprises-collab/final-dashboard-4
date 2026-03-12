@@ -1,0 +1,50 @@
+Bob
+
+I tried to run the baseline audit via the proxy-read endpoint you specified, but the proxy is returning the dashboard HTML instead of the JSON API. I can’t compute the audit until the proxy returns JSON.
+
+Here are the exact diagnostics (what I called and what I saw):
+
+Endpoints called (via proxy-read)
+- /api/ai-ops/bob/proxy-read?path=health
+- /api/ai-ops/bob/proxy-read?path=reports/item-sales&date=all
+- /api/ai-ops/bob/proxy-read?path=reports/modifier-sales&date=all
+- /api/ai-ops/bob/proxy-read?path=reports/category-totals&date=all
+- /api/ai-ops/bob/proxy-read?path=forms/daily-sales&date=all
+- /api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=all
+- /api/ai-ops/bob/proxy-read?path=purchases&limit=1000
+- /api/ai-ops/bob/proxy-read?path=audits&type=baseline&limit=50
+
+Exact result for the health call (representative)
+- URL called: http://127.0.0.1:18789/api/ai-ops/bob/proxy-read?path=health
+- HTTP status: 200 OK
+- Response Content-Type: text/html; charset=utf-8
+- Response body: HTML (dashboard UI), not application/json
+
+Notes from other calls
+- Same behaviour for item-sales and other proxy-read paths: HTTP 200, Content-Type text/html, HTML body.
+- Because the responses are HTML, the data endpoints are not returning JSON payloads I can parse.
+
+Other diagnostics I tried
+- Called endpoints with and without an explicit Authorization header (empty) — both returned HTML 200. This indicates the host is serving the UI page at that path rather than the JSON API, or the proxy is not forwarding/transforming requests correctly.
+
+Why this blocks the audit
+- The audit requires JSON responses from the read endpoints. HTML pages cannot be parsed for structured sales/stock data reliably. I need the proxy to return application/json responses from the API endpoints.
+
+What I need you (or infra) to fix
+- Ensure the proxy-read endpoint forwards requests to the internal API and returns JSON. Options:
+  1) Reconfigure the proxy so /api/ai-ops/bob/proxy-read?path=... forwards to the backend API and returns Content-Type: application/json (not the UI).
+  2) If the API is hosted at a different base path, point the proxy to the correct API host/path.
+  3) Confirm the Gateway is injecting the Authorization header for proxied calls (or supply a short‑lived token just for confirmation). Reply with “Token injected” after verifying.
+- Quick validation test you can run (one-liner on any machine that can reach the Gateway):
+  curl -i -H "Accept: application/json" "http://127.0.0.1:18789/api/ai-ops/bob/proxy-read?path=health"
+  Expect: HTTP 200 with Content-Type: application/json and a small JSON health object.
+
+When to retry
+- Tell me “Retry now” after the proxy is fixed (or after you confirm the proxy returns JSON for the health endpoint). I’ll immediately:
+  - Fetch the listed read endpoints,
+  - Run the baseline audit across all available dates,
+  - Return the full BASELINE AUDIT and recommended tasks.
+
+If you want, I can also provide a short validation curl + jq command you or your infra person can run to show me the raw JSON health output; paste that JSON here and I’ll proceed immediately.
+
+12 Mar 2026, 13:53
