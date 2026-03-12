@@ -1508,66 +1508,82 @@ const BOB_API_BASE_URL =
   "https://restaurant-operations-sbb-by-customli.replit.app";
 
 // ── Bob proxy-read request logger ─────────────────────────────────────────────
-// Logs every request to bob_read_logs (same table used by /api/bob/read/*)
+// Logs every request to bob_read_logs (timestamp, module, route, ip, status, duration)
 async function logBobProxyRequest(
-  route: string,
+  module: string,
   params: Record<string, unknown>,
   status: number,
   ok: boolean,
-  durationMs: number
+  durationMs: number,
+  ip?: string
 ): Promise<void> {
   if (!pool) return;
   try {
     await pool.query(
-      `INSERT INTO bob_read_logs (route, params, status, ok, duration_ms)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [`proxy-read:${route}`, JSON.stringify(params), status, ok, durationMs]
+      `INSERT INTO bob_read_logs (route, module, params, status, ok, duration_ms, ip)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [`proxy-read:${module}`, module, JSON.stringify(params), status, ok, durationMs, ip ?? null]
     );
   } catch { /* non-critical */ }
 }
 
 router.get("/bob/proxy-read", async (req, res) => {
-  // Auth: same BOB_READONLY_TOKEN
+  // Capture caller IP for audit log
+  const callerIp = (
+    (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() ||
+    req.socket.remoteAddress ||
+    "unknown"
+  );
+
+  // ── Auth ──
   const expectedToken = process.env.BOB_READONLY_TOKEN;
   if (!expectedToken) {
-    return res.status(503).json({ ok: false, error: "BOB_READONLY_TOKEN not configured" });
+    return res.status(503).json({ ok: false, status: "error", error: "BOB_READONLY_TOKEN not configured" });
   }
   const authHeader = (req.headers.authorization || "") as string;
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token || token !== expectedToken) {
-    return res.status(401).json({ ok: false, error: "Unauthorized" });
+    return res.status(401).json({ ok: false, status: "unauthorized", error: "Unauthorized" });
   }
 
-  const path = (req.query.path as string || "").replace(/^\/+/, "");
-  if (!path) {
+  // ── Module routing ──
+  const modulePath = (req.query.path as string || "").replace(/^\/+/, "");
+  if (!modulePath) {
     return res.json({
       ok: true,
+      status: "ok",
       message: "Bob proxy-read is operational",
       available_modules: BOB_PROXY_MODULES,
       usage: "GET /api/ai-ops/bob/proxy-read?path=<module>&date=YYYY-MM-DD&limit=N",
+      date_hint: "Use date=YYYY-MM-DD for specific day, or omit for recent data. date=all is treated as 'recent'.",
     });
   }
 
-  if (!BOB_PROXY_MODULES.includes(path as BobProxyModule)) {
+  if (!BOB_PROXY_MODULES.includes(modulePath as BobProxyModule)) {
     return res.status(400).json({
       ok: false,
-      error: `Unknown module: ${path}`,
+      status: "error",
+      error: `Invalid module: ${modulePath}`,
       available_modules: BOB_PROXY_MODULES,
     });
   }
 
+  // Normalise date=all → omit (modules handle missing date by returning recent records)
+  const queryParams = { ...req.query } as Record<string, unknown>;
+  if (queryParams.date === "all") delete queryParams.date;
+
   const start = Date.now();
   try {
-    const data = await bobProxyFetch(path as BobProxyModule, req.query as Record<string, unknown>);
+    const data = await bobProxyFetch(modulePath as BobProxyModule, queryParams);
     const ms = Date.now() - start;
-    console.log(`[bobProxy] ${path} → 200 in ${ms}ms`);
-    logBobProxyRequest(path, req.query as Record<string, unknown>, 200, true, ms).catch(() => {});
-    return res.json(data);
+    console.log(`[bobProxy] ${modulePath} → 200 in ${ms}ms (ip: ${callerIp})`);
+    logBobProxyRequest(modulePath, queryParams, 200, true, ms, callerIp).catch(() => {});
+    return res.json({ status: "ok", ...data });
   } catch (err: any) {
     const ms = Date.now() - start;
-    console.error(`[bobProxy] ${path} error:`, err.message);
-    logBobProxyRequest(path, req.query as Record<string, unknown>, 500, false, ms).catch(() => {});
-    return res.status(500).json({ ok: false, error: err.message });
+    console.error(`[bobProxy] ${modulePath} error:`, err.message);
+    logBobProxyRequest(modulePath, queryParams, 500, false, ms, callerIp).catch(() => {});
+    return res.status(500).json({ ok: false, status: "error", error: err.message });
   }
 });
 
