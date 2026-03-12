@@ -45,7 +45,7 @@ integrations = ["github:1.0.0", "google-drive:1.0.0"]
 
 [userenv.shared]
 SCB_MODE = "dry"
-BOB_READONLY_TOKEN = "bob_ro_5ff0f27885046776726dc631361ee62c6e83daf2690bfb3c"
+BOB_READONLY_TOKEN = "bob_ro_a551f678826404c7be288c49d5ccd526b1628e39c12f1243cc02062f3638e136"
 
 [userenv.development]
 PORT = "5000"
