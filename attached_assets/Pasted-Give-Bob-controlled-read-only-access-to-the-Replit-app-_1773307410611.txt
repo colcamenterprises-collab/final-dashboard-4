@@ -1,0 +1,94 @@
+Give Bob controlled read-only access to the Replit app/API so he can work inside the system now.
+
+Goal:
+Bob must be able to read operational data safely from the app without SSH, DB credentials, CSV exports, or manual token pasting each time.
+
+Required setup
+
+1. API base URL
+Confirm the canonical reachable API base URL Bob should use.
+It must be the real app backend domain, not localhost, not 127.0.0.1, and not the OpenClaw gateway host.
+
+Expected format:
+https://restaurant-operations-sbb-by-customli.replit.app
+
+2. Scoped read-only token
+Create or confirm a dedicated bearer token for Bob with these rules:
+- read-only only
+- GET access only
+- scoped only to:
+  - /api/bob/read/*
+  - and/or /api/ai-ops/bob/proxy-read
+- no write, update, delete, deploy, secret, or admin scopes
+- short-lived preferred, or revocable on demand
+
+3. Header forwarding / token injection
+Make sure Bob’s runtime can actually send authenticated requests successfully.
+Fix whichever is needed:
+- inject Authorization: Bearer <BOB_READONLY_TOKEN> automatically into Bob’s outbound data-access calls
+- or ensure the gateway/proxy forwards the Authorization header correctly
+- or both
+
+Return a clear confirmation:
+Token injected
+
+4. Use the working route only
+Choose one access path and make it the single supported path for Bob:
+Option A:
+- /api/bob/read/...
+Option B:
+- /api/ai-ops/bob/proxy-read?path=...
+
+Do not leave Bob guessing between both.
+Whichever path is selected must return JSON, not the app HTML shell.
+
+5. Health validation
+Make this command succeed with JSON:
+curl -sS -H "Authorization: Bearer $TOKEN" "https://restaurant-operations-sbb-by-customli.replit.app/<chosen-health-route>" | jq .
+
+Expected:
+- HTTP 200
+- Content-Type: application/json
+- small health JSON object
+
+6. Available read endpoints
+Confirm these are reachable for Bob on the chosen path:
+- health
+- reports/item-sales
+- reports/modifier-sales
+- reports/category-totals
+- forms/daily-sales
+- forms/daily-stock
+- purchases
+- tasks
+- audits
+
+7. Logging / audit trail
+Log Bob token usage:
+- timestamp
+- route called
+- response code
+- success/fail
+- duration
+This can stay in app logs or a bob_read_logs table.
+
+8. Security constraints
+Bob must NOT get:
+- SSH access
+- DB credentials
+- secrets tab access
+- deploy permissions
+- write endpoints
+- delete/update access
+
+Deliverables
+1. Root cause summary of why Bob could not reach the API before
+2. Exact chosen base URL
+3. Exact chosen route pattern
+4. Confirmation that token/header injection is active
+5. Proof of successful JSON response from health endpoint
+6. Proof of one successful real data call (for example item-sales)
+7. Full changed files
+
+Success condition
+After this is done, Bob must be able to call the health endpoint and at least one real read endpoint successfully from his runtime without asking Cam for CSVs, logs, SSH, or manual exports.

@@ -930,11 +930,27 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
     // (gateway proxies through 127.0.0.1:18789 which doesn't forward to our server)
     const liveSnapshot = await buildLiveDataSnapshot(lastUserMsg).catch(() => "");
 
+    // Bob's API access block — canonical deployed URL for outbound calls
+    const bobToken = process.env.BOB_READONLY_TOKEN ?? "";
+    const dataAccessBlock = bobToken
+      ? `\n[BOB API ACCESS — SINGLE CANONICAL ENDPOINT]\n` +
+        `Base URL: ${BOB_API_BASE_URL}\n` +
+        `Auth: Authorization: Bearer ${bobToken}\n` +
+        `Endpoint: GET ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=<module>\n` +
+        `Modules: health | reports/item-sales | reports/modifier-sales | reports/category-totals | forms/daily-sales | forms/daily-stock | purchases | tasks | audits\n` +
+        `Params: date=YYYY-MM-DD (reports/forms), limit=N, status/area (tasks), type=baseline|snapshot (audits)\n` +
+        `Example: GET ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=reports/item-sales&date=2026-03-11\n` +
+        `Token injected: YES. All requests logged to bob_read_logs (timestamp, route, status, duration).\n` +
+        `Note: Live data is ALSO pre-injected below in [LIVE DATA SNAPSHOT] — use that first, then call API only for specific date/detail queries.\n` +
+        `[END BOB API ACCESS]`
+      : "";
+
     messageToSend =
       `[BOB CEO CHARTER v${cachedCharterVersion} | updated ${dateStr}]\n` +
       charterBody +
       `\n[END CHARTER]` +
       systemMapExcerpt +
+      dataAccessBlock +
       liveSnapshot +
       WORKSPACE_TOOLS_BLOCK +
       `\n\nUser message:\n${lastUserMsg}`;
@@ -1485,6 +1501,31 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
   throw new Error(`Unknown module: ${module}`);
 }
 
+// Canonical Bob API base URL — used in Bob's context and for audit logging
+// Falls back to the known deployed URL if env var not set
+const BOB_API_BASE_URL =
+  process.env.BOB_API_BASE_URL?.replace(/\/$/, "") ||
+  "https://restaurant-operations-sbb-by-customli.replit.app";
+
+// ── Bob proxy-read request logger ─────────────────────────────────────────────
+// Logs every request to bob_read_logs (same table used by /api/bob/read/*)
+async function logBobProxyRequest(
+  route: string,
+  params: Record<string, unknown>,
+  status: number,
+  ok: boolean,
+  durationMs: number
+): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO bob_read_logs (route, params, status, ok, duration_ms)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [`proxy-read:${route}`, JSON.stringify(params), status, ok, durationMs]
+    );
+  } catch { /* non-critical */ }
+}
+
 router.get("/bob/proxy-read", async (req, res) => {
   // Auth: same BOB_READONLY_TOKEN
   const expectedToken = process.env.BOB_READONLY_TOKEN;
@@ -1518,10 +1559,14 @@ router.get("/bob/proxy-read", async (req, res) => {
   const start = Date.now();
   try {
     const data = await bobProxyFetch(path as BobProxyModule, req.query as Record<string, unknown>);
-    console.log(`[bobProxy] ${path} → 200 in ${Date.now()-start}ms`);
+    const ms = Date.now() - start;
+    console.log(`[bobProxy] ${path} → 200 in ${ms}ms`);
+    logBobProxyRequest(path, req.query as Record<string, unknown>, 200, true, ms).catch(() => {});
     return res.json(data);
   } catch (err: any) {
+    const ms = Date.now() - start;
     console.error(`[bobProxy] ${path} error:`, err.message);
+    logBobProxyRequest(path, req.query as Record<string, unknown>, 500, false, ms).catch(() => {});
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
