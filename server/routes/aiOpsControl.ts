@@ -788,11 +788,28 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
       ? `\n[SYSTEM MAP — Core Processes]\n${cachedProcessNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\nRule: Shopping List is auto-generated on Form 2 submit. Bob must OBSERVE and VALIDATE only — never duplicate.\nFull map: GET /api/ai-ops/process-registry\n[END SYSTEM MAP]`
       : "";
 
+    // Build Bob data-access block — proxy URL + token injected server-side
+    const appDomain = process.env.REPLIT_DOMAINS
+      ? `https://${process.env.REPLIT_DOMAINS.split(",")[0].trim()}`
+      : "http://localhost:5000";
+    const bobToken = process.env.BOB_READONLY_TOKEN ?? "";
+    const bobDataBlock = bobToken
+      ? `\n[BOB DATA ACCESS]\n` +
+        `Proxy endpoint: GET ${appDomain}/api/ai-ops/bob/proxy-read?path=<module>\n` +
+        `Auth header: Authorization: Bearer ${bobToken}\n` +
+        `Available modules: health | reports/item-sales | reports/modifier-sales | reports/category-totals | forms/daily-sales | forms/daily-stock | purchases | tasks | audits\n` +
+        `Optional params: date=YYYY-MM-DD (for reports/forms), limit=N, status=..., area=... (for tasks), type=baseline|snapshot (for audits)\n` +
+        `Example: GET ${appDomain}/api/ai-ops/bob/proxy-read?path=reports/item-sales&date=2026-03-11\n` +
+        `Note: Use this endpoint — NOT /api/bob/read/* — to avoid SPA routing interference.\n` +
+        `[END BOB DATA ACCESS]`
+      : "";
+
     messageToSend =
       `[BOB CEO CHARTER v${cachedCharterVersion} | updated ${dateStr}]\n` +
       charterBody +
       `\n[END CHARTER]` +
       systemMapExcerpt +
+      bobDataBlock +
       `\n\nUser message:\n${lastUserMsg}`;
   }
 
@@ -1127,6 +1144,235 @@ function bobHealthPayload() {
 
 // Mounted at /api/ai-ops/bob/health and /api/ops/ai/bob/health
 router.get("/bob/health", (_req, res) => res.json(bobHealthPayload()));
+
+// ─── Bob Proxy-Read ──────────────────────────────────────────────────────────
+// GET /api/ai-ops/bob/proxy-read?path=...&date=...&limit=...
+//
+// Server-side proxy for Bob's read-only data access.
+// Authenticates with BOB_READONLY_TOKEN, queries DB directly (no HTTP round-trip),
+// and returns JSON. Solves the HTML-instead-of-JSON problem caused by Bob's
+// gateway fetch calls hitting the SPA catch-all on the public domain.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const BOB_PROXY_MODULES = [
+  "health",
+  "reports/item-sales",
+  "reports/modifier-sales",
+  "reports/category-totals",
+  "forms/daily-sales",
+  "forms/daily-stock",
+  "purchases",
+  "tasks",
+  "audits",
+] as const;
+type BobProxyModule = typeof BOB_PROXY_MODULES[number];
+
+function isValidProxyDate(d: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(d);
+}
+function proxyNextDay(date: string): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+function proxyLimit(val: unknown, def = 50, max = 200): number {
+  const n = parseInt(val as string, 10);
+  if (isNaN(n) || n < 1) return def;
+  return Math.min(n, max);
+}
+
+async function bobProxyFetch(module: BobProxyModule, query: Record<string, unknown>): Promise<Record<string, unknown>> {
+  if (!pool) throw new Error("Database unavailable");
+  const { date, limit: limitRaw, status, area, type: auditType } = query as Record<string, string | undefined>;
+  const lim = proxyLimit(limitRaw);
+
+  // ── health ──
+  if (module === "health") {
+    return {
+      ok: true,
+      timestamp: new Date().toISOString(),
+      available_modules: BOB_PROXY_MODULES,
+      access: "proxy-read (server-side, DB-direct)",
+    };
+  }
+
+  // ── reports/item-sales ──
+  if (module === "reports/item-sales") {
+    if (!date || !isValidProxyDate(date)) throw new Error("date query param required (YYYY-MM-DD)");
+    const result = await pool.query(
+      `SELECT COALESCE(l.sku,'') AS sku, l.item_name AS name,
+              COALESCE(l.pos_category_name,'UNCATEGORIZED') AS category,
+              SUM(CASE WHEN l.receipt_type='SALE' THEN l.quantity ELSE 0 END)::int AS sold,
+              SUM(CASE WHEN l.receipt_type='REFUND' THEN ABS(l.quantity) ELSE 0 END)::int AS refunds
+       FROM receipt_truth_line l
+       WHERE l.receipt_date = $1::date
+       GROUP BY l.sku, l.item_name, l.pos_category_name
+       ORDER BY sold DESC, l.item_name`,
+      [date]);
+    const items = (result.rows as any[]).map(r => ({
+      sku: r.sku || null, name: r.name, category: r.category || "",
+      sold: Number(r.sold), refunds: Number(r.refunds), net: Number(r.sold) - Number(r.refunds),
+    }));
+    return { ok: true, date, count: items.length, items };
+  }
+
+  // ── reports/modifier-sales ──
+  if (module === "reports/modifier-sales") {
+    if (!date || !isValidProxyDate(date)) throw new Error("date query param required (YYYY-MM-DD)");
+    const shiftStart = `${date} 17:00:00+07`;
+    const shiftEnd = `${proxyNextDay(date)} 03:00:00+07`;
+    const result = await pool.query(
+      `SELECT m.raw_json->>'name' AS modifier_group, m.name AS modifier, SUM(m.qty)::int AS count
+       FROM lv_modifier m JOIN lv_receipt r ON r.receipt_id = m.receipt_id
+       WHERE r.datetime_bkk >= $1::timestamptz AND r.datetime_bkk < $2::timestamptz
+         AND (r.raw_json->>'refund_for') IS NULL
+       GROUP BY modifier_group, modifier ORDER BY count DESC`,
+      [shiftStart, shiftEnd]);
+    const modifiers = (result.rows as any[]).map(r => ({
+      modifier_group: r.modifier_group || "Unknown Group", modifier: r.modifier, count: Number(r.count),
+    }));
+    return { ok: true, date, count: modifiers.length, modifiers };
+  }
+
+  // ── reports/category-totals ──
+  if (module === "reports/category-totals") {
+    if (!date || !isValidProxyDate(date)) throw new Error("date query param required (YYYY-MM-DD)");
+    const result = await pool.query(
+      `SELECT COALESCE(pos_category_name,'UNCATEGORIZED') AS category, SUM(quantity)::int AS total
+       FROM receipt_truth_line
+       WHERE receipt_date = $1::date AND receipt_type = 'SALE'
+       GROUP BY COALESCE(pos_category_name,'UNCATEGORIZED') ORDER BY total DESC`,
+      [date]);
+    const totals: Record<string, number> = {};
+    for (const r of result.rows as any[]) totals[r.category] = Number(r.total);
+    return { ok: true, date, totals };
+  }
+
+  // ── forms/daily-sales ──
+  if (module === "forms/daily-sales") {
+    let rows: any[];
+    if (date && isValidProxyDate(date)) {
+      const r = await pool.query(
+        `SELECT id,"shiftDate","submittedAtISO","completedBy","totalSales","cashSales","qrSales","grabSales","cashBanked","totalExpenses"
+         FROM daily_sales_v2 WHERE "shiftDate"=$1 ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT $2`,
+        [date, lim]);
+      rows = r.rows;
+    } else {
+      const r = await pool.query(
+        `SELECT id,"shiftDate","submittedAtISO","completedBy","totalSales","cashSales","qrSales","grabSales","cashBanked","totalExpenses"
+         FROM daily_sales_v2 ORDER BY "shiftDate" DESC,"submittedAtISO" DESC NULLS LAST LIMIT $1`,
+        [lim]);
+      rows = r.rows;
+    }
+    return { ok: true, count: rows.length, forms: rows };
+  }
+
+  // ── forms/daily-stock ──
+  if (module === "forms/daily-stock") {
+    let rows: any[];
+    if (date && isValidProxyDate(date)) {
+      const r = await pool.query(
+        `SELECT s.id,s."salesId",s."createdAt",s."burgerBuns",s."meatWeightG",s."drinksJson",s."notes",d."shiftDate"
+         FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id=s."salesId"
+         WHERE d."shiftDate"=$1 ORDER BY s."createdAt" DESC LIMIT $2`,
+        [date, lim]);
+      rows = r.rows;
+    } else {
+      const r = await pool.query(
+        `SELECT s.id,s."salesId",s."createdAt",s."burgerBuns",s."meatWeightG",s."drinksJson",s."notes",d."shiftDate"
+         FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id=s."salesId"
+         ORDER BY d."shiftDate" DESC,s."createdAt" DESC LIMIT $1`,
+        [lim]);
+      rows = r.rows;
+    }
+    return { ok: true, count: rows.length, forms: rows };
+  }
+
+  // ── purchases ──
+  if (module === "purchases") {
+    const r = await pool.query(
+      `SELECT id,item,category,"orderUnit","unitCost","purchase_unit_qty",active
+       FROM purchasing_items WHERE active=true ORDER BY category,item LIMIT $1`, [lim]);
+    return { ok: true, count: r.rows.length, items: r.rows };
+  }
+
+  // ── tasks ──
+  if (module === "tasks") {
+    const conditions: string[] = ["deleted_at IS NULL"];
+    const values: any[] = [];
+    if (status) { values.push(status); conditions.push(`status=$${values.length}`); }
+    if (area)   { values.push(area);   conditions.push(`area=$${values.length}`); }
+    values.push(lim);
+    const r = await pool.query(
+      `SELECT id,task_number,title,status,priority,area,assigned_to,due_at,created_at,updated_at
+       FROM ai_tasks WHERE ${conditions.join(" AND ")}
+       ORDER BY CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,created_at DESC
+       LIMIT $${values.length}`, values);
+    return { ok: true, count: r.rows.length, tasks: r.rows };
+  }
+
+  // ── audits ──
+  if (module === "audits") {
+    const at = (auditType as string) || "both";
+    const result: Record<string, any> = { ok: true, type: at };
+    if (at === "baseline" || at === "both") {
+      const r = await pool.query(
+        `SELECT id,item_name,category,expected_qty,unit,warn_threshold,critical_threshold,created_at,updated_at
+         FROM stock_baseline ORDER BY created_at DESC LIMIT $1`, [lim]);
+      result.baseline = r.rows;
+    }
+    if (at === "snapshot" || at === "both") {
+      const r = await pool.query(
+        `SELECT id,shift_id,shift_date,item_name,category,actual_qty,unit,source,created_at
+         FROM stock_snapshot ORDER BY created_at DESC LIMIT $1`, [lim]);
+      result.snapshots = r.rows;
+    }
+    return result;
+  }
+
+  throw new Error(`Unknown module: ${module}`);
+}
+
+router.get("/bob/proxy-read", async (req, res) => {
+  // Auth: same BOB_READONLY_TOKEN
+  const expectedToken = process.env.BOB_READONLY_TOKEN;
+  if (!expectedToken) {
+    return res.status(503).json({ ok: false, error: "BOB_READONLY_TOKEN not configured" });
+  }
+  const authHeader = (req.headers.authorization || "") as string;
+  const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token || token !== expectedToken) {
+    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  }
+
+  const path = (req.query.path as string || "").replace(/^\/+/, "");
+  if (!path) {
+    return res.json({
+      ok: true,
+      message: "Bob proxy-read is operational",
+      available_modules: BOB_PROXY_MODULES,
+      usage: "GET /api/ai-ops/bob/proxy-read?path=<module>&date=YYYY-MM-DD&limit=N",
+    });
+  }
+
+  if (!BOB_PROXY_MODULES.includes(path as BobProxyModule)) {
+    return res.status(400).json({
+      ok: false,
+      error: `Unknown module: ${path}`,
+      available_modules: BOB_PROXY_MODULES,
+    });
+  }
+
+  const start = Date.now();
+  try {
+    const data = await bobProxyFetch(path as BobProxyModule, req.query as Record<string, unknown>);
+    console.log(`[bobProxy] ${path} → 200 in ${Date.now()-start}ms`);
+    return res.json(data);
+  } catch (err: any) {
+    console.error(`[bobProxy] ${path} error:`, err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
 
 // GET /api/ai-ops/bob/charter — returns the CEO Charter from DB
 router.get("/bob/charter", async (_req, res) => {
