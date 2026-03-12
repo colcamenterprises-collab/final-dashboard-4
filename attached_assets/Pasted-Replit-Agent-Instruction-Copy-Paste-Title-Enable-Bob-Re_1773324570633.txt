@@ -1,0 +1,151 @@
+Replit Agent Instruction (Copy & Paste)
+Title: Enable Bob Read-Only API Access via Proxy
+Objective:
+Allow the Bob AI agent (running through the OpenClaw gateway) to safely read operational data from the Smash Brothers Burgers dashboard via a read-only proxy API.
+Bob must NOT have DB access, SSH access, or write permissions.
+Only read-only API access is required.
+1. Create / Fix Proxy Endpoint
+Ensure this route exists and returns JSON only.
+Route:
+Copy code
+
+GET /api/ai-ops/bob/proxy-read
+Query parameter:
+Copy code
+
+?path=<module>
+Example:
+Copy code
+
+/api/ai-ops/bob/proxy-read?path=health
+2. Proxy must forward to internal data modules
+Map the path parameter to internal services.
+Allowed modules:
+Copy code
+
+health
+reports/item-sales
+reports/modifier-sales
+reports/category-totals
+forms/daily-sales
+forms/daily-stock
+purchases
+audits
+tasks
+Example mapping:
+Copy code
+
+/api/ai-ops/bob/proxy-read?path=reports/item-sales&date=all
+→ internal service: reports/item-sales
+3. Enforce Read-Only Security
+Add Bearer token validation.
+Environment variable:
+Copy code
+
+BOB_READONLY_TOKEN
+Proxy must reject requests without this token.
+Example:
+Copy code
+
+Authorization: Bearer ${BOB_READONLY_TOKEN}
+If token missing:
+Copy code
+
+401 Unauthorized
+4. Ensure JSON response
+All proxy responses must return:
+Copy code
+
+Content-Type: application/json
+Never return the frontend HTML.
+If route fails:
+Copy code
+
+{ "error": "module not available" }
+5. Prevent access to anything else
+Whitelist only these modules.
+Reject everything else.
+Example:
+Copy code
+
+400 Invalid module
+6. Add request logging (important)
+Create log table if not exists:
+Copy code
+
+bob_read_logs
+Fields:
+Copy code
+
+id
+timestamp
+module
+status
+duration_ms
+ip
+Log every proxy call.
+7. Validate deployment routing
+Ensure that:
+Copy code
+
+/api/*
+routes to the backend server and NOT the frontend SPA.
+Current issue:
+Requests are hitting the UI catch-all instead of API routes.
+Fix by ensuring Express handles /api/* before frontend routes.
+8. Validation Test
+After deploy, run this command:
+Copy code
+
+curl -sS -H "Accept: application/json" \
+https://restaurant-operations-sbb-by-customli.replit.app/api/ai-ops/bob/proxy-read?path=health | jq .
+Expected output:
+Copy code
+
+{
+  "status": "ok"
+}
+If HTML appears, routing is still wrong.
+9. Confirm token injection
+Ensure Bob's gateway requests include:
+Copy code
+
+Authorization: Bearer ${BOB_READONLY_TOKEN}
+When completed, respond:
+Copy code
+
+Token injected
+10. Deploy
+Republish the Replit app.
+Confirm proxy endpoint works publicly.
+Final Expected Endpoint
+Example Bob request:
+Copy code
+
+GET https://restaurant-operations-sbb-by-customli.replit.app/api/ai-ops/bob/proxy-read?path=reports/item-sales&date=all
+Headers:
+Copy code
+
+Authorization: Bearer bob_ro_xxxxx
+Accept: application/json
+Expected Result
+Bob will now be able to read:
+receipts
+modifiers
+daily stock
+purchases
+audits
+And run:
+Copy code
+
+BASELINE AUDIT
+THEFT ENGINE
+INGREDIENT RECONCILIATION
+without needing database credentials.
+After this is done
+Tell Bob:
+Copy code
+
+Token injected
+Retry now
+He will then run the full baseline audit automatically.
