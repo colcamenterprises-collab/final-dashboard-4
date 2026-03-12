@@ -4,6 +4,11 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import crypto from "crypto";
 import { runMonitors, startMonitorScheduler } from "../services/monitorEngine";
+import {
+  parseWorkspaceTools,
+  executeWorkspaceTools,
+  WORKSPACE_TOOLS_BLOCK,
+} from "../services/bobWorkspace";
 
 const router = Router();
 
@@ -759,6 +764,139 @@ async function loadProcessNamesFromDb(): Promise<void> {
   }
 }
 
+// ── Live Data Snapshot ───────────────────────────────────────────────────────
+// Pre-fetches real DB data and injects it inline into every Bob message.
+// Eliminates the need for Bob to make outbound HTTP calls (which the gateway
+// routes through 127.0.0.1:18789 and serves HTML, not JSON).
+// ─────────────────────────────────────────────────────────────────────────────
+async function buildLiveDataSnapshot(userMsg: string): Promise<string> {
+  if (!pool) return "";
+  const lower = userMsg.toLowerCase();
+
+  // Detect target date from message
+  const bangkokNow = new Date().toLocaleString("en-CA", { timeZone: "Asia/Bangkok", hour12: false }).slice(0, 10);
+  const dateMatch = userMsg.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  const mentionsYesterday = /yesterday/i.test(lower);
+  let targetDate = bangkokNow;
+  if (dateMatch) {
+    targetDate = dateMatch[1];
+  } else if (mentionsYesterday) {
+    const d = new Date(`${bangkokNow}T00:00:00+07:00`);
+    d.setDate(d.getDate() - 1);
+    targetDate = d.toISOString().slice(0, 10);
+  }
+
+  const parts: string[] = [];
+  parts.push(`Today (Bangkok): ${bangkokNow} | Data date: ${targetDate}`);
+
+  // Always: recent daily sales summary (last 7 days)
+  try {
+    const r = await pool.query(
+      `SELECT "shiftDate","completedBy","totalSales","cashSales","qrSales","grabSales","cashBanked","totalExpenses"
+       FROM daily_sales_v2 ORDER BY "shiftDate" DESC LIMIT 7`);
+    if (r.rows.length > 0) {
+      const lines = r.rows.map((row: any) =>
+        `  ${row.shiftDate} | by ${row.completedBy || "unknown"} | sales ฿${row.totalSales ?? 0} | banked ฿${row.cashBanked ?? 0} | expenses ฿${row.totalExpenses ?? 0}`
+      );
+      parts.push(`RECENT SALES (last 7 shifts):\n${lines.join("\n")}`);
+    } else {
+      parts.push("RECENT SALES: no forms submitted yet");
+    }
+  } catch { /* skip */ }
+
+  // Always: open/in-progress tasks
+  try {
+    const r = await pool.query(
+      `SELECT task_number,title,status,priority,area,assigned_to
+       FROM ai_tasks WHERE deleted_at IS NULL AND status NOT IN ('completed','archived')
+       ORDER BY CASE priority WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END, created_at DESC
+       LIMIT 15`);
+    if (r.rows.length > 0) {
+      const lines = r.rows.map((row: any) =>
+        `  [${row.task_number}] ${row.title} | ${row.status} | ${row.priority} | ${row.area} | ${row.assigned_to || "-"}`
+      );
+      parts.push(`OPEN TASKS (${r.rows.length}):\n${lines.join("\n")}`);
+    } else {
+      parts.push("OPEN TASKS: none");
+    }
+  } catch { /* skip */ }
+
+  // Conditional: item-level sales for target date (on explicit sales/audit query)
+  const wantsItemSales = /item.sale|audit|sales.by.item|top.sell|best.sell|item.break|per.item/i.test(lower);
+  if (wantsItemSales) {
+    try {
+      const r = await pool.query(
+        `SELECT COALESCE(l.sku,'') AS sku, l.item_name AS name,
+                COALESCE(l.pos_category_name,'UNCATEGORIZED') AS category,
+                SUM(CASE WHEN l.receipt_type='SALE' THEN l.quantity ELSE 0 END)::int AS sold,
+                SUM(CASE WHEN l.receipt_type='REFUND' THEN ABS(l.quantity) ELSE 0 END)::int AS refunds
+         FROM receipt_truth_line l WHERE l.receipt_date = $1::date
+         GROUP BY l.sku, l.item_name, l.pos_category_name ORDER BY sold DESC LIMIT 30`,
+        [targetDate]);
+      if (r.rows.length > 0) {
+        const lines = (r.rows as any[]).map(row =>
+          `  ${row.name} | category: ${row.category} | sold: ${row.sold} | refunds: ${row.refunds} | net: ${Number(row.sold) - Number(row.refunds)}`
+        );
+        parts.push(`ITEM SALES (${targetDate}, top 30):\n${lines.join("\n")}`);
+      } else {
+        parts.push(`ITEM SALES (${targetDate}): no POS data ingested for this date`);
+      }
+    } catch { /* skip */ }
+  }
+
+  // Conditional: category totals for target date
+  const wantsCategoryTotals = /categor|by.categor|categor.break|food.categor/i.test(lower);
+  if (wantsCategoryTotals || wantsItemSales) {
+    try {
+      const r = await pool.query(
+        `SELECT COALESCE(pos_category_name,'UNCATEGORIZED') AS category, SUM(quantity)::int AS total
+         FROM receipt_truth_line
+         WHERE receipt_date = $1::date AND receipt_type = 'SALE'
+         GROUP BY COALESCE(pos_category_name,'UNCATEGORIZED') ORDER BY total DESC`,
+        [targetDate]);
+      if (r.rows.length > 0) {
+        const lines = (r.rows as any[]).map(row => `  ${row.category}: ${row.total} sold`);
+        parts.push(`CATEGORY TOTALS (${targetDate}):\n${lines.join("\n")}`);
+      }
+    } catch { /* skip */ }
+  }
+
+  // Conditional: stock forms
+  const wantsStock = /stock|bun|meat|drink|inventory|variance/i.test(lower);
+  if (wantsStock) {
+    try {
+      const r = await pool.query(
+        `SELECT d."shiftDate", s."burgerBuns", s."meatWeightG", s."notes"
+         FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id = s."salesId"
+         ORDER BY d."shiftDate" DESC LIMIT 7`);
+      if (r.rows.length > 0) {
+        const lines = (r.rows as any[]).map(row =>
+          `  ${row.shiftDate} | buns: ${row.burgerBuns ?? 0} | meat: ${row.meatWeightG ?? 0}g | notes: ${row.notes || "-"}`
+        );
+        parts.push(`STOCK FORMS (last 7):\n${lines.join("\n")}`);
+      }
+    } catch { /* skip */ }
+  }
+
+  // Conditional: purchasing items count (on purchasing/food cost queries)
+  const wantsPurchasing = /purchas|food.cost|supplier|order|ingredi/i.test(lower);
+  if (wantsPurchasing) {
+    try {
+      const r = await pool.query(
+        `SELECT category, COUNT(*)::int AS items, AVG("unitCost")::numeric(10,2) AS avg_cost
+         FROM purchasing_items WHERE active = true GROUP BY category ORDER BY items DESC LIMIT 10`);
+      if (r.rows.length > 0) {
+        const lines = (r.rows as any[]).map(row =>
+          `  ${row.category}: ${row.items} items (avg cost ฿${row.avg_cost ?? 0})`
+        );
+        parts.push(`PURCHASING SUMMARY (by category):\n${lines.join("\n")}`);
+      }
+    } catch { /* skip */ }
+  }
+
+  return `\n[LIVE DATA SNAPSHOT — injected by server at ${new Date().toISOString()}]\n${parts.join("\n\n")}\n[END SNAPSHOT]`;
+}
+
 async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assistant" | "system"; content: string }>) {
   if (!process.env.OPENCLAW_BASE_URL || !process.env.OPENCLAW_GATEWAY_TOKEN) {
     console.warn("[Bob] Orchestrator not configured — returning offline message");
@@ -798,10 +936,36 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
       `\n[END CHARTER]` +
       systemMapExcerpt +
       liveSnapshot +
+      WORKSPACE_TOOLS_BLOCK +
       `\n\nUser message:\n${lastUserMsg}`;
   }
 
-  return bobManager.sendChat(messageToSend);
+  // ── Agentic tool-call loop ──────────────────────────────────────────────────
+  // Bob may embed <workspace_tool> tags in his reply. We execute them server-side
+  // and feed the results back so Bob can continue reasoning. Max 8 rounds.
+  const MAX_TOOL_ROUNDS = 8;
+  let reply = await bobManager.sendChat(messageToSend);
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const tools = parseWorkspaceTools(reply);
+    if (tools.length === 0) break;
+
+    console.log(`[BobWorkspace] Round ${round + 1}: executing ${tools.length} tool(s):`, tools.map(t => t.name));
+    const toolResults = await executeWorkspaceTools(tools);
+
+    // Feed results back to Bob for the next reasoning step
+    const followUp =
+      `[WORKSPACE TOOL RESULTS — Round ${round + 1}]\n${toolResults}\n[END TOOL RESULTS]\n\n` +
+      `Continue your analysis using the above results. If you need more data, use additional tool tags. ` +
+      `If you are done, provide your final answer without any tool tags.`;
+
+    reply = await bobManager.sendChat(followUp);
+
+    // If no more tool calls in the reply, we're done
+    if (parseWorkspaceTools(reply).length === 0) break;
+  }
+
+  return reply;
 }
 
 function parseTaskId(rawId: string) {
