@@ -1547,18 +1547,22 @@ router.get("/bob/proxy-read", async (req, res) => {
   );
 
   // ── Auth ──
-  // Accept token via: (1) Authorization: Bearer header, OR (2) ?token= query param.
-  // Query param fallback needed because the OpenClaw gateway does not forward
-  // Authorization headers on Bob's outbound HTTP calls.
-  const expectedToken = process.env.BOB_READONLY_TOKEN;
-  if (!expectedToken) {
-    return res.status(503).json({ ok: false, status: "error", error: "BOB_READONLY_TOKEN not configured" });
+  // Accepts token via: (1) Authorization: Bearer header, OR (2) ?token= / ?api_key= query param.
+  // Gateway doesn't forward Authorization headers, so ?token= is the primary path for Bob.
+  // Two valid tokens are accepted:
+  //   - BOB_READONLY_TOKEN  : internal rotated token (embedded in Bob's server-side context)
+  //   - BOBS_LOYVERSE_TOKEN : token Bob's gateway was configured with externally
+  const internalToken = process.env.BOB_READONLY_TOKEN;
+  const gatewayToken  = process.env.BOBS_LOYVERSE_TOKEN;
+  const validTokens   = [internalToken, gatewayToken].filter(Boolean) as string[];
+  if (validTokens.length === 0) {
+    return res.status(503).json({ ok: false, status: "error", error: "No read tokens configured" });
   }
-  const authHeader = (req.headers.authorization || "") as string;
+  const authHeader  = (req.headers.authorization || "") as string;
   const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const queryToken = (req.query.token as string) || (req.query.api_key as string) || null;
-  const token = headerToken || queryToken;
-  if (!token || token !== expectedToken) {
+  const queryToken  = (req.query.token as string) || (req.query.api_key as string) || null;
+  const token       = headerToken || queryToken;
+  if (!token || !validTokens.includes(token)) {
     return res.status(401).json({ ok: false, status: "unauthorized", error: "Unauthorized" });
   }
 
