@@ -1750,15 +1750,20 @@ export const purchaseAnalyticsV2 = pgTable('purchase_analytics_v2', {
 });
 
 // Derived analysis reports (deterministic + rebuildable)
+// analysis_reports — managed via raw SQL (pool.query). Schema matches live DB exactly.
+// DO NOT run db:push against this table without verifying no destructive ALTER is generated.
 export const analysisReports = pgTable('analysis_reports', {
-  id: serial('id').primaryKey(),
-  reportDate: date('report_date').notNull(),
-  reportType: text('report_type').notNull(),
-  data: jsonb('data').notNull(),
-  createdAt: timestamp('created_at').defaultNow(),
-  updatedAt: timestamp('updated_at').defaultNow(),
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  shiftDate: date('shift_date').notNull(),
+  analysisType: text('analysis_type').notNull(),
+  status: text('status').notNull().default('pending'),
+  summary: text('summary'),
+  dataJson: jsonb('data_json'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  createdBy: text('created_by').notNull().default('bob'),
 }, (table) => ({
-  uniqueReport: unique().on(table.reportDate, table.reportType),
+  shiftDateIdx: index('idx_analysis_reports_shift_date').on(table.shiftDate),
+  typeIdx: index('idx_analysis_reports_type').on(table.analysisType),
 }));
 
 // -----------------------------------------------------------------------------

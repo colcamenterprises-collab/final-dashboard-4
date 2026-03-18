@@ -1864,7 +1864,8 @@ router.post("/bob/run-analysis", async (req, res) => {
       recommendations.push("Cross-check meat delivery with supplier receipts.");
     }
     if (posTotalBaht === 0) {
-      status = "warning";
+      // Only upgrade, never downgrade — if already critical, keep critical
+      if (status === "ok") status = "warning";
       issues.push("No POS receipts found for this date — Loyverse data may not have been synced.");
       recommendations.push("Run a Loyverse sync for this date, or verify the business date mapping.");
     }

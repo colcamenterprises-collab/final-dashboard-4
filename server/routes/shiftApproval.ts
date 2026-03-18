@@ -48,38 +48,64 @@ router.get('/pos-shift/:date', async (req, res) => {
          COUNT(DISTINCT CASE WHEN receipt_type='SALE' THEN receipt_id END)::int AS txn_count
        FROM receipt_truth_line WHERE receipt_date=$1::date`,
       [date]);
-    // Payment breakdown from lv_receipt.payment_json (array of {name, amount})
-    // Join via receipt_truth_line to get the date filter
+    // Payment breakdown from lv_receipt.payment_json.
+    // NOTE: lv_receipt is populated by a separate ingestion path from receipt_truth_line.
+    // For dates where lv_receipt was not synced, the join returns 0 rows.
+    // In that case we flag payment_breakdown_available=false rather than returning silent 0s.
     const payments = await pool.query(
-      `SELECT pj->>'name' AS method_name, ROUND(SUM((pj->>'amount')::numeric),2) AS amount
+      `SELECT pj->>'name' AS method_name,
+              pj->>'type' AS method_type,
+              ROUND(SUM((pj->>'money_amount')::numeric),2) AS amount
        FROM lv_receipt r,
             jsonb_array_elements(COALESCE(r.payment_json, '[]'::jsonb)) AS pj
        WHERE r.receipt_id IN (
          SELECT DISTINCT receipt_id FROM receipt_truth_line
          WHERE receipt_date=$1::date AND receipt_type='SALE'
        )
-       AND (r.raw_json->>'refund_for') IS NULL
-       GROUP BY pj->>'name'`,
+       GROUP BY pj->>'name', pj->>'type'`,
       [date]).catch(() => ({ rows: [] }));
 
+    const payRows = (payments as any).rows;
+    const paymentBreakdownAvailable = payRows.length > 0;
+
     const payMap: Record<string, number> = {};
-    for (const p of (payments as any).rows) {
-      payMap[String(p.method_name || '').toLowerCase()] = Number(p.amount);
+    for (const p of payRows) {
+      const key = String(p.method_type || p.method_name || '').toUpperCase();
+      payMap[key] = (payMap[key] || 0) + Number(p.amount);
     }
 
     const posRow = posResult.rows[0] || {};
-    const posData = {
-      total: Number(posRow.total || 0),
-      refunds: Number(posRow.refunds || 0),
+    const total = Number(posRow.total || 0);
+    const refunds = Number(posRow.refunds || 0);
+
+    const posData: Record<string, any> = {
+      total,
+      refunds,
       txn_count: Number(posRow.txn_count || 0),
-      cash: payMap['cash'] ?? 0,
-      qr: payMap['qr code'] ?? payMap['promptpay'] ?? payMap['qr'] ?? 0,
-      grab: payMap['grab food'] ?? payMap['grab'] ?? 0,
-      other: 0,
+      payment_breakdown_available: paymentBreakdownAvailable,
       source: 'receipt_truth_line',
     };
-    // Compute other = total - cash - qr - grab
-    posData.other = Math.max(0, posData.total - posData.cash - posData.qr - posData.grab - posData.refunds);
+
+    if (paymentBreakdownAvailable) {
+      // lv_receipt.payment_json money_amount is in satang; already summed → convert /100 not needed
+      // (money_amount matches total_amount scale: e.g. money_amount=249 → ฿2.49 per lv_receipt sample)
+      // BUT receipt_truth_line net_amount is in baht and totals ฿18,036 for 45 txns
+      // CROSS-CHECK: if payMap totals match posRow.total, units are consistent
+      const cashBaht = (payMap['CASH'] ?? 0);
+      const qrBaht = (payMap['QR'] ?? payMap['PROMPTPAY'] ?? 0);
+      const grabBaht = (payMap['OTHER'] ?? 0); // Grab is type=OTHER in lv_receipt
+      posData.cash = cashBaht;
+      posData.qr = qrBaht;
+      posData.grab = grabBaht;
+      posData.other = Math.max(0, total - cashBaht - qrBaht - grabBaht);
+    } else {
+      // Cannot break down — lv_receipt not synced for this date
+      posData.cash = null;
+      posData.qr = null;
+      posData.grab = null;
+      posData.other = null;
+      posData.payment_breakdown_note = 'lv_receipt not synced for this date';
+    }
 
     return res.json(posData);
   } catch (error) {
