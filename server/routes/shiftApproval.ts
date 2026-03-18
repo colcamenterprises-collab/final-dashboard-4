@@ -8,6 +8,7 @@ import {
   upsertFormSnapshot,
 } from '../services/shiftApprovalService';
 import { storeShiftSnapshot } from '../services/loyverseService';
+import { pool } from '../db';
 
 
 const router = Router();
@@ -29,9 +30,58 @@ function requireManager(req: any, res: any, next: any) {
 router.use(attachAuth);
 
 router.get('/pos-shift/:date', async (req, res) => {
+  const date = req.params.date;
   try {
-    const snapshot = await getShiftSnapshot(req.params.date);
-    res.json(snapshot?.pos_data ?? {});
+    // Primary: ShiftSnapshot (pre-computed, set via /sync or approval)
+    const snapshot = await getShiftSnapshot(date);
+    if (snapshot?.pos_data && Object.keys(snapshot.pos_data).length > 0) {
+      return res.json({ ...snapshot.pos_data, source: 'snapshot' });
+    }
+
+    // Fallback: derive directly from receipt_truth_line (Loyverse ingested data)
+    if (!pool) return res.json({});
+    // net_amount is in baht (numeric), not cents
+    const posResult = await pool.query(
+      `SELECT
+         ROUND(SUM(CASE WHEN receipt_type='SALE' THEN COALESCE(net_amount,0) ELSE 0 END)::numeric, 2) AS total,
+         ROUND(SUM(CASE WHEN receipt_type='REFUND' THEN ABS(COALESCE(net_amount,0)) ELSE 0 END)::numeric, 2) AS refunds,
+         COUNT(DISTINCT CASE WHEN receipt_type='SALE' THEN receipt_id END)::int AS txn_count
+       FROM receipt_truth_line WHERE receipt_date=$1::date`,
+      [date]);
+    // Payment breakdown from lv_receipt.payment_json (array of {name, amount})
+    // Join via receipt_truth_line to get the date filter
+    const payments = await pool.query(
+      `SELECT pj->>'name' AS method_name, ROUND(SUM((pj->>'amount')::numeric),2) AS amount
+       FROM lv_receipt r,
+            jsonb_array_elements(COALESCE(r.payment_json, '[]'::jsonb)) AS pj
+       WHERE r.receipt_id IN (
+         SELECT DISTINCT receipt_id FROM receipt_truth_line
+         WHERE receipt_date=$1::date AND receipt_type='SALE'
+       )
+       AND (r.raw_json->>'refund_for') IS NULL
+       GROUP BY pj->>'name'`,
+      [date]).catch(() => ({ rows: [] }));
+
+    const payMap: Record<string, number> = {};
+    for (const p of (payments as any).rows) {
+      payMap[String(p.method_name || '').toLowerCase()] = Number(p.amount);
+    }
+
+    const posRow = posResult.rows[0] || {};
+    const posData = {
+      total: Number(posRow.total || 0),
+      refunds: Number(posRow.refunds || 0),
+      txn_count: Number(posRow.txn_count || 0),
+      cash: payMap['cash'] ?? 0,
+      qr: payMap['qr code'] ?? payMap['promptpay'] ?? payMap['qr'] ?? 0,
+      grab: payMap['grab food'] ?? payMap['grab'] ?? 0,
+      other: 0,
+      source: 'receipt_truth_line',
+    };
+    // Compute other = total - cash - qr - grab
+    posData.other = Math.max(0, posData.total - posData.cash - posData.qr - posData.grab - posData.refunds);
+
+    return res.json(posData);
   } catch (error) {
     console.error('[shiftApproval.pos-shift] error', error);
     res.status(500).json({ error: 'Failed to fetch POS shift data' });

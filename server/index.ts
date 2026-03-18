@@ -620,6 +620,24 @@ async function checkSchema() {
             }
           }, { timezone: 'Asia/Bangkok' });
           
+          // Auto-daily Bob analysis (09:00 Bangkok — after all data is synced)
+          nodeCron.default.schedule("0 9 * * *", async () => {
+            const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+              .toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+            try {
+              const res = await fetch(`http://localhost:${process.env.PORT || 5000}/api/ai-ops/bob/run-analysis`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ shift_date: yesterday }),
+              });
+              const json = await res.json();
+              console.log(`[AUTO-ANALYSIS] Bob shift review complete for ${yesterday}: status=${json.status}`);
+            } catch (error) {
+              console.error('[AUTO-ANALYSIS] Bob shift review failed', { yesterday, error });
+            }
+          }, { timezone: 'Asia/Bangkok' });
+          console.log("🤖 Bob auto-daily analysis scheduled for 9:00am Bangkok time");
+
           // PATCH O3 — LOYVERSE QUEUE SCHEDULER
           const { processLoyverseQueue } = await import('./services/loyverseQueue.js');
           setInterval(() => {

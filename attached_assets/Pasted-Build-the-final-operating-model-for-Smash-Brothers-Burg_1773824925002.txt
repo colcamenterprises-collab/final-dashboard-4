@@ -1,0 +1,179 @@
+Build the final operating model for Smash Brothers Burgers now.
+
+Goal:
+Bob must have complete READ-ONLY visibility across the entire SBB app and all connected operational data, including POS-facing data sources, so he can detect issues early, write analysis into the app, recommend fixes, and hand actionable work to Codex. This must be active and working, not partial.
+
+Do not return a phased plan. Implement the full solution.
+
+REQUIRED OUTCOME
+
+1. Bob must have complete read-only access to the full app
+Give Bob read-only access to:
+- all app pages
+- all API data
+- all form data
+- all reporting data
+- all stock data
+- all purchase history
+- all task/work register data
+- all audit/history tables
+- all POS/Loyverse-imported data that exists in the system
+- all visible UI pages through a browser lane
+
+This means:
+A) Read-only API access to the entire operational dataset
+B) Read-only browser/UI access to the live app
+
+No missing modules. No blind spots.
+
+2. Bob API access
+Create/complete a Bob read-only API layer that exposes:
+- item sales by date
+- modifier sales by date
+- category totals by date
+- daily sales forms
+- daily stock forms
+- purchase history by date range
+- stock ledger / stock movements
+- audits / analysis reports
+- task register
+- any POS/Loyverse reports already imported
+- health/status endpoints
+
+Important:
+The current purchases endpoint that returns only catalog items is not enough.
+Bob needs actual dated purchase history.
+
+Add/confirm:
+GET /api/ai-ops/bob/proxy-read?path=purchase-history&from=YYYY-MM-DD&to=YYYY-MM-DD
+
+Return:
+- date
+- category
+- item
+- qty
+- unit
+- supplier
+- reference
+
+Keep everything read-only.
+
+3. Bob browser access
+Set up a dedicated Bob read-only login/account for the live app.
+Bob must be able to open and inspect at minimum:
+- Sales & Shift Analysis
+- Receipt Analysis
+- Form Library
+- Daily Sales & Stock V2 views
+- Stock Ledger
+- Stock Reconciliation
+- Finance / Expenses
+- purchase modals / purchase history screens
+- any Loyverse/POS report screens already present
+
+Bob must NOT be able to save edits, approve records, delete data, deploy, or change secrets.
+
+4. One analysis output table
+Create a persistent analysis output table if not already present:
+analysis_reports
+
+Fields:
+- id
+- shift_date
+- analysis_type
+- status
+- summary
+- data_json
+- created_at
+- created_by
+
+Bob must be able to INSERT analysis results only.
+No updates/deletes needed.
+
+5. Write Bob’s results into the app
+On the existing Sales & Shift Analysis page, add a visible section:
+BOB REVIEW
+
+For the selected shift/date, display:
+- status (OK / Warning / Critical)
+- plain-English summary
+- key mismatches
+- recommended action
+- last run time
+
+Do not create a new page.
+Use the existing Sales & Shift Analysis page.
+
+6. Fix Sales & Shift Analysis data wiring
+The page currently disagrees with itself:
+- bottom data dump shows staff form data
+- top comparison says data is missing
+- Loyverse data exists but page says missing
+
+Fix this page completely so that selecting a shift/date loads:
+- the correct Daily Sales & Stock V2 record
+- the correct Loyverse/POS shift data
+- the correct Bob review
+using one shared business shift key
+
+This page must become the single daily truth screen.
+
+7. Bob audit execution
+Add a “Run Bob Analysis” action on Sales & Shift Analysis that:
+- loads the selected shift data
+- loads the matching POS/Loyverse data
+- loads dated purchase history
+- loads stock data
+- runs comparison logic
+- saves result to analysis_reports
+- displays result immediately in Bob Review
+
+8. Automatic daily analysis
+Set Bob to automatically run analysis for completed shifts and write results into analysis_reports.
+At minimum:
+- receipt integrity
+- stock variance
+- shift summary
+
+9. Codex workflow
+Codex must be part of the loop.
+Create a structured handoff model:
+
+Bob finds issue
+→ writes analysis report
+→ creates RECOMMENDED FIX block
+→ Codex receives the technical implementation instruction
+→ fix is prepared
+→ approval required
+→ applied
+
+Bob does not deploy.
+Codex does not guess.
+Everything starts from Bob’s visible analysis report.
+
+10. Guardrails
+Bob:
+- read-only everywhere except INSERT into analysis_reports
+- no deletes
+- no secret access
+- no deploy
+- no billing/infrastructure changes
+
+Codex:
+- can prepare fixes
+- cannot auto-deploy without approval
+
+11. Deliverables
+Return:
+- exact access model implemented for Bob
+- exact pages Bob can read
+- exact APIs Bob can read
+- proof Bob can view the live app in read-only mode
+- proof Bob can read dated purchase history
+- proof Bob can write analysis_reports
+- screenshot of Sales & Shift Analysis with Bob Review visible
+- one real completed analysis run
+- one example of Bob → Codex handoff format
+
+Do not return another staged roadmap.
+Implement the full operating model now.

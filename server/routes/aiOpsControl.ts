@@ -950,9 +950,23 @@ async function callBobOrchestrator(contextMessages: Array<{ role: "user" | "assi
         `  ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=tasks&token=${bobToken}\n` +
         `  ${BOB_API_BASE_URL}/api/ai-ops/bob/proxy-read?path=audits&type=baseline&token=${bobToken}\n` +
         `\n` +
-        `MODULES: health | reports/item-sales | reports/modifier-sales | reports/category-totals | forms/daily-sales | forms/daily-stock | purchases | tasks | audits\n` +
+        `READ MODULES: health | reports/item-sales | reports/modifier-sales | reports/category-totals\n` +
+        `              forms/daily-sales | forms/daily-stock | purchases | purchase-history\n` +
+        `              stock-ledger | tasks | audits | analysis-reports\n` +
         `DATE PARAMS: date=YYYY-MM-DD (specific day), omit for recent data, date=all same as omitting\n` +
-        `All requests logged to bob_read_logs table (timestamp, module, ip, status, duration_ms).\n` +
+        `purchase-history also accepts: from=YYYY-MM-DD&to=YYYY-MM-DD for a range\n` +
+        `\n` +
+        `WRITE ACCESS (Bob can INSERT analysis results):\n` +
+        `  POST ${BOB_API_BASE_URL}/api/ai-ops/bob/analysis?token=${bobToken}\n` +
+        `  Body: { shift_date, analysis_type, status, summary, data_json, created_by }\n` +
+        `  Allowed: INSERT only. No UPDATE, no DELETE.\n` +
+        `\n` +
+        `RUN SERVER-SIDE ANALYSIS:\n` +
+        `  POST ${BOB_API_BASE_URL}/api/ai-ops/bob/run-analysis  (no token required — internal)\n` +
+        `  Body: { shift_date: "YYYY-MM-DD" }\n` +
+        `  Returns: status, summary, issues[], recommendations[], codex_handoff block\n` +
+        `\n` +
+        `All read requests logged to bob_read_logs table (timestamp, module, ip, status, duration_ms).\n` +
         `[END BOB API ACCESS]`
       : "";
 
@@ -1341,8 +1355,11 @@ const BOB_PROXY_MODULES = [
   "forms/daily-sales",
   "forms/daily-stock",
   "purchases",
+  "purchase-history",
+  "stock-ledger",
   "tasks",
   "audits",
+  "analysis-reports",
 ] as const;
 type BobProxyModule = typeof BOB_PROXY_MODULES[number];
 
@@ -1509,6 +1526,119 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
     return result;
   }
 
+  // ── purchase-history ──
+  // Dated actual purchases: purchasing_shift_items (per-shift quantities) joined
+  // with purchasing_items (name/category/unit/cost) and daily_stock_v2 / daily_sales_v2 (date).
+  // Optional: from=YYYY-MM-DD, to=YYYY-MM-DD, or date=YYYY-MM-DD for single day.
+  if (module === "purchase-history") {
+    const { from, to } = query as Record<string, string | undefined>;
+    // daily_sales_v2."shiftDate" is stored as TEXT 'YYYY-MM-DD' — compare as text (ISO format sorts correctly)
+    const fromDate = (date && isValidProxyDate(date)) ? date : (from && isValidProxyDate(from)) ? from : null;
+    const toDate   = (date && isValidProxyDate(date)) ? date : (to   && isValidProxyDate(to))   ? to   : null;
+
+    let shiftRows: any[] = [];
+    {
+      const conds: string[] = ["psi.quantity > 0"];
+      const vals: any[] = [];
+      if (fromDate) { vals.push(fromDate); conds.push(`d."shiftDate" >= $${vals.length}`); }
+      if (toDate)   { vals.push(toDate);   conds.push(`d."shiftDate" <= $${vals.length}`); }
+      vals.push(lim);
+      const r = await pool.query(
+        `SELECT d."shiftDate" AS date, p.category, p.item, psi.quantity::numeric AS qty,
+                p."orderUnit" AS unit, p."supplierName" AS supplier,
+                ROUND((psi.quantity * COALESCE(p."unitCost",0))::numeric, 2) AS total_cost,
+                'shift_form' AS source
+         FROM purchasing_shift_items psi
+         JOIN purchasing_items p ON p.id = psi."purchasingItemId"
+         JOIN daily_stock_v2 s ON s.id = psi."dailyStockId"
+         JOIN daily_sales_v2 d ON d.id = s."salesId"
+         WHERE ${conds.join(" AND ")}
+         ORDER BY d."shiftDate" DESC, p.category, p.item LIMIT $${vals.length}`, vals);
+      shiftRows = r.rows;
+    }
+
+    let tallyRows: any[] = [];
+    {
+      const conds: string[] = ["(pt.amount_thb > 0 OR pt.rolls_pcs > 0 OR pt.meat_grams > 0)"];
+      const vals: any[] = [];
+      if (fromDate) { vals.push(fromDate); conds.push(`pt.date >= $${vals.length}::date`); }
+      if (toDate)   { vals.push(toDate);   conds.push(`pt.date <= $${vals.length}::date`); }
+      vals.push(lim);
+      const r = await pool.query(
+        `SELECT pt.date::text AS date, 'Rolls/Meat/Drinks' AS category,
+                CASE WHEN pt.rolls_pcs IS NOT NULL AND pt.rolls_pcs > 0 THEN 'Rolls x' || pt.rolls_pcs
+                     WHEN pt.meat_grams IS NOT NULL AND pt.meat_grams > 0 THEN 'Meat ' || pt.meat_grams || 'g'
+                     ELSE COALESCE(pt.notes,'Purchase') END AS item,
+                COALESCE(pt.rolls_pcs, pt.meat_grams, 0)::numeric AS qty,
+                CASE WHEN pt.rolls_pcs IS NOT NULL AND pt.rolls_pcs > 0 THEN 'pcs' ELSE 'g' END AS unit,
+                COALESCE(pt.supplier, 'Unknown') AS supplier,
+                COALESCE(pt.amount_thb, 0)::numeric AS total_cost, 'tally' AS source
+         FROM purchase_tally pt WHERE ${conds.join(" AND ")}
+         ORDER BY pt.date DESC LIMIT $${vals.length}`, vals);
+      tallyRows = r.rows;
+    }
+
+    const rows = [...shiftRows, ...tallyRows].map((r: any) => ({
+      date: r.date || "", category: r.category || "", item: r.item || "",
+      qty: Number(r.qty), unit: r.unit || "", supplier: r.supplier || "",
+      total_cost: Number(r.total_cost), source: r.source,
+    }));
+    const dateRange = fromDate && toDate && fromDate !== toDate ? `${fromDate} to ${toDate}` : fromDate || "all";
+    return { ok: true, date_range: dateRange, count: rows.length, purchases: rows };
+  }
+
+  // ── stock-ledger ──
+  // Roll/meat/drinks stock movements from manual_stock_ledger + stock_entries.
+  // Optional: date=YYYY-MM-DD for single day, or limit=N (default 30).
+  if (module === "stock-ledger") {
+    let rows: any[];
+    if (date && isValidProxyDate(date)) {
+      const r = await pool.query(
+        `SELECT shift_date::text AS date, rolls_prev_end, rolls_purchased, burgers_sold,
+                rolls_expected, rolls_actual, rolls_variance,
+                meat_prev_end_g, meat_purchased_g, meat_sold_g,
+                meat_expected_g, meat_actual_g, meat_variance_g,
+                completed_by, notes, created_at::text
+         FROM manual_stock_ledger
+         WHERE shift_date = $1::date ORDER BY created_at DESC LIMIT $2`,
+        [date, lim]);
+      rows = r.rows;
+    } else {
+      const r = await pool.query(
+        `SELECT shift_date::text AS date, rolls_prev_end, rolls_purchased, burgers_sold,
+                rolls_expected, rolls_actual, rolls_variance,
+                meat_prev_end_g, meat_purchased_g, meat_sold_g,
+                meat_expected_g, meat_actual_g, meat_variance_g,
+                completed_by, notes, created_at::text
+         FROM manual_stock_ledger ORDER BY shift_date DESC LIMIT $1`,
+        [lim]);
+      rows = r.rows;
+    }
+    return {
+      ok: true,
+      count: rows.length,
+      columns: "date | rolls_prev_end → purchased → sold → expected → actual → variance | meat(g) same | completed_by",
+      ledger: rows,
+    };
+  }
+
+  // ── analysis-reports ──
+  // Read Bob's own analysis output. Optional: date=YYYY-MM-DD, type=<analysis_type>, limit=N.
+  if (module === "analysis-reports") {
+    const { type: reportType } = query as Record<string, string | undefined>;
+    const conditions: string[] = [];
+    const vals: any[] = [];
+    if (date && isValidProxyDate(date)) { vals.push(date); conditions.push(`shift_date = $${vals.length}::date`); }
+    if (reportType) { vals.push(reportType); conditions.push(`analysis_type = $${vals.length}`); }
+    vals.push(lim);
+    const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const r = await pool.query(
+      `SELECT id::text, shift_date::text, analysis_type, status, summary, data_json, created_at::text, created_by
+       FROM analysis_reports ${where}
+       ORDER BY shift_date DESC, created_at DESC LIMIT $${vals.length}`, vals);
+    return { ok: true, count: r.rows.length, reports: r.rows };
+  }
+
   throw new Error(`Unknown module: ${module}`);
 }
 
@@ -1608,6 +1738,210 @@ router.get("/bob/proxy-read", async (req, res) => {
     console.error(`[bobProxy] ${modulePath} error:`, err.message);
     logBobProxyRequest(modulePath, queryParams, 500, false, ms, callerIp).catch(() => {});
     return res.status(500).json({ ok: false, status: "error", error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/ai-ops/bob/analysis — Bob writes an analysis report (INSERT only)
+// Auth: same dual-token as proxy-read (BOB_READONLY_TOKEN or BOBS_LOYVERSE_TOKEN)
+// ─────────────────────────────────────────────────────────────────────────────
+function bobAuthMiddleware(req: any, res: any, next: any) {
+  const internalToken = process.env.BOB_READONLY_TOKEN;
+  const gatewayToken  = process.env.BOBS_LOYVERSE_TOKEN;
+  const validTokens   = [internalToken, gatewayToken].filter(Boolean) as string[];
+  const authHeader    = (req.headers.authorization || "") as string;
+  const headerToken   = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const queryToken    = (req.query.token as string) || (req.query.api_key as string) || null;
+  const token         = headerToken || queryToken;
+  if (!token || !validTokens.includes(token)) {
+    return res.status(401).json({ ok: false, error: "Unauthorized" });
+  }
+  next();
+}
+
+router.post("/bob/analysis", bobAuthMiddleware, async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const { shift_date, analysis_type, status, summary, data_json, created_by } = req.body as Record<string, any>;
+    if (!shift_date || !analysis_type) {
+      return res.status(400).json({ ok: false, error: "shift_date and analysis_type are required" });
+    }
+    const r = await pool.query(
+      `INSERT INTO analysis_reports (shift_date, analysis_type, status, summary, data_json, created_by)
+       VALUES ($1::date, $2, $3, $4, $5, $6)
+       RETURNING id::text, shift_date::text, analysis_type, status, created_at::text`,
+      [shift_date, analysis_type, status || "ok", summary || null,
+       data_json ? JSON.stringify(data_json) : null,
+       created_by || "bob"]);
+    return res.json({ ok: true, report: r.rows[0] });
+  } catch (err: any) {
+    console.error("[bob/analysis] write error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/ai-ops/bob/run-analysis — Server-side shift analysis run
+// Loads shift data + POS data, compares them, writes to analysis_reports,
+// and returns the result immediately. Used by the "Run Bob Analysis" button.
+router.post("/bob/run-analysis", async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  const { shift_date } = req.body as { shift_date?: string };
+  if (!shift_date || !/^\d{4}-\d{2}-\d{2}$/.test(shift_date)) {
+    return res.status(400).json({ ok: false, error: "shift_date required (YYYY-MM-DD)" });
+  }
+  try {
+    // 1. POS data — aggregate from receipt_truth_line
+    // net_amount is already in baht (numeric); receipt_type is 'SALE' or 'REFUND'
+    const posResult = await pool.query(
+      `SELECT
+         ROUND(SUM(CASE WHEN receipt_type='SALE' THEN COALESCE(net_amount,0) ELSE 0 END)::numeric, 2) AS pos_total,
+         ROUND(SUM(CASE WHEN receipt_type='REFUND' THEN ABS(COALESCE(net_amount,0)) ELSE 0 END)::numeric, 2) AS pos_refunds,
+         COUNT(DISTINCT CASE WHEN receipt_type='SALE' THEN receipt_id END)::int  AS pos_txn_count,
+         COUNT(DISTINCT CASE WHEN receipt_type='SALE' THEN item_name END)::int   AS pos_item_types
+       FROM receipt_truth_line WHERE receipt_date=$1::date`,
+      [shift_date]);
+    const pos = posResult.rows[0] || {};
+    const posTotalBaht = Number(pos.pos_total || 0);
+    const posRefundBaht = Number(pos.pos_refunds || 0);
+
+    // 2. Form data — from daily_sales_v2
+    const formResult = await pool.query(
+      `SELECT "totalSales","cashSales","qrSales","grabSales","totalExpenses","completedBy","submittedAtISO"
+       FROM daily_sales_v2 WHERE "shiftDate"=$1
+       ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`,
+      [shift_date]);
+    const form = formResult.rows[0] || null;
+
+    // 3. Stock ledger — rolls and meat variance
+    const stockResult = await pool.query(
+      `SELECT rolls_variance, meat_variance_g, completed_by
+       FROM manual_stock_ledger WHERE shift_date=$1::date ORDER BY created_at DESC LIMIT 1`,
+      [shift_date]);
+    const stock = stockResult.rows[0] || null;
+
+    // 4. Top 5 POS items
+    const itemsResult = await pool.query(
+      `SELECT item_name, SUM(CASE WHEN receipt_type='SALE' THEN quantity ELSE 0 END)::int AS sold,
+              COALESCE(pos_category_name,'?') AS category
+       FROM receipt_truth_line WHERE receipt_date=$1::date AND receipt_type='SALE'
+       GROUP BY item_name, pos_category_name ORDER BY sold DESC LIMIT 5`,
+      [shift_date]);
+    const topItems = itemsResult.rows;
+
+    // 5. Determine status and build summary
+    const formTotalBaht = form ? Number(form.totalSales) / 100 : 0; // stored in satang
+    const salesDiff = Math.abs(posTotalBaht - formTotalBaht);
+    const salesDiffPct = posTotalBaht > 0 ? (salesDiff / posTotalBaht) * 100 : 0;
+    const rollsVariance = stock ? Number(stock.rolls_variance) : null;
+    const meatVarianceG = stock ? Number(stock.meat_variance_g) : null;
+
+    let status = "ok";
+    const issues: string[] = [];
+    const recommendations: string[] = [];
+
+    if (!form) {
+      status = "warning";
+      issues.push("No staff daily sales form found for this shift.");
+      recommendations.push("Staff must submit the daily sales form for this shift.");
+    } else if (salesDiffPct > 10) {
+      status = "critical";
+      issues.push(`Sales variance: Form ฿${formTotalBaht.toFixed(2)} vs POS ฿${posTotalBaht.toFixed(2)} (${salesDiffPct.toFixed(1)}% gap).`);
+      recommendations.push("Investigate cash handling — gap exceeds 10%. Review Loyverse receipts vs form entry.");
+    } else if (salesDiffPct > 5) {
+      status = "warning";
+      issues.push(`Sales variance: ${salesDiffPct.toFixed(1)}% gap between form and POS data.`);
+      recommendations.push("Follow up with shift manager on reconciliation.");
+    }
+
+    if (rollsVariance !== null && Math.abs(rollsVariance) > 10) {
+      status = status === "ok" ? "warning" : status;
+      issues.push(`Rolls variance: ${rollsVariance > 0 ? "+" : ""}${rollsVariance} pcs (threshold: ±10).`);
+      recommendations.push("Check rolls delivery records and burger count for this shift.");
+    }
+    if (meatVarianceG !== null && Math.abs(meatVarianceG) > 1000) {
+      status = status === "ok" ? "warning" : status;
+      issues.push(`Meat variance: ${meatVarianceG > 0 ? "+" : ""}${meatVarianceG}g (threshold: ±1000g).`);
+      recommendations.push("Cross-check meat delivery with supplier receipts.");
+    }
+    if (posTotalBaht === 0) {
+      status = "warning";
+      issues.push("No POS receipts found for this date — Loyverse data may not have been synced.");
+      recommendations.push("Run a Loyverse sync for this date, or verify the business date mapping.");
+    }
+
+    const summaryText = issues.length === 0
+      ? `Shift ${shift_date} — all checks passed. POS total ฿${posTotalBaht.toFixed(2)}, ${pos.pos_txn_count || 0} transactions.`
+      : `Shift ${shift_date} — ${issues.length} issue(s) found. ${issues[0]}`;
+
+    const codexHandoff = issues.length > 0 ? {
+      handoff_type: "RECOMMENDED_FIX",
+      shift_date,
+      status,
+      issues,
+      recommendations,
+      prepared_for: "Codex",
+      requires_approval: true,
+      instruction: recommendations[0] || "Review shift data manually.",
+    } : null;
+
+    const dataJson = {
+      pos: { total_baht: posTotalBaht, refunds_baht: posRefundBaht, txn_count: Number(pos.pos_txn_count || 0), item_types: Number(pos.pos_item_types || 0) },
+      form: form ? { total_baht: formTotalBaht, submitted_by: form.completedBy, submitted_at: form.submittedAtISO } : null,
+      stock: stock ? { rolls_variance: rollsVariance, meat_variance_g: meatVarianceG } : null,
+      top_items: topItems.map(i => ({ name: i.item_name, sold: i.sold, category: i.category })),
+      issues,
+      recommendations,
+      codex_handoff: codexHandoff,
+      run_at: new Date().toISOString(),
+    };
+
+    // 6. Write to analysis_reports (upsert — one record per date per type)
+    await pool.query(
+      `INSERT INTO analysis_reports (shift_date, analysis_type, status, summary, data_json, created_by)
+       VALUES ($1::date, 'shift_review', $2, $3, $4, 'system')
+       ON CONFLICT DO NOTHING`,
+      [shift_date, status, summaryText, JSON.stringify(dataJson)]);
+    // Always insert a fresh one (allow history)
+    const insertResult = await pool.query(
+      `INSERT INTO analysis_reports (shift_date, analysis_type, status, summary, data_json, created_by)
+       VALUES ($1::date, 'shift_review', $2, $3, $4, 'system')
+       RETURNING id::text, created_at::text`,
+      [shift_date, status, summaryText, JSON.stringify(dataJson)]);
+
+    return res.json({
+      ok: true,
+      shift_date,
+      status,
+      summary: summaryText,
+      issues,
+      recommendations,
+      data: dataJson,
+      report_id: insertResult.rows[0]?.id,
+      codex_handoff: codexHandoff,
+    });
+  } catch (err: any) {
+    console.error("[bob/run-analysis] error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/ai-ops/bob/analysis/:date — read analysis for a date (used by Sales & Shift Analysis page)
+router.get("/bob/analysis/:date", async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ ok: false, error: "date must be YYYY-MM-DD" });
+  }
+  try {
+    const r = await pool.query(
+      `SELECT id::text, shift_date::text, analysis_type, status, summary, data_json, created_at::text, created_by
+       FROM analysis_reports WHERE shift_date=$1::date AND analysis_type='shift_review'
+       ORDER BY created_at DESC LIMIT 1`,
+      [date]);
+    if (r.rows.length === 0) return res.json({ ok: true, report: null });
+    return res.json({ ok: true, report: r.rows[0] });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
