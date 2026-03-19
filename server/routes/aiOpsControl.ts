@@ -1379,8 +1379,8 @@ function proxyLimit(val: unknown, def = 50, max = 200): number {
 
 async function bobProxyFetch(module: BobProxyModule, query: Record<string, unknown>): Promise<Record<string, unknown>> {
   if (!pool) throw new Error("Database unavailable");
-  const { date, limit: limitRaw, status, area, type: auditType } = query as Record<string, string | undefined>;
-  const lim = proxyLimit(limitRaw);
+  const { date, from, to, limit: limitRaw, status, area, type: auditType } = query as Record<string, string | undefined>;
+  const lim = proxyLimit(limitRaw, 50, 500); // raised max to 500 for audit range queries
 
   // ── health ──
   if (module === "health") {
@@ -1445,43 +1445,76 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
   }
 
   // ── forms/daily-sales ──
+  // Supports: ?date=YYYY-MM-DD (single) | ?from=YYYY-MM-DD&to=YYYY-MM-DD (range) | no date (latest N)
+  // Uses shift_date (DATE column) for range queries — not shiftDate (TEXT, inconsistent format in old rows)
   if (module === "forms/daily-sales") {
     let rows: any[];
+    const cols = `id, shift_date, "shiftDate", "submittedAtISO", "completedBy",
+                  "totalSales", "cashSales", "qrSales", "grabSales", "cashBanked", "totalExpenses"`;
     if (date && isValidProxyDate(date)) {
       const r = await pool.query(
-        `SELECT id,"shiftDate","submittedAtISO","completedBy","totalSales","cashSales","qrSales","grabSales","cashBanked","totalExpenses"
-         FROM daily_sales_v2 WHERE "shiftDate"=$1 ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT $2`,
+        `SELECT ${cols} FROM daily_sales_v2
+         WHERE shift_date = $1::date
+           AND "deletedAt" IS NULL
+         ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT $2`,
         [date, lim]);
+      rows = r.rows;
+    } else if (from && isValidProxyDate(from) && to && isValidProxyDate(to)) {
+      const r = await pool.query(
+        `SELECT ${cols} FROM daily_sales_v2
+         WHERE shift_date BETWEEN $1::date AND $2::date
+           AND "deletedAt" IS NULL
+         ORDER BY shift_date DESC, "submittedAtISO" DESC NULLS LAST LIMIT $3`,
+        [from, to, lim]);
       rows = r.rows;
     } else {
       const r = await pool.query(
-        `SELECT id,"shiftDate","submittedAtISO","completedBy","totalSales","cashSales","qrSales","grabSales","cashBanked","totalExpenses"
-         FROM daily_sales_v2 ORDER BY "shiftDate" DESC,"submittedAtISO" DESC NULLS LAST LIMIT $1`,
+        `SELECT ${cols} FROM daily_sales_v2
+         WHERE "deletedAt" IS NULL
+         ORDER BY shift_date DESC NULLS LAST, "submittedAtISO" DESC NULLS LAST LIMIT $1`,
         [lim]);
       rows = r.rows;
     }
-    return { ok: true, count: rows.length, forms: rows };
+    const meta = from && to ? { from, to } : date ? { date } : {};
+    return { ok: true, count: rows.length, ...meta, forms: rows };
   }
 
   // ── forms/daily-stock ──
+  // Supports: ?date=YYYY-MM-DD (single) | ?from=YYYY-MM-DD&to=YYYY-MM-DD (range) | no date (latest N)
+  // Date filter applied via JOIN to daily_sales_v2.shift_date (daily_stock_v2 has no own date column)
   if (module === "forms/daily-stock") {
     let rows: any[];
+    const cols = `s.id, s."salesId", s."createdAt", s."burgerBuns", s."meatWeightG",
+                  s."drinksJson", s."notes", d.shift_date, d."shiftDate", d."completedBy"`;
     if (date && isValidProxyDate(date)) {
       const r = await pool.query(
-        `SELECT s.id,s."salesId",s."createdAt",s."burgerBuns",s."meatWeightG",s."drinksJson",s."notes",d."shiftDate"
+        `SELECT ${cols}
          FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id=s."salesId"
-         WHERE d."shiftDate"=$1 ORDER BY s."createdAt" DESC LIMIT $2`,
+         WHERE d.shift_date = $1::date
+           AND d."deletedAt" IS NULL
+         ORDER BY s."createdAt" DESC LIMIT $2`,
         [date, lim]);
+      rows = r.rows;
+    } else if (from && isValidProxyDate(from) && to && isValidProxyDate(to)) {
+      const r = await pool.query(
+        `SELECT ${cols}
+         FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id=s."salesId"
+         WHERE d.shift_date BETWEEN $1::date AND $2::date
+           AND d."deletedAt" IS NULL
+         ORDER BY d.shift_date DESC, s."createdAt" DESC LIMIT $3`,
+        [from, to, lim]);
       rows = r.rows;
     } else {
       const r = await pool.query(
-        `SELECT s.id,s."salesId",s."createdAt",s."burgerBuns",s."meatWeightG",s."drinksJson",s."notes",d."shiftDate"
+        `SELECT ${cols}
          FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id=s."salesId"
-         ORDER BY d."shiftDate" DESC,s."createdAt" DESC LIMIT $1`,
+         WHERE d."deletedAt" IS NULL
+         ORDER BY d.shift_date DESC NULLS LAST, s."createdAt" DESC LIMIT $1`,
         [lim]);
       rows = r.rows;
     }
-    return { ok: true, count: rows.length, forms: rows };
+    const meta = from && to ? { from, to } : date ? { date } : {};
+    return { ok: true, count: rows.length, ...meta, forms: rows };
   }
 
   // ── purchases ──
