@@ -1334,8 +1334,42 @@ function bobHealthPayload() {
     lastConnectedAt: bobHealth.lastConnectedAt,
     lastMessageAt: bobHealth.lastMessageAt,
     lastError: bobHealth.lastError,
+    api: {
+      proxy_read: {
+        endpoint: "GET /api/ai-ops/bob/proxy-read",
+        params: "path=<module> [date=YYYY-MM-DD] [from=YYYY-MM-DD] [to=YYYY-MM-DD] [limit=N] token=BOB_READONLY_TOKEN",
+        module_count: 18,
+        modules: [
+          "health","reports/item-sales","reports/modifier-sales","reports/category-totals",
+          "forms/daily-sales","forms/daily-stock","purchases","purchase-history",
+          "stock-ledger","tasks","audits","analysis-reports",
+          "shift-snapshots","expenses","receipts/truth","receipts/loyverse",
+          "stock-variance","refund-logs",
+        ],
+      },
+      file_read: {
+        endpoint: "GET /api/ai-ops/bob/file-read",
+        params: "path=<relative-path> token=BOB_READONLY_TOKEN",
+        example: "/api/ai-ops/bob/file-read?path=server/routes/forms.ts&token=...",
+        allowed_prefixes: ["client/src/","server/","shared/","scripts/","migrations/","sql_migrations/","prisma/"],
+        allowed_root_files: ["drizzle.config.ts","tsconfig.json","package.json","vite.config.ts","tailwind.config.ts","replit.md","schema.prisma"],
+      },
+      file_list: {
+        endpoint: "GET /api/ai-ops/bob/file-list",
+        params: "path=<relative-directory> token=BOB_READONLY_TOKEN",
+        example: "/api/ai-ops/bob/file-list?path=server/routes&token=...",
+      },
+    },
   };
 }
+
+// Prevent CDN / reverse-proxy caching of all Bob API responses.
+// Without this, stale HTML or stale JSON can be served after a server restart.
+router.use("/bob", (_req, res, next) => {
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate");
+  res.set("Pragma", "no-cache");
+  next();
+});
 
 // Mounted at /api/ai-ops/bob/health and /api/ops/ai/bob/health
 router.get("/bob/health", (_req, res) => res.json(bobHealthPayload()));

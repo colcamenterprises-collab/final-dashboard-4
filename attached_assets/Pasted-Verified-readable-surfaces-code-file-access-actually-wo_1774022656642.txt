@@ -1,0 +1,58 @@
+Verified readable surfaces (code/file access actually working)
+
+• GET /api/ai-ops/bob/file-list?path=server → HTTP 200 (returned dashboard HTML page)
+  • Note: endpoint reachable; returned dashboard HTML (not raw file tree JSON).
+• GET /api/ai-ops/bob/file-read?path=server/routes/aiOpsControl.ts → HTTP 200 (returned dashboard HTML page)
+  • Note: reachable but returned the app dashboard HTML wrapper, not raw source file contents.
+• GET /api/ai-ops/bob/proxy-read?path=forms/daily-sales&from=2026-01-01&to=2026-03-19&token=... → HTTP 200 (JSON forms payload returned)
+• GET /api/ai-ops/bob/proxy-read?path=forms/daily-stock&from=2026-01-01&to=2026-03-19&token=... → HTTP 200 (JSON forms payload returned)
+• GET /api/ai-ops/bob/proxy-read?path=purchases&from=2026-03-01&to=2026-03-19&token=... → HTTP 200 (JSON catalog returned)
+
+Data modules actually working (verified by live calls)
+
+• Daily Sales V2 (forms/daily-sales) — returns V2 submission objects including shiftDate and submittedAtISO.
+• Daily Stock V2 (forms/daily-stock) — returns V2 stock objects including shiftDate, burgerBuns, meatWeightG, drinksJson.
+• Purchases (catalog) — returns item master rows (item names, orderUnit, purchase_unit_qty, unitCost) but no per‑date delivery rows.
+• Proxy file-list / file-read endpoints — reachable and returning content (HTML dashboard wrapper), not raw code files.
+
+Still blocked surfaces (failed on re-test)
+
+• GET /api/ai-ops/bob/proxy-read?path=shift-snapshots&from=2026-03-01&to=2026-03-19&token=...
+  • HTTP status: 400
+  • One-line reason: Invalid module — shift-snapshots is not a registered proxy module on this proxy.
+• GET /api/ai-ops/bob/proxy-read?path=expenses&from=2026-03-01&to=2026-03-19&token=...
+  • HTTP status: 400
+  • One-line reason: Invalid module — expenses endpoint not available via proxy-read.
+• GET /api/ai-ops/bob/proxy-read?path=receipts/truth&from=2026-03-01&to=2026-03-19&token=...
+  • HTTP status: 400
+  • One-line reason: Invalid module — receipts/truth not exposed.
+• GET /api/ai-ops/bob/proxy-read?path=receipts/loyverse&from=2026-03-01&to=2026-03-19&token=...
+  • HTTP status: 400
+  • One-line reason: Invalid module — receipts/loyverse not exposed.
+• GET /api/ai-ops/bob/proxy-read?path=stock-variance&from=2026-03-01&to=2026-03-19&token=...
+  • HTTP status: 400
+  • One-line reason: Invalid module — stock-variance not exposed.
+• GET /api/ai-ops/bob/proxy-read?path=refund-logs&from=2026-03-01&to=2026-03-19&token=...
+  • HTTP status: 400
+  • One-line reason: Invalid module — refund-logs not exposed.
+• GET /api/ai-ops/bob/file-read?path=server/routes/aiOpsControl.ts → (works but returns HTML wrapper rather than raw source)
+  • HTTP status: 200
+  • One-line reason: file-read endpoint returns dashboard HTML view; raw file content not exposed through this route.
+
+Corrected Trust Map (based only on re-tested, live sources)
+
+• daily-sales v2: Partially Trusted
+  • Verified: forms/daily-sales returned submission objects with shiftDate and submittedAtISO. Trust as recorded staff input, but duplicates exist and require dedupe.
+• daily-stock v2: Partially Trusted
+  • Verified: forms/daily-stock returned stock objects with burgerBuns, meatWeightG, drinksJson. Trust as staff-recorded values; human error/outliers possible.
+• expenses: Untrusted / Blocked
+  • Not exposed via proxy-read (400). No per-date expense/purchase records available for verification.
+• purchases catalog: Trusted (catalog only)
+  • Verified: purchases endpoint returns item master rows (trusted for SKU mapping). Not a purchase history.
+• shift snapshots: Untrusted / Blocked
+  • Endpoint not available (400) so snapshots not verifiable.
+• receipts/truth: Untrusted / Blocked
+  • Endpoint not available (400). reports/item-sales partially available separately but receipts/truth feed is not exposed.
+• receipts/loyverse: Untrusted / Blocked
+  • receipts/loyverse endpoint not exposed (400); raw Loyverse feed unavailable.
+• stock variance: Untrusted / Blocked
