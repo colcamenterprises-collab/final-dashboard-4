@@ -3,6 +3,8 @@ import { pool } from "../db";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 import { runMonitors, startMonitorScheduler } from "../services/monitorEngine";
 import {
   parseWorkspaceTools,
@@ -1360,6 +1362,13 @@ const BOB_PROXY_MODULES = [
   "tasks",
   "audits",
   "analysis-reports",
+  // Full-system read additions
+  "shift-snapshots",
+  "expenses",
+  "receipts/truth",
+  "receipts/loyverse",
+  "stock-variance",
+  "refund-logs",
 ] as const;
 type BobProxyModule = typeof BOB_PROXY_MODULES[number];
 
@@ -1672,6 +1681,160 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
     return { ok: true, count: r.rows.length, reports: r.rows };
   }
 
+  // ── shift-snapshots ──
+  // ShiftSnapshot table (Prisma). date or from/to filter on windowStartUTC.
+  if (module === "shift-snapshots") {
+    let r: any;
+    if (date && isValidProxyDate(date)) {
+      r = await pool.query(
+        `SELECT id::text, provider, "windowStartUTC"::text, "windowEndUTC"::text,
+                "loyverseShiftNumber", "salesFormId"::text, "totalReceipts",
+                "totalSalesSatang", "reconcileState", "reconcileNotes", "createdAt"::text
+         FROM "ShiftSnapshot" WHERE "windowStartUTC"::date = $1::date ORDER BY "windowStartUTC" DESC LIMIT $2`,
+        [date, lim]);
+    } else if (from && isValidProxyDate(from) && to && isValidProxyDate(to)) {
+      r = await pool.query(
+        `SELECT id::text, provider, "windowStartUTC"::text, "windowEndUTC"::text,
+                "loyverseShiftNumber", "salesFormId"::text, "totalReceipts",
+                "totalSalesSatang", "reconcileState", "reconcileNotes", "createdAt"::text
+         FROM "ShiftSnapshot" WHERE "windowStartUTC"::date BETWEEN $1::date AND $2::date
+         ORDER BY "windowStartUTC" DESC LIMIT $3`,
+        [from, to, lim]);
+    } else {
+      r = await pool.query(
+        `SELECT id::text, provider, "windowStartUTC"::text, "windowEndUTC"::text,
+                "loyverseShiftNumber", "salesFormId"::text, "totalReceipts",
+                "totalSalesSatang", "reconcileState", "reconcileNotes", "createdAt"::text
+         FROM "ShiftSnapshot" ORDER BY "windowStartUTC" DESC LIMIT $1`, [lim]);
+    }
+    const meta = from && to ? { from, to } : date ? { date } : {};
+    return { ok: true, count: r.rows.length, ...meta, snapshots: r.rows };
+  }
+
+  // ── expenses ──
+  // expenses_v2 table: daily non-payroll expenses logged by date.
+  if (module === "expenses") {
+    let r: any;
+    if (date && isValidProxyDate(date)) {
+      r = await pool.query(
+        `SELECT id::text, date::text, category, subcategory, description, amount, "paymentType", vendor, "createdAt"::text
+         FROM expenses_v2 WHERE date = $1::date ORDER BY "createdAt" DESC LIMIT $2`,
+        [date, lim]);
+    } else if (from && isValidProxyDate(from) && to && isValidProxyDate(to)) {
+      r = await pool.query(
+        `SELECT id::text, date::text, category, subcategory, description, amount, "paymentType", vendor, "createdAt"::text
+         FROM expenses_v2 WHERE date BETWEEN $1::date AND $2::date ORDER BY date DESC, "createdAt" DESC LIMIT $3`,
+        [from, to, lim]);
+    } else {
+      r = await pool.query(
+        `SELECT id::text, date::text, category, subcategory, description, amount, "paymentType", vendor, "createdAt"::text
+         FROM expenses_v2 ORDER BY date DESC, "createdAt" DESC LIMIT $1`, [lim]);
+    }
+    const meta = from && to ? { from, to } : date ? { date } : {};
+    return { ok: true, count: r.rows.length, ...meta, expenses: r.rows };
+  }
+
+  // ── receipts/truth ──
+  // receipt_truth_line: line-item truth table ingested from Loyverse. Requires date or range.
+  if (module === "receipts/truth") {
+    if (!date && !(from && to)) throw new Error("date or from+to required for receipts/truth");
+    let r: any;
+    if (date && isValidProxyDate(date)) {
+      r = await pool.query(
+        `SELECT receipt_date::text, receipt_id, receipt_type, sku, item_name, category,
+                quantity, gross_amount, discount_amount, net_amount, pos_category_name
+         FROM receipt_truth_line WHERE receipt_date = $1::date ORDER BY receipt_id, sku LIMIT $2`,
+        [date, lim]);
+    } else {
+      r = await pool.query(
+        `SELECT receipt_date::text, receipt_id, receipt_type, sku, item_name, category,
+                quantity, gross_amount, discount_amount, net_amount, pos_category_name
+         FROM receipt_truth_line WHERE receipt_date BETWEEN $1::date AND $2::date
+         ORDER BY receipt_date DESC, receipt_id, sku LIMIT $3`,
+        [from, to, lim]);
+    }
+    const meta = from && to ? { from, to } : { date };
+    return { ok: true, count: r.rows.length, ...meta, lines: r.rows };
+  }
+
+  // ── receipts/loyverse ──
+  // lv_receipt: raw Loyverse receipt headers with payment_json. Requires date or range.
+  if (module === "receipts/loyverse") {
+    if (!date && !(from && to)) throw new Error("date or from+to required for receipts/loyverse");
+    let r: any;
+    if (date && isValidProxyDate(date)) {
+      r = await pool.query(
+        `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS datetime_bkk,
+                staff_name, total_amount, payment_json, created_at::text
+         FROM lv_receipt WHERE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date = $1::date
+         ORDER BY datetime_bkk DESC LIMIT $2`,
+        [date, lim]);
+    } else {
+      r = await pool.query(
+        `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS datetime_bkk,
+                staff_name, total_amount, payment_json, created_at::text
+         FROM lv_receipt WHERE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date BETWEEN $1::date AND $2::date
+         ORDER BY datetime_bkk DESC LIMIT $3`,
+        [from, to, lim]);
+    }
+    const meta = from && to ? { from, to } : { date };
+    return { ok: true, count: r.rows.length, ...meta, receipts: r.rows };
+  }
+
+  // ── stock-variance ──
+  // stock_variance: computed variance per shift. Optional date or range.
+  if (module === "stock-variance") {
+    let r: any;
+    if (date && isValidProxyDate(date)) {
+      r = await pool.query(
+        `SELECT id::text, shift_id::text, shift_date::text, item_name, category,
+                expected_qty, actual_qty, variance_qty, unit, severity, created_at::text
+         FROM stock_variance WHERE shift_date = $1::date ORDER BY severity DESC, item_name LIMIT $2`,
+        [date, lim]);
+    } else if (from && isValidProxyDate(from) && to && isValidProxyDate(to)) {
+      r = await pool.query(
+        `SELECT id::text, shift_id::text, shift_date::text, item_name, category,
+                expected_qty, actual_qty, variance_qty, unit, severity, created_at::text
+         FROM stock_variance WHERE shift_date BETWEEN $1::date AND $2::date
+         ORDER BY shift_date DESC, severity DESC LIMIT $3`,
+        [from, to, lim]);
+    } else {
+      r = await pool.query(
+        `SELECT id::text, shift_id::text, shift_date::text, item_name, category,
+                expected_qty, actual_qty, variance_qty, unit, severity, created_at::text
+         FROM stock_variance ORDER BY shift_date DESC, severity DESC LIMIT $1`, [lim]);
+    }
+    const meta = from && to ? { from, to } : date ? { date } : {};
+    return { ok: true, count: r.rows.length, ...meta, variances: r.rows };
+  }
+
+  // ── refund-logs ──
+  // refund_logs: manager-approved refund records with platform and reason.
+  if (module === "refund-logs") {
+    let r: any;
+    if (date && isValidProxyDate(date)) {
+      r = await pool.query(
+        `SELECT id::text, shift_id::text, shift_date::text, amount, reason, platform,
+                logged_by, notes, receipt_number, payment_type, approved_by, created_at::text
+         FROM refund_logs WHERE shift_date = $1::date ORDER BY created_at DESC LIMIT $2`,
+        [date, lim]);
+    } else if (from && isValidProxyDate(from) && to && isValidProxyDate(to)) {
+      r = await pool.query(
+        `SELECT id::text, shift_id::text, shift_date::text, amount, reason, platform,
+                logged_by, notes, receipt_number, payment_type, approved_by, created_at::text
+         FROM refund_logs WHERE shift_date BETWEEN $1::date AND $2::date
+         ORDER BY shift_date DESC, created_at DESC LIMIT $3`,
+        [from, to, lim]);
+    } else {
+      r = await pool.query(
+        `SELECT id::text, shift_id::text, shift_date::text, amount, reason, platform,
+                logged_by, notes, receipt_number, payment_type, approved_by, created_at::text
+         FROM refund_logs ORDER BY shift_date DESC, created_at DESC LIMIT $1`, [lim]);
+    }
+    const meta = from && to ? { from, to } : date ? { date } : {};
+    return { ok: true, count: r.rows.length, ...meta, refunds: r.rows };
+  }
+
   throw new Error(`Unknown module: ${module}`);
 }
 
@@ -1771,6 +1934,146 @@ router.get("/bob/proxy-read", async (req, res) => {
     console.error(`[bobProxy] ${modulePath} error:`, err.message);
     logBobProxyRequest(modulePath, queryParams, 500, false, ms, callerIp).catch(() => {});
     return res.status(500).json({ ok: false, status: "error", error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/ai-ops/bob/file-read — Safe codebase file read for Bob
+// Auth: BOB_READONLY_TOKEN or BOBS_LOYVERSE_TOKEN (same as proxy-read)
+// Params: path=<relative-path>  (e.g. server/routes/forms.ts)
+// Safety: whitelist-only; no .env, no node_modules, no path traversal
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WORKSPACE_ROOT = path.resolve(".");
+
+const BOB_FILE_ALLOWED_PREFIXES = [
+  "client/src/",
+  "server/",
+  "shared/",
+  "scripts/",
+  "migrations/",
+  "sql_migrations/",
+  "prisma/",
+];
+
+const BOB_FILE_ALLOWED_ROOTS = new Set([
+  "drizzle.config.ts",
+  "tsconfig.json",
+  "package.json",
+  "vite.config.ts",
+  "tailwind.config.ts",
+  "replit.md",
+  "schema.prisma",
+]);
+
+const BOB_FILE_BLOCK_PATTERNS = [
+  /\.env/,
+  /node_modules/,
+  /\.git\//,
+  /secrets/i,
+  /\.local\//,
+];
+
+function bobFilePathSafe(relPath: string): { ok: true; absPath: string } | { ok: false; reason: string } {
+  if (!relPath) return { ok: false, reason: "path is required" };
+  if (relPath.includes("..")) return { ok: false, reason: "path traversal not allowed" };
+  if (relPath.startsWith("/")) return { ok: false, reason: "absolute paths not allowed" };
+  for (const p of BOB_FILE_BLOCK_PATTERNS) {
+    if (p.test(relPath)) return { ok: false, reason: `path blocked by security policy` };
+  }
+  const isAllowed =
+    BOB_FILE_ALLOWED_PREFIXES.some((pfx) => relPath.startsWith(pfx)) ||
+    BOB_FILE_ALLOWED_ROOTS.has(relPath);
+  if (!isAllowed) {
+    return { ok: false, reason: `path not in allowed whitelist. Allowed prefixes: ${BOB_FILE_ALLOWED_PREFIXES.join(", ")} or root files: ${[...BOB_FILE_ALLOWED_ROOTS].join(", ")}` };
+  }
+  const absPath = path.join(WORKSPACE_ROOT, relPath);
+  if (!absPath.startsWith(WORKSPACE_ROOT + path.sep) && absPath !== WORKSPACE_ROOT) {
+    return { ok: false, reason: "path traversal not allowed (resolved)" };
+  }
+  return { ok: true, absPath };
+}
+
+router.get("/bob/file-read", async (req, res) => {
+  const internalToken = process.env.BOB_READONLY_TOKEN;
+  const gatewayToken  = process.env.BOBS_LOYVERSE_TOKEN;
+  const validTokens   = [internalToken, gatewayToken].filter(Boolean) as string[];
+  const provided = (req.query.token as string | undefined) ?? req.headers["x-bob-token"] as string | undefined;
+  if (!provided || !validTokens.includes(provided)) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+
+  const relPath = (req.query.path as string | undefined) ?? "";
+  const safe = bobFilePathSafe(relPath);
+  if (!safe.ok) {
+    return res.status(400).json({ ok: false, error: safe.reason });
+  }
+
+  try {
+    const stat = fs.statSync(safe.absPath);
+    if (!stat.isFile()) return res.status(400).json({ ok: false, error: "path is not a file" });
+    if (stat.size > 600_000) return res.status(413).json({ ok: false, error: "file too large (>600KB)" });
+
+    const content = fs.readFileSync(safe.absPath, "utf-8");
+    const lines   = content.split("\n");
+    return res.json({
+      ok: true,
+      path: relPath,
+      size_bytes: stat.size,
+      line_count: lines.length,
+      content,
+    });
+  } catch (err: any) {
+    if (err.code === "ENOENT") return res.status(404).json({ ok: false, error: "file not found", path: relPath });
+    console.error("[bob/file-read] error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/ai-ops/bob/file-list — List directory contents (same whitelist)
+// Params: path=<relative-directory>  (e.g. server/routes)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/bob/file-list", async (req, res) => {
+  const internalToken = process.env.BOB_READONLY_TOKEN;
+  const gatewayToken  = process.env.BOBS_LOYVERSE_TOKEN;
+  const validTokens   = [internalToken, gatewayToken].filter(Boolean) as string[];
+  const provided = (req.query.token as string | undefined) ?? req.headers["x-bob-token"] as string | undefined;
+  if (!provided || !validTokens.includes(provided)) {
+    return res.status(401).json({ ok: false, error: "unauthorized" });
+  }
+
+  const relPath = (req.query.path as string | undefined) ?? "";
+  // For listing, allow any allowed-prefix dir plus workspace root ("")
+  if (relPath !== "" && relPath !== ".") {
+    const safe = bobFilePathSafe(relPath + "/placeholder.ts"); // fake file to test prefix
+    if (!safe.ok) {
+      return res.status(400).json({ ok: false, error: safe.reason });
+    }
+  }
+
+  try {
+    const absPath = relPath === "" || relPath === "."
+      ? WORKSPACE_ROOT
+      : path.join(WORKSPACE_ROOT, relPath);
+
+    const stat = fs.statSync(absPath);
+    if (!stat.isDirectory()) return res.status(400).json({ ok: false, error: "path is not a directory" });
+
+    const entries = fs.readdirSync(absPath, { withFileTypes: true })
+      .filter((e) => !BOB_FILE_BLOCK_PATTERNS.some((p) => p.test(e.name)))
+      .map((e) => ({
+        name: e.name,
+        type: e.isDirectory() ? "directory" : "file",
+        size_bytes: e.isFile() ? (() => { try { return fs.statSync(path.join(absPath, e.name)).size; } catch { return null; } })() : null,
+      }))
+      .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+
+    return res.json({ ok: true, path: relPath || ".", count: entries.length, entries });
+  } catch (err: any) {
+    if (err.code === "ENOENT") return res.status(404).json({ ok: false, error: "directory not found", path: relPath });
+    console.error("[bob/file-list] error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
 
@@ -2102,6 +2405,48 @@ router.get("/bob/onboarding-context", async (_req, res) => {
         source_table: "purchasing_shift_items",
         master_catalog: "purchasing_items",
         process_detail: shoppingListProcess ?? null,
+      },
+      data_access: {
+        proxy_read: {
+          endpoint: "GET /api/ai-ops/bob/proxy-read",
+          auth: "?token=BOB_READONLY_TOKEN (or x-bob-token header)",
+          params: "path=<module> date=YYYY-MM-DD from=YYYY-MM-DD to=YYYY-MM-DD limit=N",
+          modules: [
+            { path: "health", description: "Liveness + available module list" },
+            { path: "reports/item-sales", description: "Per-item sold/refund counts. Requires date." },
+            { path: "reports/modifier-sales", description: "Modifier sales breakdown. Requires date." },
+            { path: "reports/category-totals", description: "Category revenue totals. Requires date." },
+            { path: "forms/daily-sales", description: "Daily sales forms (daily_sales_v2). date or from+to." },
+            { path: "forms/daily-stock", description: "Daily stock forms (daily_stock_v2). date or from+to." },
+            { path: "purchases", description: "Purchasing item catalog (master list)." },
+            { path: "purchase-history", description: "Purchasing shift items (what was ordered each shift). date or from+to." },
+            { path: "stock-ledger", description: "Stock ledger day (rolls/meat daily ledger). date or from+to." },
+            { path: "tasks", description: "AI task work register. Optional: status, area filters." },
+            { path: "audits", description: "Health & safety audit records. Optional: type filter." },
+            { path: "analysis-reports", description: "Bob's own analysis outputs. Optional: date, type filters." },
+            { path: "shift-snapshots", description: "ShiftSnapshot: POS shift totals in satang. date or from+to." },
+            { path: "expenses", description: "expenses_v2: daily non-payroll expense lines. date or from+to." },
+            { path: "receipts/truth", description: "receipt_truth_line: per-item Loyverse receipt truth. REQUIRES date or from+to." },
+            { path: "receipts/loyverse", description: "lv_receipt: raw Loyverse receipt headers + payment_json. REQUIRES date or from+to." },
+            { path: "stock-variance", description: "stock_variance: computed shift variance with severity. date or from+to." },
+            { path: "refund-logs", description: "refund_logs: manager-approved refund records. date or from+to." },
+          ],
+        },
+        file_read: {
+          endpoint: "GET /api/ai-ops/bob/file-read",
+          auth: "?token=BOB_READONLY_TOKEN",
+          params: "path=<relative-path> (e.g. server/routes/forms.ts)",
+          allowed_prefixes: ["client/src/", "server/", "shared/", "scripts/", "migrations/", "sql_migrations/", "prisma/"],
+          allowed_root_files: ["drizzle.config.ts", "tsconfig.json", "package.json", "vite.config.ts", "tailwind.config.ts", "replit.md", "schema.prisma"],
+          blocked: [".env", "node_modules", ".git/", "secrets", ".local/"],
+          max_size: "600KB",
+        },
+        file_list: {
+          endpoint: "GET /api/ai-ops/bob/file-list",
+          auth: "?token=BOB_READONLY_TOKEN",
+          params: "path=<relative-directory> (e.g. server/routes)",
+          description: "Lists files and subdirectories. Returns name, type (file/directory), size_bytes.",
+        },
       },
     });
   } catch (e: any) {

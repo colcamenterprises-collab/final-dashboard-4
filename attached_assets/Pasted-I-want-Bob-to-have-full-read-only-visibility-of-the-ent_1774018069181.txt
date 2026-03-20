@@ -1,0 +1,61 @@
+I want Bob to have full read-only visibility of the entire system.
+No more limited module-by-module exposure unless there is a genuine security reason.
+Goal: Bob must be able to inspect all files, folders, routes, services, schemas, queries, and read-only business data sources so he can act as a true operational and technical intelligence layer.
+Implement this in the safest read-only way possible.
+Required outcome:
+Full read-only codebase visibility
+Bob must be able to read all app files/folders relevant to the running system:
+client
+server
+shared
+scripts
+config
+schema/migrations
+No write, edit, delete, rename, execute, or deploy capability
+Full read-only route and query visibility
+Bob must be able to inspect:
+route definitions
+service files
+DB query files
+form handlers
+reporting logic
+cron logic
+proxy logic
+integrations
+Full read-only business-data visibility
+Bob must be able to read actual live data sources already used by the app, including:
+Daily Sales V2
+Daily Stock V2
+Finance / Expenses purchase entries
+purchasing history
+shift snapshots
+receipt truth tables
+loyverse-related read tables
+stock ledger / stock movement tables
+analysis reports
+Read only only
+Hard safety rules
+Bob cannot write to DB except where I explicitly approve a single isolated path
+Bob cannot modify files
+Bob cannot deploy
+Bob cannot run destructive commands
+Bob cannot trigger background jobs that alter state
+Bob cannot rotate secrets
+Bob cannot publish code
+Preferred implementation Choose the safest and fastest of these:
+mount the repo/workspace for Bob as read-only
+expose a read-only file browser/api for the entire repo
+expose a read-only DB/query layer for all existing business tables Bob needs
+keep token-gated auth in place
+Deliver back only
+exact implementation method chosen
+exact files changed
+exact read-only boundaries enforced
+exact paths/data sources Bob can now read
+exact proof that Bob cannot write
+exact verification steps performed
+Important:
+Do not give Bob partial visibility anymore
+Do not create a broad write surface
+This is full-system read-only access only
+Keep it bootstrap practical, not enterprise theatre
