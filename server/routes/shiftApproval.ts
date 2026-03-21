@@ -241,4 +241,38 @@ router.get('/pnl/:period', async (req, res) => {
   }
 });
 
+// GET /api/daily-stock-summary/:date
+// Returns Rolls/Meat/Drinks counts from daily_stock_v2 for the given shift date.
+// Source: primary Form 2 storage table. Safest reliable stock source.
+router.get('/daily-stock-summary/:date', async (req, res) => {
+  const { date } = req.params;
+  if (!pool || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ ok: false, error: 'Invalid date or DB unavailable' });
+  }
+  try {
+    const r = await pool.query(
+      `SELECT "burgerBuns", "meatWeightG", "drinksJson", "createdAt"::text
+       FROM daily_stock_v2
+       WHERE "createdAt"::date = $1::date
+       ORDER BY "createdAt" DESC LIMIT 1`,
+      [date]
+    );
+    if (!r.rows.length) {
+      return res.json({ ok: false, date, error: 'No stock form submitted for this date' });
+    }
+    const row = r.rows[0];
+    return res.json({
+      ok: true,
+      date,
+      burgerBuns: row.burgerBuns ?? 0,
+      meatWeightG: row.meatWeightG ?? 0,
+      drinksJson: row.drinksJson ?? {},
+      submittedAt: row.createdAt,
+    });
+  } catch (err: any) {
+    console.error('[daily-stock-summary] error', err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 export default router;
