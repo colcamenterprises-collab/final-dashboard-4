@@ -24,11 +24,10 @@ export const ROUTES = {
   SHIFT_ITEMS_MM: "/operations/analysis/shift-items",
   ROLLS_LEDGER: "/operations/analysis/rolls-ledger",
   // LOYVERSE_REPORTS: "/operations/analysis/loyverse", // Hidden - can be re-enabled
-  // DAILY_SHIFT_ANALYSIS: "/operations/analysis/daily-shift-analysis", // Hidden - can be re-enabled
+  SALES_SHIFT_ANALYSIS: "/analysis/sales-shift-analysis",
   STOCK_REVIEW: "/operations/analysis/stock-review",
   STOCK_RECONCILIATION: "/analysis/stock-reconciliation",
   ANALYSIS_STOCK_REVIEW: "/analysis/stock-review",
-  ANALYSIS_LEDGERS: "/analysis/ledgers",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",

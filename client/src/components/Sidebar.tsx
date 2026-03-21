@@ -12,7 +12,7 @@ type Group = {
  * CANONICAL OWNERSHIP:
  * - PURCHASING = items & stock (Purchasing Items, Purchasing Log)
  * - FINANCE = money only (Expenses, Profit & Loss)
- * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
+ * - ANALYSIS = insight (Sales & Shift Analysis, Stock Review)
  * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
  */
 
@@ -57,8 +57,8 @@ const groups: Group[] = [
   {
     title: "Analysis",
     items: [
-      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation" },
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis" },
+      { to: "/analysis/sales-shift-analysis", label: "Sales & Shift Analysis" },
+      { to: "/analysis/stock-review", label: "Stock Review" },
     ],
   },
   {

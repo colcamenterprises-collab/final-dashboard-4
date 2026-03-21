@@ -11,7 +11,6 @@
  *
  * Do NOT:
  * - Move Ingredient Authority out of Menu Management
- * - Move Stock Ledgers out of Analysis
  * - Add new root sections
  *
  * All navigation changes require explicit owner approval.
@@ -59,7 +58,7 @@ type NavGroup = {
  * CANONICAL OWNERSHIP:
  * - PURCHASING = items & stock (Purchasing Items, Purchasing Log)
  * - FINANCE = money only (Expenses, Profit & Loss)
- * - ANALYSIS = insight (Ingredient Reconciliation, Sales & Shift Analysis)
+ * - ANALYSIS = insight (Sales & Shift Analysis, Stock Review)
  * - MENU MANAGEMENT = sellables (Recipe Management, Menu Manager)
  * 
  * HIDDEN from sidebar (routes still accessible directly with read-only banner):
@@ -106,12 +105,9 @@ const navigationGroups: NavGroup[] = [
   {
     title: "Analysis",
     items: [
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
+      { to: "/analysis/sales-shift-analysis", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
       { to: "/analysis/stock-review", label: "Stock Review", icon: Package, testId: "nav-stock-review" },
-      { to: "/analysis/stock-reconciliation", label: "Stock Reconciliation", icon: Package, testId: "nav-stock-reconciliation" },
-      { to: "/analysis/ledgers", label: "Stock Ledgers", icon: BarChart3, testId: "nav-stock-ledgers" },
       { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
-      { to: "/analysis/ingredient-reconciliation", label: "Ingredient Reconciliation", icon: BarChart3, testId: "nav-ingredient-reconciliation" }
     ]
   },
   {

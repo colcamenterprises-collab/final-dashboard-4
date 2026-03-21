@@ -169,6 +169,68 @@ router.get('/shift-snapshots', async (_req, res) => {
   }
 });
 
+
+router.get('/latest-valid-shift', async (_req, res) => {
+  try {
+    const snapshots = await listShiftSnapshots();
+    const validSnapshot = snapshots.find((row: any) => {
+      const posTotal = Number(row?.pos_data?.total ?? 0);
+      const formTotal = Number(row?.form_data?.total ?? 0);
+      return posTotal > 0 || formTotal > 0;
+    });
+
+    if (validSnapshot?.date) {
+      return res.json({
+        ok: true,
+        date: validSnapshot.date,
+        source: 'shift-snapshots',
+      });
+    }
+
+    if (!pool) {
+      return res.status(404).json({ ok: false, error: 'No valid shift found' });
+    }
+
+    const fallbackResult = await pool.query(
+      `
+        WITH candidate_dates AS (
+          SELECT shift_date::date AS shift_date, 'daily_sales_v2'::text AS source
+          FROM daily_sales_v2
+          WHERE shift_date IS NOT NULL
+          UNION ALL
+          SELECT receipt_date::date AS shift_date, 'receipt_truth_line'::text AS source
+          FROM receipt_truth_line
+          WHERE receipt_date IS NOT NULL
+        )
+        SELECT shift_date::text AS date, source
+        FROM candidate_dates
+        WHERE shift_date < CURRENT_DATE
+        ORDER BY shift_date DESC,
+                 CASE source
+                   WHEN 'receipt_truth_line' THEN 1
+                   WHEN 'daily_sales_v2' THEN 2
+                   ELSE 9
+                 END ASC
+        LIMIT 1
+      `,
+    );
+
+    const fallback = fallbackResult.rows[0];
+    if (!fallback?.date) {
+      return res.status(404).json({ ok: false, error: 'No valid shift found' });
+    }
+
+    return res.json({
+      ok: true,
+      date: fallback.date,
+      source: fallback.source,
+    });
+  } catch (error) {
+    console.error('[shiftApproval.latest-valid-shift] error', error);
+    res.status(500).json({ error: 'Failed to resolve latest valid shift' });
+  }
+});
+
 router.get('/pnl/:period', async (req, res) => {
   try {
     const data = await getPnlForPeriod(req.params.period);

@@ -11,7 +11,6 @@
  *
  * Do NOT:
  * - Move Ingredient Authority out of Menu Management
- * - Move Stock Ledgers out of Analysis
  * - Add new root sections
  *
  * All navigation changes require explicit owner approval.
@@ -63,9 +62,7 @@ import PurchasingPage from "./pages/operations/Purchasing";
 import StockReview from "./pages/analysis/StockReview";
 import StockReconciliation from "./pages/analysis/StockReconciliation";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
-import DailyReview from "./pages/analysis/DailyReview";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
-import StockLedgers from "./pages/analysis/StockLedgers";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
 import OnlineOrderingCatalogPage from "./pages/online-ordering/CatalogPage";
@@ -103,7 +100,6 @@ import POSReceiptPreview from "./pages/pos/POSReceiptPreview";
 import LiveStock from "./pages/stock/LiveStock";
 import IngredientUsage from "./pages/analysis/IngredientUsage";
 import StockVariance from "./pages/analysis/StockVariance";
-import IngredientReconciliation from "./pages/analysis/IngredientReconciliation";
 import ReceiptsTruth from "./pages/analysis/ReceiptsTruth";
 import IngredientsTruth from "./pages/analysis/IngredientsTruth";
 import SaaSAdmin from "./pages/saas/SaaSAdmin";
@@ -179,13 +175,11 @@ export default function App() {
                   <Route path="loyverse" element={<LoyverseReports />} />
                   <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                   <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
-                  <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} />
                 </Route>
                 
                 {/* PATCH S2: Stock Reconciliation & Security Analysis */}
                 <Route path="/analysis/stock-reconciliation" element={<Guard><StockReconciliation /></Guard>} />
                 <Route path="/analysis/stock-review" element={<Guard><StockReview /></Guard>} />
-                <Route path="/analysis/ledgers" element={<Guard><StockLedgers /></Guard>} />
                 
                 <Route path="upload" element={<UploadStatements />} />
                 <Route path="receipts" element={<Receipts />} />
@@ -259,7 +253,6 @@ export default function App() {
 
                 <Route path="/analysis/ingredients-usage" element={<IngredientUsage />} />
                 <Route path="/analysis/stock-variance" element={<StockVariance />} />
-                <Route path="/analysis/ingredient-reconciliation" element={<IngredientReconciliation />} />
                 <Route path="/analysis/receipts" element={<ReceiptsTruth />} />
                 <Route path="/analysis/ingredients" element={<IngredientsTruth />} />
 
@@ -271,7 +264,7 @@ export default function App() {
                 <Route path="/membership/dashboard" element={<Guard><MemberDashboard /></Guard>} />
                 <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
 
-                <Route path="/analysis/daily-review" element={<DailyReview />} />
+                <Route path="/analysis/sales-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} />
 
                 <Route path="/marketing" element={<MarketingMachine />} />
                 <Route path="*" element={<NotFound />} />

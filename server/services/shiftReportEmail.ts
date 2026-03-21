@@ -104,7 +104,7 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
     </tr>`)
     .join('');
 
-  const shiftUrl = `${process.env.APP_BASE_URL || 'https://smash-brothers-dashboard.replit.app'}/operations/analysis/daily-shift-analysis?date=${dateISO}`;
+  const shiftUrl = `${process.env.APP_BASE_URL || 'https://smash-brothers-dashboard.replit.app'}/analysis/sales-shift-analysis?date=${dateISO}`;
 
   await transporter.sendMail({
     from: "Shift Reports <colcamenterprises@gmail.com>",
