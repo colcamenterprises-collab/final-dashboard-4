@@ -22,12 +22,11 @@ export const ROUTES = {
   RECEIPTS: "/operations/analysis/receipts",
   RECEIPTS_BURGERS: "/operations/analysis/receipts/burgers",
   SHIFT_ITEMS_MM: "/operations/analysis/shift-items",
-  ROLLS_LEDGER: "/operations/analysis/rolls-ledger",
   // LOYVERSE_REPORTS: "/operations/analysis/loyverse", // Hidden - can be re-enabled
-  // DAILY_SHIFT_ANALYSIS: "/operations/analysis/daily-shift-analysis", // Hidden - can be re-enabled
-  STOCK_REVIEW: "/operations/analysis/stock-review",
+  DAILY_SHIFT_ANALYSIS: "/analysis/daily-review",
+  DAILY_SHIFT_ANALYSIS_LEGACY: "/operations/analysis/daily-shift-analysis",
+  STOCK_REVIEW: "/analysis/stock-review",
   STOCK_RECONCILIATION: "/analysis/stock-reconciliation",
-  ANALYSIS_STOCK_REVIEW: "/analysis/stock-review",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",

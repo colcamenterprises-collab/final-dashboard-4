@@ -175,12 +175,13 @@ export default function App() {
                   <Route path="loyverse" element={<LoyverseReports />} />
                   <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
                   <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
-                  <Route path="daily-shift-analysis" element={<Guard><DailyShiftAnalysis /></Guard>} />
+                  <Route path="daily-shift-analysis" element={<Navigate to="/analysis/daily-review" replace />} />
                 </Route>
-                
-                {/* PATCH S2: Stock Reconciliation & Security Analysis */}
-                <Route path="/analysis/stock-reconciliation" element={<Guard><StockReconciliation /></Guard>} />
+
+                <Route path="/operations/analysis/stock-review" element={<Navigate to="/analysis/stock-review" replace />} />
                 <Route path="/analysis/stock-review" element={<Guard><StockReview /></Guard>} />
+                <Route path="/analysis/stock-reconciliation" element={<Guard><StockReconciliation /></Guard>} />
+                <Route path="/operations/analysis/rolls-ledger" element={<Navigate to="/analysis/stock-review" replace />} />
                 
                 <Route path="upload" element={<UploadStatements />} />
                 <Route path="receipts" element={<Receipts />} />
@@ -266,6 +267,7 @@ export default function App() {
                 <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
 
                 <Route path="/analysis/daily-review" element={<Guard><DailyShiftAnalysis /></Guard>} />
+                <Route path="/operations/analysis/daily-shift-analysis" element={<Navigate to="/analysis/daily-review" replace />} />
 
                 <Route path="/marketing" element={<MarketingMachine />} />
                 <Route path="*" element={<NotFound />} />
