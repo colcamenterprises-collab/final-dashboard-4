@@ -1374,6 +1374,385 @@ router.use("/bob", (_req, res, next) => {
 // Mounted at /api/ai-ops/bob/health and /api/ops/ai/bob/health
 router.get("/bob/health", (_req, res) => res.json(bobHealthPayload()));
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/ai-ops/bob/manifest — Full developer API manifest for ClawBot
+// No auth required. Returns every usable endpoint grouped by category.
+// Token required only for Bob-specific endpoints (proxy-read, file-read, etc.)
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/bob/manifest", (req, res) => {
+  const baseUrl = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : `http://localhost:${process.env.PORT || 5000}`;
+
+  const TOKEN_HEADER = "Authorization: Bearer <BOB_READONLY_TOKEN>";
+  const TOKEN_QUERY  = "?token=<BOB_READONLY_TOKEN>";
+  const NO_AUTH      = "none (internal app — no auth required)";
+
+  const manifest = {
+    generated_at: new Date().toISOString(),
+    base_url: baseUrl,
+    auth: {
+      description: "BOB_READONLY_TOKEN is the universal developer token. Use it via any of these methods — they are all equivalent:",
+      methods: [
+        { name: "Bearer header (preferred)", format: "Authorization: Bearer <BOB_READONLY_TOKEN>" },
+        { name: "Custom header", format: "X-Bot-Token: <BOB_READONLY_TOKEN>" },
+        { name: "Query param (Bob endpoints only)", format: "?token=<BOB_READONLY_TOKEN>" },
+      ],
+      note: "Most /api/* endpoints have NO auth requirement. The token is only required for Bob-specific endpoints (proxy-read, file-read, file-list). All other endpoints are freely accessible.",
+    },
+    categories: {
+
+      self_discovery: {
+        description: "Bot-specific endpoints for self-orientation. Start here.",
+        endpoints: [
+          {
+            method: "GET", path: "/api/ai-ops/bob/health",
+            auth: NO_AUTH,
+            description: "Bot connection status + complete API manifest summary",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/bob/manifest",
+            auth: NO_AUTH,
+            description: "THIS endpoint — full API reference for every usable route",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/bob/onboarding-context",
+            auth: NO_AUTH,
+            description: "CEO charter, process registry, thresholds, data_access map",
+          },
+          {
+            method: "GET", path: "/api/system-health",
+            auth: NO_AUTH,
+            description: "Overall system health: DB connectivity, sync status, queue depth",
+          },
+        ],
+      },
+
+      bob_data_access: {
+        description: "Proxy-read (DB-direct), file-read, file-list — require token.",
+        token_usage: TOKEN_QUERY,
+        endpoints: [
+          {
+            method: "GET", path: "/api/ai-ops/bob/proxy-read",
+            auth: TOKEN_QUERY,
+            params: ["path=<module>", "date=YYYY-MM-DD", "from=YYYY-MM-DD", "to=YYYY-MM-DD", "limit=N"],
+            modules: [
+              "health", "reports/item-sales", "reports/modifier-sales", "reports/category-totals",
+              "forms/daily-sales", "forms/daily-stock", "purchases", "purchase-history",
+              "stock-ledger", "tasks", "audits", "analysis-reports",
+              "shift-snapshots", "expenses", "receipts/truth", "receipts/loyverse",
+              "stock-variance", "refund-logs",
+            ],
+            description: "18-module DB-direct read. Use date= or from=+to= for date-scoped queries.",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/bob/file-read",
+            auth: TOKEN_QUERY,
+            params: ["path=server/routes/forms.ts"],
+            description: "Read any source file. Allowed: client/src/, server/, shared/, scripts/, migrations/. Blocked: .env, node_modules.",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/bob/file-list",
+            auth: TOKEN_QUERY,
+            params: ["path=server/routes"],
+            description: "List directory contents. Returns name, type (file/directory), size_bytes.",
+          },
+          {
+            method: "POST", path: "/api/ai-ops/bob/analysis",
+            auth: TOKEN_HEADER,
+            body: { shift_date: "YYYY-MM-DD", analysis_type: "string", summary: "string", data_json: {} },
+            description: "Write an analysis report to analysis_reports table.",
+          },
+        ],
+      },
+
+      pos_and_sales: {
+        description: "POS receipt data, Loyverse sync, daily shift POS totals.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/reports/item-sales",
+            params: ["date=YYYY-MM-DD"],
+            description: "Per-item sold/refund counts for a shift date from receipt_truth_line",
+          },
+          {
+            method: "GET", path: "/api/reports/modifier-sales",
+            params: ["date=YYYY-MM-DD"],
+            description: "Modifier sales breakdown for a shift date",
+          },
+          {
+            method: "GET", path: "/api/reports/category-totals",
+            params: ["date=YYYY-MM-DD"],
+            description: "Category revenue totals for a shift date",
+          },
+          {
+            method: "GET", path: "/api/shift-approval/pos-shift/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "POS total for a shift date from receipt_truth_line. Includes payment breakdown if lv_receipt available.",
+          },
+          {
+            method: "GET", path: "/api/shift-approval/daily-sales-v2/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "Staff-submitted daily sales form for a specific date",
+          },
+          {
+            method: "GET", path: "/api/loyverse/receipts",
+            params: ["date=YYYY-MM-DD", "limit=N"],
+            description: "Raw Loyverse receipt list for a date",
+          },
+          {
+            method: "POST", path: "/api/loyverse/sync",
+            description: "Trigger manual Loyverse receipt sync",
+          },
+          {
+            method: "GET", path: "/api/shift-approval/shift-snapshots",
+            description: "All ShiftSnapshot records (POS shift windows in satang)",
+          },
+        ],
+      },
+
+      daily_operations_forms: {
+        description: "Staff-submitted daily forms. Forms are the primary source of operational truth.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/daily-sales",
+            params: ["date=YYYY-MM-DD (optional)"],
+            description: "Legacy daily sales forms",
+          },
+          {
+            method: "GET", path: "/api/shift-approval/daily-sales-v2/:date",
+            description: "Daily Sales V2 form for a specific date",
+          },
+          {
+            method: "GET", path: "/api/daily-stock/:salesFormId",
+            description: "Daily stock form by its salesFormId",
+          },
+          {
+            method: "GET", path: "/api/forms/daily-sales",
+            params: ["date=YYYY-MM-DD or from=+to=, limit=N"],
+            description: "Forms v2 endpoint (same data as proxy-read forms/daily-sales)",
+          },
+          {
+            method: "GET", path: "/api/forms/daily-stock",
+            params: ["date=YYYY-MM-DD or from=+to=, limit=N"],
+            description: "Stock forms v2 endpoint",
+          },
+          {
+            method: "GET", path: "/api/analysis/shift/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "AI-generated shift analysis for a date",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/bob/analysis/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "Bob's own analysis output for a date",
+          },
+        ],
+      },
+
+      inventory_and_stock: {
+        description: "Stock tracking, ledgers, variance monitoring.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/stock-catalog",
+            description: "Full stock item catalog",
+          },
+          {
+            method: "GET", path: "/api/rolls-ledger",
+            description: "Rolls ledger — daily bun tracking",
+          },
+          {
+            method: "GET", path: "/api/meat-ledger",
+            description: "Meat ledger — daily meat weight tracking",
+          },
+          {
+            method: "GET", path: "/api/drinks-ledger",
+            description: "Drinks ledger — daily drinks tracking",
+          },
+          {
+            method: "GET", path: "/api/stock/variance/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "Stock variance for a shift date",
+          },
+          {
+            method: "GET", path: "/api/refunds",
+            description: "All refund log entries",
+          },
+          {
+            method: "POST", path: "/api/refunds/log",
+            body: { shift_date: "YYYY-MM-DD", amount: "number", reason: "string", platform: "string", logged_by: "string" },
+            description: "Log a refund (requires manager approval fields)",
+          },
+        ],
+      },
+
+      purchasing_and_shopping: {
+        description: "Purchasing items catalog, purchase history, shopping list.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/purchasing-items",
+            description: "Full purchasing item master catalog (62 items + 10 drinks)",
+          },
+          {
+            method: "GET", path: "/api/purchasing/shift-log",
+            params: ["date=YYYY-MM-DD (optional)"],
+            description: "What was ordered each shift (purchasing_shift_items linked to daily_stock_v2)",
+          },
+          {
+            method: "GET", path: "/api/purchasing-list/latest",
+            description: "Current shopping list (Bob OBSERVE ONLY — never duplicate)",
+          },
+          {
+            method: "GET", path: "/api/purchasing-list/latest/csv",
+            description: "Shopping list as CSV download",
+          },
+        ],
+      },
+
+      expenses_and_finance: {
+        description: "Expenses, wages, PnL, banking.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/expenses",
+            params: ["date=YYYY-MM-DD (optional)"],
+            description: "Expense entries",
+          },
+          {
+            method: "GET", path: "/api/expenses-v2",
+            params: ["date=YYYY-MM-DD or from=+to="],
+            description: "expenses_v2 entries (canonical expense table) — also available via proxy-read expenses module",
+          },
+          {
+            method: "GET", path: "/api/shift-expenses",
+            params: ["date=YYYY-MM-DD (optional)"],
+            description: "Shift-specific expense entries",
+          },
+          {
+            method: "GET", path: "/api/finance/pnl/:period",
+            params: ["period path param: YYYY-MM or YYYY-MM-DD"],
+            description: "PnL read model for a period",
+          },
+          {
+            method: "GET", path: "/api/finance/wages",
+            description: "Wage entries",
+          },
+          {
+            method: "GET", path: "/api/shift-review",
+            description: "Manager shift sign-off records",
+          },
+          {
+            method: "POST", path: "/api/shift-review",
+            body: { shift_date: "YYYY-MM-DD", manager_name: "string", notes: "string" },
+            description: "Log a manager shift sign-off",
+          },
+        ],
+      },
+
+      reports_and_analytics: {
+        description: "Pre-computed reports and analytics.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/reports/daily-summary/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "Daily summary report",
+          },
+          {
+            method: "GET", path: "/api/reports/sales-heatmap",
+            params: ["from=YYYY-MM-DD", "to=YYYY-MM-DD"],
+            description: "Sales heatmap data",
+          },
+          {
+            method: "GET", path: "/api/insights/shift/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "AI-driven shift insights",
+          },
+          {
+            method: "GET", path: "/api/analysis/shift/:date",
+            params: ["date path param: YYYY-MM-DD"],
+            description: "Shift analysis including sales, stock, expenses breakdown",
+          },
+        ],
+      },
+
+      ai_operations: {
+        description: "Bob AI tools — tasks, issues, monitors, chat.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/ai-ops/tasks",
+            params: ["status=open|in_progress|completed", "area=operations|finance|purchasing|marketing|dev|compliance"],
+            description: "Work register — list tasks",
+          },
+          {
+            method: "POST", path: "/api/ai-ops/tasks",
+            body: { title: "string", description: "string", priority: "low|medium|high|critical", area: "string", assigned_to: "string" },
+            description: "Create a task in the work register",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/issues",
+            description: "Issues register",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/monitors",
+            description: "Monitor engine results — checks for missing forms, stock variance, etc.",
+          },
+          {
+            method: "POST", path: "/api/ai-ops/monitors/run",
+            description: "Trigger on-demand monitor run",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/process-registry",
+            description: "Process registry — map of all app workflows",
+          },
+          {
+            method: "GET", path: "/api/ai-ops/bob/onboarding-context",
+            description: "Full Bob onboarding payload: charter, processes, thresholds, data_access",
+          },
+        ],
+      },
+
+      staff_and_management: {
+        description: "Manager checklists, health & safety.",
+        auth: NO_AUTH,
+        endpoints: [
+          {
+            method: "GET", path: "/api/checklists/random",
+            description: "Random manager cleaning task checklist for shift start",
+          },
+          {
+            method: "POST", path: "/api/checklists/complete",
+            body: { shiftId: "string", managerName: "string", tasksCompleted: [] },
+            description: "Submit completed checklist",
+          },
+          {
+            method: "GET", path: "/api/checklists/history",
+            description: "History of completed checklists",
+          },
+          {
+            method: "GET", path: "/api/health-safety/audits",
+            description: "Health & safety audit records",
+          },
+        ],
+      },
+
+    },
+    quick_start: {
+      step_1: `Call GET ${baseUrl}/api/ai-ops/bob/health to confirm connection`,
+      step_2: `Call GET ${baseUrl}/api/ai-ops/bob/proxy-read?path=health&token=<BOB_READONLY_TOKEN> to verify token works`,
+      step_3: `Call GET ${baseUrl}/api/ai-ops/bob/onboarding-context for full system context`,
+      step_4: `Call any /api/* endpoint freely — no token needed for most endpoints`,
+      token_format: "For proxy-read, file-read, file-list: add ?token=<BOB_READONLY_TOKEN> to URL. For POST /api/ai-ops/bob/analysis: add Authorization: Bearer <BOB_READONLY_TOKEN> header",
+    },
+  };
+
+  return res.json(manifest);
+});
+
 // ─── Bob Proxy-Read ──────────────────────────────────────────────────────────
 // GET /api/ai-ops/bob/proxy-read?path=...&date=...&limit=...
 //
@@ -2032,8 +2411,14 @@ router.get("/bob/file-read", async (req, res) => {
   const internalToken = process.env.BOB_READONLY_TOKEN;
   const gatewayToken  = process.env.BOBS_LOYVERSE_TOKEN;
   const validTokens   = [internalToken, gatewayToken].filter(Boolean) as string[];
-  const provided = (req.query.token as string | undefined) ?? req.headers["x-bob-token"] as string | undefined;
-  if (!provided || !validTokens.includes(provided)) {
+  const authHeader    = req.headers["authorization"] as string | undefined;
+  const provided      =
+    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined) ??
+    (req.headers["x-bot-token"] as string | undefined) ??
+    (req.headers["x-bob-token"] as string | undefined) ??
+    (req.query.token as string | undefined);
+  const isVerified = res.locals.isBotRequest === true || (!!provided && validTokens.includes(provided));
+  if (!isVerified) {
     return res.status(401).json({ ok: false, error: "unauthorized" });
   }
 
@@ -2072,8 +2457,14 @@ router.get("/bob/file-list", async (req, res) => {
   const internalToken = process.env.BOB_READONLY_TOKEN;
   const gatewayToken  = process.env.BOBS_LOYVERSE_TOKEN;
   const validTokens   = [internalToken, gatewayToken].filter(Boolean) as string[];
-  const provided = (req.query.token as string | undefined) ?? req.headers["x-bob-token"] as string | undefined;
-  if (!provided || !validTokens.includes(provided)) {
+  const authHeader    = req.headers["authorization"] as string | undefined;
+  const provided      =
+    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined) ??
+    (req.headers["x-bot-token"] as string | undefined) ??
+    (req.headers["x-bob-token"] as string | undefined) ??
+    (req.query.token as string | undefined);
+  const isVerified = res.locals.isBotRequest === true || (!!provided && validTokens.includes(provided));
+  if (!isVerified) {
     return res.status(401).json({ ok: false, error: "unauthorized" });
   }
 

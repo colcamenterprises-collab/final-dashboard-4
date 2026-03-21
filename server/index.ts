@@ -124,6 +124,36 @@ app.use('/public', express.static(path.resolve(process.cwd(), 'public')));
 // PATCH O14 — Tenant context middleware (SaaS foundation)
 app.use(tenantContext);
 
+// ── Universal bot-token middleware ───────────────────────────────────────────
+// Accepts BOB_READONLY_TOKEN (or BOBS_LOYVERSE_TOKEN) via:
+//   - Authorization: Bearer <token>   (preferred)
+//   - X-Bot-Token: <token>            (alternative)
+//   - ?token=<token>                  (query param, Bob-specific endpoints only)
+// Sets res.locals.isBotRequest = true so any route can branch on bot identity.
+// Does NOT block any request — purely additive.
+// ─────────────────────────────────────────────────────────────────────────────
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const t1 = process.env.BOB_READONLY_TOKEN;
+  const t2 = process.env.BOBS_LOYVERSE_TOKEN;
+  const valid = [t1, t2].filter(Boolean) as string[];
+  if (!valid.length) return next();
+
+  const authHeader = req.headers["authorization"];
+  const xBotToken  = req.headers["x-bot-token"] as string | undefined;
+  const qToken     = req.query?.token as string | undefined;
+
+  const provided =
+    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined) ??
+    xBotToken ??
+    qToken;
+
+  if (provided && valid.includes(provided)) {
+    res.locals.isBotRequest = true;
+    res.set("X-Bot-Identity", "verified");
+  }
+  next();
+});
+
 // Special tablet reload routes
 app.get('/tablet-reload', (req, res) => {
   res.sendFile(path.resolve(process.cwd(), 'public/tablet-reload.html'));
