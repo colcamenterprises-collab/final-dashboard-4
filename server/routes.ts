@@ -119,7 +119,6 @@ import dashboard4Routes from "./routes/dashboard4Routes";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
 import healthSafetyPdf from "./routes/healthSafety/pdf";
-import ingredientReconciliationRouter from "./routes/ingredientReconciliation";
 import receiptBatchRoutes from "./routes/receiptBatchRoutes";
 import pnlReadModelRoutes from "./routes/pnlReadModel";
 import pnlSnapshotRoutes from "./routes/pnlSnapshot.route";
@@ -1221,7 +1220,6 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/analysis/drinks-ledger', drinksLedgerRouter);
   
   // PHASE I: Register ingredient reconciliation BEFORE catch-all :date route
-  app.use('/api/analysis/ingredient-reconciliation', ingredientReconciliationRouter);
   
   // PHASE M: Register receipt batch truth routes BEFORE catch-all :date route
   app.use('/api/analysis', receiptBatchRoutes);
@@ -2870,6 +2868,126 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+
+  app.get("/api/analysis/stock-review/purchase-history", async (req: Request, res: Response) => {
+    try {
+      const from = typeof req.query.from === "string" && req.query.from ? req.query.from : null;
+      const to = typeof req.query.to === "string" && req.query.to ? req.query.to : null;
+      const limit = Math.min(Math.max(Number(req.query.limit || 120), 1), 365);
+
+      const params: any[] = [];
+      const where: string[] = [];
+
+      if (from) {
+        params.push(from);
+        where.push(`pt.date >= $${params.length}::date`);
+      }
+
+      if (to) {
+        params.push(to);
+        where.push(`pt.date <= $${params.length}::date`);
+      }
+
+      const whereClause = where.length > 0 ? `WHERE ${where.join(" AND ")}` : "";
+
+      const purchasesQuery = `
+        SELECT
+          pt.id,
+          pt.date::text AS date,
+          pt.created_at,
+          pt.staff,
+          pt.supplier,
+          pt.amount_thb,
+          pt.notes,
+          pt.rolls_pcs,
+          pt.meat_grams
+        FROM purchase_tally pt
+        ${whereClause}
+        ORDER BY pt.date DESC, pt.created_at DESC
+        LIMIT ${limit}
+      `;
+
+      const purchasesResult = await pool.query(purchasesQuery, params);
+      const tallyIds = purchasesResult.rows.map((row: any) => row.id).filter(Boolean);
+
+      let drinksByTallyId = new Map<string, Array<{ itemName: string; quantity: number; unit: string | null }>>();
+      if (tallyIds.length > 0) {
+        const drinksResult = await pool.query(
+          `
+            SELECT tally_id, item_name, qty, unit
+            FROM purchase_tally_drink
+            WHERE tally_id = ANY($1::uuid[])
+            ORDER BY item_name ASC
+          `,
+          [tallyIds],
+        );
+
+        drinksByTallyId = drinksResult.rows.reduce((map: Map<string, any[]>, row: any) => {
+          const tallyId = String(row.tally_id);
+          const existing = map.get(tallyId) || [];
+          existing.push({
+            itemName: row.item_name,
+            quantity: Number(row.qty || 0),
+            unit: row.unit || null,
+          });
+          map.set(tallyId, existing);
+          return map;
+        }, new Map<string, any[]>());
+      }
+
+      const rolls = purchasesResult.rows
+        .filter((row: any) => Number(row.rolls_pcs || 0) > 0)
+        .map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          createdAt: row.created_at,
+          staff: row.staff || null,
+          supplier: row.supplier || null,
+          quantity: Number(row.rolls_pcs || 0),
+          amountThb: Number(row.amount_thb || 0),
+          notes: row.notes || null,
+        }));
+
+      const meat = purchasesResult.rows
+        .filter((row: any) => Number(row.meat_grams || 0) > 0)
+        .map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          createdAt: row.created_at,
+          staff: row.staff || null,
+          supplier: row.supplier || null,
+          grams: Number(row.meat_grams || 0),
+          amountThb: Number(row.amount_thb || 0),
+          notes: row.notes || null,
+        }));
+
+      const drinks = purchasesResult.rows
+        .filter((row: any) => (drinksByTallyId.get(String(row.id)) || []).length > 0)
+        .map((row: any) => ({
+          id: row.id,
+          date: row.date,
+          createdAt: row.created_at,
+          staff: row.staff || null,
+          supplier: row.supplier || null,
+          amountThb: Number(row.amount_thb || 0),
+          notes: row.notes || null,
+          items: drinksByTallyId.get(String(row.id)) || [],
+        }));
+
+      return res.json({
+        ok: true,
+        source: ["purchase_tally", "purchase_tally_drink"],
+        filters: { from, to, limit },
+        rolls,
+        meat,
+        drinks,
+      });
+    } catch (error: any) {
+      console.error("[analysis.stock-review.purchase-history] error", error);
+      return res.status(500).json({ ok: false, error: error?.message || "Failed to load purchase history" });
+    }
+  });
+
   // Edit stock purchase endpoint - handles rolls, meat, drinks
   app.put("/api/expensesV2/stock/:id", async (req: Request, res: Response) => {
     try {
@@ -3819,7 +3937,6 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/items', varianceHistoryRouter);
   app.use('/api/executive-metrics', executiveMetricsRouter);
   app.use(dashboard4Routes);
-  // Note: ingredientReconciliationRouter is registered earlier at line ~1204
 
   // PATCH 5 — Canonical Menu Drift Report (Internal Admin)
   app.get('/api/admin/menu-canonical/status', async (req: Request, res: Response) => {
