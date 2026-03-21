@@ -107,6 +107,7 @@ const navigationGroups: NavGroup[] = [
     items: [
       { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
       { to: "/analysis/stock-review", label: "Stock Review", icon: Package, testId: "nav-stock-review" },
+      { to: "/analysis/stock-reconciliation", label: "Stock Reconciliation", icon: Package, testId: "nav-stock-reconciliation" },
       { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
     ]
   },
