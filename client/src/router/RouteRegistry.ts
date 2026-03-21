@@ -26,7 +26,6 @@ export const ROUTES = {
   // LOYVERSE_REPORTS: "/operations/analysis/loyverse", // Hidden - can be re-enabled
   SALES_SHIFT_ANALYSIS: "/analysis/sales-shift-analysis",
   STOCK_REVIEW: "/operations/analysis/stock-review",
-  STOCK_RECONCILIATION: "/analysis/stock-reconciliation",
   ANALYSIS_STOCK_REVIEW: "/analysis/stock-review",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
