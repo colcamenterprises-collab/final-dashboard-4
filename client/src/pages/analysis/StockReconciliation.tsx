@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { StockPurchaseTables } from "@/components/StockPurchaseTables";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -251,6 +252,8 @@ export default function StockReconciliation() {
           </div>
         </CardContent>
       </Card>
+
+      <StockPurchaseTables />
     </div>
   );
 }
