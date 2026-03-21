@@ -1,0 +1,103 @@
+Good call — this one is actually better suited to Replit since it’s UI relocation and needs visual verification.
+Use this exact instruction (don’t change wording) 👇
+REPLIT AGENT — ONE PATCH ONLY
+TASK
+Consolidate Rolls / Meat / Drinks purchase tables into:
+→ Analysis → Stock Reconciliation
+This is a UI relocation only.
+No system changes. No data changes.
+🚨 CRITICAL RULES (MUST FOLLOW)
+DO NOT change any database tables
+DO NOT change any write endpoints
+DO NOT change lodge flow
+DO NOT recreate tables
+DO NOT duplicate logic
+DO NOT touch Sales & Shift Analysis page
+DO NOT introduce new APIs unless absolutely required
+DO NOT remove existing data
+This is NOT a rebuild.
+This is moving the front-end display only.
+🎯 GOAL
+Currently:
+Rolls / Meat / Drinks purchase tables exist and work correctly
+They are displayed under Finance → Expenses
+Target:
+These SAME tables must now be displayed under: → Analysis → Stock Reconciliation
+They must use the SAME data source and logic
+✅ REQUIRED IMPLEMENTATION APPROACH
+Step 1 — Identify current working source
+Find where these tables are currently rendered:
+Rolls Purchases table
+Meat Purchases table
+Drinks Purchases table
+Identify:
+Components used
+Hooks / queries used
+Endpoints used
+Step 2 — Reuse (NOT rebuild)
+Move or reuse these SAME components into:
+client/src/pages/analysis/StockReconciliation.tsx
+DO NOT rewrite them.
+DO NOT duplicate logic.
+Reuse existing components.
+Step 3 — Render on Stock Reconciliation page
+Final structure of page must be:
+Existing Stock Reconciliation summary cards (unchanged)
+Existing reconciliation table (unchanged)
+Rolls Purchases table
+Meat Purchases table
+Drinks Purchases table
+Step 4 — Remove from Finance → Expenses (UI ONLY)
+Remove ONLY the visual tables from:
+client/src/pages/finance/Expenses.tsx (or equivalent)
+DO NOT:
+remove endpoints
+remove data
+remove hooks used elsewhere
+Step 5 — Update navigation references
+Anywhere in UI that suggests: → "Go to Finance / Expenses to view stock purchases"
+Must now point to: → Analysis → Stock Reconciliation
+✅ FUNCTIONAL REQUIREMENTS
+After patch:
+Adding Rolls → appears in Stock Reconciliation
+Adding Meat → appears in Stock Reconciliation
+Adding Drinks → appears in Stock Reconciliation
+Edit still works
+Delete still works
+Historical data still visible
+Finance page no longer shows these tables
+🚨 PRE-BUILD SIGN-OFF REQUIRED
+Before coding, return:
+PRE-BUILD SIGN-OFF
+Exact components used for:
+Rolls table
+Meat table
+Drinks table
+Exact endpoints used
+Exact files to be modified
+Confirmation:
+No DB changes required
+No write-path changes required
+No data migration required
+Any blockers
+DO NOT START CODING until this is returned.
+✅ AFTER BUILD — REQUIRED OUTPUT
+EVIDENCE PACK
+Files changed
+Confirmation tables are reused (not rebuilt)
+Confirmation no data was touched
+Confirmation lodge flow still works
+Confirmation historical rows visible
+Confirmation Finance page no longer shows tables
+Confirmation Stock Reconciliation shows all 3 tables
+Screenshots of:
+Stock Reconciliation page (with all 3 tables)
+Finance page (tables removed)
+🔒 FINAL RULE
+If ANY part of this requires:
+changing schema
+modifying write endpoints
+duplicating tables
+STOP and report before proceeding.
+Send that exactly.
+Once they return the sign-off, paste it here — I’ll validate it before you let them build.
