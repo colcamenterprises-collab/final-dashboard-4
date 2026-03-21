@@ -1,0 +1,166 @@
+REPLIT AGENT INSTRUCTION — ONE PATCH ONLY
+This is a one-patch implementation.
+Do not split this into phases.
+Do not implement part now and recommend the rest later.
+Do not reduce scope to make it easier.
+If you see gaps, conflicts, or blockers, you must flag them now before building, not after deployment.
+Operating rule
+You must first return a Pre-Build Sign-Off before writing code.
+Your sign-off must confirm all of the following:
+You understand this is a single patch only
+You understand the patch must be end-to-end and production-safe
+You understand Bob must have:
+full read access across code and approved data surfaces
+restricted write access only to the analysis layer and report delivery layer
+no write access to source-of-truth operational data
+You have reviewed the current architecture closely enough to identify any blockers, missing dependencies, schema issues, auth issues, route conflicts, or rollout risks
+You will flag all known issues now, before build starts
+You will not proceed into implementation until your sign-off includes:
+confirmed scope
+exact objects to be touched
+exact boundaries to be enforced
+exact risks, if any
+If anything is unclear, broken, or risky, say it in the sign-off now.
+Do not “discover” critical missing pieces after implementation.
+Objective
+Implement Bob as a full-system operational intelligence layer with:
+A. Full read access
+Bob must have read-only visibility into:
+client
+server
+shared
+scripts
+migrations / sql_migrations / prisma
+approved root config files needed to understand the app
+Bob must also have read-only access to all approved business data surfaces needed for analysis, including at minimum:
+Daily Sales V2
+Daily Stock V2
+expenses
+purchase history
+purchases catalog
+receipts truth
+receipts loyverse
+shift snapshots
+stock variance
+refund logs
+analysis reports
+existing reporting endpoints relevant to operations
+B. Restricted write access
+Bob must be able to write only to the analysis/output layer, not the truth layer.
+Allowed write scope:
+analysis reports
+analysis flags
+analysis adjustments / reviewed analytical figures
+analysis page output tables/cards/data sources
+csv generation / report export
+daily analysis email content + delivery trigger/logging
+Forbidden write scope:
+daily_sales_v2
+daily_stock_v2
+expenses source records
+purchase history source records
+purchases catalog
+receipt truth / loyverse source tables
+stock ledger source-of-truth tables
+forms and raw operational submissions
+deployment, secrets, admin, destructive routes
+Bob may amend figures only in analysis-layer tables, never by overwriting source-of-truth data.
+Every analysis adjustment must preserve:
+original value
+adjusted value
+reason
+source field/table
+created_at
+created_by = bob
+review status if needed
+Functional requirements
+1. Analysis page must actually work
+This patch must make the current analysis area usable as the central place for Bob’s outputs.
+It must support:
+population of analysis tables/cards from Bob outputs
+clear flagging of anomalies and review items
+stored analytical adjustments
+visibility of source vs adjusted values where applicable
+readably structured output for review
+2. Daily email/report delivery
+Bob must be able to:
+generate the daily analysis summary
+generate csv if required
+append results into the daily sales email flow from Replit
+send only through approved report-delivery logic
+log sent status / delivery result
+3. Auth and access model
+Use one clean Bob auth model. Do not create overlapping, messy auth patterns.
+Bob access must be:
+broad read
+narrow write
+explicitly bounded
+auditable
+4. Safety
+Bob must not be able to mutate operational truth. This must be enforced in code, not just by convention.
+Implementation expectations
+You are to choose the safest production-ready implementation and deliver it in one patch.
+That includes:
+routes
+services
+schema/table changes if required
+analysis-layer storage
+UI wiring for the analysis page
+report delivery logic
+auth boundaries
+logging/audit where needed
+Do not come back with:
+“phase 1”
+“we can add later”
+“next patch”
+“future improvement”
+If it is required for this to work properly, include it in this patch now.
+Before building: mandatory Pre-Build Sign-Off format
+Return this first, and only this first:
+PRE-BUILD SIGN-OFF
+Scope understood:
+[yes/no]
+One-patch rule understood:
+[yes/no]
+Bob read scope understood:
+[yes/no]
+Bob restricted write scope understood:
+[yes/no]
+Source-of-truth protection understood:
+[yes/no]
+Exact files likely to be touched:
+[list]
+Exact tables / routes / UI surfaces likely to be touched:
+[list]
+Known blockers or risks identified before build:
+[list or “none identified”]
+Anything unclear or conflicting in requirements:
+[list or “none”]
+Final commitment:
+“I understand this must be delivered as one complete patch and I am flagging all known issues now before implementation.”
+Do not start coding until this sign-off is returned.
+After sign-off and implementation, return only this evidence pack
+IMPLEMENTATION EVIDENCE PACK
+Exact files changed
+Exact DB/schema objects changed
+Exact auth boundaries implemented
+Exact write boundaries enforced
+Exact routes/endpoints added or changed
+Exact analysis page surfaces now powered by Bob
+Exact report/email/csv flow implemented
+Proof Bob can write analysis outputs
+Proof Bob cannot write source-of-truth operational data
+Verification results
+Top remaining risks, if any
+Final instruction
+This is now a quality-control issue.
+I want you to think through the architecture before writing anything.
+Flag missing pieces now.
+Then deliver one complete patch.
+Do not create another loop of:
+partial patch
+missed requirement
+rework
+new patch
+more cleanup
+That cycle is over

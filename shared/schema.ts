@@ -1766,6 +1766,22 @@ export const analysisReports = pgTable('analysis_reports', {
   typeIdx: index('idx_analysis_reports_type').on(table.analysisType),
 }));
 
+// analysis_adjustments — Bob's analysis-layer amendments to operational figures.
+// Never overwrites source-of-truth tables. Stores original + adjusted + reason.
+// Created by: bob. Review required before any adjustment is acted upon.
+export const analysisAdjustments = pgTable('analysis_adjustments', {
+  id: uuid('id').primaryKey().default(sql`gen_random_uuid()`),
+  analysisReportId: uuid('analysis_report_id').notNull().references(() => analysisReports.id, { onDelete: 'cascade' }),
+  sourceTable: text('source_table').notNull(),
+  sourceField: text('source_field').notNull(),
+  originalValue: text('original_value'),
+  adjustedValue: text('adjusted_value').notNull(),
+  reason: text('reason').notNull(),
+  createdBy: text('created_by').notNull().default('bob'),
+  reviewStatus: text('review_status').notNull().default('pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+});
+
 // -----------------------------------------------------------------------------
 // Daily Reports V2 — stores the compiled daily report (JSON + reference IDs)
 // -----------------------------------------------------------------------------

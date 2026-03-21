@@ -2503,6 +2503,36 @@ router.get("/bob/file-list", async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BOB WRITE-BOUNDARY GUARD
+// When a request carries the Bob token AND is a write method, it may ONLY
+// target this explicit allowlist. Any write outside this list returns 403.
+// Source-of-truth tables are never reachable via Bob write routes.
+// ─────────────────────────────────────────────────────────────────────────────
+const BOB_WRITE_ALLOWLIST = [
+  "/bob/analysis",
+  "/bob/adjustments",
+  "/bob/email/trigger",
+  "/bob/run-analysis",
+];
+
+router.use((req: any, res: any, next: any) => {
+  if (
+    res.locals.isBotRequest &&
+    ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
+  ) {
+    const isAllowed = BOB_WRITE_ALLOWLIST.some((p) => req.path.startsWith(p));
+    if (!isAllowed) {
+      return res.status(403).json({
+        ok: false,
+        error: "Bot write access denied — this endpoint is outside the Bob write allowlist",
+        write_allowlist: BOB_WRITE_ALLOWLIST,
+      });
+    }
+  }
+  next();
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // POST /api/ai-ops/bob/analysis — Bob writes an analysis report (INSERT only)
 // Auth: same dual-token as proxy-read (BOB_READONLY_TOKEN or BOBS_LOYVERSE_TOKEN)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2537,6 +2567,255 @@ router.post("/bob/analysis", bobAuthMiddleware, async (req, res) => {
     return res.json({ ok: true, report: r.rows[0] });
   } catch (err: any) {
     console.error("[bob/analysis] write error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/ai-ops/bob/adjustments — Bob writes an analysis-layer adjustment
+// Auth: bobAuthMiddleware. Writes ONLY to analysis_adjustments (never source tables).
+// Body: { analysis_report_id, source_table, source_field, original_value, adjusted_value, reason }
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/bob/adjustments", bobAuthMiddleware, async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  try {
+    const { analysis_report_id, source_table, source_field, original_value, adjusted_value, reason, created_by } =
+      req.body as Record<string, any>;
+    if (!analysis_report_id || !source_table || !source_field || !adjusted_value || !reason) {
+      return res.status(400).json({ ok: false, error: "analysis_report_id, source_table, source_field, adjusted_value, and reason are required" });
+    }
+    const r = await pool.query(
+      `INSERT INTO analysis_adjustments (analysis_report_id, source_table, source_field, original_value, adjusted_value, reason, created_by)
+       VALUES ($1::uuid, $2, $3, $4, $5, $6, $7)
+       RETURNING id::text, analysis_report_id::text, source_table, source_field, original_value, adjusted_value, reason, created_by, review_status, created_at::text`,
+      [analysis_report_id, source_table, source_field, original_value ?? null, adjusted_value, reason, created_by || "bob"]
+    );
+    return res.json({ ok: true, adjustment: r.rows[0] });
+  } catch (err: any) {
+    console.error("[bob/adjustments] write error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// GET /api/ai-ops/bob/adjustments/:date — All adjustments for a shift date
+router.get("/bob/adjustments/:date", async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ ok: false, error: "Invalid date" });
+  try {
+    const r = await pool.query(
+      `SELECT a.id::text, a.analysis_report_id::text, a.source_table, a.source_field,
+              a.original_value, a.adjusted_value, a.reason, a.created_by, a.review_status, a.created_at::text
+       FROM analysis_adjustments a
+       JOIN analysis_reports r ON r.id = a.analysis_report_id
+       WHERE r.shift_date = $1::date
+       ORDER BY a.created_at DESC`,
+      [date]
+    );
+    return res.json({ ok: true, date, count: r.rows.length, adjustments: r.rows });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PATCH /api/ai-ops/bob/adjustments/:id/review — Approve or reject an adjustment
+// Auth: no bot token required (this is a manager action, not Bob action)
+// ─────────────────────────────────────────────────────────────────────────────
+router.patch("/bob/adjustments/:id/review", async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  const { id } = req.params;
+  const { review_status } = req.body as { review_status?: string };
+  if (!["approved", "rejected", "pending"].includes(review_status || "")) {
+    return res.status(400).json({ ok: false, error: "review_status must be approved, rejected, or pending" });
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE analysis_adjustments SET review_status = $2 WHERE id = $1::uuid RETURNING id::text, review_status`,
+      [id, review_status]
+    );
+    if (!r.rows.length) return res.status(404).json({ ok: false, error: "Adjustment not found" });
+    return res.json({ ok: true, adjustment: r.rows[0] });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /api/ai-ops/bob/email/trigger — Send daily analysis email for a date
+// Auth: bobAuthMiddleware. Composes HTML from analysis_reports + adjustments,
+// sends via workingEmailService to smashbrothersburgersth@gmail.com,
+// logs the delivery result back into analysis_reports (status field).
+// Body: { shift_date, recipient? }
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/bob/email/trigger", bobAuthMiddleware, async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  const { shift_date, recipient } = req.body as { shift_date?: string; recipient?: string };
+  if (!shift_date || !/^\d{4}-\d{2}-\d{2}$/.test(shift_date)) {
+    return res.status(400).json({ ok: false, error: "shift_date required (YYYY-MM-DD)" });
+  }
+  const toEmail = recipient || "smashbrothersburgersth@gmail.com";
+  try {
+    // Load the most recent analysis report for this date
+    const rpt = await pool.query(
+      `SELECT id::text, analysis_type, status, summary, data_json, created_at::text
+       FROM analysis_reports WHERE shift_date = $1::date
+       ORDER BY created_at DESC LIMIT 1`, [shift_date]
+    );
+    if (!rpt.rows.length) {
+      return res.status(404).json({ ok: false, error: `No analysis report found for ${shift_date}` });
+    }
+    const report = rpt.rows[0];
+    const dj = report.data_json || {};
+
+    // Load adjustments for this date
+    const adj = await pool.query(
+      `SELECT a.source_table, a.source_field, a.original_value, a.adjusted_value, a.reason, a.review_status
+       FROM analysis_adjustments a
+       JOIN analysis_reports r ON r.id = a.analysis_report_id
+       WHERE r.shift_date = $1::date ORDER BY a.created_at ASC`, [shift_date]
+    );
+
+    // Compose HTML email
+    const issues: any[] = dj.issues || [];
+    const issueRows = issues.map((i: any) =>
+      `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${i.type || i.check || "issue"}</td>
+            <td style="padding:6px 10px;border-bottom:1px solid #eee;color:#b91c1c">${i.message || i.detail || JSON.stringify(i)}</td></tr>`
+    ).join("");
+
+    const adjRows = adj.rows.map((a: any) =>
+      `<tr>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee">${a.source_table}.${a.source_field}</td>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee">${a.original_value ?? "—"}</td>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee;color:#166534">${a.adjusted_value}</td>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee">${a.reason}</td>
+         <td style="padding:6px 10px;border-bottom:1px solid #eee;color:${a.review_status==="approved"?"#166534":a.review_status==="rejected"?"#b91c1c":"#92400e"}">${a.review_status}</td>
+       </tr>`
+    ).join("");
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;max-width:700px;margin:0 auto">
+        <h2 style="color:#1e293b;border-bottom:2px solid #10b981;padding-bottom:8px">
+          Bob Daily Analysis Report — ${shift_date}
+        </h2>
+        <p style="color:#475569"><strong>Status:</strong> <span style="color:${report.status==="ok"?"#166534":report.status==="warning"?"#92400e":"#b91c1c"}">${report.status?.toUpperCase()}</span></p>
+        <p style="color:#475569"><strong>Summary:</strong> ${report.summary || "No summary available"}</p>
+
+        ${dj.pos ? `<h3 style="color:#334155">POS Total</h3>
+        <p style="font-family:monospace">Sales: ฿${((dj.pos.total_baht||0)).toFixed(2)} &nbsp;|&nbsp;
+        Receipts: ${dj.pos.txn_count||0} &nbsp;|&nbsp; Payment breakdown: ${dj.pos.payment_breakdown_available?"available":"not available"}</p>` : ""}
+
+        ${dj.form ? `<h3 style="color:#334155">Staff Form</h3>
+        <p style="font-family:monospace">Reported: ฿${((dj.form.total_baht||0)).toFixed(2)} &nbsp;|&nbsp;
+        Cash: ฿${((dj.form.cash_baht||0)).toFixed(2)} &nbsp;|&nbsp; QR: ฿${((dj.form.qr_baht||0)).toFixed(2)}</p>` : ""}
+
+        ${issues.length ? `<h3 style="color:#b91c1c">Issues / Flags (${issues.length})</h3>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0">
+          <tr style="background:#fef2f2"><th style="padding:8px 10px;text-align:left">Type</th><th style="padding:8px 10px;text-align:left">Detail</th></tr>
+          ${issueRows}
+        </table>` : `<p style="color:#166534">No issues flagged for this shift.</p>`}
+
+        ${adj.rows.length ? `<h3 style="color:#1e40af">Analysis Adjustments (${adj.rows.length})</h3>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0">
+          <tr style="background:#eff6ff"><th style="padding:8px 10px;text-align:left">Field</th><th style="padding:8px 10px;text-align:left">Original</th><th style="padding:8px 10px;text-align:left">Adjusted</th><th style="padding:8px 10px;text-align:left">Reason</th><th style="padding:8px 10px;text-align:left">Status</th></tr>
+          ${adjRows}
+        </table>` : ""}
+
+        <p style="color:#94a3b8;font-size:12px;margin-top:24px">Generated by Bob AI · Smash Brothers Restaurant · ${new Date().toISOString()}</p>
+      </div>`;
+
+    // Dynamic import to avoid circular deps at module load
+    const { workingEmailService } = await import("../services/workingEmailService");
+    const sent = await workingEmailService.sendEmail(toEmail, `Bob Analysis — ${shift_date} [${report.status?.toUpperCase()}]`, html);
+
+    // Log delivery result back to analysis_reports status field
+    if (sent) {
+      await pool.query(
+        `UPDATE analysis_reports SET status = CASE WHEN status = 'ok' THEN 'ok' ELSE status END,
+         data_json = jsonb_set(COALESCE(data_json, '{}'), '{email_sent}', $2::jsonb)
+         WHERE id = $1::uuid`,
+        [report.id, JSON.stringify({ sent: true, sent_at: new Date().toISOString(), recipient: toEmail })]
+      );
+    }
+
+    return res.json({
+      ok: sent,
+      shift_date,
+      recipient: toEmail,
+      report_id: report.id,
+      email_sent: sent,
+      message: sent ? "Analysis email sent successfully" : "Email send failed — check Gmail credentials",
+    });
+  } catch (err: any) {
+    console.error("[bob/email/trigger] error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/ai-ops/bob/analysis-csv/:date — CSV export of Bob analysis for a date
+// No auth required (download link used from UI). Streams CSV.
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/bob/analysis-csv/:date", async (req, res) => {
+  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ ok: false, error: "Invalid date" });
+  try {
+    const rpt = await pool.query(
+      `SELECT id::text, analysis_type, status, summary, data_json, created_at::text, created_by
+       FROM analysis_reports WHERE shift_date = $1::date ORDER BY created_at DESC LIMIT 1`, [date]
+    );
+    if (!rpt.rows.length) return res.status(404).json({ ok: false, error: `No analysis found for ${date}` });
+
+    const report = rpt.rows[0];
+    const dj = report.data_json || {};
+
+    const adj = await pool.query(
+      `SELECT a.source_table, a.source_field, a.original_value, a.adjusted_value, a.reason, a.review_status, a.created_at::text
+       FROM analysis_adjustments a
+       JOIN analysis_reports r ON r.id = a.analysis_report_id
+       WHERE r.shift_date = $1::date ORDER BY a.created_at ASC`, [date]
+    );
+
+    const esc = (v: any) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+    const lines: string[] = [
+      "section,key,value",
+      `report,date,${esc(date)}`,
+      `report,type,${esc(report.analysis_type)}`,
+      `report,status,${esc(report.status)}`,
+      `report,summary,${esc(report.summary)}`,
+      `report,created_at,${esc(report.created_at)}`,
+      `report,created_by,${esc(report.created_by)}`,
+    ];
+
+    if (dj.pos) {
+      lines.push(`pos,total_baht,${esc(dj.pos.total_baht)}`);
+      lines.push(`pos,txn_count,${esc(dj.pos.txn_count)}`);
+      lines.push(`pos,payment_breakdown_available,${esc(dj.pos.payment_breakdown_available)}`);
+    }
+    if (dj.form) {
+      lines.push(`form,total_baht,${esc(dj.form.total_baht)}`);
+      lines.push(`form,cash_baht,${esc(dj.form.cash_baht)}`);
+      lines.push(`form,qr_baht,${esc(dj.form.qr_baht)}`);
+    }
+    if (Array.isArray(dj.issues)) {
+      dj.issues.forEach((issue: any, i: number) => {
+        lines.push(`issue_${i + 1},type,${esc(issue.type || issue.check)}`);
+        lines.push(`issue_${i + 1},message,${esc(issue.message || issue.detail)}`);
+      });
+    }
+    if (adj.rows.length) {
+      lines.push("","adjustment_id,source_table,source_field,original_value,adjusted_value,reason,review_status,created_at");
+      adj.rows.forEach((a: any, i: number) => {
+        lines.push(`adj_${i + 1},${esc(a.source_table)},${esc(a.source_field)},${esc(a.original_value)},${esc(a.adjusted_value)},${esc(a.reason)},${esc(a.review_status)},${esc(a.created_at)}`);
+      });
+    }
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="bob-analysis-${date}.csv"`);
+    return res.send(lines.join("\r\n"));
+  } catch (err: any) {
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
