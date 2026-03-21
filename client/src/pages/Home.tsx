@@ -133,7 +133,7 @@ function StockLodgementQuickActions() {
         <h2 className="text-sm font-semibold text-slate-900">Stock Lodgement</h2>
         <LogRefundModal />
       </div>
-      <p className="text-xs text-slate-500 mb-4">Open the Finance &gt; Expenses stock modal to record rolls, meat, and drinks.</p>
+      <p className="text-xs text-slate-500 mb-4">Use these lodgement actions to record rolls, meat, and drinks. Purchase history is reviewed in Analysis &gt; Stock Review.</p>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StockLodgmentModal triggerText="Lodge Rolls" triggerClassName="w-full" initialData={{ type: "rolls" }} />
         <StockLodgmentModal triggerText="Lodge Meat" triggerClassName="w-full" initialData={{ type: "meat" }} />

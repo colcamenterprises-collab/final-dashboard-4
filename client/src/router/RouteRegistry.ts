@@ -28,7 +28,6 @@ export const ROUTES = {
   STOCK_REVIEW: "/operations/analysis/stock-review",
   STOCK_RECONCILIATION: "/analysis/stock-reconciliation",
   ANALYSIS_STOCK_REVIEW: "/analysis/stock-review",
-  ANALYSIS_LEDGERS: "/analysis/ledgers",
   EXPENSES: "/operations/expenses",
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",
