@@ -1555,6 +1555,42 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  app.post('/api/analysis/receipts-truth/daily-usage/rebuild', async (req, res) => {
+    const { date } = req.body;
+    if (!date) {
+      return res.status(400).json({ error: 'date required in body (YYYY-MM-DD)' });
+    }
+    try {
+      const { rebuildReceiptTruthDailyUsage } = await import('./services/receiptTruthDailyUsageService');
+      const result = await rebuildReceiptTruthDailyUsage(date);
+      res.json(result);
+    } catch (e: any) {
+      console.error('[DAILY_USAGE_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  app.get('/api/analysis/receipts-truth/daily-usage', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const { getReceiptTruthDailyUsage } = await import('./services/receiptTruthDailyUsageService');
+      const result = await getReceiptTruthDailyUsage(date);
+      if (!result) {
+        return res.status(404).json({
+          error: 'DAILY_USAGE_NOT_BUILT',
+          message: `No daily usage found for ${date}. Use POST /api/analysis/receipts-truth/daily-usage/rebuild to build.`,
+        });
+      }
+      res.json(result);
+    } catch (e: any) {
+      console.error('[DAILY_USAGE_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
   // PATCH 13: Enhanced Ingredient Usage Engine (with modifier math)
   app.post('/api/analysis/ingredient-usage/rebuild', async (req, res) => {
     const { date } = req.body;

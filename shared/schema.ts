@@ -2157,11 +2157,54 @@ export const receiptTruthModifierEffect = pgTable('receipt_truth_modifier_effect
   unit: varchar('unit', { length: 50 }).notNull(),
 });
 
+export const receiptTruthUsageRule = pgTable('receipt_truth_usage_rule', {
+  id: serial('id').primaryKey(),
+  sku: varchar('sku', { length: 255 }),
+  itemName: varchar('item_name', { length: 255 }),
+  directDrinkCode: varchar('direct_drink_code', { length: 50 }),
+  requiresDrinkModifier: boolean('requires_drink_modifier').notNull().default(false),
+  bunsPerUnit: decimal('buns_per_unit', { precision: 10, scale: 4 }),
+  beefServesPerUnit: decimal('beef_serves_per_unit', { precision: 10, scale: 4 }),
+  beefGramsPerUnit: decimal('beef_grams_per_unit', { precision: 10, scale: 4 }),
+  chickenServesPerUnit: decimal('chicken_serves_per_unit', { precision: 10, scale: 4 }),
+  chickenGramsPerUnit: decimal('chicken_grams_per_unit', { precision: 10, scale: 4 }),
+  notes: text('notes'),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+});
+
+export const receiptTruthDailyUsage = pgTable('receipt_truth_daily_usage', {
+  id: serial('id').primaryKey(),
+  businessDate: date('business_date').notNull(),
+  shiftKey: varchar('shift_key', { length: 100 }).notNull(),
+  categoryName: varchar('category_name', { length: 255 }).notNull(),
+  sku: varchar('sku', { length: 255 }),
+  itemName: varchar('item_name', { length: 255 }).notNull(),
+  quantitySold: decimal('quantity_sold', { precision: 12, scale: 4 }).notNull(),
+  bunsUsed: decimal('buns_used', { precision: 12, scale: 4 }),
+  beefServesUsed: decimal('beef_serves_used', { precision: 12, scale: 4 }),
+  beefGramsUsed: decimal('beef_grams_used', { precision: 12, scale: 4 }),
+  chickenServesUsed: decimal('chicken_serves_used', { precision: 12, scale: 4 }),
+  chickenGramsUsed: decimal('chicken_grams_used', { precision: 12, scale: 4 }),
+  cokeUsed: decimal('coke_used', { precision: 12, scale: 4 }),
+  cokeZeroUsed: decimal('coke_zero_used', { precision: 12, scale: 4 }),
+  spriteUsed: decimal('sprite_used', { precision: 12, scale: 4 }),
+  waterUsed: decimal('water_used', { precision: 12, scale: 4 }),
+  fantaOrangeUsed: decimal('fanta_orange_used', { precision: 12, scale: 4 }),
+  fantaStrawberryUsed: decimal('fanta_strawberry_used', { precision: 12, scale: 4 }),
+  schweppesManaoUsed: decimal('schweppes_manao_used', { precision: 12, scale: 4 }),
+  builtAt: timestamp('built_at').notNull().defaultNow(),
+});
+
 export type ModifierIngredientRule = typeof modifierIngredientRules.$inferSelect;
 export type InsertModifierIngredientRule = typeof modifierIngredientRules.$inferInsert;
 export type ReceiptTruthRun = typeof receiptTruthRun.$inferSelect;
 export type ReceiptTruthIngredientUsage = typeof receiptTruthIngredientUsage.$inferSelect;
 export type ReceiptTruthModifierEffect = typeof receiptTruthModifierEffect.$inferSelect;
+export type ReceiptTruthUsageRule = typeof receiptTruthUsageRule.$inferSelect;
+export type InsertReceiptTruthUsageRule = typeof receiptTruthUsageRule.$inferInsert;
+export type ReceiptTruthDailyUsage = typeof receiptTruthDailyUsage.$inferSelect;
+export type InsertReceiptTruthDailyUsage = typeof receiptTruthDailyUsage.$inferInsert;
 
 // -----------------------------------------------------------------------------
 // 🔐 PATCH 1.6.18: P&L READ MODEL

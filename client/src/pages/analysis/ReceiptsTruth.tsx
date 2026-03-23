@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -53,14 +53,62 @@ interface ModifiersResponse {
   modifiers: ModifierData[];
 }
 
+interface DailyUsageRow {
+  categoryName: string;
+  sku: string | null;
+  itemName: string;
+  quantitySold: number;
+  bunsUsed: number | null;
+  beefGramsUsed: number | null;
+  chickenGramsUsed: number | null;
+  cokeUsed: number | null;
+  cokeZeroUsed: number | null;
+  spriteUsed: number | null;
+  waterUsed: number | null;
+  fantaOrangeUsed: number | null;
+  fantaStrawberryUsed: number | null;
+  schweppesManaoUsed: number | null;
+}
+
+interface DailyUsageResponse {
+  date: string;
+  summary: {
+    expectedBuns: number;
+    expectedBeefGrams: number;
+    expectedChickenGrams: number;
+    totalDrinksUsed: number;
+  };
+  rows: DailyUsageRow[];
+  issues: Array<{
+    type: string;
+    sku: string | null;
+    itemName: string;
+    details: string;
+  }>;
+}
+
 export default function ReceiptsTruth() {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const defaultDate = yesterday.toISOString().split('T')[0];
-  
-  const [selectedDate, setSelectedDate] = useState(defaultDate);
+  const fallbackDate = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(fallbackDate);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+
+  const { data: latestShift } = useQuery<{ ok: boolean; date: string }>({
+    queryKey: ['/api/latest-valid-shift'],
+    queryFn: async () => {
+      const res = await fetch('/api/latest-valid-shift');
+      if (!res.ok) {
+        throw new Error('Failed to load latest shift');
+      }
+      return res.json();
+    },
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (latestShift?.date && selectedDate === fallbackDate && latestShift.date !== selectedDate) {
+      setSelectedDate(latestShift.date);
+    }
+  }, [latestShift?.date, selectedDate, fallbackDate]);
 
   const { data: summary, isLoading: summaryLoading } = useQuery<ReceiptTruthSummary>({
     queryKey: ['/api/analysis/receipts-truth', selectedDate],
@@ -99,6 +147,17 @@ export default function ReceiptsTruth() {
     retry: false,
   });
 
+  const { data: dailyUsage, isLoading: usageLoading } = useQuery<DailyUsageResponse>({
+    queryKey: ['/api/analysis/receipts-truth/daily-usage', selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/analysis/receipts-truth/daily-usage?date=${selectedDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!selectedDate && !!summary,
+    retry: false,
+  });
+
   const rebuildMutation = useMutation({
     mutationFn: async () => {
       await apiRequest('/api/analysis/receipts-truth/rebuild', {
@@ -117,11 +176,17 @@ export default function ReceiptsTruth() {
         body: JSON.stringify({ date: selectedDate }),
         headers: { 'Content-Type': 'application/json' },
       });
+      await apiRequest('/api/analysis/receipts-truth/daily-usage/rebuild', {
+        method: 'POST',
+        body: JSON.stringify({ date: selectedDate }),
+        headers: { 'Content-Type': 'application/json' },
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth', selectedDate] });
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/aggregates', selectedDate] });
       queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/modifiers-effective', selectedDate] });
+      queryClient.invalidateQueries({ queryKey: ['/api/analysis/receipts-truth/daily-usage', selectedDate] });
     },
   });
 
@@ -135,6 +200,7 @@ export default function ReceiptsTruth() {
 
   const hasTruth = !!summary;
   const isLoading = summaryLoading || aggLoading;
+  const fmtNum = (value: number | null | undefined) => value === null || value === undefined ? "-" : Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
@@ -373,6 +439,105 @@ export default function ReceiptsTruth() {
             {!aggregates && !aggLoading && (
               <div className="text-center py-8 text-xs text-slate-500">
                 Aggregates not built for this date. Click "Rebuild from Loyverse" to generate.
+              </div>
+            )}
+
+            {dailyUsage && (
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                <CardHeader className="p-4 pb-2">
+                  <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Daily Usage Breakdown
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-2 space-y-4">
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
+                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                      <CardContent className="p-3">
+                        <div className="text-xs text-slate-600 dark:text-slate-400">Expected Buns</div>
+                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.expectedBuns)}</div>
+                      </CardContent>
+                    </Card>
+                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                      <CardContent className="p-3">
+                        <div className="text-xs text-slate-600 dark:text-slate-400">Expected Beef (g)</div>
+                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.expectedBeefGrams)}</div>
+                      </CardContent>
+                    </Card>
+                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                      <CardContent className="p-3">
+                        <div className="text-xs text-slate-600 dark:text-slate-400">Expected Chicken (g)</div>
+                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.expectedChickenGrams)}</div>
+                      </CardContent>
+                    </Card>
+                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                      <CardContent className="p-3">
+                        <div className="text-xs text-slate-600 dark:text-slate-400">Total Drinks Used</div>
+                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.totalDrinksUsed)}</div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {dailyUsage.issues.length > 0 && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-[4px]">
+                      <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">Daily usage has explicit unresolved rows</div>
+                      <div className="text-xs text-amber-700 dark:text-amber-400 mt-1">
+                        {dailyUsage.issues.length} rows require mapping or missing set-drink selections.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 dark:border-slate-700 text-left">
+                          <th className="py-2 pr-3">Category</th>
+                          <th className="py-2 pr-3">SKU</th>
+                          <th className="py-2 pr-3">Item</th>
+                          <th className="py-2 pr-3 text-right">Qty Sold</th>
+                          <th className="py-2 pr-3 text-right">Buns</th>
+                          <th className="py-2 pr-3 text-right">Beef g</th>
+                          <th className="py-2 pr-3 text-right">Chicken g</th>
+                          <th className="py-2 pr-3 text-right">Coke</th>
+                          <th className="py-2 pr-3 text-right">Coke Zero</th>
+                          <th className="py-2 pr-3 text-right">Sprite</th>
+                          <th className="py-2 pr-3 text-right">Water</th>
+                          <th className="py-2 pr-3 text-right">Orange Fanta</th>
+                          <th className="py-2 pr-3 text-right">Strawberry Fanta</th>
+                          <th className="py-2 pr-0 text-right">Schweppes Manao</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dailyUsage.rows.map((row, idx) => (
+                          <tr
+                            key={`${row.categoryName}-${row.sku || row.itemName}-${idx}`}
+                            className={`border-b border-slate-100 dark:border-slate-800 ${idx > 0 && dailyUsage.rows[idx - 1].categoryName !== row.categoryName ? 'border-t-2 border-t-slate-300 dark:border-t-slate-600' : ''}`}
+                          >
+                            <td className="py-2 pr-3 align-top">{row.categoryName}</td>
+                            <td className="py-2 pr-3 align-top">{row.sku || '-'}</td>
+                            <td className="py-2 pr-3 align-top">{row.itemName}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.quantitySold)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.bunsUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.beefGramsUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.chickenGramsUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.cokeUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.cokeZeroUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.spriteUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.waterUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.fantaOrangeUsed)}</td>
+                            <td className="py-2 pr-3 text-right">{fmtNum(row.fantaStrawberryUsed)}</td>
+                            <td className="py-2 pr-0 text-right">{fmtNum(row.schweppesManaoUsed)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {!dailyUsage && !usageLoading && (
+              <div className="text-center py-8 text-xs text-slate-500">
+                Daily usage not built for this date. Click "Rebuild from Loyverse" to generate.
               </div>
             )}
           </>
