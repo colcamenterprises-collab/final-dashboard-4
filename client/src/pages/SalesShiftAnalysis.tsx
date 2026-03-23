@@ -62,6 +62,23 @@ interface BobAdjustment {
   created_at: string;
 }
 
+interface DailyUsageData {
+  date: string;
+  summary: {
+    expectedBuns: number;
+    expectedBeefGrams: number;
+    expectedChickenGrams: number;
+    totalDrinksUsed: number;
+    cokeUsed: number;
+    cokeZeroUsed: number;
+    spriteUsed: number;
+    waterUsed: number;
+    fantaOrangeUsed: number;
+    fantaStrawberryUsed: number;
+    schweppesManaoUsed: number;
+  };
+}
+
 const categories: Array<{ key: keyof ShiftData; label: string }> = [
   { key: 'total', label: 'Total Sales' },
   { key: 'cash', label: 'Cash' },
@@ -123,6 +140,16 @@ export default function SalesShiftAnalysis() {
   const { data: allShifts } = useQuery<ShiftSnapshotRow[]>({
     queryKey: ['shift-snapshots'],
     queryFn: () => getJson('/api/shift-snapshots'),
+  });
+
+  const { data: dailyUsage, isLoading: usageLoading } = useQuery<DailyUsageData | null>({
+    queryKey: ['receipt-daily-usage', selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/analysis/receipts-truth/daily-usage?date=${selectedDate}`);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
   });
 
   const { data: bobReportData, refetch: refetchBobReport } = useQuery<{ ok: boolean; report: BobReport | null }>({
@@ -232,6 +259,65 @@ export default function SalesShiftAnalysis() {
             : 'no receipts for this date'}
         </span>
       </div>
+
+      <Card>
+        <CardHeader className="py-3">
+          <CardTitle className="text-sm font-medium text-slate-700">Expected Stock Usage (Stored Receipts Truth)</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {usageLoading ? (
+            <div className="text-sm text-slate-500">Loading stored daily usage...</div>
+          ) : !dailyUsage ? (
+            <div className="text-sm text-amber-700">No stored daily usage for this date. Rebuild Receipts Analysis first.</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs">Expected Buns</div>
+                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedBuns))}</div>
+                </div>
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs">Expected Beef (g)</div>
+                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedBeefGrams))}</div>
+                </div>
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs">Expected Chicken (g)</div>
+                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedChickenGrams))}</div>
+                </div>
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs">Total Drinks Used</div>
+                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.totalDrinksUsed))}</div>
+                </div>
+              </div>
+
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-slate-50">
+                    <th className="text-left p-3 font-medium text-slate-600">Drink Type</th>
+                    <th className="text-right p-3 font-medium text-slate-600">Expected Used</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ['Coke', dailyUsage.summary.cokeUsed],
+                    ['Coke Zero', dailyUsage.summary.cokeZeroUsed],
+                    ['Sprite', dailyUsage.summary.spriteUsed],
+                    ['Water', dailyUsage.summary.waterUsed],
+                    ['Orange Fanta', dailyUsage.summary.fantaOrangeUsed],
+                    ['Strawberry Fanta', dailyUsage.summary.fantaStrawberryUsed],
+                    ['Schweppes Manao', dailyUsage.summary.schweppesManaoUsed],
+                  ].map(([label, value]) => (
+                    <tr key={label} className="border-b">
+                      <td className="p-3 text-slate-700">{label}</td>
+                      <td className="p-3 text-right font-mono">{fmt(toNum(value))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── Comparison table ── */}
       {(formLoading || posLoading) ? (
