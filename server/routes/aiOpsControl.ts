@@ -1782,6 +1782,7 @@ const BOB_PROXY_MODULES = [
   "receipts/loyverse",
   "stock-variance",
   "refund-logs",
+  "analysis/stock-usage",
 ] as const;
 type BobProxyModule = typeof BOB_PROXY_MODULES[number];
 
@@ -2246,6 +2247,128 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
     }
     const meta = from && to ? { from, to } : date ? { date } : {};
     return { ok: true, count: r.rows.length, ...meta, refunds: r.rows };
+  }
+
+  // ── analysis/stock-usage ──
+  // receipt_truth_daily_usage: pre-computed per-item stock usage derived from POS receipts.
+  // Returns summary totals + per-item rows + modifier-estimation flags.
+  // Requires date param. Responds not_built:true if no rebuild has been run for that date.
+  if (module === "analysis/stock-usage") {
+    if (!date || !isValidProxyDate(date)) throw new Error("date query param required (YYYY-MM-DD)");
+
+    const summaryResult = await pool.query(
+      `SELECT
+         COUNT(*) AS row_count,
+         SUM(COALESCE(buns_used, 0))            AS buns,
+         SUM(COALESCE(beef_serves_used, 0))      AS patties,
+         SUM(COALESCE(beef_grams_used, 0))       AS beef_grams,
+         SUM(COALESCE(chicken_grams_used, 0))    AS chicken_grams,
+         SUM(COALESCE(fries_used, 0))            AS fries,
+         SUM(COALESCE(coleslaw_used, 0))         AS coleslaw,
+         SUM(COALESCE(bacon_used, 0))            AS bacon,
+         SUM(COALESCE(cheese_used, 0))           AS cheese,
+         SUM(COALESCE(coke_used, 0) + COALESCE(coke_zero_used, 0) +
+             COALESCE(sprite_used, 0) + COALESCE(water_used, 0) +
+             COALESCE(fanta_orange_used, 0) + COALESCE(fanta_strawberry_used, 0) +
+             COALESCE(schweppes_manao_used, 0))  AS total_drinks,
+         SUM(COALESCE(coke_used, 0))             AS coke,
+         SUM(COALESCE(coke_zero_used, 0))        AS coke_zero,
+         SUM(COALESCE(sprite_used, 0))           AS sprite,
+         SUM(COALESCE(water_used, 0))            AS water,
+         SUM(COALESCE(fanta_orange_used, 0))     AS fanta_orange,
+         SUM(COALESCE(fanta_strawberry_used, 0)) AS fanta_strawberry,
+         SUM(COALESCE(schweppes_manao_used, 0))  AS schweppes_manao
+       FROM receipt_truth_daily_usage
+       WHERE business_date = $1::date`,
+      [date]
+    );
+
+    const agg = summaryResult.rows[0];
+    if (!agg || Number(agg.row_count) === 0) {
+      return {
+        ok: true,
+        not_built: true,
+        date,
+        message: `No stock usage data for ${date}. A rebuild must be triggered first via the internal rebuild endpoint.`,
+      };
+    }
+
+    const rowsResult = await pool.query(
+      `SELECT
+         shift_key, category_name, sku, item_name, quantity_sold,
+         buns_used, beef_serves_used, beef_grams_used,
+         chicken_serves_used, chicken_grams_used,
+         fries_used, coleslaw_used, bacon_used, cheese_used,
+         pickles_used, salad_used, tomato_used, onion_used,
+         burger_sauce_used, jalapenos_used,
+         coke_used, coke_zero_used, sprite_used, water_used,
+         fanta_orange_used, fanta_strawberry_used, schweppes_manao_used,
+         COALESCE(is_modifier_estimated, false) AS is_modifier_estimated
+       FROM receipt_truth_daily_usage
+       WHERE business_date = $1::date
+       ORDER BY category_name, sku NULLS LAST, item_name`,
+      [date]
+    );
+
+    const summary = {
+      buns: Number(agg.buns),
+      patties: Number(agg.patties),
+      beefGrams: Number(agg.beef_grams),
+      chickenGrams: Number(agg.chicken_grams),
+      fries: Number(agg.fries),
+      coleslaw: Number(agg.coleslaw),
+      bacon: Number(agg.bacon),
+      cheese: Number(agg.cheese),
+      totalDrinks: Number(agg.total_drinks),
+      coke: Number(agg.coke),
+      cokeZero: Number(agg.coke_zero),
+      sprite: Number(agg.sprite),
+      water: Number(agg.water),
+      fantaOrange: Number(agg.fanta_orange),
+      fantaStrawberry: Number(agg.fanta_strawberry),
+      schweppesManao: Number(agg.schweppes_manao),
+    };
+
+    const rows = (rowsResult.rows as any[]).map((r) => ({
+      shiftKey: r.shift_key,
+      category: r.category_name,
+      sku: r.sku,
+      itemName: r.item_name,
+      qtySold: Number(r.quantity_sold),
+      bunsUsed: r.buns_used !== null ? Number(r.buns_used) : null,
+      pattiesUsed: r.beef_serves_used !== null ? Number(r.beef_serves_used) : null,
+      beefGrams: r.beef_grams_used !== null ? Number(r.beef_grams_used) : null,
+      chickenGrams: r.chicken_grams_used !== null ? Number(r.chicken_grams_used) : null,
+      friesUsed: r.fries_used !== null ? Number(r.fries_used) : null,
+      coleslawUsed: r.coleslaw_used !== null ? Number(r.coleslaw_used) : null,
+      baconUsed: r.bacon_used !== null ? Number(r.bacon_used) : null,
+      cheeseUsed: r.cheese_used !== null ? Number(r.cheese_used) : null,
+      cokeUsed: r.coke_used !== null ? Number(r.coke_used) : null,
+      cokeZeroUsed: r.coke_zero_used !== null ? Number(r.coke_zero_used) : null,
+      spriteUsed: r.sprite_used !== null ? Number(r.sprite_used) : null,
+      waterUsed: r.water_used !== null ? Number(r.water_used) : null,
+      fantaOrangeUsed: r.fanta_orange_used !== null ? Number(r.fanta_orange_used) : null,
+      fantaStrawberryUsed: r.fanta_strawberry_used !== null ? Number(r.fanta_strawberry_used) : null,
+      schweppesManaoUsed: r.schweppes_manao_used !== null ? Number(r.schweppes_manao_used) : null,
+      isModifierEstimated: Boolean(r.is_modifier_estimated),
+    }));
+
+    const unmapped = rows.filter(
+      (r) => r.bunsUsed === null && r.beefGrams === null && r.chickenGrams === null &&
+             r.cokeUsed === null && r.friesUsed === null
+    ).map((r) => ({ type: "UNMAPPED_ITEM", sku: r.sku, itemName: r.itemName }));
+
+    const estimated = rows.filter((r) => r.isModifierEstimated)
+      .map((r) => ({ type: "MODIFIER_ESTIMATED", sku: r.sku, itemName: r.itemName }));
+
+    return {
+      ok: true,
+      date,
+      rowCount: rows.length,
+      summary,
+      rows,
+      issues: { unmapped, estimatedModifiers: estimated },
+    };
   }
 
   throw new Error(`Unknown module: ${module}`);
@@ -3134,6 +3257,7 @@ router.get("/bob/onboarding-context", async (_req, res) => {
             { path: "receipts/loyverse", description: "lv_receipt: raw Loyverse receipt headers + payment_json. REQUIRES date or from+to." },
             { path: "stock-variance", description: "stock_variance: computed shift variance with severity. date or from+to." },
             { path: "refund-logs", description: "refund_logs: manager-approved refund records. date or from+to." },
+            { path: "analysis/stock-usage", description: "receipt_truth_daily_usage: pre-computed per-item stock usage from POS receipts. Requires date. Returns summary totals (buns, patties, beef_g, fries, coleslaw, drinks by type) + per-item rows + modifier-estimation flags. Responds not_built:true if no rebuild exists for that date." },
           ],
         },
         file_read: {

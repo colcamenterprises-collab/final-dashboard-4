@@ -15,6 +15,7 @@
  *   GET /api/bob/read/purchases?limit=N
  *   GET /api/bob/read/tasks?status=...&area=...&limit=N
  *   GET /api/bob/read/audits?type=baseline|snapshot&limit=N
+ *   GET /api/bob/read/analysis/stock-usage?date=YYYY-MM-DD
  */
 
 import { Router, Request, Response, NextFunction } from "express";
@@ -35,6 +36,7 @@ const MODULES = [
   "purchases",
   "tasks",
   "audits",
+  "analysis/stock-usage",
 ];
 
 // ─── Log Table Bootstrap ──────────────────────────────────────────────────────
@@ -476,6 +478,158 @@ router.get("/audits", async (req: Request, res: Response) => {
   } catch (err: any) {
     console.error("[bobRead/audits]", err);
     await logRequest("/audits", params, 500, false, elapsed());
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── GET /api/bob/read/analysis/stock-usage?date=YYYY-MM-DD ──────────────────
+//
+// Returns the pre-computed daily stock usage for a shift date.
+// Includes:
+//   summary  — shift-level totals (buns, patties, beef_g, fries, coleslaw, drinks, etc.)
+//   rows     — per-item breakdown with modifier-estimation flag
+//   issues   — unmapped items and missing modifier warnings
+//
+// If no rebuild has been run for the date the response will indicate not_built=true
+// so Bob knows to request a rebuild before retrying.
+
+router.get("/analysis/stock-usage", async (req: Request, res: Response) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  const params = { date };
+
+  if (!date) {
+    await logRequest("/analysis/stock-usage", params, 400, false, elapsed());
+    return res.status(400).json({ ok: false, error: "date query param required (YYYY-MM-DD)" });
+  }
+  if (!isValidDate(date)) {
+    await logRequest("/analysis/stock-usage", params, 400, false, elapsed());
+    return res.status(400).json({ ok: false, error: "date must be YYYY-MM-DD" });
+  }
+
+  try {
+    // Summary row — one per business date
+    const summaryResult = await pool.query(
+      `SELECT
+         COUNT(*) AS row_count,
+         SUM(COALESCE(buns_used, 0))            AS buns,
+         SUM(COALESCE(beef_serves_used, 0))      AS patties,
+         SUM(COALESCE(beef_grams_used, 0))       AS beef_grams,
+         SUM(COALESCE(chicken_grams_used, 0))    AS chicken_grams,
+         SUM(COALESCE(fries_used, 0))            AS fries,
+         SUM(COALESCE(coleslaw_used, 0))         AS coleslaw,
+         SUM(COALESCE(bacon_used, 0))            AS bacon,
+         SUM(COALESCE(cheese_used, 0))           AS cheese,
+         SUM(COALESCE(coke_used, 0) + COALESCE(coke_zero_used, 0) +
+             COALESCE(sprite_used, 0) + COALESCE(water_used, 0) +
+             COALESCE(fanta_orange_used, 0) + COALESCE(fanta_strawberry_used, 0) +
+             COALESCE(schweppes_manao_used, 0))  AS total_drinks,
+         SUM(COALESCE(coke_used, 0))             AS coke,
+         SUM(COALESCE(coke_zero_used, 0))        AS coke_zero,
+         SUM(COALESCE(sprite_used, 0))           AS sprite,
+         SUM(COALESCE(water_used, 0))            AS water,
+         SUM(COALESCE(fanta_orange_used, 0))     AS fanta_orange,
+         SUM(COALESCE(fanta_strawberry_used, 0)) AS fanta_strawberry,
+         SUM(COALESCE(schweppes_manao_used, 0))  AS schweppes_manao
+       FROM receipt_truth_daily_usage
+       WHERE business_date = $1::date`,
+      [date]
+    );
+
+    const agg = summaryResult.rows[0];
+    if (!agg || Number(agg.row_count) === 0) {
+      await logRequest("/analysis/stock-usage", params, 200, true, elapsed());
+      return res.json({
+        ok: true,
+        not_built: true,
+        date,
+        message: `No stock usage data for ${date}. A rebuild must be triggered first via the internal rebuild endpoint.`,
+      });
+    }
+
+    // Per-item rows
+    const rowsResult = await pool.query(
+      `SELECT
+         shift_key, category_name, sku, item_name, quantity_sold,
+         buns_used, beef_serves_used, beef_grams_used,
+         chicken_serves_used, chicken_grams_used,
+         fries_used, coleslaw_used, bacon_used, cheese_used,
+         pickles_used, salad_used, tomato_used, onion_used,
+         burger_sauce_used, jalapenos_used,
+         coke_used, coke_zero_used, sprite_used, water_used,
+         fanta_orange_used, fanta_strawberry_used, schweppes_manao_used,
+         COALESCE(is_modifier_estimated, false) AS is_modifier_estimated
+       FROM receipt_truth_daily_usage
+       WHERE business_date = $1::date
+       ORDER BY category_name, sku NULLS LAST, item_name`,
+      [date]
+    );
+
+    const summary = {
+      buns: Number(agg.buns),
+      patties: Number(agg.patties),
+      beefGrams: Number(agg.beef_grams),
+      chickenGrams: Number(agg.chicken_grams),
+      fries: Number(agg.fries),
+      coleslaw: Number(agg.coleslaw),
+      bacon: Number(agg.bacon),
+      cheese: Number(agg.cheese),
+      totalDrinks: Number(agg.total_drinks),
+      coke: Number(agg.coke),
+      cokeZero: Number(agg.coke_zero),
+      sprite: Number(agg.sprite),
+      water: Number(agg.water),
+      fantaOrange: Number(agg.fanta_orange),
+      fantaStrawberry: Number(agg.fanta_strawberry),
+      schweppesManao: Number(agg.schweppes_manao),
+    };
+
+    const rows = rowsResult.rows.map((r) => ({
+      shiftKey: r.shift_key,
+      category: r.category_name,
+      sku: r.sku,
+      itemName: r.item_name,
+      qtySold: Number(r.quantity_sold),
+      bunsUsed: r.buns_used !== null ? Number(r.buns_used) : null,
+      pattiesUsed: r.beef_serves_used !== null ? Number(r.beef_serves_used) : null,
+      beefGrams: r.beef_grams_used !== null ? Number(r.beef_grams_used) : null,
+      chickenGrams: r.chicken_grams_used !== null ? Number(r.chicken_grams_used) : null,
+      friesUsed: r.fries_used !== null ? Number(r.fries_used) : null,
+      coleslawUsed: r.coleslaw_used !== null ? Number(r.coleslaw_used) : null,
+      baconUsed: r.bacon_used !== null ? Number(r.bacon_used) : null,
+      cheeseUsed: r.cheese_used !== null ? Number(r.cheese_used) : null,
+      cokeUsed: r.coke_used !== null ? Number(r.coke_used) : null,
+      cokeZeroUsed: r.coke_zero_used !== null ? Number(r.coke_zero_used) : null,
+      spriteUsed: r.sprite_used !== null ? Number(r.sprite_used) : null,
+      waterUsed: r.water_used !== null ? Number(r.water_used) : null,
+      fantaOrangeUsed: r.fanta_orange_used !== null ? Number(r.fanta_orange_used) : null,
+      fantaStrawberryUsed: r.fanta_strawberry_used !== null ? Number(r.fanta_strawberry_used) : null,
+      schweppesManaoUsed: r.schweppes_manao_used !== null ? Number(r.schweppes_manao_used) : null,
+      isModifierEstimated: Boolean(r.is_modifier_estimated),
+    }));
+
+    // Surface any unmapped items (all usage columns null) as issues
+    const unmappedItems = rows.filter(
+      (r) => r.bunsUsed === null && r.beefGrams === null && r.chickenGrams === null &&
+             r.cokeUsed === null && r.friesUsed === null
+    ).map((r) => ({ type: "UNMAPPED_ITEM", sku: r.sku, itemName: r.itemName }));
+
+    const estimatedItems = rows.filter((r) => r.isModifierEstimated)
+      .map((r) => ({ type: "MODIFIER_ESTIMATED", sku: r.sku, itemName: r.itemName,
+                     note: "Loyverse returned full modifier group — type split is proportional" }));
+
+    await logRequest("/analysis/stock-usage", params, 200, true, elapsed());
+    return res.json({
+      ok: true,
+      date,
+      rowCount: rows.length,
+      summary,
+      rows,
+      issues: { unmapped: unmappedItems, estimatedModifiers: estimatedItems },
+    });
+  } catch (err: any) {
+    console.error("[bobRead/analysis/stock-usage]", err);
+    await logRequest("/analysis/stock-usage", params, 500, false, elapsed());
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
