@@ -1783,6 +1783,7 @@ const BOB_PROXY_MODULES = [
   "stock-variance",
   "refund-logs",
   "analysis/stock-usage",
+  "analysis/usage-reconciliation",
 ] as const;
 type BobProxyModule = typeof BOB_PROXY_MODULES[number];
 
@@ -2369,6 +2370,17 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
       rows,
       issues: { unmapped, estimatedModifiers: estimated },
     };
+  }
+
+  // ── analysis/usage-reconciliation ──
+  // Compares POS-receipt expected usage (receipt_truth_daily_usage) against
+  // physical counts from Form 2 (daily_stock_v2) + received stock.
+  // Produces variances for buns, meat and drinks with severity flags.
+  // Requires date param.
+  if (module === "analysis/usage-reconciliation") {
+    if (!date || !isValidProxyDate(date)) throw new Error("date query param required (YYYY-MM-DD)");
+    const { getUsageReconciliation } = await import("../routes/analysis/usageReconciliation.js");
+    return await getUsageReconciliation(date) as Record<string, unknown>;
   }
 
   throw new Error(`Unknown module: ${module}`);
@@ -3258,6 +3270,7 @@ router.get("/bob/onboarding-context", async (_req, res) => {
             { path: "stock-variance", description: "stock_variance: computed shift variance with severity. date or from+to." },
             { path: "refund-logs", description: "refund_logs: manager-approved refund records. date or from+to." },
             { path: "analysis/stock-usage", description: "receipt_truth_daily_usage: pre-computed per-item stock usage from POS receipts. Requires date. Returns summary totals (buns, patties, beef_g, fries, coleslaw, drinks by type) + per-item rows + modifier-estimation flags. Responds not_built:true if no rebuild exists for that date." },
+            { path: "analysis/usage-reconciliation", description: "Compares POS-receipt expected usage vs physical Form 2 closing counts. Requires date. Returns variance for buns, meat (grams), and drinks by type with severity flags (ok/warn/critical). Includes confidence indicators (unmapped items, estimated modifiers). Also shows opening stock, received stock, and physical used derived from Form 2 ledger." },
           ],
         },
         file_read: {

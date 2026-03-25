@@ -79,6 +79,41 @@ interface DailyUsageData {
   };
 }
 
+type ReconSeverity = "ok" | "warn" | "critical" | "unknown";
+
+interface UsageReconData {
+  ok: boolean;
+  date: string;
+  prevDate: string;
+  engineBuilt: boolean;
+  form2Available: boolean;
+  prevForm2Available: boolean;
+  overallSeverity: ReconSeverity;
+  buns: {
+    expected: number | null; opening: number | null; received: number;
+    closing: number | null; physicalUsed: number | null;
+    variance: number | null; severity: ReconSeverity;
+    thresholds: { warn: number; critical: number };
+  };
+  meat: {
+    expectedGrams: number | null; openingGrams: number | null; receivedGrams: number;
+    closingGrams: number | null; physicalUsedGrams: number | null;
+    varianceGrams: number | null; severity: ReconSeverity;
+    thresholds: { warn: number; critical: number };
+  };
+  drinks: {
+    totalExpected: number; totalPhysicalUsed: number | null; totalVariance: number | null;
+    rows: {
+      field: string; label: string;
+      expected: number | null; opening: number | null; received: number;
+      closing: number | null; physicalUsed: number | null;
+      variance: number | null; severity: ReconSeverity;
+    }[];
+    thresholds: { warn: number; critical: number };
+  };
+  confidence: { engineRowCount: number; unmappedItems: number; estimatedModifiers: number };
+}
+
 const categories: Array<{ key: keyof ShiftData; label: string }> = [
   { key: 'total', label: 'Total Sales' },
   { key: 'cash', label: 'Cash' },
@@ -163,6 +198,15 @@ export default function SalesShiftAnalysis() {
       const res = await fetch(`/api/analysis/receipts-truth/daily-usage?date=${selectedDate}`);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+  });
+
+  const { data: usageRecon, isLoading: reconLoading } = useQuery<UsageReconData | null>({
+    queryKey: ['usage-reconciliation', selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/analysis/usage-reconciliation?date=${selectedDate}`);
+      if (!res.ok) return null;
       return res.json();
     },
   });
@@ -329,6 +373,162 @@ export default function SalesShiftAnalysis() {
                   ))}
                 </tbody>
               </table>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Usage Reconciliation: Engine vs Physical (Form 2) ── */}
+      <Card>
+        <CardHeader className="py-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-sm font-medium text-slate-700">Stock Usage Reconciliation (Engine vs Form 2)</CardTitle>
+            {usageRecon && (
+              <Badge className={`text-xs ${
+                usageRecon.overallSeverity === 'critical' ? 'bg-red-100 text-red-800 border-red-200' :
+                usageRecon.overallSeverity === 'warn'     ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                usageRecon.overallSeverity === 'ok'       ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                                                            'bg-slate-100 text-slate-600 border-slate-200'
+              }`}>
+                {usageRecon.overallSeverity.toUpperCase()}
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {reconLoading ? (
+            <div className="text-sm text-slate-500">Loading reconciliation data...</div>
+          ) : !usageRecon || !usageRecon.ok ? (
+            <div className="text-sm text-amber-700">Reconciliation unavailable for this date.</div>
+          ) : (
+            <>
+              {/* Availability warnings */}
+              {(!usageRecon.engineBuilt || !usageRecon.form2Available || !usageRecon.prevForm2Available) && (
+                <div className="flex flex-wrap gap-2 text-xs">
+                  {!usageRecon.engineBuilt && (
+                    <span className="px-2 py-1 rounded border bg-amber-50 text-amber-700 border-amber-200">Engine not built for this date — rebuild Receipts Analysis</span>
+                  )}
+                  {!usageRecon.form2Available && (
+                    <span className="px-2 py-1 rounded border bg-amber-50 text-amber-700 border-amber-200">Form 2 (closing counts) not submitted for this date</span>
+                  )}
+                  {!usageRecon.prevForm2Available && (
+                    <span className="px-2 py-1 rounded border bg-slate-100 text-slate-600 border-slate-200">Previous day Form 2 missing — opening stock unknown, physical usage not computed</span>
+                  )}
+                </div>
+              )}
+
+              {/* Buns + Meat headline tiles */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                {/* Buns */}
+                <div className={`rounded border p-3 ${
+                  usageRecon.buns.severity === 'critical' ? 'border-red-300 bg-red-50' :
+                  usageRecon.buns.severity === 'warn' ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+                }`}>
+                  <div className="text-slate-500 text-xs mb-1">Buns</div>
+                  <div className="text-xs text-slate-400">Expected: <span className="font-mono text-slate-700">{usageRecon.buns.expected ?? '—'}</span></div>
+                  <div className="text-xs text-slate-400">Physical used: <span className="font-mono text-slate-700">{usageRecon.buns.physicalUsed ?? '—'}</span></div>
+                  <div className={`text-xs font-semibold mt-1 ${
+                    usageRecon.buns.severity === 'critical' ? 'text-red-700' :
+                    usageRecon.buns.severity === 'warn' ? 'text-amber-700' : 'text-emerald-700'
+                  }`}>
+                    Δ {usageRecon.buns.variance !== null ? (usageRecon.buns.variance >= 0 ? '+' : '') + usageRecon.buns.variance : '—'}
+                  </div>
+                </div>
+                {/* Buns breakdown */}
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs mb-1">Buns Detail</div>
+                  <div className="text-xs text-slate-400">Opening: <span className="font-mono">{usageRecon.buns.opening ?? '—'}</span></div>
+                  <div className="text-xs text-slate-400">Received: <span className="font-mono">+{usageRecon.buns.received}</span></div>
+                  <div className="text-xs text-slate-400">Closing: <span className="font-mono">{usageRecon.buns.closing ?? '—'}</span></div>
+                </div>
+                {/* Meat */}
+                <div className={`rounded border p-3 ${
+                  usageRecon.meat.severity === 'critical' ? 'border-red-300 bg-red-50' :
+                  usageRecon.meat.severity === 'warn' ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+                }`}>
+                  <div className="text-slate-500 text-xs mb-1">Meat (g)</div>
+                  <div className="text-xs text-slate-400">Expected: <span className="font-mono text-slate-700">{usageRecon.meat.expectedGrams !== null ? usageRecon.meat.expectedGrams.toLocaleString() : '—'}</span></div>
+                  <div className="text-xs text-slate-400">Physical used: <span className="font-mono text-slate-700">{usageRecon.meat.physicalUsedGrams !== null ? usageRecon.meat.physicalUsedGrams.toLocaleString() : '—'}</span></div>
+                  <div className={`text-xs font-semibold mt-1 ${
+                    usageRecon.meat.severity === 'critical' ? 'text-red-700' :
+                    usageRecon.meat.severity === 'warn' ? 'text-amber-700' : 'text-emerald-700'
+                  }`}>
+                    Δ {usageRecon.meat.varianceGrams !== null ? (usageRecon.meat.varianceGrams >= 0 ? '+' : '') + usageRecon.meat.varianceGrams.toLocaleString() + 'g' : '—'}
+                  </div>
+                </div>
+                {/* Meat breakdown */}
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs mb-1">Meat Detail</div>
+                  <div className="text-xs text-slate-400">Opening: <span className="font-mono">{usageRecon.meat.openingGrams !== null ? usageRecon.meat.openingGrams.toLocaleString() + 'g' : '—'}</span></div>
+                  <div className="text-xs text-slate-400">Received: <span className="font-mono">+{usageRecon.meat.receivedGrams.toLocaleString()}g</span></div>
+                  <div className="text-xs text-slate-400">Closing: <span className="font-mono">{usageRecon.meat.closingGrams !== null ? usageRecon.meat.closingGrams.toLocaleString() + 'g' : '—'}</span></div>
+                </div>
+              </div>
+
+              {/* Drinks reconciliation table */}
+              <div>
+                <div className="text-xs font-medium text-slate-500 mb-2">Drink Usage Reconciliation <span className="text-slate-400">(physical = opening + received − closing)</span></div>
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b bg-slate-50">
+                      <th className="text-left p-2 font-medium text-slate-600">Drink</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Expected</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Opening</th>
+                      <th className="text-right p-2 font-medium text-slate-600">+Received</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Closing</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Physical Used</th>
+                      <th className="text-right p-2 font-medium text-slate-600">Variance Δ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usageRecon.drinks.rows.map((row) => (
+                      <tr key={row.field} className={`border-b ${
+                        row.severity === 'critical' ? 'bg-red-50' :
+                        row.severity === 'warn' ? 'bg-amber-50' : ''
+                      }`}>
+                        <td className="p-2 text-slate-700">{row.label}</td>
+                        <td className="p-2 text-right font-mono">{row.expected ?? '—'}</td>
+                        <td className="p-2 text-right font-mono text-slate-500">{row.opening ?? '—'}</td>
+                        <td className="p-2 text-right font-mono text-slate-500">+{row.received}</td>
+                        <td className="p-2 text-right font-mono text-slate-500">{row.closing ?? '—'}</td>
+                        <td className="p-2 text-right font-mono">{row.physicalUsed ?? '—'}</td>
+                        <td className={`p-2 text-right font-mono font-semibold ${
+                          row.severity === 'critical' ? 'text-red-700' :
+                          row.severity === 'warn' ? 'text-amber-700' :
+                          row.severity === 'ok' ? 'text-emerald-700' : 'text-slate-400'
+                        }`}>
+                          {row.variance !== null ? (row.variance >= 0 ? '+' : '') + row.variance : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-slate-300 font-semibold bg-slate-50">
+                      <td className="p-2 text-slate-700">Total Drinks</td>
+                      <td className="p-2 text-right font-mono">{usageRecon.drinks.totalExpected}</td>
+                      <td colSpan={3} />
+                      <td className="p-2 text-right font-mono">{usageRecon.drinks.totalPhysicalUsed ?? '—'}</td>
+                      <td className={`p-2 text-right font-mono ${
+                        usageRecon.drinks.totalVariance !== null && Math.abs(usageRecon.drinks.totalVariance) > 4 ? 'text-red-700' :
+                        usageRecon.drinks.totalVariance !== null && Math.abs(usageRecon.drinks.totalVariance) > 2 ? 'text-amber-700' :
+                        usageRecon.drinks.totalVariance !== null ? 'text-emerald-700' : 'text-slate-400'
+                      }`}>
+                        {usageRecon.drinks.totalVariance !== null ? (usageRecon.drinks.totalVariance >= 0 ? '+' : '') + usageRecon.drinks.totalVariance : '—'}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Confidence footer */}
+              <div className="flex flex-wrap gap-3 text-xs text-slate-500 border-t pt-3">
+                <span>Engine rows: <strong>{usageRecon.confidence.engineRowCount}</strong></span>
+                {usageRecon.confidence.unmappedItems > 0 && (
+                  <span className="text-amber-600">Unmapped items: <strong>{usageRecon.confidence.unmappedItems}</strong></span>
+                )}
+                {usageRecon.confidence.estimatedModifiers > 0 && (
+                  <span className="text-amber-600">Estimated modifiers: <strong>{usageRecon.confidence.estimatedModifiers}</strong></span>
+                )}
+                <span className="text-slate-400">Thresholds — Buns: warn &gt;{usageRecon.buns.thresholds.warn}/crit &gt;{usageRecon.buns.thresholds.critical} · Meat: warn &gt;{usageRecon.meat.thresholds.warn}g/crit &gt;{usageRecon.meat.thresholds.critical}g · Drinks/type: warn &gt;{usageRecon.drinks.thresholds.warn}/crit &gt;{usageRecon.drinks.thresholds.critical}</span>
+              </div>
             </>
           )}
         </CardContent>

@@ -1041,6 +1041,22 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  // POS engine vs Form 2 usage reconciliation
+  app.get("/api/analysis/usage-reconciliation", async (req, res) => {
+    try {
+      const { getUsageReconciliation } = await import("./routes/analysis/usageReconciliation.js");
+      const { date } = req.query;
+      if (!date || typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return res.status(400).json({ ok: false, error: "date query param required (YYYY-MM-DD)" });
+      }
+      const data = await getUsageReconciliation(date);
+      res.json(data);
+    } catch (e: any) {
+      console.error("[USAGE_RECONCILIATION_FAIL]", e);
+      res.status(500).json({ ok: false, error: e.message || String(e) });
+    }
+  });
+
   app.get('/api/analysis/list', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
