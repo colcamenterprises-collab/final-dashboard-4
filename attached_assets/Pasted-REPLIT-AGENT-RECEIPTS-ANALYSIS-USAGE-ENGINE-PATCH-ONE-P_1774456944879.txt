@@ -1,0 +1,220 @@
+REPLIT AGENT — RECEIPTS ANALYSIS USAGE ENGINE PATCH
+ONE PASS. NO CLARIFYING QUESTIONS. NO PARTIALS. IMPLEMENT END TO END.
+
+OBJECTIVE
+Extend the existing Receipts Analysis page without breaking anything that already works.
+
+We are NOT rebuilding this page.
+We are NOT changing the existing receipt truth ingestion semantics.
+We ARE adding a derived usage layer on top of the existing receipt truth output.
+
+ARCHITECTURE LOCK
+- Keep existing Receipts Analysis page and existing sections intact:
+  - summary cards
+  - category totals
+  - item breakdown
+  - modifiers section
+- Build new usage output FROM stored receipt truth tables, not from a second direct Loyverse pull
+- Do not create a parallel raw receipt pipeline
+- Do not remove existing functionality
+- Do not freestyle architecture
+
+SOURCE OF TRUTH
+Use the existing receipt truth layer:
+- receipt_truth_summary
+- receipt_truth_line
+- receipt_truth_modifier
+- receipt_truth_modifier_effective if already part of current working chain
+
+NEW GOAL
+Add a derived daily usage engine that calculates ingredient and stock usage from sold items and modifiers.
+
+SETS MUST EXPLODE FULLY
+Option A is approved and locked:
+Meal sets must count as:
+- burger
+- fries
+- drink
+
+Do not count sets as a single abstract item.
+They must expand into real usage.
+
+MODIFIER RULES
+1. Structural modifiers count into usage:
+- Drink Options (Sets)
+- Mix and Match burger options
+- Mix and Match drink options
+
+2. Add-on modifiers count into usage:
+- Bacon
+- Jalapenos
+- similar positive add-ons
+
+3. “Please no” modifiers:
+- keep visible
+- store if already stored
+- no subtraction logic required in this patch unless already trivially safe
+- do not let these block the patch
+
+STARTER USAGE COLUMNS
+Add these fields to the derived usage result:
+- bunsUsed
+- beefPattiesUsed
+- beefGramsUsed
+- chickenUsed
+- friesUsed
+- cokeUsed
+- cokeZeroUsed
+- spriteUsed
+- waterUsed
+- fantaOrangeUsed
+- fantaStrawberryUsed
+- schweppesManaoUsed
+- baconUsed
+- cheeseUsed
+- picklesUsed
+- saladUsed
+- tomatoUsed
+- onionUsed
+- burgerSauceUsed
+- jalapenosUsed
+
+IMPORTANT
+This is intentionally broader than just buns/meat/chicken/drinks.
+I want the usage table to already support the next layer of analysis.
+
+MAPPING LOGIC
+Build explicit mapping rules from sold SKU/item to usage.
+
+Base burgers:
+- Single Smash Burger = 1 bun, 1 beef patty, 95g beef
+- Ultimate Double = 1 bun, 2 beef patties, 190g beef
+- Triple Smash Burger = 1 bun, 3 beef patties, 285g beef
+- Super Double Bacon and Cheese = 1 bun, 2 beef patties, 190g beef, bacon where appropriate
+- Crispy Chicken Fillet Burger = 1 bun, 1 chicken
+
+Sets:
+- Single Meal Set = 1 bun, 1 beef patty, 95g beef, 1 fries, 1 drink
+- Double Set = 1 bun, 2 beef patties, 190g beef, 1 fries, 1 drink
+- Super Double Bacon & Cheese Set = 1 bun, 2 beef patties, 190g beef, bacon where appropriate, 1 fries, 1 drink
+- Mix and Match Meal Deal must use the burger option modifier + drink option modifier to compute actual usage
+- Kids Single Meal Set / similar must also expand if present in truth tables
+
+Sides:
+- Dirty Fries uses beef only
+- Loaded Fries / fries products should count fries only unless explicit toppings/add-ons exist
+- Nuggets should count chicken if safe mapping exists, otherwise leave as zero and flag later — do not invent fake numbers
+
+Drinks:
+Count standalone drink SKUs plus drink modifiers from sets.
+
+POS CATEGORIES
+Keep POS category grouping exactly as currently stored and displayed.
+Do not remap categories in this patch.
+
+STORAGE
+Store the derived result locally in proper derived tables keyed by business date.
+Use existing derived-engine patterns already present in the codebase if available.
+Prefer extending the existing truth-run / derived-output structure over inventing a disconnected system.
+
+PAGE CHANGES — RECEIPTS ANALYSIS
+Add these two sections BELOW the existing working sections:
+
+1. DAILY USAGE SUMMARY
+Show totals for:
+- buns
+- beef patties
+- beef grams
+- chicken
+- fries
+- each drink type
+- bacon
+- cheese
+- pickles
+- salad
+- tomato
+- onion
+- burger sauce
+- jalapenos
+
+2. USAGE BY ITEM
+One row per sold item/set with columns:
+- Category
+- SKU
+- Item
+- Qty Sold
+- Buns
+- Beef Patties
+- Beef g
+- Chicken
+- Fries
+- Coke
+- Coke Zero
+- Sprite
+- Water
+- Fanta Orange
+- Fanta Strawberry
+- Schweppes Manao
+- Bacon
+- Cheese
+- Pickles
+- Salad
+- Tomato
+- Onion
+- Sauce
+- Jalapenos
+
+The table should be readable on tablet.
+Do not create cramped unreadable columns.
+Use sensible spacing and horizontal scroll if needed.
+Do not destroy the current page layout.
+
+SALES & SHIFT ANALYSIS
+Do not make this page call Loyverse for this usage.
+Prepare it to read from the stored derived usage output only.
+If a small backend read endpoint is needed, add it.
+Do not rebuild that page in this patch.
+
+NON-NEGOTIABLE WARNINGS
+- Do not touch or break existing summary/category/modifier functionality
+- Do not alter receipt truth ingestion semantics
+- Do not create a second Loyverse fetch path for usage
+- Do not replace working code just because you found a “cleaner” way
+- Do not remove current sections from Receipts Analysis
+- Do not improvise category remapping
+- Do not guess quantities where mapping is unknown; leave zero or clearly safe default
+- Do not stop halfway and say architecture needs discussion — it has already been decided
+
+TESTING REQUIRED
+You must test and verify all of this before stopping.
+
+Test checklist:
+1. Existing Receipts Analysis summary still works
+2. Existing category totals still work
+3. Existing item breakdown still works
+4. Existing modifiers section still works
+5. New Daily Usage Summary appears
+6. New Usage By Item table appears
+7. Rebuild works for a selected business date
+8. Derived usage is stored locally
+9. No second raw Loyverse pipeline was created
+10. Sets count as burger + fries + drink
+11. Standalone drinks plus set drink modifiers are counted together
+12. Dirty Fries contributes beef usage
+13. No console errors
+14. No server crash
+15. Tablet view remains usable
+
+DELIVERABLE FORMAT
+When complete, return:
+- PASS/FAIL checklist
+- exact files changed
+- exact tables/endpoints added or extended
+- screenshots of Receipts Analysis showing:
+  - old sections still intact
+  - new Daily Usage Summary
+  - new Usage By Item table
+- brief note of any safe zero/default mappings left for later expansion
+
+DO NOT ASK ME QUESTIONS.
+IMPLEMENT THE PATCH.

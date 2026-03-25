@@ -59,7 +59,9 @@ interface DailyUsageRow {
   itemName: string;
   quantitySold: number;
   bunsUsed: number | null;
+  beefServesUsed: number | null;
   beefGramsUsed: number | null;
+  chickenServesUsed: number | null;
   chickenGramsUsed: number | null;
   cokeUsed: number | null;
   cokeZeroUsed: number | null;
@@ -68,16 +70,44 @@ interface DailyUsageRow {
   fantaOrangeUsed: number | null;
   fantaStrawberryUsed: number | null;
   schweppesManaoUsed: number | null;
+  friesUsed: number | null;
+  baconUsed: number | null;
+  cheeseUsed: number | null;
+  picklesUsed: number | null;
+  saladUsed: number | null;
+  tomatoUsed: number | null;
+  onionUsed: number | null;
+  burgerSauceUsed: number | null;
+  jalapenosUsed: number | null;
+}
+
+interface DailyUsageSummary {
+  expectedBuns: number;
+  expectedBeefPatties: number;
+  expectedBeefGrams: number;
+  expectedChickenGrams: number;
+  totalDrinksUsed: number;
+  friesUsed: number;
+  baconUsed: number;
+  cheeseUsed: number;
+  picklesUsed: number;
+  saladUsed: number;
+  tomatoUsed: number;
+  onionUsed: number;
+  burgerSauceUsed: number;
+  jalapenosUsed: number;
+  cokeUsed: number;
+  cokeZeroUsed: number;
+  spriteUsed: number;
+  waterUsed: number;
+  fantaOrangeUsed: number;
+  fantaStrawberryUsed: number;
+  schweppesManaoUsed: number;
 }
 
 interface DailyUsageResponse {
   date: string;
-  summary: {
-    expectedBuns: number;
-    expectedBeefGrams: number;
-    expectedChickenGrams: number;
-    totalDrinksUsed: number;
-  };
+  summary: DailyUsageSummary;
   rows: DailyUsageRow[];
   issues: Array<{
     type: string;
@@ -96,9 +126,7 @@ export default function ReceiptsTruth() {
     queryKey: ['/api/latest-valid-shift'],
     queryFn: async () => {
       const res = await fetch('/api/latest-valid-shift');
-      if (!res.ok) {
-        throw new Error('Failed to load latest shift');
-      }
+      if (!res.ok) throw new Error('Failed to load latest shift');
       return res.json();
     },
     retry: false,
@@ -114,10 +142,7 @@ export default function ReceiptsTruth() {
     queryKey: ['/api/analysis/receipts-truth', selectedDate],
     queryFn: async () => {
       const res = await fetch(`/api/analysis/receipts-truth?date=${selectedDate}`);
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || 'Not found');
-      }
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Not found'); }
       return res.json();
     },
     enabled: !!selectedDate,
@@ -135,7 +160,6 @@ export default function ReceiptsTruth() {
     retry: false,
   });
 
-  // PATCH 14: Use modifiers-effective endpoint for accurate modifier counts
   const { data: modifiersData, isLoading: modLoading } = useQuery<ModifiersResponse>({
     queryKey: ['/api/analysis/receipts-truth/modifiers-effective', selectedDate],
     queryFn: async () => {
@@ -170,7 +194,6 @@ export default function ReceiptsTruth() {
         body: JSON.stringify({ date: selectedDate }),
         headers: { 'Content-Type': 'application/json' },
       });
-      // PATCH 14: Rebuild modifiers-effective
       await apiRequest('/api/analysis/receipts-truth/modifiers-effective/rebuild', {
         method: 'POST',
         body: JSON.stringify({ date: selectedDate }),
@@ -190,17 +213,13 @@ export default function ReceiptsTruth() {
     },
   });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('th-TH', {
-      style: 'currency',
-      currency: 'THB',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB', minimumFractionDigits: 0 }).format(amount);
 
   const hasTruth = !!summary;
   const isLoading = summaryLoading || aggLoading;
-  const fmtNum = (value: number | null | undefined) => value === null || value === undefined ? "-" : Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
+  const n = (v: number | null | undefined) => (v === null || v === undefined ? '-' : Number(v) === 0 ? '-' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }));
+  const nz = (v: number | null | undefined) => (v === null || v === undefined ? '-' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 }));
 
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
@@ -209,11 +228,10 @@ export default function ReceiptsTruth() {
           Receipts Analysis
         </h1>
 
+        {/* ── Summary card ─────────────────────────────────────────────── */}
         <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
-              Summary
-            </CardTitle>
+            <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">Summary</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-2 space-y-4">
             <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
@@ -250,7 +268,6 @@ export default function ReceiptsTruth() {
                 </div>
               </div>
             )}
-
             {rebuildMutation.isError && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-[4px]">
                 <div className="text-xs font-semibold text-red-800 dark:text-red-300">Rebuild Failed</div>
@@ -259,7 +276,6 @@ export default function ReceiptsTruth() {
                 </div>
               </div>
             )}
-
             {hasTruth && (
               <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 rounded-[4px]">
                 <div className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">Data confirmed</div>
@@ -273,84 +289,42 @@ export default function ReceiptsTruth() {
 
         {hasTruth && summary && (
           <>
+            {/* ── Financial metric cards ──────────────────────────────────── */}
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3 xl:grid-cols-7">
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                <CardContent className="p-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Receipts</div>
-                  <div className="text-lg md:text-xl font-bold text-slate-900 dark:text-white" data-testid="text-all-receipts">
-                    {summary.allReceipts}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                <CardContent className="p-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Sales</div>
-                  <div className="text-lg md:text-xl font-bold text-emerald-600" data-testid="text-sales-count">
-                    {summary.salesReceipts}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                <CardContent className="p-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Refunds</div>
-                  <div className="text-lg md:text-xl font-bold text-red-600" data-testid="text-refund-count">
-                    {summary.refundReceipts}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                <CardContent className="p-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Gross</div>
-                  <div className="text-lg md:text-xl font-bold text-emerald-600 truncate" data-testid="text-gross-sales">
-                    {formatCurrency(Number(summary.grossSales))}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                <CardContent className="p-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Discounts</div>
-                  <div className="text-lg md:text-xl font-bold text-amber-600 truncate" data-testid="text-discounts">
-                    {formatCurrency(Number(summary.discounts))}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                <CardContent className="p-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Refund Amt</div>
-                  <div className="text-lg md:text-xl font-bold text-red-600 truncate" data-testid="text-refund-amount">
-                    {formatCurrency(Number(summary.refunds))}
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px] col-span-2 md:col-span-1">
-                <CardContent className="p-3">
-                  <div className="text-xs text-slate-600 dark:text-slate-400">Net Sales</div>
-                  <div className="text-lg md:text-xl font-bold text-slate-900 dark:text-white truncate" data-testid="text-net-sales">
-                    {formatCurrency(Number(summary.netSales))}
-                  </div>
-                </CardContent>
-              </Card>
+              {[
+                { label: 'Receipts', value: summary.allReceipts, color: 'text-slate-900 dark:text-white', testId: 'text-all-receipts' },
+                { label: 'Sales', value: summary.salesReceipts, color: 'text-emerald-600', testId: 'text-sales-count' },
+                { label: 'Refunds', value: summary.refundReceipts, color: 'text-red-600', testId: 'text-refund-count' },
+                { label: 'Gross', value: formatCurrency(Number(summary.grossSales)), color: 'text-emerald-600', testId: 'text-gross-sales' },
+                { label: 'Discounts', value: formatCurrency(Number(summary.discounts)), color: 'text-amber-600', testId: 'text-discounts' },
+                { label: 'Refund Amt', value: formatCurrency(Number(summary.refunds)), color: 'text-red-600', testId: 'text-refund-amount' },
+                { label: 'Net Sales', value: formatCurrency(Number(summary.netSales)), color: 'text-slate-900 dark:text-white', testId: 'text-net-sales', wide: true },
+              ].map((m, i) => (
+                <Card key={i} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px] ${m.wide ? 'col-span-2 md:col-span-1' : ''}`}>
+                  <CardContent className="p-3">
+                    <div className="text-xs text-slate-600 dark:text-slate-400">{m.label}</div>
+                    <div className={`text-lg md:text-xl font-bold truncate ${m.color}`} data-testid={m.testId}>{m.value}</div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
+            {/* ── Category Totals ─────────────────────────────────────────── */}
             {aggregates && aggregates.categoryTotals.length > 0 && (
               <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
                 <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
-                    Category Totals
-                  </CardTitle>
+                  <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">Category Totals</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-2">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
                     {aggregates.categoryTotals.map((cat, idx) => (
-                      <div 
-                        key={idx} 
+                      <div
+                        key={idx}
                         className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px] cursor-pointer hover:border-emerald-400 transition-colors"
                         onClick={() => setExpandedCategory(expandedCategory === cat.category ? null : cat.category)}
                         data-testid={`total-${cat.category.replace(/\s+/g, '-')}`}
                       >
-                        <div className="text-xs font-semibold text-slate-900 dark:text-white mb-1 truncate">
-                          {cat.category}
-                        </div>
+                        <div className="text-xs font-semibold text-slate-900 dark:text-white mb-1 truncate">{cat.category}</div>
                         <div className="text-lg font-bold text-emerald-600">{cat.totalQuantity}</div>
                         <div className="text-xs text-slate-500">items sold</div>
                         <div className="text-sm font-semibold text-slate-900 dark:text-white mt-1">{formatCurrency(cat.grossAmount)}</div>
@@ -361,6 +335,7 @@ export default function ReceiptsTruth() {
               </Card>
             )}
 
+            {/* ── Item Breakdown (expandable) ─────────────────────────────── */}
             {aggregates && expandedCategory && aggregates.itemsByCategory[expandedCategory] && (
               <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
                 <CardHeader className="p-4 pb-2">
@@ -388,11 +363,10 @@ export default function ReceiptsTruth() {
             )}
 
             {aggregates && !expandedCategory && aggregates.categories.length > 0 && (
-              <div className="text-center py-4 text-xs text-slate-500">
-                Click a category above to view items
-              </div>
+              <div className="text-center py-4 text-xs text-slate-500">Click a category above to view items</div>
             )}
 
+            {/* ── Modifiers ───────────────────────────────────────────────── */}
             {modifiersData && (
               <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
                 <CardHeader className="p-4 pb-2">
@@ -405,9 +379,7 @@ export default function ReceiptsTruth() {
                 </CardHeader>
                 <CardContent className="p-4 pt-2">
                   {modifiersData.modifiers.length === 0 ? (
-                    <div className="text-xs text-slate-500 text-center py-4">
-                      No modifiers recorded for this date.
-                    </div>
+                    <div className="text-xs text-slate-500 text-center py-4">No modifiers recorded for this date.</div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1">
                       {modifiersData.modifiers.map((mod, idx) => (
@@ -430,9 +402,7 @@ export default function ReceiptsTruth() {
             {!modifiersData && !modLoading && summary && (
               <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-[4px]">
                 <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">MODIFIERS NOT BUILT</div>
-                <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Click "Rebuild from Loyverse" to load modifier data.
-                </div>
+                <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">Click "Rebuild from Loyverse" to load modifier data.</div>
               </div>
             )}
 
@@ -442,97 +412,155 @@ export default function ReceiptsTruth() {
               </div>
             )}
 
+            {/* ── DAILY USAGE SUMMARY ─────────────────────────────────────── */}
             {dailyUsage && (
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">
-                    Daily Usage Breakdown
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-2 space-y-4">
-                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-3">
-                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
-                      <CardContent className="p-3">
-                        <div className="text-xs text-slate-600 dark:text-slate-400">Expected Buns</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.expectedBuns)}</div>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
-                      <CardContent className="p-3">
-                        <div className="text-xs text-slate-600 dark:text-slate-400">Expected Beef (g)</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.expectedBeefGrams)}</div>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
-                      <CardContent className="p-3">
-                        <div className="text-xs text-slate-600 dark:text-slate-400">Expected Chicken (g)</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.expectedChickenGrams)}</div>
-                      </CardContent>
-                    </Card>
-                    <Card className="border border-slate-200 dark:border-slate-700 rounded-[4px]">
-                      <CardContent className="p-3">
-                        <div className="text-xs text-slate-600 dark:text-slate-400">Total Drinks Used</div>
-                        <div className="text-lg font-bold text-slate-900 dark:text-white">{fmtNum(dailyUsage.summary.totalDrinksUsed)}</div>
-                      </CardContent>
-                    </Card>
-                  </div>
+              <>
+                <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px]">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">Daily Usage Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-2 space-y-4">
+                    {dailyUsage.issues.length > 0 && (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-[4px]">
+                        <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">{dailyUsage.issues.length} unmapped rows</div>
+                        <div className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Some items lack usage rules — their usage counts as zero.</div>
+                      </div>
+                    )}
 
-                  {dailyUsage.issues.length > 0 && (
-                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-[4px]">
-                      <div className="text-xs font-semibold text-amber-800 dark:text-amber-300">Daily usage has explicit unresolved rows</div>
-                      <div className="text-xs text-amber-700 dark:text-amber-400 mt-1">
-                        {dailyUsage.issues.length} rows require mapping or missing set-drink selections.
+                    {/* Burger & kitchen */}
+                    <div>
+                      <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Burger &amp; Kitchen</div>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                        {[
+                          { label: 'Buns', value: dailyUsage.summary.expectedBuns },
+                          { label: 'Beef Patties', value: dailyUsage.summary.expectedBeefPatties },
+                          { label: 'Beef (g)', value: dailyUsage.summary.expectedBeefGrams },
+                          { label: 'Chicken (g)', value: dailyUsage.summary.expectedChickenGrams },
+                          { label: 'Fries', value: dailyUsage.summary.friesUsed },
+                          { label: 'Bacon', value: dailyUsage.summary.baconUsed },
+                          { label: 'Cheese', value: dailyUsage.summary.cheeseUsed },
+                          { label: 'Pickles', value: dailyUsage.summary.picklesUsed },
+                          { label: 'Salad', value: dailyUsage.summary.saladUsed },
+                          { label: 'Tomato', value: dailyUsage.summary.tomatoUsed },
+                          { label: 'Onion', value: dailyUsage.summary.onionUsed },
+                          { label: 'Burger Sauce', value: dailyUsage.summary.burgerSauceUsed },
+                          { label: 'Jalapeños', value: dailyUsage.summary.jalapenosUsed },
+                        ].map((item, i) => (
+                          <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                            <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight mb-1">{item.label}</div>
+                            <div className="text-base font-bold text-slate-900 dark:text-white">{nz(item.value)}</div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  )}
 
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-200 dark:border-slate-700 text-left">
-                          <th className="py-2 pr-3">Category</th>
-                          <th className="py-2 pr-3">SKU</th>
-                          <th className="py-2 pr-3">Item</th>
-                          <th className="py-2 pr-3 text-right">Qty Sold</th>
-                          <th className="py-2 pr-3 text-right">Buns</th>
-                          <th className="py-2 pr-3 text-right">Beef g</th>
-                          <th className="py-2 pr-3 text-right">Chicken g</th>
-                          <th className="py-2 pr-3 text-right">Coke</th>
-                          <th className="py-2 pr-3 text-right">Coke Zero</th>
-                          <th className="py-2 pr-3 text-right">Sprite</th>
-                          <th className="py-2 pr-3 text-right">Water</th>
-                          <th className="py-2 pr-3 text-right">Orange Fanta</th>
-                          <th className="py-2 pr-3 text-right">Strawberry Fanta</th>
-                          <th className="py-2 pr-0 text-right">Schweppes Manao</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dailyUsage.rows.map((row, idx) => (
-                          <tr
-                            key={`${row.categoryName}-${row.sku || row.itemName}-${idx}`}
-                            className={`border-b border-slate-100 dark:border-slate-800 ${idx > 0 && dailyUsage.rows[idx - 1].categoryName !== row.categoryName ? 'border-t-2 border-t-slate-300 dark:border-t-slate-600' : ''}`}
-                          >
-                            <td className="py-2 pr-3 align-top">{row.categoryName}</td>
-                            <td className="py-2 pr-3 align-top">{row.sku || '-'}</td>
-                            <td className="py-2 pr-3 align-top">{row.itemName}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.quantitySold)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.bunsUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.beefGramsUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.chickenGramsUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.cokeUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.cokeZeroUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.spriteUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.waterUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.fantaOrangeUsed)}</td>
-                            <td className="py-2 pr-3 text-right">{fmtNum(row.fantaStrawberryUsed)}</td>
-                            <td className="py-2 pr-0 text-right">{fmtNum(row.schweppesManaoUsed)}</td>
-                          </tr>
+                    {/* Drinks */}
+                    <div>
+                      <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Drinks — Total: {nz(dailyUsage.summary.totalDrinksUsed)}</div>
+                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">
+                        {[
+                          { label: 'Coke', value: dailyUsage.summary.cokeUsed },
+                          { label: 'Coke Zero', value: dailyUsage.summary.cokeZeroUsed },
+                          { label: 'Sprite', value: dailyUsage.summary.spriteUsed },
+                          { label: 'Water', value: dailyUsage.summary.waterUsed },
+                          { label: 'Fanta Orange', value: dailyUsage.summary.fantaOrangeUsed },
+                          { label: 'Fanta Straw.', value: dailyUsage.summary.fantaStrawberryUsed },
+                          { label: 'Schweppes', value: dailyUsage.summary.schweppesManaoUsed },
+                        ].map((item, i) => (
+                          <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                            <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight mb-1">{item.label}</div>
+                            <div className="text-base font-bold text-emerald-600">{nz(item.value)}</div>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* ── USAGE BY ITEM ─────────────────────────────────────────── */}
+                <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[4px] overflow-hidden min-w-0">
+                  <CardHeader className="p-4 pb-2">
+                    <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white flex items-center justify-between">
+                      <span>Usage By Item</span>
+                      <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded-[4px]">
+                        {dailyUsage.rows.length} rows
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0 pt-0">
+                    <div className="overflow-x-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
+                      <table className="w-full text-xs border-collapse" style={{ minWidth: '1200px' }}>
+                        <thead>
+                          <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-left bg-slate-50 dark:bg-slate-800">
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">Category</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">SKU</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 min-w-[140px]">Item</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Qty</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Buns</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Patties</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Beef g</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Chkn g</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Fries</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Bacon</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Cheese</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Pickles</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Salad</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Tomato</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Onion</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Sauce</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Jalap.</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Coke</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">C.Zero</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Sprite</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Water</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">F.Org</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">F.Str</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Schwpps</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dailyUsage.rows.map((row, idx) => {
+                            const prevCat = idx > 0 ? dailyUsage.rows[idx - 1].categoryName : null;
+                            const isCatBoundary = prevCat !== null && prevCat !== row.categoryName;
+                            const isUnmapped = row.bunsUsed === null && row.beefGramsUsed === null && row.chickenGramsUsed === null && row.cokeUsed === null && row.friesUsed === null;
+                            return (
+                              <tr
+                                key={`${row.categoryName}-${row.sku || row.itemName}-${idx}`}
+                                className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isCatBoundary ? 'border-t-2 border-t-slate-300 dark:border-t-slate-600' : ''} ${isUnmapped ? 'opacity-50' : ''}`}
+                              >
+                                <td className="py-2 px-2 text-slate-600 dark:text-slate-400 whitespace-nowrap max-w-[120px] truncate">{row.categoryName}</td>
+                                <td className="py-2 px-2 text-slate-500 whitespace-nowrap">{row.sku || '-'}</td>
+                                <td className="py-2 px-2 text-slate-900 dark:text-white min-w-[140px]">{row.itemName}</td>
+                                <td className="py-2 px-2 text-right font-semibold text-slate-900 dark:text-white">{nz(row.quantitySold)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.bunsUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.beefServesUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.beefGramsUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.chickenGramsUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.friesUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.baconUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.cheeseUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.picklesUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.saladUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.tomatoUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.onionUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.burgerSauceUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.jalapenosUsed)}</td>
+                                <td className="py-2 px-2 text-right text-emerald-600">{n(row.cokeUsed)}</td>
+                                <td className="py-2 px-2 text-right text-emerald-600">{n(row.cokeZeroUsed)}</td>
+                                <td className="py-2 px-2 text-right text-emerald-600">{n(row.spriteUsed)}</td>
+                                <td className="py-2 px-2 text-right text-emerald-600">{n(row.waterUsed)}</td>
+                                <td className="py-2 px-2 text-right text-emerald-600">{n(row.fantaOrangeUsed)}</td>
+                                <td className="py-2 px-2 text-right text-emerald-600">{n(row.fantaStrawberryUsed)}</td>
+                                <td className="py-2 px-2 text-right text-emerald-600">{n(row.schweppesManaoUsed)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
             )}
 
             {!dailyUsage && !usageLoading && (
@@ -544,9 +572,7 @@ export default function ReceiptsTruth() {
         )}
 
         {isLoading && (
-          <div className="text-center py-8 text-xs text-slate-600 dark:text-slate-400">
-            Loading receipt truth...
-          </div>
+          <div className="text-center py-8 text-xs text-slate-600 dark:text-slate-400">Loading receipt truth...</div>
         )}
       </div>
     </div>
