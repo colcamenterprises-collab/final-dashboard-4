@@ -64,6 +64,8 @@ interface BobAdjustment {
 
 interface DailyUsageData {
   date: string;
+  receiptTruthBuiltAt: string | null;
+  dailyUsageBuiltAt: string | null;
   summary: {
     expectedBuns: number;
     expectedBeefGrams: number;
@@ -321,7 +323,15 @@ export default function SalesShiftAnalysis() {
 
       <Card>
         <CardHeader className="py-3">
-          <CardTitle className="text-sm font-medium text-slate-700">Expected Stock Usage (Stored Receipts Truth)</CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <CardTitle className="text-sm font-medium text-slate-700">Expected Stock Usage (Stored Receipts Truth)</CardTitle>
+            {dailyUsage && dailyUsage.receiptTruthBuiltAt && dailyUsage.dailyUsageBuiltAt &&
+              dailyUsage.receiptTruthBuiltAt > dailyUsage.dailyUsageBuiltAt && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                ⚠ Usage out of date — rebuild required
+              </span>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {usageLoading ? (

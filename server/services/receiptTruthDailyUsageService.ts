@@ -247,6 +247,8 @@ export interface DailyUsageResponse {
   summary: DailyUsageSummary;
   rows: DailyUsageRow[];
   issues: UsageIssue[];
+  receiptTruthBuiltAt: string | null;
+  dailyUsageBuiltAt: string | null;
 }
 
 export interface DailyUsageRebuildResult extends DailyUsageResponse {
@@ -604,7 +606,7 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
   await ensureUsageRulesSeeded();
 
   const summaryCheck = await db.execute(sql`
-    SELECT all_receipts FROM receipt_truth_summary WHERE business_date = ${businessDate}::date
+    SELECT all_receipts, built_at FROM receipt_truth_summary WHERE business_date = ${businessDate}::date
   `);
   if (!summaryCheck.rows || summaryCheck.rows.length === 0) {
     throw new Error(`[DAILY_USAGE_FAIL] No receipt truth found for ${businessDate}. Run receipts-truth/rebuild first.`);
@@ -901,7 +903,11 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
     summary.cokeUsed + summary.cokeZeroUsed + summary.spriteUsed + summary.waterUsed +
     summary.fantaOrangeUsed + summary.fantaStrawberryUsed + summary.schweppesManaoUsed;
 
-  return { date: businessDate, summary, rows, issues };
+  const receiptTruthBuiltAt = (summaryCheck.rows[0] as any)?.built_at
+    ? new Date((summaryCheck.rows[0] as any).built_at).toISOString()
+    : null;
+
+  return { date: businessDate, summary, rows, issues, receiptTruthBuiltAt, dailyUsageBuiltAt: null };
 }
 
 // ─── PUBLIC API ───────────────────────────────────────────────────────────────
@@ -928,7 +934,8 @@ export async function rebuildReceiptTruthDailyUsage(businessDate: string): Promi
     `);
   }
 
-  return { ok: true, ...built, rowsStored: built.rows.length };
+  const nowIso = new Date().toISOString();
+  return { ok: true, ...built, dailyUsageBuiltAt: nowIso, rowsStored: built.rows.length };
 }
 
 export async function getReceiptTruthDailyUsage(businessDate: string): Promise<DailyUsageResponse | null> {
@@ -945,13 +952,25 @@ export async function getReceiptTruthDailyUsage(businessDate: string): Promise<D
            fanta_orange_used, fanta_strawberry_used, schweppes_manao_used,
            fries_used, bacon_used, cheese_used, pickles_used, salad_used, tomato_used,
            onion_used, burger_sauce_used, jalapenos_used,
-           coleslaw_used, COALESCE(is_modifier_estimated, false) AS is_modifier_estimated
+           coleslaw_used, COALESCE(is_modifier_estimated, false) AS is_modifier_estimated,
+           built_at
     FROM receipt_truth_daily_usage
     WHERE business_date = ${businessDate}::date
     ORDER BY category_name, sku, item_name
   `);
 
   if (!result.rows || result.rows.length === 0) return null;
+
+  const dailyUsageBuiltAt = (result.rows[0] as any)?.built_at
+    ? new Date((result.rows[0] as any).built_at).toISOString()
+    : null;
+
+  const truthCheck = await db.execute(sql`
+    SELECT built_at FROM receipt_truth_summary WHERE business_date = ${businessDate}::date LIMIT 1
+  `);
+  const receiptTruthBuiltAt = (truthCheck.rows[0] as any)?.built_at
+    ? new Date((truthCheck.rows[0] as any).built_at).toISOString()
+    : null;
 
   const rows: DailyUsageRow[] = (result.rows as any[]).map((row) => ({
     businessDate: String(row.business_date),
@@ -999,5 +1018,5 @@ export async function getReceiptTruthDailyUsage(businessDate: string): Promise<D
       details: `Stored daily usage row contains NULL usage columns for ${row.itemName}`,
     }));
 
-  return { date: businessDate, summary, rows, issues };
+  return { date: businessDate, summary, rows, issues, receiptTruthBuiltAt, dailyUsageBuiltAt };
 }

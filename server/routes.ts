@@ -1266,7 +1266,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
     try {
       const summary = await rebuildReceiptTruth(business_date);
-      res.json({ ok: true, ...summary });
+      // Auto-trigger daily usage rebuild so it never lags behind receipt truth
+      let usageRebuildOk = false;
+      let usageRebuildError: string | null = null;
+      try {
+        const { rebuildReceiptTruthDailyUsage } = await import('./services/receiptTruthDailyUsageService');
+        await rebuildReceiptTruthDailyUsage(business_date);
+        usageRebuildOk = true;
+      } catch (usageErr: any) {
+        usageRebuildError = usageErr?.message || String(usageErr);
+        console.error('[RECEIPT_TRUTH_REBUILD] Daily usage auto-rebuild failed:', usageRebuildError);
+      }
+      res.json({ ok: true, ...summary, usageRebuildOk, usageRebuildError });
     } catch (e: any) {
       console.error('[RECEIPT_TRUTH_FAIL]', e);
       res.status(500).json({ error: e.message || String(e) });
