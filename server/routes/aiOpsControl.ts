@@ -2151,21 +2151,31 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
 
   // ── receipts/truth ──
   // receipt_truth_line: line-item truth table ingested from Loyverse. Requires date or range.
+  // P0.3 — LEFT JOIN lv_receipt to include receipt_datetime_bkk (Bangkok local timestamp).
   if (module === "receipts/truth") {
     if (!date && !(from && to)) throw new Error("date or from+to required for receipts/truth");
     let r: any;
     if (date && isValidProxyDate(date)) {
       r = await pool.query(
-        `SELECT receipt_date::text, receipt_id, receipt_type, sku, item_name, category,
-                quantity, gross_amount, discount_amount, net_amount, pos_category_name
-         FROM receipt_truth_line WHERE receipt_date = $1::date ORDER BY receipt_id, sku LIMIT $2`,
+        `SELECT l.receipt_date::text, l.receipt_id, l.receipt_type, l.sku, l.item_name, l.category,
+                l.quantity, l.gross_amount, l.discount_amount, l.net_amount, l.pos_category_name,
+                (lv.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS receipt_datetime_bkk
+         FROM receipt_truth_line l
+         LEFT JOIN lv_receipt lv ON lv.receipt_id = l.receipt_id
+         WHERE l.receipt_date = $1::date
+         ORDER BY COALESCE(lv.datetime_bkk, '1970-01-01'::timestamptz), l.receipt_id, l.sku
+         LIMIT $2`,
         [date, lim]);
     } else {
       r = await pool.query(
-        `SELECT receipt_date::text, receipt_id, receipt_type, sku, item_name, category,
-                quantity, gross_amount, discount_amount, net_amount, pos_category_name
-         FROM receipt_truth_line WHERE receipt_date BETWEEN $1::date AND $2::date
-         ORDER BY receipt_date DESC, receipt_id, sku LIMIT $3`,
+        `SELECT l.receipt_date::text, l.receipt_id, l.receipt_type, l.sku, l.item_name, l.category,
+                l.quantity, l.gross_amount, l.discount_amount, l.net_amount, l.pos_category_name,
+                (lv.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS receipt_datetime_bkk
+         FROM receipt_truth_line l
+         LEFT JOIN lv_receipt lv ON lv.receipt_id = l.receipt_id
+         WHERE l.receipt_date BETWEEN $1::date AND $2::date
+         ORDER BY l.receipt_date DESC, COALESCE(lv.datetime_bkk, '1970-01-01'::timestamptz), l.receipt_id, l.sku
+         LIMIT $3`,
         [from, to, lim]);
     }
     const meta = from && to ? { from, to } : { date };
@@ -2174,21 +2184,29 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
 
   // ── receipts/loyverse ──
   // lv_receipt: raw Loyverse receipt headers with payment_json. Requires date or range.
+  // AT-3 fix: filter by shift window (17:00 BKK → 03:00 BKK next day) = 10:00 UTC → 20:00 UTC same day.
+  // This ensures post-midnight receipts (00:00-03:00 BKK on day+1) are included in the date's shift.
   if (module === "receipts/loyverse") {
     if (!date && !(from && to)) throw new Error("date or from+to required for receipts/loyverse");
     let r: any;
     if (date && isValidProxyDate(date)) {
+      // Shift window: date 10:00 UTC → date 20:00 UTC (= 17:00 BKK → 03:00 BKK next day)
       r = await pool.query(
         `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS datetime_bkk,
                 staff_name, total_amount, payment_json, created_at::text
-         FROM lv_receipt WHERE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date = $1::date
-         ORDER BY datetime_bkk DESC LIMIT $2`,
+         FROM lv_receipt
+         WHERE datetime_bkk >= ($1::date + INTERVAL '10 hours')
+           AND datetime_bkk <  ($1::date + INTERVAL '20 hours')
+         ORDER BY datetime_bkk ASC LIMIT $2`,
         [date, lim]);
     } else {
+      // Range: cover all shift windows across the date range
       r = await pool.query(
         `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS datetime_bkk,
                 staff_name, total_amount, payment_json, created_at::text
-         FROM lv_receipt WHERE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date BETWEEN $1::date AND $2::date
+         FROM lv_receipt
+         WHERE datetime_bkk >= ($1::date + INTERVAL '10 hours')
+           AND datetime_bkk <  ($2::date + INTERVAL '20 hours')
          ORDER BY datetime_bkk DESC LIMIT $3`,
         [from, to, lim]);
     }

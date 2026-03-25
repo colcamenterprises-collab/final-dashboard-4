@@ -36,6 +36,12 @@ interface LoyverseLineItem {
   line_modifiers?: LoyverseLineModifier[];
 }
 
+interface LoyversePayment {
+  payment_type_id?: string;
+  name?: string;
+  money_amount?: number;
+}
+
 interface LoyverseReceipt {
   receipt_number: string;
   receipt_date: string;
@@ -43,6 +49,9 @@ interface LoyverseReceipt {
   total_discount?: number;
   refund_for?: string | null;
   line_items?: LoyverseLineItem[];
+  payments?: LoyversePayment[];
+  customer_id?: string | null;
+  employee_id?: string | null;
 }
 
 interface LoyverseCategory {
@@ -68,6 +77,8 @@ export interface ReceiptTruthLine {
   discountAmount: number;
   netAmount: number;
   modifiers?: { name: string; quantity: number; priceImpact: number }[];
+  /** P0.2: Bangkok-local receipt timestamp, derived from lv_receipt via receipt_id join */
+  receiptDatetimeBkk?: string | null;
 }
 
 function getShiftWindowUTC(businessDate: string): { start: string; end: string } {
@@ -308,6 +319,45 @@ export async function rebuildReceiptTruth(businessDate: string): Promise<Receipt
 
   console.log(`[RECEIPT_TRUTH] Lines: ${lineCount}, Modifiers: ${modifierCount}`);
 
+  // P0.1 — upsert raw receipt headers into lv_receipt so raw-receipts endpoint returns data
+  // and so receipt_truth_line can be joined with lv_receipt to retrieve receipt_datetime_bkk.
+  let lvUpsertCount = 0;
+  for (const receipt of receipts) {
+    const paymentJson = JSON.stringify(receipt.payments ?? []);
+    const rawJson = JSON.stringify({
+      receipt_number: receipt.receipt_number,
+      receipt_date: receipt.receipt_date,
+      total_money: receipt.total_money,
+      total_discount: receipt.total_discount ?? 0,
+      refund_for: receipt.refund_for ?? null,
+      payments: receipt.payments ?? [],
+    });
+    try {
+      await db.execute(sql`
+        INSERT INTO lv_receipt (receipt_id, datetime_bkk, staff_name, customer_id, total_amount, payment_json, raw_json)
+        VALUES (
+          ${receipt.receipt_number},
+          ${receipt.receipt_date}::timestamptz,
+          NULL,
+          ${receipt.customer_id ?? null},
+          ${Number(receipt.total_money || 0)},
+          ${paymentJson}::jsonb,
+          ${rawJson}::jsonb
+        )
+        ON CONFLICT (receipt_id) DO UPDATE SET
+          datetime_bkk  = EXCLUDED.datetime_bkk,
+          total_amount  = EXCLUDED.total_amount,
+          payment_json  = EXCLUDED.payment_json,
+          raw_json      = EXCLUDED.raw_json
+      `);
+      lvUpsertCount++;
+    } catch (e) {
+      // Non-fatal: log and continue. receipt_truth_line write already succeeded.
+      console.warn(`[RECEIPT_TRUTH] lv_receipt upsert failed for ${receipt.receipt_number}:`, e);
+    }
+  }
+  console.log(`[RECEIPT_TRUTH] lv_receipt upserted: ${lvUpsertCount}/${receipts.length}`);
+
   return {
     allReceipts: allReceiptsCount,
     salesReceipts: salesReceiptsCount,
@@ -358,13 +408,16 @@ export async function getReceiptTruthLines(businessDate: string): Promise<Receip
     throw new Error('[RECEIPT_TRUTH_FAIL] Invalid date format. Use YYYY-MM-DD');
   }
 
+  // P0.2 — LEFT JOIN lv_receipt to surface receipt_datetime_bkk per line
   const linesResult = await db.execute(sql`
     SELECT 
       l.receipt_date, l.receipt_id, l.receipt_type, l.sku, l.item_name, l.category,
-      l.quantity, l.gross_amount, l.discount_amount, l.net_amount
+      l.quantity, l.gross_amount, l.discount_amount, l.net_amount,
+      (r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS receipt_datetime_bkk
     FROM receipt_truth_line l
+    LEFT JOIN lv_receipt r ON r.receipt_id = l.receipt_id
     WHERE l.receipt_date = ${businessDate}::date
-    ORDER BY l.receipt_id, l.item_name
+    ORDER BY COALESCE(r.datetime_bkk, '1970-01-01'::timestamptz), l.receipt_id, l.item_name
   `);
 
   const modifiersResult = await db.execute(sql`
@@ -407,5 +460,6 @@ export async function getReceiptTruthLines(businessDate: string): Promise<Receip
     discountAmount: Number(row.discount_amount),
     netAmount: Number(row.net_amount),
     modifiers: modifiersByReceipt.get(row.receipt_id)?.get(row.sku || '') || [],
+    receiptDatetimeBkk: row.receipt_datetime_bkk ?? null,
   }));
 }
