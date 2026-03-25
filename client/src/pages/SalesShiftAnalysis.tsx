@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -121,11 +121,26 @@ function issueText(issue: string | { type?: string; message?: string; check?: st
 export default function SalesShiftAnalysis() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(todayBkk());
+  const [autoLoaded, setAutoLoaded] = useState(false);
   const [notes, setNotes] = useState('');
   const [cashBanked, setCashBanked] = useState('0');
   const [qrBanked, setQrBanked] = useState('0');
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
   const managerName = 'dashboard';
+
+  // Auto-load: on first mount, resolve the latest shift that has data and jump to it
+  useEffect(() => {
+    if (autoLoaded) return;
+    setAutoLoaded(true);
+    fetch('/api/latest-valid-shift')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.ok && j?.date && j.date !== todayBkk()) {
+          setSelectedDate(j.date);
+        }
+      })
+      .catch(() => { /* silently fall back to today */ });
+  }, [autoLoaded]);
 
   const { data: formData, isLoading: formLoading } = useQuery<ShiftData>({
     queryKey: ['daily-sales', selectedDate],

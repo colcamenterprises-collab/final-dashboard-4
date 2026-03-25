@@ -32,11 +32,38 @@ export async function getShiftSnapshot(date: string): Promise<any | null> {
 export async function listShiftSnapshots(): Promise<any[]> {
   await ensureShiftDerivedTables();
   const prisma = db();
+  // Join daily_sales_v2 directly so form totals are always live (not dependent on stale snapshot form_data).
+  // COALESCE(NULLIF(col,0), payload->>col, 0) handles the common case where DB columns store 0 but real data lives in payload JSONB.
   return prisma.$queryRawUnsafe<any[]>(
-    `SELECT date, approved, pos_data, form_data, cash_banked, qr_banked, completed_by, updated_at
-     FROM shift_snapshot_v2
-     ORDER BY date DESC
-     LIMIT 90`,
+    `
+    WITH all_dates AS (
+      SELECT date::date AS d FROM shift_snapshot_v2
+      UNION
+      SELECT shift_date::date AS d FROM daily_sales_v2 WHERE shift_date IS NOT NULL
+    ),
+    dsv2 AS (
+      SELECT DISTINCT ON (shift_date::date)
+        shift_date::date AS d,
+        COALESCE(
+          NULLIF("totalSales"::numeric, 0),
+          NULLIF((payload->>'totalSales')::numeric, 0),
+          0
+        ) AS form_total
+      FROM daily_sales_v2
+      WHERE shift_date IS NOT NULL
+      ORDER BY shift_date::date, COALESCE("submittedAtISO", "createdAt") DESC
+    )
+    SELECT
+      TO_CHAR(ad.d, 'YYYY-MM-DD') AS date,
+      COALESCE(s.approved, false) AS approved,
+      s.pos_data,
+      json_build_object('total', COALESCE(dv.form_total, 0)) AS form_data
+    FROM all_dates ad
+    LEFT JOIN shift_snapshot_v2 s ON s.date = ad.d
+    LEFT JOIN dsv2 dv ON dv.d = ad.d
+    ORDER BY ad.d DESC
+    LIMIT 90
+    `,
   );
 }
 
@@ -61,14 +88,14 @@ export async function getDailySalesFormNormalized(date: string): Promise<ShiftCo
   const row = salesRows[0];
   const payload = (row.payload ?? {}) as Record<string, any>;
 
-  const total = parseNumeric(row.totalSales ?? payload.totalSales);
-  const cash = parseNumeric(row.cashSales ?? payload.cashSales);
-  const qr = parseNumeric(row.qrSales ?? payload.qrSales);
-  const grab = parseNumeric(row.grabSales ?? payload.grabSales);
-  const otherFromPayload = payload.otherSales ?? payload.aroiSales;
-  const other = parseNumeric(otherFromPayload ?? total - cash - qr - grab);
+  const total = parseNumeric(row.totalSales || payload.totalSales);
+  const cash = parseNumeric(row.cashSales || payload.cashSales);
+  const qr = parseNumeric(row.qrSales || payload.qrSales);
+  const grab = parseNumeric(row.grabSales || payload.grabSales);
+  const otherFromPayload = payload.otherSales || payload.aroiSales;
+  const other = parseNumeric(otherFromPayload || (total - cash - qr - grab));
 
-  const totalExpenses = parseNumeric(row.totalExpenses ?? payload.totalExpenses);
+  const totalExpenses = parseNumeric(row.totalExpenses || payload.totalExpenses);
   const explicitExpCash = payload.exp_cash ?? payload.expCash ?? payload.cashExpense;
 
   return {
