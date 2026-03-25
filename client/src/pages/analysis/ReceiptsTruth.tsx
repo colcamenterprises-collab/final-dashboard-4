@@ -79,6 +79,8 @@ interface DailyUsageRow {
   onionUsed: number | null;
   burgerSauceUsed: number | null;
   jalapenosUsed: number | null;
+  coleslawUsed: number | null;
+  isModifierEstimated: boolean;
 }
 
 interface DailyUsageSummary {
@@ -96,6 +98,7 @@ interface DailyUsageSummary {
   onionUsed: number;
   burgerSauceUsed: number;
   jalapenosUsed: number;
+  coleslawUsed: number;
   cokeUsed: number;
   cokeZeroUsed: number;
   spriteUsed: number;
@@ -437,6 +440,7 @@ export default function ReceiptsTruth() {
                           { label: 'Beef (g)', value: dailyUsage.summary.expectedBeefGrams },
                           { label: 'Chicken (g)', value: dailyUsage.summary.expectedChickenGrams },
                           { label: 'Fries', value: dailyUsage.summary.friesUsed },
+                          { label: 'Coleslaw', value: dailyUsage.summary.coleslawUsed },
                           { label: 'Bacon', value: dailyUsage.summary.baconUsed },
                           { label: 'Cheese', value: dailyUsage.summary.cheeseUsed },
                           { label: 'Pickles', value: dailyUsage.summary.picklesUsed },
@@ -509,6 +513,7 @@ export default function ReceiptsTruth() {
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Onion</th>
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Sauce</th>
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Jalap.</th>
+                            <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Coleslaw</th>
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Coke</th>
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">C.Zero</th>
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 text-right whitespace-nowrap">Sprite</th>
@@ -530,7 +535,12 @@ export default function ReceiptsTruth() {
                               >
                                 <td className="py-2 px-2 text-slate-600 dark:text-slate-400 whitespace-nowrap max-w-[120px] truncate">{row.categoryName}</td>
                                 <td className="py-2 px-2 text-slate-500 whitespace-nowrap">{row.sku || '-'}</td>
-                                <td className="py-2 px-2 text-slate-900 dark:text-white min-w-[140px]">{row.itemName}</td>
+                                <td className="py-2 px-2 text-slate-900 dark:text-white min-w-[140px]">
+                                  {row.itemName}
+                                  {row.isModifierEstimated && (
+                                    <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400 font-medium">~Est.</span>
+                                  )}
+                                </td>
                                 <td className="py-2 px-2 text-right font-semibold text-slate-900 dark:text-white">{nz(row.quantitySold)}</td>
                                 <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.bunsUsed)}</td>
                                 <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.beefServesUsed)}</td>
@@ -545,6 +555,7 @@ export default function ReceiptsTruth() {
                                 <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.onionUsed)}</td>
                                 <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.burgerSauceUsed)}</td>
                                 <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.jalapenosUsed)}</td>
+                                <td className="py-2 px-2 text-right text-slate-700 dark:text-slate-300">{n(row.coleslawUsed)}</td>
                                 <td className="py-2 px-2 text-right text-emerald-600">{n(row.cokeUsed)}</td>
                                 <td className="py-2 px-2 text-right text-emerald-600">{n(row.cokeZeroUsed)}</td>
                                 <td className="py-2 px-2 text-right text-emerald-600">{n(row.spriteUsed)}</td>

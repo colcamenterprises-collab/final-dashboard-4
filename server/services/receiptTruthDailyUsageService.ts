@@ -108,6 +108,12 @@ async function ensureTables() {
   await db.execute(sql`ALTER TABLE receipt_truth_daily_usage ADD COLUMN IF NOT EXISTS onion_used numeric(12,4)`);
   await db.execute(sql`ALTER TABLE receipt_truth_daily_usage ADD COLUMN IF NOT EXISTS burger_sauce_used numeric(12,4)`);
   await db.execute(sql`ALTER TABLE receipt_truth_daily_usage ADD COLUMN IF NOT EXISTS jalapenos_used numeric(12,4)`);
+  // Mix & Match extended fields
+  await db.execute(sql`ALTER TABLE receipt_truth_usage_rule ADD COLUMN IF NOT EXISTS coleslaw_per_unit numeric(10,4)`);
+  await db.execute(sql`ALTER TABLE receipt_truth_usage_rule ADD COLUMN IF NOT EXISTS modifier_drinks_expected int NOT NULL DEFAULT 1`);
+  await db.execute(sql`ALTER TABLE receipt_truth_usage_rule ADD COLUMN IF NOT EXISTS modifier_burgers_expected int NOT NULL DEFAULT 1`);
+  await db.execute(sql`ALTER TABLE receipt_truth_daily_usage ADD COLUMN IF NOT EXISTS coleslaw_used numeric(12,4)`);
+  await db.execute(sql`ALTER TABLE receipt_truth_daily_usage ADD COLUMN IF NOT EXISTS is_modifier_estimated boolean NOT NULL DEFAULT false`);
 
   tablesEnsured = true;
 }
@@ -134,6 +140,9 @@ interface UsageRuleSeed {
   onionPerUnit?: number;
   burgerSaucePerUnit?: number;
   jalapenosPerUnit?: number;
+  coleslawPerUnit?: number;
+  modifierDrinksExpected?: number;
+  modifierBurgersExpected?: number;
   notes: string;
 }
 
@@ -172,6 +181,8 @@ interface DailyUsageRowAccumulator {
   onionUsed: number | null;
   burgerSauceUsed: number | null;
   jalapenosUsed: number | null;
+  coleslawUsed: number | null;
+  isModifierEstimated: boolean;
 }
 
 export interface DailyUsageSummary {
@@ -196,6 +207,7 @@ export interface DailyUsageSummary {
   onionUsed: number;
   burgerSauceUsed: number;
   jalapenosUsed: number;
+  coleslawUsed: number;
 }
 
 export interface DailyUsageRow {
@@ -226,6 +238,8 @@ export interface DailyUsageRow {
   onionUsed: number | null;
   burgerSauceUsed: number | null;
   jalapenosUsed: number | null;
+  coleslawUsed: number | null;
+  isModifierEstimated: boolean;
 }
 
 export interface DailyUsageResponse {
@@ -254,8 +268,8 @@ const RULE_SEEDS: UsageRuleSeed[] = [
   { sku: '10036', itemName: 'Super Double Bacon & Cheese Set (Meal Deal)', bunsPerUnit: 1, beefServesPerUnit: 2, beefGramsPerUnit: 190, friesPerUnit: 1, baconPerUnit: 1, requiresDrinkModifier: true, notes: 'Super double set with bacon, fries and drink modifier' },
   { sku: '10034', itemName: 'Triple Smash Set (Meal Deal)', bunsPerUnit: 1, beefServesPerUnit: 3, beefGramsPerUnit: 285, friesPerUnit: 1, requiresDrinkModifier: true, notes: 'Triple meal set with fries and drink modifier' },
 
-  // Mix & Match — burger content from burger modifier, drink from drink modifier
-  { sku: '10069', itemName: 'Mix and Match Meal Deal', friesPerUnit: 1, requiresDrinkModifier: true, requiresBurgerModifier: true, notes: 'Mix and match set - burger/drink from modifiers' },
+  // Mix & Match — 2 burgers, 2 fries, 1 coleslaw, 2 drinks per deal; burger/drink types from modifiers
+  { sku: '10069', itemName: 'Mix and Match Meal Deal', friesPerUnit: 2, coleslawPerUnit: 1, requiresDrinkModifier: true, requiresBurgerModifier: true, modifierDrinksExpected: 2, modifierBurgersExpected: 2, notes: 'Mix and match: 2 burgers, 2 fries, 1 coleslaw, 2 drinks - types estimated from modifiers' },
 
   // Kids sets
   { sku: '10003', itemName: 'Kids Single Meal Set (Burger Fries Drink)', bunsPerUnit: 1, beefServesPerUnit: 1, beefGramsPerUnit: 95, friesPerUnit: 1, requiresDrinkModifier: true, notes: 'Kids single meal set with fries and drink modifier' },
@@ -379,6 +393,8 @@ function createEmptyAccumulator(businessDate: string, categoryName: string, sku:
     onionUsed: 0,
     burgerSauceUsed: 0,
     jalapenosUsed: 0,
+    coleslawUsed: 0,
+    isModifierEstimated: false,
   };
 }
 
@@ -424,6 +440,7 @@ function summarize(rows: DailyUsageRow[]): DailyUsageSummary {
     acc.onionUsed += Number(row.onionUsed || 0);
     acc.burgerSauceUsed += Number(row.burgerSauceUsed || 0);
     acc.jalapenosUsed += Number(row.jalapenosUsed || 0);
+    acc.coleslawUsed += Number(row.coleslawUsed || 0);
     return acc;
   }, {
     expectedBuns: 0,
@@ -447,6 +464,7 @@ function summarize(rows: DailyUsageRow[]): DailyUsageSummary {
     onionUsed: 0,
     burgerSauceUsed: 0,
     jalapenosUsed: 0,
+    coleslawUsed: 0,
   });
 }
 
@@ -462,6 +480,7 @@ async function ensureUsageRulesSeeded() {
            chicken_serves_per_unit, chicken_grams_per_unit,
            fries_per_unit, bacon_per_unit, cheese_per_unit, pickles_per_unit,
            salad_per_unit, tomato_per_unit, onion_per_unit, burger_sauce_per_unit, jalapenos_per_unit,
+           coleslaw_per_unit, modifier_drinks_expected, modifier_burgers_expected,
            notes, active)
         VALUES
           (${rule.sku}, ${rule.itemName ?? null}, ${rule.directDrinkCode ?? null},
@@ -471,6 +490,7 @@ async function ensureUsageRulesSeeded() {
            ${rule.friesPerUnit ?? null}, ${rule.baconPerUnit ?? null}, ${rule.cheesePerUnit ?? null},
            ${rule.picklesPerUnit ?? null}, ${rule.saladPerUnit ?? null}, ${rule.tomatoPerUnit ?? null},
            ${rule.onionPerUnit ?? null}, ${rule.burgerSaucePerUnit ?? null}, ${rule.jalapenosPerUnit ?? null},
+           ${rule.coleslawPerUnit ?? null}, ${rule.modifierDrinksExpected ?? 1}, ${rule.modifierBurgersExpected ?? 1},
            ${rule.notes}, true)
       `);
       continue;
@@ -485,6 +505,7 @@ async function ensureUsageRulesSeeded() {
            chicken_serves_per_unit, chicken_grams_per_unit,
            fries_per_unit, bacon_per_unit, cheese_per_unit, pickles_per_unit,
            salad_per_unit, tomato_per_unit, onion_per_unit, burger_sauce_per_unit, jalapenos_per_unit,
+           coleslaw_per_unit, modifier_drinks_expected, modifier_burgers_expected,
            notes, active)
         VALUES
           (NULL, ${rule.itemName}, ${rule.directDrinkCode ?? null},
@@ -494,6 +515,7 @@ async function ensureUsageRulesSeeded() {
            ${rule.friesPerUnit ?? null}, ${rule.baconPerUnit ?? null}, ${rule.cheesePerUnit ?? null},
            ${rule.picklesPerUnit ?? null}, ${rule.saladPerUnit ?? null}, ${rule.tomatoPerUnit ?? null},
            ${rule.onionPerUnit ?? null}, ${rule.burgerSaucePerUnit ?? null}, ${rule.jalapenosPerUnit ?? null},
+           ${rule.coleslawPerUnit ?? null}, ${rule.modifierDrinksExpected ?? 1}, ${rule.modifierBurgersExpected ?? 1},
            ${rule.notes}, true)
       `);
     }
@@ -506,7 +528,9 @@ async function loadUsageRules() {
            buns_per_unit, beef_serves_per_unit, beef_grams_per_unit,
            chicken_serves_per_unit, chicken_grams_per_unit,
            fries_per_unit, bacon_per_unit, cheese_per_unit, pickles_per_unit,
-           salad_per_unit, tomato_per_unit, onion_per_unit, burger_sauce_per_unit, jalapenos_per_unit
+           salad_per_unit, tomato_per_unit, onion_per_unit, burger_sauce_per_unit, jalapenos_per_unit,
+           coleslaw_per_unit, COALESCE(modifier_drinks_expected, 1) AS modifier_drinks_expected,
+           COALESCE(modifier_burgers_expected, 1) AS modifier_burgers_expected
     FROM receipt_truth_usage_rule
     WHERE active = true
   `);
@@ -535,6 +559,9 @@ async function loadUsageRules() {
       onionPerUnit: row.onion_per_unit === null ? null : Number(row.onion_per_unit),
       burgerSaucePerUnit: row.burger_sauce_per_unit === null ? null : Number(row.burger_sauce_per_unit),
       jalapenosPerUnit: row.jalapenos_per_unit === null ? null : Number(row.jalapenos_per_unit),
+      coleslawPerUnit: row.coleslaw_per_unit === null ? null : Number(row.coleslaw_per_unit),
+      modifierDrinksExpected: Number(row.modifier_drinks_expected || 1),
+      modifierBurgersExpected: Number(row.modifier_burgers_expected || 1),
     };
 
     if (parsed.sku) bySku.set(parsed.sku, parsed);
@@ -739,6 +766,7 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
     acc.onionUsed = zeroable(acc.onionUsed) + (Number(rule.onionPerUnit || 0) * group.quantitySold);
     acc.burgerSauceUsed = zeroable(acc.burgerSauceUsed) + (Number(rule.burgerSaucePerUnit || 0) * group.quantitySold);
     acc.jalapenosUsed = zeroable(acc.jalapenosUsed) + (Number(rule.jalapenosPerUnit || 0) * group.quantitySold);
+    acc.coleslawUsed = zeroable(acc.coleslawUsed) + (Number(rule.coleslawPerUnit || 0) * group.quantitySold);
 
     // Direct drink (standalone drink items)
     if (rule.directDrinkCode) {
@@ -760,11 +788,15 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
         let totalDrinkInstances = 0;
         for (const qty of modMap.values()) totalDrinkInstances += qty;
 
-        // If more drink modifier instances than meals sold, Loyverse is showing the full
-        // modifier group — scale down proportionally to match meals sold.
-        const drinkScale = totalDrinkInstances > group.quantitySold
-          ? group.quantitySold / totalDrinkInstances
+        // modifierDrinksExpected: how many drinks per unit sold (default 1, Mix&Match = 2)
+        // Loyverse may return ALL modifier-group options — scale to match expected total.
+        const expectedDrinkTotal = (rule.modifierDrinksExpected || 1) * group.quantitySold;
+        const drinkScale = totalDrinkInstances > expectedDrinkTotal
+          ? expectedDrinkTotal / totalDrinkInstances
           : 1;
+        // Mark as estimated when Loyverse returned more options than expected drinks
+        // (full-group display) — type split cannot be verified from receipt data
+        if (totalDrinkInstances !== expectedDrinkTotal) acc.isModifierEstimated = true;
 
         let scaledDrinkTotal = 0;
         for (const [drinkCode, qty] of modMap.entries()) {
@@ -773,22 +805,24 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
           scaledDrinkTotal += scaledQty;
         }
 
-        if (scaledDrinkTotal < group.quantitySold - 0.01) {
-          issues.push({ type: 'SET_DRINK_MODIFIER_PARTIAL', sku: group.sku, itemName: group.itemName, details: `Meal-set drinks partial for receipt ${group.receiptId}: expected ${group.quantitySold}, found ${scaledDrinkTotal.toFixed(2)}` });
+        if (scaledDrinkTotal < expectedDrinkTotal - 0.01) {
+          issues.push({ type: 'SET_DRINK_MODIFIER_PARTIAL', sku: group.sku, itemName: group.itemName, details: `Meal-set drinks partial for receipt ${group.receiptId}: expected ${expectedDrinkTotal}, found ${scaledDrinkTotal.toFixed(2)}` });
         }
       }
     }
 
     // Burger modifiers for Mix & Match
-    // Loyverse returns ALL options in the "Burger Option" modifier group (not just the selected one).
-    // When burgerMods.length > quantitySold the modifier list is a full-group display.
-    // Average contributions proportionally so total usage equals quantitySold burgers.
+    // modifierBurgersExpected: how many burgers per unit sold (default 1, Mix&Match = 2)
+    // Loyverse returns ALL options in the "Burger Option" modifier group — scale to match expected.
+    // isModifierEstimated = true: burger type split cannot be verified from receipt data.
     if (rule.requiresBurgerModifier) {
       const burgerMods = burgerModByReceipt.get(group.receiptId);
       if (burgerMods && burgerMods.length > 0) {
-        const burgerScale = burgerMods.length > group.quantitySold
-          ? group.quantitySold / burgerMods.length
+        const expectedBurgerTotal = (rule.modifierBurgersExpected || 1) * group.quantitySold;
+        const burgerScale = burgerMods.length > expectedBurgerTotal
+          ? expectedBurgerTotal / burgerMods.length
           : 1;
+        acc.isModifierEstimated = true; // burger types always estimated — Loyverse returns full group
         for (const bu of burgerMods) {
           acc.bunsUsed = zeroable(acc.bunsUsed) + (bu.bunsPerUnit || 0) * burgerScale;
           acc.beefServesUsed = zeroable(acc.beefServesUsed) + (bu.beefServesPerUnit || 0) * burgerScale;
@@ -854,6 +888,8 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
       onionUsed: round4(row.onionUsed),
       burgerSauceUsed: round4(row.burgerSauceUsed),
       jalapenosUsed: round4(row.jalapenosUsed),
+      coleslawUsed: round4(row.coleslawUsed),
+      isModifierEstimated: row.isModifierEstimated,
     }))
     .sort((a, b) => a.categoryName.localeCompare(b.categoryName) || (a.sku || '').localeCompare(b.sku || '') || a.itemName.localeCompare(b.itemName));
 
@@ -879,13 +915,13 @@ export async function rebuildReceiptTruthDailyUsage(businessDate: string): Promi
          buns_used, beef_serves_used, beef_grams_used, chicken_serves_used, chicken_grams_used,
          coke_used, coke_zero_used, sprite_used, water_used, fanta_orange_used, fanta_strawberry_used, schweppes_manao_used,
          fries_used, bacon_used, cheese_used, pickles_used, salad_used, tomato_used, onion_used, burger_sauce_used, jalapenos_used,
-         built_at)
+         coleslaw_used, is_modifier_estimated, built_at)
       VALUES
         (${row.businessDate}::date, ${row.shiftKey}, ${row.categoryName}, ${row.sku}, ${row.itemName}, ${row.quantitySold},
          ${row.bunsUsed}, ${row.beefServesUsed}, ${row.beefGramsUsed}, ${row.chickenServesUsed}, ${row.chickenGramsUsed},
          ${row.cokeUsed}, ${row.cokeZeroUsed}, ${row.spriteUsed}, ${row.waterUsed}, ${row.fantaOrangeUsed}, ${row.fantaStrawberryUsed}, ${row.schweppesManaoUsed},
          ${row.friesUsed}, ${row.baconUsed}, ${row.cheeseUsed}, ${row.picklesUsed}, ${row.saladUsed}, ${row.tomatoUsed}, ${row.onionUsed}, ${row.burgerSauceUsed}, ${row.jalapenosUsed},
-         NOW())
+         ${row.coleslawUsed}, ${row.isModifierEstimated}, NOW())
     `);
   }
 
@@ -905,7 +941,8 @@ export async function getReceiptTruthDailyUsage(businessDate: string): Promise<D
            coke_used, coke_zero_used, sprite_used, water_used,
            fanta_orange_used, fanta_strawberry_used, schweppes_manao_used,
            fries_used, bacon_used, cheese_used, pickles_used, salad_used, tomato_used,
-           onion_used, burger_sauce_used, jalapenos_used
+           onion_used, burger_sauce_used, jalapenos_used,
+           coleslaw_used, COALESCE(is_modifier_estimated, false) AS is_modifier_estimated
     FROM receipt_truth_daily_usage
     WHERE business_date = ${businessDate}::date
     ORDER BY category_name, sku, item_name
@@ -941,6 +978,8 @@ export async function getReceiptTruthDailyUsage(businessDate: string): Promise<D
     onionUsed: row.onion_used === null ? null : Number(row.onion_used),
     burgerSauceUsed: row.burger_sauce_used === null ? null : Number(row.burger_sauce_used),
     jalapenosUsed: row.jalapenos_used === null ? null : Number(row.jalapenos_used),
+    coleslawUsed: row.coleslaw_used === null ? null : Number(row.coleslaw_used),
+    isModifierEstimated: Boolean(row.is_modifier_estimated),
   }));
 
   const summary = summarize(rows);
