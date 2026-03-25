@@ -813,8 +813,10 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
 
     // Burger modifiers for Mix & Match
     // modifierBurgersExpected: how many burgers per unit sold (default 1, Mix&Match = 2)
-    // Loyverse returns ALL options in the "Burger Option" modifier group — scale to match expected.
-    // isModifierEstimated = true: burger type split cannot be verified from receipt data.
+    // Loyverse may return ALL options in the "Burger Option" modifier group — scale to match expected.
+    // isModifierEstimated = true only when Loyverse returned more options than expected (full-group
+    // display), meaning the type-level split was spread proportionally and cannot be verified.
+    // When modifier count exactly equals expected total, the split is treated as exact.
     if (rule.requiresBurgerModifier) {
       const burgerMods = burgerModByReceipt.get(group.receiptId);
       if (burgerMods && burgerMods.length > 0) {
@@ -822,7 +824,8 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
         const burgerScale = burgerMods.length > expectedBurgerTotal
           ? expectedBurgerTotal / burgerMods.length
           : 1;
-        acc.isModifierEstimated = true; // burger types always estimated — Loyverse returns full group
+        // Only mark estimated when Loyverse returned more modifier rows than expected (scaled down)
+        if (burgerMods.length > expectedBurgerTotal) acc.isModifierEstimated = true;
         for (const bu of burgerMods) {
           acc.bunsUsed = zeroable(acc.bunsUsed) + (bu.bunsPerUnit || 0) * burgerScale;
           acc.beefServesUsed = zeroable(acc.beefServesUsed) + (bu.beefServesPerUnit || 0) * burgerScale;
