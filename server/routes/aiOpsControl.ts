@@ -6,6 +6,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { runMonitors, startMonitorScheduler } from "../services/monitorEngine";
+import { startShiftRebuildScheduler, runShiftRebuild } from "../services/shiftRebuildScheduler";
 import {
   parseWorkspaceTools,
   executeWorkspaceTools,
@@ -4132,6 +4133,42 @@ router.post("/monitors/run", async (req, res) => {
 
 // Start daily scheduler (non-blocking, idempotent)
 startMonitorScheduler();
+
+// Start shift rebuild scheduler at 03:05 BKK (non-blocking, idempotent)
+startShiftRebuildScheduler();
+
+// ─── Shift Rebuild Log endpoints ─────────────────────────────────────────────
+router.get("/shift-rebuild-log", async (req, res) => {
+  if (!pool) return res.status(503).json({ message: "Database unavailable" });
+  try {
+    const limit = Math.min(Number(req.query.limit) || 30, 100);
+    const result = await pool.query(
+      `SELECT id, business_date::text, triggered_at::text, trigger_source, status,
+              receipt_count, buns_total, beef_g_total, drinks_total,
+              usage_rebuild_ok, error_message, duration_ms
+       FROM shift_rebuild_log
+       ORDER BY triggered_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json({ rows: result.rows });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+router.post("/shift-rebuild-log/trigger", async (req, res) => {
+  const businessDate = req.body?.business_date;
+  if (!businessDate || !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)) {
+    return res.status(400).json({ error: "business_date (YYYY-MM-DD) required" });
+  }
+  try {
+    const result = await runShiftRebuild(businessDate, "manual");
+    res.json(result);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 router.get("/issues", async (req, res) => {
   if (!pool) return res.status(503).json({ message: "Database unavailable" });
