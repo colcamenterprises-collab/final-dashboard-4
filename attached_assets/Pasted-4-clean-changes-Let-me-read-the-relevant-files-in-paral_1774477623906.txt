@@ -1,0 +1,57 @@
+4 clean changes. Let me read the relevant files in parallel first:
+
+All the context I need. Now implementing all 4 changes in parallel:
+
+Now update buildDailyUsage to fetch and return the receipt truth timestamp, and getReceiptTruthDailyUsage to return both timestamps:
+
+Now update the return at the end of buildDailyUsage to include receiptTruthBuiltAt:
+
+Now I'll update the return value in buildDailyUsage and then update getReceiptTruthDailyUsage and the rebuild function:
+
+Now update rebuildReceiptTruthDailyUsage to set the actual dailyUsageBuiltAt after INSERT, and update getReceiptTruthDailyUsage to return both timestamps:
+
+Now update both rebuildReceiptTruthDailyUsage return and getReceiptTruthDailyUsage to include proper timestamps:
+
+Now update the receipt truth rebuild route to auto-trigger the daily usage rebuild:
+
+Now update the frontend — add timestamps to the interface and add the stale warning badge:
+
+Now add the stale badge to the card header:
+
+All 4 changes made. Let me restart the app and run a test:
+
+Timestamps are flowing correctly — dailyUsageBuiltAt is newer than receiptTruthBuiltAt so the stale badge won't show. Let me now verify the auto-rebuild chain by triggering a truth rebuild and checking both are updated:
+
+usageRebuildOk: true — the chain works. Now verify both timestamps are fresh and in-sync:
+
+Both timestamps are now in sync after a single receipt truth rebuild. Let me run a final E2E test to verify the badge logic and UI:
+
+All tests passed. Here's the complete delivery:
+
+Hardening Complete — 4 Changes Applied
+1. Auto-rebuild after receipt truth rebuild (server/routes.ts)
+POST /api/analysis/receipts-truth/rebuild now runs the daily usage rebuild automatically inside a guarded try-catch after the truth rebuild succeeds. The response now includes usageRebuildOk: true/false and usageRebuildError: null/string. A usage failure never blocks the receipt truth response.
+
+Receipt Truth Rebuild → Daily Usage Rebuild (auto, best-effort)
+                                     ↑ confirmed: usageRebuildOk: true
+2. Timestamps in daily usage API (receiptTruthDailyUsageService.ts)
+GET /api/analysis/receipts-truth/daily-usage?date= now returns:
+
+{
+  "receiptTruthBuiltAt": "2026-03-25T22:18:52.744Z",
+  "dailyUsageBuiltAt":   "2026-03-25T22:19:08.542Z"
+}
+Both timestamps are ISO strings from their respective source tables (receipt_truth_summary.built_at and receipt_truth_daily_usage.built_at).
+
+3. Stale badge on frontend (SalesShiftAnalysis.tsx)
+The card header shows an amber warning badge if receiptTruthBuiltAt > dailyUsageBuiltAt (ISO string comparison — correct because they are UTC-normalised). The badge reads: ⚠ Usage out of date — rebuild required
+
+With the auto-rebuild now in place, this badge should never appear under normal operation. It acts as a safety net for any edge case where usage gets out of sync.
+
+4. No calculation changes
+Only orchestration and freshness plumbing was touched. All calculation paths in buildDailyUsage are identical.
+
+Live Proof
+Triggered receipt truth rebuild → usageRebuildOk: true confirmed in response
+Both timestamps in sync: receiptTruthBuiltAt 22:18:52 → dailyUsageBuiltAt 22:19:08
+UI test: Expected Buns = 66.00, Expected Beef (g) = 9,880.00, Total Drinks Used = 28.00 — no stale badge present
