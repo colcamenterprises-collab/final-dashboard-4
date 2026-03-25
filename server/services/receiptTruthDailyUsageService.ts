@@ -746,34 +746,56 @@ async function buildDailyUsage(businessDate: string): Promise<DailyUsageResponse
     }
 
     // Drink modifiers for sets
+    // Loyverse returns ALL options in a modifier group (not just the selected one).
+    // When totalDrinkInstances > quantitySold, this receipt shows the full modifier group.
+    // Scale each drink's contribution proportionally so the total equals quantitySold.
     if (rule.requiresDrinkModifier) {
       const scopedMods = group.sku ? modifiersByReceiptSku.get(`${group.receiptId}::${group.sku}`) : undefined;
       const modMap = scopedMods || modifiersByReceiptAny.get(group.receiptId);
-      let matchedDrinkCount = 0;
-      if (modMap) {
-        for (const [drinkCode, qty] of modMap.entries()) {
-          addDrink(acc, drinkCode, qty);
-          matchedDrinkCount += qty;
-        }
-      }
-      if (!modMap || matchedDrinkCount === 0) {
+
+      if (!modMap || modMap.size === 0) {
         issues.push({ type: 'SET_DRINK_MODIFIER_MISSING', sku: group.sku, itemName: group.itemName, details: `Meal-set drinks missing for receipt ${group.receiptId} SKU=${group.sku || 'NULL'}` });
-      } else if (matchedDrinkCount < group.quantitySold) {
-        issues.push({ type: 'SET_DRINK_MODIFIER_PARTIAL', sku: group.sku, itemName: group.itemName, details: `Meal-set drinks partial for receipt ${group.receiptId}: expected ${group.quantitySold}, found ${matchedDrinkCount}` });
+      } else {
+        // Total raw drink instances on this receipt
+        let totalDrinkInstances = 0;
+        for (const qty of modMap.values()) totalDrinkInstances += qty;
+
+        // If more drink modifier instances than meals sold, Loyverse is showing the full
+        // modifier group — scale down proportionally to match meals sold.
+        const drinkScale = totalDrinkInstances > group.quantitySold
+          ? group.quantitySold / totalDrinkInstances
+          : 1;
+
+        let scaledDrinkTotal = 0;
+        for (const [drinkCode, qty] of modMap.entries()) {
+          const scaledQty = qty * drinkScale;
+          addDrink(acc, drinkCode, scaledQty);
+          scaledDrinkTotal += scaledQty;
+        }
+
+        if (scaledDrinkTotal < group.quantitySold - 0.01) {
+          issues.push({ type: 'SET_DRINK_MODIFIER_PARTIAL', sku: group.sku, itemName: group.itemName, details: `Meal-set drinks partial for receipt ${group.receiptId}: expected ${group.quantitySold}, found ${scaledDrinkTotal.toFixed(2)}` });
+        }
       }
     }
 
     // Burger modifiers for Mix & Match
+    // Loyverse returns ALL options in the "Burger Option" modifier group (not just the selected one).
+    // When burgerMods.length > quantitySold the modifier list is a full-group display.
+    // Average contributions proportionally so total usage equals quantitySold burgers.
     if (rule.requiresBurgerModifier) {
       const burgerMods = burgerModByReceipt.get(group.receiptId);
       if (burgerMods && burgerMods.length > 0) {
+        const burgerScale = burgerMods.length > group.quantitySold
+          ? group.quantitySold / burgerMods.length
+          : 1;
         for (const bu of burgerMods) {
-          acc.bunsUsed = zeroable(acc.bunsUsed) + (bu.bunsPerUnit || 0);
-          acc.beefServesUsed = zeroable(acc.beefServesUsed) + (bu.beefServesPerUnit || 0);
-          acc.beefGramsUsed = zeroable(acc.beefGramsUsed) + (bu.beefGramsPerUnit || 0);
-          acc.chickenServesUsed = zeroable(acc.chickenServesUsed) + (bu.chickenServesPerUnit || 0);
-          acc.chickenGramsUsed = zeroable(acc.chickenGramsUsed) + (bu.chickenGramsPerUnit || 0);
-          if (bu.baconPerUnit) acc.baconUsed = zeroable(acc.baconUsed) + bu.baconPerUnit;
+          acc.bunsUsed = zeroable(acc.bunsUsed) + (bu.bunsPerUnit || 0) * burgerScale;
+          acc.beefServesUsed = zeroable(acc.beefServesUsed) + (bu.beefServesPerUnit || 0) * burgerScale;
+          acc.beefGramsUsed = zeroable(acc.beefGramsUsed) + (bu.beefGramsPerUnit || 0) * burgerScale;
+          acc.chickenServesUsed = zeroable(acc.chickenServesUsed) + (bu.chickenServesPerUnit || 0) * burgerScale;
+          acc.chickenGramsUsed = zeroable(acc.chickenGramsUsed) + (bu.chickenGramsPerUnit || 0) * burgerScale;
+          if (bu.baconPerUnit) acc.baconUsed = zeroable(acc.baconUsed) + bu.baconPerUnit * burgerScale;
         }
       }
     }
