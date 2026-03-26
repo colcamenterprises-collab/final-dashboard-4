@@ -311,10 +311,10 @@ export default function SalesShiftAnalysis() {
 
       {/* ── Data availability badges ── */}
       <div className="flex gap-2 text-xs flex-wrap">
-        <span className={`px-2 py-1 rounded border ${formHasData ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+        <span className={`px-2 py-1 rounded-[4px] border ${formHasData ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
           Form data: {formHasData ? `฿${fmt(toNum(formData?.total))}` : 'none for this date'}
         </span>
-        <span className={`px-2 py-1 rounded border ${posHasData ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+        <span className={`px-2 py-1 rounded-[4px] border ${posHasData ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
           POS data: {posHasData
             ? `฿${fmt(toNum(posData?.total))} · ${toNum(posData?.txn_count)} txns${posData?.source === 'receipt_truth_line' ? ' (Loyverse)' : ''}`
             : 'no receipts for this date'}
@@ -327,7 +327,7 @@ export default function SalesShiftAnalysis() {
             <CardTitle className="text-sm font-medium text-slate-700">Expected Stock Usage (Stored Receipts Truth)</CardTitle>
             {dailyUsage && dailyUsage.receiptTruthBuiltAt && dailyUsage.dailyUsageBuiltAt &&
               dailyUsage.receiptTruthBuiltAt > dailyUsage.dailyUsageBuiltAt && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
                 ⚠ Usage out of date — rebuild required
               </span>
             )}
@@ -361,7 +361,7 @@ export default function SalesShiftAnalysis() {
 
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b bg-slate-50">
+                  <tr className="border-b border-slate-200">
                     <th className="text-left p-3 font-medium text-slate-600">Drink Type</th>
                     <th className="text-right p-3 font-medium text-slate-600">Expected Used</th>
                   </tr>
@@ -416,13 +416,13 @@ export default function SalesShiftAnalysis() {
               {(!usageRecon.engineBuilt || !usageRecon.form2Available || !usageRecon.prevForm2Available) && (
                 <div className="flex flex-wrap gap-2 text-xs">
                   {!usageRecon.engineBuilt && (
-                    <span className="px-2 py-1 rounded border bg-amber-50 text-amber-700 border-amber-200">Engine not built for this date — rebuild Receipts Analysis</span>
+                    <span className="px-2 py-1 rounded-[4px] border bg-amber-100 text-amber-700 border-amber-200">Engine not built for this date — rebuild Receipts Analysis</span>
                   )}
                   {!usageRecon.form2Available && (
-                    <span className="px-2 py-1 rounded border bg-amber-50 text-amber-700 border-amber-200">Form 2 (closing counts) not submitted for this date</span>
+                    <span className="px-2 py-1 rounded-[4px] border bg-amber-100 text-amber-700 border-amber-200">Form 2 (closing counts) not submitted for this date</span>
                   )}
                   {!usageRecon.prevForm2Available && (
-                    <span className="px-2 py-1 rounded border bg-slate-100 text-slate-600 border-slate-200">Previous day Form 2 missing — opening stock unknown, physical usage not computed</span>
+                    <span className="px-2 py-1 rounded-[4px] border bg-slate-100 text-slate-600 border-slate-200">Previous day Form 2 missing — opening stock unknown, physical usage not computed</span>
                   )}
                 </div>
               )}
@@ -480,7 +480,7 @@ export default function SalesShiftAnalysis() {
                 <div className="text-xs font-medium text-slate-500 mb-2">Drink Usage Reconciliation <span className="text-slate-400">(physical = opening + received − closing)</span></div>
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b bg-slate-50">
+                    <tr className="border-b border-slate-200">
                       <th className="text-left p-2 font-medium text-slate-600">Drink</th>
                       <th className="text-right p-2 font-medium text-slate-600">Expected</th>
                       <th className="text-right p-2 font-medium text-slate-600">Opening</th>
@@ -511,7 +511,7 @@ export default function SalesShiftAnalysis() {
                         </td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-slate-300 font-semibold bg-slate-50">
+                    <tr className="border-t-2 border-slate-300 font-semibold">
                       <td className="p-2 text-slate-700">Total Drinks</td>
                       <td className="p-2 text-right font-mono">{usageRecon.drinks.totalExpected}</td>
                       <td colSpan={3} />
@@ -555,7 +555,7 @@ export default function SalesShiftAnalysis() {
           <CardContent className="p-0">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b bg-slate-50">
+                <tr className="border-b border-slate-200">
                   <th className="text-left p-3 font-medium text-slate-600">Category</th>
                   <th className="text-right p-3 font-medium text-slate-600">Staff Form</th>
                   <th className="text-right p-3 font-medium text-slate-600">POS / Loyverse</th>
@@ -596,7 +596,7 @@ export default function SalesShiftAnalysis() {
             </CardTitle>
             <div className="flex items-center gap-2 flex-wrap">
               {emailStatus && (
-                <span className={`text-xs px-2 py-1 rounded border ${emailStatus.includes('Sent') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                <span className={`text-xs px-2 py-1 rounded-[4px] border ${emailStatus.includes('Sent') ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-red-100 text-red-700 border-red-200'}`}>
                   {emailStatus}
                 </span>
               )}
@@ -615,7 +615,7 @@ export default function SalesShiftAnalysis() {
                 <a
                   href={`/api/ai-ops/bob/analysis-csv/${selectedDate}`}
                   download={`bob-analysis-${selectedDate}.csv`}
-                  className="inline-flex items-center gap-1 border border-slate-200 rounded-[4px] px-3 h-7 text-xs text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="inline-flex items-center gap-1 border border-slate-200 rounded-[4px] px-3 h-7 text-xs text-slate-700 hover:bg-slate-100/60 transition-colors"
                 >
                   ↓ CSV
                 </a>
@@ -723,7 +723,7 @@ export default function SalesShiftAnalysis() {
             <CardTitle className="text-sm font-medium text-slate-700 flex items-center gap-2">
               Analysis Adjustments
               {adjustments.length > 0 && (
-                <Badge className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+                <Badge className="text-xs bg-slate-100 text-slate-700 border-slate-200">
                   {adjustments.length}
                 </Badge>
               )}
@@ -738,7 +738,7 @@ export default function SalesShiftAnalysis() {
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="border-b bg-slate-50">
+                  <tr className="border-b border-slate-200">
                     <th className="text-left p-3 font-medium text-slate-600">Field</th>
                     <th className="text-right p-3 font-medium text-slate-600">Original</th>
                     <th className="text-right p-3 font-medium text-slate-600">Adjusted</th>
@@ -749,7 +749,7 @@ export default function SalesShiftAnalysis() {
                 </thead>
                 <tbody>
                   {adjustments.map((adj) => (
-                    <tr key={adj.id} className="border-b hover:bg-slate-50">
+                    <tr key={adj.id} className="border-b hover:bg-slate-100/40">
                       <td className="p-3 font-mono text-slate-700">
                         <span className="text-slate-400">{adj.source_table}.</span>{adj.source_field}
                       </td>
@@ -814,7 +814,7 @@ export default function SalesShiftAnalysis() {
           <div className="grid md:grid-cols-2 gap-4">
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-xs font-medium text-slate-600">Manager</span>
-              <input value={managerName} readOnly className="border border-slate-200 rounded-[4px] px-2 py-1.5 bg-slate-50 text-sm" />
+              <input value={managerName} readOnly className="border border-slate-200 rounded-[4px] px-2 py-1.5 bg-slate-100 text-sm text-slate-500" />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-xs font-medium text-slate-600">Cash Banked (฿)</span>
@@ -847,7 +847,7 @@ export default function SalesShiftAnalysis() {
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-slate-50">
+              <tr className="border-b border-slate-200">
                 <th className="text-left p-3 font-medium text-slate-600">Date</th>
                 <th className="text-left p-3 font-medium text-slate-600">Status</th>
                 <th className="text-right p-3 font-medium text-slate-600">POS Total</th>
@@ -858,17 +858,17 @@ export default function SalesShiftAnalysis() {
               {(allShifts || []).map((row) => (
                 <tr
                   key={row.date}
-                  className={`border-b cursor-pointer hover:bg-slate-50 ${row.date === selectedDate ? 'bg-emerald-50' : ''}`}
+                  className={`border-b cursor-pointer hover:bg-slate-100/40 transition-colors ${row.date === selectedDate ? 'bg-emerald-100/30 border-l-2 border-l-emerald-500' : ''}`}
                   onClick={() => setSelectedDate(row.date)}
                 >
-                  <td className="p-3 font-mono text-xs">{row.date}</td>
+                  <td className="p-3 text-sm text-slate-700">{row.date}</td>
                   <td className="p-3">
-                    <Badge className={`text-xs ${row.approved ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                    <Badge className={`text-xs ${row.approved ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                       {row.approved ? 'Approved' : 'Pending'}
                     </Badge>
                   </td>
-                  <td className="p-3 text-right font-mono">{fmt(toNum(row.pos_data?.total))}</td>
-                  <td className="p-3 text-right font-mono">{fmt(toNum(row.form_data?.total))}</td>
+                  <td className="p-3 text-right text-sm tabular-nums text-slate-700">{fmt(toNum(row.pos_data?.total))}</td>
+                  <td className="p-3 text-right text-sm tabular-nums text-slate-700">{fmt(toNum(row.form_data?.total))}</td>
                 </tr>
               ))}
               {(!allShifts || allShifts.length === 0) && (
