@@ -14,6 +14,9 @@ interface ReconciliationRow {
 }
 
 export async function getStockReconciliation(date?: string): Promise<ReconciliationRow[]> {
+  const dateFilter = date ? `AND date::date = '${date}'::date` : '';
+  const shiftFilter = date ? `AND DATE("createdAt") = '${date}'` : '';
+
   const query = `
     WITH
     shift_data AS (
@@ -24,7 +27,7 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
         "drinksJson" AS drinks_end
       FROM daily_stock_v2
       WHERE "deletedAt" IS NULL
-      ${date ? `AND DATE("createdAt") = '${date}'` : ''}
+      ${shiftFilter}
       ORDER BY "createdAt" DESC
     ),
 
@@ -39,24 +42,34 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
     ),
 
     purchased_rolls AS (
-      SELECT shift_date, SUM(qty) AS purchased_qty
-      FROM stock_received_log WHERE item_type = 'rolls'
-      ${date ? `AND shift_date = '${date}'` : ''}
-      GROUP BY shift_date
+      SELECT
+        date::date AS shift_date,
+        SUM(rolls_pcs) AS purchased_qty
+      FROM purchase_tally
+      WHERE rolls_pcs IS NOT NULL AND rolls_pcs > 0
+      ${date ? `AND date::date = '${date}'::date` : ''}
+      GROUP BY date::date
     ),
 
     purchased_meat AS (
-      SELECT shift_date, SUM(weight_g) AS purchased_g
-      FROM stock_received_log WHERE item_type = 'meat'
-      ${date ? `AND shift_date = '${date}'` : ''}
-      GROUP BY shift_date
+      SELECT
+        date::date AS shift_date,
+        SUM(meat_grams) AS purchased_g
+      FROM purchase_tally
+      WHERE meat_grams IS NOT NULL AND meat_grams > 0
+      ${date ? `AND date::date = '${date}'::date` : ''}
+      GROUP BY date::date
     ),
 
     purchased_drinks AS (
-      SELECT shift_date, item_name, SUM(qty) AS purchased_qty
-      FROM stock_received_log WHERE item_type = 'drinks'
-      ${date ? `AND shift_date = '${date}'` : ''}
-      GROUP BY shift_date, item_name
+      SELECT
+        pt.date::date AS shift_date,
+        ptd.item_name,
+        SUM(ptd.qty) AS purchased_qty
+      FROM purchase_tally_drink ptd
+      JOIN purchase_tally pt ON pt.id = ptd.tally_id
+      ${date ? `WHERE pt.date::date = '${date}'::date` : ''}
+      GROUP BY pt.date::date, ptd.item_name
     )
 
     SELECT
@@ -89,7 +102,22 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
     LEFT JOIN prev_shift_data prev ON prev.shift_date = curr.shift_date - INTERVAL '1 day'
     LEFT JOIN purchased_meat pm ON pm.shift_date = curr.shift_date
 
-    ORDER BY shift_date DESC, item_type
+    UNION ALL
+
+    SELECT
+      curr.shift_date::text,
+      'drinks' AS item_type,
+      pd.item_name,
+      0::int AS start_qty,
+      COALESCE(pd.purchased_qty, 0)::int AS purchased_qty,
+      0::int AS used_qty,
+      COALESCE(pd.purchased_qty, 0)::int AS expected_end_qty,
+      0::int AS actual_end_qty,
+      0::int AS variance
+    FROM shift_data curr
+    JOIN purchased_drinks pd ON pd.shift_date = curr.shift_date
+
+    ORDER BY shift_date DESC, item_type, item_name
   `;
 
   const result = await db.execute(sql.raw(query));

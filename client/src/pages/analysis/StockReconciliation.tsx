@@ -67,10 +67,10 @@ export default function StockReconciliation() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-4 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900" data-testid="heading-stock-reconciliation">
+          <h1 className="text-3xl font-bold text-slate-900" data-testid="heading-stock-reconciliation">
             Stock Reconciliation & Security
           </h1>
           <p className="text-sm text-slate-500 mt-1">
@@ -83,7 +83,7 @@ export default function StockReconciliation() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <Card className="bg-white border-slate-200">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -135,9 +135,9 @@ export default function StockReconciliation() {
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium text-slate-700">Reconciliation Detail</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {isLoading ? (
-            <div className="space-y-2">
+            <div className="space-y-2 p-4">
               {[1, 2, 3, 4, 5].map((i) => (
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
@@ -148,6 +148,7 @@ export default function StockReconciliation() {
               <p className="text-xs mt-1">Submit daily stock forms to see data here</p>
             </div>
           ) : (
+            <div className="overflow-x-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
             <Table>
               <TableHeader>
                 <TableRow>
@@ -227,6 +228,7 @@ export default function StockReconciliation() {
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -236,7 +238,7 @@ export default function StockReconciliation() {
           <CardTitle className="text-sm font-medium text-slate-700">Security Rules</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="grid grid-cols-3 gap-4 text-xs">
             <div className="p-3 rounded-[4px] border border-slate-200">
               <p className="font-medium text-slate-700">Rolls</p>
               <p className="text-slate-500 mt-1">Variance ≠ 0 → Flag for review</p>

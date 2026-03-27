@@ -324,10 +324,10 @@ export default function SalesShiftAnalysis() {
     : 'border-slate-200';
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl">
+    <div className="p-4 space-y-4 max-w-5xl">
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Sales &amp; Shift Analysis</h1>
+          <h1 className="text-3xl font-semibold text-slate-900">Sales &amp; Shift Analysis</h1>
           <p className="text-xs text-slate-500 mt-0.5">Single truth screen — Form vs POS comparison + Bob Review</p>
         </div>
         <input
@@ -388,6 +388,7 @@ export default function SalesShiftAnalysis() {
                 </div>
               </div>
 
+              <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200">
@@ -412,6 +413,7 @@ export default function SalesShiftAnalysis() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </>
           )}
         </CardContent>
@@ -505,7 +507,7 @@ export default function SalesShiftAnalysis() {
               </div>
 
               {/* Drinks reconciliation table */}
-              <div>
+              <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="text-xs font-medium text-slate-500 mb-2">Drink Usage Reconciliation <span className="text-slate-400">(physical = opening + received − closing)</span></div>
                 <table className="w-full text-xs">
                   <thead>
@@ -522,8 +524,8 @@ export default function SalesShiftAnalysis() {
                   <tbody>
                     {usageRecon.drinks.rows.map((row) => (
                       <tr key={row.field} className={`border-b ${
-                        row.severity === 'critical' ? 'bg-red-50' :
-                        row.severity === 'warn' ? 'bg-amber-50' : ''
+                        row.severity === 'critical' ? 'bg-red-100/40' :
+                        row.severity === 'warn' ? 'bg-amber-100/40' : ''
                       }`}>
                         <td className="p-2 text-slate-700">{row.label}</td>
                         <td className="p-2 text-right font-mono">{row.expected ?? '—'}</td>
@@ -582,6 +584,7 @@ export default function SalesShiftAnalysis() {
             <CardTitle className="text-sm font-medium text-slate-700">Form vs POS Comparison</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
+            <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-200">
@@ -593,7 +596,7 @@ export default function SalesShiftAnalysis() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.label} className={`border-b ${r.flagged ? 'bg-red-50' : ''}`}>
+                  <tr key={r.label} className={`border-b ${r.flagged ? 'bg-red-100/40' : ''}`}>
                     <td className="p-3 text-slate-700">{r.label}</td>
                     <td className="p-3 text-right font-mono">{fmt(r.form)}</td>
                     <td className="p-3 text-right font-mono">{fmt(r.pos)}</td>
@@ -604,6 +607,7 @@ export default function SalesShiftAnalysis() {
                 ))}
               </tbody>
             </table>
+            </div>
           </CardContent>
         </Card>
       )}

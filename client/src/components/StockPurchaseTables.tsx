@@ -80,7 +80,7 @@ export function StockPurchaseTables() {
   return (
     <div className="space-y-6 mt-6">
       {/* Month selector */}
-      <div className="bg-white rounded shadow p-4">
+      <div className="bg-white rounded-[4px] border border-slate-200 p-4">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
           <h2 className="text-xs font-semibold">Stock Purchases — Month:</h2>
           <div className="flex gap-3">
@@ -126,11 +126,12 @@ export function StockPurchaseTables() {
       )}
 
       {/* Rolls Table */}
-      <div className="bg-white rounded shadow p-4" data-testid="section-rolls-purchases">
+      <div className="bg-white rounded-[4px] border border-slate-200 p-4" data-testid="section-rolls-purchases">
         <h2 className="text-sm font-semibold mb-2">Rolls Purchases</h2>
-        <table className="w-full border text-xs" data-testid="table-rolls-purchases">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <table className="w-full border-collapse text-xs" data-testid="table-rolls-purchases">
           <thead>
-            <tr className="bg-gray-100">
+            <tr className="border-b-2 border-slate-200">
               <th className="p-1 border text-left text-xs">Date</th>
               <th className="p-1 border text-left text-xs">Staff</th>
               <th className="p-1 border text-left text-xs">Quantity</th>
@@ -145,7 +146,7 @@ export function StockPurchaseTables() {
               const amount = r.amountTHB || 0;
               const paid = amount > 0 ? 'Yes' : 'No';
               return (
-                <tr key={i} className="hover:bg-gray-50" data-testid={`row-roll-${r.id}`}>
+                <tr key={i} className="border-b border-slate-100 hover:bg-slate-100/40 transition-colors" data-testid={`row-roll-${r.id}`}>
                   <td className="border p-1">
                     <div>{formatDateDDMMYYYY(r.date)}</div>
                     {r.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(r.createdAt)}</div>}
@@ -216,14 +217,16 @@ export function StockPurchaseTables() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Meat Table */}
-      <div className="bg-white rounded shadow p-4" data-testid="section-meat-purchases">
+      <div className="bg-white rounded-[4px] border border-slate-200 p-4" data-testid="section-meat-purchases">
         <h2 className="text-sm font-semibold mb-2">Meat Purchases</h2>
-        <table className="w-full border text-xs" data-testid="table-meat-purchases">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <table className="w-full border-collapse text-xs" data-testid="table-meat-purchases">
           <thead>
-            <tr className="bg-gray-100">
+            <tr className="border-b-2 border-slate-200">
               <th className="p-1 border text-left text-xs">Date</th>
               <th className="p-1 border text-left text-xs">Staff</th>
               <th className="p-1 border text-left text-xs">Type</th>
@@ -234,7 +237,7 @@ export function StockPurchaseTables() {
           </thead>
           <tbody>
             {meat.map((m: any, i: number) => (
-              <tr key={i} className="hover:bg-gray-50" data-testid={`row-meat-${m.id}`}>
+              <tr key={i} className="border-b border-slate-100 hover:bg-slate-100/40 transition-colors" data-testid={`row-meat-${m.id}`}>
                 <td className="border p-1">
                   <div>{formatDateDDMMYYYY(m.date)}</div>
                   {m.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(m.createdAt)}</div>}
@@ -303,14 +306,16 @@ export function StockPurchaseTables() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Drinks Table */}
-      <div className="bg-white rounded shadow p-4" data-testid="section-drinks-purchases">
+      <div className="bg-white rounded-[4px] border border-slate-200 p-4" data-testid="section-drinks-purchases">
         <h2 className="text-sm font-semibold mb-2">Drinks Purchases</h2>
-        <table className="w-full border text-xs" data-testid="table-drinks-purchases">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <table className="w-full border-collapse text-xs" data-testid="table-drinks-purchases">
           <thead>
-            <tr className="bg-gray-100">
+            <tr className="border-b-2 border-slate-200">
               <th className="p-1 border text-left text-xs">Date</th>
               <th className="p-1 border text-left text-xs">Staff</th>
               <th className="p-1 border text-left text-xs">Type</th>
@@ -324,7 +329,7 @@ export function StockPurchaseTables() {
 
               if (drinkItems.length > 0) {
                 return drinkItems.map((drink: any, di: number) => (
-                  <tr key={`${d.id}-${di}`} className="hover:bg-gray-50" data-testid={`row-drink-${d.id}-${di}`}>
+                  <tr key={`${d.id}-${di}`} className="border-b border-slate-100 hover:bg-slate-100/40 transition-colors" data-testid={`row-drink-${d.id}-${di}`}>
                     {di === 0 && (
                       <>
                         <td className="border p-1" rowSpan={drinkItems.length}>
@@ -405,7 +410,7 @@ export function StockPurchaseTables() {
               }
 
               return (
-                <tr key={i} className="hover:bg-gray-50" data-testid={`row-drink-${d.id}`}>
+                <tr key={i} className="border-b border-slate-100 hover:bg-slate-100/40 transition-colors" data-testid={`row-drink-${d.id}`}>
                   <td className="border p-1">
                     <div>{formatDateDDMMYYYY(d.date || d.createdAt)}</div>
                     {d.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(d.createdAt)}</div>}
@@ -464,6 +469,7 @@ export function StockPurchaseTables() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

@@ -78,31 +78,31 @@ export default function StockReview() {
   }), [data]);
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-6 bg-white min-h-screen space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-xl font-semibold">Stock Review</h1>
-        <p className="text-sm text-slate-600">
+    <div className="p-4 space-y-4">
+      <div className="space-y-1">
+        <h1 className="text-3xl font-semibold text-slate-900">Stock Review</h1>
+        <p className="text-sm text-slate-500">
           Read-only purchase history sourced only from purchase_tally and purchase_tally_drink.
         </p>
       </div>
 
-      <section className="rounded border p-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+      <section className="rounded-[4px] border border-slate-200 p-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <label className="block">
             <div className="text-xs text-slate-500 mb-1">From</div>
-            <input type="date" max={today} value={from} onChange={(e) => setFrom(e.target.value)} className="w-full h-10 rounded border px-3 text-sm" />
+            <input type="date" max={today} value={from} onChange={(e) => setFrom(e.target.value)} className="w-full h-10 rounded-[4px] border border-slate-200 px-3 text-sm" />
           </label>
           <label className="block">
             <div className="text-xs text-slate-500 mb-1">To</div>
-            <input type="date" max={today} value={to} onChange={(e) => setTo(e.target.value)} className="w-full h-10 rounded border px-3 text-sm" />
+            <input type="date" max={today} value={to} onChange={(e) => setTo(e.target.value)} className="w-full h-10 rounded-[4px] border border-slate-200 px-3 text-sm" />
           </label>
-          <div className="text-sm text-slate-700">Source tables: {(data?.source || ["purchase_tally", "purchase_tally_drink"]).join(", ")}</div>
-          <div className="text-sm text-slate-700">Range: {formatDate(from)} to {formatDate(to)}</div>
+          <div className="text-xs text-slate-600">Source: {(data?.source || ["purchase_tally", "purchase_tally_drink"]).join(", ")}</div>
+          <div className="text-xs text-slate-600">Range: {formatDate(from)} → {formatDate(to)}</div>
         </div>
       </section>
 
-      <section className="rounded border p-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+      <section className="rounded-[4px] border border-slate-200 p-4">
+        <div className="grid grid-cols-3 gap-4 text-sm">
           <div>Rolls entries: <span className="font-medium">{summary.rollsCount}</span> | Units: <span className="font-medium">{summary.rollsQty}</span></div>
           <div>Meat entries: <span className="font-medium">{summary.meatCount}</span> | Grams: <span className="font-medium">{summary.meatGrams}</span></div>
           <div>Drinks entries: <span className="font-medium">{summary.drinksCount}</span> | Units: <span className="font-medium">{summary.drinksUnits}</span></div>
@@ -169,15 +169,15 @@ function PurchaseTable({
   emptyText: string;
 }) {
   return (
-    <section className="rounded border overflow-hidden">
-      <div className="border-b bg-slate-50 px-4 py-3 text-sm font-medium">{title}</div>
+    <section className="rounded-[4px] border border-slate-200 overflow-hidden">
+      <div className="border-b border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700">{title}</div>
       {rows.length === 0 ? (
         <div className="p-4 text-sm text-slate-500">{emptyText}</div>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-white">
+              <tr className="border-b border-slate-200">
                 {headers.map((header) => (
                   <th key={header} className="text-left p-3 font-medium text-slate-600">{header}</th>
                 ))}
@@ -185,7 +185,7 @@ function PurchaseTable({
             </thead>
             <tbody>
               {rows.map((row, index) => (
-                <tr key={`${title}-${index}`} className="border-b">
+                <tr key={`${title}-${index}`} className="border-b border-slate-100 hover:bg-slate-100/40">
                   {row.map((value, cellIndex) => (
                     <td key={`${title}-${index}-${cellIndex}`} className="p-3 align-top">{value}</td>
                   ))}
