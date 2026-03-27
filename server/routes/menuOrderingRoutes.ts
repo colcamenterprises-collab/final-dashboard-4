@@ -1,12 +1,9 @@
-// PATCH O1 — ONLINE ORDERING MENU DATA PIPELINE
 import { Router } from "express";
 import { db } from "../lib/prisma";
-import { getOnlineProductsGrouped } from "../services/onlineProductFeed";
 
 const router = Router();
 
-// GET ALL CATEGORIES
-router.get("/categories", async (req, res) => {
+router.get("/categories", async (_req, res) => {
   try {
     const prisma = db();
     const categories = await prisma.menuCategory.findMany({
@@ -19,14 +16,13 @@ router.get("/categories", async (req, res) => {
   }
 });
 
-// GET ITEMS BY CATEGORY
 router.get("/items/:categoryId", async (req, res) => {
   try {
     const prisma = db();
     const { categoryId } = req.params;
 
     const items = await prisma.menuItem_Online.findMany({
-      where: { categoryId },
+      where: { categoryId, available: true },
       include: {
         groups: {
           include: {
@@ -44,10 +40,29 @@ router.get("/items/:categoryId", async (req, res) => {
   }
 });
 
-// GET FULL MENU (PRODUCT TABLE ONLY)
-router.get("/full", async (req, res) => {
+router.get("/full", async (_req, res) => {
   try {
-    const categories = await getOnlineProductsGrouped();
+    const prisma = db();
+    const categories = await prisma.menuCategory.findMany({
+      orderBy: { position: "asc" },
+      include: {
+        items: {
+          where: { available: true },
+          orderBy: { position: "asc" },
+          include: {
+            groups: {
+              orderBy: { position: "asc" },
+              include: {
+                options: {
+                  orderBy: { position: "asc" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
     res.json({ categories });
   } catch (err) {
     console.error("MENU FULL ERROR:", err);

@@ -6,7 +6,7 @@ import { getOnlineProductsFlat } from "../services/onlineProductFeed";
 const router = Router();
 const prisma = new PrismaClient();
 
-const ALLOWED_STATUSES = ["NEW", "PREPARING", "READY"] as const;
+const ALLOWED_STATUSES = ["PENDING", "ACCEPTED", "PREPARING", "READY", "COMPLETED", "CANCELLED"] as const;
 
 const generateOrderRef = () => {
   const timestamp = Date.now().toString(36).toUpperCase();
@@ -356,7 +356,7 @@ router.patch("/online/products/:id", async (req, res) => {
 
 router.post("/online/orders", async (req, res) => {
   try {
-    const { items, channel, timestamp } = req.body || {};
+    const { items, channel, timestamp, customerName, customerPhone, notes } = req.body || {};
 
     if (channel !== "ONLINE") {
       return res.status(400).json({ error: "Channel must be ONLINE" });
@@ -375,86 +375,135 @@ router.post("/online/orders", async (req, res) => {
       return res.status(400).json({ error: "timestamp must be a valid ISO string" });
     }
 
-    const onlineProducts = await getOnlineProductsFlat();
-    const productMap = new Map<number, (typeof onlineProducts)[number]>();
-    for (const product of onlineProducts) {
-      productMap.set(product.id, product);
-    }
+    const requestedIds = Array.from(new Set(items.map((item: any) => String(item?.itemId || item?.productId || "")).filter(Boolean)));
+    const catalogItems = await prisma.menuItem_Online.findMany({
+      where: { id: { in: requestedIds }, available: true },
+      include: {
+        groups: {
+          include: { options: true },
+        },
+      },
+    });
 
-    const errors: Array<{ productId: number; error: string }> = [];
+    const catalogMap = new Map(catalogItems.map((item) => [item.id, item]));
+
+    const errors: Array<{ itemId: string; error: string }> = [];
     const lineItems: Array<{
       itemId: string;
+      sku: string | null;
       name: string;
       qty: number;
       basePrice: number;
+      modifiers: any[];
       lineTotal: number;
     }> = [];
 
     for (const item of items) {
-      const productId = Number(item?.productId);
+      const itemId = String(item?.itemId || item?.productId || "");
       const quantity = Number(item?.quantity);
-      const priceAtTime = Number(item?.priceAtTimeOfSale);
+      const selectedMods = Array.isArray(item?.modifiers) ? item.modifiers : [];
 
-      if (!Number.isInteger(productId)) {
-        errors.push({ productId, error: "Invalid productId" });
+      if (!itemId) {
+        errors.push({ itemId: "", error: "Missing itemId" });
         continue;
       }
 
       if (!Number.isInteger(quantity) || quantity <= 0) {
-        errors.push({ productId, error: "Invalid quantity" });
+        errors.push({ itemId, error: "Invalid quantity" });
         continue;
       }
 
-      const product = productMap.get(productId);
-      if (!product) {
-        errors.push({ productId, error: "Product not available online" });
+      const catalogItem = catalogMap.get(itemId);
+      if (!catalogItem) {
+        errors.push({ itemId, error: "Item not available online" });
         continue;
       }
 
-      if (!Number.isFinite(product.price)) {
-        errors.push({ productId, error: "Online price is invalid" });
-        continue;
+      let modifierTotal = 0;
+      const validatedModifiers: Array<{ groupId: string; groupName: string; optionId: string; optionName: string; priceDelta: number }> = [];
+
+      for (const group of catalogItem.groups) {
+        const selections = selectedMods.filter((mod: any) => String(mod?.groupId) === group.id);
+
+        if (group.required && selections.length === 0) {
+          errors.push({ itemId, error: `Missing required group: ${group.name}` });
+          continue;
+        }
+
+        if (group.type === "single" && selections.length > 1) {
+          errors.push({ itemId, error: `Too many selections for ${group.name}` });
+          continue;
+        }
+
+        if (group.maxSel != null && selections.length > group.maxSel) {
+          errors.push({ itemId, error: `Exceeded max selections for ${group.name}` });
+          continue;
+        }
+
+        for (const selection of selections) {
+          const optionId = String(selection?.optionId || "");
+          const option = group.options.find((opt) => opt.id === optionId);
+          if (!option) {
+            errors.push({ itemId, error: `Invalid modifier option in ${group.name}` });
+            continue;
+          }
+
+          modifierTotal += option.priceDelta;
+          validatedModifiers.push({
+            groupId: group.id,
+            groupName: group.name,
+            optionId: option.id,
+            optionName: option.name,
+            priceDelta: option.priceDelta,
+          });
+        }
       }
 
-      const priceOnline = product.price as number;
-      if (!Number.isFinite(priceAtTime) || priceAtTime !== priceOnline) {
-        errors.push({ productId, error: "Price mismatch. Refresh menu before checkout." });
-        continue;
-      }
+      const basePrice = Number(catalogItem.price);
+      const lineTotal = (basePrice + modifierTotal) * quantity;
 
-      const lineTotal = priceOnline * quantity;
       lineItems.push({
-        itemId: String(product.id),
-        name: product.name,
+        itemId: catalogItem.id,
+        sku: catalogItem.sku,
+        name: catalogItem.name,
         qty: quantity,
-        basePrice: priceOnline,
+        basePrice,
+        modifiers: validatedModifiers,
         lineTotal,
       });
     }
 
     if (errors.length > 0) {
-      return res.status(409).json({ error: "Order blocked due to product changes", details: errors });
+      return res.status(409).json({ error: "Order blocked due to catalog validation", details: errors });
     }
 
     const subtotal = lineItems.reduce((sum, item) => sum + item.lineTotal, 0);
-    if (!Number.isFinite(subtotal)) {
-      return res.status(400).json({ error: "Subtotal is invalid" });
-    }
 
     const order = await prisma.orderOnline.create({
       data: {
         ref: generateOrderRef(),
-        status: "NEW",
+        status: "PENDING",
+        name: customerName ? String(customerName) : null,
+        phone: customerPhone ? String(customerPhone) : null,
+        type: "Online",
         subtotal,
         vatAmount: 0,
         total: subtotal,
         rawPayload: {
           channel,
           timestamp,
-          items,
+          notes: notes ?? null,
         },
         lines: {
-          create: lineItems,
+          create: lineItems.map((line) => ({
+            itemId: line.itemId,
+            sku: line.sku,
+            name: line.name,
+            qty: line.qty,
+            basePrice: line.basePrice,
+            modifiers: line.modifiers,
+            lineTotal: line.lineTotal,
+          })),
         },
       },
       include: {
@@ -464,6 +513,7 @@ router.post("/online/orders", async (req, res) => {
 
     res.status(201).json({
       orderId: order.id,
+      orderNumber: order.ref,
       status: order.status,
       createdAt: order.createdAt,
     });
@@ -473,9 +523,13 @@ router.post("/online/orders", async (req, res) => {
   }
 });
 
-router.get("/online/orders", async (_req, res) => {
+router.get("/online/orders", async (req, res) => {
   try {
+    const status = req.query.status ? String(req.query.status).toUpperCase() : undefined;
+    const where = status ? { status } : undefined;
+
     const orders = await prisma.orderOnline.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       include: { lines: true },
     });
@@ -483,14 +537,22 @@ router.get("/online/orders", async (_req, res) => {
     res.json({
       orders: orders.map((order) => ({
         id: order.id,
+        orderNumber: order.ref,
         createdAt: order.createdAt,
-        status: order.status ?? "NEW",
+        status: order.status ?? "PENDING",
         channel: "ONLINE",
+        customerName: order.name,
+        customerPhone: order.phone,
+        subtotal: order.subtotal,
+        total: order.total,
         items: order.lines.map((line) => ({
-          productId: line.itemId,
+          itemId: line.itemId,
+          sku: line.sku,
           name: line.name,
           quantity: line.qty ?? 1,
-          priceAtTimeOfSale: line.basePrice,
+          unitPrice: line.basePrice,
+          lineTotal: line.lineTotal,
+          modifiers: line.modifiers,
         })),
       })),
     });
