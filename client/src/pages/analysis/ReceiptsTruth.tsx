@@ -227,7 +227,7 @@ export default function ReceiptsTruth() {
   return (
     <div className="min-h-screen bg-white dark:bg-slate-950">
       <div className="p-4 md:p-6 space-y-4">
-        <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+        <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
           Receipts Analysis
         </h1>
 
@@ -319,11 +319,11 @@ export default function ReceiptsTruth() {
                   <CardTitle className="text-sm font-semibold text-slate-900 dark:text-white">Category Totals</CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-2">
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 gap-3">
                     {aggregates.categoryTotals.map((cat, idx) => (
                       <div
                         key={idx}
-                        className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px] cursor-pointer hover:border-emerald-400 transition-colors"
+                        className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px] cursor-pointer hover:border-emerald-400 transition-colors"
                         onClick={() => setExpandedCategory(expandedCategory === cat.category ? null : cat.category)}
                         data-testid={`total-${cat.category.replace(/\s+/g, '-')}`}
                       >
@@ -433,7 +433,7 @@ export default function ReceiptsTruth() {
                     {/* Burger & kitchen */}
                     <div>
                       <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Burger &amp; Kitchen</div>
-                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-7">
                         {[
                           { label: 'Buns', value: dailyUsage.summary.expectedBuns },
                           { label: 'Beef Patties', value: dailyUsage.summary.expectedBeefPatties },
@@ -450,7 +450,7 @@ export default function ReceiptsTruth() {
                           { label: 'Burger Sauce', value: dailyUsage.summary.burgerSauceUsed },
                           { label: 'Jalapeños', value: dailyUsage.summary.jalapenosUsed },
                         ].map((item, i) => (
-                          <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                          <div key={i} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]">
                             <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight mb-1">{item.label}</div>
                             <div className="text-base font-bold text-slate-900 dark:text-white">{nz(item.value)}</div>
                           </div>
@@ -461,7 +461,7 @@ export default function ReceiptsTruth() {
                     {/* Drinks */}
                     <div>
                       <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Drinks — Total: {nz(dailyUsage.summary.totalDrinksUsed)}</div>
-                      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-7">
+                      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:grid-cols-7">
                         {[
                           { label: 'Coke', value: dailyUsage.summary.cokeUsed },
                           { label: 'Coke Zero', value: dailyUsage.summary.cokeZeroUsed },
@@ -471,7 +471,7 @@ export default function ReceiptsTruth() {
                           { label: 'Fanta Straw.', value: dailyUsage.summary.fantaStrawberryUsed },
                           { label: 'Schweppes', value: dailyUsage.summary.schweppesManaoUsed },
                         ].map((item, i) => (
-                          <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]">
+                          <div key={i} className="p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-[4px]">
                             <div className="text-xs text-slate-500 dark:text-slate-400 leading-tight mb-1">{item.label}</div>
                             <div className="text-base font-bold text-emerald-600">{nz(item.value)}</div>
                           </div>
@@ -495,7 +495,7 @@ export default function ReceiptsTruth() {
                     <div className="overflow-x-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
                       <table className="w-full text-xs border-collapse" style={{ minWidth: '1200px' }}>
                         <thead>
-                          <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-left bg-slate-50 dark:bg-slate-800">
+                          <tr className="border-b-2 border-slate-200 dark:border-slate-700 text-left">
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">Category</th>
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">SKU</th>
                             <th className="py-2 px-2 font-semibold text-slate-700 dark:text-slate-300 min-w-[140px]">Item</th>
@@ -531,7 +531,7 @@ export default function ReceiptsTruth() {
                             return (
                               <tr
                                 key={`${row.categoryName}-${row.sku || row.itemName}-${idx}`}
-                                className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${isCatBoundary ? 'border-t-2 border-t-slate-300 dark:border-t-slate-600' : ''} ${isUnmapped ? 'opacity-50' : ''}`}
+                                className={`border-b border-slate-100 dark:border-slate-800 hover:bg-slate-100/40 dark:hover:bg-slate-800/50 transition-colors ${isCatBoundary ? 'border-t-2 border-t-slate-300 dark:border-t-slate-600' : ''} ${isUnmapped ? 'opacity-50' : ''}`}
                               >
                                 <td className="py-2 px-2 text-slate-600 dark:text-slate-400 whitespace-nowrap max-w-[120px] truncate">{row.categoryName}</td>
                                 <td className="py-2 px-2 text-slate-500 whitespace-nowrap">{row.sku || '-'}</td>
