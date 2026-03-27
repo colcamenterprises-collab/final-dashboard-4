@@ -123,6 +123,7 @@ import receiptBatchRoutes from "./routes/receiptBatchRoutes";
 import pnlReadModelRoutes from "./routes/pnlReadModel";
 import pnlSnapshotRoutes from "./routes/pnlSnapshot.route";
 import shiftApprovalRoutes from "./routes/shiftApproval";
+import issueRegisterRoutes from "./routes/issueRegister";
 import { menuManagementRouter } from "./routes/menuManagement";
 import modifiersRouter from "./routes/modifiers";
 import productsRouter from "./routes/products";
@@ -3950,6 +3951,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/debug', debugPurchasingRouter); // PATCH A: Purchasing parity check
   app.use('/api/pnl', pnlReadModelRoutes); // PATCH 1.6.18: P&L Read Model
   app.use('/api', shiftApprovalRoutes); // Shift snapshot approval + shift-reconciled P&L
+  app.use('/api/issue-register', issueRegisterRoutes); // Theft-Control Issue Register
   app.use('/api/pnl/snapshot', pnlSnapshotRoutes); // PATCH 1: P&L Snapshot with checksums
   app.use('/api/menu-management', menuManagementRouter); // PATCH 2.1: Menu Management Foundation
   app.use('/api/modifiers', modifiersRouter); // PATCH 2.2: Modifiers System

@@ -39,6 +39,7 @@ export const ROUTES = {
   INGREDIENTS_MASTER: "/operations/ingredients-master",
   RECIPE_MAPPING: "/operations/recipe-mapping",
   VARIANCE_MONITOR: "/operations/variance-monitor",
+  ISSUE_REGISTER: "/operations/issue-register",
   OPS_PURCHASING_LIVE: "/ops/purchasing-live",
   PRODUCTS: "/products",
   PRODUCT_NEW: "/products/new",

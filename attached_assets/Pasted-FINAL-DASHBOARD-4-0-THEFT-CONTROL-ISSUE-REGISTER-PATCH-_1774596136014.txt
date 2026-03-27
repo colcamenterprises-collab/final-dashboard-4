@@ -1,0 +1,424 @@
+FINAL DASHBOARD 4.0 — THEFT CONTROL ISSUE REGISTER PATCH
+ONE PATCH ONLY
+NO ENHANCEMENTS
+NO UI REDESIGN
+NO ARCHITECTURE CHANGES OUTSIDE THIS SCOPE
+NO ONLINE ORDERING
+NO MARGIN/PRICING WORK
+NO EXTRA FEATURES
+
+OBJECTIVE
+Build the missing accountability layer on top of the existing theft-control and shift analysis system.
+
+The app already detects:
+- missing usage builds
+- buns variance
+- meat variance
+- drink variance
+- POS vs Form mismatches
+- invalid / impossible stock inputs
+
+We now need to convert those detections into a proper Issue Register so management can:
+- see all issues
+- assign them
+- mark them in progress
+- resolve them
+- close them with verification
+
+This patch must be additive and production-safe.
+
+==================================================
+LOCKED BUSINESS RULES
+==================================================
+
+1. This patch is for ISSUE TRACKING only.
+2. Do NOT touch:
+   - receipt truth calculations
+   - usage engine calculations
+   - rebuild scheduler logic
+   - online ordering
+   - recipe costing
+   - styling outside minimal readability work
+3. Existing working flows must remain untouched:
+   - receipts truth rebuild
+   - daily usage rebuild
+   - Sales & Shift Analysis expected usage
+   - stock reconciliation math
+4. If a shift cannot be fully analyzed because usage is not built, the system must create an issue instead of silently failing.
+5. Status lifecycle must be:
+   - OPEN
+   - IN_PROGRESS
+   - RESOLVED
+   - CLOSED
+6. CLOSED means verified and finished.
+7. Each issue must support:
+   - shift date
+   - type
+   - severity
+   - title
+   - description
+   - detected by
+   - status
+   - assigned to
+   - resolution notes
+   - timestamps
+
+==================================================
+DELIVERABLES REQUIRED
+==================================================
+
+A. New DB table: issue_register
+B. Backend issue creation + read/update routes
+C. Automatic issue creation from existing theft-control / reconciliation blockers
+D. Minimal Issue Register UI page
+E. Hook Sales & Shift Analysis into issue creation where appropriate
+F. Full frontend/backend test evidence
+G. No partial patching
+
+==================================================
+DATABASE
+==================================================
+
+Create a new table using the project’s existing DB pattern.
+
+Table name:
+issue_register
+
+Required fields:
+- id
+- shift_date
+- issue_type
+- category
+- severity
+- title
+- description
+- detected_by
+- source_page
+- source_ref
+- status
+- assigned_to
+- resolution_notes
+- metadata_json
+- created_at
+- updated_at
+- resolved_at
+- closed_at
+
+Field guidance:
+- issue_type examples:
+  - MISSING_USAGE_BUILD
+  - BUNS_VARIANCE
+  - MEAT_VARIANCE
+  - DRINK_VARIANCE
+  - POS_FORM_MISMATCH
+  - INVALID_STOCK_INPUT
+  - UNIT_MISMATCH
+  - MISSING_FRIES_DATA
+  - MEAT_SPLIT_AMBIGUITY
+- category examples:
+  - SYSTEM
+  - STOCK
+  - DATA
+  - FINANCIAL
+  - PROCESS
+- severity enum/string:
+  - LOW
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+- detected_by:
+  - SYSTEM
+  - BOB
+  - MANUAL
+- status:
+  - OPEN
+  - IN_PROGRESS
+  - RESOLVED
+  - CLOSED
+
+Add indexes for:
+- shift_date
+- status
+- severity
+- category
+- issue_type
+
+==================================================
+BACKEND ROUTES
+==================================================
+
+Build or extend routes to support:
+
+1. GET /api/issues
+Query params supported:
+- shiftDate
+- status
+- severity
+- category
+- issueType
+
+2. GET /api/issues/:id
+
+3. POST /api/issues
+Manual issue creation
+
+4. PATCH /api/issues/:id
+Allowed updates:
+- status
+- assigned_to
+- resolution_notes
+- severity
+- title
+- description
+
+5. POST /api/issues/auto-create
+Internal safe endpoint to create issues from current system detections if not already present.
+
+Use dedupe logic so the same issue is not repeatedly created for the same shift/date/type/source.
+
+==================================================
+AUTO-CREATION RULES
+==================================================
+
+Use the existing working data already shown in Sales & Shift Analysis / stock reconciliation.
+
+Auto-create issues for these cases:
+
+1. Missing usage build
+Condition:
+- analysis/stock-usage for shift date returns not_built = true
+Create:
+- issue_type: MISSING_USAGE_BUILD
+- category: SYSTEM
+- severity: CRITICAL
+
+2. Buns variance beyond threshold
+Thresholds:
+- warn > 5
+- critical > 10
+Create:
+- issue_type: BUNS_VARIANCE
+- category: STOCK
+- severity according to threshold
+
+3. Meat variance beyond threshold
+Thresholds:
+- warn > 500g
+- critical > 1000g
+Create:
+- issue_type: MEAT_VARIANCE
+- category: STOCK
+
+4. Drink variance by type beyond threshold
+Thresholds:
+- warn > 2
+- critical > 4
+Create one issue per drink type when breached
+- issue_type: DRINK_VARIANCE
+- category: STOCK
+
+5. Invalid stock inputs
+Examples:
+- closing > opening + received
+- physical used < 0
+- impossible totals
+Create:
+- issue_type: INVALID_STOCK_INPUT
+- category: DATA
+- severity: HIGH or CRITICAL depending on impact
+
+6. Missing fries data
+If shift analysis cannot validate fries because no staff-side actual exists:
+- issue_type: MISSING_FRIES_DATA
+- category: DATA
+- severity: MEDIUM
+
+7. Meat split ambiguity
+If actual form only has combined meatWeightG and no beef/chicken split for a shift where chicken/beef are both used:
+- issue_type: MEAT_SPLIT_AMBIGUITY
+- category: DATA
+- severity: MEDIUM
+
+8. POS vs Form mismatch
+If Total Sales mismatch exists and exceeds practical tolerance:
+- issue_type: POS_FORM_MISMATCH
+- category: FINANCIAL
+- severity based on delta
+
+==================================================
+FRONTEND UI
+==================================================
+
+Add one new page only:
+Route:
+- /operations/issues-register
+
+Add it under Operations nav.
+
+Page requirements:
+1. Summary row/cards:
+- Total issues
+- Open
+- In Progress
+- Resolved
+- Closed
+- Critical count
+
+2. Filter bar:
+- shift date
+- status
+- severity
+- category
+- search box
+
+3. Main table:
+Columns:
+- Date
+- Type
+- Category
+- Severity
+- Title
+- Status
+- Assigned To
+- Created
+- Actions
+
+4. Detail drawer/modal/panel:
+Show:
+- full description
+- metadata_json prettified
+- detected_by
+- source_page
+- source_ref
+- timestamps
+- resolution notes
+
+5. Quick actions:
+- mark In Progress
+- mark Resolved
+- mark Closed
+- assign
+- add resolution note
+
+6. Keep layout clean and readable on tablet.
+Do not redesign the app. Match current styling.
+
+==================================================
+SALES & SHIFT ANALYSIS INTEGRATION
+==================================================
+
+On the existing Sales & Shift Analysis page:
+
+1. Add a small issue summary box or row near the reconciliation area:
+- Open issues for this shift
+- Critical issues for this shift
+
+2. Add button:
+- “Create / Refresh Issues for This Shift”
+This should call the backend auto-create logic.
+
+3. If issues already exist for the selected shift, show a simple linked list:
+- severity
+- title
+- status
+
+Do not redesign the page.
+Do not move existing cards.
+Do not change existing calculations.
+
+==================================================
+IMPORTANT VALIDATION RULES
+==================================================
+
+1. No duplicate issue spam
+If an issue already exists for same:
+- shift_date
+- issue_type
+- source_ref or source_page
+- same key metadata
+then update timestamp/metadata if needed, do not create endless duplicates.
+
+2. Status behavior
+- OPEN = newly detected
+- IN_PROGRESS = someone is working it
+- RESOLVED = fix/action applied but not verified
+- CLOSED = verified final
+
+3. Closed issues must remain visible in the register
+They are part of history.
+
+4. When a previously detected issue no longer applies, do NOT auto-delete it.
+Optional safe behavior:
+- leave OPEN until human resolves/closes
+or
+- mark system note in metadata that the live condition is no longer present
+But do not silently remove issue history.
+
+==================================================
+FILES TO UPDATE
+==================================================
+
+Use exact project structure already in repo.
+Likely files include:
+- shared/schema.ts or equivalent DB schema location
+- server routes registration
+- server issue route file(s)
+- client App.tsx / route registry
+- client sidebar / nav
+- Sales & Shift Analysis page
+- new Issues Register page
+- any existing reconciliation service only for reading signals (not changing math)
+
+Do NOT create random duplicate systems.
+Use the existing patterns already used elsewhere in the app.
+
+==================================================
+TESTING REQUIRED
+==================================================
+
+Test all of these and report PASS/FAIL:
+
+1. Create manual issue
+2. Update status OPEN → IN_PROGRESS → RESOLVED → CLOSED
+3. Auto-create MISSING_USAGE_BUILD issue when stock usage not built
+4. Auto-create BUNS_VARIANCE issue when threshold breached
+5. Auto-create MEAT_VARIANCE issue when threshold breached
+6. Auto-create DRINK_VARIANCE issue when threshold breached
+7. Auto-create INVALID_STOCK_INPUT issue when impossible values exist
+8. No duplicate issues created on repeated refresh
+9. Issues Register page loads and filters correctly
+10. Sales & Shift Analysis shows issue summary for selected shift
+11. Existing calculations still unchanged
+12. Existing receipts truth / daily usage / scheduler flows still work
+
+==================================================
+OUTPUT FORMAT REQUIRED BACK
+==================================================
+
+Return:
+1. Files changed
+2. DB changes
+3. Routes added
+4. UI added
+5. PASS/FAIL checklist
+6. Screenshot proof
+7. Confirmation that no calculations were changed
+
+==================================================
+ABSOLUTE DO NOT TOUCH
+==================================================
+
+- Online ordering
+- Recipe costing
+- Receipt truth math
+- Daily usage math
+- Scheduler timings
+- Existing style system outside minimal layout support
+- Unrelated pages
+- Random refactors
+
+This patch is to create the ISSUE REGISTER and wire the existing detections into it.
+One patch only.
+No freestyle.
+No extra ideas.
+Complete end-to-end.

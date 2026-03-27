@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -210,6 +211,34 @@ export default function SalesShiftAnalysis() {
       const res = await fetch(`/api/analysis/usage-reconciliation?date=${selectedDate}`);
       if (!res.ok) return null;
       return res.json();
+    },
+  });
+
+  const { data: issueByShift, refetch: refetchIssues } = useQuery<{
+    ok: boolean; date: string; issues: { id: number; severity: string; status: string; title: string }[]; openCount: number; criticalCount: number;
+  } | null>({
+    queryKey: ['issue-register-by-shift', selectedDate],
+    queryFn: async () => {
+      if (!selectedDate) return null;
+      const res = await fetch(`/api/issue-register/by-shift/${selectedDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!selectedDate,
+  });
+
+  const autoCreateIssuesMutation = useMutation({
+    mutationFn: async (date: string) => {
+      const res = await fetch('/api/issue-register/auto-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['issue-register-by-shift', selectedDate] });
+      refetchIssues();
     },
   });
 
@@ -836,6 +865,75 @@ export default function SalesShiftAnalysis() {
               {approveMutation.isPending ? 'Approving…' : 'Approve & Close Shift'}
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Issue Register summary for selected date ── */}
+      <Card>
+        <CardHeader className="py-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-slate-700 flex items-center gap-2">
+              Issue Register
+              {issueByShift && issueByShift.openCount > 0 && (
+                <Badge className={`text-xs rounded-[4px] ${issueByShift.criticalCount > 0 ? 'bg-red-100 text-red-700 border-red-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                  {issueByShift.openCount} open{issueByShift.criticalCount > 0 ? ` · ${issueByShift.criticalCount} critical` : ''}
+                </Badge>
+              )}
+              {issueByShift && issueByShift.openCount === 0 && (issueByShift.issues ?? []).length > 0 && (
+                <Badge className="text-xs rounded-[4px] bg-emerald-100 text-emerald-700 border-emerald-200">All resolved</Badge>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs rounded-[4px] h-7 px-2"
+                onClick={() => autoCreateIssuesMutation.mutate(selectedDate)}
+                disabled={autoCreateIssuesMutation.isPending}
+              >
+                {autoCreateIssuesMutation.isPending ? 'Scanning…' : 'Scan for Issues'}
+              </Button>
+              <Link to="/operations/issue-register">
+                <Button size="sm" variant="outline" className="text-xs rounded-[4px] h-7 px-2">
+                  View All Issues →
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-3">
+          {autoCreateIssuesMutation.isSuccess && (() => {
+            const r = autoCreateIssuesMutation.data as any;
+            return (
+              <div className="mb-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-[4px] px-3 py-2">
+                Scan complete — {r?.created?.length ?? 0} new issues created, {r?.skipped?.length ?? 0} checks passed
+              </div>
+            );
+          })()}
+          {!issueByShift || (issueByShift.issues ?? []).length === 0 ? (
+            <p className="text-xs text-slate-400">No issues logged for {selectedDate}. Run "Scan for Issues" to auto-detect from reconciliation data.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {(issueByShift.issues ?? []).slice(0, 6).map(issue => (
+                <div key={issue.id} className="flex items-center gap-2 text-xs">
+                  <Badge className={`text-xs rounded-[4px] shrink-0 ${
+                    issue.severity === 'CRITICAL' ? 'bg-red-100 text-red-700 border-red-200' :
+                    issue.severity === 'HIGH' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                    'bg-slate-100 text-slate-600 border-slate-200'
+                  }`}>{issue.severity}</Badge>
+                  <Badge className={`text-xs rounded-[4px] shrink-0 ${
+                    issue.status === 'OPEN' ? 'bg-red-100 text-red-700 border-red-200' :
+                    issue.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                    'bg-emerald-100 text-emerald-700 border-emerald-200'
+                  }`}>{issue.status.replace('_',' ')}</Badge>
+                  <span className="text-slate-700 truncate">{issue.title}</span>
+                </div>
+              ))}
+              {(issueByShift.issues ?? []).length > 6 && (
+                <p className="text-xs text-slate-400">+{issueByShift.issues.length - 6} more — <Link to="/operations/issue-register" className="text-emerald-600 underline">view all</Link></p>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 
