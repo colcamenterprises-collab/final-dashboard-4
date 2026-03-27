@@ -2156,16 +2156,27 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
     let r: any;
     if (date && isValidProxyDate(date)) {
       r = await pool.query(
-        `SELECT receipt_date::text, receipt_id, receipt_type, sku, item_name, category,
+        `SELECT l.receipt_date::text, l.receipt_id,
+                (lr.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS receipt_datetime_bkk,
+                l.receipt_type, l.sku, l.item_name, l.category,
                 quantity, gross_amount, discount_amount, net_amount, pos_category_name
-         FROM receipt_truth_line WHERE receipt_date = $1::date ORDER BY receipt_id, sku LIMIT $2`,
+         FROM receipt_truth_line l
+         LEFT JOIN lv_receipt lr ON lr.receipt_id = l.receipt_id
+         WHERE l.receipt_date = $1::date
+         ORDER BY l.receipt_id, l.sku
+         LIMIT $2`,
         [date, lim]);
     } else {
       r = await pool.query(
-        `SELECT receipt_date::text, receipt_id, receipt_type, sku, item_name, category,
+        `SELECT l.receipt_date::text, l.receipt_id,
+                (lr.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS receipt_datetime_bkk,
+                l.receipt_type, l.sku, l.item_name, l.category,
                 quantity, gross_amount, discount_amount, net_amount, pos_category_name
-         FROM receipt_truth_line WHERE receipt_date BETWEEN $1::date AND $2::date
-         ORDER BY receipt_date DESC, receipt_id, sku LIMIT $3`,
+         FROM receipt_truth_line l
+         LEFT JOIN lv_receipt lr ON lr.receipt_id = l.receipt_id
+         WHERE l.receipt_date BETWEEN $1::date AND $2::date
+         ORDER BY l.receipt_date DESC, l.receipt_id, l.sku
+         LIMIT $3`,
         [from, to, lim]);
     }
     const meta = from && to ? { from, to } : { date };
@@ -2179,17 +2190,23 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
     let r: any;
     if (date && isValidProxyDate(date)) {
       r = await pool.query(
-        `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS datetime_bkk,
+        `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS receipt_datetime_bkk,
                 staff_name, total_amount, payment_json, created_at::text
-         FROM lv_receipt WHERE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date = $1::date
-         ORDER BY datetime_bkk DESC LIMIT $2`,
+         FROM lv_receipt
+         WHERE datetime_bkk >= ($1::date::timestamp AT TIME ZONE 'Asia/Bangkok')
+           AND datetime_bkk < (($1::date::timestamp + INTERVAL '1 day') AT TIME ZONE 'Asia/Bangkok')
+         ORDER BY datetime_bkk DESC
+         LIMIT $2`,
         [date, lim]);
     } else {
       r = await pool.query(
-        `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS datetime_bkk,
+        `SELECT receipt_id, (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::text AS receipt_datetime_bkk,
                 staff_name, total_amount, payment_json, created_at::text
-         FROM lv_receipt WHERE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date BETWEEN $1::date AND $2::date
-         ORDER BY datetime_bkk DESC LIMIT $3`,
+         FROM lv_receipt
+         WHERE datetime_bkk >= ($1::date::timestamp AT TIME ZONE 'Asia/Bangkok')
+           AND datetime_bkk < (($2::date::timestamp + INTERVAL '1 day') AT TIME ZONE 'Asia/Bangkok')
+         ORDER BY datetime_bkk DESC
+         LIMIT $3`,
         [from, to, lim]);
     }
     const meta = from && to ? { from, to } : { date };
