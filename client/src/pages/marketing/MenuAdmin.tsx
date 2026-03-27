@@ -79,6 +79,7 @@ export default function MenuAdmin() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string>("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string>("");
+  const [groupsJson, setGroupsJson] = useState<string>("[]");
 
   const { data, isLoading } = useQuery<{ categories: Category[] }>({
     queryKey: ["/api/admin/menu"],
@@ -219,6 +220,15 @@ export default function MenuAdmin() {
   const handleSaveItem = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
+    let parsedGroups: ModifierGroup[] = [];
+    try {
+      const decoded = JSON.parse(groupsJson || "[]");
+      parsedGroups = Array.isArray(decoded) ? decoded : [];
+    } catch {
+      toast({ title: "Invalid modifiers JSON", variant: "destructive" });
+      return;
+    }
+
     const item: MenuItem = {
       categoryId: selectedCategoryId,
       name: formData.get("name") as string,
@@ -228,7 +238,7 @@ export default function MenuAdmin() {
       imageUrl: uploadedImageUrl || editingItem?.imageUrl || undefined,
       position: parseInt(formData.get("position") as string) || 0,
       available: formData.get("available") === "on",
-      groups: editingItem?.groups || [],
+      groups: parsedGroups,
     };
 
     if (editingItem?.id) {
@@ -353,6 +363,7 @@ export default function MenuAdmin() {
                       setImagePreviewUrl("");
                       setImageFile(null);
                       setUploadedImageUrl("");
+                      setGroupsJson("[]");
                       setItemDialogOpen(true);
                     }}
                     data-testid={`button-add-item-${category.id}`}
@@ -429,6 +440,7 @@ export default function MenuAdmin() {
                             setImagePreviewUrl(item.imageUrl || "");
                             setImageFile(null);
                             setUploadedImageUrl(item.imageUrl || "");
+                            setGroupsJson(JSON.stringify(item.groups || [], null, 2));
                             setItemDialogOpen(true);
                           }}
                           data-testid={`button-edit-item-${item.id}`}
@@ -579,6 +591,19 @@ export default function MenuAdmin() {
                 />
                 <Label htmlFor="item-available">Available</Label>
               </div>
+            </div>
+            <div>
+              <Label htmlFor="item-groups-json">Modifier Groups JSON</Label>
+              <Textarea
+                id="item-groups-json"
+                value={groupsJson}
+                onChange={(e) => setGroupsJson(e.target.value)}
+                className="font-mono text-xs min-h-[180px]"
+                data-testid="textarea-item-groups"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                {`Format: [{"name":"Size","type":"single","required":true,"maxSel":1,"options":[{"name":"Regular","priceDelta":0}]}]`}
+              </p>
             </div>
             <Button type="submit" data-testid="button-save-item">
               Save Menu Item

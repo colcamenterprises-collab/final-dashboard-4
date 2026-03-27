@@ -143,7 +143,7 @@ export function registerAdminMenuRoutes(app: Express) {
   // PUT /api/admin/menu/item/:id - Update menu item
   app.put("/api/admin/menu/item/:id", async (req, res) => {
     try {
-      const { name, description, price, sku, imageUrl, position, available, groups } = req.body;
+      const { categoryId, name, description, price, sku, imageUrl, position, available, groups } = req.body;
       
       // Delete existing groups
       await prisma.modifierGroup_Online.deleteMany({
@@ -154,6 +154,7 @@ export function registerAdminMenuRoutes(app: Express) {
       const item = await prisma.menuItem_Online.update({
         where: { id: req.params.id },
         data: {
+          categoryId,
           name,
           description,
           price,
