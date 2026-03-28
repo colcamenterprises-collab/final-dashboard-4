@@ -203,7 +203,7 @@ async function checkDailyUsageExists(businessDate: string): Promise<boolean> {
 
 async function checkRawSourceExists(businessDate: string): Promise<boolean> {
   const result = await pool!.query(
-    `SELECT 1 FROM lv_receipt WHERE business_date = $1::date LIMIT 1`,
+    `SELECT 1 FROM lv_receipt WHERE DATE(datetime_bkk) = $1::date LIMIT 1`,
     [businessDate]
   );
   return result.rows.length > 0;

@@ -952,6 +952,9 @@ h1, h2, h3 { color: inherit !important; }
 .admin-page .btn {
   font-size: 0.75rem !important; /* text-xs */
   border-radius: 4px !important; /* 4px standard for tablet */
+  min-height: unset !important;
+  min-width: unset !important;
+  font-family: 'Poppins', sans-serif !important;
 }
 
 .admin-page .card {
@@ -962,8 +965,12 @@ h1, h2, h3 { color: inherit !important; }
 .admin-page input,
 .admin-page select,
 .admin-page textarea {
-  font-size: 0.75rem !important; /* text-xs */
+  font-size: 0.75rem !important; /* text-xs = 12px */
   border-radius: 4px !important;
+  min-height: 36px !important;  /* compact — not the 44px touch-target override */
+  padding: 0.375rem 0.625rem !important; /* py-1.5 px-2.5 equivalent */
+  font-family: 'Poppins', sans-serif !important;
+  line-height: 1.4 !important;
 }
 
 .admin-page .badge {

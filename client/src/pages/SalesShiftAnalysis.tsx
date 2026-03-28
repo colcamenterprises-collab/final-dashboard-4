@@ -130,9 +130,9 @@ const categories: Array<{ key: keyof ShiftData; label: string }> = [
 const toNum = (v: unknown) => { const n = Number(v ?? 0); return Number.isFinite(n) ? n : 0; };
 const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayBkk = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-const TABLE_TEXT_CLASS = 'text-xs sm:text-sm';
-const TABLE_CELL_CLASS = 'p-2 sm:p-2.5';
-const INPUT_CLASS = 'border border-slate-200 rounded-[4px] px-2.5 py-1.5 text-sm leading-5';
+const TABLE_TEXT_CLASS = 'text-xs';
+const TABLE_CELL_CLASS = 'p-2';
+const INPUT_CLASS = 'border border-slate-200 rounded-[4px] px-2.5 py-1.5 leading-5 bg-white text-slate-800';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -371,10 +371,10 @@ export default function SalesShiftAnalysis() {
     : 'border-slate-200';
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-3 sm:p-4 space-y-4 overflow-x-hidden">
+    <div className="admin-page w-full max-w-5xl mx-auto p-4 space-y-4 overflow-x-hidden">
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-slate-900">Sales &amp; Shift Analysis</h1>
+          <h1 className="text-3xl font-semibold text-slate-900 page-title">Sales &amp; Shift Analysis</h1>
           <p className="text-xs text-slate-500 mt-0.5">Single truth screen — Form vs POS comparison + Bob Review</p>
         </div>
         <input
@@ -474,11 +474,11 @@ export default function SalesShiftAnalysis() {
               )}
 
               {/* Buns + Meat headline tiles */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 {/* Buns */}
-                <div className={`rounded border p-3 ${
-                  usageRecon.buns.severity === 'critical' ? 'border-red-300 bg-red-50' :
-                  usageRecon.buns.severity === 'warn' ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+                <div className={`rounded-[4px] border p-3 ${
+                  usageRecon.buns.severity === 'critical' ? 'border-red-300 bg-red-100/40' :
+                  usageRecon.buns.severity === 'warn' ? 'border-amber-300 bg-amber-100/40' : 'border-slate-200'
                 }`}>
                   <div className="text-slate-500 text-xs mb-1">Buns</div>
                   <div className="text-xs text-slate-400">Expected: <span className="font-mono text-slate-700">{usageRecon.buns.expected ?? '—'}</span></div>
@@ -498,9 +498,9 @@ export default function SalesShiftAnalysis() {
                   <div className="text-xs text-slate-400">Closing: <span className="font-mono">{usageRecon.buns.closing ?? '—'}</span></div>
                 </div>
                 {/* Meat */}
-                <div className={`rounded border p-3 ${
-                  usageRecon.meat.severity === 'critical' ? 'border-red-300 bg-red-50' :
-                  usageRecon.meat.severity === 'warn' ? 'border-amber-300 bg-amber-50' : 'border-slate-200'
+                <div className={`rounded-[4px] border p-3 ${
+                  usageRecon.meat.severity === 'critical' ? 'border-red-300 bg-red-100/40' :
+                  usageRecon.meat.severity === 'warn' ? 'border-amber-300 bg-amber-100/40' : 'border-slate-200'
                 }`}>
                   <div className="text-slate-500 text-xs mb-1">Meat (g)</div>
                   <div className="text-xs text-slate-400">Expected: <span className="font-mono text-slate-700">{usageRecon.meat.expectedGrams !== null ? usageRecon.meat.expectedGrams.toLocaleString() : '—'}</span></div>
@@ -597,7 +597,7 @@ export default function SalesShiftAnalysis() {
             <div className="text-sm text-amber-700">No stored daily usage for this date. Rebuild Receipts Analysis first.</div>
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-sm">
+              <div className="grid grid-cols-3 gap-2.5">
                 <div className="rounded border border-slate-200 p-3">
                   <div className="text-slate-500 text-xs">Expected Buns</div>
                   <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedBuns))}</div>
@@ -875,30 +875,32 @@ export default function SalesShiftAnalysis() {
           <CardTitle className="text-sm font-medium text-slate-700">Shift Approval</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-2 gap-4">
-            <label className="flex flex-col gap-1 text-sm">
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-600">Manager</span>
               <input value={managerName} readOnly className={`${INPUT_CLASS} bg-slate-100 text-slate-500`} />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-600">Cash Banked (฿)</span>
               <input type="number" value={cashBanked} onChange={(e) => setCashBanked(e.target.value)} className={INPUT_CLASS} />
             </label>
-            <label className="flex flex-col gap-1 text-sm">
+            <label className="flex flex-col gap-1">
               <span className="text-xs font-medium text-slate-600">QR Banked (฿)</span>
               <input type="number" value={qrBanked} onChange={(e) => setQrBanked(e.target.value)} className={INPUT_CLASS} />
             </label>
-            <label className="flex flex-col gap-1 text-sm md:col-span-2">
+            <label className="flex flex-col gap-1 col-span-2">
               <span className="text-xs font-medium text-slate-600">Notes</span>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className={`${INPUT_CLASS} min-h-16`} />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className={`${INPUT_CLASS} min-h-[64px]`} />
             </label>
-            <Button
-              className="bg-slate-900 text-white w-fit text-sm"
-              onClick={() => approveMutation.mutate()}
-              disabled={approveMutation.isPending}
-            >
-              {approveMutation.isPending ? 'Approving…' : 'Approve & Close Shift'}
-            </Button>
+            <div>
+              <Button
+                className="bg-slate-900 text-white w-fit rounded-[4px]"
+                onClick={() => approveMutation.mutate()}
+                disabled={approveMutation.isPending}
+              >
+                {approveMutation.isPending ? 'Approving…' : 'Approve & Close Shift'}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
