@@ -703,13 +703,18 @@ async function checkSchema() {
             console.log("👤 Default admin created: admin@sbb.com (password: sbb123)");
           }
           
-          // Patch 4.0 — Self-healing analysis catch-up for last 3 business dates
+          // Patch 4.0 — Self-healing analysis catch-up + build-status backfill
           try {
-            const { runStartupCatchup } = await import('./services/analysisBuildOrchestrator');
+            const { runStartupCatchup, runBackfillBuildStatus } = await import('./services/analysisBuildOrchestrator');
+            // Backfill status rows for existing data first (safe, no-op if already present)
+            runBackfillBuildStatus(7).catch((e: any) =>
+              console.error('[analysisBuildOrchestrator] Backfill error:', e?.message)
+            );
+            // Then check last 3 dates for missing daily usage and rebuild if needed
             runStartupCatchup().catch((e: any) =>
               console.error('[analysisBuildOrchestrator] Startup catch-up error:', e?.message)
             );
-            console.log('🔧 Analysis startup catch-up queued');
+            console.log('🔧 Analysis startup catch-up + backfill queued');
           } catch (catchupImportErr: any) {
             console.warn('[analysisBuildOrchestrator] Could not load orchestrator:', catchupImportErr?.message);
           }

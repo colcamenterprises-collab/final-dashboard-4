@@ -400,6 +400,95 @@ export async function runStartupCatchup(): Promise<void> {
   }
 }
 
+// ─── Backfill existing data into build status ─────────────────────────────────
+
+/**
+ * One-shot backfill — called at startup, safe to re-run.
+ *
+ * For each of the last N business dates:
+ *   - If receipt_truth_summary exists but no RECEIPTS_TRUTH status row → insert SUCCESS
+ *   - If receipt_truth_daily_usage exists but no DAILY_USAGE status row → insert SUCCESS
+ *
+ * Uses the real built_at timestamp from each table.
+ * Never touches existing status rows. Never rebuilds data.
+ */
+export async function runBackfillBuildStatus(daysBack = 7): Promise<void> {
+  const tag = "[analysisBuildOrchestrator][BACKFILL]";
+  try {
+    await ensureTable();
+
+    const dates = lastNBusinessDates(daysBack);
+    let inserted = 0;
+
+    for (const date of dates) {
+      // ── Receipts truth backfill ──────────────────────────────────────────
+      const rtCheck = await pool!.query(
+        `SELECT built_at FROM receipt_truth_summary
+         WHERE business_date = $1::date
+         ORDER BY built_at DESC LIMIT 1`,
+        [date]
+      );
+
+      if (rtCheck.rows.length > 0) {
+        const rtBuiltAt: string = rtCheck.rows[0].built_at
+          ? new Date(rtCheck.rows[0].built_at).toISOString()
+          : new Date().toISOString();
+
+        const rtStatusExists = await pool!.query(
+          `SELECT 1 FROM analysis_build_status
+           WHERE business_date = $1::date AND build_type = 'RECEIPTS_TRUTH'`,
+          [date]
+        );
+
+        if (rtStatusExists.rows.length === 0) {
+          await pool!.query(
+            `INSERT INTO analysis_build_status
+               (business_date, build_type, status, trigger_source, started_at, completed_at, updated_at)
+             VALUES ($1::date, 'RECEIPTS_TRUTH', 'SUCCESS', 'BACKFILL', $2, $2, NOW())
+             ON CONFLICT (business_date, build_type) DO NOTHING`,
+            [date, rtBuiltAt]
+          );
+          inserted++;
+          console.log(`${tag} ${date} RECEIPTS_TRUTH → SUCCESS (built_at=${rtBuiltAt})`);
+        }
+      }
+
+      // ── Daily usage backfill ─────────────────────────────────────────────
+      const duCheck = await pool!.query(
+        `SELECT MAX(built_at) AS built_at FROM receipt_truth_daily_usage
+         WHERE business_date = $1::date`,
+        [date]
+      );
+
+      if (duCheck.rows.length > 0 && duCheck.rows[0].built_at !== null) {
+        const duBuiltAt: string = new Date(duCheck.rows[0].built_at).toISOString();
+
+        const duStatusExists = await pool!.query(
+          `SELECT 1 FROM analysis_build_status
+           WHERE business_date = $1::date AND build_type = 'DAILY_USAGE'`,
+          [date]
+        );
+
+        if (duStatusExists.rows.length === 0) {
+          await pool!.query(
+            `INSERT INTO analysis_build_status
+               (business_date, build_type, status, trigger_source, started_at, completed_at, updated_at)
+             VALUES ($1::date, 'DAILY_USAGE', 'SUCCESS', 'BACKFILL', $2, $2, NOW())
+             ON CONFLICT (business_date, build_type) DO NOTHING`,
+            [date, duBuiltAt]
+          );
+          inserted++;
+          console.log(`${tag} ${date} DAILY_USAGE → SUCCESS (built_at=${duBuiltAt})`);
+        }
+      }
+    }
+
+    console.log(`${tag} Complete — inserted ${inserted} status rows across ${dates.length} dates`);
+  } catch (err: any) {
+    console.error(`${tag} Error:`, err.message);
+  }
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function lastNBusinessDates(n: number): string[] {
