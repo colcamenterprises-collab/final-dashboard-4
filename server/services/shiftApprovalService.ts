@@ -62,7 +62,7 @@ export async function listShiftSnapshots(): Promise<any[]> {
     LEFT JOIN shift_snapshot_v2 s ON s.date = ad.d
     LEFT JOIN dsv2 dv ON dv.d = ad.d
     ORDER BY ad.d DESC
-    LIMIT 90
+    LIMIT 30
     `,
   );
 }

@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { apiRequest } from '@/lib/queryClient';
 
 interface ShiftData {
   total?: number;
@@ -131,6 +130,9 @@ const categories: Array<{ key: keyof ShiftData; label: string }> = [
 const toNum = (v: unknown) => { const n = Number(v ?? 0); return Number.isFinite(n) ? n : 0; };
 const fmt = (v: number) => v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const todayBkk = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
+const TABLE_TEXT_CLASS = 'text-xs sm:text-sm';
+const TABLE_CELL_CLASS = 'p-2 sm:p-2.5';
+const INPUT_CLASS = 'border border-slate-200 rounded-[4px] px-2.5 py-1.5 text-sm leading-5';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -164,6 +166,7 @@ export default function SalesShiftAnalysis() {
   const [cashBanked, setCashBanked] = useState('0');
   const [qrBanked, setQrBanked] = useState('0');
   const [emailStatus, setEmailStatus] = useState<string | null>(null);
+  const [historyPage, setHistoryPage] = useState(1);
   const managerName = 'dashboard';
 
   // Auto-load: on first mount, resolve the latest shift that has data and jump to it
@@ -179,6 +182,10 @@ export default function SalesShiftAnalysis() {
       })
       .catch(() => { /* silently fall back to today */ });
   }, [autoLoaded]);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [selectedDate]);
 
   const { data: formData, isLoading: formLoading } = useQuery<ShiftData>({
     queryKey: ['daily-sales', selectedDate],
@@ -212,6 +219,8 @@ export default function SalesShiftAnalysis() {
       if (!res.ok) return null;
       return res.json();
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000,
   });
 
   const { data: issueByShift, refetch: refetchIssues } = useQuery<{
@@ -257,7 +266,15 @@ export default function SalesShiftAnalysis() {
   const adjustments = adjustmentsData?.adjustments ?? [];
 
   const runAnalysisMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/ai-ops/bob/run-analysis', { shift_date: selectedDate }),
+    mutationFn: async () => {
+      const res = await fetch('/api/ai-ops/bob/run-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_date: selectedDate }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bob-analysis', selectedDate] });
       queryClient.invalidateQueries({ queryKey: ['bob-adjustments', selectedDate] });
@@ -267,7 +284,15 @@ export default function SalesShiftAnalysis() {
   });
 
   const emailMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/ai-ops/bob/email/trigger', { shift_date: selectedDate }),
+    mutationFn: async () => {
+      const res = await fetch('/api/ai-ops/bob/email/trigger', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ shift_date: selectedDate }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
     onSuccess: (data: any) => {
       setEmailStatus(data?.email_sent ? `Sent to ${data.recipient}` : 'Send failed — check Gmail');
       setTimeout(() => setEmailStatus(null), 6000);
@@ -280,8 +305,15 @@ export default function SalesShiftAnalysis() {
   });
 
   const reviewMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
-      apiRequest('PATCH', `/api/ai-ops/bob/adjustments/${id}/review`, { review_status: status }),
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await fetch(`/api/ai-ops/bob/adjustments/${id}/review`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ review_status: status }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
     onSuccess: () => refetchAdjustments(),
   });
 
@@ -314,6 +346,21 @@ export default function SalesShiftAnalysis() {
     });
   }, [formData, posData]);
 
+  const filteredShifts = useMemo(() => {
+    if (!allShifts?.length) return [];
+    return allShifts.filter((row) => {
+      const d = new Date(`${row.date}T00:00:00Z`);
+      const now = new Date();
+      const diff = now.getTime() - d.getTime();
+      const days = diff / (1000 * 60 * 60 * 24);
+      return days >= 0 && days <= 30;
+    });
+  }, [allShifts]);
+
+  const historyPageSize = 10;
+  const totalHistoryPages = Math.max(1, Math.ceil(filteredShifts.length / historyPageSize));
+  const pagedHistory = filteredShifts.slice((historyPage - 1) * historyPageSize, historyPage * historyPageSize);
+
   const posHasData = toNum(posData?.total) > 0;
   const formHasData = toNum(formData?.total) > 0;
   const issues = bobReport?.data_json?.issues ?? [];
@@ -324,7 +371,7 @@ export default function SalesShiftAnalysis() {
     : 'border-slate-200';
 
   return (
-    <div className="p-4 space-y-4 max-w-5xl">
+    <div className="w-full max-w-5xl mx-auto p-3 sm:p-4 space-y-4 overflow-x-hidden">
       <div className="flex flex-wrap gap-3 items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-slate-900">Sales &amp; Shift Analysis</h1>
@@ -334,7 +381,7 @@ export default function SalesShiftAnalysis() {
           type="date"
           value={selectedDate}
           onChange={(e) => { setSelectedDate(e.target.value); setEmailStatus(null); }}
-          className="border border-slate-200 rounded-[4px] px-3 py-1.5 text-sm"
+          className={INPUT_CLASS}
         />
       </div>
 
@@ -350,76 +397,44 @@ export default function SalesShiftAnalysis() {
         </span>
       </div>
 
-      <Card>
-        <CardHeader className="py-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <CardTitle className="text-sm font-medium text-slate-700">Expected Stock Usage (Stored Receipts Truth)</CardTitle>
-            {dailyUsage && dailyUsage.receiptTruthBuiltAt && dailyUsage.dailyUsageBuiltAt &&
-              dailyUsage.receiptTruthBuiltAt > dailyUsage.dailyUsageBuiltAt && (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
-                ⚠ Usage out of date — rebuild required
-              </span>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {usageLoading ? (
-            <div className="text-sm text-slate-500">Loading stored daily usage...</div>
-          ) : !dailyUsage ? (
-            <div className="text-sm text-amber-700">No stored daily usage for this date. Rebuild Receipts Analysis first.</div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div className="rounded border border-slate-200 p-3">
-                  <div className="text-slate-500 text-xs">Expected Buns</div>
-                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedBuns))}</div>
-                </div>
-                <div className="rounded border border-slate-200 p-3">
-                  <div className="text-slate-500 text-xs">Expected Beef (g)</div>
-                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedBeefGrams))}</div>
-                </div>
-                <div className="rounded border border-slate-200 p-3">
-                  <div className="text-slate-500 text-xs">Expected Chicken (g)</div>
-                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedChickenGrams))}</div>
-                </div>
-                <div className="rounded border border-slate-200 p-3">
-                  <div className="text-slate-500 text-xs">Total Drinks Used</div>
-                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.totalDrinksUsed))}</div>
-                </div>
-              </div>
-
-              <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="text-left p-3 font-medium text-slate-600">Drink Type</th>
-                    <th className="text-right p-3 font-medium text-slate-600">Expected Used</th>
+      {/* ── Form vs POS Comparison (1) ── */}
+      {(formLoading || posLoading) ? (
+        <div className="text-sm text-slate-500">Loading comparison...</div>
+      ) : (
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm font-medium text-slate-700">Form vs POS Comparison</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <table className={`w-full ${TABLE_TEXT_CLASS}`}>
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Category</th>
+                  <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Staff Form</th>
+                  <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>POS / Loyverse</th>
+                  <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Difference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.label} className={`border-b ${r.flagged ? 'bg-red-100/40' : ''}`}>
+                    <td className={`${TABLE_CELL_CLASS} text-slate-700`}>{r.label}</td>
+                    <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{fmt(r.form)}</td>
+                    <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{fmt(r.pos)}</td>
+                    <td className={`${TABLE_CELL_CLASS} text-right font-mono ${r.flagged ? 'text-red-600 font-semibold' : r.absDiff < 1 ? 'text-slate-400' : 'text-slate-700'}`}>
+                      {r.diff >= 0 ? '+' : ''}{fmt(r.diff)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {[
-                    ['Coke', dailyUsage.summary.cokeUsed],
-                    ['Coke Zero', dailyUsage.summary.cokeZeroUsed],
-                    ['Sprite', dailyUsage.summary.spriteUsed],
-                    ['Water', dailyUsage.summary.waterUsed],
-                    ['Orange Fanta', dailyUsage.summary.fantaOrangeUsed],
-                    ['Strawberry Fanta', dailyUsage.summary.fantaStrawberryUsed],
-                    ['Schweppes Manao', dailyUsage.summary.schweppesManaoUsed],
-                  ].map(([label, value]) => (
-                    <tr key={label} className="border-b">
-                      <td className="p-3 text-slate-700">{label}</td>
-                      <td className="p-3 text-right font-mono">{fmt(toNum(value))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </tbody>
+            </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* ── Usage Reconciliation: Engine vs Physical (Form 2) ── */}
+      {/* ── Stock Usage Reconciliation (2) ── */}
       <Card>
         <CardHeader className="py-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -459,7 +474,7 @@ export default function SalesShiftAnalysis() {
               )}
 
               {/* Buns + Meat headline tiles */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
                 {/* Buns */}
                 <div className={`rounded border p-3 ${
                   usageRecon.buns.severity === 'critical' ? 'border-red-300 bg-red-50' :
@@ -507,18 +522,18 @@ export default function SalesShiftAnalysis() {
               </div>
 
               {/* Drinks reconciliation table */}
-              <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
                 <div className="text-xs font-medium text-slate-500 mb-2">Drink Usage Reconciliation <span className="text-slate-400">(physical = opening + received − closing)</span></div>
-                <table className="w-full text-xs">
+                <table className={`w-full ${TABLE_TEXT_CLASS}`}>
                   <thead>
                     <tr className="border-b border-slate-200">
-                      <th className="text-left p-2 font-medium text-slate-600">Drink</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Expected</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Opening</th>
-                      <th className="text-right p-2 font-medium text-slate-600">+Received</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Closing</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Physical Used</th>
-                      <th className="text-right p-2 font-medium text-slate-600">Variance Δ</th>
+                      <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Drink</th>
+                      <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Expected</th>
+                      <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Opening</th>
+                      <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>+Received</th>
+                      <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Closing</th>
+                      <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Physical Used</th>
+                      <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Variance Δ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -527,13 +542,13 @@ export default function SalesShiftAnalysis() {
                         row.severity === 'critical' ? 'bg-red-100/40' :
                         row.severity === 'warn' ? 'bg-amber-100/40' : ''
                       }`}>
-                        <td className="p-2 text-slate-700">{row.label}</td>
-                        <td className="p-2 text-right font-mono">{row.expected ?? '—'}</td>
-                        <td className="p-2 text-right font-mono text-slate-500">{row.opening ?? '—'}</td>
-                        <td className="p-2 text-right font-mono text-slate-500">+{row.received}</td>
-                        <td className="p-2 text-right font-mono text-slate-500">{row.closing ?? '—'}</td>
-                        <td className="p-2 text-right font-mono">{row.physicalUsed ?? '—'}</td>
-                        <td className={`p-2 text-right font-mono font-semibold ${
+                        <td className={`${TABLE_CELL_CLASS} text-slate-700`}>{row.label}</td>
+                        <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{row.expected ?? '—'}</td>
+                        <td className={`${TABLE_CELL_CLASS} text-right font-mono text-slate-500`}>{row.opening ?? '—'}</td>
+                        <td className={`${TABLE_CELL_CLASS} text-right font-mono text-slate-500`}>+{row.received}</td>
+                        <td className={`${TABLE_CELL_CLASS} text-right font-mono text-slate-500`}>{row.closing ?? '—'}</td>
+                        <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{row.physicalUsed ?? '—'}</td>
+                        <td className={`${TABLE_CELL_CLASS} text-right font-mono font-semibold ${
                           row.severity === 'critical' ? 'text-red-700' :
                           row.severity === 'warn' ? 'text-amber-700' :
                           row.severity === 'ok' ? 'text-emerald-700' : 'text-slate-400'
@@ -542,19 +557,6 @@ export default function SalesShiftAnalysis() {
                         </td>
                       </tr>
                     ))}
-                    <tr className="border-t-2 border-slate-300 font-semibold">
-                      <td className="p-2 text-slate-700">Total Drinks</td>
-                      <td className="p-2 text-right font-mono">{usageRecon.drinks.totalExpected}</td>
-                      <td colSpan={3} />
-                      <td className="p-2 text-right font-mono">{usageRecon.drinks.totalPhysicalUsed ?? '—'}</td>
-                      <td className={`p-2 text-right font-mono ${
-                        usageRecon.drinks.totalVariance !== null && Math.abs(usageRecon.drinks.totalVariance) > 4 ? 'text-red-700' :
-                        usageRecon.drinks.totalVariance !== null && Math.abs(usageRecon.drinks.totalVariance) > 2 ? 'text-amber-700' :
-                        usageRecon.drinks.totalVariance !== null ? 'text-emerald-700' : 'text-slate-400'
-                      }`}>
-                        {usageRecon.drinks.totalVariance !== null ? (usageRecon.drinks.totalVariance >= 0 ? '+' : '') + usageRecon.drinks.totalVariance : '—'}
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -575,42 +577,71 @@ export default function SalesShiftAnalysis() {
         </CardContent>
       </Card>
 
-      {/* ── Comparison table ── */}
-      {(formLoading || posLoading) ? (
-        <div className="text-sm text-slate-500">Loading comparison...</div>
-      ) : (
-        <Card>
-          <CardHeader className="py-3">
-            <CardTitle className="text-sm font-medium text-slate-700">Form vs POS Comparison</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200">
-                  <th className="text-left p-3 font-medium text-slate-600">Category</th>
-                  <th className="text-right p-3 font-medium text-slate-600">Staff Form</th>
-                  <th className="text-right p-3 font-medium text-slate-600">POS / Loyverse</th>
-                  <th className="text-right p-3 font-medium text-slate-600">Difference</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.label} className={`border-b ${r.flagged ? 'bg-red-100/40' : ''}`}>
-                    <td className="p-3 text-slate-700">{r.label}</td>
-                    <td className="p-3 text-right font-mono">{fmt(r.form)}</td>
-                    <td className="p-3 text-right font-mono">{fmt(r.pos)}</td>
-                    <td className={`p-3 text-right font-mono ${r.flagged ? 'text-red-600 font-semibold' : r.absDiff < 1 ? 'text-slate-400' : 'text-slate-700'}`}>
-                      {r.diff >= 0 ? '+' : ''}{fmt(r.diff)}
-                    </td>
+      {/* ── Expected Stock Usage (3) ── */}
+      <Card>
+        <CardHeader className="py-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <CardTitle className="text-sm font-medium text-slate-700">Expected Stock Usage (Stored Receipts Truth)</CardTitle>
+            {dailyUsage && dailyUsage.receiptTruthBuiltAt && dailyUsage.dailyUsageBuiltAt &&
+              dailyUsage.receiptTruthBuiltAt > dailyUsage.dailyUsageBuiltAt && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] text-xs font-medium bg-amber-100 text-amber-700 border border-amber-200">
+                ⚠ Usage out of date — rebuild required
+              </span>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {usageLoading ? (
+            <div className="text-sm text-slate-500">Loading stored daily usage...</div>
+          ) : !dailyUsage ? (
+            <div className="text-sm text-amber-700">No stored daily usage for this date. Rebuild Receipts Analysis first.</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-sm">
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs">Expected Buns</div>
+                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedBuns))}</div>
+                </div>
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs">Expected Beef (g)</div>
+                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedBeefGrams))}</div>
+                </div>
+                <div className="rounded border border-slate-200 p-3">
+                  <div className="text-slate-500 text-xs">Expected Chicken (g)</div>
+                  <div className="font-semibold">{fmt(toNum(dailyUsage.summary.expectedChickenGrams))}</div>
+                </div>
+              </div>
+
+              <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <table className={`w-full ${TABLE_TEXT_CLASS}`}>
+                <thead>
+                  <tr className="border-b border-slate-200">
+                    <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Drink Type</th>
+                    <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Expected Used</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                </thead>
+                <tbody>
+                  {[
+                    ['Coke', dailyUsage.summary.cokeUsed],
+                    ['Coke Zero', dailyUsage.summary.cokeZeroUsed],
+                    ['Sprite', dailyUsage.summary.spriteUsed],
+                    ['Water', dailyUsage.summary.waterUsed],
+                    ['Orange Fanta', dailyUsage.summary.fantaOrangeUsed],
+                    ['Strawberry Fanta', dailyUsage.summary.fantaStrawberryUsed],
+                    ['Schweppes Manao', dailyUsage.summary.schweppesManaoUsed],
+                  ].map(([label, value]) => (
+                    <tr key={label} className="border-b">
+                      <td className={`${TABLE_CELL_CLASS} text-slate-700`}>{label}</td>
+                      <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{fmt(toNum(value))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
 
       {/* ── BOB REVIEW ── */}
       <Card className={`border-2 ${bobBorderClass}`}>
@@ -768,33 +799,33 @@ export default function SalesShiftAnalysis() {
           {adjustments.length === 0 ? (
             <p className="text-xs text-slate-400 p-4">No adjustments recorded for {selectedDate}. Bob can write adjustments via the API.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+            <div className="w-full overflow-x-auto">
+              <table className={`w-full ${TABLE_TEXT_CLASS}`}>
                 <thead>
                   <tr className="border-b border-slate-200">
-                    <th className="text-left p-3 font-medium text-slate-600">Field</th>
-                    <th className="text-right p-3 font-medium text-slate-600">Original</th>
-                    <th className="text-right p-3 font-medium text-slate-600">Adjusted</th>
-                    <th className="text-left p-3 font-medium text-slate-600">Reason</th>
-                    <th className="text-left p-3 font-medium text-slate-600">Status</th>
-                    <th className="text-left p-3 font-medium text-slate-600">Actions</th>
+                    <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Field</th>
+                    <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Original</th>
+                    <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Adjusted</th>
+                    <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Reason</th>
+                    <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Status</th>
+                    <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {adjustments.map((adj) => (
                     <tr key={adj.id} className="border-b hover:bg-slate-100/40">
-                      <td className="p-3 font-mono text-slate-700">
+                      <td className={`${TABLE_CELL_CLASS} font-mono text-slate-700`}>
                         <span className="text-slate-400">{adj.source_table}.</span>{adj.source_field}
                       </td>
-                      <td className="p-3 text-right font-mono text-slate-500">{adj.original_value ?? '—'}</td>
-                      <td className="p-3 text-right font-mono text-emerald-700 font-semibold">{adj.adjusted_value}</td>
-                      <td className="p-3 text-slate-600 max-w-[220px]">{adj.reason}</td>
-                      <td className="p-3">
+                      <td className={`${TABLE_CELL_CLASS} text-right font-mono text-slate-500`}>{adj.original_value ?? '—'}</td>
+                      <td className={`${TABLE_CELL_CLASS} text-right font-mono text-emerald-700 font-semibold`}>{adj.adjusted_value}</td>
+                      <td className={`${TABLE_CELL_CLASS} text-slate-600 max-w-[220px]`}>{adj.reason}</td>
+                      <td className={TABLE_CELL_CLASS}>
                         <Badge className={`text-xs ${reviewStatusColors[adj.review_status] || 'bg-slate-100 text-slate-600'}`}>
                           {adj.review_status}
                         </Badge>
                       </td>
-                      <td className="p-3">
+                      <td className={TABLE_CELL_CLASS}>
                         {adj.review_status === 'pending' && (
                           <div className="flex gap-1">
                             <Button
@@ -838,7 +869,7 @@ export default function SalesShiftAnalysis() {
         </CardContent>
       </Card>
 
-      {/* ── Approval form ── */}
+      {/* ── Shift Approval (4) ── */}
       <Card>
         <CardHeader className="py-3">
           <CardTitle className="text-sm font-medium text-slate-700">Shift Approval</CardTitle>
@@ -847,19 +878,19 @@ export default function SalesShiftAnalysis() {
           <div className="grid md:grid-cols-2 gap-4">
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-xs font-medium text-slate-600">Manager</span>
-              <input value={managerName} readOnly className="border border-slate-200 rounded-[4px] px-2 py-1.5 bg-slate-100 text-sm text-slate-500" />
+              <input value={managerName} readOnly className={`${INPUT_CLASS} bg-slate-100 text-slate-500`} />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-xs font-medium text-slate-600">Cash Banked (฿)</span>
-              <input type="number" value={cashBanked} onChange={(e) => setCashBanked(e.target.value)} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-sm" />
+              <input type="number" value={cashBanked} onChange={(e) => setCashBanked(e.target.value)} className={INPUT_CLASS} />
             </label>
             <label className="flex flex-col gap-1 text-sm">
               <span className="text-xs font-medium text-slate-600">QR Banked (฿)</span>
-              <input type="number" value={qrBanked} onChange={(e) => setQrBanked(e.target.value)} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-sm" />
+              <input type="number" value={qrBanked} onChange={(e) => setQrBanked(e.target.value)} className={INPUT_CLASS} />
             </label>
             <label className="flex flex-col gap-1 text-sm md:col-span-2">
               <span className="text-xs font-medium text-slate-600">Notes</span>
-              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className="border border-slate-200 rounded-[4px] px-2 py-1.5 min-h-16 text-sm" />
+              <textarea value={notes} onChange={(e) => setNotes(e.target.value)} className={`${INPUT_CLASS} min-h-16`} />
             </label>
             <Button
               className="bg-slate-900 text-white w-fit text-sm"
@@ -941,43 +972,71 @@ export default function SalesShiftAnalysis() {
         </CardContent>
       </Card>
 
-      {/* ── All shifts history ── */}
+      {/* ── All Shifts History (5 / last) ── */}
       <Card>
         <CardHeader className="py-3">
-          <CardTitle className="text-sm font-medium text-slate-700">All Shifts History</CardTitle>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="text-sm font-medium text-slate-700">All Shifts History</CardTitle>
+            <span className="text-xs text-slate-500">Showing last 30 days</span>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
-          <table className="w-full text-sm">
+          <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+          <table className={`w-full ${TABLE_TEXT_CLASS}`}>
             <thead>
               <tr className="border-b border-slate-200">
-                <th className="text-left p-3 font-medium text-slate-600">Date</th>
-                <th className="text-left p-3 font-medium text-slate-600">Status</th>
-                <th className="text-right p-3 font-medium text-slate-600">POS Total</th>
-                <th className="text-right p-3 font-medium text-slate-600">Form Total</th>
+                <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Date</th>
+                <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Status</th>
+                <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>POS Total</th>
+                <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Form Total</th>
               </tr>
             </thead>
             <tbody>
-              {(allShifts || []).map((row) => (
+              {pagedHistory.map((row) => (
                 <tr
                   key={row.date}
                   className={`border-b cursor-pointer hover:bg-slate-100/40 transition-colors ${row.date === selectedDate ? 'bg-emerald-100/30 border-l-2 border-l-emerald-500' : ''}`}
                   onClick={() => setSelectedDate(row.date)}
                 >
-                  <td className="p-3 text-sm text-slate-700">{row.date}</td>
-                  <td className="p-3">
+                  <td className={`${TABLE_CELL_CLASS} text-slate-700`}>{row.date}</td>
+                  <td className={TABLE_CELL_CLASS}>
                     <Badge className={`text-xs ${row.approved ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'}`}>
                       {row.approved ? 'Approved' : 'Pending'}
                     </Badge>
                   </td>
-                  <td className="p-3 text-right text-sm tabular-nums text-slate-700">{fmt(toNum(row.pos_data?.total))}</td>
-                  <td className="p-3 text-right text-sm tabular-nums text-slate-700">{fmt(toNum(row.form_data?.total))}</td>
+                  <td className={`${TABLE_CELL_CLASS} text-right tabular-nums text-slate-700`}>{fmt(toNum(row.pos_data?.total))}</td>
+                  <td className={`${TABLE_CELL_CLASS} text-right tabular-nums text-slate-700`}>{fmt(toNum(row.form_data?.total))}</td>
                 </tr>
               ))}
-              {(!allShifts || allShifts.length === 0) && (
+              {(pagedHistory.length === 0) && (
                 <tr><td colSpan={4} className="p-4 text-center text-slate-400 text-xs">No shift history available</td></tr>
               )}
             </tbody>
           </table>
+          </div>
+          {totalHistoryPages > 1 && (
+            <div className="flex items-center justify-end gap-2 p-3 border-t border-slate-200">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                disabled={historyPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-slate-500">Page {historyPage} / {totalHistoryPages}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-xs"
+                onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                disabled={historyPage === totalHistoryPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

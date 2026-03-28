@@ -67,6 +67,10 @@ function normDrinkKey(key: string): string {
   return DRINK_NAME_MAP[key.toLowerCase().trim()] ?? null;
 }
 
+function normItemType(itemType: string | null | undefined): string {
+  return String(itemType ?? "").toLowerCase().trim();
+}
+
 /** Collapse a drinksJson object from Form 2 into the engine field buckets. */
 function collapseDrinksJson(drinksJson: Record<string, number> | null): Record<string, number> {
   const out: Record<string, number> = {};
@@ -161,9 +165,15 @@ export async function getUsageReconciliation(date: string) {
   const receivedDrinks: Record<string, number> = {};
 
   for (const r of receivedResult.rows) {
-    if (r.item_type === "rolls") receivedBuns += Number(r.qty ?? 0);
-    if (r.item_type === "meat") receivedMeatG += Number(r.weight_g ?? 0);
-    if (r.item_type === "drinks" && r.item_name) {
+    const itemType = normItemType(r.item_type);
+    if (itemType === "rolls" || itemType === "roll" || itemType === "bun" || itemType === "buns") {
+      receivedBuns += Number(r.qty ?? 0);
+    }
+    if (itemType === "meat" || itemType === "beef" || itemType === "protein") {
+      receivedMeatG += Number(r.weight_g ?? 0);
+    }
+    if (itemType === "drinks" || itemType === "drink" || itemType === "beverage") {
+      if (!r.item_name) continue;
       const field = normDrinkKey(r.item_name);
       if (field) receivedDrinks[field] = (receivedDrinks[field] ?? 0) + Number(r.qty ?? 0);
     }
@@ -251,7 +261,7 @@ export async function getUsageReconciliation(date: string) {
     });
   }
 
-  if (totalDrinksKnown && meatGExpected !== null) {
+  if (totalDrinksKnown && engineBuilt) {
     totalDrinksVariance = totalDrinksPhysical - totalDrinksExpected;
   }
 
