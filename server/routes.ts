@@ -1605,16 +1605,60 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
     try {
       const { getReceiptTruthDailyUsage } = await import('./services/receiptTruthDailyUsageService');
-      const result = await getReceiptTruthDailyUsage(date);
-      if (!result) {
-        return res.status(404).json({
-          error: 'DAILY_USAGE_NOT_BUILT',
-          message: `No daily usage found for ${date}. Use POST /api/analysis/receipts-truth/daily-usage/rebuild to build.`,
+      const existing = await getReceiptTruthDailyUsage(date);
+      if (existing) {
+        return res.json({ ...existing, autoBuilt: false });
+      }
+
+      // Not built — attempt auto-build
+      const { ensureAnalysisForDate } = await import('./services/analysisBuildOrchestrator');
+      const buildResult = await ensureAnalysisForDate(date, 'AUTO_ON_READ');
+
+      if (!buildResult.ok) {
+        return res.status(503).json({
+          error: 'DAILY_USAGE_BUILD_FAILED',
+          message: buildResult.buildError || 'Auto-build failed',
+          autoBuilt: false,
+          buildStatus: buildResult.buildStatus,
+          receiptsTruthStatus: buildResult.receiptsTruthStatus,
+          dailyUsageStatus: buildResult.dailyUsageStatus,
         });
       }
-      res.json(result);
+
+      const rebuilt = await getReceiptTruthDailyUsage(date);
+      if (!rebuilt) {
+        return res.status(503).json({
+          error: 'DAILY_USAGE_BUILD_FAILED',
+          message: 'Build succeeded but data still not found — source data may be empty',
+          autoBuilt: true,
+          buildStatus: 'SUCCESS',
+        });
+      }
+      return res.json({
+        ...rebuilt,
+        autoBuilt: true,
+        buildStatus: 'SUCCESS',
+        receiptsTruthStatus: buildResult.receiptsTruthStatus,
+        dailyUsageStatus: buildResult.dailyUsageStatus,
+      });
     } catch (e: any) {
       console.error('[DAILY_USAGE_FAIL]', e);
+      res.status(500).json({ error: e.message || String(e) });
+    }
+  });
+
+  // Build status read endpoint
+  app.get('/api/analysis/build-status', async (req, res) => {
+    const date = req.query.date as string;
+    if (!date) {
+      return res.status(400).json({ error: 'date query parameter required (YYYY-MM-DD)' });
+    }
+    try {
+      const { getBuildStatus } = await import('./services/analysisBuildOrchestrator');
+      const status = await getBuildStatus(date);
+      res.json({ ok: true, date, ...status });
+    } catch (e: any) {
+      console.error('[BUILD_STATUS_FAIL]', e);
       res.status(500).json({ error: e.message || String(e) });
     }
   });

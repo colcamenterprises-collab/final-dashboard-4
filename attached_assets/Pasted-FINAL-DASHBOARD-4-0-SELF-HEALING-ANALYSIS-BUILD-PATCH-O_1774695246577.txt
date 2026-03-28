@@ -1,0 +1,217 @@
+FINAL DASHBOARD 4.0 — SELF-HEALING ANALYSIS BUILD PATCH
+ONE PATCH ONLY
+NO OTHER WORK
+NO ENHANCEMENTS OUTSIDE THIS SCOPE
+
+PROBLEM
+The source data exists (forms, receipts truth, POS), but the derived analysis layer is sometimes missing for specific dates.
+
+Example:
+- 2026-03-25 has forms and receipts
+- but analysis/stock-usage is not built
+- Bob reads the derived layer and gets not_built
+- theft-control / shift analysis cannot proceed
+
+This must be fixed permanently.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Make the analysis layer self-healing.
+
+If a date is missing derived usage, the app must automatically rebuild the missing layer from source data instead of requiring manual intervention.
+
+==================================================
+REQUIRED OUTCOME
+==================================================
+
+For any requested business date:
+1. If source data exists and derived usage is missing
+   → auto-build it
+2. If receipts truth is also missing
+   → rebuild receipts truth first
+   → then rebuild daily usage
+3. Return final data if build succeeds
+4. If build fails
+   → return structured failure
+   → persist build status/error
+   → create/update issue_register entry
+
+No more “not_built” dead ends without an attempted recovery.
+
+==================================================
+SCOPE
+==================================================
+
+Fix only:
+- receipts truth / daily usage build orchestration
+- analysis build status visibility
+- issue creation for failed builds
+- Bob/app read paths for analysis availability
+
+Do NOT touch:
+- online ordering
+- recipe costing
+- theft logic math
+- issue register structure except to use it
+- UI redesign
+- unrelated pages
+
+==================================================
+PATCH REQUIREMENTS
+==================================================
+
+A. BUILD STATUS TABLE
+Create a new DB table if needed:
+
+analysis_build_status
+
+Fields:
+- id
+- business_date
+- build_type
+  - RECEIPTS_TRUTH
+  - DAILY_USAGE
+- status
+  - PENDING
+  - RUNNING
+  - SUCCESS
+  - FAILED
+- trigger_source
+  - SCHEDULER
+  - AUTO_ON_READ
+  - MANUAL
+  - STARTUP_CATCHUP
+  - BOB
+- started_at
+- completed_at
+- error_message
+- metadata_json
+- updated_at
+
+Unique key:
+- business_date + build_type
+
+This is now the source of truth for build health.
+Do NOT rely on workspace artifacts.
+
+B. AUTO-BUILD ON READ
+For the canonical daily usage read endpoint(s):
+- /api/analysis/receipts-truth/daily-usage?date=...
+- any Bob proxy path that exposes analysis/stock-usage
+
+Implement this logic:
+
+1. Request comes in for date X
+2. Check whether daily usage exists for X
+3. If exists → return it normally
+4. If missing:
+   a. mark build status RUNNING for DAILY_USAGE
+   b. check whether receipts truth exists for X
+   c. if missing, rebuild receipts truth first
+   d. rebuild daily usage
+   e. re-query result
+   f. if success, return usage and mark SUCCESS
+   g. if failure, mark FAILED and return structured error
+
+IMPORTANT:
+- do not silently return not_built without attempting recovery
+- if source data exists, try to build it
+- if build fails, expose exact failure cleanly
+
+C. STARTUP CATCH-UP
+On app/server startup:
+- check the last 3 business dates
+- if receipts truth or daily usage is missing for any of them
+  → run catch-up rebuilds automatically
+
+This must be safe and idempotent.
+
+D. ISSUE REGISTER INTEGRATION
+If auto-build fails:
+- create or update issue_register entry:
+  - issue_type: MISSING_USAGE_BUILD
+  - category: SYSTEM
+  - severity: CRITICAL
+  - shift_date: requested date
+  - source_page: analysis/stock-usage or equivalent
+  - description: auto-build attempted and failed
+
+If auto-build later succeeds:
+- do NOT delete issue history
+- leave issue open for human closure or add metadata indicating condition cleared
+
+E. BUILD STATUS API
+Add read endpoints:
+- GET /api/analysis/build-status?date=YYYY-MM-DD
+- and Bob proxy equivalent if needed
+
+Return:
+- receipts truth status
+- daily usage status
+- started/completed times
+- last error
+- trigger source
+
+F. FRONTEND / BOB CONTRACT
+Wherever the UI or Bob reads stock usage:
+- if data is present, return it
+- if data had to be auto-built, include:
+  - autoBuilt: true
+  - buildStatus
+- if build fails, include:
+  - autoBuilt: false
+  - buildStatus: FAILED
+  - buildError
+
+G. DO NOT CHANGE CALCULATIONS
+This patch is orchestration only.
+Do not change:
+- buns logic
+- patties logic
+- drinks logic
+- fries logic
+- Mix & Match logic
+
+==================================================
+ACCEPTANCE TESTS
+==================================================
+
+1. Pick a date with existing usage
+   → endpoint returns immediately
+   → no rebuild triggered
+
+2. Pick a date with missing daily usage but existing receipts truth
+   → endpoint auto-builds daily usage
+   → returns data
+   → build status logged
+
+3. Pick a date with missing receipts truth and missing daily usage but raw source data present
+   → endpoint rebuilds receipts truth
+   → then daily usage
+   → returns data
+   → both build statuses logged
+
+4. Pick a date where build genuinely fails
+   → returns structured failure
+   → issue_register gets MISSING_USAGE_BUILD issue
+   → build status shows FAILED
+
+5. Startup catch-up checks last 3 dates and fills any gaps safely
+
+6. Bob can query build status through app APIs, not workspace artifact guessing
+
+==================================================
+DELIVER BACK
+==================================================
+
+Return:
+1. exact files changed
+2. exact tables added/used
+3. exact endpoints changed/added
+4. PASS/FAIL against all acceptance tests
+5. before/after example for one missing date
+6. confirmation that no calculation logic was changed
+
+This patch must eliminate the current problem where source data exists but analysis fails because the derived layer was never built.

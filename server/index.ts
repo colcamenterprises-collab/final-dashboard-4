@@ -703,6 +703,17 @@ async function checkSchema() {
             console.log("👤 Default admin created: admin@sbb.com (password: sbb123)");
           }
           
+          // Patch 4.0 — Self-healing analysis catch-up for last 3 business dates
+          try {
+            const { runStartupCatchup } = await import('./services/analysisBuildOrchestrator');
+            runStartupCatchup().catch((e: any) =>
+              console.error('[analysisBuildOrchestrator] Startup catch-up error:', e?.message)
+            );
+            console.log('🔧 Analysis startup catch-up queued');
+          } catch (catchupImportErr: any) {
+            console.warn('[analysisBuildOrchestrator] Could not load orchestrator:', catchupImportErr?.message);
+          }
+
           console.log('✅ All background services started successfully');
         } catch (err) {
           console.error('❌ Error starting background services:', err);

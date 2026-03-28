@@ -508,7 +508,38 @@ router.get("/analysis/stock-usage", async (req: Request, res: Response) => {
   }
 
   try {
-    // Summary row — one per business date
+    // ── 1. Check if data exists; if not, auto-build ───────────────────────────
+    let autoBuilt = false;
+    let autoBuildStatus: string | undefined;
+
+    const existsCheck = await pool.query(
+      `SELECT 1 FROM receipt_truth_daily_usage WHERE business_date = $1::date LIMIT 1`,
+      [date]
+    );
+
+    if (existsCheck.rows.length === 0) {
+      // Data missing — attempt auto-build
+      const { ensureAnalysisForDate } = await import("../services/analysisBuildOrchestrator");
+      const buildResult = await ensureAnalysisForDate(date, "BOB");
+
+      if (!buildResult.ok) {
+        await logRequest("/analysis/stock-usage", params, 503, false, elapsed());
+        return res.status(503).json({
+          ok: false,
+          not_built: true,
+          autoBuilt: false,
+          buildStatus: buildResult.buildStatus,
+          buildError: buildResult.buildError,
+          date,
+          message: `Auto-build attempted but failed for ${date}: ${buildResult.buildError}`,
+        });
+      }
+
+      autoBuilt = buildResult.autoBuilt;
+      autoBuildStatus = buildResult.buildStatus;
+    }
+
+    // ── 2. Query summary aggregates ───────────────────────────────────────────
     const summaryResult = await pool.query(
       `SELECT
          COUNT(*) AS row_count,
@@ -538,12 +569,15 @@ router.get("/analysis/stock-usage", async (req: Request, res: Response) => {
 
     const agg = summaryResult.rows[0];
     if (!agg || Number(agg.row_count) === 0) {
+      // Build succeeded but still empty — source data may be genuinely empty
       await logRequest("/analysis/stock-usage", params, 200, true, elapsed());
       return res.json({
         ok: true,
         not_built: true,
+        autoBuilt,
+        buildStatus: autoBuildStatus ?? "SUCCESS",
         date,
-        message: `No stock usage data for ${date}. A rebuild must be triggered first via the internal rebuild endpoint.`,
+        message: `No stock usage rows found for ${date} — shift may have had no sales.`,
       });
     }
 
@@ -622,6 +656,8 @@ router.get("/analysis/stock-usage", async (req: Request, res: Response) => {
     return res.json({
       ok: true,
       date,
+      autoBuilt,
+      ...(autoBuildStatus ? { buildStatus: autoBuildStatus } : {}),
       rowCount: rows.length,
       summary,
       rows,
