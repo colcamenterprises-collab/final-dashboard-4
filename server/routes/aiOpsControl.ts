@@ -2691,14 +2691,20 @@ router.use((req: any, res: any, next: any) => {
 // Auth: same dual-token as proxy-read (BOB_READONLY_TOKEN or BOBS_LOYVERSE_TOKEN)
 // ─────────────────────────────────────────────────────────────────────────────
 function bobAuthMiddleware(req: any, res: any, next: any) {
-  const internalToken = process.env.BOB_READONLY_TOKEN;
-  const gatewayToken  = process.env.BOBS_LOYVERSE_TOKEN;
-  const validTokens   = [internalToken, gatewayToken].filter(Boolean) as string[];
-  const authHeader    = (req.headers.authorization || "") as string;
-  const headerToken   = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
-  const queryToken    = (req.query.token as string) || (req.query.api_key as string) || null;
-  const token         = headerToken || queryToken;
-  if (!token || !validTokens.includes(token)) {
+  const writeToken = process.env.BOB_WRITE_TOKEN || process.env.BOBS_LOYVERSE_WRITE_TOKEN;
+  if (!writeToken) {
+    return res.status(403).json({
+      ok: false,
+      error: "Bob write endpoints are disabled. Configure BOB_WRITE_TOKEN (or BOBS_LOYVERSE_WRITE_TOKEN) for explicit write authority.",
+    });
+  }
+
+  const authHeader = (req.headers.authorization || "") as string;
+  const headerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const queryToken = (req.query.token as string) || (req.query.api_key as string) || null;
+  const token = headerToken || queryToken;
+
+  if (!token || token !== writeToken) {
     return res.status(401).json({ ok: false, error: "Unauthorized" });
   }
   next();
