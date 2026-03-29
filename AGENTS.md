@@ -16,6 +16,14 @@ These instructions apply to the full repository.
 4. `GET /api/bob/read/build-status?date=YYYY-MM-DD`
 5. `GET /api/bob/read/shift-snapshot?date=YYYY-MM-DD`
 
+## Canonical Daily Readiness Runner
+- Script: `server/scripts/daily_readiness_check.js`
+- Wrapper: `scripts/run-daily-readiness.sh`
+- This runner is the canonical Bob daily readiness script.
+- This runner is strictly read-only and evidence-only.
+- This runner must not trigger rebuilds.
+- This runner must not mutate production data.
+
 ## Definition of Done for Bob Daily Read
 - Each endpoint returns `ok`, `source`, `scope`, `status`, `data`, `warnings`, `blockers`, `last_updated`.
 - Missing inputs or derived data are explicitly represented as blockers.
