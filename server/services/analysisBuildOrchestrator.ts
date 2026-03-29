@@ -489,6 +489,56 @@ export async function runBackfillBuildStatus(daysBack = 7): Promise<void> {
   }
 }
 
+// ─── Scheduled build for previous business date ───────────────────────────────
+
+/**
+ * runScheduledBuildForPreviousDate()
+ *
+ * Intended to be called by a daily cron at 4:00 AM Bangkok time.
+ * Ensures the previous business date has completed receipt truth + daily usage builds.
+ * Idempotent — ensureAnalysisForDate() is a no-op if data already exists.
+ * On failure → creates an issue_register entry and logs clearly.
+ */
+export async function runScheduledBuildForPreviousDate(): Promise<void> {
+  const tag = "[analysisBuildOrchestrator][SCHEDULED_BUILD]";
+  const prevDate = lastNBusinessDates(1)[0];
+
+  console.log(`${tag} Starting scheduled build for ${prevDate}`);
+
+  const result = await ensureAnalysisForDate(prevDate, "SCHEDULER");
+
+  if (result.ok) {
+    if (result.autoBuilt) {
+      console.log(`${tag} ${prevDate} — built successfully (receipts=${result.receiptsTruthStatus}, usage=${result.dailyUsageStatus})`);
+    } else {
+      console.log(`${tag} ${prevDate} — already complete, no action needed`);
+    }
+  } else {
+    const errMsg = result.buildError ?? "Unknown build failure";
+    console.error(`${tag} ${prevDate} — FAILED: ${errMsg}`);
+
+    // Write to issue_register for visibility
+    try {
+      const sourceRef = `SCHEDULED_BUILD_FAILED::${prevDate}`;
+      await pool!.query(
+        `INSERT INTO issue_register
+           (shift_date, issue_type, detected_by, severity, description, source_ref, resolved)
+         VALUES ($1::date, 'MISSING_USAGE_BUILD', 'SYSTEM', 'HIGH', $2, $3, false)
+         ON CONFLICT (shift_date, issue_type, source_ref) DO UPDATE SET
+           description = EXCLUDED.description,
+           updated_at  = NOW()`,
+        [
+          prevDate,
+          `Scheduled build failed for ${prevDate}: ${errMsg}`,
+          sourceRef,
+        ]
+      );
+    } catch (issueErr: any) {
+      console.error(`${tag} Failed to write issue_register:`, issueErr.message);
+    }
+  }
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function lastNBusinessDates(n: number): string[] {

@@ -67,10 +67,6 @@ function normDrinkKey(key: string): string {
   return DRINK_NAME_MAP[key.toLowerCase().trim()] ?? null;
 }
 
-function normItemType(itemType: string | null | undefined): string {
-  return String(itemType ?? "").toLowerCase().trim();
-}
-
 /** Collapse a drinksJson object from Form 2 into the engine field buckets. */
 function collapseDrinksJson(drinksJson: Record<string, number> | null): Record<string, number> {
   const out: Record<string, number> = {};
@@ -144,12 +140,23 @@ export async function getUsageReconciliation(date: string) {
     [prev]
   );
 
-  // 4. Received stock for this date
-  const receivedResult = await pool.query(
-    `SELECT item_type, item_name, SUM(qty) AS qty, SUM(weight_g) AS weight_g
-     FROM stock_received_log
-     WHERE shift_date = $1::date
-     GROUP BY item_type, item_name`,
+  // 4. Received stock — canonical source: purchase_tally + purchase_tally_drink
+  //    (same source as Stock Reconciliation — this is the ONE purchase truth)
+  const receivedTallyResult = await pool.query(
+    `SELECT
+       COALESCE(SUM(CASE WHEN rolls_pcs > 0 THEN rolls_pcs ELSE 0 END), 0)  AS received_buns,
+       COALESCE(SUM(CASE WHEN meat_grams > 0 THEN meat_grams ELSE 0 END), 0) AS received_meat_g
+     FROM purchase_tally
+     WHERE date::date = $1::date`,
+    [date]
+  );
+
+  const receivedDrinksResult = await pool.query(
+    `SELECT ptd.item_name, SUM(ptd.qty) AS qty
+     FROM purchase_tally_drink ptd
+     JOIN purchase_tally pt ON pt.id = ptd.tally_id
+     WHERE pt.date::date = $1::date
+     GROUP BY ptd.item_name`,
     [date]
   );
 
@@ -159,24 +166,17 @@ export async function getUsageReconciliation(date: string) {
   const curr = form2Available ? currentForm2.rows[0] : null;
   const opening = prevForm2Available ? prevForm2.rows[0] : null;
 
-  // Received buns (rolls) and meat
-  let receivedBuns = 0;
-  let receivedMeatG = 0;
-  const receivedDrinks: Record<string, number> = {};
+  // Received buns (rolls) and meat from canonical purchase_tally
+  const tallyRow = receivedTallyResult.rows[0];
+  const receivedBuns = Number(tallyRow?.received_buns ?? 0);
+  const receivedMeatG = Number(tallyRow?.received_meat_g ?? 0);
 
-  for (const r of receivedResult.rows) {
-    const itemType = normItemType(r.item_type);
-    if (itemType === "rolls" || itemType === "roll" || itemType === "bun" || itemType === "buns") {
-      receivedBuns += Number(r.qty ?? 0);
-    }
-    if (itemType === "meat" || itemType === "beef" || itemType === "protein") {
-      receivedMeatG += Number(r.weight_g ?? 0);
-    }
-    if (itemType === "drinks" || itemType === "drink" || itemType === "beverage") {
-      if (!r.item_name) continue;
-      const field = normDrinkKey(r.item_name);
-      if (field) receivedDrinks[field] = (receivedDrinks[field] ?? 0) + Number(r.qty ?? 0);
-    }
+  // Received drinks from purchase_tally_drink — normalize names via DRINK_NAME_MAP
+  const receivedDrinks: Record<string, number> = {};
+  for (const r of receivedDrinksResult.rows) {
+    if (!r.item_name) continue;
+    const field = normDrinkKey(r.item_name);
+    if (field) receivedDrinks[field] = (receivedDrinks[field] ?? 0) + Number(r.qty ?? 0);
   }
 
   // ─── Buns ─────────────────────────────────────────────────────────────────

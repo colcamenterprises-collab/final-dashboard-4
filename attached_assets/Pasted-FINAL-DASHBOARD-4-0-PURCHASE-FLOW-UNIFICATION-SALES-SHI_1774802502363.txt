@@ -1,0 +1,146 @@
+FINAL DASHBOARD 4.0 — PURCHASE FLOW UNIFICATION + SALES & SHIFT ANALYSIS FIX
+PRIORITY: IMMEDIATE
+ONE PATCH
+TAKE OWNERSHIP
+DO NOT PATCH AROUND THE ISSUE
+DO NOT REDESIGN UI
+DO NOT WORK ON ANYTHING ELSE
+
+PROBLEM
+
+Purchased rolls, meat, and drinks entered via the modal are updating Stock Reconciliation,
+but they are NOT flowing into Sales & Shift Analysis.
+
+Result:
+- Stock Reconciliation shows purchases
+- Sales & Shift Analysis shows Received = +0
+- variance is wrong
+- Bob is reading an incomplete picture
+- there are clearly two truths or two read paths
+
+This must be fixed now.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Make Sales & Shift Analysis use the SAME canonical purchase source as Stock Reconciliation.
+
+There must be ONE purchase truth only.
+
+==================================================
+WHAT TO AUDIT FIRST
+==================================================
+
+Identify exactly:
+
+1. Which table(s) / route(s) the purchase modal writes to
+2. Which table(s) / route(s) Stock Reconciliation reads from
+3. Which table(s) / route(s) Sales & Shift Analysis reads from
+4. Why Sales & Shift Analysis is not including purchases
+5. Whether duplicate storage or duplicate read-model logic exists
+
+==================================================
+IMPLEMENTATION RULE
+==================================================
+
+Do NOT create another purchase storage path.
+Do NOT duplicate purchase data.
+Do NOT fake received values in the UI.
+
+Instead:
+- identify the canonical purchase ledger already used by Stock Reconciliation
+- make Sales & Shift Analysis reconciliation consume that same source
+
+ONE purchase truth only.
+
+==================================================
+EXPECTED BUSINESS LOGIC
+==================================================
+
+Sales & Shift Analysis reconciliation must include:
+
+BUNS
+physical_used = opening + received - closing
+
+MEAT
+physical_used = opening + received - closing
+
+DRINKS
+physical_used = opening + received - closing
+
+Where:
+- opening = start / prior known value
+- received = canonical purchases for that shift date
+- closing = staff form count
+- expected = usage engine / receipts truth
+
+==================================================
+ALSO FIX THIS
+==================================================
+
+Remove the latest-date automation weakness.
+
+Ensure the previous business date is automatically built on schedule so Bob does not depend on manual timing.
+
+Use the existing orchestrator.
+Do not change any calculation logic.
+
+Required:
+- scheduled build for previous business date
+- idempotent
+- no duplicate builds
+- clear success / fail logging
+- create issue if scheduled build fails
+
+==================================================
+DO NOT TOUCH
+==================================================
+
+- online ordering
+- recipe costing
+- UI redesign
+- theft thresholds
+- issue register structure
+- receipts math
+- usage math
+
+This patch is ONLY:
+- purchase data flow unification
+- Sales & Shift Analysis correctness
+- scheduled build reliability
+
+==================================================
+VERIFICATION REQUIRED
+==================================================
+
+You must prove all of this:
+
+1. Enter purchase via modal
+2. Confirm purchase is written to canonical source
+3. Confirm Stock Reconciliation reads it
+4. Confirm Sales & Shift Analysis now reads the same purchase
+5. Confirm Received values are no longer +0
+6. Confirm buns/meat/drinks reconciliation reflects purchases correctly
+7. Confirm Bob’s read path now includes the same received data
+8. Confirm previous business date build runs automatically without manual intervention
+
+==================================================
+DELIVER BACK
+==================================================
+
+Return:
+1. architecture summary
+2. exact canonical purchase source chosen
+3. exact files changed
+4. exact routes / services / tables changed
+5. before vs after data flow
+6. PASS/FAIL verification
+7. screenshots:
+   - Stock Reconciliation
+   - Sales & Shift Analysis
+   - proof the same purchases appear in both
+
+Take ownership.
+Fix the duplicate truth.
+Make Bob’s page accurate.

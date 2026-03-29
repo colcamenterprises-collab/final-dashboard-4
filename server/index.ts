@@ -709,7 +709,7 @@ async function checkSchema() {
           
           // Patch 4.0 — Self-healing analysis catch-up + build-status backfill
           try {
-            const { runStartupCatchup, runBackfillBuildStatus } = await import('./services/analysisBuildOrchestrator');
+            const { runStartupCatchup, runBackfillBuildStatus, runScheduledBuildForPreviousDate } = await import('./services/analysisBuildOrchestrator');
             // Backfill status rows for existing data first (safe, no-op if already present)
             runBackfillBuildStatus(7).catch((e: any) =>
               console.error('[analysisBuildOrchestrator] Backfill error:', e?.message)
@@ -719,6 +719,14 @@ async function checkSchema() {
               console.error('[analysisBuildOrchestrator] Startup catch-up error:', e?.message)
             );
             console.log('🔧 Analysis startup catch-up + backfill queued');
+
+            // Daily scheduled build at 4:00 AM Bangkok — ensures previous date is always built
+            nodeCron.default.schedule("0 4 * * *", () => {
+              runScheduledBuildForPreviousDate().catch((e: any) =>
+                console.error('[analysisBuildOrchestrator] Scheduled build error:', e?.message)
+              );
+            }, { timezone: "Asia/Bangkok" });
+            console.log('📊 Analysis scheduled build registered (04:00 Bangkok — previous business date)');
           } catch (catchupImportErr: any) {
             console.warn('[analysisBuildOrchestrator] Could not load orchestrator:', catchupImportErr?.message);
           }
