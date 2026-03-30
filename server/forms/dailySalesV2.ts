@@ -21,8 +21,21 @@ import { v4 as uuid } from "uuid";
 import { computeBankingAuto } from "../services/bankingAuto.js";
 import { validateStockRequired } from "../services/stockRequired.js";
 import { PrismaClient } from "@prisma/client";
+import { computeRecommendedOrder, ensureRollOrderTable, resolveRollOrderConfig, sendLineBakeryOrder } from "../services/rollOrderService";
 
 const prisma = new PrismaClient();
+
+
+async function getShiftDateForSalesId(salesId: string): Promise<string | null> {
+  const row = await pool.query(`SELECT "shiftDate"::text AS shift_date FROM daily_sales_v2 WHERE id = $1 LIMIT 1`, [salesId]);
+  return row.rows?.[0]?.shift_date ?? null;
+}
+
+async function getRollOrderByShiftDate(shiftDate: string) {
+  await ensureRollOrderTable();
+  const result = await pool.query(`SELECT * FROM roll_order WHERE shift_date = $1::date LIMIT 1`, [shiftDate]);
+  return result.rows?.[0] ?? null;
+}
 
 // Utility functions for THB values (no cents conversion)
 const toTHB = (v: any) => Math.round(Number(String(v).replace(/[^\d.-]/g, '')) || 0);
@@ -914,6 +927,104 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
   }
 }
 
+
+export async function getDailySalesV2RollOrder(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const shiftDate = await getShiftDateForSalesId(id);
+    if (!shiftDate) return res.status(404).json({ ok: false, error: "Daily sales record not found" });
+
+    const cfg = resolveRollOrderConfig();
+    const existing = await getRollOrderByShiftDate(shiftDate);
+    const closingRolls = existing ? Number(existing.closing_rolls || 0) : 0;
+    const recommendedQty = computeRecommendedOrder(cfg.targetRolls, closingRolls, cfg.increment);
+
+    return res.json({
+      ok: true,
+      shiftDate,
+      targetRolls: cfg.targetRolls,
+      bakeryIncrement: cfg.increment,
+      lineTargetIdConfigured: Boolean(cfg.lineTargetId),
+      rollOrder: existing,
+      defaults: {
+        closingRolls,
+        recommendedQty,
+        approvedQty: existing ? Number(existing.approved_qty || recommendedQty) : recommendedQty,
+      },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error?.message || "Failed to load roll order" });
+  }
+}
+
+export async function sendDailySalesV2RollOrder(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const shiftDate = await getShiftDateForSalesId(id);
+    if (!shiftDate) return res.status(404).json({ ok: false, error: "Daily sales record not found" });
+
+    const cfg = resolveRollOrderConfig();
+    const closingRolls = Math.max(0, Number(req.body?.closingRolls ?? 0));
+    const targetRolls = Math.max(0, Number(req.body?.targetRolls ?? cfg.targetRolls));
+    const recommendedQty = computeRecommendedOrder(targetRolls, closingRolls, cfg.increment);
+    const approvedQty = Math.max(0, Number(req.body?.approvedQty ?? recommendedQty));
+    const wasOverridden = approvedQty !== recommendedQty;
+    const overrideReason = wasOverridden ? String(req.body?.overrideReason || "").trim() || null : null;
+
+    await ensureRollOrderTable();
+
+    const statusBeforeSend = wasOverridden ? "OVERRIDDEN" : "APPROVED";
+    const upsertResult = await pool.query(
+      `INSERT INTO roll_order
+       (shift_date, closing_rolls, target_rolls, recommended_qty, approved_qty, was_overridden, override_reason, status, recipient_id, line_target_id, updated_at)
+       VALUES ($1::date, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+       ON CONFLICT (shift_date)
+       DO UPDATE SET
+         closing_rolls = EXCLUDED.closing_rolls,
+         target_rolls = EXCLUDED.target_rolls,
+         recommended_qty = EXCLUDED.recommended_qty,
+         approved_qty = EXCLUDED.approved_qty,
+         was_overridden = EXCLUDED.was_overridden,
+         override_reason = EXCLUDED.override_reason,
+         status = EXCLUDED.status,
+         recipient_id = EXCLUDED.recipient_id,
+         line_target_id = EXCLUDED.line_target_id,
+         updated_at = NOW()
+       RETURNING *`,
+      [shiftDate, closingRolls, targetRolls, recommendedQty, approvedQty, wasOverridden, overrideReason, statusBeforeSend, cfg.lineTargetId || null, cfg.lineTargetId || null],
+    );
+
+    const lineResult = await sendLineBakeryOrder({
+      shiftDate,
+      closingRolls,
+      targetRolls,
+      recommendedQty,
+      approvedQty,
+      wasOverridden,
+      overrideReason,
+    });
+
+    const finalStatus = lineResult.ok ? "SENT" : "FAILED";
+    const final = await pool.query(
+      `UPDATE roll_order
+       SET status = $2,
+           line_message_payload = $3::jsonb,
+           line_send_response = $4::jsonb,
+           line_error = $5,
+           sent_at = CASE WHEN $2 = 'SENT' THEN NOW() ELSE NULL END,
+           updated_at = NOW()
+       WHERE shift_date = $1::date
+       RETURNING *`,
+      [shiftDate, finalStatus, JSON.stringify(lineResult.payload), JSON.stringify(lineResult.response), lineResult.error],
+    );
+
+    return res.json({ ok: true, shiftDate, line: lineResult, rollOrder: final.rows[0], saved: upsertResult.rows[0] });
+  } catch (error: any) {
+    return res.status(500).json({ ok: false, error: error?.message || "Failed to send roll order" });
+  }
+}
+
+
 export async function getDailySalesV2LatestProof(_req: Request, res: Response) {
   try {
     const latestSalesResult = await pool.query(
@@ -1201,3 +1312,5 @@ dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id/print", printDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id/print-full", printDailySalesV2Full);
 dailySalesV2Router.patch("/daily-sales/v2/:id/stock", updateDailySalesV2WithStock);
+dailySalesV2Router.get("/daily-sales/v2/:id/roll-order", getDailySalesV2RollOrder);
+dailySalesV2Router.post("/daily-sales/v2/:id/roll-order/send", sendDailySalesV2RollOrder);

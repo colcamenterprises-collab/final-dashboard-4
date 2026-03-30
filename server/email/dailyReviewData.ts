@@ -372,3 +372,18 @@ export function meatStatus(expectedG: number | null, recordedG: number | null) {
   const status = Math.abs(varianceG) > MEAT_THRESHOLD_G ? ("FLAG" as const) : ("OK" as const);
   return { varianceG, status };
 }
+
+
+export async function loadRollOrderStatus(dateISO: string) {
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT shift_date::text AS shift_date, closing_rolls, target_rolls, recommended_qty, approved_qty,
+            was_overridden, override_reason, status, sent_at::text AS sent_at, line_error
+     FROM roll_order
+     WHERE shift_date = $1::date
+     ORDER BY updated_at DESC
+     LIMIT 1`,
+    dateISO,
+  ).catch(() => [] as any[]);
+
+  return rows?.[0] ?? null;
+}

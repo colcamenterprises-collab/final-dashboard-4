@@ -83,7 +83,7 @@ export class CronEmailService {
 
       console.log(`📊 Generating Daily Review email for ${yesterday}`);
 
-      const { loadStaffForm, loadPosShift, loadDailyReview, loadFinance, buildFBvsSalesChart, rollsStatus, meatStatus, loadCanonicalSales, loadCanonicalShiftExpenses, loadCanonicalReconciliation } = await import('../email/dailyReviewData');
+      const { loadStaffForm, loadPosShift, loadDailyReview, loadFinance, buildFBvsSalesChart, rollsStatus, meatStatus, loadCanonicalSales, loadCanonicalShiftExpenses, loadCanonicalReconciliation, loadRollOrderStatus } = await import('../email/dailyReviewData');
       const { dailySummaryTemplate } = await import('../email/templates/dailySummary');
       const { sendMail } = await import('../email/mailer');
 
@@ -96,10 +96,11 @@ export class CronEmailService {
       ]);
 
       // Load from canonical sources (PATCH: Table-based Daily Review)
-      const [canonicalSales, canonicalExpenses, canonicalRecon] = await Promise.all([
+      const [canonicalSales, canonicalExpenses, canonicalRecon, rollOrder] = await Promise.all([
         loadCanonicalSales(yesterday),
         loadCanonicalShiftExpenses(yesterday),
         loadCanonicalReconciliation(yesterday),
+        loadRollOrderStatus(yesterday),
       ]);
 
       const fbVsSalesChartDataUrl =
@@ -174,6 +175,7 @@ export class CronEmailService {
           totalShiftExpenses: canonicalExpenses.totalShiftExpenses,
           reconciliation: canonicalReconciliation,
           itemsByCategory: canonicalSales.itemsByCategory,
+          rollOrder,
         },
       });
 
