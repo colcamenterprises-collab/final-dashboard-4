@@ -12,7 +12,7 @@
  *   analysis_build_status  — build lifecycle tracking (unique per date+type)
  *
  * Trigger sources:
- *   SCHEDULER | AUTO_ON_READ | MANUAL | STARTUP_CATCHUP | BOB
+ *   SCHEDULER | SCHEDULED_BUILD | AUTO_ON_READ | MANUAL | STARTUP_CATCHUP | BOB
  */
 
 import { pool } from "../db";
@@ -21,7 +21,7 @@ import { pool } from "../db";
 
 export type BuildType = "RECEIPTS_TRUTH" | "DAILY_USAGE";
 export type BuildStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
-export type TriggerSource = "SCHEDULER" | "AUTO_ON_READ" | "MANUAL" | "STARTUP_CATCHUP" | "BOB";
+export type TriggerSource = "SCHEDULER" | "SCHEDULED_BUILD" | "AUTO_ON_READ" | "MANUAL" | "STARTUP_CATCHUP" | "BOB";
 
 export interface BuildStatusRow {
   id: number;
@@ -281,7 +281,7 @@ export async function ensureAnalysisForDate(
   }
 
   // Prevent duplicate concurrent builds for same date
-  const flightKey = `${businessDate}:${triggerSource}`;
+  const flightKey = businessDate;
   if (_inFlight.has(flightKey)) {
     console.log(`${tag} Build already in-flight — skipping duplicate`);
     return {

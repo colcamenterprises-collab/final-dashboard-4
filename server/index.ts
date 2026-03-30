@@ -577,6 +577,10 @@ async function checkSchema() {
           // Start the scheduler service for daily 4am tasks
           schedulerService.start();
 
+          // Guaranteed daily analysis build before readiness checks (04:30 BKK)
+          const { startScheduledAnalysisBuildJob } = await import("./services/scheduledAnalysisBuild");
+          startScheduledAnalysisBuildJob();
+
           // Start the email cron service for daily 8am management reports
           const { cronEmailService } = await import('./services/cronEmailService');
           cronEmailService.startEmailCron();
