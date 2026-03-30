@@ -35,7 +35,6 @@ export function StockPurchaseTables() {
   const { data: purchaseTallyData } = useQuery({
     queryKey: ['/api/purchase-tally', selectedMonth, selectedYear],
     queryFn: () => axios.get(`/api/purchase-tally?month=${monthParam}`).then(res => res.data),
-    staleTime: 5 * 60 * 1000,
   });
 
   const rolls = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries))

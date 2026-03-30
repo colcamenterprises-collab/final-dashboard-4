@@ -67,7 +67,7 @@ export default function StockReconciliation() {
   }
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="admin-page p-4 space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold text-slate-900" data-testid="heading-stock-reconciliation">
@@ -172,9 +172,9 @@ export default function StockReconciliation() {
                       key={i}
                       className={
                         status === "critical"
-                          ? "bg-red-50"
+                          ? "bg-red-100/40"
                           : status === "warning"
-                          ? "bg-amber-50"
+                          ? "bg-amber-100/40"
                           : ""
                       }
                       data-testid={`row-reconciliation-${i}`}
