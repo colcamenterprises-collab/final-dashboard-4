@@ -21,6 +21,7 @@ const MODULES = [
   "reports/modifier-sales",
   "reports/category-totals",
   "analysis/stock-usage",
+  "roll-order",
 ] as const;
 
 type BobEnvelope<T> = {
@@ -216,7 +217,7 @@ router.get("/system-map", async (_req, res) => {
       namespace: "/api/bob/read",
       routes: [
         { page: "/", purpose: "Homepage modules", endpoint: "/api/bob/read/module-status", service: "bobRead", table: "daily_sales_v2,daily_stock_v2,analysis_reports", canonical_source: "daily_sales_v2 + derived analysis" },
-        { page: "/daily-stock-sales", purpose: "Daily forms", endpoint: "/api/bob/read/forms/daily-sales,/api/bob/read/forms/daily-stock", service: "forms", table: "daily_sales_v2,daily_stock_v2", canonical_source: "daily_sales_v2 + daily_stock_v2" },
+        { page: "/daily-stock-sales", purpose: "Daily forms", endpoint: "/api/bob/read/forms/daily-sales,/api/bob/read/forms/daily-stock,/api/bob/read/roll-order", service: "forms", table: "daily_sales_v2,daily_stock_v2,roll_order", canonical_source: "daily_sales_v2 + daily_stock_v2 + roll_order" },
         { page: "/sales-shift-analysis", purpose: "Shift diagnostics", endpoint: "/api/bob/read/shift-snapshot", service: "analysisBuildOrchestrator + shift analytics", table: "receipt_truth_line,receipt_truth_daily_usage,analysis_reports", canonical_source: "receipt_truth_* tables + analysis_reports" },
         { page: "/receipts-analysis", purpose: "Receipts truth", endpoint: "/api/bob/read/receipts/truth", service: "receipt truth pipeline", table: "receipt_truth_line,lv_receipt", canonical_source: "receipt_truth_line" },
         { page: "/issue-register", purpose: "Issue register", endpoint: "/api/bob/read/issues", service: "aiOps issues", table: "ai_issues", canonical_source: "ai_issues" },
@@ -549,6 +550,26 @@ router.get("/orders", async (req, res) => {
   return res.json(payload);
 });
 
+
+router.get("/roll-order", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  const limit = safeLimit(req.query.limit, 20, 100);
+
+  if (date && !isValidDate(date)) {
+    await logRequest("/roll-order", { date, limit }, 400, false, elapsed());
+    return res.status(400).json(envelope({ source: "request", scope: "roll-order", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date must be YYYY-MM-DD", where: "query.date", canonical_source: "roll_order.shift_date" }] }));
+  }
+
+  const rows = date
+    ? await pool.query(`SELECT * FROM roll_order WHERE shift_date = $1::date ORDER BY updated_at DESC LIMIT $2`, [date, limit]).catch(() => ({ rows: [] } as any))
+    : await pool.query(`SELECT * FROM roll_order ORDER BY shift_date DESC, updated_at DESC LIMIT $1`, [limit]).catch(() => ({ rows: [] } as any));
+
+  const payload = envelope({ source: "roll_order", scope: date ? `date:${date}` : `limit:${limit}`, date, status: rows.rows.length ? "ok" : "missing", data: { count: rows.rows.length, rows: rows.rows }, blockers: rows.rows.length ? [] : [{ code: "ROLL_ORDER_MISSING", message: date ? `No roll order found for ${date}` : "No roll orders found", where: "roll_order", canonical_source: "roll_order.shift_date", auto_build_attempted: false }] });
+  await logRequest("/roll-order", { date, limit }, 200, true, elapsed());
+  return res.json(payload);
+});
+
 router.get("/module-status", async (_req, res) => {
   const elapsed = timed();
   const [sales, stock, receipts, usage, issues, catalog, orders, bobDocs] = await Promise.all([
@@ -609,9 +630,10 @@ router.get("/shift-snapshot", async (req, res) => {
     return res.status(400).json(envelope({ source: "request", scope: "shift-snapshot", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date query param required (YYYY-MM-DD)", where: "query.date", canonical_source: "all date-scoped sources" }] }));
   }
 
-  const [sales, stock, receipts, usage, build, issueCounts] = await Promise.all([
+  const [sales, stock, rollOrder, receipts, usage, build, issueCounts] = await Promise.all([
     pool.query(`SELECT id, "shiftDate", "totalSales", "cashSales", "qrSales", "grabSales", "submittedAtISO" FROM daily_sales_v2 WHERE "shiftDate" = $1 ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`, [date]).catch(() => ({ rows: [] } as any)),
     pool.query(`SELECT s.id, s."salesId", s."burgerBuns", s."meatWeightG", s."drinksJson", s."createdAt" FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id = s."salesId" WHERE d."shiftDate" = $1 ORDER BY s."createdAt" DESC LIMIT 1`, [date]).catch(() => ({ rows: [] } as any)),
+    pool.query(`SELECT * FROM roll_order WHERE shift_date = $1::date ORDER BY updated_at DESC LIMIT 1`, [date]).catch(() => ({ rows: [] } as any)),
     pool.query(`SELECT COUNT(*)::int AS c, MIN(datetime_bkk)::text AS first_ts, MAX(datetime_bkk)::text AS last_ts FROM lv_receipt WHERE datetime_bkk >= $1::timestamptz AND datetime_bkk < $2::timestamptz`, [`${date} 00:00:00+07`, `${nextDay(date)} 00:00:00+07`]).catch(() => ({ rows: [{ c: 0, first_ts: null, last_ts: null }] } as any)),
     pool.query(`SELECT COUNT(*)::int AS c, SUM(COALESCE(buns_used,0)) AS buns, SUM(COALESCE(beef_grams_used,0)) AS beef_grams FROM receipt_truth_daily_usage WHERE business_date = $1::date`, [date]).catch(() => ({ rows: [{ c: 0, buns: 0, beef_grams: 0 }] } as any)),
     pool.query(`SELECT analysis_type, status, summary, created_at::text FROM analysis_reports WHERE shift_date = $1::date ORDER BY created_at DESC LIMIT 20`, [date]).catch(() => ({ rows: [] } as any)),
@@ -621,6 +643,10 @@ router.get("/shift-snapshot", async (req, res) => {
   const blockers: BobEnvelope<any>["blockers"] = [];
   if (!sales.rows.length) blockers.push({ code: "SALES_FORM_MISSING", message: `No daily_sales_v2 row for ${date}`, where: "daily_sales_v2", canonical_source: "daily_sales_v2.shiftDate", auto_build_attempted: false });
   if (!stock.rows.length) blockers.push({ code: "STOCK_FORM_MISSING", message: `No daily_stock_v2 row linked to ${date}`, where: "daily_stock_v2", canonical_source: "daily_stock_v2.salesId -> daily_sales_v2.id", auto_build_attempted: false });
+  if (!rollOrder.rows.length) blockers.push({ code: "ROLL_ORDER_MISSING", message: `No roll order created for ${date}`, where: "roll_order", canonical_source: "roll_order.shift_date", auto_build_attempted: false });
+  if (rollOrder.rows[0]?.status === "FAILED") blockers.push({ code: "ROLL_ORDER_FAILED", message: `Roll order failed for ${date}`, where: "roll_order.status", canonical_source: "roll_order", auto_build_attempted: false });
+  if (rollOrder.rows[0]?.status !== "SENT") blockers.push({ code: "ROLL_ORDER_NOT_SENT", message: `Roll order not sent for ${date}`, where: "roll_order.status", canonical_source: "roll_order", auto_build_attempted: false });
+  if (rollOrder.rows[0]?.was_overridden) blockers.push({ code: "ROLL_ORDER_OVERRIDDEN", message: `Roll order override was used for ${date}`, where: "roll_order.was_overridden", canonical_source: "roll_order", auto_build_attempted: false });
   if (Number(usage.rows[0]?.c ?? 0) === 0) blockers.push({ code: "USAGE_TRUTH_MISSING", message: `No usage truth for ${date}`, where: "receipt_truth_daily_usage", canonical_source: "receipt_truth_daily_usage.business_date", auto_build_attempted: false });
 
   const confidenceSignals = {
@@ -636,7 +662,7 @@ router.get("/shift-snapshot", async (req, res) => {
     date,
     status: blockers.length ? "partial" : "ok",
     data: {
-      forms_summary: { daily_sales: sales.rows[0] ?? null, daily_stock: stock.rows[0] ?? null },
+      forms_summary: { daily_sales: sales.rows[0] ?? null, daily_stock: stock.rows[0] ?? null, roll_order: rollOrder.rows[0] ?? null },
       receipts_truth_availability: receipts.rows[0],
       usage_truth_availability: usage.rows[0],
       build_statuses: build.rows,

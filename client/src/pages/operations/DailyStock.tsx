@@ -158,6 +158,15 @@ const DailyStock: React.FC = () => {
     drinks?: string[];
   }>({});
 
+  const [rollTarget, setRollTarget] = useState<number>(140);
+  const [bakeryIncrement, setBakeryIncrement] = useState<number>(1);
+  const [recommendedOrderQty, setRecommendedOrderQty] = useState<number>(0);
+  const [approvedOrderQty, setApprovedOrderQty] = useState<number>(0);
+  const [overrideReason, setOverrideReason] = useState<string>("");
+  const [rollOrderStatus, setRollOrderStatus] = useState<any>(null);
+  const [sendingRollOrder, setSendingRollOrder] = useState(false);
+  const [showConfirmRollOrder, setShowConfirmRollOrder] = useState(false);
+
   const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
   const [syncing, setSyncing] = useState(false);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
@@ -263,6 +272,16 @@ const DailyStock: React.FC = () => {
       try {
         if (!mounted) return;
         await runSync();
+        if (shiftId) {
+          const rr = await fetch(`/api/forms/daily-sales/v2/${shiftId}/roll-order`);
+          const rrData = await rr.json();
+          if (rr.ok && rrData?.ok) {
+            setRollTarget(Number(rrData.targetRolls ?? 140));
+            setBakeryIncrement(Number(rrData.bakeryIncrement ?? 1));
+            if (rrData.rollOrder) setRollOrderStatus(rrData.rollOrder);
+            if (rrData.defaults?.approvedQty != null) setApprovedOrderQty(Number(rrData.defaults.approvedQty));
+          }
+        }
       } catch (error: any) {
         if (!mounted) return;
         setSyncError(error?.message || 'Failed to sync from purchasing list');
@@ -330,6 +349,17 @@ const DailyStock: React.FC = () => {
     return Number.isFinite(n) ? n : 0;
   };
 
+  useEffect(() => {
+    const diff = Math.max(0, Number(rollTarget || 0) - Number(rolls || 0));
+    const inc = Math.max(1, Number(bakeryIncrement || 1));
+    const next = inc > 1 ? Math.ceil(diff / inc) * inc : diff;
+    setRecommendedOrderQty(next);
+  }, [rollTarget, rolls, bakeryIncrement]);
+
+  useEffect(() => {
+    setApprovedOrderQty(recommendedOrderQty);
+  }, [recommendedOrderQty]);
+
   // Debounced quantity update functions
   const setQuantity = useCallback((id: string, qty: number) => {
     setQuantities((prev) => ({ ...prev, [id]: Math.max(0, qty) }));
@@ -370,6 +400,34 @@ const DailyStock: React.FC = () => {
         unit: drink.unit
       }))
       .filter(item => item.quantity > 0);
+  };
+
+  const handleSendRollOrder = async () => {
+    if (!shiftId || sendingRollOrder) return;
+    setSendingRollOrder(true);
+    try {
+      const res = await fetch(`/api/forms/daily-sales/v2/${shiftId}/roll-order/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          closingRolls: rolls,
+          targetRolls: rollTarget,
+          approvedQty: approvedOrderQty,
+          overrideReason: approvedOrderQty !== recommendedOrderQty ? overrideReason : null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || 'Failed to send bakery order');
+      }
+      setRollOrderStatus(data.rollOrder);
+      setMessage({ type: data?.line?.ok ? 'success' : 'error', text: data?.line?.ok ? 'Bakery order sent via LINE.' : `Bakery LINE failed: ${data?.line?.error || 'Unknown error'}` });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error?.message || 'Failed to send bakery order' });
+    } finally {
+      setSendingRollOrder(false);
+      setShowConfirmRollOrder(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -610,7 +668,7 @@ const DailyStock: React.FC = () => {
       )}
       
       {/* EXACT LanguageToggle from consolidated patch */}
-      <LanguageToggle onChange={setLang} />
+      <LanguageToggle onChange={(nextLang) => setLang((nextLang === "th" ? "th" : "en"))} />
       
       {/* EXACT error display from consolidated patch */}
       {errors.length > 0 && <p className="text-red-500 text-xs">{L.validationError}</p>}
@@ -654,6 +712,59 @@ const DailyStock: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <section className="space-y-4">
+        <div className="rounded-[4px] border border-slate-200 p-4 bg-white">
+          <h2 className="text-sm font-semibold mb-4">Bakery Roll Order</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm mb-1 font-medium">Closing rolls</label>
+              <input type="number" className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs" value={rolls} readOnly />
+            </div>
+            <div>
+              <label className="block text-sm mb-1 font-medium">Recommended order qty</label>
+              <input type="number" className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs" value={recommendedOrderQty} readOnly />
+            </div>
+            <div>
+              <label className="block text-sm mb-1 font-medium">Approved order qty</label>
+              <input type="number" min="0" step="1" className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs" value={approvedOrderQty}
+                onChange={(e) => setApprovedOrderQty(safeInt(e.target.value))}
+              />
+            </div>
+          </div>
+          {approvedOrderQty !== recommendedOrderQty && (
+            <div className="mt-3">
+              <label className="block text-sm mb-1 font-medium">Override reason</label>
+              <input type="text" className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs" value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)} placeholder="Reason for override" />
+            </div>
+          )}
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            <button type="button" onClick={() => setShowConfirmRollOrder(true)} disabled={!shiftId || sendingRollOrder} className="rounded-[4px] bg-emerald-600 px-4 py-2 text-white text-xs hover:bg-emerald-700 disabled:opacity-60">
+              {sendingRollOrder ? 'Sending...' : 'Send Bakery Order (LINE)'}
+            </button>
+            {rollOrderStatus && (
+              <div className={`px-3 py-1 rounded-[4px] text-xs border ${rollOrderStatus.status === 'SENT' ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : rollOrderStatus.status === 'FAILED' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-slate-50 border-slate-200 text-slate-700'}`}>
+                Roll order status: {rollOrderStatus.status}
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <AlertDialog open={showConfirmRollOrder} onOpenChange={setShowConfirmRollOrder}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm font-semibold">Confirm bakery order quantity is correct</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-slate-600">
+              Closing rolls: {rolls} | Recommended: {recommendedOrderQty} | Approved: {approvedOrderQty}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowConfirmRollOrder(false)}>Cancel</Button>
+            <Button type="button" onClick={handleSendRollOrder} disabled={sendingRollOrder}>Confirm & Send</Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Drinks Stock Count Section */}
       <section className="space-y-4">

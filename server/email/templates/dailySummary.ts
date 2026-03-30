@@ -79,6 +79,18 @@ export function dailySummaryTemplate(input: {
       cashToBank: number;
       qrToBank: number;
     };
+    rollOrder?: {
+      shift_date: string;
+      closing_rolls: number;
+      target_rolls: number;
+      recommended_qty: number;
+      approved_qty: number;
+      was_overridden: boolean;
+      override_reason: string | null;
+      status: string;
+      sent_at: string | null;
+      line_error: string | null;
+    } | null;
   };
 }) {
   const css = `
@@ -353,6 +365,31 @@ body { margin:0; padding:0; background:#0B0C10; }
       </table>
     </div>
     ` : ''}
+
+
+    <!-- ROLL ORDER STATUS -->
+    <div class="card">
+      <div class="h2">Roll Order (Bakery / LINE)</div>
+      ${input.canonical?.rollOrder ? `
+      <table class="table" width="100%" cellpadding="6" cellspacing="0">
+        <thead>
+          <tr>
+            <th>Shift Date</th><th class="right">Closing</th><th class="right">Recommended</th><th class="right">Approved</th><th class="right">Overridden</th><th class="right">LINE Status</th><th>Sent/Failure</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>${input.canonical.rollOrder.shift_date}</td>
+            <td class="right">${qty(input.canonical.rollOrder.closing_rolls)}</td>
+            <td class="right">${qty(input.canonical.rollOrder.recommended_qty)}</td>
+            <td class="right">${qty(input.canonical.rollOrder.approved_qty)}</td>
+            <td class="right">${input.canonical.rollOrder.was_overridden ? 'YES' : 'NO'}</td>
+            <td class="right">${input.canonical.rollOrder.status}</td>
+            <td>${input.canonical.rollOrder.status === 'SENT' ? (input.canonical.rollOrder.sent_at || 'SENT') : (input.canonical.rollOrder.line_error || 'FAILED')}</td>
+          </tr>
+        </tbody>
+      </table>` : `<p class="small">No roll order record for this shift date.</p>`}
+    </div>
 
     <!-- MTD FINANCE -->
     <div class="card">
