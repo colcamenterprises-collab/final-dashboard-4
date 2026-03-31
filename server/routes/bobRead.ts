@@ -89,6 +89,13 @@ function nextDay(date: string): string {
   return d.toISOString().slice(0, 10);
 }
 
+function getShiftWindow(shiftDate: string): { start: string; end: string } {
+  return {
+    start: `${shiftDate}T17:00:00+07:00`,
+    end: `${nextDay(shiftDate)}T03:00:00+07:00`,
+  };
+}
+
 function envelope<T>(input: Partial<BobEnvelope<T>> & Pick<BobEnvelope<T>, "source" | "scope" | "status" | "data">): BobEnvelope<T> {
   return {
     ok: input.ok ?? (input.status !== "error"),
@@ -333,25 +340,31 @@ router.get("/receipts/truth", async (req, res) => {
     return res.status(400).json(envelope({ source: "request", scope: "receipts-truth", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date query param required (YYYY-MM-DD)", where: "query.date", canonical_source: "receipt_truth_line.receipt_date" }] }));
   }
 
+  const { start, end } = getShiftWindow(date);
+  console.info("[bob/read/receipts/truth] shift_window", { date, start, end });
+
   const [lineAgg, receiptWindow] = await Promise.all([
     pool.query(
       `SELECT COALESCE(pos_category_name, 'UNCATEGORIZED') AS category,
               COALESCE(item_name, 'UNKNOWN_ITEM') AS item,
               SUM(CASE WHEN receipt_type = 'SALE' THEN quantity ELSE 0 END)::int AS sale_qty,
               SUM(CASE WHEN receipt_type = 'REFUND' THEN ABS(quantity) ELSE 0 END)::int AS refund_qty
-       FROM receipt_truth_line
-       WHERE receipt_date = $1::date
+       FROM receipt_truth_line l
+       JOIN lv_receipt r ON r.receipt_id = l.receipt_id
+       WHERE r.datetime_bkk >= $1::timestamptz
+         AND r.datetime_bkk < $2::timestamptz
        GROUP BY 1,2
        ORDER BY sale_qty DESC, item`,
-      [date],
+      [start, end],
     ).catch(() => ({ rows: [] } as any)),
     pool.query(
       `SELECT MIN(datetime_bkk)::text AS first_ts, MAX(datetime_bkk)::text AS last_ts, COUNT(*)::int AS raw_count
        FROM lv_receipt
        WHERE datetime_bkk >= $1::timestamptz AND datetime_bkk < $2::timestamptz`,
-      [`${date} 00:00:00+07`, `${nextDay(date)} 00:00:00+07`],
+      [start, end],
     ).catch(() => ({ rows: [{ first_ts: null, last_ts: null, raw_count: 0 }] } as any)),
   ]);
+  console.info("[bob/read/receipts/truth] receipt_count_used", { date, count: Number(receiptWindow.rows[0]?.raw_count ?? 0) });
 
   const blockers: BobEnvelope<any>["blockers"] = [];
   if (lineAgg.rows.length === 0) {
@@ -364,6 +377,7 @@ router.get("/receipts/truth", async (req, res) => {
     date,
     status: blockers.length ? "partial" : "ok",
     data: {
+      shift_window: { start, end },
       raw_receipts: receiptWindow.rows[0],
       normalized_count: lineAgg.rows.length,
       aggregates: lineAgg.rows,
@@ -381,6 +395,9 @@ router.get("/usage/truth", async (req, res) => {
     await logRequest("/usage/truth", { date }, 400, false, elapsed());
     return res.status(400).json(envelope({ source: "request", scope: "usage-truth", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date query param required (YYYY-MM-DD)", where: "query.date", canonical_source: "receipt_truth_daily_usage.business_date" }] }));
   }
+
+  const { start, end } = getShiftWindow(date);
+  console.info("[bob/read/usage/truth] shift_window", { date, start, end });
 
   const summary = await pool.query(
     `SELECT COUNT(*)::int AS row_count,
@@ -423,7 +440,7 @@ router.get("/usage/truth", async (req, res) => {
     scope: `date:${date}`,
     date,
     status: blockers.length ? "missing" : "ok",
-    data: { summary: summary.rows[0], rows: rows.rows },
+    data: { shift_window: { start, end }, summary: summary.rows[0], rows: rows.rows },
     blockers,
   });
 
@@ -630,15 +647,19 @@ router.get("/shift-snapshot", async (req, res) => {
     return res.status(400).json(envelope({ source: "request", scope: "shift-snapshot", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date query param required (YYYY-MM-DD)", where: "query.date", canonical_source: "all date-scoped sources" }] }));
   }
 
+  const { start, end } = getShiftWindow(date);
+  console.info("[bob/read/shift-snapshot] shift_window", { date, start, end });
+
   const [sales, stock, rollOrder, receipts, usage, build, issueCounts] = await Promise.all([
     pool.query(`SELECT id, "shiftDate", "totalSales", "cashSales", "qrSales", "grabSales", "submittedAtISO" FROM daily_sales_v2 WHERE "shiftDate" = $1 ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`, [date]).catch(() => ({ rows: [] } as any)),
     pool.query(`SELECT s.id, s."salesId", s."burgerBuns", s."meatWeightG", s."drinksJson", s."createdAt" FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id = s."salesId" WHERE d."shiftDate" = $1 ORDER BY s."createdAt" DESC LIMIT 1`, [date]).catch(() => ({ rows: [] } as any)),
     pool.query(`SELECT * FROM roll_order WHERE shift_date = $1::date ORDER BY updated_at DESC LIMIT 1`, [date]).catch(() => ({ rows: [] } as any)),
-    pool.query(`SELECT COUNT(*)::int AS c, MIN(datetime_bkk)::text AS first_ts, MAX(datetime_bkk)::text AS last_ts FROM lv_receipt WHERE datetime_bkk >= $1::timestamptz AND datetime_bkk < $2::timestamptz`, [`${date} 00:00:00+07`, `${nextDay(date)} 00:00:00+07`]).catch(() => ({ rows: [{ c: 0, first_ts: null, last_ts: null }] } as any)),
+    pool.query(`SELECT COUNT(*)::int AS c, MIN(datetime_bkk)::text AS first_ts, MAX(datetime_bkk)::text AS last_ts FROM lv_receipt WHERE datetime_bkk >= $1::timestamptz AND datetime_bkk < $2::timestamptz`, [start, end]).catch(() => ({ rows: [{ c: 0, first_ts: null, last_ts: null }] } as any)),
     pool.query(`SELECT COUNT(*)::int AS c, SUM(COALESCE(buns_used,0)) AS buns, SUM(COALESCE(beef_grams_used,0)) AS beef_grams FROM receipt_truth_daily_usage WHERE business_date = $1::date`, [date]).catch(() => ({ rows: [{ c: 0, buns: 0, beef_grams: 0 }] } as any)),
     pool.query(`SELECT analysis_type, status, summary, created_at::text FROM analysis_reports WHERE shift_date = $1::date ORDER BY created_at DESC LIMIT 20`, [date]).catch(() => ({ rows: [] } as any)),
     pool.query(`SELECT COALESCE(status,'unknown') AS status, COUNT(*)::int AS c FROM ai_issues WHERE shift_date = $1::date GROUP BY 1 ORDER BY 1`, [date]).catch(() => ({ rows: [] } as any)),
   ]);
+  console.info("[bob/read/shift-snapshot] receipt_count_used", { date, count: Number(receipts.rows[0]?.c ?? 0) });
 
   const blockers: BobEnvelope<any>["blockers"] = [];
   if (!sales.rows.length) blockers.push({ code: "SALES_FORM_MISSING", message: `No daily_sales_v2 row for ${date}`, where: "daily_sales_v2", canonical_source: "daily_sales_v2.shiftDate", auto_build_attempted: false });
@@ -662,6 +683,7 @@ router.get("/shift-snapshot", async (req, res) => {
     date,
     status: blockers.length ? "partial" : "ok",
     data: {
+      shift_window: { start, end },
       forms_summary: { daily_sales: sales.rows[0] ?? null, daily_stock: stock.rows[0] ?? null, roll_order: rollOrder.rows[0] ?? null },
       receipts_truth_availability: receipts.rows[0],
       usage_truth_availability: usage.rows[0],

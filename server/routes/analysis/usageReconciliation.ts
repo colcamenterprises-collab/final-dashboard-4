@@ -57,12 +57,6 @@ function severity(variance: number | null, warnAt: number, criticalAt: number): 
   return "ok";
 }
 
-function prevDate(date: string): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCDate(d.getUTCDate() - 1);
-  return d.toISOString().slice(0, 10);
-}
-
 function normDrinkKey(key: string): string {
   return DRINK_NAME_MAP[key.toLowerCase().trim()] ?? null;
 }
@@ -83,7 +77,16 @@ function collapseDrinksJson(drinksJson: Record<string, number> | null): Record<s
 export async function getUsageReconciliation(date: string) {
   if (!pool) throw new Error("Database unavailable");
 
-  const prev = prevDate(date);
+  const prevShift = await pool.query(
+    `SELECT ds.shift_date::text AS shift_date
+     FROM daily_sales_v2 ds
+     WHERE ds.shift_date < $1::date
+       AND ds."deletedAt" IS NULL
+     ORDER BY ds.shift_date DESC
+     LIMIT 1`,
+    [date]
+  );
+  const prev = prevShift.rows[0]?.shift_date ?? null;
 
   // 1. Engine expected usage for this date
   const engineResult = await pool.query(
@@ -129,16 +132,18 @@ export async function getUsageReconciliation(date: string) {
   );
 
   // 3. Previous shift Form 2 closing counts (= opening for this shift)
-  const prevForm2 = await pool.query(
-    `SELECT dsv2."burgerBuns" AS buns, dsv2."meatWeightG" AS meat_g, dsv2."drinksJson"
-     FROM daily_stock_v2 dsv2
-     JOIN daily_sales_v2 ds ON ds.id = dsv2."salesId"
-     WHERE ds.shift_date = $1::date
-       AND dsv2."deletedAt" IS NULL
-     ORDER BY dsv2."createdAt" DESC
-     LIMIT 1`,
-    [prev]
-  );
+  const prevForm2 = prev
+    ? await pool.query(
+      `SELECT dsv2."burgerBuns" AS buns, dsv2."meatWeightG" AS meat_g, dsv2."drinksJson"
+       FROM daily_stock_v2 dsv2
+       JOIN daily_sales_v2 ds ON ds.id = dsv2."salesId"
+       WHERE ds.shift_date = $1::date
+         AND dsv2."deletedAt" IS NULL
+       ORDER BY dsv2."createdAt" DESC
+       LIMIT 1`,
+      [prev]
+    )
+    : { rows: [] };
 
   // 4. Received stock — canonical source: purchase_tally + purchase_tally_drink
   //    (same source as Stock Reconciliation — this is the ONE purchase truth)
@@ -162,6 +167,7 @@ export async function getUsageReconciliation(date: string) {
 
   const form2Available = currentForm2.rows.length > 0;
   const prevForm2Available = prevForm2.rows.length > 0;
+  console.info("[analysis/usage-reconciliation] opening_source", { date, previousShiftDate: prev, previousShiftFound: prevForm2Available });
 
   const curr = form2Available ? currentForm2.rows[0] : null;
   const opening = prevForm2Available ? prevForm2.rows[0] : null;
@@ -313,6 +319,7 @@ export async function getUsageReconciliation(date: string) {
       engineRowCount: engineBuilt ? Number(eng.row_count) : 0,
       unmappedItems: engineBuilt ? Number(eng.unmapped_count) : 0,
       estimatedModifiers: engineBuilt ? Number(eng.estimated_count) : 0,
+      openingSource: prevForm2Available ? `daily_stock_v2(previous shift ${prev})` : null,
     },
   };
 }

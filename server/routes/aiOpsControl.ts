@@ -1993,17 +1993,23 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
     // daily_sales_v2."shiftDate" is stored as TEXT 'YYYY-MM-DD' — compare as text (ISO format sorts correctly)
     const fromDate = (date && isValidProxyDate(date)) ? date : (from && isValidProxyDate(from)) ? from : null;
     const toDate   = (date && isValidProxyDate(date)) ? date : (to   && isValidProxyDate(to))   ? to   : null;
+    const shiftStart = fromDate ? `${fromDate}T17:00:00+07:00` : null;
+    const shiftEnd = toDate ? `${proxyNextDay(toDate)}T03:00:00+07:00` : null;
+    if (shiftStart && shiftEnd) {
+      console.info("[ai-ops/proxy-read/purchase-history] shift_window", { fromDate, toDate, shiftStart, shiftEnd });
+    }
 
     let shiftRows: any[] = [];
     {
       const conds: string[] = ["psi.quantity > 0"];
       const vals: any[] = [];
-      if (fromDate) { vals.push(fromDate); conds.push(`d."shiftDate" >= $${vals.length}`); }
-      if (toDate)   { vals.push(toDate);   conds.push(`d."shiftDate" <= $${vals.length}`); }
+      if (shiftStart) { vals.push(shiftStart); conds.push(`COALESCE(psi."createdAt", s."createdAt") >= $${vals.length}::timestamptz`); }
+      if (shiftEnd)   { vals.push(shiftEnd);   conds.push(`COALESCE(psi."createdAt", s."createdAt") < $${vals.length}::timestamptz`); }
       vals.push(lim);
       const r = await pool.query(
         `SELECT d."shiftDate" AS date, p.category, p.item, psi.quantity::numeric AS qty,
                 p."orderUnit" AS unit, p."supplierName" AS supplier,
+                COALESCE(psi."createdAt", s."createdAt")::text AS purchase_time,
                 ROUND((psi.quantity * COALESCE(p."unitCost",0))::numeric, 2) AS total_cost,
                 'shift_form' AS source
          FROM purchasing_shift_items psi
@@ -2011,7 +2017,7 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
          JOIN daily_stock_v2 s ON s.id = psi."dailyStockId"
          JOIN daily_sales_v2 d ON d.id = s."salesId"
          WHERE ${conds.join(" AND ")}
-         ORDER BY d."shiftDate" DESC, p.category, p.item LIMIT $${vals.length}`, vals);
+         ORDER BY COALESCE(psi."createdAt", s."createdAt") DESC, p.category, p.item LIMIT $${vals.length}`, vals);
       shiftRows = r.rows;
     }
 
@@ -2019,8 +2025,8 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
     {
       const conds: string[] = ["(pt.amount_thb > 0 OR pt.rolls_pcs > 0 OR pt.meat_grams > 0)"];
       const vals: any[] = [];
-      if (fromDate) { vals.push(fromDate); conds.push(`pt.date >= $${vals.length}::date`); }
-      if (toDate)   { vals.push(toDate);   conds.push(`pt.date <= $${vals.length}::date`); }
+      if (shiftStart) { vals.push(shiftStart); conds.push(`COALESCE(pt.created_at, pt.date::timestamp) >= $${vals.length}::timestamptz`); }
+      if (shiftEnd)   { vals.push(shiftEnd);   conds.push(`COALESCE(pt.created_at, pt.date::timestamp) < $${vals.length}::timestamptz`); }
       vals.push(lim);
       const r = await pool.query(
         `SELECT pt.date::text AS date, 'Rolls/Meat/Drinks' AS category,
@@ -2030,15 +2036,18 @@ async function bobProxyFetch(module: BobProxyModule, query: Record<string, unkno
                 COALESCE(pt.rolls_pcs, pt.meat_grams, 0)::numeric AS qty,
                 CASE WHEN pt.rolls_pcs IS NOT NULL AND pt.rolls_pcs > 0 THEN 'pcs' ELSE 'g' END AS unit,
                 COALESCE(pt.supplier, 'Unknown') AS supplier,
+                COALESCE(pt.created_at, pt.date::timestamp)::text AS purchase_time,
                 COALESCE(pt.amount_thb, 0)::numeric AS total_cost, 'tally' AS source
          FROM purchase_tally pt WHERE ${conds.join(" AND ")}
-         ORDER BY pt.date DESC LIMIT $${vals.length}`, vals);
+         ORDER BY COALESCE(pt.created_at, pt.date::timestamp) DESC LIMIT $${vals.length}`, vals);
       tallyRows = r.rows;
     }
+    console.info("[ai-ops/proxy-read/purchase-history] purchase_count_used", { shiftRows: shiftRows.length, tallyRows: tallyRows.length, total: shiftRows.length + tallyRows.length });
 
     const rows = [...shiftRows, ...tallyRows].map((r: any) => ({
       date: r.date || "", category: r.category || "", item: r.item || "",
       qty: Number(r.qty), unit: r.unit || "", supplier: r.supplier || "",
+      purchase_time: r.purchase_time || null,
       total_cost: Number(r.total_cost), source: r.source,
     }));
     const dateRange = fromDate && toDate && fromDate !== toDate ? `${fromDate} to ${toDate}` : fromDate || "all";
