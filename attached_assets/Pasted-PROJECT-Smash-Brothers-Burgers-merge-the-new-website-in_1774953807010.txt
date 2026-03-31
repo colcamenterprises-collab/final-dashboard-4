@@ -1,0 +1,135 @@
+PROJECT: Smash Brothers Burgers — merge the new website into the EXISTING Replit app
+ATTACHMENT: burger-master (1).zip
+
+CRITICAL RULES — DO NOT BREAK THESE
+1. DO NOT create a separate app, separate server, separate auth system, or separate deployment.
+2. DO NOT replace or overwrite the existing Smash Brothers Burgers dashboard/app architecture.
+3. DO NOT delete, rename, move, or rewrite core existing files unless absolutely required for integration.
+4. DO NOT introduce fake/local-only auth, fake/local cart persistence, mock APIs, or placeholder database flows.
+5. DO NOT create a second source of truth for products, menu items, orders, users, or sessions.
+6. DO NOT freestyle architecture changes.
+7. DO NOT touch existing operations/dashboard/business-critical flows unless required for routing/layout integration.
+8. Treat the uploaded zip as a DESIGN + PAGE STRUCTURE DONOR, not as a standalone production app.
+9. Preserve the current Replit app as the master application.
+10. If there is any conflict between the zip app and the current Replit app, the CURRENT Replit app wins.
+
+OBJECTIVE
+Merge the public-facing website experience from the attached zip into the current Smash Brothers Burgers Replit app as a PUBLIC WEBSITE LAYER.
+
+TARGET RESULT
+Add these public routes into the current app:
+- /
+- /membership
+- /online-ordering
+
+Keep the existing protected internal app/dashboard intact, using the current auth/session/database structure.
+
+ARCHITECTURE REQUIREMENT
+The final system must be ONE app with:
+- one deployment
+- one routing system
+- one auth/session system
+- one database
+- one product/menu source
+- one order flow
+
+USE THE ZIP FOR
+- visual design
+- layout structure
+- component inspiration
+- homepage section structure
+- membership page UI structure
+- online ordering page UI structure
+- motion/animation styling where compatible
+
+DO NOT DIRECTLY ADOPT FROM THE ZIP
+- separate server.ts if it creates duplicate backend behavior
+- separate AuthContext if current app already has auth
+- separate ProtectedRoute if current app already has route protection
+- fake cart logic if current app already has order/menu/cart architecture
+- duplicate state or duplicate providers
+- duplicate package or routing setup if current app already has equivalents
+
+PHASE 1 — DISCOVERY
+First inspect BOTH:
+A. the current Replit app structure
+B. the uploaded zip structure
+
+Then produce a short implementation summary inside your response before coding:
+- current app routing entry points
+- current auth/session approach
+- current layout/navigation structure
+- current public vs protected route structure
+- reusable files/components from the zip
+- exact merge plan with minimum-risk file changes
+
+PHASE 2 — IMPLEMENTATION
+Implement the website inside the current app using the existing framework and conventions.
+
+Required pages:
+1. Homepage
+   - modern black/yellow theme
+   - bold typography
+   - mobile/tablet responsive
+   - hero section
+   - CTA areas
+   - featured product/cards section
+   - polished footer
+   - smooth animation/motion only if compatible with current stack
+
+2. Membership page
+   - integrated with CURRENT auth/session flow only
+   - if sign-in already exists, reuse it
+   - if register flow already exists, reuse it
+   - page should act as branded membership/login gateway
+   - after successful auth, redirect to protected internal dashboard/app route already used by the system
+
+3. Online ordering page
+   - visually polished public ordering page
+   - MUST connect to current real menu/products/order flow if one already exists
+   - if current ordering system exists, reuse it and reskin/restructure the UI
+   - do not create a fake ordering backend
+
+PHASE 3 — INTEGRATION RULES
+- Integrate new public navbar/footer cleanly
+- Preserve existing internal dashboard nav/layout
+- Public pages must not expose internal ops/dashboard content
+- Protected routes must remain protected
+- Existing dashboard URLs must continue working
+- Existing database/business logic must remain the source of truth
+
+SEO / UX REQUIREMENTS
+- Set page titles and meta descriptions for the new public routes
+- Ensure mobile-first responsiveness
+- Avoid layout shift
+- Keep fonts modern and clean
+- No Arial/default ugly styling
+- Use current design system if app already has one; otherwise adapt the public styling safely
+
+TESTING REQUIREMENTS
+After implementation, verify and report:
+1. homepage loads
+2. membership page loads
+3. online ordering page loads
+4. existing dashboard/protected routes still work
+5. auth redirect still works
+6. no duplicated providers/auth contexts/server bootstraps exist
+7. no broken imports
+8. no TypeScript/build errors
+9. no routes from the zip are running as a second app
+10. current business-critical sections remain unaffected
+
+DELIVERABLE FORMAT
+Return:
+1. files changed
+2. what was merged from the zip
+3. what was intentionally NOT merged from the zip
+4. confirmation that only one app/auth/database/order source remains
+5. any blockers found
+
+ABSOLUTE WARNING
+This is a SURGICAL merge, not a rebuild.
+Do not replace the current Smash Brothers Burgers app with the zip.
+Do not scaffold a second project.
+Do not create architectural drift.
+Use minimum-change, maximum-safety integration only.

@@ -114,6 +114,10 @@ import HealthSafetyAuditPage from "./pages/operations/health-safety-audit";
 import HealthSafetyQuestionManager from "./pages/operations/health-safety-audit/questions";
 import RecipeMappingPage from "./pages/operations/recipe-mapping";
 
+import HomePage from "./pages/public/HomePage";
+import PublicMembership from "./pages/public/PublicMembership";
+import PublicOnlineOrdering from "./pages/public/PublicOnlineOrdering";
+
 import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
 
 function Guard({ children }: { children: JSX.Element }) {
@@ -128,15 +132,18 @@ export default function App() {
         <TooltipProvider>
           <BrowserRouter>
             <Routes>
+              {/* Public website routes — no sidebar/shell */}
+              <Route path="/" element={<HomePage />} />
+              <Route path="/membership" element={<PublicMembership />} />
+              <Route path="/online-ordering" element={<PublicOnlineOrdering />} />
               <Route path="/login" element={<Login />} />
               <Route path={ROUTES.ORDER} element={<OnlineOrdering />} />
               <Route path={ROUTES.ORDER_CHECKOUT} element={<Checkout />} />
               <Route path={ROUTES.ORDER_CONFIRMATION} element={<OrderConfirmation />} />
 
               <Route element={<PageShell />}>
-                <Route path={ROUTES.HOME} element={<Guard><Home /></Guard>} />
-                <Route path="/dashboard" element={<Navigate to="/" replace />} />
-                <Route path="/home" element={<Navigate to="/" replace />} />
+                <Route path="/dashboard" element={<Guard><Home /></Guard>} />
+                <Route path="/home" element={<Navigate to="/dashboard" replace />} />
 
                 <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
                 <Route path="/operations/daily-sales-library" element={<Guard><DailySalesV2Library /></Guard>} />
@@ -264,7 +271,6 @@ export default function App() {
                 <Route path="/settings/tenant" element={<TenantSwitcher />} />
                 <Route path="/settings/payments" element={<PaymentProviders />} />
 
-                <Route path="/membership" element={<Navigate to="/membership/dashboard" replace />} />
                 <Route path="/membership/dashboard" element={<Guard><MemberDashboard /></Guard>} />
                 <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
 

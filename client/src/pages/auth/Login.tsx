@@ -31,7 +31,7 @@ export default function Login() {
       localStorage.setItem("authToken", data.token);
       localStorage.setItem("authUser", JSON.stringify(data.user));
       toast({ title: "Success", description: "Logged in successfully" });
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     } finally {

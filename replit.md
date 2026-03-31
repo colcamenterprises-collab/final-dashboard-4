@@ -1,7 +1,7 @@
-# Restaurant Management Dashboard
+# Restaurant Management Dashboard + Public Website
 
 ## Overview
-This project is a comprehensive restaurant management dashboard designed to streamline operations, enhance efficiency, and boost profitability. It leverages AI-powered analytics and real-time insights by integrating with external POS systems and AI services. The platform provides automated sales analysis, inventory management, and marketing tools, aiming to be a centralized, data-driven solution for restaurant decision-making.
+This project is a comprehensive restaurant management dashboard designed to streamline operations, enhance efficiency, and boost profitability. It also includes a public-facing website layer (black/yellow Smash Brothers brand) at the root URL. It leverages AI-powered analytics and real-time insights by integrating with external POS systems and AI services. The platform provides automated sales analysis, inventory management, and marketing tools, aiming to be a centralized, data-driven solution for restaurant decision-making.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.

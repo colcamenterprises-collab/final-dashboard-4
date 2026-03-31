@@ -1,8 +1,11 @@
 export const ROUTES = {
   // Home
-  HOME: "/",
+  PUBLIC_HOME: "/",
+  HOME: "/dashboard",
   DASHBOARD: "/dashboard",
   HOME_ALIAS: "/home",
+  PUBLIC_MEMBERSHIP: "/membership",
+  PUBLIC_ONLINE_ORDERING: "/online-ordering",
 
   // Operations (Core active routes only)
   DAILY_STOCK: "/operations/daily-stock",
