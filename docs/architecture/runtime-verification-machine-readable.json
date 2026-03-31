@@ -1,0 +1,5404 @@
+{
+  "generated_at": "2026-03-31T20:23:45.092Z",
+  "base_url": "http://127.0.0.1:8080",
+  "source_architecture_counts": {
+    "routes": 115,
+    "endpoints": 665
+  },
+  "verified_routes": [
+    {
+      "path": "/",
+      "normalized_path": "/",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/membership",
+      "normalized_path": "/membership",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/online-ordering",
+      "normalized_path": "/online-ordering",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 301,
+        "location": "/online-ordering/",
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Redirecting</title>\n</head>\n<body>\n<pre>Redirecting to /online-ordering/</pre>\n</body>\n</h"
+      }
+    },
+    {
+      "path": "/login",
+      "normalized_path": "/login",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/order",
+      "normalized_path": "/order",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/online-ordering/checkout",
+      "normalized_path": "/online-ordering/checkout",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta\n      name=\"viewport\"\n      content=\"width=device-width, initial-scale=1, viewp"
+      }
+    },
+    {
+      "path": "/online-ordering/confirmation",
+      "normalized_path": "/online-ordering/confirmation",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <meta\n      name=\"viewport\"\n      content=\"width=device-width, initial-scale=1, viewp"
+      }
+    },
+    {
+      "path": "/dashboard",
+      "normalized_path": "/dashboard",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/home",
+      "normalized_path": "/home",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/daily-sales-v2/library",
+      "normalized_path": "/operations/daily-sales-v2/library",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/daily-sales-library",
+      "normalized_path": "/operations/daily-sales-library",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/shopping-list",
+      "normalized_path": "/operations/shopping-list",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/purchasing-mapping",
+      "normalized_path": "/operations/purchasing-mapping",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/purchasing-shift-log",
+      "normalized_path": "/operations/purchasing-shift-log",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/purchasing-analytics",
+      "normalized_path": "/operations/purchasing-analytics",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/ingredient-purchasing",
+      "normalized_path": "/operations/ingredient-purchasing",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/ingredient-purchasing/new",
+      "normalized_path": "/operations/ingredient-purchasing/new",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/daily-sales",
+      "normalized_path": "/operations/daily-sales",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/daily-sales",
+      "normalized_path": "/daily-sales",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/daily-sales-stock",
+      "normalized_path": "/operations/daily-sales-stock",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/daily-stock",
+      "normalized_path": "/operations/daily-stock",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/ops/purchasing-live",
+      "normalized_path": "/ops/purchasing-live",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/purchasing",
+      "normalized_path": "/operations/purchasing",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/daily-reports",
+      "normalized_path": "/operations/daily-reports",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/system-health",
+      "normalized_path": "/operations/system-health",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/ai-ops-control",
+      "normalized_path": "/operations/ai-ops-control",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/purchase-history",
+      "normalized_path": "/operations/purchase-history",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/health-safety-audit",
+      "normalized_path": "/operations/health-safety-audit",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/health-safety-audit/questions",
+      "normalized_path": "/operations/health-safety-audit/questions",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/ingredients-master",
+      "normalized_path": "/operations/ingredients-master",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/recipe-mapping",
+      "normalized_path": "/operations/recipe-mapping",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/variance-monitor",
+      "normalized_path": "/operations/variance-monitor",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/issue-register",
+      "normalized_path": "/operations/issue-register",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/analysis",
+      "normalized_path": "/operations/analysis",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "loyverse",
+      "normalized_path": "/operations/analysis/loyverse",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "stock-review",
+      "normalized_path": "/operations/analysis/stock-review",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "shift-items",
+      "normalized_path": "/operations/analysis/shift-items",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "daily-shift-analysis",
+      "normalized_path": "/operations/analysis/daily-shift-analysis",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/analysis/stock-review",
+      "normalized_path": "/operations/analysis/stock-review",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/analysis/stock-review",
+      "normalized_path": "/analysis/stock-review",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/analysis/stock-reconciliation",
+      "normalized_path": "/analysis/stock-reconciliation",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/analysis/rolls-ledger",
+      "normalized_path": "/operations/analysis/rolls-ledger",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "upload",
+      "normalized_path": "/operations/analysis/upload",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "receipts",
+      "normalized_path": "/operations/analysis/receipts",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/analysis/upload",
+      "normalized_path": "/operations/analysis/upload",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/analysis/receipts",
+      "normalized_path": "/operations/analysis/receipts",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/analysis/receipts/burgers",
+      "normalized_path": "/operations/analysis/receipts/burgers",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/receipts-burger-counts",
+      "normalized_path": "/receipts-burger-counts",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/expenses",
+      "normalized_path": "/operations/expenses",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/expenses",
+      "normalized_path": "/expenses",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/shift-reports",
+      "normalized_path": "/operations/shift-reports",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/reports/shift-report",
+      "normalized_path": "/reports/shift-report",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/reports/shift-report/history",
+      "normalized_path": "/reports/shift-report/history",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/finance",
+      "normalized_path": "/finance",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/finance/profit-loss",
+      "normalized_path": "/finance/profit-loss",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/finance/expenses",
+      "normalized_path": "/finance/expenses",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/finance/expenses-import",
+      "normalized_path": "/finance/expenses-import",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/finance/expenses-v2",
+      "normalized_path": "/finance/expenses-v2",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/cost-calculator",
+      "normalized_path": "/menu/cost-calculator",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/ingredients",
+      "normalized_path": "/menu/ingredients",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/manager",
+      "normalized_path": "/menu/manager",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/import",
+      "normalized_path": "/menu/import",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/description-tool",
+      "normalized_path": "/menu/description-tool",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/recipe-management",
+      "normalized_path": "/recipe-management",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/recipes",
+      "normalized_path": "/menu/recipes",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/recipes/new",
+      "normalized_path": "/menu/recipes/new",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/recipe-cards",
+      "normalized_path": "/menu/recipe-cards",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu/ingredient-management",
+      "normalized_path": "/menu/ingredient-management",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/products",
+      "normalized_path": "/products",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/products/new",
+      "normalized_path": "/products/new",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/managers/nightly-checklist",
+      "normalized_path": "/managers/nightly-checklist",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/ai/jussi-ops",
+      "normalized_path": "/ai/jussi-ops",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/ai/jane-accounts",
+      "normalized_path": "/ai/jane-accounts",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/marketing/online-ordering",
+      "normalized_path": "/marketing/online-ordering",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/online-ordering/catalog",
+      "normalized_path": "/online-ordering/catalog",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/marketing/menu-admin",
+      "normalized_path": "/marketing/menu-admin",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/admin/orders",
+      "normalized_path": "/admin/orders",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/admin/loyverse-mapping",
+      "normalized_path": "/admin/loyverse-mapping",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/admin/data-safety",
+      "normalized_path": "/admin/data-safety",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/partners",
+      "normalized_path": "/partners",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/partners/analytics",
+      "normalized_path": "/partners/analytics",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/delivery/admin",
+      "normalized_path": "/delivery/admin",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/delivery/drivers",
+      "normalized_path": "/delivery/drivers",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/delivery/history",
+      "normalized_path": "/delivery/history",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/kds",
+      "normalized_path": "/kds",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/kds/history",
+      "normalized_path": "/kds/history",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu-v3",
+      "normalized_path": "/menu-v3",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu-management/ingredients",
+      "normalized_path": "/menu-management/ingredients",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/menu-management",
+      "normalized_path": "/menu-management",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/pos-login",
+      "normalized_path": "/pos-login",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/pos",
+      "normalized_path": "/pos",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/pos-register",
+      "normalized_path": "/pos-register",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/pos-checkout",
+      "normalized_path": "/pos-checkout",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/pos-receipt",
+      "normalized_path": "/pos-receipt",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/stock-live",
+      "normalized_path": "/stock-live",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/analysis/ingredients-usage",
+      "normalized_path": "/analysis/ingredients-usage",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/analysis/stock-variance",
+      "normalized_path": "/analysis/stock-variance",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/analysis/receipts",
+      "normalized_path": "/analysis/receipts",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/analysis/ingredients",
+      "normalized_path": "/analysis/ingredients",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/saas",
+      "normalized_path": "/saas",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/settings/tenant",
+      "normalized_path": "/settings/tenant",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/settings/payments",
+      "normalized_path": "/settings/payments",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/membership/dashboard",
+      "normalized_path": "/membership/dashboard",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/membership/register",
+      "normalized_path": "/membership/register",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/analysis/daily-review",
+      "normalized_path": "/analysis/daily-review",
+      "guarded": true,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/operations/analysis/daily-shift-analysis",
+      "normalized_path": "/operations/analysis/daily-shift-analysis",
+      "guarded": false,
+      "redirected": true,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "path": "/marketing",
+      "normalized_path": "/marketing",
+      "guarded": false,
+      "redirected": false,
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    }
+  ],
+  "failed_routes": [],
+  "verified_endpoints": [
+    {
+      "method": "GET",
+      "path": "/",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/vendors",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/categories",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/summary/today",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pnl-expenses",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pnl-summary",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pl",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pl/export",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/summary",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/god-file",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/rolls",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/tablet-reload",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1, us"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/tablet-nuclear",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html>\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, user-scalable=no\">\n    <meta "
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-sales",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch daily sales records\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Server error\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/suppliers-json",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "[{\"id\":1,\"item\":\"Topside Beef\",\"category\":\"Fresh Food\",\"supplier\":\"Makro\",\"brand\":\"Harvey Beef\",\"sku\":\"\",\"cost\":319,\"packagingQty\":\"1kg\",\"unit\":\"kg\",\"portionSiz"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-stock",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"ok\":true,\"data\":[]}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/pos/batches",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch batches\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/shift",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Analysis failed\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/profit-loss",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to aggregate P&L data\",\"details\":\"Cannot read properties of null (reading 'select')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/loyverse/shifts",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"Token missing\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/loyverse/receipts",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"Token missing\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/stock-discrepancies",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"discrepancies\":[{\"item\":\"Burger Buns\",\"expected\":50,\"actual\":45,\"difference\":-5,\"threshold\":10,\"isOutOfBounds\":false,\"alert\":null},{\"item\":\"Chicken Wings\",\"ex"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/stock-reconciliation",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Cannot read properties of null (reading 'execute')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/usage-reconciliation",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"ok\":false,\"error\":\"date query param required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/list",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"\\nInvalid `prisma.shiftSnapshot.findMany()` invocation in\\n/workspace/final-dashboard-4/server/routes.ts:1065:47\\n\\n  1062 const { PrismaClient } = aw"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/daily-sales",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"\\nInvalid `prisma.dailySalesV2.findMany()` invocation in\\n/workspace/final-dashboard-4/server/routes.ts:1107:47\\n\\n  1104   console.log(`[K-4.4] Filte"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/daily-sales/export.csv",
+      "runtime": {
+        "ok": true,
+        "status": 503,
+        "location": null,
+        "body_snippet": "{\"error\":\"CSV export not available - daily_shift_summary table does not exist\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-summary",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth/lines",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth/modifiers",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth/ingredients",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/ingredients-truth",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth/aggregates",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth/category-mappings",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"getCategoryMappings is not a function\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth/modifiers-effective",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/receipts-truth/daily-usage",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/build-status",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/ingredient-usage",
+      "runtime": {
+        "ok": true,
+        "status": 400,
+        "location": null,
+        "body_snippet": "{\"error\":\"date query parameter required (YYYY-MM-DD)\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/modifier-rules",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Cannot read properties of null (reading 'execute')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/expensesV2",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch expenses\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients/search",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "[]"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/sales-summary",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to get sales summary\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/financial-overview",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to get financial overview\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/reports/performance-metrics",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to get performance metrics\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients/by-category",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch ingredients\",\"details\":\"Cannot read properties of null (reading 'select')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-stock-sales",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch daily stock sales\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-stock-sales/archived",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"message\":\"Failed to fetch archived forms\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-stock-sales/search",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to search daily stock sales\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/shopping-lists",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch shopping lists\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/food-costings",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "[{\"name\":\"Burger Buns\",\"supplier\":\"Bakery Supply\",\"cost\":2.5,\"unit\":\"pack\",\"portions\":8,\"key\":\"burger_buns\"},{\"name\":\"Ground Beef\",\"supplier\":\"Meat Supplier\",\"c"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/system/status",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to check system status\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/stock-review/purchase-history",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"ok\":false,\"error\":\"pool is not defined\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/expensesV2/month-to-date",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch month-to-date expenses\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/expensesV2/by-category",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch expenses by category\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/expensesV2/totals",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch expense totals\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/expense-suppliers",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "[{\"name\":\"Other\",\"isDefault\":true,\"id\":10,\"createdAt\":\"2026-03-31T20:20:08.581Z\"},{\"name\":\"Mr DIY\",\"isDefault\":true,\"id\":11,\"createdAt\":\"2026-03-31T20:20:08.581"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/expense-categories",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "[{\"name\":\"Food\",\"isDefault\":true,\"id\":26,\"createdAt\":\"2026-03-31T20:20:08.581Z\"},{\"name\":\"Beverage\",\"isDefault\":true,\"id\":27,\"createdAt\":\"2026-03-31T20:20:08.58"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/bank-statements",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch bank statements\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients/print",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "\n        <!DOCTYPE html>\n        <html>\n        <head>\n          <title>Ingredient List - 3/31/2026</title>\n          <style>\n            body { font-family: Ar"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Internal server error\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/items",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to load items\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/menu-canonical/status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"loaded\":true,\"itemCount\":47,\"loadedAt\":\"2026-03-31T20:22:54.002Z\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/menu-canonical/drift",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"generatedAt\":\"2026-03-31T20:23:35.175Z\",\"canonical\":{\"source\":\"Loyverse CSV\",\"itemCount\":47},\"online\":{\"source\":\"/api/menu-ordering/full\",\"itemCount\":0},\"drif"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/pos/sync-status",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch POS status\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analytics/latest",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch analytics\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/jussi/status",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch Jussi status\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/jussi/latest",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Fetch failed\",\"details\":\"Cannot read properties of null (reading 'select')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/receipts/recent",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch receipts\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/suppliers/makro/prices",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"status\":\"UNAVAILABLE\",\"reason\":\"INTEGRATION_NOT_CONFIGURED\",\"updatedAt\":\"2026-03-31T20:23:35.343Z\",\"items\":[]}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/library/daily-sales",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"ok\":false,\"error\":\"Failed to get library data\",\"details\":\"\\nInvalid `db().dailySalesV2.findMany()` invocation in\\n/workspace/final-dashboard-4/server/api/libr"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/operations/variance",
+      "runtime": {
+        "ok": true,
+        "status": 401,
+        "location": null,
+        "body_snippet": "{\"error\":\"LOYVERSE_TOKEN not configured\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/forms/library",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch forms library: Cannot read properties of null (reading 'query')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-sales-v2/latest-proof",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch daily sales form data\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/manager-checklist/questions",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"rows\":[{\"id\":\"q1\",\"text\":\"Fridge temps logged accurately\",\"area\":\"Kitchen\",\"active\":true},{\"id\":\"q2\",\"text\":\"Handwash station stocked (soap/towels)\",\"area\":\"K"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/manager-checklist/status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"dateISO\":\"2026-03-31\",\"completed\":false,\"completedAtISO\":null,\"notesPresent\":false}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/snapshots",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch snapshots\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/jussi/latest-comparison",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch comparison\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/dashboard/latest",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"\\nInvalid `prisma.shiftSnapshot.findFirst()` invocation in\\n/workspace/final-dashboard-4/server/routes.ts:5299:49\\n\\n  5296 const { PrismaClient } = a"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/operations/stats",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch operations stats\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/download/architecture-report",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "# Daily Sales & Stock Forms Architecture Report\n**Generated:** October 8, 2025  \n**System:** Restaurant Management Dashboard - Daily Operations Module\n\n---\n\n## "
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/download/ground-zero-schema",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "# Ground-Zero Schema Summary\n\n**Generated:** 2025-10-08 08:14:09 UTC\n\nThis document reflects the **current** Postgres schema as the single source of truth.\n\n> S"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/shift-reports/balance-review",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch shift balance review\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/review-queue",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/admin/menu",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch menu\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/sync-loyverse",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bob/health",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bob/manifest",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bob/proxy-read",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bob/file-read",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bob/file-list",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bob/charter",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/process-registry",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/bob/onboarding-context",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/agents",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/chat/threads",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/tasks",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/monitors",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shift-rebuild-log",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/issues",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ideas",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/export.csv",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/latest",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/window",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/daily",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/top",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pos",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/forms",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/combined",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/rules",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/system-health",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/system-map",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/build-status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/forms/daily-sales",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/forms/daily-stock",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/receipts/truth",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/usage/truth",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/catalog",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/orders",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/roll-order",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/module-status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shift-snapshot",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/item-sales",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/modifier-sales",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/reports/category-totals",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analysis/stock-usage",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/random",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/history",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients/master",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"ok\":true,\"ingredients\":[],\"warning\":\"SAFE_FALLBACK_USED\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/purchases/summary",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"ok\":true,\"period\":\"day\",\"summary\":[],\"warning\":\"SAFE_FALLBACK_USED\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/data-confidence",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"ok\":true,\"status\":\"RED\",\"reasons\":[\"No sales form for 2026-03-31\",\"No stock form for 2026-03-31\",\"No POS receipts for 2026-03-31\"],\"checks\":{\"ingredientsVerif"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/power-tools/backup/status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"ok\":true,\"lastBackup\":null,\"warning\":\"SAFE_FALLBACK_USED\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/power-tools/historical-import/stats",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"ok\":true,\"stats\":null,\"warning\":\"SAFE_FALLBACK_USED\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/purchasing-parity",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ingredient-parity",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ingredient-usage-summary",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/active",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/drivers",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/purchasing-demand",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pending",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/defaults",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/all",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/daily-sales-v2",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/daily-stock-v2",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pos/shift-reports",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pos/receipts",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/expenses",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/library",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ingredients",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/canonical",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/management",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/item-sales",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/modifier-sales",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/category-totals",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/daily-sales",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shopping-list",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/recipes",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/suppliers",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/menu-items",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/partners",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/enhanced/test-connection",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/enhanced/status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/enhanced/history",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/enhanced/validation-stats",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/enhanced/health",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/loyverse/menu/status",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shift-report",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/questions",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/admin/questions",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/items",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/modifiers/groups",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/menu",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/menu-online",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/full",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/online/catalog",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/menu",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch menu\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/online/products",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/online/products/catalog",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/online/orders",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ordering/menu",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ordering/orders",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/orders/today",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch order count\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/orders",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Failed to fetch orders\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ops/mtd",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analytics",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/list",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/dynamic",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/years",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/year",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/receipts-summary",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analysis/shift",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/live-items",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/live-shift",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/receipts",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shifts",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/ingredient-usage",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/metrics/prime-cost",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"ok\":false,\"error\":\"Cannot read properties of null (reading 'query')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/product-menu",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"ok\":false,\"error\":\"Cannot read properties of null (reading 'execute')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/products",
+      "runtime": {
+        "ok": true,
+        "status": 500,
+        "location": null,
+        "body_snippet": "{\"error\":\"Cannot read properties of null (reading 'execute')\"}"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/drinks",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/field-keys",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/export/csv",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/purchasing-shift-matrix",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/generate",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/receipts/summary",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/count",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shift/burgers/ping",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shift/burgers",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/debug/items",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/cards",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/v2",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/cross-ref-shift",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/search",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/export-range",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analysis/shift/items",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/analysis/shift/raw",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shift-snapshots",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/latest-valid-shift",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/by-date",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/system-purchases",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/latest/csv",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pdf/latest",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/pdf/range",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/live",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/shift",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/baseline",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/variance",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/manual-ledger/health",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/run",
+      "runtime": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    }
+  ],
+  "unverified_endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/analysis",
+      "runtime": {
+        "ok": false,
+        "error": "AbortError: This operation was aborted"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/search",
+      "runtime": {
+        "ok": false,
+        "error": "AbortError: This operation was aborted"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/analysis/latest",
+      "runtime": {
+        "ok": false,
+        "error": "AbortError: This operation was aborted"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/manager-checklist/nightly",
+      "runtime": {
+        "ok": false,
+        "error": "AbortError: This operation was aborted"
+      }
+    }
+  ],
+  "auth_findings": [
+    {
+      "name": "login_invalid",
+      "request": "POST /api/auth/login",
+      "result": {
+        "ok": false,
+        "error": "AbortError: This operation was aborted"
+      }
+    },
+    {
+      "name": "finance_protected_probe",
+      "request": "GET /api/finance/summary/today",
+      "result": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "{\"sales\":0,\"currentMonthSales\":0,\"shiftCount\":0,\"shiftCoverage\":{\"expectedCompletedShifts\":0,\"syncedShiftReports\":0,\"missingShiftReports\":0,\"latestBusinessDate\""
+      }
+    },
+    {
+      "name": "bob_read_no_token",
+      "request": "GET /api/bob/read/system-health",
+      "result": {
+        "ok": true,
+        "status": 503,
+        "location": null,
+        "body_snippet": "{\"ok\":false,\"source\":\"env:BOB_READONLY_TOKEN\",\"scope\":\"auth\",\"status\":\"error\",\"data\":{\"authorized\":false},\"warnings\":[],\"blockers\":[{\"code\":\"TOKEN_NOT_CONFIGURE"
+      }
+    },
+    {
+      "name": "dashboard_html",
+      "request": "GET /dashboard",
+      "result": {
+        "ok": true,
+        "status": 200,
+        "location": null,
+        "body_snippet": "<!DOCTYPE html>\n<html lang=\"en\">\n  <head>\n    <script type=\"module\">\nimport { createHotContext } from \"/@vite/client\";\nconst hot = createHotContext(\"/__dummy__r"
+      }
+    }
+  ],
+  "consumer_matrix": [
+    {
+      "file": "client/src/pages/TestEmailPage.tsx",
+      "calls": [
+        "'/api/send-form-summary",
+        "'/api/send-last-form-summary"
+      ]
+    },
+    {
+      "file": "client/src/pages/Products.tsx",
+      "calls": [
+        "'/api/products"
+      ]
+    },
+    {
+      "file": "client/src/pages/SalesShiftAnalysis.tsx",
+      "calls": [
+        "'/api/ai-ops/bob/email/trigger",
+        "'/api/ai-ops/bob/run-analysis",
+        "'/api/approve-shift",
+        "'/api/issue-register/auto-create",
+        "'/api/latest-valid-shift",
+        "'/api/shift-snapshots"
+      ]
+    },
+    {
+      "file": "client/src/pages/EnhancedExpenses.tsx",
+      "calls": [
+        "\"/api/bank-statements",
+        "\"/api/expense-categories",
+        "\"/api/expense-suppliers",
+        "\"/api/expensesV2",
+        "\"/api/expensesV2/by-category",
+        "\"/api/expensesV2/month-to-date"
+      ]
+    },
+    {
+      "file": "client/src/pages/Home.tsx",
+      "calls": [
+        "\"/api/balance/forms",
+        "\"/api/balance/pos",
+        "\"/api/finance/summary/today",
+        "\"/api/metrics/prime-cost",
+        "\"/api/shift-report/latest"
+      ]
+    },
+    {
+      "file": "client/src/pages/OnlineOrdering.tsx",
+      "calls": [
+        "\"/api/menu-ordering/full"
+      ]
+    },
+    {
+      "file": "client/src/pages/AnalysisList.tsx",
+      "calls": [
+        "'/api/analysis/list"
+      ]
+    },
+    {
+      "file": "client/src/pages/Marketing.tsx",
+      "calls": [
+        "'/api/marketing-calendar",
+        "'/api/quick-notes"
+      ]
+    },
+    {
+      "file": "client/src/pages/IngredientManagement.tsx",
+      "calls": [
+        "'/api/ingredients",
+        "'/api/ingredients/print"
+      ]
+    },
+    {
+      "file": "client/src/pages/RecipeIngredientManagement.tsx",
+      "calls": [
+        "'/api/ingredients",
+        "'/api/recipe-ingredients",
+        "'/api/recipes"
+      ]
+    },
+    {
+      "file": "client/src/pages/ShiftComparison.tsx",
+      "calls": [
+        "'/api/shift-comparison"
+      ]
+    },
+    {
+      "file": "client/src/pages/ShiftReportDetail.tsx",
+      "calls": [
+        "'/api/shift-reports"
+      ]
+    },
+    {
+      "file": "client/src/pages/Dashboard.tsx",
+      "calls": [
+        "'/api/dashboard/latest",
+        "'/api/operations/stats"
+      ]
+    },
+    {
+      "file": "client/src/pages/ProfitLoss.tsx",
+      "calls": [
+        "'/api/pnl/year",
+        "'/api/pnl/years"
+      ]
+    },
+    {
+      "file": "client/src/pages/Receipts.tsx",
+      "calls": [
+        "\"/api/receipts/jussi-summary/latest"
+      ]
+    },
+    {
+      "file": "client/src/pages/SupplierManagement.tsx",
+      "calls": [
+        "'/api/legacy-bridge/suppliers",
+        "'/api/suppliers"
+      ]
+    },
+    {
+      "file": "client/src/pages/SystemStatus.tsx",
+      "calls": [
+        "'/api/expensesV2",
+        "'/api/system/status"
+      ]
+    },
+    {
+      "file": "client/src/pages/TestMonthlyStock.tsx",
+      "calls": [
+        "\"/api/stock-purchase/monthly-summary"
+      ]
+    },
+    {
+      "file": "client/src/pages/Purchasing.tsx",
+      "calls": [
+        "\"/api/suppliers-json"
+      ]
+    },
+    {
+      "file": "client/src/pages/ProductPage.tsx",
+      "calls": [
+        "\"/api/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/pages/WebhookManagement.tsx",
+      "calls": [
+        "'/api/webhooks/list",
+        "'/api/webhooks/register"
+      ]
+    },
+    {
+      "file": "client/src/pages/Finance.tsx",
+      "calls": [
+        "\"/api/finance/pos-vs-staff"
+      ]
+    },
+    {
+      "file": "client/src/pages/ShiftAnalytics.tsx",
+      "calls": [
+        "'/api/analysis/process-shift",
+        "'/api/analysis/shift"
+      ]
+    },
+    {
+      "file": "client/src/pages/Ingredients.tsx",
+      "calls": [
+        "\"/api/costing/ingredients",
+        "\"/api/costing/ingredients/import",
+        "\"/api/ingredients",
+        "'/api/ingredients",
+        "'/api/ingredients/print",
+        "'/api/legacy-bridge/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/pages/form-library.tsx",
+      "calls": [
+        "'/api/forms"
+      ]
+    },
+    {
+      "file": "client/src/pages/ReportsAnalysis.tsx",
+      "calls": [
+        "'/api/reports/financial-overview",
+        "'/api/reports/performance-metrics",
+        "'/api/reports/sales-summary"
+      ]
+    },
+    {
+      "file": "client/src/pages/ReceiptsSummary.tsx",
+      "calls": [
+        "'/api/receipts/summary"
+      ]
+    },
+    {
+      "file": "client/src/pages/ShoppingList.tsx",
+      "calls": [
+        "\"/api/purchasing-list/latest",
+        "\"/api/purchasing-list/system-purchases",
+        "'/api/purchasing-list/latest/csv"
+      ]
+    },
+    {
+      "file": "client/src/pages/ExpenseUpload.tsx",
+      "calls": [
+        "'/api/expensesV2/imports",
+        "'/api/expensesV2/imports/categories",
+        "'/api/expensesV2/imports/vendors"
+      ]
+    },
+    {
+      "file": "client/src/pages/IngredientsTable.tsx",
+      "calls": [
+        "'/api/ingredients",
+        "'/api/ingredients/sync-csv",
+        "'/api/legacy-bridge/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/pages/CostCalculator.tsx",
+      "calls": [
+        "\"/api/costing/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/pages/Expenses.tsx",
+      "calls": [
+        "\"/api/expensesV2",
+        "\"/api/expensesV2/approve",
+        "\"/api/expensesV2/upload",
+        "\"/api/purchase-tally",
+        "'/api/expenses/batch-approve",
+        "'/api/expenses/batch-reject",
+        "'/api/expenses/defaults",
+        "'/api/expenses/pending",
+        "'/api/expensesV2",
+        "'/api/expensesV2/totals",
+        "'/api/shift-expenses"
+      ]
+    },
+    {
+      "file": "client/src/pages/stock-library.tsx",
+      "calls": [
+        "'/api/daily-stock"
+      ]
+    },
+    {
+      "file": "client/src/pages/POSLoyverse.tsx",
+      "calls": [
+        "'/api/loyverse/receipts",
+        "'/api/loyverse/receipts-by-shifts",
+        "'/api/loyverse/receipts/sync-live",
+        "'/api/loyverse/shift-balance-analysis",
+        "'/api/loyverse/shift-reports",
+        "'/api/loyverse/sync"
+      ]
+    },
+    {
+      "file": "client/src/pages/Recipes.tsx",
+      "calls": [
+        "'/api/ingredients",
+        "'/api/recipes"
+      ]
+    },
+    {
+      "file": "client/src/pages/partners/PartnerBars.tsx",
+      "calls": [
+        "\"/api/partners/all",
+        "\"/api/partners/create"
+      ]
+    },
+    {
+      "file": "client/src/pages/partners/PartnerAnalytics.tsx",
+      "calls": [
+        "\"/api/partners/analytics"
+      ]
+    },
+    {
+      "file": "client/src/pages/menuV3/ModifiersEditor.tsx",
+      "calls": [
+        "\"/api/menu-v3/modifiers/create",
+        "\"/api/menu-v3/modifiers/groups",
+        "\"/api/menu-v3/modifiers/groups/create"
+      ]
+    },
+    {
+      "file": "client/src/pages/menuV3/RecipeEditor.tsx",
+      "calls": [
+        "\"/api/ingredients",
+        "\"/api/menu-v3/recipes/",
+        "\"/api/menu-v3/recipes/set"
+      ]
+    },
+    {
+      "file": "client/src/pages/menuV3/CategoriesEditor.tsx",
+      "calls": [
+        "\"/api/menu-v3/categories",
+        "\"/api/menu-v3/categories/create"
+      ]
+    },
+    {
+      "file": "client/src/pages/menuV3/ItemsEditor.tsx",
+      "calls": [
+        "\"/api/menu-v3/categories",
+        "\"/api/menu-v3/items",
+        "\"/api/menu-v3/items/create"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/IngredientManagement.tsx",
+      "calls": [
+        "\"/api/ingredients",
+        "\"/api/ingredients/management",
+        "\"/api/ingredients/management?showHidden=true",
+        "\"/api/recipes"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/MenuImport.tsx",
+      "calls": [
+        "\"/api/menus/import"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/MenuManager.tsx",
+      "calls": [
+        "\"/api/menus"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/MenuManagement.tsx",
+      "calls": [
+        "\"/api/ingredients",
+        "\"/api/menu-v3/categories",
+        "\"/api/menu-v3/categories/create",
+        "\"/api/menu-v3/items",
+        "\"/api/menu-v3/items/create",
+        "\"/api/menu-v3/items/update",
+        "\"/api/menu-v3/modifiers/apply",
+        "\"/api/menu-v3/modifiers/groups",
+        "\"/api/menu-v3/recipes",
+        "\"/api/menu-v3/recipes/set",
+        "\"/api/recipes/cards"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/DescriptionTool.tsx",
+      "calls": [
+        "\"/api/menus/description/generate"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/RecipeCards.tsx",
+      "calls": [
+        "\"/api/recipes/cards",
+        "'/api/recipes/upload-image"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/CostCalculator.tsx",
+      "calls": [
+        "\"/api/chef/describe",
+        "\"/api/ingredients/canonical",
+        "\"/api/recipes/save",
+        "\"/api/recipes/save-with-photo"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/IngredientEdit.tsx",
+      "calls": [
+        "\"/api/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/pages/menu/Recipes.tsx",
+      "calls": [
+        "\"/api/recipes/v2"
+      ]
+    },
+    {
+      "file": "client/src/pages/managers/ChecklistHistory.tsx",
+      "calls": [
+        "\"/api/manager-checklist/history?limit=30"
+      ]
+    },
+    {
+      "file": "client/src/pages/managers/AdminQuestions.tsx",
+      "calls": [
+        "\"/api/manager-checklist/questions"
+      ]
+    },
+    {
+      "file": "client/src/pages/managers/NightlyChecklist.tsx",
+      "calls": [
+        "\"/api/manager-checklist/submit",
+        "\"/api/tmp/attester-photo"
+      ]
+    },
+    {
+      "file": "client/src/pages/marketing/MenuAdmin.tsx",
+      "calls": [
+        "\"/api/admin/menu",
+        "\"/api/admin/menu/category",
+        "\"/api/admin/menu/item",
+        "\"/api/menu",
+        "\"/api/upload/menu-item-image"
+      ]
+    },
+    {
+      "file": "client/src/pages/settings/PaymentProviders.tsx",
+      "calls": [
+        "\"/api/payment-providers/list",
+        "\"/api/payment-providers/save"
+      ]
+    },
+    {
+      "file": "client/src/pages/expenses/IngredientSearch.tsx",
+      "calls": [
+        "'/api/ingredients/search?q="
+      ]
+    },
+    {
+      "file": "client/src/pages/expenses/ExpensesV2.tsx",
+      "calls": [
+        "\"/api/expenses-v2/all",
+        "\"/api/expenses-v2/create",
+        "\"/api/expenses-v2/summary"
+      ]
+    },
+    {
+      "file": "client/src/pages/expenses/BusinessExpenses.tsx",
+      "calls": [
+        "\"/api/expensesV2",
+        "\"/api/expensesV2/upload"
+      ]
+    },
+    {
+      "file": "client/src/pages/expenses/ExpensesList.tsx",
+      "calls": [
+        "'/api/expensesV2",
+        "'/api/legacy-bridge/expenses"
+      ]
+    },
+    {
+      "file": "client/src/pages/expenses/ShiftPurchasing.tsx",
+      "calls": [
+        "'/api/expensesV2",
+        "'/api/expensesV2?source=SHIFT_FORM",
+        "'/api/snapshots?limit=1"
+      ]
+    },
+    {
+      "file": "client/src/pages/expenses/ExpenseEditor.tsx",
+      "calls": [
+        "'/api/expensesV2"
+      ]
+    },
+    {
+      "file": "client/src/pages/admin/DataSafety.tsx",
+      "calls": [
+        "\"/api/admin/backup/run",
+        "\"/api/admin/backup/status",
+        "\"/api/admin/historical/import",
+        "\"/api/admin/historical/status"
+      ]
+    },
+    {
+      "file": "client/src/pages/ops/PurchasingLive.tsx",
+      "calls": [
+        "'/api/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/pages/ops/IngredientPurchasingList.tsx",
+      "calls": [
+        "\"/api/ingredient-authority"
+      ]
+    },
+    {
+      "file": "client/src/pages/ops/IngredientPurchasingForm.tsx",
+      "calls": [
+        "\"/api/ingredient-authority"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/DailyStock.tsx",
+      "calls": [
+        "\"/api/purchasing-items/sync-to-daily-stock",
+        "'/api/finance/summary/today",
+        "'/api/purchasing-items?active=true"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/IngredientsMaster.tsx",
+      "calls": [
+        "\"/api/ingredient-master"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/IssueRegister.tsx",
+      "calls": [
+        "\"/api/issue-register",
+        "\"/api/issue-register/auto-create"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/PurchasingFieldMapping.tsx",
+      "calls": [
+        "'/api/purchasing-field-mapping/field-keys",
+        "'/api/purchasing-field-mapping/items",
+        "'/api/purchasing-field-mapping/map"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/PurchasingShiftLog.tsx",
+      "calls": [
+        "\"/api/purchasing-shift-log"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/PurchasingAnalytics.tsx",
+      "calls": [
+        "\"/api/purchasing-analytics"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/Purchasing.tsx",
+      "calls": [
+        "\"/api/purchasing-items/export/csv",
+        "'/api/purchasing-items",
+        "'/api/purchasing-items/import/csv"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/PurchaseHistory.tsx",
+      "calls": [
+        "\"/api/purchases/summary"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/VarianceMonitor.tsx",
+      "calls": [
+        "\"/api/refunds",
+        "\"/api/stock/variance"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/AiOpsControl.tsx",
+      "calls": [
+        "'/api/ai-ops/agents",
+        "'/api/ai-ops/chat/threads",
+        "'/api/ai-ops/ideas",
+        "'/api/ai-ops/issues",
+        "'/api/ai-ops/process-registry",
+        "'/api/ai-ops/tasks"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/Analysis.tsx",
+      "calls": [
+        "\"/api/jussi/latest",
+        "'/api/analysis/upload",
+        "'/api/operations/stats"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/Recipes.tsx",
+      "calls": [
+        "\"/api/ingredients/canonical",
+        "\"/api/recipes/cards",
+        "\"/api/recipes/save"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/recipe-mapping/index.tsx",
+      "calls": [
+        "'/api/admin/rebuild-usage",
+        "'/api/recipe-mapping"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/daily-sales/Form.tsx",
+      "calls": [
+        "\"/api/expense-suppliers",
+        "\"/api/forms/daily-sales/v3",
+        "\"/api/purchasing-items/sync-to-daily-stock",
+        "'/api/finance/summary/today",
+        "'/api/refunds/log"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/daily-sales/Library.tsx",
+      "calls": [
+        "\"/api/forms/daily-sales/v2"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/daily-reports/index.tsx",
+      "calls": [
+        "\"/api/reports/list"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/daily-reports/view.tsx",
+      "calls": [
+        "\"/api/reports",
+        "\"/api/reports/list"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/analysis/ShiftSummary.tsx",
+      "calls": [
+        "\"/api/pos/shifts",
+        "\"/api/pos/upload"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/tasks/TaskDetail.tsx",
+      "calls": [
+        "'/api/ai-ops/tasks"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/shopping-list/index.tsx",
+      "calls": [
+        "'/api/purchasing-list/latest",
+        "'/api/purchasing-list/system-purchases"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/shopping-list/history.tsx",
+      "calls": [
+        "\"/api/shopping-list/pdf/latest?date=",
+        "'/api/shopping-list/history"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/system-health/index.tsx",
+      "calls": [
+        "\"/api/system-health/run"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/daily-sales-v2/Library.tsx",
+      "calls": [
+        "\"/api/forms/daily-sales/v2",
+        "'/api/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/health-safety-audit/index.tsx",
+      "calls": [
+        "\"/api/health-safety/audits",
+        "\"/api/health-safety/questions"
+      ]
+    },
+    {
+      "file": "client/src/pages/operations/health-safety-audit/questions.tsx",
+      "calls": [
+        "\"/api/health-safety/questions",
+        "\"/api/health-safety/questions/all"
+      ]
+    },
+    {
+      "file": "client/src/pages/kds/KDSHistory.tsx",
+      "calls": [
+        "\"/api/kds/history"
+      ]
+    },
+    {
+      "file": "client/src/pages/kds/KDS.tsx",
+      "calls": [
+        "\"/api/kds/active",
+        "\"/api/kds/update-status"
+      ]
+    },
+    {
+      "file": "client/src/pages/membership/MemberDashboard.tsx",
+      "calls": [
+        "'/api/membership/list"
+      ]
+    },
+    {
+      "file": "client/src/pages/membership/MembershipApp.tsx",
+      "calls": [
+        "'/api/membership/register"
+      ]
+    },
+    {
+      "file": "client/src/pages/membership/MemberRegistration.tsx",
+      "calls": [
+        "'/api/membership/register"
+      ]
+    },
+    {
+      "file": "client/src/pages/finance/ExpensesImport.tsx",
+      "calls": [
+        "'/api/expenses/pending",
+        "'/api/expenses/upload-bank",
+        "'/api/expenses/upload-partner",
+        "'/api/partners/summary"
+      ]
+    },
+    {
+      "file": "client/src/pages/auth/Login.tsx",
+      "calls": [
+        "\"/api/auth/login"
+      ]
+    },
+    {
+      "file": "client/src/pages/ordering/AdminOrders.tsx",
+      "calls": [
+        "\"/api/online/orders"
+      ]
+    },
+    {
+      "file": "client/src/pages/pos/POSCheckout.tsx",
+      "calls": [
+        "\"/api/pos/order/checkout"
+      ]
+    },
+    {
+      "file": "client/src/pages/pos/POS.tsx",
+      "calls": [
+        "\"/api/menu-v3/categories",
+        "\"/api/menu-v3/items",
+        "\"/api/menu-v3/modifiers/groups"
+      ]
+    },
+    {
+      "file": "client/src/pages/pos/POSRegisterStatus.tsx",
+      "calls": [
+        "\"/api/pos/register/close",
+        "\"/api/pos/register/open",
+        "\"/api/pos/register/status"
+      ]
+    },
+    {
+      "file": "client/src/pages/reports/shift-report/index.tsx",
+      "calls": [
+        "\"/api/shift-report/latest"
+      ]
+    },
+    {
+      "file": "client/src/pages/reports/shift-report/history.tsx",
+      "calls": [
+        "\"/api/shift-report/history"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/IngredientUsage.tsx",
+      "calls": [
+        "\"/api/analysis/ingredient-usage",
+        "\"/api/analysis/ingredient-usage/rebuild"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/ShiftAnalysis.tsx",
+      "calls": [
+        "'/api/pos/analysis/shift"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/StockReconciliation.tsx",
+      "calls": [
+        "\"/api/analysis/stock-reconciliation"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/DailyReview.tsx",
+      "calls": [
+        "\"/api/analysis/approve-shift",
+        "\"/api/analysis/daily-comparison",
+        "\"/api/analysis/daily-sales"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/StockReview.tsx",
+      "calls": [
+        "\"/api/analysis/stock-review/purchase-history"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/PosUpload.tsx",
+      "calls": [
+        "'/api/pos/upload"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/ReceiptsTruth.tsx",
+      "calls": [
+        "'/api/analysis/receipts-truth",
+        "'/api/analysis/receipts-truth/aggregates",
+        "'/api/analysis/receipts-truth/aggregates/rebuild",
+        "'/api/analysis/receipts-truth/daily-usage",
+        "'/api/analysis/receipts-truth/daily-usage/rebuild",
+        "'/api/analysis/receipts-truth/modifiers-effective",
+        "'/api/analysis/receipts-truth/modifiers-effective/rebuild",
+        "'/api/analysis/receipts-truth/rebuild",
+        "'/api/latest-valid-shift"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/ShiftAnalyticsMM.tsx",
+      "calls": [
+        "'/api/analysis/meat-ledger/backfill-14",
+        "'/api/analysis/meat-ledger/history",
+        "'/api/analysis/meat-ledger/update-manual",
+        "'/api/analysis/rolls-ledger/history",
+        "'/api/analysis/rolls-ledger/update-manual"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/RollsLedger.tsx",
+      "calls": [
+        "'/api/analysis/meat-ledger/approve",
+        "'/api/analysis/meat-ledger/backfill-14",
+        "'/api/analysis/meat-ledger/history",
+        "'/api/analysis/meat-ledger/update-manual",
+        "'/api/analysis/rolls-ledger/approve",
+        "'/api/analysis/rolls-ledger/backfill-14",
+        "'/api/analysis/rolls-ledger/history",
+        "'/api/analysis/rolls-ledger/update-manual"
+      ]
+    },
+    {
+      "file": "client/src/pages/analysis/IngredientsTruth.tsx",
+      "calls": [
+        "'/api/analysis/ingredients-truth",
+        "'/api/analysis/receipts-truth/ingredients/rebuild",
+        "'/api/analysis/receipts-truth/rebuild"
+      ]
+    },
+    {
+      "file": "client/src/lib/purchasingApi.ts",
+      "calls": [
+        "'/api/purchasing/plan"
+      ]
+    },
+    {
+      "file": "client/src/lib/api.ts",
+      "calls": [
+        "\"/api/dashboard/ai-insights",
+        "\"/api/dashboard/kpis",
+        "\"/api/dashboard/recent-transactions",
+        "\"/api/dashboard/top-menu-items",
+        "\"/api/expensesV2",
+        "\"/api/expensesV2/by-category",
+        "\"/api/finance/pos-vs-staff",
+        "\"/api/inventory",
+        "\"/api/inventory/low-stock",
+        "\"/api/pos/analyze-receipt",
+        "\"/api/pos/detect-anomalies",
+        "\"/api/shopping-list",
+        "\"/api/shopping-list/generate",
+        "\"/api/suppliers",
+        "'/api/expensesV2",
+        "'/api/forms",
+        "'/api/ingredients",
+        "'/api/legacy-bridge/daily-sales",
+        "'/api/legacy-bridge/expenses",
+        "'/api/legacy-bridge/ingredients",
+        "'/api/legacy-bridge/menu-items",
+        "'/api/legacy-bridge/partners",
+        "'/api/legacy-bridge/recipes",
+        "'/api/legacy-bridge/shopping-list",
+        "'/api/legacy-bridge/suppliers",
+        "'/api/menu-v3/items",
+        "'/api/partners",
+        "'/api/recipes",
+        "'/api/shopping-list",
+        "'/api/suppliers"
+      ]
+    },
+    {
+      "file": "client/src/lib/uploader.ts",
+      "calls": [
+        "\"/api/import/menu/commit",
+        "\"/api/upload/image"
+      ]
+    },
+    {
+      "file": "client/src/components/PurchaseTallyModal.tsx",
+      "calls": [
+        "\"/api/costing/ingredients",
+        "\"/api/purchase-tally"
+      ]
+    },
+    {
+      "file": "client/src/components/LoyverseConnectionStatus.tsx",
+      "calls": [
+        "\"/api/loyverse/live/status"
+      ]
+    },
+    {
+      "file": "client/src/components/CompactShiftReports.tsx",
+      "calls": [
+        "\"/api/loyverse/shift-balance-analysis"
+      ]
+    },
+    {
+      "file": "client/src/components/BalanceWidget.tsx",
+      "calls": [
+        "\"/api/balance/daily"
+      ]
+    },
+    {
+      "file": "client/src/components/BankUploadCard.tsx",
+      "calls": [
+        "\"/api/bank-imports/csv",
+        "\"/api/bank-imports/pdf"
+      ]
+    },
+    {
+      "file": "client/src/components/ShiftBalanceSummary.tsx",
+      "calls": [
+        "\"/api/loyverse/shift-balance-analysis"
+      ]
+    },
+    {
+      "file": "client/src/components/PurchaseTallyList.tsx",
+      "calls": [
+        "\"/api/purchase-tally",
+        "\"/api/purchase-tally/summary",
+        "\"/api/purchase-tally/summary?",
+        "\"/api/purchase-tally?"
+      ]
+    },
+    {
+      "file": "client/src/components/SalesHeatmap.tsx",
+      "calls": [
+        "\"/api/dashboard/sales-heatmap"
+      ]
+    },
+    {
+      "file": "client/src/components/BankTransactionReview.tsx",
+      "calls": [
+        "'/api/bank-imports"
+      ]
+    },
+    {
+      "file": "client/src/components/RollVarianceCard.tsx",
+      "calls": [
+        "'/api/dashboard/roll-variance"
+      ]
+    },
+    {
+      "file": "client/src/components/ShiftSummaryCard.tsx",
+      "calls": [
+        "\"/api/shift-summary/latest"
+      ]
+    },
+    {
+      "file": "client/src/components/StockPurchaseTables.tsx",
+      "calls": [
+        "'/api/purchase-tally"
+      ]
+    },
+    {
+      "file": "client/src/components/SalesByPaymentType.tsx",
+      "calls": [
+        "\"/api/loyverse/sales-by-payment-type"
+      ]
+    },
+    {
+      "file": "client/src/components/SalesChart.tsx",
+      "calls": [
+        "\"/api/loyverse/monthly-revenue"
+      ]
+    },
+    {
+      "file": "client/src/components/ShiftReportModal.tsx",
+      "calls": [
+        "'/api/shift-reports"
+      ]
+    },
+    {
+      "file": "client/src/components/ShiftReportReview.tsx",
+      "calls": [
+        "'/api/shift-reports/balance-review"
+      ]
+    },
+    {
+      "file": "client/src/components/HomeFinanceSnapshot.tsx",
+      "calls": [
+        "'/api/finance/summary/today"
+      ]
+    },
+    {
+      "file": "client/src/components/ChefRamsayGordon.tsx",
+      "calls": [
+        "\"/api/chef/chat"
+      ]
+    },
+    {
+      "file": "client/src/components/DiscrepancyCard.tsx",
+      "calls": [
+        "\"/api/dashboard/stock-discrepancies"
+      ]
+    },
+    {
+      "file": "client/src/components/LatestShiftSummaryCard.tsx",
+      "calls": [
+        "'/api/receipts/export/csv",
+        "'/api/receipts/jussi-summary/latest"
+      ]
+    },
+    {
+      "file": "client/src/components/MonthlyExpensesChart.tsx",
+      "calls": [
+        "\"/api/expensesV2/month-to-date"
+      ]
+    },
+    {
+      "file": "client/src/components/BankStatementUpload.tsx",
+      "calls": [
+        "'/api/bank-imports"
+      ]
+    },
+    {
+      "file": "client/src/components/AIInsightsCard.tsx",
+      "calls": [
+        "\"/api/dashboard/ai-insights"
+      ]
+    },
+    {
+      "file": "client/src/components/ManagerChecklistModal.tsx",
+      "calls": [
+        "\"/api/checklists/complete"
+      ]
+    },
+    {
+      "file": "client/src/components/LastShiftIngredients.tsx",
+      "calls": [
+        "'/api/pos/ingredient-usage"
+      ]
+    },
+    {
+      "file": "client/src/components/MonthlyStockDisplay.tsx",
+      "calls": [
+        "\"/api/stock-purchase/monthly-summary"
+      ]
+    },
+    {
+      "file": "client/src/components/navigation/ModernHeader.tsx",
+      "calls": [
+        "'/api/orders/today"
+      ]
+    },
+    {
+      "file": "client/src/components/menu/ModifierEditor.tsx",
+      "calls": [
+        "\"/api/modifiers/groups",
+        "\"/api/modifiers/ingredients",
+        "\"/api/modifiers/modifiers",
+        "\"/api/purchasing-items"
+      ]
+    },
+    {
+      "file": "client/src/components/menu/IngredientSelector.tsx",
+      "calls": [
+        "\"/api/ingredients/suggest"
+      ]
+    },
+    {
+      "file": "client/src/components/library/DailySalesLibrary.tsx",
+      "calls": [
+        "\"/api/library/daily-sales"
+      ]
+    },
+    {
+      "file": "client/src/components/library/FormattedLibrary.tsx",
+      "calls": [
+        "\"/api/library/daily-sales"
+      ]
+    },
+    {
+      "file": "client/src/components/stock-lodgement/StockLodgementPanels.tsx",
+      "calls": [
+        "\"/api/expensesV2/drinks",
+        "\"/api/expensesV2/meat",
+        "\"/api/expensesV2/rolls",
+        "\"/api/expensesV2/stock",
+        "\"/api/purchase-tally",
+        "\"/api/purchasing/drinks"
+      ]
+    },
+    {
+      "file": "client/src/components/operations/LogRefundModal.tsx",
+      "calls": [
+        "\"/api/refunds",
+        "\"/api/refunds/log"
+      ]
+    },
+    {
+      "file": "client/src/components/operations/ExpenseLodgmentModal.tsx",
+      "calls": [
+        "\"/api/expenses-v2/summary",
+        "\"/api/expensesV2",
+        "\"/api/finance/summary/today",
+        "\"/api/pnl"
+      ]
+    },
+    {
+      "file": "client/src/components/pos/ReceiptsViewer.tsx",
+      "calls": [
+        "'/api/pos/receipts"
+      ]
+    },
+    {
+      "file": "client/src/components/purchasing/StockReceivedModal.tsx",
+      "calls": [
+        "\"/api/stock",
+        "\"/api/stock/drinks",
+        "\"/api/stock/meat",
+        "\"/api/stock/rolls"
+      ]
+    },
+    {
+      "file": "client/src/hooks/useIngredients.ts",
+      "calls": [
+        "'/api/ingredients"
+      ]
+    },
+    {
+      "file": "client/src/hooks/useLegacyData.ts",
+      "calls": [
+        "\"/api/legacy-bridge/daily-sales",
+        "\"/api/legacy-bridge/expenses",
+        "\"/api/legacy-bridge/ingredients",
+        "\"/api/legacy-bridge/menu-items",
+        "\"/api/legacy-bridge/recipes",
+        "\"/api/legacy-bridge/shopping-list",
+        "\"/api/legacy-bridge/suppliers"
+      ]
+    },
+    {
+      "file": "client/src/archive/LoyverseLive.tsx",
+      "calls": [
+        "'/api/dashboard",
+        "'/api/loyverse/live/start-realtime",
+        "'/api/loyverse/live/status",
+        "'/api/loyverse/live/stores",
+        "'/api/loyverse/live/sync-customers",
+        "'/api/loyverse/live/sync-items",
+        "'/api/loyverse/live/sync-receipts",
+        "'/api/menu",
+        "'/api/webhooks/list",
+        "'/api/webhooks/register"
+      ]
+    }
+  ],
+  "source_of_truth_verification": [
+    {
+      "domain": "auth_users",
+      "source": "saas_tenant_users (Prisma)"
+    },
+    {
+      "domain": "bob_read",
+      "source": "/api/bob/read/*"
+    },
+    {
+      "domain": "frontend_routes",
+      "source": "client/src/App.tsx"
+    }
+  ],
+  "duplicate_systems_verified": [
+    {
+      "method": "POST",
+      "path": "/",
+      "count": 13
+    },
+    {
+      "method": "GET",
+      "path": "/",
+      "count": 29
+    },
+    {
+      "method": "GET",
+      "path": "/categories",
+      "count": 3
+    },
+    {
+      "method": "GET",
+      "path": "/summary/today",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/summary",
+      "count": 4
+    },
+    {
+      "method": "POST",
+      "path": "/import",
+      "count": 3
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-sales",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients",
+      "count": 3
+    },
+    {
+      "method": "GET",
+      "path": "/api/daily-stock",
+      "count": 2
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-stock",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/api/expensesV2",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients/by-category",
+      "count": 2
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-shift-forms",
+      "count": 2
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/daily-stock-sales/:id/soft",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/api/ingredients/print",
+      "count": 2
+    },
+    {
+      "method": "PUT",
+      "path": "/:id",
+      "count": 8
+    },
+    {
+      "method": "GET",
+      "path": "/:id",
+      "count": 6
+    },
+    {
+      "method": "GET",
+      "path": "/status",
+      "count": 4
+    },
+    {
+      "method": "GET",
+      "path": "/issues",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/export.csv",
+      "count": 3
+    },
+    {
+      "method": "POST",
+      "path": "/upload",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/latest",
+      "count": 5
+    },
+    {
+      "method": "POST",
+      "path": "/register",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "count": 3
+    },
+    {
+      "method": "GET",
+      "path": "/history",
+      "count": 5
+    },
+    {
+      "method": "POST",
+      "path": "/create",
+      "count": 4
+    },
+    {
+      "method": "POST",
+      "path": "/update-status",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/active",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/all",
+      "count": 5
+    },
+    {
+      "method": "GET",
+      "path": "/expenses",
+      "count": 2
+    },
+    {
+      "method": "DELETE",
+      "path": "/:id",
+      "count": 3
+    },
+    {
+      "method": "POST",
+      "path": "/rebuild",
+      "count": 3
+    },
+    {
+      "method": "GET",
+      "path": "/ingredients",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/:reportId/live",
+      "count": 2
+    },
+    {
+      "method": "POST",
+      "path": "/save",
+      "count": 5
+    },
+    {
+      "method": "GET",
+      "path": "/items",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/list",
+      "count": 2
+    },
+    {
+      "method": "GET",
+      "path": "/export/csv",
+      "count": 3
+    },
+    {
+      "method": "POST",
+      "path": "/import/csv",
+      "count": 2
+    },
+    {
+      "method": "POST",
+      "path": "/refresh-meat",
+      "count": 2
+    },
+    {
+      "method": "POST",
+      "path": "/refresh-rolls",
+      "count": 2
+    }
+  ],
+  "dead_code_verified": [
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/AnalysisDetail.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/AnalysisList.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/BusinessExpenses.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/DailyShiftForm.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/DailyStockSales.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/Dashboard.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/EnhancedExpenses.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ExpenseUpload.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ExpensesMerged.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/Finance.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/IngredientManagement.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/IngredientsTable.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/Marketing.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/POSLoyverse.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/Placeholder.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/Purchasing.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ReceiptsBurgerCounts.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ReceiptsSummary.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/RecipeIngredientManagement.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/Recipes.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ReportsAnalysis.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/SalesShiftAnalysis.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ShiftAnalytics.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ShiftComparison.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/ShiftReportDetail.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/SupplierManagement.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/SystemStatus.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/TestEmailPage.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/TestMonthlyStock.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/WebhookManagement.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/admin/IngredientAuthority.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/analysis/DailyReview.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/analysis/PosReceipts.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/analysis/PosUpload.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/analysis/RollsLedger.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/analysis/ShiftAnalysis.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/expenses/BusinessExpenses.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/expenses/ExpenseEditor.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/expenses/ExpensesList.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/expenses/IngredientSearch.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/expenses/ShiftPurchasing.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/form-detail.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/form-library.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/kds/KDSOrderCard.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/managers/AdminQuestions.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/managers/ChecklistHistory.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/managers/NightlyChecklist.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/membership/MembershipApp.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menu/CostCalculator.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menu/MenuImportWizard.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menu/MenuManager.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menu/RamsayChat.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menuV3/CategoriesEditor.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menuV3/ItemsEditor.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menuV3/ModifiersEditor.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/menuV3/RecipeEditor.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/not-found.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/operations/Recipes.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/operations/analysis/ShiftSummary.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/operations/daily-reports/view.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/operations/daily-sales/Library.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/operations/daily-sales/View.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/operations/shopping-list/history.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/operations/shopping-list/index.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/pos/components/POSCart.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/pos/components/POSCategoryBar.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/pos/components/POSItemGrid.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/pos/components/POSModifierSheet.tsx"
+    },
+    {
+      "type": "orphan_page",
+      "file": "client/src/pages/stock-library.tsx"
+    }
+  ],
+  "mismatches": [
+    {
+      "id": "route-access-label-drift",
+      "item": "frontend route access classification drift",
+      "expected": "architecture route map marks most routes public/unguarded",
+      "actual": "App.tsx wraps most app routes in Guard",
+      "severity": "medium",
+      "evidence": [
+        "docs/architecture/01-frontend-route-map.md",
+        "client/src/App.tsx"
+      ]
+    },
+    {
+      "id": "guard-not-auth",
+      "item": "guard implementation",
+      "expected": "protected routes enforce auth",
+      "actual": "Guard only checks allowlisted pathname via isAllowedPath",
+      "severity": "critical",
+      "evidence": [
+        "client/src/App.tsx",
+        "client/src/router/RouteRegistry.ts"
+      ]
+    },
+    {
+      "id": "dashboard-unauth-reachable",
+      "item": "dashboard access",
+      "expected": "requires authenticated session",
+      "actual": "GET /dashboard returns app html without auth token/session validation",
+      "severity": "critical",
+      "evidence": [
+        "runtime probe GET /dashboard"
+      ]
+    },
+    {
+      "id": "endpoint-runtime-degraded",
+      "item": "endpoint runtime availability",
+      "expected": "mounted endpoints reachable with deterministic responses",
+      "actual": "47/236 GET probes returned 500 and 4 timed out in no-DB runtime",
+      "severity": "high",
+      "evidence": [
+        "scripts/architecture/verify-runtime.mjs probe output"
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "id": "auth-bypass-surface",
+      "severity": "critical",
+      "statement": "path-based allowlist guard enables rendering internal pages without identity verification"
+    },
+    {
+      "id": "db-missing-failure-mode",
+      "severity": "high",
+      "statement": "missing DATABASE_URL causes startup/background and request-path failures; not all endpoints degrade gracefully"
+    },
+    {
+      "id": "duplicate-mount-ownership",
+      "severity": "medium",
+      "statement": "overlapping mounts increase ambiguity in canonical endpoint ownership"
+    }
+  ]
+}
