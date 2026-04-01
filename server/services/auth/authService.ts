@@ -60,5 +60,9 @@ export const AuthService = {
     } catch {
       return null;
     }
-  }
+  },
+
+  getJwtSecret() {
+    return JWT_SECRET;
+  },
 };

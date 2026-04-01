@@ -110,18 +110,3 @@ export const ROUTES = {
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];
-
-export const ALLOWED_PATHS: string[] = Object.values(ROUTES);
-
-export const isAllowedPath = (path: string) => {
-  const normalized = (path || "/").replace(/\/+$/, "") || "/";
-  return ALLOWED_PATHS.some((allowed) => {
-    if (!allowed.includes(":")) {
-      return allowed === normalized;
-    }
-    const allowedParts = allowed.split("/");
-    const pathParts = normalized.split("/");
-    if (allowedParts.length !== pathParts.length) return false;
-    return allowedParts.every((part, index) => part.startsWith(":") || part === pathParts[index]);
-  });
-};

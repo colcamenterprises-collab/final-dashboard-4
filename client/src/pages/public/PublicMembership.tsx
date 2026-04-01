@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Menu, X, ChevronRight, Star, Zap, Gift } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/auth/AuthProvider";
 
 const SBB_YELLOW = "#FFEB00";
 
@@ -62,22 +63,16 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { login } = useAuth();
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Login failed");
-      localStorage.setItem("authToken", data.token);
-      localStorage.setItem("authUser", JSON.stringify(data.user));
+      await login(email, password);
       toast({ title: "Welcome back!", description: "Redirecting to your dashboard." });
-      window.location.href = "/dashboard";
+      navigate("/dashboard", { replace: true });
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message, variant: "destructive" });
     } finally {

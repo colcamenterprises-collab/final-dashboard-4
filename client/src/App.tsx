@@ -15,7 +15,7 @@
  *
  * All navigation changes require explicit owner approval.
  */
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -113,22 +113,20 @@ import PurchaseHistory from "./pages/operations/PurchaseHistory";
 import HealthSafetyAuditPage from "./pages/operations/health-safety-audit";
 import HealthSafetyQuestionManager from "./pages/operations/health-safety-audit/questions";
 import RecipeMappingPage from "./pages/operations/recipe-mapping";
+import { AuthProvider } from "./auth/AuthProvider";
+import ProtectedRoute from "./auth/ProtectedRoute";
 
 import HomePage from "./pages/public/HomePage";
 import PublicMembership from "./pages/public/PublicMembership";
 import PublicOnlineOrdering from "./pages/public/PublicOnlineOrdering";
 
-import { isAllowedPath, ROUTES } from "./router/RouteRegistry";
-
-function Guard({ children }: { children: JSX.Element }) {
-  const { pathname } = useLocation();
-  return isAllowedPath(pathname) ? children : <NotFound />;
-}
+import { ROUTES } from "./router/RouteRegistry";
 
 export default function App() {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <AuthProvider>
         <TooltipProvider>
           <BrowserRouter>
             <Routes>
@@ -142,148 +140,149 @@ export default function App() {
               <Route path={ROUTES.ORDER_CONFIRMATION} element={<OrderConfirmation />} />
 
               <Route element={<PageShell />}>
-                <Route path="/dashboard" element={<Guard><Home /></Guard>} />
+                <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                 <Route path="/home" element={<Navigate to="/dashboard" replace />} />
 
-                <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<Guard><DailySalesV2Library /></Guard>} />
-                <Route path="/operations/daily-sales-library" element={<Guard><DailySalesV2Library /></Guard>} />
-                <Route path={ROUTES.SHOPPING_LIST} element={<Guard><ShoppingList /></Guard>} />
-                <Route path="/operations/purchasing-list/:id" element={<Guard><PurchasingList /></Guard>} />
-                <Route path="/operations/purchasing-mapping" element={<Guard><PurchasingFieldMapping /></Guard>} />
-                <Route path="/operations/purchasing-shift-log" element={<Guard><PurchasingShiftLog /></Guard>} />
-                <Route path="/operations/purchasing-analytics" element={<Guard><PurchasingAnalytics /></Guard>} />
-                <Route path={ROUTES.INGREDIENT_PURCHASING} element={<Guard><IngredientPurchasingList /></Guard>} />
-                <Route path="/operations/ingredient-purchasing/new" element={<Guard><IngredientPurchasingForm /></Guard>} />
-                <Route path="/operations/ingredient-purchasing/:id" element={<Guard><IngredientPurchasingForm /></Guard>} />
+                <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<ProtectedRoute><DailySalesV2Library /></ProtectedRoute>} />
+                <Route path="/operations/daily-sales-library" element={<ProtectedRoute><DailySalesV2Library /></ProtectedRoute>} />
+                <Route path={ROUTES.SHOPPING_LIST} element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />
+                <Route path="/operations/purchasing-list/:id" element={<ProtectedRoute><PurchasingList /></ProtectedRoute>} />
+                <Route path="/operations/purchasing-mapping" element={<ProtectedRoute><PurchasingFieldMapping /></ProtectedRoute>} />
+                <Route path="/operations/purchasing-shift-log" element={<ProtectedRoute><PurchasingShiftLog /></ProtectedRoute>} />
+                <Route path="/operations/purchasing-analytics" element={<ProtectedRoute><PurchasingAnalytics /></ProtectedRoute>} />
+                <Route path={ROUTES.INGREDIENT_PURCHASING} element={<ProtectedRoute><IngredientPurchasingList /></ProtectedRoute>} />
+                <Route path="/operations/ingredient-purchasing/new" element={<ProtectedRoute><IngredientPurchasingForm /></ProtectedRoute>} />
+                <Route path="/operations/ingredient-purchasing/:id" element={<ProtectedRoute><IngredientPurchasingForm /></ProtectedRoute>} />
                 {/* PATCH S1: Disabled - stock logging moved to Shopping List modal */}
                 
-                <Route path="/operations/daily-sales" element={<DailySalesForm />} />
-                <Route path="/operations/daily-sales/edit/:id" element={<DailySalesForm />} />
+                <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
+                <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                 <Route path="/daily-sales" element={<Navigate to="/operations/daily-sales" replace />} />
                 <Route path="/operations/daily-sales-stock" element={<Navigate to="/operations/daily-sales" replace />} />
 
-                <Route path="/operations/daily-stock" element={<Guard><DailyStock /></Guard>} />
+                <Route path="/operations/daily-stock" element={<ProtectedRoute><DailyStock /></ProtectedRoute>} />
                 
-                <Route path="/ops/purchasing-live" element={<Guard><PurchasingLive /></Guard>} />
-                <Route path="/operations/purchasing" element={<Guard><PurchasingPage /></Guard>} />
+                <Route path="/ops/purchasing-live" element={<ProtectedRoute><PurchasingLive /></ProtectedRoute>} />
+                <Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} />
                 
-                <Route path="/operations/daily-reports" element={<Guard><DailySummaryReportsPage /></Guard>} />
-                <Route path="/operations/system-health" element={<Guard><SystemHealthPage /></Guard>} />
-                <Route path="/operations/ai-ops-control" element={<Guard><AiOpsControlPage /></Guard>} />
-                <Route path="/operations/tasks/:id" element={<Guard><TaskDetailPage /></Guard>} />
-                <Route path="/operations/purchase-history" element={<Guard><PurchaseHistory /></Guard>} />
-                <Route path="/operations/health-safety-audit" element={<Guard><HealthSafetyAuditPage /></Guard>} />
-                <Route path="/operations/health-safety-audit/questions" element={<Guard><HealthSafetyQuestionManager /></Guard>} />
-                <Route path="/operations/ingredients-master" element={<Guard><IngredientsMaster /></Guard>} />
-                <Route path="/operations/recipe-mapping" element={<Guard><RecipeMappingPage /></Guard>} />
-                <Route path="/operations/variance-monitor" element={<Guard><VarianceMonitorPage /></Guard>} />
-                <Route path="/operations/issue-register" element={<Guard><IssueRegisterPage /></Guard>} />
+                <Route path="/operations/daily-reports" element={<ProtectedRoute><DailySummaryReportsPage /></ProtectedRoute>} />
+                <Route path="/operations/system-health" element={<ProtectedRoute><SystemHealthPage /></ProtectedRoute>} />
+                <Route path="/operations/ai-ops-control" element={<ProtectedRoute><AiOpsControlPage /></ProtectedRoute>} />
+                <Route path="/operations/tasks/:id" element={<ProtectedRoute><TaskDetailPage /></ProtectedRoute>} />
+                <Route path="/operations/purchase-history" element={<ProtectedRoute><PurchaseHistory /></ProtectedRoute>} />
+                <Route path="/operations/health-safety-audit" element={<ProtectedRoute><HealthSafetyAuditPage /></ProtectedRoute>} />
+                <Route path="/operations/health-safety-audit/questions" element={<ProtectedRoute><HealthSafetyQuestionManager /></ProtectedRoute>} />
+                <Route path="/operations/ingredients-master" element={<ProtectedRoute><IngredientsMaster /></ProtectedRoute>} />
+                <Route path="/operations/recipe-mapping" element={<ProtectedRoute><RecipeMappingPage /></ProtectedRoute>} />
+                <Route path="/operations/variance-monitor" element={<ProtectedRoute><VarianceMonitorPage /></ProtectedRoute>} />
+                <Route path="/operations/issue-register" element={<ProtectedRoute><IssueRegisterPage /></ProtectedRoute>} />
                 
-                <Route path="/operations/analysis" element={<Guard><Analysis /></Guard>}>
+                <Route path="/operations/analysis" element={<ProtectedRoute><Analysis /></ProtectedRoute>}>
                   <Route index element={null} />
                   <Route path="loyverse" element={<LoyverseReports />} />
-                  <Route path="stock-review" element={<Guard><StockReview /></Guard>} />
-                  <Route path="shift-items" element={<Guard><ShiftAnalyticsMM /></Guard>} />
+                  <Route path="stock-review" element={<ProtectedRoute><StockReview /></ProtectedRoute>} />
+                  <Route path="shift-items" element={<ProtectedRoute><ShiftAnalyticsMM /></ProtectedRoute>} />
                   <Route path="daily-shift-analysis" element={<Navigate to="/analysis/daily-review" replace />} />
                 </Route>
 
                 <Route path="/operations/analysis/stock-review" element={<Navigate to="/analysis/stock-review" replace />} />
-                <Route path="/analysis/stock-review" element={<Guard><StockReview /></Guard>} />
-                <Route path="/analysis/stock-reconciliation" element={<Guard><StockReconciliation /></Guard>} />
+                <Route path="/analysis/stock-review" element={<ProtectedRoute><StockReview /></ProtectedRoute>} />
+                <Route path="/analysis/stock-reconciliation" element={<ProtectedRoute><StockReconciliation /></ProtectedRoute>} />
                 <Route path="/operations/analysis/rolls-ledger" element={<Navigate to="/analysis/stock-review" replace />} />
                 
-                <Route path="upload" element={<UploadStatements />} />
-                <Route path="receipts" element={<Receipts />} />
+                <Route path="upload" element={<ProtectedRoute><UploadStatements /></ProtectedRoute>} />
+                <Route path="receipts" element={<ProtectedRoute><Receipts /></ProtectedRoute>} />
                 
-                <Route path={ROUTES.UPLOAD_STATEMENTS} element={<Guard><UploadStatements /></Guard>} />
-                <Route path={ROUTES.RECEIPTS} element={<Guard><Receipts /></Guard>} />
+                <Route path={ROUTES.UPLOAD_STATEMENTS} element={<ProtectedRoute><UploadStatements /></ProtectedRoute>} />
+                <Route path={ROUTES.RECEIPTS} element={<ProtectedRoute><Receipts /></ProtectedRoute>} />
                 <Route path={ROUTES.RECEIPTS_BURGERS} element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
                 <Route path="/receipts-burger-counts" element={<Navigate to={ROUTES.SHIFT_ITEMS_MM} replace />} />
-                <Route path={ROUTES.EXPENSES} element={<Guard><Expenses /></Guard>} />
+                <Route path={ROUTES.EXPENSES} element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                 <Route path="/expenses" element={<Navigate to="/operations/expenses" replace />} />
-                <Route path={ROUTES.SHIFT_REPORTS} element={<Guard><ShiftReports /></Guard>} />
+                <Route path={ROUTES.SHIFT_REPORTS} element={<ProtectedRoute><ShiftReports /></ProtectedRoute>} />
 
-                <Route path="/reports/shift-report" element={<Guard><ShiftReportDashboard /></Guard>} />
-                <Route path="/reports/shift-report/history" element={<Guard><ShiftReportHistory /></Guard>} />
-                <Route path="/reports/shift-report/view/:id" element={<Guard><ShiftReportDetail /></Guard>} />
+                <Route path="/reports/shift-report" element={<ProtectedRoute><ShiftReportDashboard /></ProtectedRoute>} />
+                <Route path="/reports/shift-report/history" element={<ProtectedRoute><ShiftReportHistory /></ProtectedRoute>} />
+                <Route path="/reports/shift-report/view/:id" element={<ProtectedRoute><ShiftReportDetail /></ProtectedRoute>} />
 
-                <Route path={ROUTES.FINANCE} element={<Guard><FinancePage /></Guard>} />
-                <Route path={ROUTES.PROFIT_LOSS} element={<Guard><ProfitLoss /></Guard>} />
-                <Route path="/finance/expenses" element={<Guard><Expenses /></Guard>} />
-                <Route path={ROUTES.EXPENSES_IMPORT} element={<Guard><ExpensesImport /></Guard>} />
-                <Route path={ROUTES.EXPENSES_V2} element={<Guard><ExpensesV2 /></Guard>} />
+                <Route path={ROUTES.FINANCE} element={<ProtectedRoute><FinancePage /></ProtectedRoute>} />
+                <Route path={ROUTES.PROFIT_LOSS} element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
+                <Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+                <Route path={ROUTES.EXPENSES_IMPORT} element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
+                <Route path={ROUTES.EXPENSES_V2} element={<ProtectedRoute><ExpensesV2 /></ProtectedRoute>} />
 
-                <Route path={ROUTES.COST_CALCULATOR} element={<Guard><CostCalculator /></Guard>} />
-                <Route path={ROUTES.INGREDIENTS} element={<Guard><Ingredients /></Guard>} />
-                <Route path="/menu/ingredients/edit/:id" element={<Guard><IngredientEdit /></Guard>} />
+                <Route path={ROUTES.COST_CALCULATOR} element={<ProtectedRoute><CostCalculator /></ProtectedRoute>} />
+                <Route path={ROUTES.INGREDIENTS} element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />
+                <Route path="/menu/ingredients/edit/:id" element={<ProtectedRoute><IngredientEdit /></ProtectedRoute>} />
                 <Route path={ROUTES.MENU_MGR} element={<Navigate to="/menu/recipes" replace />} />
-                <Route path={ROUTES.MENU_IMPORT} element={<Guard><MenuImport /></Guard>} />
-                <Route path={ROUTES.MENU_DESC_TOOL} element={<Guard><DescriptionTool /></Guard>} />
+                <Route path={ROUTES.MENU_IMPORT} element={<ProtectedRoute><MenuImport /></ProtectedRoute>} />
+                <Route path={ROUTES.MENU_DESC_TOOL} element={<ProtectedRoute><DescriptionTool /></ProtectedRoute>} />
                 <Route path={ROUTES.RECIPE_MANAGEMENT} element={<Navigate to="/menu/recipes" replace />} />
-                <Route path={ROUTES.RECIPES} element={<Guard><RecipeListPage /></Guard>} />
-                <Route path={ROUTES.RECIPES_NEW} element={<Guard><RecipeEditorPage /></Guard>} />
-                <Route path={ROUTES.RECIPES_EDIT} element={<Guard><RecipeEditorPage /></Guard>} />
-                <Route path={ROUTES.RECIPE_CARDS} element={<Guard><RecipeCards /></Guard>} />
-                <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<Guard><IngredientManagement /></Guard>} />
-                <Route path="/products" element={<Guard><Products /></Guard>} />
-                <Route path="/products/new" element={<Guard><ProductPage /></Guard>} />
-                <Route path="/products/:id" element={<Guard><ProductPage /></Guard>} />
+                <Route path={ROUTES.RECIPES} element={<ProtectedRoute><RecipeListPage /></ProtectedRoute>} />
+                <Route path={ROUTES.RECIPES_NEW} element={<ProtectedRoute><RecipeEditorPage /></ProtectedRoute>} />
+                <Route path={ROUTES.RECIPES_EDIT} element={<ProtectedRoute><RecipeEditorPage /></ProtectedRoute>} />
+                <Route path={ROUTES.RECIPE_CARDS} element={<ProtectedRoute><RecipeCards /></ProtectedRoute>} />
+                <Route path={ROUTES.INGREDIENT_MANAGEMENT} element={<ProtectedRoute><IngredientManagement /></ProtectedRoute>} />
+                <Route path="/products" element={<ProtectedRoute><Products /></ProtectedRoute>} />
+                <Route path="/products/new" element={<ProtectedRoute><ProductPage /></ProtectedRoute>} />
+                <Route path="/products/:id" element={<ProtectedRoute><ProductPage /></ProtectedRoute>} />
 
-                <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<Guard><NightlyChecklist /></Guard>} />
-                <Route path={ROUTES.JUSSI_AI} element={<Guard><JussiOps /></Guard>} />
-                <Route path={ROUTES.JANE_ACCOUNTS} element={<Guard><JaneAccounts /></Guard>} />
+                <Route path={ROUTES.NIGHTLY_CHECKLIST} element={<ProtectedRoute><NightlyChecklist /></ProtectedRoute>} />
+                <Route path={ROUTES.JUSSI_AI} element={<ProtectedRoute><JussiOps /></ProtectedRoute>} />
+                <Route path={ROUTES.JANE_ACCOUNTS} element={<ProtectedRoute><JaneAccounts /></ProtectedRoute>} />
 
-                <Route path={ROUTES.ONLINE_ORDERING} element={<Guard><OnlineOrdering /></Guard>} />
-                <Route path="/online-ordering/catalog" element={<Guard><OnlineOrderingCatalogPage /></Guard>} />
-                <Route path={ROUTES.MENU_ADMIN} element={<Guard><MenuAdmin /></Guard>} />
-                <Route path={ROUTES.ADMIN_ORDERS} element={<Guard><AdminOrders /></Guard>} />
-                <Route path="/admin/loyverse-mapping" element={<Guard><LoyverseMappingConsole /></Guard>} />
-                <Route path="/admin/data-safety" element={<Guard><DataSafety /></Guard>} />
+                <Route path={ROUTES.ONLINE_ORDERING} element={<ProtectedRoute><OnlineOrdering /></ProtectedRoute>} />
+                <Route path="/online-ordering/catalog" element={<ProtectedRoute><OnlineOrderingCatalogPage /></ProtectedRoute>} />
+                <Route path={ROUTES.MENU_ADMIN} element={<ProtectedRoute><MenuAdmin /></ProtectedRoute>} />
+                <Route path={ROUTES.ADMIN_ORDERS} element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
+                <Route path="/admin/loyverse-mapping" element={<ProtectedRoute><LoyverseMappingConsole /></ProtectedRoute>} />
+                <Route path="/admin/data-safety" element={<ProtectedRoute><DataSafety /></ProtectedRoute>} />
 
-                <Route path="/partners" element={<Guard><PartnerBars /></Guard>} />
-                <Route path="/partners/analytics" element={<Guard><PartnerAnalytics /></Guard>} />
+                <Route path="/partners" element={<ProtectedRoute><PartnerBars /></ProtectedRoute>} />
+                <Route path="/partners/analytics" element={<ProtectedRoute><PartnerAnalytics /></ProtectedRoute>} />
 
-                <Route path="/delivery/admin" element={<Guard><DeliveryAdmin /></Guard>} />
-                <Route path="/delivery/drivers" element={<Guard><DriverManager /></Guard>} />
-                <Route path="/delivery/history" element={<Guard><DeliveryHistory /></Guard>} />
+                <Route path="/delivery/admin" element={<ProtectedRoute><DeliveryAdmin /></ProtectedRoute>} />
+                <Route path="/delivery/drivers" element={<ProtectedRoute><DriverManager /></ProtectedRoute>} />
+                <Route path="/delivery/history" element={<ProtectedRoute><DeliveryHistory /></ProtectedRoute>} />
 
-                <Route path="/kds" element={<KDS />} />
-                <Route path="/kds/history" element={<KDSHistory />} />
+                <Route path="/kds" element={<ProtectedRoute><KDS /></ProtectedRoute>} />
+                <Route path="/kds/history" element={<ProtectedRoute><KDSHistory /></ProtectedRoute>} />
 
-                <Route path="/menu-v3" element={<MenuAdminV3 />} />
-                <Route path="/menu-management/ingredients" element={<Guard><IngredientManagement /></Guard>} />
-                <Route path="/menu-management" element={<Guard><MenuManagement /></Guard>} />
+                <Route path="/menu-v3" element={<ProtectedRoute><MenuAdminV3 /></ProtectedRoute>} />
+                <Route path="/menu-management/ingredients" element={<ProtectedRoute><IngredientManagement /></ProtectedRoute>} />
+                <Route path="/menu-management" element={<ProtectedRoute><MenuManagement /></ProtectedRoute>} />
 
                 <Route path="/pos-login" element={<POSLogin />} />
-                <Route path="/pos" element={<POS />} />
-                <Route path="/pos-register" element={<POSRegisterStatus />} />
-                <Route path="/pos-checkout" element={<POSCheckout />} />
-                <Route path="/pos-receipt" element={<POSReceiptPreview />} />
+                <Route path="/pos" element={<ProtectedRoute><POS /></ProtectedRoute>} />
+                <Route path="/pos-register" element={<ProtectedRoute><POSRegisterStatus /></ProtectedRoute>} />
+                <Route path="/pos-checkout" element={<ProtectedRoute><POSCheckout /></ProtectedRoute>} />
+                <Route path="/pos-receipt" element={<ProtectedRoute><POSReceiptPreview /></ProtectedRoute>} />
 
-                <Route path="/stock-live" element={<LiveStock />} />
+                <Route path="/stock-live" element={<ProtectedRoute><LiveStock /></ProtectedRoute>} />
 
-                <Route path="/analysis/ingredients-usage" element={<IngredientUsage />} />
-                <Route path="/analysis/stock-variance" element={<StockVariance />} />
-                <Route path="/analysis/receipts" element={<ReceiptsTruth />} />
-                <Route path="/analysis/ingredients" element={<IngredientsTruth />} />
+                <Route path="/analysis/ingredients-usage" element={<ProtectedRoute><IngredientUsage /></ProtectedRoute>} />
+                <Route path="/analysis/stock-variance" element={<ProtectedRoute><StockVariance /></ProtectedRoute>} />
+                <Route path="/analysis/receipts" element={<ProtectedRoute><ReceiptsTruth /></ProtectedRoute>} />
+                <Route path="/analysis/ingredients" element={<ProtectedRoute><IngredientsTruth /></ProtectedRoute>} />
 
-                <Route path="/saas" element={<SaaSAdmin />} />
-                <Route path="/settings/tenant" element={<TenantSwitcher />} />
-                <Route path="/settings/payments" element={<PaymentProviders />} />
+                <Route path="/saas" element={<ProtectedRoute><SaaSAdmin /></ProtectedRoute>} />
+                <Route path="/settings/tenant" element={<ProtectedRoute><TenantSwitcher /></ProtectedRoute>} />
+                <Route path="/settings/payments" element={<ProtectedRoute><PaymentProviders /></ProtectedRoute>} />
 
-                <Route path="/membership/dashboard" element={<Guard><MemberDashboard /></Guard>} />
-                <Route path="/membership/register" element={<Guard><MemberRegistration /></Guard>} />
+                <Route path="/membership/dashboard" element={<ProtectedRoute><MemberDashboard /></ProtectedRoute>} />
+                <Route path="/membership/register" element={<ProtectedRoute><MemberRegistration /></ProtectedRoute>} />
 
-                <Route path="/analysis/daily-review" element={<Guard><DailyShiftAnalysis /></Guard>} />
+                <Route path="/analysis/daily-review" element={<ProtectedRoute><DailyShiftAnalysis /></ProtectedRoute>} />
                 <Route path="/operations/analysis/daily-shift-analysis" element={<Navigate to="/analysis/daily-review" replace />} />
 
-                <Route path="/marketing" element={<MarketingMachine />} />
+                <Route path="/marketing" element={<ProtectedRoute><MarketingMachine /></ProtectedRoute>} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
             <Toaster />
           </BrowserRouter>
         </TooltipProvider>
+      </AuthProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   );
