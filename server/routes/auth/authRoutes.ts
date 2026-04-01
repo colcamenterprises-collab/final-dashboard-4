@@ -1,5 +1,6 @@
 import express, { Request, Response } from "express";
 import { AuthService } from "../../services/auth/authService";
+import { AUTH_COOKIE_NAME, attachSessionUser } from "../../middleware/sessionAuth";
 
 const router = express.Router();
 
@@ -29,11 +30,42 @@ router.post("/login", async (req: Request, res: Response) => {
     return res.status(401).json({ error: "Invalid credentials" });
   }
 
+  const isSecure = process.env.NODE_ENV === "production";
+  res.cookie(AUTH_COOKIE_NAME, result.token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isSecure,
+    path: "/",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
   res.json({
     success: true,
     token: result.token,
     user: result.user
   });
+});
+
+router.get("/session", async (req: Request, res: Response) => {
+  if (!attachSessionUser(req)) {
+    return res.status(401).json({ authenticated: false });
+  }
+
+  return res.json({
+    authenticated: true,
+    user: (req as any).user,
+  });
+});
+
+router.post("/logout", async (_req: Request, res: Response) => {
+  res.clearCookie(AUTH_COOKIE_NAME, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+
+  return res.json({ success: true });
 });
 
 export default router;

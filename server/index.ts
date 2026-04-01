@@ -44,6 +44,7 @@ import { tenantResolver } from "./middleware/tenantResolver";
 import { TenantScoped } from "./services/tenant/tenantScopedService";
 import { AuthService } from "./services/auth/authService";
 import authRoutes from "./routes/auth/authRoutes";
+import { requireSessionAuth } from "./middleware/sessionAuth";
 import providerRoutes from "./routes/payments/providerRoutes";
 import paymentProcessRoutes from "./routes/payments/processRoutes";
 import legacyBridgeRoutes from "./routes/legacyBridge";
@@ -123,6 +124,49 @@ app.use('/public', express.static(path.resolve(process.cwd(), 'public')));
 
 // PATCH O14 — Tenant context middleware (SaaS foundation)
 app.use(tenantContext);
+
+const API_PROTECTED_PREFIXES = [
+  "/api/dashboard",
+  "/api/operations",
+  "/api/analysis",
+  "/api/forms",
+  "/api/reports",
+  "/api/finance",
+  "/api/purchasing",
+  "/api/purchasing-items",
+  "/api/purchasing-list",
+  "/api/purchasing-field-mapping",
+  "/api/purchasing-shift-log",
+  "/api/purchasing-analytics",
+  "/api/internal",
+  "/api/partners",
+];
+
+const API_PUBLIC_PREFIXES = [
+  "/api/auth",
+  "/api/membership",
+  "/api/menu-ordering",
+  "/api/online-ordering",
+  "/api/menu-online",
+  "/api/online-catalog",
+  "/api/health",
+  "/api/system-health",
+  "/api/bob/read",
+];
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api/")) return next();
+
+  if (API_PUBLIC_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
+    return next();
+  }
+
+  if (API_PROTECTED_PREFIXES.some((prefix) => req.path.startsWith(prefix))) {
+    return requireSessionAuth(req, res, next);
+  }
+
+  return next();
+});
 
 // ── Universal bot-token middleware ───────────────────────────────────────────
 // Accepts BOB_READONLY_TOKEN (or BOBS_LOYVERSE_TOKEN) via:
