@@ -1,0 +1,194 @@
+PROJECT: Smash Brothers Burgers — ONLINE ORDERING RUNTIME TEST + GAP REPORT
+PRIORITY: URGENT
+MODE: TEST THE CURRENT SYSTEM, DO NOT REBUILD FIRST
+GOAL: Determine exactly what is already working, what is broken, what source the public online ordering page reads from, and what is still required to get a real product live for sale.
+
+CRITICAL RULES
+1. DO NOT start by changing architecture.
+2. DO NOT start by rewriting code.
+3. DO NOT start by adding new systems.
+4. TEST FIRST.
+5. VERIFY AGAINST RUNTIME, NOT THEORY.
+6. DO NOT guess.
+7. DO NOT say “should work” or “likely”.
+8. Only state what is proven by code inspection, database inspection, route inspection, API response, or browser/runtime test.
+9. If something fails, capture the exact failure point.
+10. If you need to create ONE temporary test product to prove the flow, that is allowed, but only after identifying the real source of truth.
+
+MISSION
+I need to know exactly why the public online ordering platform does not currently show products for sale.
+
+SUCCESS FOR THIS TASK
+This task is successful only if you produce a precise test report showing:
+- what the public online ordering page currently reads from
+- whether that source contains products
+- whether products are marked live/published correctly
+- whether the frontend fetch is succeeding or failing
+- whether categories are being built correctly
+- whether the publish path from recipe/product/admin side actually reaches the public feed
+- the exact blocker(s) preventing products from appearing
+- the exact fix list needed next
+
+DO NOT IMPLEMENT THE FULL FIX FIRST.
+FIRST TEST AND REPORT THE REAL STATE OF THE SYSTEM.
+
+TEST SCOPE
+
+A. PUBLIC FRONTEND
+Test these routes in the browser:
+- /
+- /online-ordering
+- /order (if still exists)
+- /membership
+- /dashboard (only to confirm separation, not to modify)
+
+For /online-ordering specifically verify:
+1. Does the page load?
+2. Does it call a real API?
+3. Which API endpoint(s) does it call?
+4. What response comes back?
+5. Does the response contain categories?
+6. Does the response contain products/items?
+7. If empty, is it truly empty at source or filtered out in frontend?
+8. Are there console errors?
+9. Are there network errors?
+10. Is there a category mismatch problem?
+
+B. BACKEND FEED
+Inspect and test the real menu/ordering feed endpoints. Identify exactly which one the public page uses.
+Likely candidates include things like:
+- /api/menu-ordering/full
+- /api/menu-ordering/items/:categoryId
+- any product/catalog/menu feed routes actually called by the frontend
+
+For each active feed endpoint verify:
+1. Exact route path
+2. Source file
+3. Whether it is mounted
+4. Raw JSON response
+5. Number of categories returned
+6. Number of items returned
+7. Whether categories are merged/colliding
+8. Whether live/published filter is excluding items
+9. Whether DB query is returning zero rows
+10. Whether the route is reading the correct table/source
+
+C. SOURCE OF TRUTH TEST
+Identify with evidence:
+1. Where recipe data lives
+2. Where product data lives
+3. Where published/live ordering data lives
+4. Whether there is a disconnect between:
+   - recipes
+   - products
+   - online catalog
+   - public ordering feed
+5. Which exact table or model the public feed currently uses
+6. Whether that table/model currently has any rows
+7. Whether rows are missing required visibility fields
+8. Whether items exist but are being filtered out
+
+D. ADMIN/PUBLISH PATH TEST
+Find the actual internal route/page currently intended to manage or publish products/menu items.
+Test it.
+
+Verify:
+1. Exact internal route
+2. Does the page load?
+3. Can existing products be seen there?
+4. Is there a publish/live toggle?
+5. Does changing publish state persist?
+6. After persisting, does the public feed change?
+7. If not, where does the chain break?
+
+E. DATABASE TEST
+Inspect the relevant DB tables/models actually used by:
+- products
+- menu ordering feed
+- online catalog
+- categories
+- recipes if connected
+
+For each relevant table/model report:
+1. Name
+2. Is it active or legacy?
+3. Row count
+4. Has live/published entries?
+5. Has category values?
+6. Has price values?
+7. Has image/name/description needed for frontend?
+8. Is this table read by the public feed or not?
+
+F. BLOCKER ISOLATION
+At the end, identify the exact blocker class:
+- no products exist in source table
+- wrong source table used
+- publish flag not set
+- feed route filtering incorrectly
+- categories collapsing incorrectly
+- frontend calling wrong endpoint
+- admin publish path writes to a different table than frontend reads
+- route mounted but broken
+- runtime/db failure
+- other proven cause
+
+TEMPORARY PROOF PRODUCT
+If needed to prove the chain, you may create ONE clearly named temporary product:
+- Name it exactly: TEST PRODUCT - ONLINE ORDERING PROOF
+Only do this if necessary to test the real path.
+If created, report:
+- where it was created
+- which table/source it landed in
+- whether it appeared on /online-ordering
+- then leave it in place unless removal is explicitly safer
+
+DELIVERABLE FORMAT
+Return exactly this structure:
+
+1. VERIFIED ACTIVE ONLINE ORDERING SOURCE
+- frontend route:
+- frontend component/file:
+- API endpoint(s) called:
+- backend file serving it:
+- DB table/model used by feed:
+- source-of-truth status:
+
+2. RUNTIME TEST RESULTS
+- /online-ordering:
+- network calls:
+- API response summary:
+- console errors:
+- item count:
+- category count:
+
+3. ADMIN/PUBLISH PATH RESULTS
+- internal route tested:
+- file/page:
+- can view products:
+- can publish:
+- publish persists:
+- affects public feed:
+- yes/no with evidence
+
+4. DATABASE FINDINGS
+List relevant tables/models with row counts and whether they are active vs legacy.
+
+5. EXACT BLOCKERS
+List the exact proven blockers preventing products from appearing.
+
+6. REQUIRED FIXES NEXT
+List only the exact fixes needed next, in priority order.
+NO fluff.
+NO broad rewrite plan.
+Only the direct path to get products live.
+
+7. FILES / ROUTES / ENDPOINTS INSPECTED
+List everything you inspected so there are no blind spots.
+
+TESTING REQUIREMENT
+You must actually run the app and test through browser/runtime/network/API where possible.
+Do not give a static code summary only.
+
+ABSOLUTE WARNING
+This task is NOT “improve online ordering”.
+This task is “tell me exactly what is set up, what is broken, and what must be done next so products appear for sale now.”
