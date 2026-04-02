@@ -10,18 +10,18 @@ function PublicNav() {
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-black border-b border-yellow-400/20">
       <div className="max-w-6xl mx-auto px-4 flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/website" className="flex items-center gap-2">
           <span className="text-lg font-black tracking-tight" style={{ color: SBB_YELLOW }}>
             SMASH BROTHERS
           </span>
           <span className="text-lg font-black text-white tracking-tight">BURGERS</span>
         </Link>
         <div className="hidden md:flex items-center gap-8">
-          <Link to="/" className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">Home</Link>
-          <Link to="/online-ordering" className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">Menu</Link>
-          <Link to="/membership" className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">Membership</Link>
+          <Link to="/website" className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">Home</Link>
+          <Link to="/website/online-ordering" className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">Menu</Link>
+          <Link to="/website/membership" className="text-sm font-semibold text-white hover:text-yellow-400 transition-colors">Membership</Link>
           <Link
-            to="/online-ordering"
+            to="/website/online-ordering"
             className="px-4 py-2 text-sm font-bold rounded-sm transition-all hover:opacity-90"
             style={{ background: SBB_YELLOW, color: "#000" }}
           >
@@ -38,11 +38,11 @@ function PublicNav() {
       </div>
       {open && (
         <div className="md:hidden bg-black border-t border-white/10 px-4 pb-4 space-y-3 pt-3">
-          <Link to="/" className="block text-sm font-semibold text-white py-2" onClick={() => setOpen(false)}>Home</Link>
-          <Link to="/online-ordering" className="block text-sm font-semibold text-white py-2" onClick={() => setOpen(false)}>Menu</Link>
-          <Link to="/membership" className="block text-sm font-semibold text-white py-2" onClick={() => setOpen(false)}>Membership</Link>
+          <Link to="/website" className="block text-sm font-semibold text-white py-2" onClick={() => setOpen(false)}>Home</Link>
+          <Link to="/website/online-ordering" className="block text-sm font-semibold text-white py-2" onClick={() => setOpen(false)}>Menu</Link>
+          <Link to="/website/membership" className="block text-sm font-semibold text-white py-2" onClick={() => setOpen(false)}>Membership</Link>
           <Link
-            to="/online-ordering"
+            to="/website/online-ordering"
             className="block w-full text-center px-4 py-3 text-sm font-bold rounded-sm"
             style={{ background: SBB_YELLOW, color: "#000" }}
             onClick={() => setOpen(false)}
@@ -73,8 +73,8 @@ function PublicFooter() {
           <div>
             <h3 className="text-sm font-bold text-white/80 uppercase tracking-widest mb-4">Quick Links</h3>
             <ul className="space-y-2">
-              <li><Link to="/online-ordering" className="text-sm text-white/60 hover:text-yellow-400 transition-colors">Order Online</Link></li>
-              <li><Link to="/membership" className="text-sm text-white/60 hover:text-yellow-400 transition-colors">Membership</Link></li>
+              <li><Link to="/website/online-ordering" className="text-sm text-white/60 hover:text-yellow-400 transition-colors">Order Online</Link></li>
+              <li><Link to="/website/membership" className="text-sm text-white/60 hover:text-yellow-400 transition-colors">Membership</Link></li>
               <li><Link to="/login" className="text-sm text-white/60 hover:text-yellow-400 transition-colors">Staff Login</Link></li>
             </ul>
           </div>
@@ -147,14 +147,14 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              to="/online-ordering"
+              to="/website/online-ordering"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold rounded-sm hover:opacity-90 transition-all"
               style={{ background: SBB_YELLOW, color: "#000" }}
             >
               ORDER NOW <ChevronRight className="h-4 w-4" />
             </Link>
             <Link
-              to="/membership"
+              to="/website/membership"
               className="inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-bold rounded-sm border border-white/30 text-white hover:border-yellow-400 hover:text-yellow-400 transition-all"
             >
               JOIN THE CLUB
@@ -224,7 +224,7 @@ export default function HomePage() {
                 <p className="text-white/50 text-sm">Crafted fresh. Available every night.</p>
               </div>
               <Link
-                to="/online-ordering"
+                to="/website/online-ordering"
                 className="text-sm font-bold hover:opacity-80 transition-opacity flex items-center gap-1"
                 style={{ color: SBB_YELLOW }}
               >
@@ -316,7 +316,7 @@ export default function HomePage() {
               ))}
             </div>
             <Link
-              to="/online-ordering"
+              to="/website/online-ordering"
               className="inline-flex items-center gap-2 px-8 py-4 text-base font-bold rounded-sm hover:opacity-90 transition-all"
               style={{ background: SBB_YELLOW, color: "#000" }}
             >
@@ -341,7 +341,7 @@ export default function HomePage() {
             </p>
           </div>
           <Link
-            to="/online-ordering"
+            to="/website/online-ordering"
             className="inline-flex items-center gap-2 px-8 py-4 text-sm font-bold rounded-sm bg-black text-white hover:bg-black/80 transition-all flex-shrink-0"
           >
             ORDER ONLINE <ChevronRight className="h-4 w-4" />

@@ -131,10 +131,13 @@ export default function App() {
         <TooltipProvider>
           <BrowserRouter>
             <Routes>
+              {/* Root — redirect to app dashboard */}
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
               {/* Public website routes — no sidebar/shell */}
-              <Route path="/" element={<HomePage />} />
-              <Route path="/membership" element={<PublicMembership />} />
-              <Route path="/online-ordering" element={<PublicOnlineOrdering />} />
+              <Route path="/website" element={<HomePage />} />
+              <Route path="/website/membership" element={<PublicMembership />} />
+              <Route path="/website/online-ordering" element={<PublicOnlineOrdering />} />
               <Route path="/login" element={<Login />} />
               <Route path={ROUTES.ORDER} element={<OnlineOrdering />} />
               <Route path={ROUTES.ORDER_CHECKOUT} element={<Checkout />} />
