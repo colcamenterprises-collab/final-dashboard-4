@@ -273,6 +273,13 @@ export async function getUsageReconciliation(date: string) {
   const hasCritical = [bunsSeverity, meatSeverity, ...drinkSeverities].some(s => s === "critical");
   const overallSeverity = hasCritical ? "critical" : hasWarning ? "warn" : engineBuilt && form2Available ? "ok" : "unknown";
 
+  // Flag: no purchases at all logged for this shift date
+  const noPurchasesLogged =
+    receivedBuns === 0 &&
+    receivedMeatG === 0 &&
+    Object.values(receivedDrinks).every((v) => v === 0) &&
+    receivedDrinksResult.rows.length === 0;
+
   return {
     ok: true,
     date,
@@ -281,6 +288,7 @@ export async function getUsageReconciliation(date: string) {
     form2Available,
     prevForm2Available,
     overallSeverity,
+    noPurchasesLogged,
     receivedStock: { buns: receivedBuns, meatG: receivedMeatG, drinks: receivedDrinks },
     buns: {
       expected: bunsExpected,

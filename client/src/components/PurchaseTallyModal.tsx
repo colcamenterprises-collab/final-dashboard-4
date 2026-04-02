@@ -40,6 +40,18 @@ interface PurchaseTallyModalProps {
   entry?: any; // For editing existing entries
 }
 
+/** Returns the shift-start date in Bangkok time (YYYY-MM-DD).
+ *  Shift starts at 17:00 Bangkok. Before 17:00 → yesterday's date. */
+function getBangkokShiftDate(): string {
+  const now = new Date();
+  const bkk = new Date(now.toLocaleString("en-CA", { timeZone: "Asia/Bangkok" }));
+  const hour = bkk.getHours();
+  if (hour < 17) {
+    bkk.setDate(bkk.getDate() - 1);
+  }
+  return bkk.toLocaleDateString("en-CA"); // YYYY-MM-DD
+}
+
 export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -62,7 +74,7 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
   const form = useForm<PurchaseTallyForm>({
     resolver: zodResolver(purchaseTallySchema),
     defaultValues: {
-      date: entry?.date || new Date().toISOString().split('T')[0],
+      date: entry?.date || getBangkokShiftDate(),
       supplier: entry?.supplier || "",
       amountTHB: entry?.amountTHB || "",
       rollsPcs: entry?.rollsPcs?.toString() || "",
@@ -190,10 +202,11 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Date *</FormLabel>
+                    <FormLabel>Shift Date * <span className="text-xs font-normal text-slate-400">(must match shift start date)</span></FormLabel>
                     <FormControl>
                       <Input type="date" {...field} />
                     </FormControl>
+                    <p className="text-xs text-slate-400 mt-1">Pre-filled to current shift start date. If purchasing for a past shift, change this to that shift's date.</p>
                     <FormMessage />
                   </FormItem>
                 )}

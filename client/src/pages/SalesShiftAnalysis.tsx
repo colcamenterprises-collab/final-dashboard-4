@@ -91,6 +91,7 @@ interface UsageReconData {
   form2Available: boolean;
   prevForm2Available: boolean;
   overallSeverity: ReconSeverity;
+  noPurchasesLogged?: boolean;
   buns: {
     expected: number | null; opening: number | null; received: number;
     closing: number | null; physicalUsed: number | null;
@@ -458,6 +459,17 @@ export default function SalesShiftAnalysis() {
             <div className="text-sm text-amber-700">Reconciliation unavailable for this date.</div>
           ) : (
             <>
+              {/* ANOMALY: No purchases logged for this shift date */}
+              {usageRecon.noPurchasesLogged && usageRecon.form2Available && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-[4px] border border-red-400 bg-red-100/60 text-xs font-semibold text-red-800">
+                  <span className="mt-0.5 text-base leading-none">⚠</span>
+                  <span>
+                    NO PURCHASES LOGGED for {usageRecon.date} — Rolls, meat and drinks received must be entered in Purchasing before variance is meaningful.
+                    All received amounts are showing +0. Go to <strong>Purchasing</strong> and lodge stock received for this shift date.
+                  </span>
+                </div>
+              )}
+
               {/* Availability warnings */}
               {(!usageRecon.engineBuilt || !usageRecon.form2Available || !usageRecon.prevForm2Available) && (
                 <div className="flex flex-wrap gap-2 text-xs">
@@ -494,7 +506,7 @@ export default function SalesShiftAnalysis() {
                 <div className="rounded border border-slate-200 p-3">
                   <div className="text-slate-500 text-xs mb-1">Buns Detail</div>
                   <div className="text-xs text-slate-400">Opening: <span className="font-mono">{usageRecon.buns.opening ?? '—'}</span></div>
-                  <div className="text-xs text-slate-400">Received: <span className="font-mono">+{usageRecon.buns.received}</span></div>
+                  <div className={`text-xs ${usageRecon.buns.received === 0 ? 'text-red-700 font-semibold' : 'text-slate-400'}`}>Received: <span className="font-mono">+{usageRecon.buns.received}</span>{usageRecon.buns.received === 0 ? ' ← NOT LODGED' : ''}</div>
                   <div className="text-xs text-slate-400">Closing: <span className="font-mono">{usageRecon.buns.closing ?? '—'}</span></div>
                 </div>
                 {/* Meat */}
@@ -516,7 +528,7 @@ export default function SalesShiftAnalysis() {
                 <div className="rounded border border-slate-200 p-3">
                   <div className="text-slate-500 text-xs mb-1">Meat Detail</div>
                   <div className="text-xs text-slate-400">Opening: <span className="font-mono">{usageRecon.meat.openingGrams !== null ? usageRecon.meat.openingGrams.toLocaleString() + 'g' : '—'}</span></div>
-                  <div className="text-xs text-slate-400">Received: <span className="font-mono">+{usageRecon.meat.receivedGrams.toLocaleString()}g</span></div>
+                  <div className={`text-xs ${usageRecon.meat.receivedGrams === 0 ? 'text-red-700 font-semibold' : 'text-slate-400'}`}>Received: <span className="font-mono">+{usageRecon.meat.receivedGrams.toLocaleString()}g</span>{usageRecon.meat.receivedGrams === 0 ? ' ← NOT LODGED' : ''}</div>
                   <div className="text-xs text-slate-400">Closing: <span className="font-mono">{usageRecon.meat.closingGrams !== null ? usageRecon.meat.closingGrams.toLocaleString() + 'g' : '—'}</span></div>
                 </div>
               </div>
@@ -545,7 +557,7 @@ export default function SalesShiftAnalysis() {
                         <td className={`${TABLE_CELL_CLASS} text-slate-700`}>{row.label}</td>
                         <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{row.expected ?? '—'}</td>
                         <td className={`${TABLE_CELL_CLASS} text-right font-mono text-slate-500`}>{row.opening ?? '—'}</td>
-                        <td className={`${TABLE_CELL_CLASS} text-right font-mono text-slate-500`}>+{row.received}</td>
+                        <td className={`${TABLE_CELL_CLASS} text-right font-mono ${row.received === 0 ? 'text-red-600' : 'text-slate-500'}`}>+{row.received}</td>
                         <td className={`${TABLE_CELL_CLASS} text-right font-mono text-slate-500`}>{row.closing ?? '—'}</td>
                         <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{row.physicalUsed ?? '—'}</td>
                         <td className={`${TABLE_CELL_CLASS} text-right font-mono font-semibold ${
