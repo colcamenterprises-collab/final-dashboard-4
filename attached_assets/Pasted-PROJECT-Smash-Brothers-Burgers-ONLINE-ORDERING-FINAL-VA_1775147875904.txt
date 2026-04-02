@@ -1,0 +1,151 @@
+PROJECT: Smash Brothers Burgers — ONLINE ORDERING FINAL VALIDATION
+MODE: STRICT TESTING
+GOAL: PROVE THAT THE RECIPE → PRODUCT → PUBLIC ORDERING FLOW IS NOW WORKING
+
+CRITICAL RULES
+1. DO NOT change code unless a blocking issue is found.
+2. DO NOT assume success.
+3. DO NOT say “should work”.
+4. ONLY report what is proven through runtime, API, DB, or UI testing.
+5. If it fails, isolate the exact break point.
+
+MISSION
+Verify that a product created/published through the internal system now appears on the public online ordering page.
+
+SUCCESS CRITERIA
+A single product created via the real workflow must:
+- land in the correct table (`product`)
+- satisfy feed filters
+- appear in `/api/menu-ordering/full`
+- appear on `/online-ordering`
+- be selectable in the UI
+
+---
+
+## TEST STEPS
+
+### STEP 1 — CREATE PROOF PRODUCT
+Use the REAL internal workflow (NOT DB insert)
+
+- Go to the real admin route used for publishing
+- Create or use a recipe
+- Publish it as:
+
+NAME: TEST PRODUCT - ONLINE ORDERING PROOF
+
+Verify:
+- product created or updated
+- correct category
+- price set (> 0)
+- marked visible online
+- marked active
+
+---
+
+### STEP 2 — DATABASE CHECK
+
+Verify the product exists in `product` table:
+
+Report:
+- row exists: YES/NO
+- visible_online = true
+- price_online > 0
+- active = true
+- category value
+- any missing fields
+
+---
+
+### STEP 3 — API CHECK
+
+Call:
+
+GET /api/menu-ordering/full
+
+Verify:
+- response 200
+- product exists in response
+- correct category grouping
+- no category collision
+- total items count increased by +1
+
+---
+
+### STEP 4 — FRONTEND CHECK
+
+Go to:
+
+/online-ordering
+
+Verify:
+- page loads clean
+- no blocking console errors
+- proof product is visible
+- appears in correct category
+- UI renders correctly
+
+---
+
+### STEP 5 — INTERACTION CHECK
+
+Verify:
+- product can be selected
+- product can be added to cart
+- cart updates correctly
+- no runtime errors
+
+---
+
+### STEP 6 — REGRESSION CHECK
+
+Verify:
+- existing 5 products still appear
+- no categories disappeared
+- no duplication issues
+- no blank screen on load
+- no crash from filter/localStorage
+
+---
+
+## OUTPUT FORMAT
+
+Return EXACTLY:
+
+1. PROOF PRODUCT STATUS
+- created via:
+- internal route:
+- success: YES/NO
+
+2. DATABASE RESULT
+- exists in product table:
+- visible_online:
+- price_online:
+- active:
+- category:
+
+3. API RESULT
+- endpoint:
+- status:
+- item found: YES/NO
+- category:
+- total items:
+
+4. FRONTEND RESULT
+- appears on /online-ordering:
+- category correct:
+- UI state:
+
+5. INTERACTION RESULT
+- add to cart works:
+- errors:
+
+6. FINAL VERDICT
+- FULL SUCCESS / PARTIAL / FAILED
+
+7. IF FAILED — EXACT BREAKPOINT
+- where the chain breaks:
+- why:
+- what is missing:
+
+ABSOLUTE RULE
+Do not say “working” unless the product is visible on the public page and can be added to cart.
