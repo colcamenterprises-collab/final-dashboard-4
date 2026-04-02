@@ -37,6 +37,11 @@ const cleanMoney = (value: unknown) => {
   return Number.isFinite(n) ? n : 0;
 };
 
+const normalizeCategory = (value: unknown) => {
+  const category = String(value ?? "").trim();
+  return category.length > 0 ? category : "UNMAPPED";
+};
+
 async function loadRecipeForPublish(recipeId: number) {
   const result = await pool.query(
     `SELECT id, name, description, category, suggested_price, image_url, notes
@@ -54,7 +59,7 @@ async function loadRecipeForPublish(recipeId: number) {
     id: Number(row.id),
     name: String(row.name ?? ""),
     description: String(row.description ?? ""),
-    category: String(row.category ?? "Unmapped"),
+    category: normalizeCategory(row.category),
     price: cleanMoney(meta?.pricing?.directPrice ?? row.suggested_price),
     imageUrl: String(meta?.imageUrl || row.image_url || ""),
     notes: String(row.notes ?? ""),
@@ -72,6 +77,13 @@ router.post("/online/products/upsert-from-recipe", async (req, res) => {
     const recipe = await loadRecipeForPublish(recipeId);
     if (!recipe) {
       return res.status(404).json({ error: "Recipe not found" });
+    }
+
+    if (!(recipe.price > 0)) {
+      return res.status(400).json({
+        error: "Recipe direct price must be greater than 0 before publishing",
+        code: "ONLINE_PRICE_REQUIRED",
+      });
     }
 
     const existing = await pool.query(

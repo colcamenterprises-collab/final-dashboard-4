@@ -119,8 +119,15 @@ export default function OnlineOrderingPage() {
   }, []);
 
   // PATCH O1 — Fetch menu from menu-ordering API
-  const { data: menuData, isLoading: menuLoading } = useQuery<{ categories?: Array<any> }>({
+  const { data: menuData, isLoading: menuLoading, isError: menuLoadError } = useQuery<{ categories?: Array<any> }>({
     queryKey: ["/api/menu-ordering/full"],
+    queryFn: async () => {
+      const response = await fetch("/api/menu-ordering/full");
+      if (!response.ok) {
+        throw new Error("Failed to load menu");
+      }
+      return response.json();
+    },
     enabled: !getParam("admin"), // Only fetch if NOT in admin mode
   });
 
@@ -229,8 +236,9 @@ export default function OnlineOrderingPage() {
   }, []);
 
   const filteredMenu = useMemo(() => { 
+    const items = Array.isArray(menu?.items) ? menu.items : [];
     const q = search.trim().toLowerCase(); 
-    return menu.items.filter((m) => (!activeCat || m.category === activeCat) && (!q || m.name.toLowerCase().includes(q))); 
+    return items.filter((m) => (!activeCat || m.category === activeCat) && (!q || m.name.toLowerCase().includes(q))); 
   }, [menu, activeCat, search]);
 
   const subtotal = useMemo(() => cart.reduce((s, l) => s + lineTotal(l), 0), [cart]);
@@ -402,6 +410,24 @@ export default function OnlineOrderingPage() {
         </div>
 
         <div className="mt-6 space-y-6">
+          {!isAdmin && menuLoading && (
+            <div className="rounded-2xl bg-[#121212] border border-white/10 p-6 text-center text-white/80">
+              Loading menu...
+            </div>
+          )}
+
+          {!isAdmin && menuLoadError && !menuLoading && (
+            <div className="rounded-2xl bg-[#121212] border border-white/10 p-6 text-center text-red-300">
+              Unable to load menu right now. Please try again.
+            </div>
+          )}
+
+          {!isAdmin && !menuLoading && filteredMenu.length === 0 && (
+            <div className="rounded-2xl bg-[#121212] border border-white/10 p-6 text-center text-white/70">
+              No items available in this category.
+            </div>
+          )}
+
           {filteredMenu.map((m) => (
             <div 
               key={m.id} 
