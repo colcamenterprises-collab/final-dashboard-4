@@ -154,11 +154,11 @@ export default function StockReconciliation() {
                 <TableRow>
                   <TableHead className="text-xs">Date</TableHead>
                   <TableHead className="text-xs">Item</TableHead>
-                  <TableHead className="text-xs text-right">Start</TableHead>
-                  <TableHead className="text-xs text-right">Purchased</TableHead>
-                  <TableHead className="text-xs text-right">Used</TableHead>
-                  <TableHead className="text-xs text-right">Expected</TableHead>
-                  <TableHead className="text-xs text-right">Actual</TableHead>
+                  <TableHead className="text-xs text-right">Opening</TableHead>
+                  <TableHead className="text-xs text-right">Received</TableHead>
+                  <TableHead className="text-xs text-right">Physical Used</TableHead>
+                  <TableHead className="text-xs text-right">Number Sold</TableHead>
+                  <TableHead className="text-xs text-right">Closing</TableHead>
                   <TableHead className="text-xs text-right">Variance</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
                 </TableRow>
