@@ -412,6 +412,25 @@ export const Analysis = () => {
             </CardContent>
           </Card>
 
+          <Card className="bg-white rounded shadow hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Grab vs Loyverse Reconciliation
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-600 mb-4">
+                Strict monthly reconciliation for March 2026 using exact amount + timestamp tolerance only.
+              </p>
+              <Link to="/analysis/grab-loyverse-monthly-reconciliation">
+                <Button className="w-full">
+                  Open Reconciliation Page
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
         </div>
       )}
 
