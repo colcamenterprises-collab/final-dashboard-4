@@ -32,8 +32,6 @@ export async function getShiftSnapshot(date: string): Promise<any | null> {
 export async function listShiftSnapshots(): Promise<any[]> {
   await ensureShiftDerivedTables();
   const prisma = db();
-  // Join daily_sales_v2 directly so form totals are always live (not dependent on stale snapshot form_data).
-  // COALESCE(NULLIF(col,0), payload->>col, 0) handles the common case where DB columns store 0 but real data lives in payload JSONB.
   return prisma.$queryRawUnsafe<any[]>(
     `
     WITH all_dates AS (
@@ -44,23 +42,56 @@ export async function listShiftSnapshots(): Promise<any[]> {
     dsv2 AS (
       SELECT DISTINCT ON (shift_date::date)
         shift_date::date AS d,
-        COALESCE(
-          NULLIF("totalSales"::numeric, 0),
-          NULLIF((payload->>'totalSales')::numeric, 0),
-          0
-        ) AS form_total
+        payload,
+        COALESCE(NULLIF("totalSales"::numeric, 0), NULLIF((payload->>'totalSales')::numeric, 0), 0) AS total_sales,
+        COALESCE(NULLIF("cashSales"::numeric, 0), NULLIF((payload->>'cashSales')::numeric, 0), 0) AS cash_sales,
+        COALESCE(NULLIF("qrSales"::numeric, 0), NULLIF((payload->>'qrSales')::numeric, 0), 0) AS qr_sales,
+        COALESCE(NULLIF("grabSales"::numeric, 0), NULLIF((payload->>'grabSales')::numeric, 0), 0) AS grab_sales,
+        COALESCE(NULLIF("othersTotal"::numeric, 0), NULLIF((payload->>'otherSales')::numeric, 0), 0) AS other_sales,
+        COALESCE(NULLIF("totalExpenses"::numeric, 0), NULLIF((payload->>'totalExpenses')::numeric, 0), 0) AS total_expenses
       FROM daily_sales_v2
       WHERE shift_date IS NOT NULL
       ORDER BY shift_date::date, COALESCE("submittedAtISO", "createdAt") DESC
+    ),
+    receipt_numbers AS (
+      SELECT
+        receipt_date::date AS d,
+        ARRAY_AGG(DISTINCT COALESCE(receipt_number, receipt_id)::text ORDER BY COALESCE(receipt_number, receipt_id)::text) AS receipt_numbers
+      FROM receipt_truth_line
+      GROUP BY receipt_date::date
     )
     SELECT
       TO_CHAR(ad.d, 'YYYY-MM-DD') AS date,
       COALESCE(s.approved, false) AS approved,
       s.pos_data,
-      json_build_object('total', COALESCE(dv.form_total, 0)) AS form_data
+      json_build_object(
+        'total', COALESCE(dv.total_sales, 0),
+        'cash', COALESCE(dv.cash_sales, 0),
+        'qr', COALESCE(dv.qr_sales, 0),
+        'grab', COALESCE(dv.grab_sales, 0),
+        'other', COALESCE(dv.other_sales, 0),
+        'refunds', COALESCE(NULLIF((dv.payload->>'refundAmount')::numeric, 0), 0),
+        'exp', COALESCE(dv.total_expenses, 0),
+        'closing_cash', COALESCE(NULLIF((dv.payload->>'closingCash')::numeric, 0), 0),
+        'cash_banked', COALESCE(NULLIF((dv.payload->>'cashBanked')::numeric, 0), 0),
+        'qr_transfer', COALESCE(NULLIF((dv.payload->>'qrTransfer')::numeric, 0), 0),
+        'net_position', COALESCE(
+          NULLIF((dv.payload->'bankingAuto'->>'netPosition')::numeric, 0),
+          NULLIF((dv.payload->>'netPosition')::numeric, 0),
+          0
+        ),
+        'receipt_count', GREATEST(
+          COALESCE((dv.payload->>'grabReceiptCount')::int, 0)
+          + COALESCE((dv.payload->>'cashReceiptCount')::int, 0)
+          + COALESCE((dv.payload->>'qrReceiptCount')::int, 0),
+          COALESCE(array_length(rn.receipt_numbers, 1), 0)
+        ),
+        'receipt_numbers', COALESCE(to_json(rn.receipt_numbers), '[]'::json)
+      ) AS form_data
     FROM all_dates ad
     LEFT JOIN shift_snapshot_v2 s ON s.date = ad.d
     LEFT JOIN dsv2 dv ON dv.d = ad.d
+    LEFT JOIN receipt_numbers rn ON rn.d = ad.d
     ORDER BY ad.d DESC
     LIMIT 30
     `,
