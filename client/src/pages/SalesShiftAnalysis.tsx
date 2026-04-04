@@ -124,8 +124,7 @@ const categories: Array<{ key: keyof ShiftData; label: string }> = [
   { key: 'grab', label: 'GrabFood' },
   { key: 'other', label: 'Other' },
   { key: 'refunds', label: 'Refunds' },
-  { key: 'exp_cash', label: 'Expenses (Cash)' },
-  { key: 'exp', label: 'Expenses (Total)' },
+  { key: 'exp', label: 'Expenses' },
 ];
 
 const toNum = (v: unknown) => { const n = Number(v ?? 0); return Number.isFinite(n) ? n : 0; };
@@ -342,7 +341,7 @@ export default function SalesShiftAnalysis() {
       const pos = toNum(posData?.[key]);
       const diff = form - pos;
       const absDiff = Math.abs(diff);
-      const flagged = key !== 'exp_cash' && key !== 'exp' && absDiff > Math.max(5, pos * 0.05);
+      const flagged = key !== 'exp' && absDiff > Math.max(5, pos * 0.05);
       return { label, form, pos, diff, absDiff, flagged };
     });
   }, [formData, posData]);
