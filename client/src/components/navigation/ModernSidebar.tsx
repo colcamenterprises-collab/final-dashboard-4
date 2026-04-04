@@ -108,6 +108,7 @@ const navigationGroups: NavGroup[] = [
       { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
       { to: "/analysis/stock-review", label: "Stock Review", icon: Package, testId: "nav-stock-review" },
       { to: "/analysis/stock-reconciliation", label: "Stock Reconciliation", icon: Package, testId: "nav-stock-reconciliation" },
+      { to: "/analysis/grab-loyverse-monthly-reconciliation", label: "Grab vs Loyverse", icon: BarChart3, testId: "nav-grab-loyverse-reconciliation" },
       { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
     ]
   },

@@ -1,0 +1,144 @@
+TASK: Expose the existing Reconciliation page in the frontend under the Analysis tab
+
+READ CAREFULLY — DO NOT FREESTYLE
+
+GOAL
+The Reconciliation page already exists in the codebase.
+Your job is ONLY to:
+1. Register the route
+2. Add it to the Analysis navigation/menu
+3. Ensure it is accessible from the frontend
+
+DO NOT:
+- modify business logic
+- rebuild the page
+- change styling
+- touch unrelated routes/components
+
+--------------------------------------------------
+
+STEP 1 — FIND THE PAGE COMPONENT
+
+Locate the existing reconciliation page file.
+
+Likely names:
+- ReconciliationPage.tsx
+- reconciliation.tsx
+- analysis/reconciliation.tsx
+
+CONFIRM:
+- component is exported as default
+- component renders correctly
+
+DO NOT MODIFY THIS FILE
+
+--------------------------------------------------
+
+STEP 2 — REGISTER ROUTE
+
+Find the main router file (one of these):
+- App.tsx
+- router.tsx
+- routes.tsx
+
+ADD THIS ROUTE:
+
+<Route path="/analysis/reconciliation" element={<ReconciliationPage />} />
+
+ALSO:
+- import the component at the top:
+import ReconciliationPage from "PATH_TO_FILE";
+
+DO NOT REMOVE OR MODIFY ANY OTHER ROUTES
+
+--------------------------------------------------
+
+STEP 3 — ADD TO ANALYSIS MENU / SIDEBAR
+
+Find navigation component:
+- Sidebar.tsx
+- Navigation.tsx
+- AnalysisMenu.tsx
+
+Locate the Analysis section.
+
+ADD NEW ITEM:
+
+{
+  name: "Reconciliation",
+  path: "/analysis/reconciliation"
+}
+
+OR JSX VERSION:
+
+<Link to="/analysis/reconciliation">
+  Reconciliation
+</Link>
+
+PLACE:
+- inside Analysis group
+- consistent with existing menu items
+
+DO NOT CHANGE STYLING OR ORDER OF OTHER ITEMS
+
+--------------------------------------------------
+
+STEP 4 — OPTIONAL (IF DASHBOARD CARDS EXIST)
+
+If Analysis page has clickable cards:
+
+ADD:
+
+onClick={() => navigate("/analysis/reconciliation")}
+
+Label:
+"Reconciliation"
+
+--------------------------------------------------
+
+STEP 5 — VERIFY
+
+YOU MUST TEST:
+
+1. Navigate via sidebar → Analysis → Reconciliation
+2. Direct URL:
+   /analysis/reconciliation
+
+EXPECTED:
+- page loads correctly
+- no blank screen
+- no console errors
+
+--------------------------------------------------
+
+STEP 6 — DO NOT BREAK ANYTHING
+
+- existing routes must still work
+- sidebar must render correctly
+- no duplicate routes
+- no type errors
+
+--------------------------------------------------
+
+DELIVERABLE
+
+Return:
+1. Full patch (ALL modified files)
+2. Files changed list
+3. Confirmation:
+   - route works
+   - menu link works
+
+--------------------------------------------------
+
+FINAL WARNING
+
+This is a wiring task only.
+
+DO NOT:
+- refactor logic
+- rebuild UI
+- rename files
+- introduce new dependencies
+
+ONLY connect the existing page to the frontend.
