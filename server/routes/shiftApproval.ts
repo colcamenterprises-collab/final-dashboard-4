@@ -7,8 +7,16 @@ import {
   listShiftSnapshots,
   upsertFormSnapshot,
 } from '../services/shiftApprovalService';
-import { storeShiftSnapshot } from '../services/loyverseService';
+import { storeShiftSnapshot, fetchShiftReport } from '../services/loyverseService';
 import { pool } from '../db';
+
+function classifyPaymentByName(name: string): 'cash' | 'qr' | 'grab' | 'other' {
+  const key = String(name).toLowerCase();
+  if (key.includes('cash')) return 'cash';
+  if (key.includes('qr') || key.includes('promptpay') || key.includes('transfer')) return 'qr';
+  if (key.includes('grab')) return 'grab';
+  return 'other';
+}
 
 
 const router = Router();
@@ -38,9 +46,46 @@ router.get('/pos-shift/:date', async (req, res) => {
       return res.json({ ...snapshot.pos_data, source: 'snapshot' });
     }
 
-    // Fallback: derive directly from receipt_truth_line (Loyverse ingested data)
+    // Fallback tier 1: call Loyverse API directly for authoritative shift report data.
+    // This gives correct cash_payments, paid_out/expenses, and classifies payments by name
+    // (so QR codes, Grab etc. are correctly bucketed regardless of lv_receipt type field).
+    //
+    // Shift date vs receipt date: shifts open at 17:00 BKK and can close after midnight,
+    // so receipts for a shift opened on day D may be stored under receipt_date = D+1.
+    // We try the given date first; if the shift report comes back empty we try D-1
+    // (the shift that opened the evening before and closed in the early hours of `date`).
+    try {
+      let report = await fetchShiftReport(date);
+
+      // If the shift-window for `date` returned nothing, try the previous calendar day
+      // (covers the common case where receipt_date is the close-date of an overnight shift)
+      if (report.total === 0) {
+        const { DateTime: DT } = await import('luxon');
+        const prevDate = DT.fromISO(date, { zone: 'Asia/Bangkok' })
+          .minus({ days: 1 })
+          .toFormat('yyyy-MM-dd');
+        const prevReport = await fetchShiftReport(prevDate);
+        if (prevReport.total > 0) {
+          report = prevReport;
+        }
+      }
+
+      let txn_count = 0;
+      if (pool) {
+        const txnResult = await pool.query(
+          `SELECT COUNT(DISTINCT receipt_id)::int AS txn_count
+           FROM receipt_truth_line WHERE receipt_date=$1::date AND receipt_type='SALE'`,
+          [date]).catch(() => ({ rows: [] }));
+        txn_count = Number((txnResult as any).rows[0]?.txn_count || 0);
+      }
+      return res.json({ ...report, txn_count, source: 'loyverse_api' });
+    } catch (apiErr) {
+      console.warn('[pos-shift] Loyverse API call failed, falling back to receipt_truth_line:', (apiErr as Error)?.message);
+    }
+
+    // Fallback tier 2: derive from receipt_truth_line + lv_receipt (offline / no token).
+    // Uses payment method NAME for classification so QR codes are not mis-bucketed as Grab.
     if (!pool) return res.json({});
-    // net_amount is in baht (numeric), not cents
     const posResult = await pool.query(
       `SELECT
          ROUND(SUM(CASE WHEN receipt_type='SALE' THEN COALESCE(net_amount,0) ELSE 0 END)::numeric, 2) AS total,
@@ -48,13 +93,9 @@ router.get('/pos-shift/:date', async (req, res) => {
          COUNT(DISTINCT CASE WHEN receipt_type='SALE' THEN receipt_id END)::int AS txn_count
        FROM receipt_truth_line WHERE receipt_date=$1::date`,
       [date]);
-    // Payment breakdown from lv_receipt.payment_json.
-    // NOTE: lv_receipt is populated by a separate ingestion path from receipt_truth_line.
-    // For dates where lv_receipt was not synced, the join returns 0 rows.
-    // In that case we flag payment_breakdown_available=false rather than returning silent 0s.
+
     const payments = await pool.query(
       `SELECT pj->>'name' AS method_name,
-              pj->>'type' AS method_type,
               ROUND(SUM((pj->>'money_amount')::numeric),2) AS amount
        FROM lv_receipt r,
             jsonb_array_elements(COALESCE(r.payment_json, '[]'::jsonb)) AS pj
@@ -62,16 +103,17 @@ router.get('/pos-shift/:date', async (req, res) => {
          SELECT DISTINCT receipt_id FROM receipt_truth_line
          WHERE receipt_date=$1::date AND receipt_type='SALE'
        )
-       GROUP BY pj->>'name', pj->>'type'`,
+       GROUP BY pj->>'name'`,
       [date]).catch(() => ({ rows: [] }));
 
     const payRows = (payments as any).rows;
     const paymentBreakdownAvailable = payRows.length > 0;
 
-    const payMap: Record<string, number> = {};
+    // Classify by method name — not type — so "SCAN (QR Code)" → qr, "GRAB" → grab
+    const buckets: Record<string, number> = { cash: 0, qr: 0, grab: 0, other: 0 };
     for (const p of payRows) {
-      const key = String(p.method_type || p.method_name || '').toUpperCase();
-      payMap[key] = (payMap[key] || 0) + Number(p.amount);
+      const bucket = classifyPaymentByName(String(p.method_name || ''));
+      buckets[bucket] = (buckets[bucket] || 0) + Number(p.amount);
     }
 
     const posRow = posResult.rows[0] || {};
@@ -87,24 +129,33 @@ router.get('/pos-shift/:date', async (req, res) => {
     };
 
     if (paymentBreakdownAvailable) {
-      // lv_receipt.payment_json money_amount is in satang; already summed → convert /100 not needed
-      // (money_amount matches total_amount scale: e.g. money_amount=249 → ฿2.49 per lv_receipt sample)
-      // BUT receipt_truth_line net_amount is in baht and totals ฿18,036 for 45 txns
-      // CROSS-CHECK: if payMap totals match posRow.total, units are consistent
-      const cashBaht = (payMap['CASH'] ?? 0);
-      const qrBaht = (payMap['QR'] ?? payMap['PROMPTPAY'] ?? 0);
-      const grabBaht = (payMap['OTHER'] ?? 0); // Grab is type=OTHER in lv_receipt
-      posData.cash = cashBaht;
-      posData.qr = qrBaht;
-      posData.grab = grabBaht;
-      posData.other = Math.max(0, total - cashBaht - qrBaht - grabBaht);
+      posData.cash = buckets.cash;
+      posData.qr = buckets.qr;
+      posData.grab = buckets.grab;
+      posData.other = buckets.other;
     } else {
-      // Cannot break down — lv_receipt not synced for this date
       posData.cash = null;
       posData.qr = null;
       posData.grab = null;
       posData.other = null;
       posData.payment_breakdown_note = 'lv_receipt not synced for this date';
+    }
+
+    // Add expenses from the loyverse_shifts cache (paid_out) when API is unavailable.
+    // Try the given date first; if no shift data, try the previous day (overnight shift).
+    const expQuery = `
+      SELECT COALESCE((data->'shifts'->0->>'paid_out')::numeric, 0) AS exp,
+             COALESCE((data->'shifts'->0->>'cash_payments')::numeric, 0) AS cash_from_shift
+      FROM loyverse_shifts
+      WHERE shift_date = $1::date
+      LIMIT 1`;
+    const expRow = await pool.query(expQuery, [date]).then((r: any) => r.rows[0]).catch(() => null);
+    if (expRow) {
+      posData.exp = Number(expRow.exp || 0);
+      posData.exp_cash = Number(expRow.exp || 0);
+    } else {
+      posData.exp = 0;
+      posData.exp_cash = 0;
     }
 
     return res.json(posData);

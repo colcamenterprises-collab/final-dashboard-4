@@ -111,20 +111,55 @@ export async function fetchShiftReport(date: string): Promise<NormalizedShiftRep
     const shifts = Array.isArray(data?.shifts) ? data.shifts : [];
     const report = { ...EMPTY_REPORT };
 
+    // Build payment_type_id → name lookup from lv_receipt so we can classify
+    // shift-level payments that only carry a UUID (no payment_type_name).
+    const prisma = db();
+    const paymentTypeLookup: Record<string, string> = {};
+    try {
+      const typeRows = await prisma.$queryRaw<Array<{ type_id: string; name: string }>>`
+        SELECT DISTINCT
+          (pj->>'payment_type_id') AS type_id,
+          (pj->>'name')            AS name
+        FROM lv_receipt,
+             jsonb_array_elements(COALESCE(payment_json, '[]'::jsonb)) AS pj
+        WHERE (pj->>'payment_type_id') IS NOT NULL
+          AND (pj->>'name')            IS NOT NULL
+      `;
+      for (const row of typeRows) {
+        if (row.type_id && row.name) paymentTypeLookup[row.type_id] = row.name;
+      }
+    } catch (_e) {
+      // Non-fatal — classification falls back to payment_type_id string
+    }
+
+    // Lower bound uses the same 1-hour buffer as opened_at_min so shifts that
+    // open slightly before 17:00 (e.g. 16:50–16:59) are not incorrectly skipped.
+    const lowerBound = start.minus({ hours: 1 });
+
     for (const shift of shifts) {
       const openedAt = DateTime.fromISO(shift?.opened_at ?? '', { zone: 'utc' }).setZone('Asia/Bangkok');
-      if (!openedAt.isValid || openedAt < start || openedAt >= end) {
+      if (!openedAt.isValid || openedAt < lowerBound || openedAt >= end) {
         continue;
       }
 
       report.total += parseMoney(shift?.gross_sales ?? shift?.net_sales ?? shift?.total_sales);
-      report.exp += parseMoney(shift?.paid_in_and_out?.paid_out ?? shift?.expenses_total);
-      report.exp_cash += parseMoney(shift?.paid_in_and_out?.paid_out_cash ?? shift?.cash_expenses_total);
+
+      // Expenses: Loyverse API may nest inside paid_in_and_out OR expose directly as paid_out
+      report.exp      += parseMoney(shift?.paid_in_and_out?.paid_out      ?? shift?.paid_out      ?? shift?.expenses_total);
+      report.exp_cash += parseMoney(shift?.paid_in_and_out?.paid_out_cash ?? shift?.paid_out_cash ?? shift?.cash_expenses_total ?? shift?.paid_out ?? shift?.expenses_total);
 
       const payments = Array.isArray(shift?.payments) ? shift.payments : [];
       for (const payment of payments) {
-        const amount = parseMoney(payment?.total_money ?? payment?.amount_money ?? payment?.amount);
-        const methodName = String(payment?.payment_type_name ?? payment?.name ?? payment?.payment_type_id ?? 'other');
+        // Loyverse shift API may use money_amount (vs receipt API's total_money)
+        const amount = parseMoney(payment?.money_amount ?? payment?.total_money ?? payment?.amount_money ?? payment?.amount);
+        // Prefer explicit name fields; fall back to our lv_receipt-derived lookup by UUID
+        const methodName = String(
+          payment?.payment_type_name ??
+          payment?.name ??
+          paymentTypeLookup[payment?.payment_type_id] ??
+          payment?.payment_type_id ??
+          'other'
+        );
         const bucket = classifyPayment(methodName);
         report[bucket] += amount;
       }

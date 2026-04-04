@@ -1,0 +1,177 @@
+TASK: Fix the Loyverse POS side of the first table on Analysis → Sales & Shift Analysis for the latest shift
+
+PRIORITY
+This is the current number 1 task.
+Do this first.
+Do not touch unrelated pages or logic.
+
+PAGE
+Analysis → Sales & Shift Analysis
+
+TARGET
+First table only:
+“Form vs POS Comparison”
+
+PROBLEM
+The Loyverse POS side is still showing wrong or missing values for the latest shift.
+
+SHIFT TO VERIFY
+Shift number: 816
+Store: Smash Bros Burgers (Rawai)
+POS: Smash Brothers - Rawai (Main POS)
+Shift opened: 02/04/2026 16:50
+Shift closed: 03/04/2026 02:23
+
+THIS IS THE SOURCE OF TRUTH FOR THIS FIX
+
+SOURCE OF TRUTH — LOYVERSE
+Sales Summary by hour:
+17:00  0
+18:00  390
+19:00  778
+20:00  1298
+21:00  2345
+22:00  1327
+23:00  2566
+00:00  3413
+01:00  1615
+02:00  0
+
+Expected total net sales from hourly summary:
+13732
+
+Shift Report:
+Starting cash: 2440
+Cash payments: 3394
+Cash refunds: 0
+Paid in: 0
+Paid out: 2111
+Expected cash amount: 3723
+Actual cash amount: 3723
+Difference: 0
+
+Shift Report Ins and Outs:
+03/04/2026 01:23  Payout  Burger wrapping paper      229
+03/04/2026 01:01  Payout  Sauce Containers skewers   251
+03/04/2026 00:41  Payout  Salary                    1500
+03/04/2026 00:41  Payout  15                          15
+03/04/2026 00:41  Payout  Water soda                 116
+
+Paid out total must equal:
+229 + 251 + 1500 + 15 + 116 = 2111
+
+CURRENT WRONG UI VALUES TO FIX
+The current table is showing:
+- Total Sales POS: 13732.00  ✅ this is correct
+- Cash POS: 4644.00          ❌ wrong
+- QR / Promptpay POS: 0.00   ❌ wrong / missing
+- GrabFood POS: 9088.00      ❌ wrong
+- Expenses (Cash) POS: 0.00  ❌ wrong
+- Expenses (Total) POS: 0.00 ❌ wrong
+
+REQUIRED CORRECT POS VALUES
+The first table must show the Loyverse POS side as:
+
+1. Total Sales
+POS / Loyverse = 13732.00
+
+2. Cash
+POS / Loyverse = 3394.00
+
+3. QR / Promptpay
+POS / Loyverse = 599.00
+Reason:
+Total non-cash non-grab remainder is:
+13732 - 3394 - 9739 = 599
+This is what the UI is already implying on staff form side and the missing POS mapping must pick it up properly.
+
+4. GrabFood
+POS / Loyverse = 9739.00
+Reason:
+13732 total sales - 3394 cash - 599 QR = 9739 Grab
+
+5. Other
+POS / Loyverse = 0.00
+
+6. Refunds
+POS / Loyverse = 0.00
+
+7. Expenses (Cash)
+POS / Loyverse = 2111.00
+
+8. Expenses (Total)
+POS / Loyverse = 2111.00
+
+IMPORTANT
+Do not invent values from previous shifts.
+Do not use calendar-date-only logic.
+Use the actual shift window and the actual shift report / shift ins-outs for this shift.
+
+ROOT ISSUE TO FIND AND FIX
+Investigate and fix the logic that populates the Loyverse POS values for the first table.
+Likely failures:
+1. Cash is being derived incorrectly from drawer math instead of shift cash payments
+2. QR payment method is not mapped into the POS table output
+3. Grab total is being overstated because QR is being lumped into Grab
+4. Paid out / expenses are not being pulled from shift ins-outs / paid_out field
+5. Shift window filtering may be wrong
+6. The table may be using mixed sources instead of strict shift data
+
+RULES FOR THIS FIX
+- Fix only the first table logic
+- Do not redesign the page
+- Do not touch stock reconciliation logic in lower sections
+- Do not change styling
+- Do not change form-side values
+- Do not break past shifts
+- Do not use fallback guesses if actual shift data exists
+
+WHAT TO CHANGE
+Find the code that builds the first table’s POS/Loyverse values and make it use:
+- net sales total from the shift summary
+- cash payments from the shift report
+- QR / Promptpay from the correct Loyverse payment mapping
+- Grab from the correct Loyverse payment mapping
+- paid out / expenses from shift report and ins-outs
+
+VALIDATION REQUIRED
+After patching, test the page for shift 816 and confirm the POS side shows exactly:
+
+Total Sales      13732.00
+Cash              3394.00
+QR / Promptpay     599.00
+GrabFood          9739.00
+Other                0.00
+Refunds              0.00
+Expenses (Cash)   2111.00
+Expenses (Total)  2111.00
+
+MANDATORY TESTING
+You must test this in the real frontend after the fix.
+
+Test steps:
+1. Open Analysis → Sales & Shift Analysis
+2. Select the latest shift date / shift tied to shift 816
+3. Confirm the first table updates
+4. Confirm all POS values above match exactly
+5. Confirm no console errors
+6. Confirm no unrelated sections broke
+
+SCREENSHOT PROOF REQUIRED
+Return screenshots showing:
+1. The fixed first table
+2. The selected shift/date
+3. Console clean if possible
+
+DELIVERABLE
+Return:
+1. Full patch
+2. Files changed
+3. Exact root cause
+4. Exact fix made
+5. Screenshot proof
+6. Confirmation that shift 816 now matches the source-of-truth figures above
+
+FINAL WARNING
+This task is not complete until the frontend table is tested and proven correct against the exact figures above.
+Do not stop at code changes.
