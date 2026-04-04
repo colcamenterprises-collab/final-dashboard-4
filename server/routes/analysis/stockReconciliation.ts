@@ -96,7 +96,9 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
         SUM((e.value)::numeric)::int AS start_qty
       FROM shift_data curr
       JOIN shift_data prev ON prev.shift_date = curr.shift_date - INTERVAL '1 day'
-      CROSS JOIN LATERAL jsonb_each_text(prev.drinks_end) e
+      CROSS JOIN LATERAL jsonb_each_text(
+        CASE WHEN jsonb_typeof(prev.drinks_end) = 'object' THEN prev.drinks_end ELSE '{}'::jsonb END
+      ) e
       GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
     ),
 
@@ -106,7 +108,9 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
         ${normalizeDrinkNameSql('e.key')} AS item_name,
         SUM((e.value)::numeric)::int AS actual_end_qty
       FROM shift_data curr
-      CROSS JOIN LATERAL jsonb_each_text(curr.drinks_end) e
+      CROSS JOIN LATERAL jsonb_each_text(
+        CASE WHEN jsonb_typeof(curr.drinks_end) = 'object' THEN curr.drinks_end ELSE '{}'::jsonb END
+      ) e
       GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
     ),
 
