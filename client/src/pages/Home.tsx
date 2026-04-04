@@ -269,6 +269,84 @@ function CashBalanceSnapshot() {
   );
 }
 
+function OpsTaskSummaryModule() {
+  const { data: tasksResponse, isLoading } = useQuery<{ items: any[] }>({ queryKey: ["/api/ai-ops/tasks"] });
+  const tasks = tasksResponse?.items || [];
+
+  const mapToBoardColumn = (status: string) => {
+    if (status === "blocked") return "blocked";
+    if (["done", "completed", "approved", "archived", "cancelled"].includes(status)) return "done";
+    if (["needs_review", "in_review", "changes_requested", "rejected"].includes(status)) return "review";
+    if (status === "in_progress") return "in_progress";
+    if (status === "assigned") return "assigned";
+    return "inbox";
+  };
+
+  const counts = tasks.reduce(
+    (acc, task) => {
+      if (task.deletedAt) return acc;
+      const col = mapToBoardColumn(task.status);
+      acc[col] += 1;
+      if (col !== "done") acc.totalOpen += 1;
+      const doneToday =
+        col === "done" &&
+        task.updatedAt &&
+        new Date(task.updatedAt).toDateString() === new Date().toDateString();
+      if (doneToday) acc.doneToday += 1;
+      return acc;
+    },
+    { totalOpen: 0, inbox: 0, in_progress: 0, review: 0, blocked: 0, doneToday: 0 }
+  );
+
+  const urgentOrBlocked = tasks
+    .filter((task) => !task.deletedAt)
+    .filter((task) => mapToBoardColumn(task.status) === "blocked" || ["urgent", "critical"].includes(task.priority))
+    .slice(0, 5);
+
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-slate-900">AI Ops Task Summary</h2>
+        <Link to="/operations/ai-ops-control" className="text-xs font-medium text-emerald-700 hover:underline">
+          Open AI Ops Board
+        </Link>
+      </div>
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
+        {[
+          { label: "Total Open", value: counts.totalOpen },
+          { label: "Inbox", value: counts.inbox },
+          { label: "In Progress", value: counts.in_progress },
+          { label: "Review", value: counts.review },
+          { label: "Blocked", value: counts.blocked },
+          { label: "Done Today", value: counts.doneToday },
+        ].map((item) => (
+          <div key={item.label} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+            <p className="text-[11px] text-slate-500">{item.label}</p>
+            <p className="text-lg font-semibold text-slate-900">{isLoading ? "—" : item.value}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4">
+        <p className="mb-2 text-xs font-semibold text-slate-700">Urgent / Blocked Tasks</p>
+        {isLoading && <p className="text-xs text-slate-500">Loading tasks…</p>}
+        {!isLoading && urgentOrBlocked.length === 0 && <p className="text-xs text-slate-500">No urgent or blocked tasks.</p>}
+        {!isLoading && urgentOrBlocked.length > 0 && (
+          <div className="space-y-1.5">
+            {urgentOrBlocked.map((task) => (
+              <div key={task.id} className="rounded-[4px] border border-slate-200 px-2 py-1.5 text-xs">
+                <p className="font-medium text-slate-900">{task.title}</p>
+                <p className="text-[11px] text-slate-500">
+                  {task.taskNumber || `Task #${task.id}`} · {task.status} · {task.priority}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function Home() {
   return (
     <div className="space-y-6 md:space-y-8 p-2 sm:p-0 pb-24 md:pb-8 bg-slate-50">
@@ -276,6 +354,7 @@ export default function Home() {
       <BalanceHero />
       <KPIGrid />
       <StockLodgementQuickActions />
+      <OpsTaskSummaryModule />
       <PrimeCostCards />
       <VarianceWidget />
       <CashBalanceSnapshot />
