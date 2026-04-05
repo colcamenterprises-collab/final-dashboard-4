@@ -36,19 +36,34 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
   const dateFilter = date ? `WHERE q.shift_date = '${date}'::date` : "";
 
   const query = `
-    WITH latest_form2 AS (
+    WITH normalized_sales AS (
       SELECT
-        ds.shift_date::date AS shift_date,
+        d.id,
+        COALESCE(
+          d.shift_date::date,
+          CASE
+            WHEN NULLIF(d."shiftDate", '') ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN NULLIF(d."shiftDate", '')::date
+            ELSE NULL
+          END
+        ) AS shift_date
+      FROM daily_sales_v2 d
+      WHERE d."deletedAt" IS NULL
+    ),
+
+    latest_form2 AS (
+      SELECT
+        ns.shift_date AS shift_date,
         dsv2."burgerBuns" AS buns_end,
         dsv2."meatWeightG" AS meat_end_g,
         COALESCE(dsv2."drinksJson", '{}'::jsonb) AS drinks_end,
         ROW_NUMBER() OVER (
-          PARTITION BY ds.shift_date::date
+          PARTITION BY ns.shift_date
           ORDER BY dsv2."createdAt" DESC
         ) AS rn
       FROM daily_stock_v2 dsv2
-      JOIN daily_sales_v2 ds ON ds.id = dsv2."salesId"
+      JOIN normalized_sales ns ON ns.id = dsv2."salesId"
       WHERE dsv2."deletedAt" IS NULL
+        AND ns.shift_date IS NOT NULL
     ),
 
     shift_data AS (
