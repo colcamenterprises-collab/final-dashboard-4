@@ -1,0 +1,102 @@
+TASK: ANALYSE the live Stock Reconciliation page implementation before making any further changes
+
+IMPORTANT
+Do NOT write a new patch yet.
+Do NOT change code yet.
+Do NOT guess.
+This is an investigation task only.
+
+GOAL
+Determine exactly why the merged PR made no visible change to the Stock Reconciliation page.
+
+WHAT I AM SEEING
+After the PR merge, the page is still clearly the old implementation:
+- header still says "Stock Reconciliation & Security"
+- old summary cards still exist
+- old "Reconciliation Detail" table still exists
+- endless rows still exist
+- lots of zero rows still exist
+- page is still not the agreed rebuilt version
+
+This means either:
+1. the new implementation was never connected
+2. the wrong component/route is still rendering
+3. the old page was not replaced
+4. the new code is orphaned
+5. the build/runtime is still pointing at old files
+6. caching or import wiring is wrong
+
+YOUR JOB
+Inspect the repo and the live rendered page and tell me EXACTLY what is happening.
+
+INVESTIGATION CHECKLIST
+
+1. Identify the exact frontend route used for:
+   /analysis/stock-reconciliation
+
+2. Identify the exact component file currently rendering that page
+
+3. Confirm whether the old page component still exists and is still mounted
+
+4. Confirm whether a new replacement component was created in the PR
+   - if yes, give the file path
+   - confirm whether it is imported anywhere
+   - confirm whether it is actually routed/rendered
+
+5. Check whether the route/import points to the old component instead of the new one
+
+6. Check whether the sidebar/menu route is pointing correctly
+
+7. Check whether there are duplicate stock reconciliation page files
+
+8. Check whether any conditional rendering or feature flag is causing the old page to load
+
+9. Check whether build cache/hot reload failure could explain why the merged PR is not visible
+
+10. Check whether the PR only modified data logic but never replaced the UI component
+
+REQUIRED OUTPUT
+I do NOT want a new patch yet.
+
+I want a diagnosis in this exact format:
+
+1. LIVE ROUTE FILE:
+[path]
+
+2. LIVE RENDERED COMPONENT:
+[path]
+
+3. DID THE PR CREATE A NEW COMPONENT?
+[yes/no]
+If yes:
+[path]
+
+4. IS THE NEW COMPONENT ACTUALLY CONNECTED?
+[yes/no]
+
+5. IF NOT CONNECTED, WHY NOT?
+[exact reason]
+
+6. IS THE OLD COMPONENT STILL ACTIVE?
+[yes/no]
+If yes:
+[path]
+
+7. WHAT EXACTLY HAPPENED?
+Give a concise explanation of why nothing changed after merge.
+
+8. WHAT IS THE MINIMUM FIX REQUIRED?
+Do not apply it yet.
+Just state the minimum change needed.
+
+PROOF REQUIRED
+Show:
+- the route file path
+- the component import path
+- the actual rendered component path
+- any duplicate/orphaned file paths found
+
+FINAL RULE
+Do not start coding.
+This is analysis only.
+I want the truth about what is rendering right now before any further patch is attempted.
