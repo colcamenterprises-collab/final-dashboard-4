@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CartItem, CartModifier, OnlineCategory, OnlineProduct, OrderPayload } from "./types";
 
 type OnlineCatalogItem = OnlineProduct;
@@ -37,6 +37,8 @@ const saveLS = (k: string, v: unknown) => localStorage.setItem(k, JSON.stringify
 const lineUnitPrice = (item: CartItem) => item.product.price + item.modifiers.reduce((sum, mod) => sum + mod.priceDelta, 0);
 const lineTotal = (item: CartItem) => lineUnitPrice(item) * item.quantity;
 
+const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
 export default function App() {
   const [categories, setCategories] = useState<OnlineCategory[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>("");
@@ -56,6 +58,9 @@ export default function App() {
   const [customerNotes, setCustomerNotes] = useState("");
 
   const fontInjected = useRef(false);
+  const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
+  const categoryNavRef = useRef<HTMLDivElement>(null);
+  const scrolling = useRef(false);
 
   const productMap = useMemo(() => {
     const map = new Map<string, OnlineProduct>();
@@ -76,10 +81,6 @@ export default function App() {
 
   const subtotal = useMemo(() => cart.reduce((sum, item) => sum + lineTotal(item), 0), [cart]);
 
-  const activeProducts = useMemo(() => {
-    return categories.find((c) => c.name === activeCategory)?.items ?? [];
-  }, [categories, activeCategory]);
-
   useEffect(() => saveLS("sbb.cart", cart), [cart]);
 
   useEffect(() => {
@@ -99,7 +100,6 @@ export default function App() {
       existing.push(item);
       grouped.set(category, existing);
     }
-
     return Array.from(grouped.entries()).map(([name, categoryItems]) => ({ name, items: categoryItems }));
   };
 
@@ -121,7 +121,7 @@ export default function App() {
         : [];
       const nextCategories = buildCategories(normalizedItems);
       setCategories(nextCategories);
-      if ((!activeCategory || !nextCategories.some((c) => c.name === activeCategory)) && nextCategories.length > 0) {
+      if (nextCategories.length > 0) {
         setActiveCategory(nextCategories[0].name);
       }
     } catch (_error) {
@@ -135,12 +135,55 @@ export default function App() {
     fetchProducts();
   }, []);
 
-  const setQuantityForProduct = (productId: string, value: number) => {
-    setCardQty((prev) => ({
-      ...prev,
-      [productId]: Math.max(1, value),
-    }));
-  };
+  // IntersectionObserver — update active category as user scrolls
+  useEffect(() => {
+    if (categories.length === 0) return;
+
+    const observers: IntersectionObserver[] = [];
+
+    categories.forEach((cat) => {
+      const el = sectionRefs.current[cat.name];
+      if (!el) return;
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting && !scrolling.current) {
+              setActiveCategory(cat.name);
+            }
+          });
+        },
+        { rootMargin: "-20% 0px -70% 0px", threshold: 0 },
+      );
+      observer.observe(el);
+      observers.push(observer);
+    });
+
+    return () => {
+      observers.forEach((o) => o.disconnect());
+    };
+  }, [categories]);
+
+  const scrollToCategory = useCallback((categoryName: string) => {
+    const el = sectionRefs.current[categoryName];
+    if (!el) return;
+    setActiveCategory(categoryName);
+    scrolling.current = true;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setTimeout(() => { scrolling.current = false; }, 800);
+
+    // Scroll the category nav so the active tab is centered
+    const navEl = categoryNavRef.current;
+    if (navEl) {
+      const btn = navEl.querySelector(`[data-cat="${slugify(categoryName)}"]`) as HTMLElement;
+      if (btn) {
+        const btnLeft = btn.offsetLeft;
+        const btnWidth = btn.offsetWidth;
+        const navWidth = navEl.offsetWidth;
+        navEl.scrollTo({ left: btnLeft - navWidth / 2 + btnWidth / 2, behavior: "smooth" });
+      }
+    }
+  }, []);
 
   const openProductOptions = async (product: OnlineProduct) => {
     setSelectedProduct(product);
@@ -172,12 +215,10 @@ export default function App() {
       if (group.type === "single") {
         return { ...prev, [group.id]: [option.id] };
       }
-
       const exists = current.includes(option.id);
       if (exists) {
         return { ...prev, [group.id]: current.filter((id) => id !== option.id) };
       }
-
       if (current.length >= group.max) return prev;
       return { ...prev, [group.id]: [...current, option.id] };
     });
@@ -185,7 +226,6 @@ export default function App() {
 
   const addConfiguredItemToCart = (product: OnlineProduct) => {
     const qty = cardQty[product.id] ?? 1;
-
     const modifiers: CartModifier[] = [];
     for (const group of optionGroups) {
       const selectedIds = draftSelections[group.id] || [];
@@ -205,16 +245,7 @@ export default function App() {
         });
       }
     }
-
-    setCart((prev) => [
-      ...prev,
-      {
-        lineId: uid(),
-        product,
-        quantity: qty,
-        modifiers,
-      },
-    ]);
+    setCart((prev) => [...prev, { lineId: uid(), product, quantity: qty, modifiers }]);
     setSelectedProduct(null);
     setOptionGroups([]);
     setDraftSelections({});
@@ -223,11 +254,7 @@ export default function App() {
   const updateCartQty = (lineId: string, delta: number) => {
     setCart((prev) =>
       prev
-        .map((item) =>
-          item.lineId === lineId
-            ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-            : item,
-        )
+        .map((item) => item.lineId === lineId ? { ...item, quantity: Math.max(1, item.quantity + delta) } : item)
         .filter((item) => item.quantity > 0),
     );
   };
@@ -239,19 +266,9 @@ export default function App() {
   const submitOrder = async () => {
     setErrorMessage("");
     setSuccessMessage("");
-
-    if (cart.length === 0) {
-      setErrorMessage("Add items to your cart before checkout.");
-      return;
-    }
-
-    if (!customerName.trim() || !customerPhone.trim()) {
-      setErrorMessage("Customer name and phone are required.");
-      return;
-    }
-
+    if (cart.length === 0) { setErrorMessage("Add items to your cart before checkout."); return; }
+    if (!customerName.trim() || !customerPhone.trim()) { setErrorMessage("Customer name and phone are required."); return; }
     setSubmitting(true);
-
     try {
       const payload: OrderPayload = {
         channel: "ONLINE",
@@ -262,24 +279,16 @@ export default function App() {
         items: cart.map((item) => ({
           itemId: item.product.id,
           quantity: item.quantity,
-          modifiers: item.modifiers.map((mod) => ({
-            groupId: mod.groupId,
-            optionId: mod.optionId,
-          })),
+          modifiers: item.modifiers.map((mod) => ({ groupId: mod.groupId, optionId: mod.optionId })),
         })),
       };
-
       const response = await fetch("/api/online/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Order submission failed.");
-      }
-
+      if (!response.ok) throw new Error(data?.error || "Order submission failed.");
       setCart([]);
       setCheckoutOpen(false);
       setCustomerName("");
@@ -294,11 +303,19 @@ export default function App() {
   };
 
   if (loading) {
-    return <div className="min-h-screen bg-black text-white font-[Poppins]"><div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4"><h1 className="text-2xl font-semibold">Loading online menu...</h1></div></div>;
+    return (
+      <div className="min-h-screen bg-black text-white font-[Poppins]">
+        <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
+          <h1 className="text-2xl font-semibold">Loading online menu...</h1>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-black text-white font-[Poppins]">
+
+      {/* Header */}
       <div className="mx-auto w-full max-w-[700px] px-4 pt-8 pb-4">
         <div className="flex flex-col items-start">
           <div className="flex items-center gap-3">
@@ -309,106 +326,201 @@ export default function App() {
           </div>
           <p className="mt-2 text-sm text-white/70">Traditional American Smash Burgers — Opens at 6:00 pm</p>
         </div>
+      </div>
 
-        <div className="mt-5">
-          <div className="flex flex-wrap items-center gap-4">
-            {categories.map((category) => (
-              <button key={category.name} onClick={() => setActiveCategory(category.name)} className="relative pb-2 text-sm font-semibold">
-                <span className="opacity-90">{category.name.toUpperCase()}</span>
-                {activeCategory === category.name && <span className="absolute left-0 right-0 -bottom-[9px] h-[3px] rounded" style={{ background: SBB_YELLOW }} />}
-              </button>
-            ))}
+      {/* Sticky category nav */}
+      <div className="sticky top-0 z-40 bg-black/95 backdrop-blur border-b border-white/10">
+        <div className="mx-auto w-full max-w-[700px]">
+          <div
+            ref={categoryNavRef}
+            className="flex items-center gap-1 px-4 overflow-x-auto scrollbar-hide"
+            style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+          >
+            {categories.map((category) => {
+              const isActive = activeCategory === category.name;
+              return (
+                <button
+                  key={category.name}
+                  data-cat={slugify(category.name)}
+                  onClick={() => scrollToCategory(category.name)}
+                  className="relative flex-shrink-0 pb-3 pt-3 px-2 text-sm font-semibold transition-colors"
+                  style={{ color: isActive ? SBB_YELLOW : "rgba(255,255,255,0.7)" }}
+                >
+                  {category.name.toUpperCase()}
+                  {isActive && (
+                    <span
+                      className="absolute left-0 right-0 bottom-0 h-[3px] rounded"
+                      style={{ background: SBB_YELLOW }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
-          <div className="mt-3 h-px w-full bg-white/10" />
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-[700px] px-4">
-        <div className="mt-3 flex items-center gap-3"><div className="h-1.5 w-6 rounded-full" style={{ background: SBB_YELLOW }} /><h2 className="text-lg md:text-xl font-extrabold">{activeCategory ? activeCategory.toUpperCase() : ""}</h2></div>
-
+      {/* Vertical content */}
+      <div className="mx-auto w-full max-w-[700px] px-4 pb-4">
         {errorMessage && <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm">{errorMessage}</div>}
         {successMessage && <div className="mt-4 rounded-xl border border-green-500/40 bg-green-500/10 px-4 py-3 text-sm">{successMessage}</div>}
 
-        <div className="mt-4 space-y-4">
-          {activeProducts.map((product) => {
-            const qty = cardQty[product.id] ?? 1;
-            return (
-              <div key={product.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
-                <div className="flex items-center gap-4">
-                  <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">{product.image_url ? <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" /> : null}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold leading-tight">{product.name}</div>
-                    {product.description && <div className="text-sm text-white/70 line-clamp-2">{product.description}</div>}
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                  <div className="font-semibold">{THB(product.price)}</div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setQuantityForProduct(product.id, qty - 1)}>-</button>
-                      <div className="min-w-[24px] text-center">{qty}</div>
-                      <button className="border border-white/20 rounded-lg px-3 py-1" onClick={() => setQuantityForProduct(product.id, qty + 1)}>+</button>
+        {categories.map((category) => (
+          <section
+            key={category.name}
+            ref={(el) => { sectionRefs.current[category.name] = el; }}
+            className="mt-8"
+          >
+            {/* Category header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-1.5 w-6 rounded-full flex-shrink-0" style={{ background: SBB_YELLOW }} />
+              <h2 className="text-lg md:text-xl font-extrabold">{category.name.toUpperCase()}</h2>
+            </div>
+
+            {/* Items */}
+            <div className="space-y-4">
+              {category.items.map((product) => {
+                const qty = cardQty[product.id] ?? 1;
+                return (
+                  <div key={product.id} className="rounded-2xl bg-white/5 border border-white/10 px-4 py-3">
+                    <div className="flex items-center gap-4">
+                      <div className="h-14 w-14 rounded-lg bg-white/10 overflow-hidden flex-shrink-0">
+                        {product.image_url ? (
+                          <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+                        ) : null}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold leading-tight">{product.name}</div>
+                        {product.description && (
+                          <div className="text-sm text-white/70 line-clamp-2">{product.description}</div>
+                        )}
+                      </div>
                     </div>
-                    <button onClick={() => openProductOptions(product)} className="rounded-xl px-3 py-2 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }}>
-                      Select options
-                    </button>
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                      <div className="font-semibold">{THB(product.price)}</div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <button
+                            className="border border-white/20 rounded-lg px-3 py-1"
+                            onClick={() => setCardQty((prev) => ({ ...prev, [product.id]: Math.max(1, (prev[product.id] ?? 1) - 1) }))}
+                          >-</button>
+                          <div className="min-w-[24px] text-center">{qty}</div>
+                          <button
+                            className="border border-white/20 rounded-lg px-3 py-1"
+                            onClick={() => setCardQty((prev) => ({ ...prev, [product.id]: (prev[product.id] ?? 1) + 1 }))}
+                          >+</button>
+                        </div>
+                        <button
+                          onClick={() => openProductOptions(product)}
+                          className="rounded-xl px-3 py-2 text-sm font-semibold text-black"
+                          style={{ background: SBB_YELLOW }}
+                        >
+                          Select options
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div className="h-28" />
+                );
+              })}
+            </div>
+          </section>
+        ))}
+
+        <div className="h-40" />
       </div>
 
+      {/* Options modal */}
       {selectedProduct && (
-        <div className="fixed inset-0 z-[70] bg-black/70 flex items-end md:items-center justify-center p-4" onClick={() => setSelectedProduct(null)}>
-          <div className="w-full max-w-[560px] rounded-2xl border border-white/10 bg-black p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3"><h3 className="text-lg font-semibold">{selectedProduct.name}</h3><button className="text-sm underline text-white/70" onClick={() => setSelectedProduct(null)}>Close</button></div>
-            {loadingOptions ? <div className="mt-3 text-sm text-white/70">Loading options...</div> : (
-              <div className="mt-3 space-y-3">{optionGroups.map((group) => (
-                <div key={group.id} className="rounded-xl border border-white/10 p-3">
-                  <div className="font-semibold">{group.name}</div>
-                  <div className="text-xs text-white/60">min {group.min} · max {group.max} · {group.required ? "required" : "optional"}</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {group.options.map((option) => {
-                      const selected = (draftSelections[group.id] || []).includes(option.id);
-                      return (
-                        <button key={option.id} onClick={() => toggleOption(group, option)} className={`rounded-lg border px-3 py-2 text-sm ${selected ? "bg-white text-black" : "border-white/20"}`}>
-                          {option.name}{option.price_delta ? ` +${THB(option.price_delta)}` : ""}
-                        </button>
-                      );
-                    })}
+        <div
+          className="fixed inset-0 z-[70] bg-black/70 flex items-end md:items-center justify-center p-4"
+          onClick={() => setSelectedProduct(null)}
+        >
+          <div
+            className="w-full max-w-[560px] rounded-2xl border border-white/10 bg-black p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-lg font-semibold">{selectedProduct.name}</h3>
+              <button className="text-sm underline text-white/70" onClick={() => setSelectedProduct(null)}>Close</button>
+            </div>
+            {loadingOptions ? (
+              <div className="mt-3 text-sm text-white/70">Loading options...</div>
+            ) : (
+              <div className="mt-3 space-y-3">
+                {optionGroups.map((group) => (
+                  <div key={group.id} className="rounded-xl border border-white/10 p-3">
+                    <div className="font-semibold">{group.name}</div>
+                    <div className="text-xs text-white/60">min {group.min} · max {group.max} · {group.required ? "required" : "optional"}</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {group.options.map((option) => {
+                        const selected = (draftSelections[group.id] || []).includes(option.id);
+                        return (
+                          <button
+                            key={option.id}
+                            onClick={() => toggleOption(group, option)}
+                            className={`rounded-lg border px-3 py-2 text-sm ${selected ? "bg-white text-black" : "border-white/20"}`}
+                          >
+                            {option.name}{option.price_delta ? ` +${THB(option.price_delta)}` : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}</div>
+                ))}
+              </div>
             )}
-            <button className="mt-4 rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW }} onClick={() => addConfiguredItemToCart(selectedProduct)}>Add to cart</button>
+            <button
+              className="mt-4 rounded-xl px-4 py-3 text-sm font-semibold text-black"
+              style={{ background: SBB_YELLOW }}
+              onClick={() => addConfiguredItemToCart(selectedProduct)}
+            >
+              Add to cart
+            </button>
           </div>
         </div>
       )}
 
+      {/* Checkout modal */}
       {checkoutOpen && (
-        <div className="fixed inset-0 z-[75] bg-black/70 flex items-end md:items-center justify-center p-4" onClick={() => setCheckoutOpen(false)}>
-          <div className="w-full max-w-[560px] rounded-2xl border border-white/10 bg-black p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between"><h3 className="text-lg font-semibold">Checkout</h3><button className="text-sm underline text-white/70" onClick={() => setCheckoutOpen(false)}>Close</button></div>
+        <div
+          className="fixed inset-0 z-[75] bg-black/70 flex items-end md:items-center justify-center p-4"
+          onClick={() => setCheckoutOpen(false)}
+        >
+          <div
+            className="w-full max-w-[560px] rounded-2xl border border-white/10 bg-black p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold">Checkout</h3>
+              <button className="text-sm underline text-white/70" onClick={() => setCheckoutOpen(false)}>Close</button>
+            </div>
             <div className="mt-3 space-y-2">
               <input className="w-full rounded-lg border border-white/20 bg-transparent px-3 py-2" placeholder="Customer name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
               <input className="w-full rounded-lg border border-white/20 bg-transparent px-3 py-2" placeholder="Customer phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} />
               <textarea className="w-full rounded-lg border border-white/20 bg-transparent px-3 py-2" placeholder="Order notes" value={customerNotes} onChange={(e) => setCustomerNotes(e.target.value)} />
             </div>
-            <button className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW, opacity: submitting ? 0.5 : 1 }} onClick={submitOrder} disabled={submitting}>{submitting ? "Submitting..." : "Confirm order"}</button>
+            <button
+              className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold text-black"
+              style={{ background: SBB_YELLOW, opacity: submitting ? 0.5 : 1 }}
+              onClick={submitOrder}
+              disabled={submitting}
+            >
+              {submitting ? "Submitting..." : "Confirm order"}
+            </button>
           </div>
         </div>
       )}
 
+      {/* Cart bar */}
       <div className="fixed inset-x-0 bottom-0 z-50">
         <div className="mx-auto w-full max-w-[900px] px-3 pb-4">
           <div className="rounded-2xl border border-white/10 bg-black/90 backdrop-blur p-3 flex flex-col gap-3">
             <div className="flex flex-wrap items-center gap-3 text-xs md:text-sm">
               <div className="px-3 py-2 rounded-xl bg-white/10">{cart.length} item{cart.length !== 1 ? "s" : ""}</div>
               <div className="px-3 py-2 rounded-xl bg-white/10">Subtotal: {THB(subtotal)}</div>
-              {unavailableCartItems.length > 0 && <div className="px-3 py-2 rounded-xl bg-red-500/20 text-red-200">Some items are no longer available</div>}
+              {unavailableCartItems.length > 0 && (
+                <div className="px-3 py-2 rounded-xl bg-red-500/20 text-red-200">Some items are no longer available</div>
+              )}
             </div>
             <div className="space-y-3">
               {cart.map((item) => (
@@ -428,8 +540,18 @@ export default function App() {
                   </div>
                 </div>
               ))}
-              <div className="flex items-center justify-between text-sm font-semibold"><span>Total</span><span>{THB(subtotal)}</span></div>
-              <button className="rounded-xl px-4 py-3 text-sm font-semibold text-black" style={{ background: SBB_YELLOW, opacity: cart.length === 0 || unavailableCartItems.length > 0 ? 0.5 : 1 }} onClick={() => setCheckoutOpen(true)} disabled={cart.length === 0 || unavailableCartItems.length > 0}>Checkout</button>
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span>Total</span>
+                <span>{THB(subtotal)}</span>
+              </div>
+              <button
+                className="rounded-xl px-4 py-3 text-sm font-semibold text-black"
+                style={{ background: SBB_YELLOW, opacity: cart.length === 0 || unavailableCartItems.length > 0 ? 0.5 : 1 }}
+                onClick={() => setCheckoutOpen(true)}
+                disabled={cart.length === 0 || unavailableCartItems.length > 0}
+              >
+                Checkout
+              </button>
             </div>
           </div>
         </div>

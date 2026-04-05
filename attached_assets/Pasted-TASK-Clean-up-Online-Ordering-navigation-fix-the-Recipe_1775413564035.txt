@@ -1,0 +1,219 @@
+TASK: Clean up Online Ordering navigation, fix the Recipe → Online Ordering → Portal publish flow end-to-end, test it with a real product, and convert the portal to vertical scrolling with sticky category navigation
+
+READ CAREFULLY
+This is a direct implementation + testing task in Replit.
+Do not freestyle.
+Do not create a parallel online ordering system.
+Do not leave legacy admin paths exposed if they are redundant.
+Do not stop at code changes.
+You must test the full flow with a real product and prove it works.
+
+==================================================
+PART 1 — NAVIGATION CLEANUP
+==================================================
+
+REQUIRED CHANGES
+1. KEEP the large top-level "Online Ordering" button
+   - this remains the single entry point to the portal
+   - do not remove it
+
+2. REMOVE the redundant sidebar dropdown section:
+   - Online Ordering
+   - Catalog
+   - Portal
+
+Reason:
+- this is confusing and redundant
+- Catalog currently points to old/legacy admin behavior
+- Portal is duplicated by the large top button
+
+3. If the old Online Menu Admin / Catalog page is legacy and not the truth source:
+   - remove it from visible navigation
+   - do not leave users landing on “this page has been moved”
+
+Do not change unrelated sidebar sections.
+
+==================================================
+PART 2 — FIX THE REAL PUBLISH FLOW
+==================================================
+
+CORE REQUIREMENT
+Recipe / Menu Management must be the source of truth for online ordering visibility.
+
+That means:
+- if an item is marked live / added to online ordering in Recipe Management or Menu Management
+- that same item must appear in the Online Ordering portal
+- no second publishing step
+- no separate old catalog dependency
+
+CURRENT PROBLEM TO FIX
+A recipe/item can be marked:
+“now live in online ordering”
+but it still does not appear in the portal.
+
+This means the write path and the portal read path are disconnected.
+
+YOU MUST FIND AND FIX:
+1. what Recipe/Menu Management updates when “Add to online ordering” is selected
+2. what data source / table / API the portal actually reads from
+3. why they are disconnected
+4. make them use one truth source
+
+==================================================
+PART 3 — REQUIRED REAL TEST PRODUCT FLOW
+==================================================
+
+You must test with ONE REAL PRODUCT from Recipe/Menu Management.
+
+Use:
+- Triple Smash Burger
+or another real live burger item if that one is unsuitable
+
+TEST FLOW
+1. Open Recipe/Menu Management
+2. Choose a real item
+3. Mark it live / add to online ordering
+4. Save
+5. Open the Online Ordering portal using the large top button
+6. Confirm the exact item appears in the correct category
+7. Unpublish it
+8. Confirm it disappears
+9. Re-publish if needed after test
+
+You must follow the product end-to-end from:
+Recipe/Menu Management
+→ publish state
+→ portal data source
+→ portal display
+
+This is mandatory.
+
+==================================================
+PART 4 — PORTAL LAYOUT CHANGE
+==================================================
+
+The Online Ordering portal must be changed from tab/selection-based item display to a modern vertical scrolling layout.
+
+REQUIRED NEW PORTAL BEHAVIOR
+1. Categories remain accessible in the header/top navigation
+2. The item list itself must scroll vertically like a normal food ordering app
+3. Users should be able to browse all sections by vertical scroll on phone/tablet
+4. Category header nav should highlight the active category while the user scrolls
+
+TARGET EXPERIENCE
+- similar to common delivery/ordering apps
+- vertical content flow
+- category menu at top
+- active category updates as scroll position changes
+- tapping a category scrolls to that section
+- no “one tab at a time” item browsing
+
+REQUIRED STRUCTURE
+Portal page should behave like this:
+- top sticky category nav
+- vertically stacked category sections
+- each category section contains its items
+- smooth scroll to section when category clicked
+- active category visually highlighted during scrolling
+
+Do not redesign the whole portal unnecessarily.
+Only change it enough to achieve this correct browsing behavior.
+
+==================================================
+PART 5 — CATEGORY REQUIREMENTS
+==================================================
+
+The categories shown in the portal must come from the real item/category data being used by Menu/Recipe Management.
+
+At minimum:
+- burgers must show correct items
+- drinks must appear if drinks are published
+- category mapping must not silently drop published items
+
+If a published item has a category, it must render under that category in the portal.
+
+==================================================
+PART 6 — DO NOT DO THESE THINGS
+==================================================
+
+- do not keep both old Catalog admin and Recipe publishing as parallel systems
+- do not require publishing in two places
+- do not leave the old Online Ordering dropdown in the sidebar
+- do not break the top Online Ordering button
+- do not build a fake/static portal
+- do not use mock data if real data exists
+- do not leave the portal in tab-only mode
+- do not touch unrelated pages
+
+==================================================
+PART 7 — TESTING REQUIRED
+==================================================
+
+You must test the real frontend end-to-end.
+
+TEST 1 — Navigation cleanup
+- confirm Online Ordering dropdown is gone from sidebar
+- confirm Catalog is gone
+- confirm Portal submenu is gone
+- confirm top Online Ordering button remains
+
+TEST 2 — Portal access
+- confirm top Online Ordering button opens the portal correctly
+- confirm no dead/legacy routing issue remains
+
+TEST 3 — Real product publish flow
+- use a real product from Recipe/Menu Management
+- publish it to online ordering
+- confirm it appears in portal
+- unpublish it
+- confirm it disappears
+- confirm no second catalog step is needed
+
+TEST 4 — Category mapping
+- confirm item appears under correct category
+- confirm categories like drinks show if published items exist
+
+TEST 5 — Portal UX
+- confirm portal is now vertical scrolling
+- confirm category nav is sticky/top
+- confirm clicking category scrolls to section
+- confirm active category highlights while scrolling
+
+TEST 6 — Regression
+- Menu/Recipe Management still works
+- portal still loads
+- no console/runtime errors
+
+==================================================
+PART 8 — SCREENSHOT / PROOF REQUIRED
+==================================================
+
+Return screenshots showing:
+1. cleaned sidebar with no Online Ordering dropdown
+2. top Online Ordering button still visible
+3. Recipe/Menu Management with the real test product being marked live
+4. portal showing that same product live
+5. portal in vertical scroll layout
+6. category header highlighting while in scroll view if possible
+7. console clean if possible
+
+==================================================
+PART 9 — DELIVERABLE
+==================================================
+
+Return:
+1. full patch
+2. files changed
+3. exact root cause of the publish disconnect
+4. exact fix made
+5. test product used
+6. test results
+7. screenshot proof
+
+FINAL RULE
+This task is not complete unless:
+- the sidebar duplicate Online Ordering section is removed
+- the top Online Ordering button still works
+- a real product is followed from Recipe/Menu Management to the portal successfully
+- the portal is converted to vertical scroll with sticky/highlighting category navigation
+- screenshots prove it all works

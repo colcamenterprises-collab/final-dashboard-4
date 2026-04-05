@@ -134,13 +134,6 @@ const navigationGroups: NavGroup[] = [
     ]
   },
   {
-    title: "Online Ordering",
-    items: [
-      { to: "/online-ordering/catalog", label: "Catalog", icon: ShoppingBag, testId: "nav-online-ordering-catalog" },
-      { to: "/order", label: "Portal", icon: ShoppingBag, testId: "nav-online-ordering" }
-    ]
-  },
-  {
     title: "Membership",
     items: [
       { to: "/membership/dashboard", label: "Member Dashboard", icon: Users, testId: "nav-member-dashboard" },
