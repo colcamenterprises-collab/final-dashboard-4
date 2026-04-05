@@ -1,0 +1,164 @@
+Resolve this manually in the current Replit workspace. Do not use GitHub conflict tools. Do not reference PRs or branches. Do not generate a new redesign. Finish the live implementation directly.
+
+TASK
+Fix the Stock Reconciliation implementation by manually resolving the broken backend logic in:
+server/routes/analysis/stockReconciliation.ts
+
+GOAL
+Make the live page at:
+/analysis/stock-reconciliation
+use the final rebuilt Stock Reconciliation structure and correct stock logic.
+
+IMPORTANT
+Do NOT use “accept current/incoming/both” style conflict handling.
+Do NOT leave any conflict markers.
+Do NOT keep the old bloated Stock Reconciliation page.
+Do NOT touch unrelated pages.
+
+==================================================
+PART 1 — MANUAL BACKEND FIX
+==================================================
+
+Open:
+server/routes/analysis/stockReconciliation.ts
+
+There are two broken conflict sections around:
+- prev_drinks
+- curr_drinks
+
+Replace the prev_drinks CTE with this exact block:
+
+prev_drinks AS (
+  SELECT
+    curr.shift_date,
+    ${normalizeDrinkNameSql('e.key')} AS item_name,
+    SUM((e.value)::numeric)::int AS start_qty
+  FROM shift_data curr
+  LEFT JOIN shift_data prev
+    ON prev.shift_date = curr.shift_date - INTERVAL '1 day'
+  CROSS JOIN LATERAL jsonb_each_text(
+    CASE
+      WHEN jsonb_typeof(prev.drinks_end) = 'object' THEN prev.drinks_end
+      ELSE '{}'::jsonb
+    END
+  ) e
+  GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
+),
+
+Replace the curr_drinks CTE with this exact block:
+
+curr_drinks AS (
+  SELECT
+    curr.shift_date,
+    ${normalizeDrinkNameSql('e.key')} AS item_name,
+    SUM((e.value)::numeric)::int AS actual_end_qty
+  FROM shift_data curr
+  CROSS JOIN LATERAL jsonb_each_text(
+    CASE
+      WHEN jsonb_typeof(curr.drinks_end) = 'object' THEN curr.drinks_end
+      ELSE '{}'::jsonb
+    END
+  ) e
+  GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
+),
+
+==================================================
+PART 2 — BUSINESS LOGIC TO PRESERVE
+==================================================
+
+The stock reconciliation logic must remain:
+
+Start = previous completed shift closing
+Purchased = stock received during current shift
+Number Sold = actual sold from receipts/POS
+Expected End = Start + Purchased - Number Sold
+Actual End = closing stock from completed Daily Sales & Stock v2
+Variance = Actual End - Expected End
+
+The shift window rule remains:
+- shift is 5pm to 3am BKK
+- form submission time is not the shift boundary
+
+==================================================
+PART 3 — FRONTEND FINAL STATE
+==================================================
+
+After the backend fix, confirm the live Stock Reconciliation page is the rebuilt simplified version.
+
+It must show:
+
+1. Title:
+Stock Reconciliation
+
+2. Controls:
+- Shift selector
+- Category filter
+- Show Issues Only / Show All toggle
+Default = Show Issues Only
+
+3. Small summary cards only:
+- Items with Variance
+- Critical Issues
+- Overall Status
+
+4. ONE main table only:
+- Item
+- Start
+- Purchased
+- Number Sold
+- Expected End
+- Actual End
+- Variance
+- Status
+
+The page must NOT show:
+- Stock Reconciliation & Security
+- Security Analysis
+- Total Shifts Analyzed
+- Variance Issues
+- Items Tracked
+- Reconciliation Detail
+- endless zero rows
+- giant audit dump
+
+==================================================
+PART 4 — WORDING RULES
+==================================================
+
+Use these labels only:
+- Start
+- Purchased
+- Number Sold
+- Expected End
+- Actual End
+- Variance
+- Status
+
+Do NOT use “expected usage”.
+
+==================================================
+PART 5 — TESTING REQUIRED
+==================================================
+
+After editing, test the live app in Replit:
+
+1. App builds/runs
+2. No TypeScript/server errors
+3. /analysis/stock-reconciliation loads
+4. Old stock reconciliation page is gone
+5. Rebuilt simplified page is live
+6. No console/runtime errors
+7. No broken analysis routes
+
+==================================================
+PART 6 — DELIVERABLE
+==================================================
+
+Return:
+1. files changed
+2. concise explanation of what was manually fixed
+3. test results
+4. screenshots proving the rebuilt Stock Reconciliation page is now live
+
+FINAL RULE
+This is a direct manual fix in Replit. Do not do another redesign pass. Fix the backend logic, ensure the rebuilt page is live, test it, and prove it.

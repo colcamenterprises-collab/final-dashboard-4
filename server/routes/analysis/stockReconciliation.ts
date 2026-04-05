@@ -103,30 +103,34 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
 
     prev_drinks AS (
       SELECT
-        ss.shift_date,
-        ${normalizeDrinkNameSql("e.key")} AS item_name,
+        curr.shift_date,
+        ${normalizeDrinkNameSql('e.key')} AS item_name,
         SUM((e.value)::numeric)::int AS start_qty
-      FROM shift_sequence ss
+      FROM shift_data curr
+      LEFT JOIN shift_data prev
+        ON prev.shift_date = curr.shift_date - INTERVAL '1 day'
       CROSS JOIN LATERAL jsonb_each_text(
-        CASE WHEN jsonb_typeof(COALESCE(ss.prev_drinks_end, '{}'::jsonb)) = 'object'
-             THEN COALESCE(ss.prev_drinks_end, '{}'::jsonb)
-             ELSE '{}'::jsonb END
+        CASE
+          WHEN jsonb_typeof(prev.drinks_end) = 'object' THEN prev.drinks_end
+          ELSE '{}'::jsonb
+        END
       ) e
-      GROUP BY ss.shift_date, ${normalizeDrinkNameSql("e.key")}
+      GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
     ),
 
     curr_drinks AS (
       SELECT
-        ss.shift_date,
-        ${normalizeDrinkNameSql("e.key")} AS item_name,
+        curr.shift_date,
+        ${normalizeDrinkNameSql('e.key')} AS item_name,
         SUM((e.value)::numeric)::int AS actual_end_qty
-      FROM shift_sequence ss
+      FROM shift_data curr
       CROSS JOIN LATERAL jsonb_each_text(
-        CASE WHEN jsonb_typeof(ss.drinks_end) = 'object'
-             THEN ss.drinks_end
-             ELSE '{}'::jsonb END
+        CASE
+          WHEN jsonb_typeof(curr.drinks_end) = 'object' THEN curr.drinks_end
+          ELSE '{}'::jsonb
+        END
       ) e
-      GROUP BY ss.shift_date, ${normalizeDrinkNameSql("e.key")}
+      GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
     ),
 
     receipt_usage AS (
