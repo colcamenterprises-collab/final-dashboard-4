@@ -98,6 +98,7 @@ import POS from "./pages/pos/POS";
 import POSRegisterStatus from "./pages/pos/POSRegisterStatus";
 import POSCheckout from "./pages/pos/POSCheckout";
 import POSReceiptPreview from "./pages/pos/POSReceiptPreview";
+import CustomerDisplayPage from "./pages/pos/CustomerDisplayPage";
 import LiveStock from "./pages/stock/LiveStock";
 import IngredientUsage from "./pages/analysis/IngredientUsage";
 import StockVariance from "./pages/analysis/StockVariance";
@@ -261,6 +262,7 @@ export default function App() {
                 <Route path="/pos-register" element={<ProtectedRoute><POSRegisterStatus /></ProtectedRoute>} />
                 <Route path="/pos-checkout" element={<ProtectedRoute><POSCheckout /></ProtectedRoute>} />
                 <Route path="/pos-receipt" element={<ProtectedRoute><POSReceiptPreview /></ProtectedRoute>} />
+                <Route path="/pos/customer-display" element={<ProtectedRoute><CustomerDisplayPage /></ProtectedRoute>} />
 
                 <Route path="/stock-live" element={<ProtectedRoute><LiveStock /></ProtectedRoute>} />
 

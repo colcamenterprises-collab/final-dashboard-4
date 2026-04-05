@@ -1803,6 +1803,7 @@ model orders_v2 {
   kdsUpdatedAt    DateTime @updatedAt
 
   items           order_items_v2[]
+  kdsEvents       KDSQueue[]
   restaurantId    String?
 }
 
@@ -1826,6 +1827,16 @@ model order_modifiers_v2 {
 
   name        String
   price       Float
+}
+
+model KDSQueue {
+  id        String    @id @default(cuid())
+  orderId   String
+  order     orders_v2 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  timestamp DateTime  @default(now())
+
+  @@index([orderId, timestamp])
 }
 
 // PATCH O3 — ORDER NUMBER SEQUENCE
