@@ -1,9 +1,11 @@
 import express from "express";
 import multer from "multer";
 import { processPosCsv, getShiftSummary } from "../services/posUploadService";
+import posBlazeRouter from "./posBlaze";
 
 const upload = multer({ dest: "uploads/" });
 const router = express.Router();
+router.use(posBlazeRouter);
 
 router.post("/upload", upload.single("file"), async (req, res) => {
   console.log("🔥 POS UPLOAD HANDLER CALLED");
