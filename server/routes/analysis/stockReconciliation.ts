@@ -7,7 +7,7 @@ interface ReconciliationRow {
   item_name: string;
   start_qty: number;
   purchased_qty: number;
-  used_qty: number;
+  number_sold_qty: number;
   expected_end_qty: number;
   actual_end_qty: number;
   variance: number;
@@ -33,13 +33,13 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
     throw new Error("Invalid date format. Use YYYY-MM-DD");
   }
 
-  const dateFilter = date ? `WHERE q.shift_date = '${date}'::date` : '';
+  const dateFilter = date ? `WHERE q.shift_date = '${date}'::date` : "";
 
   const query = `
     WITH latest_form2 AS (
       SELECT
         ds.shift_date::date AS shift_date,
-        dsv2."burgerBuns" AS rolls_end,
+        dsv2."burgerBuns" AS buns_end,
         dsv2."meatWeightG" AS meat_end_g,
         COALESCE(dsv2."drinksJson", '{}'::jsonb) AS drinks_end,
         ROW_NUMBER() OVER (
@@ -52,15 +52,27 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
     ),
 
     shift_data AS (
-      SELECT shift_date, rolls_end, meat_end_g, drinks_end
+      SELECT shift_date, buns_end, meat_end_g, drinks_end
       FROM latest_form2
       WHERE rn = 1
     ),
 
-    purchased_rolls AS (
+    shift_sequence AS (
+      SELECT
+        shift_date,
+        buns_end,
+        meat_end_g,
+        drinks_end,
+        LAG(buns_end) OVER (ORDER BY shift_date) AS prev_buns_end,
+        LAG(meat_end_g) OVER (ORDER BY shift_date) AS prev_meat_end_g,
+        LAG(drinks_end) OVER (ORDER BY shift_date) AS prev_drinks_end
+      FROM shift_data
+    ),
+
+    purchased_buns AS (
       SELECT
         date::date AS shift_date,
-        COALESCE(SUM(CASE WHEN rolls_pcs > 0 THEN rolls_pcs ELSE 0 END), 0) AS purchased_qty
+        COALESCE(SUM(CASE WHEN rolls_pcs > 0 THEN rolls_pcs ELSE 0 END), 0)::int AS purchased_qty
       FROM purchase_tally
       GROUP BY date::date
     ),
@@ -68,7 +80,7 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
     purchased_meat AS (
       SELECT
         date::date AS shift_date,
-        COALESCE(SUM(CASE WHEN meat_grams > 0 THEN meat_grams ELSE 0 END), 0) AS purchased_g
+        COALESCE(SUM(CASE WHEN meat_grams > 0 THEN meat_grams ELSE 0 END), 0)::int AS purchased_g
       FROM purchase_tally
       GROUP BY date::date
     ),
@@ -76,11 +88,11 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
     purchased_drinks_raw AS (
       SELECT
         pt.date::date AS shift_date,
-        ${normalizeDrinkNameSql('ptd.item_name')} AS item_name,
-        COALESCE(SUM(ptd.qty), 0) AS purchased_qty
+        ${normalizeDrinkNameSql("ptd.item_name")} AS item_name,
+        COALESCE(SUM(ptd.qty), 0)::int AS purchased_qty
       FROM purchase_tally_drink ptd
       JOIN purchase_tally pt ON pt.id = ptd.tally_id
-      GROUP BY pt.date::date, ${normalizeDrinkNameSql('ptd.item_name')}
+      GROUP BY pt.date::date, ${normalizeDrinkNameSql("ptd.item_name")}
     ),
 
     purchased_drinks AS (
@@ -91,23 +103,22 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
 
     prev_drinks AS (
       SELECT
-        curr.shift_date,
-        ${normalizeDrinkNameSql('e.key')} AS item_name,
+        ss.shift_date,
+        ${normalizeDrinkNameSql("e.key")} AS item_name,
         SUM((e.value)::numeric)::int AS start_qty
-      FROM shift_data curr
-      JOIN shift_data prev ON prev.shift_date = curr.shift_date - INTERVAL '1 day'
-      CROSS JOIN LATERAL jsonb_each_text(prev.drinks_end) e
-      GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
+      FROM shift_sequence ss
+      CROSS JOIN LATERAL jsonb_each_text(COALESCE(ss.prev_drinks_end, '{}'::jsonb)) e
+      GROUP BY ss.shift_date, ${normalizeDrinkNameSql("e.key")}
     ),
 
     curr_drinks AS (
       SELECT
-        curr.shift_date,
-        ${normalizeDrinkNameSql('e.key')} AS item_name,
+        ss.shift_date,
+        ${normalizeDrinkNameSql("e.key")} AS item_name,
         SUM((e.value)::numeric)::int AS actual_end_qty
-      FROM shift_data curr
-      CROSS JOIN LATERAL jsonb_each_text(curr.drinks_end) e
-      GROUP BY curr.shift_date, ${normalizeDrinkNameSql('e.key')}
+      FROM shift_sequence ss
+      CROSS JOIN LATERAL jsonb_each_text(ss.drinks_end) e
+      GROUP BY ss.shift_date, ${normalizeDrinkNameSql("e.key")}
     ),
 
     receipt_usage AS (
@@ -149,36 +160,34 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
     SELECT *
     FROM (
       SELECT
-        curr.shift_date::text,
-        'rolls' AS item_type,
+        ss.shift_date::text,
+        'buns' AS item_type,
         'Burger Buns' AS item_name,
-        COALESCE(prev.rolls_end, 0)::int AS start_qty,
-        COALESCE(pr.purchased_qty, 0)::int AS purchased_qty,
-        (COALESCE(prev.rolls_end, 0) + COALESCE(pr.purchased_qty, 0) - COALESCE(curr.rolls_end, 0))::int AS used_qty,
-        COALESCE(ru.buns_sold, 0)::int AS expected_end_qty,
-        COALESCE(curr.rolls_end, 0)::int AS actual_end_qty,
-        ((COALESCE(prev.rolls_end, 0) + COALESCE(pr.purchased_qty, 0) - COALESCE(curr.rolls_end, 0)) - COALESCE(ru.buns_sold, 0))::int AS variance
-      FROM shift_data curr
-      LEFT JOIN shift_data prev ON prev.shift_date = curr.shift_date - INTERVAL '1 day'
-      LEFT JOIN purchased_rolls pr ON pr.shift_date = curr.shift_date
-      LEFT JOIN receipt_usage ru ON ru.shift_date = curr.shift_date
+        COALESCE(ss.prev_buns_end, 0)::int AS start_qty,
+        COALESCE(pb.purchased_qty, 0)::int AS purchased_qty,
+        COALESCE(ru.buns_sold, 0)::int AS number_sold_qty,
+        (COALESCE(ss.prev_buns_end, 0) + COALESCE(pb.purchased_qty, 0) - COALESCE(ru.buns_sold, 0))::int AS expected_end_qty,
+        COALESCE(ss.buns_end, 0)::int AS actual_end_qty,
+        (COALESCE(ss.buns_end, 0) - (COALESCE(ss.prev_buns_end, 0) + COALESCE(pb.purchased_qty, 0) - COALESCE(ru.buns_sold, 0)))::int AS variance
+      FROM shift_sequence ss
+      LEFT JOIN purchased_buns pb ON pb.shift_date = ss.shift_date
+      LEFT JOIN receipt_usage ru ON ru.shift_date = ss.shift_date
 
       UNION ALL
 
       SELECT
-        curr.shift_date::text,
+        ss.shift_date::text,
         'meat' AS item_type,
-        'Minced Meat (g)' AS item_name,
-        COALESCE(prev.meat_end_g, 0)::int AS start_qty,
+        'Meat (g)' AS item_name,
+        COALESCE(ss.prev_meat_end_g, 0)::int AS start_qty,
         COALESCE(pm.purchased_g, 0)::int AS purchased_qty,
-        (COALESCE(prev.meat_end_g, 0) + COALESCE(pm.purchased_g, 0) - COALESCE(curr.meat_end_g, 0))::int AS used_qty,
-        COALESCE(ru.meat_sold_g, 0)::int AS expected_end_qty,
-        COALESCE(curr.meat_end_g, 0)::int AS actual_end_qty,
-        ((COALESCE(prev.meat_end_g, 0) + COALESCE(pm.purchased_g, 0) - COALESCE(curr.meat_end_g, 0)) - COALESCE(ru.meat_sold_g, 0))::int AS variance
-      FROM shift_data curr
-      LEFT JOIN shift_data prev ON prev.shift_date = curr.shift_date - INTERVAL '1 day'
-      LEFT JOIN purchased_meat pm ON pm.shift_date = curr.shift_date
-      LEFT JOIN receipt_usage ru ON ru.shift_date = curr.shift_date
+        COALESCE(ru.meat_sold_g, 0)::int AS number_sold_qty,
+        (COALESCE(ss.prev_meat_end_g, 0) + COALESCE(pm.purchased_g, 0) - COALESCE(ru.meat_sold_g, 0))::int AS expected_end_qty,
+        COALESCE(ss.meat_end_g, 0)::int AS actual_end_qty,
+        (COALESCE(ss.meat_end_g, 0) - (COALESCE(ss.prev_meat_end_g, 0) + COALESCE(pm.purchased_g, 0) - COALESCE(ru.meat_sold_g, 0)))::int AS variance
+      FROM shift_sequence ss
+      LEFT JOIN purchased_meat pm ON pm.shift_date = ss.shift_date
+      LEFT JOIN receipt_usage ru ON ru.shift_date = ss.shift_date
 
       UNION ALL
 
@@ -188,10 +197,10 @@ export async function getStockReconciliation(date?: string): Promise<Reconciliat
         dk.item_name,
         COALESCE(pd.start_qty, 0)::int AS start_qty,
         COALESCE(prd.purchased_qty, 0)::int AS purchased_qty,
-        (COALESCE(pd.start_qty, 0) + COALESCE(prd.purchased_qty, 0) - COALESCE(cd.actual_end_qty, 0))::int AS used_qty,
-        COALESCE(ds.number_sold, 0)::int AS expected_end_qty,
+        COALESCE(ds.number_sold, 0)::int AS number_sold_qty,
+        (COALESCE(pd.start_qty, 0) + COALESCE(prd.purchased_qty, 0) - COALESCE(ds.number_sold, 0))::int AS expected_end_qty,
         COALESCE(cd.actual_end_qty, 0)::int AS actual_end_qty,
-        ((COALESCE(pd.start_qty, 0) + COALESCE(prd.purchased_qty, 0) - COALESCE(cd.actual_end_qty, 0)) - COALESCE(ds.number_sold, 0))::int AS variance
+        (COALESCE(cd.actual_end_qty, 0) - (COALESCE(pd.start_qty, 0) + COALESCE(prd.purchased_qty, 0) - COALESCE(ds.number_sold, 0)))::int AS variance
       FROM drink_keys dk
       LEFT JOIN prev_drinks pd ON pd.shift_date = dk.shift_date AND pd.item_name = dk.item_name
       LEFT JOIN curr_drinks cd ON cd.shift_date = dk.shift_date AND cd.item_name = dk.item_name

@@ -1,10 +1,19 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { StockPurchaseTables } from "@/components/StockPurchaseTables";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle2, Shield, TrendingDown } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
+type CategoryFilter = "all" | "buns" | "meat" | "drinks" | "other";
 
 interface ReconciliationRow {
   shift_date: string;
@@ -12,10 +21,35 @@ interface ReconciliationRow {
   item_name: string;
   start_qty: number;
   purchased_qty: number;
-  used_qty: number;
+  number_sold_qty: number;
   expected_end_qty: number;
   actual_end_qty: number;
   variance: number;
+}
+
+function normalizeItemType(itemType: string): CategoryFilter {
+  if (itemType === "buns" || itemType === "meat" || itemType === "drinks") {
+    return itemType;
+  }
+  return "other";
+}
+
+function getStatus(row: ReconciliationRow): "OK" | "Warning" | "Critical" {
+  const absVariance = Math.abs(row.variance);
+
+  if (row.variance === 0) return "OK";
+  if (normalizeItemType(row.item_type) === "meat") {
+    return absVariance >= 500 ? "Critical" : "Warning";
+  }
+
+  return absVariance >= 3 ? "Critical" : "Warning";
+}
+
+function formatQty(row: ReconciliationRow, value: number): string {
+  if (normalizeItemType(row.item_type) === "meat") {
+    return `${Math.round(value)} g`;
+  }
+  return `${Math.round(value)}`;
 }
 
 export default function StockReconciliation() {
@@ -23,239 +57,198 @@ export default function StockReconciliation() {
     queryKey: ["/api/analysis/stock-reconciliation"],
   });
 
-  const rows = data?.data || [];
+  const allRows = data?.data || [];
 
-  const groupedByDate = rows.reduce((acc, row) => {
-    if (!acc[row.shift_date]) {
-      acc[row.shift_date] = [];
+  const shiftDates = useMemo(
+    () => Array.from(new Set(allRows.map((row) => row.shift_date))).sort((a, b) => b.localeCompare(a)),
+    [allRows],
+  );
+
+  const [selectedShift, setSelectedShift] = useState<string>("");
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
+  const [showIssuesOnly, setShowIssuesOnly] = useState(true);
+
+  const effectiveShift = selectedShift || shiftDates[0] || "";
+
+  const filteredRows = useMemo(() => {
+    let rows = allRows;
+
+    if (effectiveShift) {
+      rows = rows.filter((row) => row.shift_date === effectiveShift);
     }
-    acc[row.shift_date].push(row);
-    return acc;
-  }, {} as Record<string, ReconciliationRow[]>);
 
-  const getVarianceStatus = (row: ReconciliationRow) => {
-    const variance = row.variance;
-    if (row.item_type === "meat") {
-      if (Math.abs(variance) > 500) return "critical";
-      if (Math.abs(variance) > 200) return "warning";
-    } else {
-      if (variance !== 0) return variance < -2 ? "critical" : "warning";
+    if (categoryFilter !== "all") {
+      rows = rows.filter((row) => normalizeItemType(row.item_type) === categoryFilter);
     }
-    return "ok";
-  };
 
-  const formatVariance = (row: ReconciliationRow) => {
-    const variance = row.variance;
-    if (row.item_type === "meat") {
-      return `${variance >= 0 ? "+" : ""}${(variance / 1000).toFixed(2)} kg`;
+    if (showIssuesOnly) {
+      rows = rows.filter((row) => row.variance !== 0);
     }
-    return `${variance >= 0 ? "+" : ""}${variance}`;
-  };
 
-  const totalIssues = rows.filter((r) => getVarianceStatus(r) !== "ok").length;
+    return rows;
+  }, [allRows, effectiveShift, categoryFilter, showIssuesOnly]);
+
+  const shiftRows = useMemo(() => {
+    if (!effectiveShift) return [];
+    return allRows.filter((row) => row.shift_date === effectiveShift);
+  }, [allRows, effectiveShift]);
+
+  const varianceItems = shiftRows.filter((row) => row.variance !== 0).length;
+  const criticalItems = shiftRows.filter((row) => getStatus(row) === "Critical").length;
+  const overallStatus = criticalItems > 0 ? "Critical" : varianceItems > 0 ? "Warning" : "OK";
 
   if (error) {
     return (
-      <div className="p-6">
-        <Card className="border-red-200 bg-white">
-          <CardContent className="p-6">
-            <p className="text-red-600">Failed to load reconciliation data</p>
-          </CardContent>
+      <div className="p-4">
+        <Card>
+          <CardContent className="p-4 text-red-600">Failed to load stock reconciliation data.</CardContent>
         </Card>
       </div>
     );
   }
 
   return (
-    <div className="admin-page p-4 space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900" data-testid="heading-stock-reconciliation">
-            Stock Reconciliation & Security
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Shift balancing, theft visibility, deterministic reconciliation
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-emerald-600" />
-          <span className="text-sm font-medium text-slate-600">Security Analysis</span>
-        </div>
-      </div>
+    <div className="admin-page p-4 space-y-4" data-testid="page-stock-reconciliation">
+      <h1 className="text-2xl md:text-3xl font-bold text-slate-900" data-testid="heading-stock-reconciliation">
+        Stock Reconciliation
+      </h1>
 
-      <div className="grid grid-cols-3 gap-4">
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Total Shifts Analyzed</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {isLoading ? <Skeleton className="h-8 w-12" /> : Object.keys(groupedByDate).length}
-                </p>
-              </div>
-              <CheckCircle2 className="h-8 w-8 text-emerald-500" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Variance Issues</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {isLoading ? <Skeleton className="h-8 w-12" /> : totalIssues}
-                </p>
-              </div>
-              {totalIssues > 0 ? (
-                <AlertTriangle className="h-8 w-8 text-amber-500" />
+      <Card>
+        <CardContent className="p-3 md:p-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <p className="text-xs text-slate-500 mb-1">Shift</p>
+              {isLoading ? (
+                <Skeleton className="h-10 w-full" />
               ) : (
-                <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                <Select value={effectiveShift} onValueChange={setSelectedShift}>
+                  <SelectTrigger data-testid="select-shift-reconciliation">
+                    <SelectValue placeholder="Select shift" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shiftDates.map((shiftDate) => (
+                      <SelectItem key={shiftDate} value={shiftDate}>
+                        {shiftDate}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
             </div>
-          </CardContent>
-        </Card>
 
-        <Card className="bg-white border-slate-200">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-slate-500">Items Tracked</p>
-                <p className="text-2xl font-bold text-slate-900">
-                  {isLoading ? <Skeleton className="h-8 w-12" /> : rows.length}
-                </p>
+            <div>
+              <p className="text-xs text-slate-500 mb-1">Category</p>
+              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value as CategoryFilter)}>
+                <SelectTrigger data-testid="select-category-reconciliation">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="buns">Buns</SelectItem>
+                  <SelectItem value="meat">Meat</SelectItem>
+                  <SelectItem value="drinks">Drinks</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <p className="text-xs text-slate-500 mb-1">Rows</p>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant={showIssuesOnly ? "default" : "outline"}
+                  onClick={() => setShowIssuesOnly(true)}
+                  data-testid="toggle-issues-only"
+                >
+                  Show Issues Only
+                </Button>
+                <Button
+                  size="sm"
+                  variant={!showIssuesOnly ? "default" : "outline"}
+                  onClick={() => setShowIssuesOnly(false)}
+                  data-testid="toggle-show-all"
+                >
+                  Show All
+                </Button>
               </div>
-              <TrendingDown className="h-8 w-8 text-slate-400" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="bg-white border-slate-200">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-slate-700">Reconciliation Detail</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="space-y-2 p-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <Skeleton key={i} className="h-12 w-full" />
-              ))}
-            </div>
-          ) : rows.length === 0 ? (
-            <div className="text-center py-8 text-slate-500">
-              <p>No reconciliation data available</p>
-              <p className="text-xs mt-1">Submit daily stock forms to see data here</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto w-full" style={{ WebkitOverflowScrolling: 'touch' }}>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="text-xs">Date</TableHead>
-                  <TableHead className="text-xs">Item</TableHead>
-                  <TableHead className="text-xs text-right">Opening</TableHead>
-                  <TableHead className="text-xs text-right">Received</TableHead>
-                  <TableHead className="text-xs text-right">Physical Used</TableHead>
-                  <TableHead className="text-xs text-right">Number Sold</TableHead>
-                  <TableHead className="text-xs text-right">Closing</TableHead>
-                  <TableHead className="text-xs text-right">Variance</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row, i) => {
-                  const status = getVarianceStatus(row);
-                  const isMeat = row.item_type === "meat";
-                  return (
-                    <TableRow
-                      key={i}
-                      className={
-                        status === "critical"
-                          ? "bg-red-100/40"
-                          : status === "warning"
-                          ? "bg-amber-100/40"
-                          : ""
-                      }
-                      data-testid={`row-reconciliation-${i}`}
-                    >
-                      <TableCell className="text-xs font-medium">{row.shift_date}</TableCell>
-                      <TableCell className="text-xs">{row.item_name}</TableCell>
-                      <TableCell className="text-xs text-right">
-                        {isMeat ? `${(row.start_qty / 1000).toFixed(1)}kg` : row.start_qty}
-                      </TableCell>
-                      <TableCell className="text-xs text-right">
-                        {isMeat ? `${(row.purchased_qty / 1000).toFixed(1)}kg` : row.purchased_qty}
-                      </TableCell>
-                      <TableCell className="text-xs text-right">
-                        {isMeat ? `${(row.used_qty / 1000).toFixed(1)}kg` : row.used_qty}
-                      </TableCell>
-                      <TableCell className="text-xs text-right">
-                        {isMeat ? `${(row.expected_end_qty / 1000).toFixed(1)}kg` : row.expected_end_qty}
-                      </TableCell>
-                      <TableCell className="text-xs text-right">
-                        {isMeat ? `${(row.actual_end_qty / 1000).toFixed(1)}kg` : row.actual_end_qty}
-                      </TableCell>
-                      <TableCell className="text-xs text-right font-bold">
-                        <span
-                          className={
-                            status === "critical"
-                              ? "text-red-600"
-                              : status === "warning"
-                              ? "text-amber-600"
-                              : "text-emerald-600"
-                          }
-                        >
-                          {formatVariance(row)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            status === "critical"
-                              ? "destructive"
-                              : status === "warning"
-                              ? "secondary"
-                              : "outline"
-                          }
-                          className="text-xs"
-                        >
-                          {status === "ok" ? "OK" : status === "warning" ? "Check" : "Alert"}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card className="bg-white border-slate-200">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-slate-700">Security Rules</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-3 gap-4 text-xs">
-            <div className="p-3 rounded-[4px] border border-slate-200">
-              <p className="font-medium text-slate-700">Rolls</p>
-              <p className="text-slate-500 mt-1">Variance ≠ 0 → Flag for review</p>
-            </div>
-            <div className="p-3 rounded-[4px] border border-slate-200">
-              <p className="font-medium text-slate-700">Meat</p>
-              <p className="text-slate-500 mt-1">Variance &gt; ±0.5 kg → Flag for review</p>
-            </div>
-            <div className="p-3 rounded-[4px] border border-slate-200">
-              <p className="font-medium text-slate-700">Drinks</p>
-              <p className="text-slate-500 mt-1">Variance ≠ 0 → Flag for review</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <StockPurchaseTables />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-slate-500">Items with Variance</p>
+            <p className="text-2xl font-semibold text-slate-900" data-testid="metric-variance-items">{varianceItems}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-slate-500">Critical Issues</p>
+            <p className="text-2xl font-semibold text-slate-900" data-testid="metric-critical-items">{criticalItems}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-slate-500">Overall Status</p>
+            <p className="text-2xl font-semibold text-slate-900" data-testid="metric-overall-status">{overallStatus}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-4 space-y-2">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          ) : filteredRows.length === 0 ? (
+            <div className="p-6 text-center text-slate-500">No rows for current filters.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Item</TableHead>
+                    <TableHead className="text-right">Start</TableHead>
+                    <TableHead className="text-right">Purchased</TableHead>
+                    <TableHead className="text-right">Number Sold</TableHead>
+                    <TableHead className="text-right">Expected End</TableHead>
+                    <TableHead className="text-right">Actual End</TableHead>
+                    <TableHead className="text-right">Variance</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredRows.map((row, index) => {
+                    const status = getStatus(row);
+                    return (
+                      <TableRow key={`${row.shift_date}-${row.item_name}-${index}`} data-testid={`row-reconciliation-${index}`}>
+                        <TableCell className="font-medium whitespace-nowrap">{row.item_name}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">{formatQty(row, row.start_qty)}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">{formatQty(row, row.purchased_qty)}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">{formatQty(row, row.number_sold_qty)}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">{formatQty(row, row.expected_end_qty)}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">{formatQty(row, row.actual_end_qty)}</TableCell>
+                        <TableCell className="text-right whitespace-nowrap">{formatQty(row, row.variance)}</TableCell>
+                        <TableCell>
+                          <Badge variant={status === "Critical" ? "destructive" : status === "Warning" ? "secondary" : "outline"}>
+                            {status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
