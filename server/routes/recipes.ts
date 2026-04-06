@@ -35,6 +35,12 @@ function cleanMoney(v: any) {
   return isFinite(n) ? n : 0;
 }
 
+function cleanNonNegativeNumber(v: any) {
+  const n = Number(v ?? 0);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return n;
+}
+
 const LOCKED_RECIPE_TEMPLATES = [
   { name: "Cheesy Bacon Fries", sku: "10010", category: "Side Orders", salePrice: 119 },
   { name: "Coleslaw with Bacon", sku: "10025", category: "Side Orders", salePrice: 99 },
@@ -387,7 +393,10 @@ router.get('/v2', async (_req, res) => {
     await seedLockedRecipeTemplates();
 
     const rowsResult = await pool.query(`
-      SELECT id, name, description, category, suggested_price, notes, image_url, updated_at
+      SELECT id, name, description, category, suggested_price, notes, image_url, updated_at,
+             COALESCE(service_minutes, 0) AS service_minutes,
+             COALESCE(prep_allocation_minutes, 0) AS prep_allocation_minutes,
+             COALESCE(packaging_minutes, 0) AS packaging_minutes
       FROM recipes
       WHERE notes LIKE $1
       ORDER BY name ASC
@@ -408,6 +417,13 @@ router.get('/v2', async (_req, res) => {
         salePrice: Number(row.suggested_price ?? 0),
         description: row.description ?? '',
         imageUrl: meta?.imageUrl || row.image_url || '',
+        serviceMinutes: cleanNonNegativeNumber(row.service_minutes),
+        prepAllocationMinutes: cleanNonNegativeNumber(row.prep_allocation_minutes),
+        packagingMinutes: cleanNonNegativeNumber(row.packaging_minutes),
+        effectiveItemMinutes:
+          cleanNonNegativeNumber(row.service_minutes) +
+          cleanNonNegativeNumber(row.prep_allocation_minutes) +
+          cleanNonNegativeNumber(row.packaging_minutes),
         published: Boolean(meta?.onlinePublishing?.published),
         publishedAt: meta?.onlinePublishing?.publishedAt || null,
         updatedAt: row.updated_at,
@@ -432,7 +448,10 @@ router.get('/v2/:id', async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
     const result = await pool.query(`
-      SELECT id, name, description, category, suggested_price, notes, image_url
+      SELECT id, name, description, category, suggested_price, notes, image_url,
+             COALESCE(service_minutes, 0) AS service_minutes,
+             COALESCE(prep_allocation_minutes, 0) AS prep_allocation_minutes,
+             COALESCE(packaging_minutes, 0) AS packaging_minutes
       FROM recipes
       WHERE id = $1
       LIMIT 1
@@ -443,6 +462,9 @@ router.get('/v2/:id', async (req, res) => {
     if (!meta?.sku || !LOCKED_RECIPE_TEMPLATES.some((t) => t.sku === meta.sku)) {
       return res.status(404).json({ error: 'Not found' });
     }
+    const serviceMinutes = cleanNonNegativeNumber(row.service_minutes);
+    const prepAllocationMinutes = cleanNonNegativeNumber(row.prep_allocation_minutes);
+    const packagingMinutes = cleanNonNegativeNumber(row.packaging_minutes);
     res.json({
       id: row.id,
       name: row.name,
@@ -464,6 +486,10 @@ router.get('/v2/:id', async (req, res) => {
       packaging: Array.isArray(meta.packaging) ? meta.packaging : [],
       labour: Array.isArray(meta.labour) ? meta.labour : [],
       other: Array.isArray(meta.other) ? meta.other : [],
+      serviceMinutes,
+      prepAllocationMinutes,
+      packagingMinutes,
+      effectiveItemMinutes: serviceMinutes + prepAllocationMinutes + packagingMinutes,
     });
   } catch (error) {
     console.error('[recipes/v2/:id] Error:', error);
@@ -476,7 +502,10 @@ router.put('/v2/:id', async (req, res) => {
     await seedLockedRecipeTemplates();
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) return res.status(400).json({ error: 'Invalid id' });
-    const source = await pool.query('SELECT name, category, notes FROM recipes WHERE id = $1 LIMIT 1', [id]);
+    const source = await pool.query(
+      'SELECT name, category, notes, service_minutes, prep_allocation_minutes, packaging_minutes FROM recipes WHERE id = $1 LIMIT 1',
+      [id],
+    );
     const current = source.rows[0];
     if (!current) return res.status(404).json({ error: 'Not found' });
     const currentMeta = parseRecipeMeta(current.notes);
@@ -486,6 +515,9 @@ router.put('/v2/:id', async (req, res) => {
 
     const payload = req.body ?? {};
     const directPrice = cleanMoney(payload.directPrice ?? payload.salePrice ?? 0);
+    const serviceMinutes = cleanNonNegativeNumber(payload.serviceMinutes ?? current.service_minutes ?? 0);
+    const prepAllocationMinutes = cleanNonNegativeNumber(payload.prepAllocationMinutes ?? current.prep_allocation_minutes ?? 0);
+    const packagingMinutes = cleanNonNegativeNumber(payload.packagingMinutes ?? current.packaging_minutes ?? 0);
     const nextMeta = {
       ...currentMeta,
       sku: currentMeta.sku,
@@ -509,7 +541,9 @@ router.put('/v2/:id', async (req, res) => {
     await pool.query(
       `UPDATE recipes
        SET name = $2, category = $3, description = $4, suggested_price = $5,
-           image_url = $6, notes = $7, updated_at = now()
+           image_url = $6, notes = $7,
+           service_minutes = $8, prep_allocation_minutes = $9, packaging_minutes = $10,
+           updated_at = now()
        WHERE id = $1`,
       [
         id,
@@ -519,6 +553,9 @@ router.put('/v2/:id', async (req, res) => {
         directPrice,
         String(payload.imageUrl ?? ''),
         buildRecipeMeta(nextMeta),
+        serviceMinutes,
+        prepAllocationMinutes,
+        packagingMinutes,
       ],
     );
 

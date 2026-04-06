@@ -16,6 +16,7 @@
  */
 
 import { pool } from "../../db";
+import { buildLabourAnalysis } from "../../services/labourAnalysis";
 
 // ─── Drink name → engine field mapping ───────────────────────────────────────
 
@@ -280,6 +281,8 @@ export async function getUsageReconciliation(date: string) {
     Object.values(receivedDrinks).every((v) => v === 0) &&
     receivedDrinksResult.rows.length === 0;
 
+  const labourAnalysis = await buildLabourAnalysis(date);
+
   return {
     ok: true,
     date,
@@ -322,5 +325,6 @@ export async function getUsageReconciliation(date: string) {
       unmappedItems: engineBuilt ? Number(eng.unmapped_count) : 0,
       estimatedModifiers: engineBuilt ? Number(eng.estimated_count) : 0,
     },
+    labourAnalysis,
   };
 }

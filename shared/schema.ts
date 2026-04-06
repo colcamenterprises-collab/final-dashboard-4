@@ -578,6 +578,9 @@ export const recipes = pgTable("recipes", {
   servingSize: text("serving_size"), // Description of serving size
   profitMargin: decimal("profit_margin", { precision: 5, scale: 2 }), // percentage
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  serviceMinutes: decimal("service_minutes", { precision: 10, scale: 2 }).notNull().default('0'),
+  prepAllocationMinutes: decimal("prep_allocation_minutes", { precision: 10, scale: 2 }).notNull().default('0'),
+  packagingMinutes: decimal("packaging_minutes", { precision: 10, scale: 2 }).notNull().default('0'),
   
   // Recipe management
   isActive: boolean("is_active").default(true),

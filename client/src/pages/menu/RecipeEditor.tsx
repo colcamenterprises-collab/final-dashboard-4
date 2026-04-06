@@ -47,13 +47,17 @@ type RecipePayload = {
   grabFeePercent?: number;
   directPrice?: number;
   published?: boolean;
+  serviceMinutes?: number;
+  prepAllocationMinutes?: number;
+  packagingMinutes?: number;
+  effectiveItemMinutes?: number;
 };
 
 const asUnit = (value: unknown): Unit => {
   const normalized = String(value || "").toLowerCase();
   if (normalized === "l") return "l";
   if (normalized === "pcs") return "pcs";
-  return UNITS.includes(normalized as Unit) ? (normalized as Unit) : "";
+  return UNITS.includes(normalized as (typeof UNITS)[number]) ? (normalized as Unit) : "";
 };
 
 const normalizeLine = (line: Partial<Line>): Line => ({
@@ -78,6 +82,10 @@ const normalizePayload = (payload: RecipePayload): RecipePayload => ({
   directPrice: N(payload.directPrice ?? payload.salePrice),
   grabPrice: N(payload.grabPrice),
   grabFeePercent: N(payload.grabFeePercent),
+  serviceMinutes: N(payload.serviceMinutes),
+  prepAllocationMinutes: N(payload.prepAllocationMinutes),
+  packagingMinutes: N(payload.packagingMinutes),
+  effectiveItemMinutes: N(payload.serviceMinutes) + N(payload.prepAllocationMinutes) + N(payload.packagingMinutes),
 });
 
 const newLine = (): Line => normalizeLine({ name: "" });
@@ -147,6 +155,7 @@ export default function RecipeEditorPage() {
   const grabFeePercent = N(state.grabFeePercent);
   const netGrabAfterFees = grabPrice * (1 - grabFeePercent / 100);
   const netDirectAfterFees = directPrice;
+  const effectiveItemMinutes = N(state.serviceMinutes) + N(state.prepAllocationMinutes) + N(state.packagingMinutes);
 
   const breakdownData = [
     { name: "Ingredients", value: ingredientsCost, color: "#0f766e" },
@@ -405,6 +414,54 @@ export default function RecipeEditorPage() {
             <div>
               <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Slippage % (global)</label>
               <Input type="number" value={state.slippagePercent} onChange={(e) => setState({ ...state, slippagePercent: N(e.target.value) })} className="h-10 rounded-xl" placeholder="e.g. 3" />
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:p-8">
+          <h3 className="text-xl font-semibold text-slate-900">Labour Timing</h3>
+          <p className="mt-1 text-xs text-slate-500">Recipe timing is the variable labour source for shift analysis calculations.</p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Service Minutes</label>
+              <Input
+                type="number"
+                min={0}
+                step="0.1"
+                value={N(state.serviceMinutes)}
+                onChange={(e) => setState({ ...state, serviceMinutes: Math.max(0, N(e.target.value)) })}
+                className="h-10 rounded-xl"
+              />
+              <p className="mt-1 text-[11px] text-slate-500">Active cooking or assembly time for one sold item.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Prep Allocation Minutes</label>
+              <Input
+                type="number"
+                min={0}
+                step="0.1"
+                value={N(state.prepAllocationMinutes)}
+                onChange={(e) => setState({ ...state, prepAllocationMinutes: Math.max(0, N(e.target.value)) })}
+                className="h-10 rounded-xl"
+              />
+              <p className="mt-1 text-[11px] text-slate-500">Per-item share of batch prep.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Packaging Minutes</label>
+              <Input
+                type="number"
+                min={0}
+                step="0.1"
+                value={N(state.packagingMinutes)}
+                onChange={(e) => setState({ ...state, packagingMinutes: Math.max(0, N(e.target.value)) })}
+                className="h-10 rounded-xl"
+              />
+              <p className="mt-1 text-[11px] text-slate-500">Wrapping, boxing, bagging time.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Effective Item Minutes</label>
+              <Input type="number" readOnly value={effectiveItemMinutes.toFixed(2)} className="h-10 rounded-xl bg-slate-50" />
+              <p className="mt-1 text-[11px] text-slate-500">Total labour minutes used for one item.</p>
             </div>
           </div>
         </section>
