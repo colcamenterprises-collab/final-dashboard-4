@@ -65,7 +65,66 @@ interface UsageReconData {
     thresholds: { warn: number; critical: number };
   };
   confidence: { engineRowCount: number; unmappedItems: number; estimatedModifiers: number };
+  labourAnalysis?: {
+    assumptions: {
+      staffCount: number;
+      shiftHours: number;
+      openingMinutes: number;
+      closingMinutes: number;
+      cleaningMinutes: number;
+      adminMinutes: number;
+      fixedOverheadMinutes: number;
+    };
+    totals: {
+      serviceWorkMinutes: number;
+      fullShiftWorkMinutes: number;
+      totalAvailableLabourMinutes: number;
+    };
+    utilisation: {
+      serviceUtilisationPercent: number;
+      fullShiftUtilisationPercent: number;
+      utilisationStatus: "Underutilised" | "Steady" | "Busy" | "Overloaded";
+    };
+    staffing: {
+      actualStaff: number;
+      recommendedStaff: number;
+      staffingVariance: number;
+      staffingStatus: "Overstaffed" | "Understaffed" | "On Target";
+    };
+    itemBreakdown: Array<{
+      itemName: string;
+      quantitySold: number;
+      serviceMinutes: number;
+      prepAllocationMinutes: number;
+      packagingMinutes: number;
+      effectiveItemMinutes: number;
+      itemWorkMinutes: number;
+      mapped: boolean;
+    }>;
+    hourlyDemand: Array<{
+      hourLabel: string;
+      hour24: number;
+      serviceWorkMinutes: number;
+      availableLabourMinutes: number;
+      utilisationPercent: number;
+      status: "Underutilised" | "Steady" | "Busy" | "Overloaded";
+    }>;
+    warnings: string[];
+  };
 }
+
+const SHIFT_HOURS_ORDER = [18, 19, 20, 21, 22, 23, 0, 1, 2] as const;
+const SHIFT_HOUR_LABELS: Record<number, string> = {
+  18: '6 PM',
+  19: '7 PM',
+  20: '8 PM',
+  21: '9 PM',
+  22: '10 PM',
+  23: '11 PM',
+  0: '12 AM',
+  1: '1 AM',
+  2: '2 AM',
+};
 
 const categories: Array<{ key: keyof ShiftData; label: string }> = [
   { key: 'total', label: 'Total Sales' },
@@ -101,6 +160,7 @@ export default function SalesShiftAnalysis() {
   const [selectedDate, setSelectedDate] = useState(todayBkk());
   const [autoLoaded, setAutoLoaded] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
+  const [activeHour, setActiveHour] = useState<number | null>(null);
 
   // Auto-load: on first mount, resolve the latest shift that has data and jump to it
   useEffect(() => {
@@ -219,6 +279,52 @@ export default function SalesShiftAnalysis() {
   }, [usageRecon]);
 
   const drinkAnomalyCount = anomalyRows.filter((row) => row.category === 'Drinks' && row.severity !== 'OK').length;
+  const labourAnalysis = useMemo(() => {
+    const src = usageRecon?.labourAnalysis;
+    const hourlyByHour = new Map<number, any>((src?.hourlyDemand || []).map((h) => [toNum(h.hour24), h]));
+    return {
+      assumptions: {
+        staffCount: toNum(src?.assumptions?.staffCount),
+        shiftHours: toNum(src?.assumptions?.shiftHours || 8.5),
+        openingMinutes: toNum(src?.assumptions?.openingMinutes || 20),
+        closingMinutes: toNum(src?.assumptions?.closingMinutes || 20),
+        cleaningMinutes: toNum(src?.assumptions?.cleaningMinutes || 45),
+        adminMinutes: toNum(src?.assumptions?.adminMinutes || 20),
+        fixedOverheadMinutes: toNum(src?.assumptions?.fixedOverheadMinutes || 105),
+      },
+      totals: {
+        serviceWorkMinutes: toNum(src?.totals?.serviceWorkMinutes),
+        fullShiftWorkMinutes: toNum(src?.totals?.fullShiftWorkMinutes),
+        totalAvailableLabourMinutes: toNum(src?.totals?.totalAvailableLabourMinutes),
+      },
+      utilisation: {
+        serviceUtilisationPercent: toNum(src?.utilisation?.serviceUtilisationPercent),
+        fullShiftUtilisationPercent: toNum(src?.utilisation?.fullShiftUtilisationPercent),
+        utilisationStatus: src?.utilisation?.utilisationStatus || 'Underutilised',
+      },
+      staffing: {
+        actualStaff: toNum(src?.staffing?.actualStaff),
+        recommendedStaff: toNum(src?.staffing?.recommendedStaff),
+        staffingVariance: toNum(src?.staffing?.staffingVariance),
+        staffingStatus: src?.staffing?.staffingStatus || 'On Target',
+      },
+      itemBreakdown: src?.itemBreakdown || [],
+      hourlyDemand: SHIFT_HOURS_ORDER.map((hour24) => {
+        const existing = hourlyByHour.get(hour24);
+        return {
+          hourLabel: SHIFT_HOUR_LABELS[hour24],
+          hour24,
+          serviceWorkMinutes: toNum(existing?.serviceWorkMinutes),
+          availableLabourMinutes: toNum(existing?.availableLabourMinutes),
+          utilisationPercent: toNum(existing?.utilisationPercent),
+          status: existing?.status || 'Underutilised',
+        };
+      }),
+      warnings: src?.warnings || [],
+    };
+  }, [usageRecon?.labourAnalysis]);
+  const maxHourlyWork = Math.max(1, ...labourAnalysis.hourlyDemand.map((h) => h.serviceWorkMinutes));
+  const selectedHour = labourAnalysis.hourlyDemand.find((h) => h.hour24 === activeHour) ?? labourAnalysis.hourlyDemand[0];
 
   const posHasData = toNum(posData?.total) > 0;
   const formHasData = toNum(formData?.total) > 0;
@@ -407,6 +513,143 @@ export default function SalesShiftAnalysis() {
           )}
         </CardContent>
       </Card>
+
+      <>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm font-medium text-slate-700">Labour Assumptions</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs text-slate-600">
+                <div>Staff Count</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.assumptions.staffCount))}</div>
+                <div>Shift Hours</div><div className="text-right font-mono text-slate-800">{toNum(labourAnalysis.assumptions.shiftHours).toFixed(1)}</div>
+                <div>Opening Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.assumptions.openingMinutes))}</div>
+                <div>Closing Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.assumptions.closingMinutes))}</div>
+                <div>Cleaning Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.assumptions.cleaningMinutes))}</div>
+                <div>Admin Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.assumptions.adminMinutes))}</div>
+                <div>Fixed Overhead Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.assumptions.fixedOverheadMinutes))}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm font-medium text-slate-700">Labour Utilisation</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs text-slate-600">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div>Service Work Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.totals.serviceWorkMinutes))}</div>
+                  <div>Full Shift Work Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.totals.fullShiftWorkMinutes))}</div>
+                  <div>Available Labour Minutes</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.totals.totalAvailableLabourMinutes))}</div>
+                  <div>Service Utilisation %</div><div className="text-right font-mono text-slate-800">{toNum(labourAnalysis.utilisation.serviceUtilisationPercent).toFixed(1)}%</div>
+                  <div>Full Shift Utilisation %</div><div className="text-right font-mono text-slate-800">{toNum(labourAnalysis.utilisation.fullShiftUtilisationPercent).toFixed(1)}%</div>
+                  <div>Recommended Staff</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.staffing.recommendedStaff))}</div>
+                  <div>Actual Staff</div><div className="text-right font-mono text-slate-800">{fmtInt(toNum(labourAnalysis.staffing.actualStaff))}</div>
+                  <div>Staffing Variance</div><div className="text-right font-mono text-slate-800">{toNum(labourAnalysis.staffing.staffingVariance) >= 0 ? '+' : ''}{fmtInt(toNum(labourAnalysis.staffing.staffingVariance))}</div>
+                </div>
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <span className="px-2 py-1 rounded-[4px] border border-slate-200 bg-slate-100 text-slate-700">Utilisation: {labourAnalysis.utilisation.utilisationStatus}</span>
+                  <span className="px-2 py-1 rounded-[4px] border border-slate-200 bg-slate-100 text-slate-700">Staffing: {labourAnalysis.staffing.staffingStatus}</span>
+                </div>
+                {!!labourAnalysis.warnings?.length && (
+                  <div className="rounded-[4px] border border-amber-200 bg-amber-50 p-2 text-amber-800">
+                    {labourAnalysis.warnings.join(' ')}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader className="py-3">
+              <CardTitle className="text-sm font-medium text-slate-700">Staffing vs Demand</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="w-full overflow-x-auto">
+                <div className="min-w-[620px]">
+                  <div className="flex items-end justify-between gap-2 h-40 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    {labourAnalysis.hourlyDemand.map((hour) => {
+                      const ratio = hour.serviceWorkMinutes / maxHourlyWork;
+                      const barHeight = Math.max(10, Math.round(10 + ratio * 112));
+                      const selected = selectedHour?.hour24 === hour.hour24;
+                      const statusClass =
+                        hour.status === 'Overloaded' ? 'bg-red-500' :
+                        hour.status === 'Busy' ? 'bg-amber-500' :
+                        hour.status === 'Steady' ? 'bg-emerald-500' : 'bg-slate-300';
+                      return (
+                        <button
+                          key={hour.hour24}
+                          className={`group flex w-full flex-col items-center justify-end rounded-lg p-1 transition ${selected ? 'bg-slate-200/70' : 'hover:bg-slate-200/40'}`}
+                          onMouseEnter={() => setActiveHour(hour.hour24)}
+                          onFocus={() => setActiveHour(hour.hour24)}
+                          onClick={() => setActiveHour(hour.hour24)}
+                          aria-label={`Hour ${hour.hourLabel}`}
+                        >
+                          <div className={`w-6 rounded-full transition-all ${statusClass} ${selected ? 'ring-2 ring-slate-500/40' : ''}`} style={{ height: `${barHeight}px` }} />
+                          <div className="mt-2 text-[10px] text-slate-600">{hour.hourLabel}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                <span className="px-2 py-1 rounded-[4px] bg-slate-100 border border-slate-200">Quiet</span>
+                <span className="px-2 py-1 rounded-[4px] bg-emerald-100 border border-emerald-200">Steady</span>
+                <span className="px-2 py-1 rounded-[4px] bg-amber-100 border border-amber-200">Busy</span>
+                <span className="px-2 py-1 rounded-[4px] bg-red-100 border border-red-200">Overloaded</span>
+              </div>
+              {selectedHour && (
+                <div className="rounded-[4px] border border-slate-200 bg-white p-3 text-xs text-slate-700 grid gap-1 sm:grid-cols-5">
+                  <div><span className="text-slate-500">Hour:</span> {selectedHour.hourLabel}</div>
+                  <div><span className="text-slate-500">Work Minutes:</span> {fmtInt(toNum(selectedHour.serviceWorkMinutes))}</div>
+                  <div><span className="text-slate-500">Available Minutes:</span> {fmtInt(toNum(selectedHour.availableLabourMinutes))}</div>
+                  <div><span className="text-slate-500">Utilisation:</span> {toNum(selectedHour.utilisationPercent).toFixed(1)}%</div>
+                  <div><span className="text-slate-500">Demand Status:</span> {selectedHour.status}</div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {labourAnalysis.itemBreakdown.length > 0 && (
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm font-medium text-slate-700">Item Labour Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="w-full overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  <table className={`w-full ${TABLE_TEXT_CLASS}`}>
+                    <thead>
+                      <tr className="border-b border-slate-200">
+                        <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Item</th>
+                        <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Qty Sold</th>
+                        <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Service Min</th>
+                        <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Prep Min</th>
+                        <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Packaging Min</th>
+                        <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Effective Min</th>
+                        <th className={`text-right ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Work Minutes</th>
+                        <th className={`text-left ${TABLE_CELL_CLASS} font-medium text-slate-600`}>Mapped</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {labourAnalysis.itemBreakdown.map((row, idx) => (
+                        <tr key={`${row.itemName}-${idx}`} className="border-b">
+                          <td className={`${TABLE_CELL_CLASS} text-slate-700`}>{row.itemName}</td>
+                          <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{fmtInt(toNum(row.quantitySold))}</td>
+                          <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{toNum(row.serviceMinutes).toFixed(1)}</td>
+                          <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{toNum(row.prepAllocationMinutes).toFixed(1)}</td>
+                          <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{toNum(row.packagingMinutes).toFixed(1)}</td>
+                          <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{toNum(row.effectiveItemMinutes).toFixed(1)}</td>
+                          <td className={`${TABLE_CELL_CLASS} text-right font-mono`}>{fmtInt(toNum(row.itemWorkMinutes))}</td>
+                          <td className={`${TABLE_CELL_CLASS} text-slate-700`}>{row.mapped ? 'Yes' : 'No'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </>
       {/* ── All Shifts History (3 / last) ── */}
       <Card>
         <CardHeader className="py-3">
