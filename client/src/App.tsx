@@ -63,6 +63,7 @@ import StockReview from "./pages/analysis/StockReview";
 import StockReconciliation from "./pages/analysis/StockReconciliation";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
+import AnalysisPrototype from "./pages/AnalysisPrototype";
 import OnlineOrdering from "./pages/OnlineOrdering";
 import MenuAdmin from "./pages/marketing/MenuAdmin";
 import OnlineOrderingCatalogPage from "./pages/online-ordering/CatalogPage";
@@ -283,6 +284,9 @@ export default function App() {
                 <Route path="/operations/analysis/daily-shift-analysis" element={<Navigate to="/analysis/daily-review" replace />} />
 
                 <Route path="/marketing" element={<ProtectedRoute><MarketingMachine /></ProtectedRoute>} />
+
+                <Route path="/analysis-prototype" element={<ProtectedRoute><AnalysisPrototype /></ProtectedRoute>} />
+
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

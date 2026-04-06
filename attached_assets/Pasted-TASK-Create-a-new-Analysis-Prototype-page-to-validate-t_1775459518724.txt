@@ -1,0 +1,177 @@
+TASK: Create a new Analysis Prototype page to validate the new dashboard direction
+
+GOAL
+We are NOT modifying existing analysis pages yet.
+We are creating a clean prototype page to test structure, layout, and clarity before replacing anything.
+
+This page must be:
+- simple
+- fast to read
+- focused only on key metrics + issues
+- no long tables
+- no legacy components
+
+==================================================
+PART 1 — CREATE NEW PAGE
+==================================================
+
+Create a new file:
+
+client/src/pages/AnalysisPrototype.tsx
+
+This must be a standalone page (no dependencies on existing analysis components).
+
+==================================================
+PART 2 — BUILD THE PAGE STRUCTURE
+==================================================
+
+The page must contain ONLY 3 sections:
+
+--------------------------------------------------
+SECTION 1 — KEY METRICS (TOP ROW)
+--------------------------------------------------
+
+Display 4 cards in a row:
+
+- Revenue
+- COGS %
+- Prime Cost %
+- Critical Issues
+
+Each card must:
+- be visually clean
+- large number
+- small label
+- evenly spaced
+
+--------------------------------------------------
+SECTION 2 — CRITICAL STOCK ISSUES (FOCUS TABLE)
+--------------------------------------------------
+
+Single table ONLY showing problem items.
+
+Columns:
+- Item
+- Start
+- Purchased
+- Sold
+- Expected End
+- Actual End
+- Variance
+
+IMPORTANT:
+- DO NOT show all items
+- ONLY show items where variance != 0
+- keep table compact and readable
+- no pagination
+- no massive dataset
+
+--------------------------------------------------
+SECTION 3 — DAILY REPORT SUMMARY
+--------------------------------------------------
+
+Simple bullet blocks:
+
+- Sales Summary
+- Stock Variance
+- Ingredient Usage
+- Profit Snapshot
+
+No heavy UI needed here — just structure.
+
+==================================================
+PART 3 — ADD ROUTE
+==================================================
+
+In:
+client/src/App.tsx
+
+1. Import:
+import AnalysisPrototype from "./pages/AnalysisPrototype";
+
+2. Add route:
+<Route path="/analysis-prototype" element={<AnalysisPrototype />} />
+
+Do NOT modify any existing routes.
+
+==================================================
+PART 4 — DATA (IMPORTANT)
+==================================================
+
+DO NOT connect to backend yet.
+
+Use MOCK DATA inline for now:
+- hardcode 2–4 example rows (Coke Zero, Buns, etc.)
+- realistic numbers only
+
+This is a UI validation step only.
+
+==================================================
+PART 5 — STYLING
+==================================================
+
+Requirements:
+- use existing styling system (Tailwind if available)
+- clean spacing (padding 16–24px)
+- rounded cards
+- no clutter
+- no dense text blocks
+
+This must NOT look like:
+❌ legacy admin table
+❌ spreadsheet UI
+❌ debug screen
+
+It should feel like:
+✅ modern dashboard
+✅ fast to scan
+✅ owner-friendly
+
+==================================================
+PART 6 — TESTING
+==================================================
+
+After implementation:
+
+1. Open:
+/analysis-prototype
+
+2. Confirm:
+- page loads
+- cards render
+- table renders correctly
+- no console errors
+- layout is clean on desktop
+
+==================================================
+PART 7 — DO NOT DO THESE
+==================================================
+
+- do NOT reuse old analysis components
+- do NOT import stock reconciliation page
+- do NOT add filters, toggles, or complexity
+- do NOT overbuild this
+- do NOT connect backend yet
+
+==================================================
+PART 8 — DELIVERABLE
+==================================================
+
+Return:
+
+1. files created/modified
+2. confirmation route works
+3. screenshot of page
+4. confirmation no errors
+
+==================================================
+FINAL RULE
+==================================================
+
+This is a prototype validation page.
+
+Do NOT try to fix the whole system.
+Do NOT touch existing analysis pages.
+
+We validate UI first.
+Then we rebuild properly.
