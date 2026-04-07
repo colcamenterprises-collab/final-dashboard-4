@@ -1,0 +1,284 @@
+REPLIT AGENT TASK
+TITLE: Replace Sales & Shift Analysis with Live Daily Review Page
+
+READ THIS FIRST — DO NOT FREESTYLE
+- Do not do a cosmetic tweak of the current page
+- Do not preserve the current Sales & Shift Analysis layout
+- Do not keep the current labour UI as-is
+- Do not keep the current empty heat map design
+- Do not invent fake data
+- Do not hardcode sample values
+- Do not break existing routes or backend flows
+- Do not touch Daily Sales & Stock V2 form structure
+- Only implement what is requested below
+- Test front to back before stopping
+- If data is missing from source, show a visible warning, not dead zero cards
+- Tablet layout must be checked before completion
+- This task is not complete until the new page is live, wired, and usable
+
+OBJECTIVE
+The current Sales & Shift Analysis page is rejected.
+It is not operationally useful, the UI is poor, and Daily Sales & Stock V2 is not surfacing correctly.
+Replace the current analysis experience with a new live Daily Review page based on the approved prototype direction.
+
+BUSINESS DECISION
+- Rebuild the page end to end
+- Use live data only
+- If live data is missing, show clear source warnings
+- Remove the current dead-card layout
+- Make the page useful for management at a glance
+
+TARGET
+Create one primary analysis page called:
+
+Daily Review
+
+ROUTE
+- Rebuild the current primary analysis route to use the new Daily Review experience
+- If `/analysis/daily-review` already exists, make that the primary page and ensure navigation lands there
+- If the old Sales & Shift Analysis route still exists, either redirect it safely or replace its content safely
+- Do not leave the old rubbish page as the user-facing main analysis page
+
+DESIGN DIRECTION
+- Dark background
+- Yellow accent
+- Premium operations dashboard feel
+- Rounded 2xl cards
+- Strong spacing
+- Clean typography
+- No icons
+- No clutter
+- No weak grey empty boxes
+- No giant dead sections
+- Tablet-first usability required
+
+PAGE STRUCTURE
+
+1. HEADER
+Top area must include:
+- Title: Daily Review
+- Subtitle: Daily management summary for sales, variances, labour, and ingredient usage
+- Date/shift selector on the right
+- Source status pills under header:
+  - Daily Form: Connected / Missing
+  - POS Shift Data: Connected / Missing
+  - Receipt Data: Connected / Missing
+  - Labour Data: Connected / Missing
+
+These pills must reflect real backend availability for the selected shift.
+
+2. CRITICAL ISSUES STRIP
+This is the first important section.
+Show only actual issues for the selected shift.
+
+Content examples:
+- stock variances
+- missing POS vs form mismatch
+- receipt mismatch
+- labour warnings
+- unmapped sold items impacting analysis
+
+Display:
+- compact strip or concise table
+- no pagination
+- no filler cards
+
+Columns:
+- Type
+- Item / Source
+- Expected
+- Actual
+- Variance
+- Severity
+
+If no critical issues:
+- show one clean “No critical issues detected” block
+
+3. DAILY REPORT SUMMARY
+Four blocks side by side on desktop, stacked cleanly on tablet.
+
+Block A — Sales Summary
+- Total Sales
+- Cash
+- QR / PromptPay
+- GrabFood
+- Other
+- Refunds if present
+- Receipt Count if available
+
+Block B — Stock Variance
+- Rolls variance
+- Meat variance
+- Drinks variance count
+- Number of critical items
+- Overall stock status
+
+Block C — Ingredient Usage
+- Top ingredients used
+- Sold item count
+- Mapped vs unmapped sold items
+- Recipe coverage indicator
+
+Block D — Profit Snapshot
+- Total Sales
+- Total Expenses
+- Labour Cost if derivable
+- Prime Cost % if derivable
+- Margin style summary if safe
+
+If any figure cannot be derived truthfully:
+- show “Unavailable”
+- do not fake it
+
+4. LABOUR SUMMARY
+Keep labour but make it compact and useful.
+
+Show:
+- Actual Staff
+- Recommended Staff
+- Service Work Minutes
+- Full Shift Work Minutes
+- Available Labour Minutes
+- Full Shift Utilisation %
+- Utilisation Status
+- Staffing Status
+
+5. STAFFING VS DEMAND CHART
+Replace the current ugly chart entirely.
+
+Requirements:
+- inspired by Google Popular Times, but clean and premium
+- hours from 6 PM to 2 AM
+- good contrast
+- tight spacing
+- clear selected/active state
+- tablet safe
+- show detail on tap/click/hover:
+  - Hour
+  - Work Minutes
+  - Available Minutes
+  - Utilisation %
+  - Demand Status
+
+IMPORTANT:
+- if hourly demand data is missing, show a compact warning block
+- do not render a giant empty chart container
+
+6. ITEM / RECEIPT / COVERAGE INSIGHT
+This section must help answer:
+- what sold
+- what drove workload
+- what could not be matched
+
+Include clean sub-sections or tabs only if genuinely simple:
+- top sold items
+- item labour breakdown
+- unmapped sold items
+- receipt coverage / mismatch notes
+
+7. SHIFT HISTORY
+Keep this near the bottom.
+Useful and readable only.
+
+Columns:
+- Date
+- Status
+- Sales
+- Expenses
+- Closing Cash
+- Cash Banked
+- Receipt Count
+- Warning Count
+
+Do not let this dominate the page.
+
+LIVE DATA REQUIREMENTS
+This page must be wired to real data.
+Do not build a disconnected mock.
+
+Required sources:
+1. Daily Sales & Stock V2 form data
+2. POS shift data
+3. Receipt / usage reconciliation data
+4. Labour analysis data
+5. Shift history if available
+
+IMPORTANT
+The current problem is that Daily Sales & Stock V2 is not coming through properly.
+Fix that.
+The new page must clearly surface real Daily Sales & Stock V2 figures where available.
+
+BACKEND REQUIREMENT
+Use or extend existing backend logic.
+Do not create duplicated analysis systems unless absolutely necessary.
+
+Prefer one unified response for the page.
+Example shape:
+
+{
+  date,
+  sourceStatus,
+  criticalIssues,
+  salesSummary,
+  stockVarianceSummary,
+  ingredientUsageSummary,
+  profitSnapshot,
+  labourSummary,
+  hourlyDemand,
+  itemInsights,
+  shiftHistory
+}
+
+This does not have to be exact if there is already a stronger backend pattern, but frontend must receive one coherent live payload.
+
+REMOVE / DEMOTE
+Do NOT keep these as major visible sections:
+- giant Labour Assumptions card
+- dead zero-only cards with no warning context
+- washed-out empty demand chart
+- large useless whitespace
+- empty stock anomaly sections with no meaningful explanation
+
+TESTING — MANDATORY BEFORE STOPPING
+1. Select a shift/date with Daily Sales & Stock V2 data
+   - verify figures appear on page
+   - verify Daily Form pill says Connected
+
+2. Select a shift/date with missing POS receipt data
+   - verify explicit warning appears
+   - verify page remains usable
+
+3. Select a shift/date with stock variances
+   - verify critical issues strip shows them first
+
+4. Verify labour section
+   - if wage rows exist, actual staff populates
+   - if no wage rows exist, warning is visible and page still works
+
+5. Verify staffing vs demand chart
+   - 6 PM through 2 AM render in order
+   - no overflow on Samsung tablet width
+   - detail panel works
+
+6. Verify no console errors on page load or date change
+
+7. Verify tablet layout
+   - no crushed labels
+   - no giant blank sections
+   - no unreadable tables
+
+8. Verify shift history still loads if source exists
+
+DELIVERABLES REQUIRED FROM AGENT
+When complete, return:
+1. exact files changed
+2. exact route now used for Daily Review
+3. backend endpoint(s) used
+4. confirmation of which live data sources are successfully wired
+5. screenshots of finished page on tablet width
+6. any remaining source blockers
+7. whether old Sales & Shift Analysis was removed, redirected, or replaced
+
+FINAL RULE
+This is a rebuild, not a polish pass.
+Do not stop until the new Daily Review page is live, wired, tested, and clearly better than the current rubbish page.

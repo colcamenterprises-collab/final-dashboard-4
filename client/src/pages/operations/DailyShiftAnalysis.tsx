@@ -1,3 +1,3 @@
-import SalesShiftAnalysis from '../SalesShiftAnalysis';
+import DailyReview from '../analysis/DailyReview';
 
-export default SalesShiftAnalysis;
+export default DailyReview;
