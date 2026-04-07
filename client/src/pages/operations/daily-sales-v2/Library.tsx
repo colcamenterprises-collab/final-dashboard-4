@@ -10,7 +10,7 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { Eye, Printer, Download } from 'lucide-react';
+import { Eye, Printer, Download, AlertTriangle } from 'lucide-react';
 import { ConfirmDialog, SuccessDialog } from '@/components/ui/confirm-dialog';
 
 // MEGA PATCH V3: Safe number helpers
@@ -283,7 +283,8 @@ export default function DailySalesV2Library() {
         stock: {
           rolls: p.rollsEnd ?? 0,
           meat: p.meatEnd ?? 0,
-          drinks: drinksArray
+          drinks: drinksArray,
+          zeroConfirmation: p.zeroConfirmation || null
         },
         shoppingList: p.requisition || [],
         audit: Array.isArray(record.audit) ? record.audit : []
@@ -382,9 +383,20 @@ export default function DailySalesV2Library() {
               <div className="border-t border-slate-100 pt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
                 {(() => {
                   const receipt = getReceiptCounts(rec);
+                  const rollsZero = (rec.buns ?? null) !== null && Number(rec.buns) === 0;
+                  const meatZero = (rec.meat ?? null) !== null && Number(rec.meat) === 0;
+                  const hasZeroCount = hasForm2Data(rec) && (rollsZero || meatZero);
                   return (
                     <div className="text-sm text-slate-700">
-                      <p className="font-medium">Rolls: {rec.buns ?? "-"} | Meat: {rec.meat ?? "-"} | Receipts: {receipt.total}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium">Rolls: {rec.buns ?? "-"} | Meat: {rec.meat ?? "-"} | Receipts: {receipt.total}</p>
+                        {hasZeroCount && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 whitespace-nowrap">
+                            <AlertTriangle className="h-2.5 w-2.5" />
+                            Zero count logged
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-500">Grab: {receipt.grab} | Cash: {receipt.cash} | QR: {receipt.qr}</p>
                     </div>
                   );
@@ -566,6 +578,35 @@ export default function DailySalesV2Library() {
                   <h4 className="text-xs font-semibold mb-2">End Count</h4>
                   <p className="text-xs"><strong>Rolls:</strong> {selected.stock.rolls ?? 0} pcs</p>
                   <p className="text-xs"><strong>Meat:</strong> {selected.stock.meat ?? 0} grams</p>
+
+                  {selected.stock.zeroConfirmation ? (
+                    <div className="mt-3 p-2 bg-amber-50 border border-amber-300 rounded">
+                      <div className="flex items-center gap-1.5 text-amber-700 font-semibold mb-1">
+                        <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+                        <span className="text-[11px]">Zero Count — Staff Confirmed</span>
+                      </div>
+                      <p className="text-[11px] text-amber-800">
+                        <strong>Fields confirmed as zero:</strong>{' '}
+                        {selected.stock.zeroConfirmation.fields.join(' & ')}
+                      </p>
+                      <p className="text-[11px] text-amber-700 mt-0.5">
+                        <strong>Confirmed at:</strong>{' '}
+                        {new Date(selected.stock.zeroConfirmation.confirmedAt).toLocaleString('en-GB', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        })}
+                      </p>
+                      <p className="text-[10px] text-amber-600 mt-1 italic">
+                        Staff confirmed these counts were correct at time of submission.
+                      </p>
+                    </div>
+                  ) : (selected.stock.rolls === 0 || selected.stock.meat === 0) && (selected.stock.rolls !== null && selected.stock.meat !== null) ? (
+                    <div className="mt-3 p-2 bg-slate-100 border border-slate-300 rounded">
+                      <p className="text-[10px] text-slate-500 italic">
+                        ⚠️ One or more counts are zero — submitted without confirmation prompt (legacy record).
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 {/* Drinks Stock Section - ALWAYS SHOW ALL DRINKS EVEN IF 0 */}

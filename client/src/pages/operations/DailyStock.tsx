@@ -167,6 +167,9 @@ const DailyStock: React.FC = () => {
   const [sendingRollOrder, setSendingRollOrder] = useState(false);
   const [showConfirmRollOrder, setShowConfirmRollOrder] = useState(false);
 
+  const [showZeroConfirm, setShowZeroConfirm] = useState(false);
+  const [zeroConfirmFields, setZeroConfirmFields] = useState<string[]>([]);
+
   const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
   const [syncing, setSyncing] = useState(false);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
@@ -479,7 +482,22 @@ const DailyStock: React.FC = () => {
       setShowValidationDialog(true);
       return;
     }
-    
+
+    // Zero-count guard: if rolls or meat are 0, require explicit confirmation before submitting
+    const zeroFields: string[] = [];
+    if (rollsNum === 0) zeroFields.push('Rolls');
+    if (meatNum === 0) zeroFields.push('Meat');
+
+    if (zeroFields.length > 0) {
+      setZeroConfirmFields(zeroFields);
+      setShowZeroConfirm(true);
+      return;
+    }
+
+    await doSubmit();
+  };
+
+  const doSubmit = async (zeroConfirmation?: { fields: string[]; confirmedAt: string }) => {
     setSubmitting(true);
     setMessage(null);
 
@@ -498,13 +516,17 @@ const DailyStock: React.FC = () => {
     }
     
     // Update the existing Form 1 record with stock data
-    const payload = {
+    const payload: Record<string, any> = {
       rollsEnd: rolls,
       meatEnd: meatGrams,
       drinkStock: drinkStockObj,
       requisition: requisitionItems,
       notes: notes.trim()
     };
+
+    if (zeroConfirmation) {
+      payload.zeroConfirmation = zeroConfirmation;
+    }
 
     try {
       console.log("[DAILY_STOCK_UI] saving", { salesId: shiftId, payloadPreview: payload });
@@ -615,6 +637,54 @@ const DailyStock: React.FC = () => {
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-2 rounded-[4px]"
             >
               {L.gotIt}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Zero Count Confirmation Dialog */}
+      <AlertDialog open={showZeroConfirm} onOpenChange={setShowZeroConfirm}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-100">
+                <AlertTriangle className="h-6 w-6 text-amber-600" />
+              </div>
+              <AlertDialogTitle className="text-sm font-semibold text-amber-900">
+                Zero Count — Please Confirm
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-xs text-slate-700 space-y-3">
+              <p>The following end-of-shift stock counts have been entered as <strong>zero (0)</strong>:</p>
+              <ul className="ml-4 space-y-1">
+                {zeroConfirmFields.map(f => (
+                  <li key={f} className="flex items-center gap-2 text-amber-800 font-semibold">
+                    <span className="text-amber-500">•</span> {f}: 0
+                  </li>
+                ))}
+              </ul>
+              <p className="pt-1">Many pages and reports rely on these numbers. Are you sure these counts are correct?</p>
+              <p className="text-[10px] text-slate-500 border-t border-slate-200 pt-2">
+                If you confirm, this will be recorded with a timestamp and flagged in the form library.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2 flex-col sm:flex-row">
+            <Button
+              variant="outline"
+              onClick={() => setShowZeroConfirm(false)}
+              className="text-xs border-slate-300 text-slate-700"
+            >
+              No — let me fix it
+            </Button>
+            <Button
+              onClick={() => {
+                setShowZeroConfirm(false);
+                doSubmit({ fields: zeroConfirmFields, confirmedAt: new Date().toISOString() });
+              }}
+              className="text-xs bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              Yes, I confirm — submit as zero
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
