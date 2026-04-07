@@ -1,97 +1,166 @@
 page_name,route,main_file,feature_area,primary_data_sources,linked_from_ui (yes/no/unknown),duplicate_page_of,status (active/legacy/broken/unknown),delete_candidate,confidence,notes
-NotFound,"""*""",client/src/pages/NotFound.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Home,UNKNOWN,client/src/pages/Home.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Analysis,UNKNOWN,client/src/pages/operations/Analysis.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DailySalesV2Library,UNKNOWN,client/src/pages/operations/daily-sales-v2/Library.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ShoppingList,UNKNOWN,client/src/pages/ShoppingList.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PurchasingList,UNKNOWN,client/src/pages/operations/PurchasingList.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PurchasingFieldMapping,UNKNOWN,client/src/pages/operations/PurchasingFieldMapping.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PurchasingShiftLog,UNKNOWN,client/src/pages/operations/PurchasingShiftLog.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PurchasingAnalytics,UNKNOWN,client/src/pages/operations/PurchasingAnalytics.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Receipts,UNKNOWN,client/src/pages/Receipts.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-UploadStatements,UNKNOWN,client/src/pages/UploadStatements.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ProfitLoss,UNKNOWN,client/src/pages/ProfitLoss.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-FinancePage,UNKNOWN,client/src/pages/finance/FinancePage.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-CostCalculator,UNKNOWN,client/src/pages/CostCalculator.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Ingredients,UNKNOWN,client/src/pages/Ingredients.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Expenses,UNKNOWN,client/src/pages/Expenses.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ExpensesImport,UNKNOWN,client/src/pages/finance/ExpensesImport.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ExpensesV2,UNKNOWN,client/src/pages/expenses/ExpensesV2.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-MenuManagement,UNKNOWN,client/src/pages/menu/MenuManagement.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-MenuImport,UNKNOWN,client/src/pages/menu/MenuImport.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DescriptionTool,UNKNOWN,client/src/pages/menu/DescriptionTool.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IngredientEdit,UNKNOWN,client/src/pages/menu/IngredientEdit.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-RecipeCards,UNKNOWN,client/src/pages/menu/RecipeCards.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-RecipeEditorPage,UNKNOWN,client/src/pages/menu/RecipeEditor.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-RecipeListPage,UNKNOWN,client/src/pages/menu/Recipes.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IngredientManagement,UNKNOWN,client/src/pages/menu/IngredientManagement.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Products,UNKNOWN,client/src/pages/Products.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ProductPage,UNKNOWN,client/src/pages/ProductPage.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ShiftReports,UNKNOWN,client/src/pages/ShiftReports.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-NightlyChecklist,UNKNOWN,client/src/pages/NightlyChecklist.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-JussiOps,UNKNOWN,client/src/pages/JussiOps.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-JaneAccounts,UNKNOWN,client/src/pages/JaneAccounts.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DailySalesForm,UNKNOWN,client/src/pages/operations/daily-sales/Form.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DailyStock,UNKNOWN,client/src/pages/operations/DailyStock.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-LoyverseReports,"""loyverse""",client/src/pages/operations/LoyverseReports.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PurchasingPage,UNKNOWN,client/src/pages/operations/Purchasing.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-StockReview,UNKNOWN,client/src/pages/analysis/StockReview.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-StockReconciliation,UNKNOWN,client/src/pages/analysis/StockReconciliation.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ShiftAnalyticsMM,UNKNOWN,client/src/pages/analysis/ShiftAnalyticsMM.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DailyShiftAnalysis,UNKNOWN,client/src/pages/operations/DailyShiftAnalysis.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-AnalysisPrototype,UNKNOWN,client/src/pages/AnalysisPrototype.tsx,other,unknown (inspect page fetch/axios),unknown,,legacy,maybe,LIKELY,mapped from App.tsx imports
-OnlineOrdering,{ROUTES.ORDER},client/src/pages/OnlineOrdering.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-MenuAdmin,UNKNOWN,client/src/pages/marketing/MenuAdmin.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-OnlineOrderingCatalogPage,UNKNOWN,client/src/pages/online-ordering/CatalogPage.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-MarketingMachine,UNKNOWN,client/src/pages/marketing/MarketingMachine.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PurchasingLive,UNKNOWN,client/src/pages/ops/PurchasingLive.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IngredientPurchasingList,UNKNOWN,client/src/pages/ops/IngredientPurchasingList.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IngredientPurchasingForm,UNKNOWN,client/src/pages/ops/IngredientPurchasingForm.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-MemberDashboard,UNKNOWN,client/src/pages/membership/MemberDashboard.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-MemberRegistration,UNKNOWN,client/src/pages/membership/MemberRegistration.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DailySummaryReportsPage,UNKNOWN,client/src/pages/operations/daily-reports.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-SystemHealthPage,UNKNOWN,client/src/pages/operations/system-health.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-AiOpsControlPage,UNKNOWN,client/src/pages/operations/AiOpsControl.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-TaskDetailPage,UNKNOWN,client/src/pages/operations/tasks/TaskDetail.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-VarianceMonitorPage,UNKNOWN,client/src/pages/operations/VarianceMonitor.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IssueRegisterPage,UNKNOWN,client/src/pages/operations/IssueRegister.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ShiftReportDashboard,UNKNOWN,client/src/pages/reports/shift-report.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ShiftReportHistory,UNKNOWN,client/src/pages/reports/shift-report/history.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ShiftReportDetail,UNKNOWN,client/src/pages/reports/shift-report/view/ShiftReportDetail.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Checkout,{ROUTES.ORDER_CHECKOUT},client/src/pages/ordering/Checkout.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-OrderConfirmation,{ROUTES.ORDER_CONFIRMATION},client/src/pages/ordering/OrderConfirmation.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-AdminOrders,UNKNOWN,client/src/pages/ordering/AdminOrders.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-LoyverseMappingConsole,UNKNOWN,client/src/pages/loyverse/LoyverseMappingConsole.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PartnerBars,UNKNOWN,client/src/pages/partners/PartnerBars.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PartnerAnalytics,UNKNOWN,client/src/pages/partners/PartnerAnalytics.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DeliveryAdmin,UNKNOWN,client/src/pages/delivery/DeliveryAdmin.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DriverManager,UNKNOWN,client/src/pages/delivery/DriverManager.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DeliveryHistory,UNKNOWN,client/src/pages/delivery/DeliveryHistory.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-KDS,UNKNOWN,client/src/pages/kds/KDS.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-KDSHistory,UNKNOWN,client/src/pages/kds/KDSHistory.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-MenuAdminV3,UNKNOWN,client/src/pages/menuV3/MenuAdmin.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-POSLogin,"""/pos-login""",client/src/pages/pos/POSLogin.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-POS,UNKNOWN,client/src/pages/pos/POS.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-POSRegisterStatus,UNKNOWN,client/src/pages/pos/POSRegisterStatus.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-POSCheckout,UNKNOWN,client/src/pages/pos/POSCheckout.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-POSReceiptPreview,UNKNOWN,client/src/pages/pos/POSReceiptPreview.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-CustomerDisplayPage,UNKNOWN,client/src/pages/pos/CustomerDisplayPage.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-LiveStock,UNKNOWN,client/src/pages/stock/LiveStock.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IngredientUsage,UNKNOWN,client/src/pages/analysis/IngredientUsage.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-StockVariance,UNKNOWN,client/src/pages/analysis/StockVariance.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-ReceiptsTruth,UNKNOWN,client/src/pages/analysis/ReceiptsTruth.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IngredientsTruth,UNKNOWN,client/src/pages/analysis/IngredientsTruth.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-GrabLoyverseMonthlyReconciliation,UNKNOWN,client/src/pages/analysis/GrabLoyverseMonthlyReconciliation.tsx,analysis,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-SaaSAdmin,UNKNOWN,client/src/pages/saas/SaaSAdmin.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-Login,"""/login""",client/src/pages/auth/Login.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-TenantSwitcher,UNKNOWN,client/src/pages/settings/TenantSwitcher.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PaymentProviders,UNKNOWN,client/src/pages/settings/PaymentProviders.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-DataSafety,UNKNOWN,client/src/pages/admin/DataSafety.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-IngredientsMaster,UNKNOWN,client/src/pages/operations/IngredientsMaster.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PurchaseHistory,UNKNOWN,client/src/pages/operations/PurchaseHistory.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-HealthSafetyAuditPage,UNKNOWN,client/src/pages/operations/health-safety-audit.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-HealthSafetyQuestionManager,UNKNOWN,client/src/pages/operations/health-safety-audit/questions.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-RecipeMappingPage,UNKNOWN,client/src/pages/operations/recipe-mapping.tsx,operations,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-HomePage,"""/website""",client/src/pages/public/HomePage.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PublicMembership,"""/website/membership""",client/src/pages/public/PublicMembership.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
-PublicOnlineOrdering,"""/website/online-ordering""",client/src/pages/public/PublicOnlineOrdering.tsx,other,unknown (inspect page fetch/axios),unknown,,active,no,LIKELY,mapped from App.tsx imports
+AnalysisDetail,ROUTES lookup required,client/src/pages/AnalysisDetail.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+AnalysisList,ROUTES lookup required,client/src/pages/AnalysisList.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+AnalysisPrototype,ROUTES lookup required,client/src/pages/AnalysisPrototype.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+BusinessExpenses,ROUTES lookup required,client/src/pages/BusinessExpenses.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+CostCalculator,ROUTES lookup required,client/src/pages/CostCalculator.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DailyShiftForm,ROUTES lookup required,client/src/pages/DailyShiftForm.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DailyStockSales,ROUTES lookup required,client/src/pages/DailyStockSales.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Dashboard,ROUTES lookup required,client/src/pages/Dashboard.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+EnhancedExpenses,ROUTES lookup required,client/src/pages/EnhancedExpenses.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ExpenseUpload,ROUTES lookup required,client/src/pages/ExpenseUpload.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Expenses,ROUTES lookup required,client/src/pages/Expenses.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ExpensesMerged,ROUTES lookup required,client/src/pages/ExpensesMerged.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Finance,ROUTES lookup required,client/src/pages/Finance.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Home,ROUTES lookup required,client/src/pages/Home.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientManagement,ROUTES lookup required,client/src/pages/IngredientManagement.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Ingredients,ROUTES lookup required,client/src/pages/Ingredients.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientsTable,ROUTES lookup required,client/src/pages/IngredientsTable.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+JaneAccounts,ROUTES lookup required,client/src/pages/JaneAccounts.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+JussiOps,ROUTES lookup required,client/src/pages/JussiOps.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Marketing,ROUTES lookup required,client/src/pages/Marketing.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+NightlyChecklist,ROUTES lookup required,client/src/pages/NightlyChecklist.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+NotFound,ROUTES lookup required,client/src/pages/NotFound.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+OnlineOrdering,ROUTES lookup required,client/src/pages/OnlineOrdering.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSLoyverse,ROUTES lookup required,client/src/pages/POSLoyverse.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Placeholder,ROUTES lookup required,client/src/pages/Placeholder.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ProductPage,ROUTES lookup required,client/src/pages/ProductPage.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Products,ROUTES lookup required,client/src/pages/Products.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ProfitLoss,ROUTES lookup required,client/src/pages/ProfitLoss.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Purchasing,ROUTES lookup required,client/src/pages/Purchasing.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Receipts,ROUTES lookup required,client/src/pages/Receipts.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ReceiptsBurgerCounts,ROUTES lookup required,client/src/pages/ReceiptsBurgerCounts.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ReceiptsSummary,ROUTES lookup required,client/src/pages/ReceiptsSummary.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+RecipeIngredientManagement,ROUTES lookup required,client/src/pages/RecipeIngredientManagement.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Recipes,ROUTES lookup required,client/src/pages/Recipes.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ReportsAnalysis,ROUTES lookup required,client/src/pages/ReportsAnalysis.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+SalesShiftAnalysis,ROUTES lookup required,client/src/pages/SalesShiftAnalysis.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftAnalytics,ROUTES lookup required,client/src/pages/ShiftAnalytics.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftComparison,ROUTES lookup required,client/src/pages/ShiftComparison.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftReportDetail,ROUTES lookup required,client/src/pages/ShiftReportDetail.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftReports,ROUTES lookup required,client/src/pages/ShiftReports.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShoppingList,ROUTES lookup required,client/src/pages/ShoppingList.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+SupplierManagement,ROUTES lookup required,client/src/pages/SupplierManagement.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+SystemStatus,ROUTES lookup required,client/src/pages/SystemStatus.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+TestEmailPage,ROUTES lookup required,client/src/pages/TestEmailPage.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+TestMonthlyStock,ROUTES lookup required,client/src/pages/TestMonthlyStock.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+UploadStatements,ROUTES lookup required,client/src/pages/UploadStatements.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+WebhookManagement,ROUTES lookup required,client/src/pages/WebhookManagement.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DataSafety,ROUTES lookup required,client/src/pages/admin/DataSafety.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientAuthority,ROUTES lookup required,client/src/pages/admin/IngredientAuthority.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DailyReview,ROUTES lookup required,client/src/pages/analysis/DailyReview.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+GrabLoyverseMonthlyReconciliation,ROUTES lookup required,client/src/pages/analysis/GrabLoyverseMonthlyReconciliation.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientUsage,ROUTES lookup required,client/src/pages/analysis/IngredientUsage.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientsTruth,ROUTES lookup required,client/src/pages/analysis/IngredientsTruth.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PosReceipts,ROUTES lookup required,client/src/pages/analysis/PosReceipts.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PosUpload,ROUTES lookup required,client/src/pages/analysis/PosUpload.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ReceiptsTruth,ROUTES lookup required,client/src/pages/analysis/ReceiptsTruth.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+RollsLedger,ROUTES lookup required,client/src/pages/analysis/RollsLedger.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftAnalysis,ROUTES lookup required,client/src/pages/analysis/ShiftAnalysis.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftAnalyticsMM,ROUTES lookup required,client/src/pages/analysis/ShiftAnalyticsMM.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+StockReconciliation,ROUTES lookup required,client/src/pages/analysis/StockReconciliation.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+StockReview,ROUTES lookup required,client/src/pages/analysis/StockReview.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+StockVariance,ROUTES lookup required,client/src/pages/analysis/StockVariance.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Login,ROUTES lookup required,client/src/pages/auth/Login.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DeliveryAdmin,ROUTES lookup required,client/src/pages/delivery/DeliveryAdmin.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DeliveryHistory,ROUTES lookup required,client/src/pages/delivery/DeliveryHistory.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DriverManager,ROUTES lookup required,client/src/pages/delivery/DriverManager.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+BusinessExpenses,ROUTES lookup required,client/src/pages/expenses/BusinessExpenses.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ExpenseEditor,ROUTES lookup required,client/src/pages/expenses/ExpenseEditor.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ExpensesList,ROUTES lookup required,client/src/pages/expenses/ExpensesList.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ExpensesV2,ROUTES lookup required,client/src/pages/expenses/ExpensesV2.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientSearch,ROUTES lookup required,client/src/pages/expenses/IngredientSearch.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftPurchasing,ROUTES lookup required,client/src/pages/expenses/ShiftPurchasing.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ExpensesImport,ROUTES lookup required,client/src/pages/finance/ExpensesImport.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+FinancePage,ROUTES lookup required,client/src/pages/finance/FinancePage.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+form-detail,ROUTES lookup required,client/src/pages/form-detail.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+form-library,ROUTES lookup required,client/src/pages/form-library.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+KDS,ROUTES lookup required,client/src/pages/kds/KDS.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+KDSHistory,ROUTES lookup required,client/src/pages/kds/KDSHistory.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+KDSOrderCard,ROUTES lookup required,client/src/pages/kds/KDSOrderCard.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+LoyverseMappingConsole,ROUTES lookup required,client/src/pages/loyverse/LoyverseMappingConsole.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+AdminQuestions,ROUTES lookup required,client/src/pages/managers/AdminQuestions.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ChecklistHistory,ROUTES lookup required,client/src/pages/managers/ChecklistHistory.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+NightlyChecklist,ROUTES lookup required,client/src/pages/managers/NightlyChecklist.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MarketingMachine,ROUTES lookup required,client/src/pages/marketing/MarketingMachine.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MenuAdmin,ROUTES lookup required,client/src/pages/marketing/MenuAdmin.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MemberDashboard,ROUTES lookup required,client/src/pages/membership/MemberDashboard.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MemberRegistration,ROUTES lookup required,client/src/pages/membership/MemberRegistration.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MembershipApp,ROUTES lookup required,client/src/pages/membership/MembershipApp.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+CostCalculator,ROUTES lookup required,client/src/pages/menu/CostCalculator.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DescriptionTool,ROUTES lookup required,client/src/pages/menu/DescriptionTool.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientEdit,ROUTES lookup required,client/src/pages/menu/IngredientEdit.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientManagement,ROUTES lookup required,client/src/pages/menu/IngredientManagement.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MenuImport,ROUTES lookup required,client/src/pages/menu/MenuImport.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MenuImportWizard,ROUTES lookup required,client/src/pages/menu/MenuImportWizard.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MenuManagement,ROUTES lookup required,client/src/pages/menu/MenuManagement.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MenuManager,ROUTES lookup required,client/src/pages/menu/MenuManager.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+RamsayChat,ROUTES lookup required,client/src/pages/menu/RamsayChat.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+RecipeCards,ROUTES lookup required,client/src/pages/menu/RecipeCards.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+RecipeEditor,ROUTES lookup required,client/src/pages/menu/RecipeEditor.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Recipes,ROUTES lookup required,client/src/pages/menu/Recipes.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+CategoriesEditor,ROUTES lookup required,client/src/pages/menuV3/CategoriesEditor.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ItemsEditor,ROUTES lookup required,client/src/pages/menuV3/ItemsEditor.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+MenuAdmin,ROUTES lookup required,client/src/pages/menuV3/MenuAdmin.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ModifiersEditor,ROUTES lookup required,client/src/pages/menuV3/ModifiersEditor.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+RecipeEditor,ROUTES lookup required,client/src/pages/menuV3/RecipeEditor.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+not-found,ROUTES lookup required,client/src/pages/not-found.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+CatalogPage,ROUTES lookup required,client/src/pages/online-ordering/CatalogPage.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+AiOpsControl,ROUTES lookup required,client/src/pages/operations/AiOpsControl.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Analysis,ROUTES lookup required,client/src/pages/operations/Analysis.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DailyShiftAnalysis,ROUTES lookup required,client/src/pages/operations/DailyShiftAnalysis.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+DailyStock,ROUTES lookup required,client/src/pages/operations/DailyStock.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientsMaster,ROUTES lookup required,client/src/pages/operations/IngredientsMaster.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IssueRegister,ROUTES lookup required,client/src/pages/operations/IssueRegister.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+LoyverseReports,ROUTES lookup required,client/src/pages/operations/LoyverseReports.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PurchaseHistory,ROUTES lookup required,client/src/pages/operations/PurchaseHistory.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Purchasing,ROUTES lookup required,client/src/pages/operations/Purchasing.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PurchasingAnalytics,ROUTES lookup required,client/src/pages/operations/PurchasingAnalytics.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PurchasingFieldMapping,ROUTES lookup required,client/src/pages/operations/PurchasingFieldMapping.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PurchasingList,ROUTES lookup required,client/src/pages/operations/PurchasingList.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PurchasingShiftLog,ROUTES lookup required,client/src/pages/operations/PurchasingShiftLog.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Recipes,ROUTES lookup required,client/src/pages/operations/Recipes.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+VarianceMonitor,ROUTES lookup required,client/src/pages/operations/VarianceMonitor.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftSummary,ROUTES lookup required,client/src/pages/operations/analysis/ShiftSummary.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+index,ROUTES lookup required,client/src/pages/operations/daily-reports/index.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+view,ROUTES lookup required,client/src/pages/operations/daily-reports/view.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Form,ROUTES lookup required,client/src/pages/operations/daily-sales/Form.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Library,ROUTES lookup required,client/src/pages/operations/daily-sales/Library.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+View,ROUTES lookup required,client/src/pages/operations/daily-sales/View.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Library,ROUTES lookup required,client/src/pages/operations/daily-sales-v2/Library.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+index,ROUTES lookup required,client/src/pages/operations/health-safety-audit/index.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+questions,ROUTES lookup required,client/src/pages/operations/health-safety-audit/questions.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+index,ROUTES lookup required,client/src/pages/operations/recipe-mapping/index.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+history,ROUTES lookup required,client/src/pages/operations/shopping-list/history.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+index,ROUTES lookup required,client/src/pages/operations/shopping-list/index.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+index,ROUTES lookup required,client/src/pages/operations/system-health/index.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+TaskDetail,ROUTES lookup required,client/src/pages/operations/tasks/TaskDetail.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientPurchasingForm,ROUTES lookup required,client/src/pages/ops/IngredientPurchasingForm.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+IngredientPurchasingList,ROUTES lookup required,client/src/pages/ops/IngredientPurchasingList.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PurchasingLive,ROUTES lookup required,client/src/pages/ops/PurchasingLive.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+AdminOrders,ROUTES lookup required,client/src/pages/ordering/AdminOrders.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+Checkout,ROUTES lookup required,client/src/pages/ordering/Checkout.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+OrderConfirmation,ROUTES lookup required,client/src/pages/ordering/OrderConfirmation.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PartnerAnalytics,ROUTES lookup required,client/src/pages/partners/PartnerAnalytics.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PartnerBars,ROUTES lookup required,client/src/pages/partners/PartnerBars.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+CustomerDisplayPage,ROUTES lookup required,client/src/pages/pos/CustomerDisplayPage.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POS,ROUTES lookup required,client/src/pages/pos/POS.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSCheckout,ROUTES lookup required,client/src/pages/pos/POSCheckout.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSLogin,ROUTES lookup required,client/src/pages/pos/POSLogin.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSReceiptPreview,ROUTES lookup required,client/src/pages/pos/POSReceiptPreview.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSRegisterStatus,ROUTES lookup required,client/src/pages/pos/POSRegisterStatus.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSCart,ROUTES lookup required,client/src/pages/pos/components/POSCart.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSCategoryBar,ROUTES lookup required,client/src/pages/pos/components/POSCategoryBar.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSItemGrid,ROUTES lookup required,client/src/pages/pos/components/POSItemGrid.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+POSModifierSheet,ROUTES lookup required,client/src/pages/pos/components/POSModifierSheet.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+HomePage,ROUTES lookup required,client/src/pages/public/HomePage.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PublicMembership,ROUTES lookup required,client/src/pages/public/PublicMembership.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PublicOnlineOrdering,ROUTES lookup required,client/src/pages/public/PublicOnlineOrdering.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+history,ROUTES lookup required,client/src/pages/reports/shift-report/history.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+index,ROUTES lookup required,client/src/pages/reports/shift-report/index.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+ShiftReportDetail,ROUTES lookup required,client/src/pages/reports/shift-report/view/ShiftReportDetail.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+SaaSAdmin,ROUTES lookup required,client/src/pages/saas/SaaSAdmin.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+PaymentProviders,ROUTES lookup required,client/src/pages/settings/PaymentProviders.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+TenantSwitcher,ROUTES lookup required,client/src/pages/settings/TenantSwitcher.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+LiveStock,ROUTES lookup required,client/src/pages/stock/LiveStock.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
+stock-library,ROUTES lookup required,client/src/pages/stock-library.tsx,ui,fetch/axios + react-query (inspect file),unknown,,active,no,LIKELY,page component discovered from tree
