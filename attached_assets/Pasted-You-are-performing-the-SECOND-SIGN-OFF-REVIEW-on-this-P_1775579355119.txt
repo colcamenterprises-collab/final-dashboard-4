@@ -1,0 +1,75 @@
+You are performing the SECOND SIGN-OFF REVIEW on this PR:
+
+PR TITLE:
+Dashboard 4.0 – Full Audit Report Before Consolidation
+
+IMPORTANT RULES
+1. This is a review-only task.
+2. Do NOT implement changes.
+3. Do NOT delete files.
+4. Do NOT refactor.
+5. Do NOT "tidy up" anything.
+6. Your job is to verify whether the audit is complete, factual, and safe to rely on before consolidation begins.
+
+YOUR JOB
+Review the audit PR and verify whether Codex missed anything in the repository.
+
+You must specifically check for:
+- missed frontend routes
+- missed backend routes
+- hidden route registration
+- lazy-loaded pages
+- runtime-only imports
+- startup ensure functions
+- background jobs / loops / scheduled processes
+- duplicate endpoints
+- duplicate systems
+- legacy pages
+- orphan pages reachable only by direct URL
+- old admin/debug/test pages
+- old API surfaces
+- environment-driven features
+- abandoned files
+- accidental files
+- files that appear unused but are actually runtime critical
+- files that should NOT be deleted even if they look old
+
+REQUIRED OUTPUT
+Produce a structured review with these exact sections:
+
+1. MISSED ITEMS
+List anything Codex missed.
+For each item include:
+- type
+- exact file path
+- exact route/endpoint if relevant
+- why it was missed
+- business impact
+- confidence
+
+2. CORRECTIONS REQUIRED
+List anything in the audit that is inaccurate, overstated, understated, or insufficiently evidenced.
+
+3. HIGH-RISK AREAS
+List any areas that must NOT be consolidated or deleted without runtime validation.
+
+4. STATIC-ANALYSIS BLIND SPOTS
+List anything that may not be provable from static analysis alone and needs manual/runtime review.
+
+5. DELETE-SAFETY WARNINGS
+List anything currently marked as delete candidate that may be dangerous to remove.
+
+6. FINAL SIGN-OFF STATUS
+Return one of:
+- APPROVED
+- APPROVED WITH CORRECTIONS
+- NOT APPROVED
+
+7. FINAL COMMENT
+State whether this audit is strong enough to be used as the source document for Dashboard 4.0 consolidation planning.
+
+IMPORTANT
+Be critical.
+Assume the report may have missed things.
+This is not a rubber-stamp review.
+We need factual completeness before any cleanup, deletion, migration, or Dashboard 5 work begins.
