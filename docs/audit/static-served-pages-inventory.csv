@@ -1,0 +1,4 @@
+mount_or_route,target,file,type,runtime_active
+sendFile,path.resolve(process.cwd(,server/index.ts,operational static page,yes
+sendFile,path.resolve(process.cwd(,server/index.ts,operational static page,yes
+/,distPath,server/vite.ts,production SPA static serve,yes

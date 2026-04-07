@@ -1,0 +1,15 @@
+file,job_type,schedule_or_trigger,area,runtime_active (yes/no/unknown),confidence
+server/index.ts,setInterval,inline timer,scheduler,yes,VERIFIED
+server/jobs/cron.ts,cron.schedule,"'0 * * * *', async () => {",scheduler,yes,VERIFIED
+server/jobs/cron.ts,cron.schedule,"'15 3 * * *', async () => {",scheduler,yes,VERIFIED
+server/jobs/cron.ts,cron.schedule,"'5 3 * * *', async () => {",scheduler,yes,VERIFIED
+server/jobs/cron.ts,cron.schedule,"'55 2 * * *', async () => {",scheduler,yes,VERIFIED
+server/jobs/cronEnsureShift.ts,cron.schedule,"""5 3 * * *"", async () => {",scheduler,yes,VERIFIED
+server/loyverseAPI_old.ts,setInterval,inline timer,scheduler,yes,VERIFIED
+server/routes/aiOpsControl.ts,setInterval,inline timer,scheduler,yes,VERIFIED
+server/services/cronEmailService.ts,cron.schedule,"'0 9 * * *', async () => {",scheduler,yes,VERIFIED
+server/services/loyverseDataOrchestrator.ts,cron.schedule,"'5 20 * * *', async () => {",scheduler,yes,VERIFIED
+server/services/scheduler.js,cron.schedule,"'*/15 * * * *', async () => {",scheduler,yes,VERIFIED
+server/services/scheduler.js,cron.schedule,"'0 8 * * *', async () => {",scheduler,yes,VERIFIED
+server/services/scheduler.js,cron.schedule,"'30 3 * * *', async () => {",scheduler,yes,VERIFIED
+server/services/scheduler.ts,setInterval,inline timer,scheduler,yes,VERIFIED

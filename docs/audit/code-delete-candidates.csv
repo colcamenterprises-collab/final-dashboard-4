@@ -1,0 +1,3 @@
+path,reason,classification,action,confidence
+archive/**,"legacy snapshot tree, not runtime mounted",archive,defer-delete-with-backup,VERIFIED
+attached_assets/**,"transcripts/artifacts, non-runtime",asset-noise,defer-delete-with-owner-signoff,VERIFIED
