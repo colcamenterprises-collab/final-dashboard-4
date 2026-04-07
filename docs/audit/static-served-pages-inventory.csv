@@ -1,0 +1,10 @@
+file,classification,exposure_mechanism,served_route,evidence_file,confidence
+public/tablet-nuclear.html,operational page,dedicated express route + express.static,/tablet-nuclear and /public/tablet-nuclear.html,server/index.ts,VERIFIED
+public/tablet-reload.html,operational page,dedicated express route + express.static,/tablet-reload and /public/tablet-reload.html,server/index.ts,VERIFIED
+public/chatbox.html,operational page,express.static /public,/public/chatbox.html,server/index.ts,VERIFIED
+public/chatbox-ollie.html,operational page,express.static /public,/public/chatbox-ollie.html,server/index.ts,VERIFIED
+public/chatbox-sally.html,operational page,express.static /public,/public/chatbox-sally.html,server/index.ts,VERIFIED
+public/chatbox-marlo.html,operational page,express.static /public,/public/chatbox-marlo.html,server/index.ts,VERIFIED
+public/chatbox-jussi.html,operational page,express.static /public,/public/chatbox-jussi.html,server/index.ts,VERIFIED
+public/chatbox-bigboss.html,operational page,express.static /public,/public/chatbox-bigboss.html,server/index.ts,VERIFIED
+public/chatbox-template.html,operational page,express.static /public,/public/chatbox-template.html,server/index.ts,VERIFIED

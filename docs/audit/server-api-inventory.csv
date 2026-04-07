@@ -1,0 +1,14 @@
+file,imported (yes/no),imported_from,likely_role,delete_risk,confidence
+server/api/daily-sales.legacy.ts,no,,legacy api endpoint,high,LIKELY
+server/api/daily-stock.ts,no,,stock api,high,LIKELY
+server/api/db-health.ts,no,,api module,high,LIKELY
+server/api/expenseImports.ts,no,,api module,high,LIKELY
+server/api/finance.ts,no,,finance api,high,LIKELY
+server/api/forms.ts,no,,forms api,high,LIKELY
+server/api/ingredients-import.ts,no,,ingredient api,high,LIKELY
+server/api/ingredients/upload.ts,no,,ingredient api,high,LIKELY
+server/api/library/daily-sales.ts,no,,library read endpoint,high,LIKELY
+server/api/stock-catalog-new.ts,no,,stock api,high,LIKELY
+server/api/stock-catalog.ts,no,,stock api,high,LIKELY
+server/api/stock-master.ts,no,,stock api,high,LIKELY
+server/api/stockReview.ts,yes,server/routes.ts,stock api,medium,VERIFIED

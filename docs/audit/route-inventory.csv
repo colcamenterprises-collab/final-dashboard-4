@@ -1,0 +1,763 @@
+route_type (frontend/backend/api),method,path,file_source,handler_or_component,auth_required,currently_used (yes/no/unknown),duplicate_or_overlap,related_feature,delete_candidate,confidence,notes
+frontend,GET,/,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 137; source literal; original ""/"""
+frontend,GET,/website,client/src/App.tsx,HomePage,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 140; source literal; original ""/website"""
+frontend,GET,/website/membership,client/src/App.tsx,PublicMembership,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 141; source literal; original ""/website/membership"""
+frontend,GET,/website/online-ordering,client/src/App.tsx,PublicOnlineOrdering,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 142; source literal; original ""/website/online-ordering"""
+frontend,GET,/login,client/src/App.tsx,Login,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 143; source literal; original ""/login"""
+frontend,GET,/order,client/src/App.tsx,OnlineOrdering,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 144; source ROUTES.ORDER; original {ROUTES.ORDER}
+frontend,GET,/online-ordering/checkout,client/src/App.tsx,Checkout,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 145; source ROUTES.ORDER_CHECKOUT; original {ROUTES.ORDER_CHECKOUT}
+frontend,GET,/online-ordering/confirmation,client/src/App.tsx,OrderConfirmation,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 146; source ROUTES.ORDER_CONFIRMATION; original {ROUTES.ORDER_CONFIRMATION}
+frontend,GET,/dashboard,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 149; source literal; original ""/dashboard"""
+frontend,GET,/home,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 150; source literal; original ""/home"""
+frontend,GET,/operations/daily-sales-v2/library,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 152; source ROUTES.DAILY_SALES_LIBRARY; original {ROUTES.DAILY_SALES_LIBRARY}
+frontend,GET,/operations/daily-sales-library,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 153; source literal; original ""/operations/daily-sales-library"""
+frontend,GET,/operations/shopping-list,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 154; source ROUTES.SHOPPING_LIST; original {ROUTES.SHOPPING_LIST}
+frontend,GET,/operations/purchasing-list/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 155; source literal; original ""/operations/purchasing-list/:id"""
+frontend,GET,/operations/purchasing-mapping,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 156; source literal; original ""/operations/purchasing-mapping"""
+frontend,GET,/operations/purchasing-shift-log,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 157; source literal; original ""/operations/purchasing-shift-log"""
+frontend,GET,/operations/purchasing-analytics,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 158; source literal; original ""/operations/purchasing-analytics"""
+frontend,GET,/operations/ingredient-purchasing,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 159; source ROUTES.INGREDIENT_PURCHASING; original {ROUTES.INGREDIENT_PURCHASING}
+frontend,GET,/operations/ingredient-purchasing/new,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 160; source literal; original ""/operations/ingredient-purchasing/new"""
+frontend,GET,/operations/ingredient-purchasing/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 161; source literal; original ""/operations/ingredient-purchasing/:id"""
+frontend,GET,/operations/daily-sales,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 164; source literal; original ""/operations/daily-sales"""
+frontend,GET,/operations/daily-sales/edit/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 165; source literal; original ""/operations/daily-sales/edit/:id"""
+frontend,GET,/daily-sales,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 166; source literal; original ""/daily-sales"""
+frontend,GET,/operations/daily-sales-stock,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 167; source literal; original ""/operations/daily-sales-stock"""
+frontend,GET,/operations/daily-stock,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 169; source literal; original ""/operations/daily-stock"""
+frontend,GET,/ops/purchasing-live,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 171; source literal; original ""/ops/purchasing-live"""
+frontend,GET,/operations/purchasing,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 172; source literal; original ""/operations/purchasing"""
+frontend,GET,/operations/daily-reports,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 174; source literal; original ""/operations/daily-reports"""
+frontend,GET,/operations/system-health,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 175; source literal; original ""/operations/system-health"""
+frontend,GET,/operations/ai-ops-control,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 176; source literal; original ""/operations/ai-ops-control"""
+frontend,GET,/operations/tasks/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 177; source literal; original ""/operations/tasks/:id"""
+frontend,GET,/operations/purchase-history,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 178; source literal; original ""/operations/purchase-history"""
+frontend,GET,/operations/health-safety-audit,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 179; source literal; original ""/operations/health-safety-audit"""
+frontend,GET,/operations/health-safety-audit/questions,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 180; source literal; original ""/operations/health-safety-audit/questions"""
+frontend,GET,/operations/ingredients-master,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 181; source literal; original ""/operations/ingredients-master"""
+frontend,GET,/operations/recipe-mapping,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 182; source literal; original ""/operations/recipe-mapping"""
+frontend,GET,/operations/variance-monitor,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 183; source literal; original ""/operations/variance-monitor"""
+frontend,GET,/operations/issue-register,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 184; source literal; original ""/operations/issue-register"""
+frontend,GET,/operations/analysis,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 186; source literal; original ""/operations/analysis"""
+frontend,GET,/operations/analysis/loyverse,client/src/App.tsx,LoyverseReports,mixed,unknown,alias/redirect possible,ui-routing,no,LIKELY,"App.tsx line 188; source literal; original ""loyverse"""
+frontend,GET,/operations/analysis/stock-review,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,LIKELY,"App.tsx line 189; source literal; original ""stock-review"""
+frontend,GET,/operations/analysis/shift-items,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,LIKELY,"App.tsx line 190; source literal; original ""shift-items"""
+frontend,GET,/daily-shift-analysis,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,LIKELY,"App.tsx line 191; source literal; original ""daily-shift-analysis"""
+frontend,GET,/operations/analysis/stock-review,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 194; source literal; original ""/operations/analysis/stock-review"""
+frontend,GET,/analysis/stock-review,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 195; source literal; original ""/analysis/stock-review"""
+frontend,GET,/analysis/stock-reconciliation,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 196; source literal; original ""/analysis/stock-reconciliation"""
+frontend,GET,/operations/analysis/rolls-ledger,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 197; source literal; original ""/operations/analysis/rolls-ledger"""
+frontend,GET,/upload,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,LIKELY,"App.tsx line 199; source literal; original ""upload"""
+frontend,GET,/receipts,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,LIKELY,"App.tsx line 200; source literal; original ""receipts"""
+frontend,GET,/operations/analysis/upload,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 202; source ROUTES.UPLOAD_STATEMENTS; original {ROUTES.UPLOAD_STATEMENTS}
+frontend,GET,/operations/analysis/receipts,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 203; source ROUTES.RECEIPTS; original {ROUTES.RECEIPTS}
+frontend,GET,/operations/analysis/receipts/burgers,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 204; source ROUTES.RECEIPTS_BURGERS; original {ROUTES.RECEIPTS_BURGERS}
+frontend,GET,/receipts-burger-counts,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 205; source literal; original ""/receipts-burger-counts"""
+frontend,GET,/operations/expenses,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 206; source ROUTES.EXPENSES; original {ROUTES.EXPENSES}
+frontend,GET,/expenses,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 207; source literal; original ""/expenses"""
+frontend,GET,/operations/shift-reports,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 208; source ROUTES.SHIFT_REPORTS; original {ROUTES.SHIFT_REPORTS}
+frontend,GET,/reports/shift-report,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 210; source literal; original ""/reports/shift-report"""
+frontend,GET,/reports/shift-report/history,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 211; source literal; original ""/reports/shift-report/history"""
+frontend,GET,/reports/shift-report/view/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 212; source literal; original ""/reports/shift-report/view/:id"""
+frontend,GET,/finance,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 214; source ROUTES.FINANCE; original {ROUTES.FINANCE}
+frontend,GET,/finance/profit-loss,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 215; source ROUTES.PROFIT_LOSS; original {ROUTES.PROFIT_LOSS}
+frontend,GET,/finance/expenses,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 216; source literal; original ""/finance/expenses"""
+frontend,GET,/finance/expenses-import,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 217; source ROUTES.EXPENSES_IMPORT; original {ROUTES.EXPENSES_IMPORT}
+frontend,GET,/finance/expenses-v2,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 218; source ROUTES.EXPENSES_V2; original {ROUTES.EXPENSES_V2}
+frontend,GET,/menu/cost-calculator,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 220; source ROUTES.COST_CALCULATOR; original {ROUTES.COST_CALCULATOR}
+frontend,GET,/menu/ingredients,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 221; source ROUTES.INGREDIENTS; original {ROUTES.INGREDIENTS}
+frontend,GET,/menu/ingredients/edit/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 222; source literal; original ""/menu/ingredients/edit/:id"""
+frontend,GET,/menu/manager,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 223; source ROUTES.MENU_MGR; original {ROUTES.MENU_MGR}
+frontend,GET,/menu/import,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 224; source ROUTES.MENU_IMPORT; original {ROUTES.MENU_IMPORT}
+frontend,GET,/menu/description-tool,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 225; source ROUTES.MENU_DESC_TOOL; original {ROUTES.MENU_DESC_TOOL}
+frontend,GET,/recipe-management,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 226; source ROUTES.RECIPE_MANAGEMENT; original {ROUTES.RECIPE_MANAGEMENT}
+frontend,GET,/menu/recipes,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 227; source ROUTES.RECIPES; original {ROUTES.RECIPES}
+frontend,GET,/menu/recipes/new,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 228; source ROUTES.RECIPES_NEW; original {ROUTES.RECIPES_NEW}
+frontend,GET,/menu/recipes/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 229; source ROUTES.RECIPES_EDIT; original {ROUTES.RECIPES_EDIT}
+frontend,GET,/menu/recipe-cards,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 230; source ROUTES.RECIPE_CARDS; original {ROUTES.RECIPE_CARDS}
+frontend,GET,/menu/ingredient-management,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 231; source ROUTES.INGREDIENT_MANAGEMENT; original {ROUTES.INGREDIENT_MANAGEMENT}
+frontend,GET,/products,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 232; source literal; original ""/products"""
+frontend,GET,/products/new,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 233; source literal; original ""/products/new"""
+frontend,GET,/products/:id,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 234; source literal; original ""/products/:id"""
+frontend,GET,/managers/nightly-checklist,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 236; source ROUTES.NIGHTLY_CHECKLIST; original {ROUTES.NIGHTLY_CHECKLIST}
+frontend,GET,/ai/jussi-ops,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 237; source ROUTES.JUSSI_AI; original {ROUTES.JUSSI_AI}
+frontend,GET,/ai/jane-accounts,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 238; source ROUTES.JANE_ACCOUNTS; original {ROUTES.JANE_ACCOUNTS}
+frontend,GET,/marketing/online-ordering,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 240; source ROUTES.ONLINE_ORDERING; original {ROUTES.ONLINE_ORDERING}
+frontend,GET,/online-ordering/catalog,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 241; source literal; original ""/online-ordering/catalog"""
+frontend,GET,/marketing/menu-admin,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 242; source ROUTES.MENU_ADMIN; original {ROUTES.MENU_ADMIN}
+frontend,GET,/admin/orders,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,App.tsx line 243; source ROUTES.ADMIN_ORDERS; original {ROUTES.ADMIN_ORDERS}
+frontend,GET,/admin/loyverse-mapping,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 244; source literal; original ""/admin/loyverse-mapping"""
+frontend,GET,/admin/data-safety,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 245; source literal; original ""/admin/data-safety"""
+frontend,GET,/partners,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 247; source literal; original ""/partners"""
+frontend,GET,/partners/analytics,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 248; source literal; original ""/partners/analytics"""
+frontend,GET,/delivery/admin,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 250; source literal; original ""/delivery/admin"""
+frontend,GET,/delivery/drivers,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 251; source literal; original ""/delivery/drivers"""
+frontend,GET,/delivery/history,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 252; source literal; original ""/delivery/history"""
+frontend,GET,/kds,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 254; source literal; original ""/kds"""
+frontend,GET,/kds/history,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 255; source literal; original ""/kds/history"""
+frontend,GET,/menu-v3,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 257; source literal; original ""/menu-v3"""
+frontend,GET,/menu-management/ingredients,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 258; source literal; original ""/menu-management/ingredients"""
+frontend,GET,/menu-management,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 259; source literal; original ""/menu-management"""
+frontend,GET,/pos-login,client/src/App.tsx,POSLogin,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 261; source literal; original ""/pos-login"""
+frontend,GET,/pos,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 262; source literal; original ""/pos"""
+frontend,GET,/pos-register,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 263; source literal; original ""/pos-register"""
+frontend,GET,/pos-checkout,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 264; source literal; original ""/pos-checkout"""
+frontend,GET,/pos-receipt,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 265; source literal; original ""/pos-receipt"""
+frontend,GET,/pos/customer-display,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 266; source literal; original ""/pos/customer-display"""
+frontend,GET,/stock-live,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 268; source literal; original ""/stock-live"""
+frontend,GET,/analysis/ingredients-usage,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 270; source literal; original ""/analysis/ingredients-usage"""
+frontend,GET,/analysis/stock-variance,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 271; source literal; original ""/analysis/stock-variance"""
+frontend,GET,/analysis/receipts,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 272; source literal; original ""/analysis/receipts"""
+frontend,GET,/analysis/ingredients,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 273; source literal; original ""/analysis/ingredients"""
+frontend,GET,/analysis/grab-loyverse-monthly-reconciliation,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 274; source literal; original ""/analysis/grab-loyverse-monthly-reconciliation"""
+frontend,GET,/saas,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 276; source literal; original ""/saas"""
+frontend,GET,/settings/tenant,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 277; source literal; original ""/settings/tenant"""
+frontend,GET,/settings/payments,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 278; source literal; original ""/settings/payments"""
+frontend,GET,/membership/dashboard,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 280; source literal; original ""/membership/dashboard"""
+frontend,GET,/membership/register,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 281; source literal; original ""/membership/register"""
+frontend,GET,/analysis/daily-review,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 283; source literal; original ""/analysis/daily-review"""
+frontend,GET,/operations/analysis/daily-shift-analysis,client/src/App.tsx,Navigate,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 284; source literal; original ""/operations/analysis/daily-shift-analysis"""
+frontend,GET,/marketing,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,no,VERIFIED,"App.tsx line 286; source literal; original ""/marketing"""
+frontend,GET,/analysis-prototype,client/src/App.tsx,ProtectedRoute,mixed,unknown,alias/redirect possible,ui-routing,maybe,VERIFIED,"App.tsx line 288; source literal; original ""/analysis-prototype"""
+frontend,GET,*,client/src/App.tsx,NotFound,mixed,unknown,alias/redirect possible,ui-routing,no,LIKELY,"App.tsx line 290; source literal; original ""*"""
+api,GET,/api/suppliers-json,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/stock-catalog/import,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/daily-stock,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/daily-stock,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/pos/upload,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/pos/upload-bundle,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/pos/batches,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/pos/:batchId/analyze,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/shift,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/profit-loss,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/loyverse/shifts,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/loyverse/receipts,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/dashboard/stock-discrepancies,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/upload,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/trigger,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/generate,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/stock-reconciliation,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/usage-reconciliation,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/list,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/daily-sales,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/daily-sales/export.csv,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+backend,GET,/online-ordering/*,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-summary,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/receipts-truth/rebuild,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth/lines,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth/modifiers,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/receipts-truth/ingredients/rebuild,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth/ingredients,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/ingredients-truth,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/receipts-truth/aggregates/rebuild,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth/aggregates,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth/category-mappings,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/receipts-truth/category-mappings,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/receipts-truth/modifiers-effective/rebuild,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth/modifiers-effective,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/receipts-truth/daily-usage/rebuild,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/receipts-truth/daily-usage,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/build-status,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/ingredient-usage/rebuild,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/ingredient-usage,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/modifier-rules,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analysis/modifier-rules,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/:date,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/snapshot/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/search,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/latest,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/expensesV2/legacy,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/expensesV2,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/ingredients/search,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/reports/sales-summary,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/reports/financial-overview,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/reports/performance-metrics,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/sync-supplier-csv,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/ingredients/by-category,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/daily-shift-forms,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/daily-stock-sales/draft,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/daily-stock-sales,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,DELETE,/api/daily-stock-sales/:id/soft,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/daily-stock-sales/archived,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/daily-stock-sales/:id/restore,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/daily-stock-sales,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/lodge-stock,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/daily-stock-sales/search,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/shopping-lists,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/food-costings,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+backend,POST,/submit-form,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/system/status,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/expensesV2,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/expensesV2/upload,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/expensesV2/approve,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/expensesV2/stock,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analysis/stock-review/purchase-history,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,PUT,/api/expensesV2/stock/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,PUT,/api/expensesV2/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,DELETE,/api/expensesV2/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/expensesV2/month-to-date,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/expensesV2/by-category,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/expensesV2/totals,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/expense-suppliers,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/expense-suppliers,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/expense-categories,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/expense-categories,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/bank-statements,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/bank-statements,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/ingredients,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/ingredients/print,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,PUT,/api/ingredients/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/ingredients/sync-csv,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/daily-sales,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/forms,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/forms/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/forms/:id/email,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/items,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/admin/menu-canonical/status,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/admin/menu-canonical/load,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/admin/menu-canonical/drift,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/pos/sync-status,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/pos/sync,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/analytics/latest,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/analytics/process,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/jussi/status,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/jussi/generate,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/jussi/latest,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/receipts/recent,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/recipes,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/recipes/save-with-photo,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/recipes/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,PUT,/api/recipes/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/ingredients,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/items/:id/waste-history,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/suppliers/makro/prices,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/library/daily-sales,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/ingredients/upload,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/shopping-list/regenerate,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/shopping-list/:date?,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/shopping-list/:id/estimate,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/shopping-list/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/ops/jussi/compare-shift,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/acc/jane/reconcile-day,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/operations/variance,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/ai/recipe-description,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/menu/publish,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/forms/library,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/forms/daily-sales/v3,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/dev/daily-sales-v2/:id/repair-merge,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/daily-sales-v2/latest-proof,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/ingredients/upload-csv,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/ingredients/shopping-list/:date,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/manager-checklist/questions,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/manager-checklist/questions,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,DELETE,/api/manager-checklist/questions/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/manager-checklist/nightly,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/manager-checklist/status,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/manager-checklist/submit,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/manager-checklist/seed,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/upload/image,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/snapshots,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/snapshots/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/jussi/latest-comparison,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/snapshots/:id/items,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/dashboard/latest,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/snapshots/create,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/snapshots/:id/comparison,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/snapshots/:id/recompute,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/shift-sales,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/shift-sales/:id,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/shift-sales/date/:date,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,PATCH,/api/shift-sales/:id/status,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/operations/stats,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/download/architecture-report,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/download/ground-zero-schema,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/shift-reports/balance-review,server/routes.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+backend,GET,/tablet-reload,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+backend,GET,/tablet-nuclear,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/daily-stock/:salesFormId,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,POST,/api/daily-sales,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/daily-sales,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/ingredients,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+backend,POST,/chat/:agent,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+backend,GET,/env,server/index.ts,inline app handler,unknown,unknown,,inline route family,unknown,VERIFIED,direct app.METHOD in file
+api,GET,/api/stock-review/manual-ledger/,server/routes/stockReviewManual.ts,stockReviewManual,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review/manual-ledger
+api,POST,/api/stock-review/manual-ledger/,server/routes/stockReviewManual.ts,stockReviewManual,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review/manual-ledger
+api,GET,/api/stock-review/manual-ledger/export.csv,server/routes/stockReviewManual.ts,stockReviewManual,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review/manual-ledger
+api,GET,/api/stock-review/manual-ledger/health,server/routes/stockReviewManual.ts,stockReviewManual,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review/manual-ledger
+api,POST,/api/stock-review/manual-ledger/refresh-meat,server/routes/stockReviewManual.ts,stockReviewManual,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review/manual-ledger
+api,POST,/api/stock-review/manual-ledger/refresh-rolls,server/routes/stockReviewManual.ts,stockReviewManual,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review/manual-ledger
+api,POST,/api/stock-review/manual-ledger/save,server/routes/stockReviewManual.ts,stockReviewManual,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review/manual-ledger
+api,GET,/api/stock-review/rolls,server/api/stockReview.ts,stockReviewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock-review
+api,GET,/api/receipts/shift/burgers/ping,server/routes/receiptsBurgers.ts,receiptsBurgers,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/receipts
+api,GET,/api/receipts/shift/burgers,server/routes/receiptsBurgers.ts,receiptsBurgers,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/receipts
+api,POST,/api/receipts/shift/burgers/rebuild,server/routes/receiptsBurgers.ts,receiptsBurgers,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/receipts
+api,GET,/api/receipts/debug/items,server/routes/receiptsDebug.ts,receiptsDebug,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/receipts
+api,GET,/api/receipts/count,server/routes/receiptCount.ts,receiptCount,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/receipts
+backend,GET,/internal/api/reports/item-sales,server/routes/internalReports.ts,internalReports,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /internal/api/reports
+backend,GET,/internal/api/reports/modifier-sales,server/routes/internalReports.ts,internalReports,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /internal/api/reports
+backend,GET,/internal/api/reports/category-totals,server/routes/internalReports.ts,internalReports,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /internal/api/reports
+api,POST,/api/loyverse/sync,server/routes/loyverseSync.ts,loyverseSync,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/shift-report,server/routes/loyverseShiftReport.ts,loyverseShiftReportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,POST,/api/shift-report/generate,server/routes/shiftReportRoutes.ts,shiftReportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shift-report
+api,GET,/api/shift-report/latest,server/routes/shiftReportRoutes.ts,shiftReportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shift-report
+api,GET,/api/shift-report/history,server/routes/shiftReportRoutes.ts,shiftReportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shift-report
+api,GET,/api/shift-report/view/:id,server/routes/shiftReportRoutes.ts,shiftReportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shift-report
+api,GET,/api/shift-report/pdf/:id,server/routes/shiftReportRoutes.ts,shiftReportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shift-report
+api,POST,/api/purchases/import-purchases,server/routes/purchases.ts,purchasesRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchases
+api,POST,/api/online/products/upsert-from-recipe,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/online/products/unpublish-from-recipe,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/online/products,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/online/products/catalog,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,PATCH,/api/online/products/:id,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/online/orders,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/online/orders,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,PATCH,/api/online/orders/:id/status,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/ordering/menu,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/ordering/orders,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/ordering/orders,server/routes/onlineOrderingV2.ts,onlineOrderingV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/online/catalog,server/routes/onlineCatalog.ts,onlineCatalogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/online/catalog/:id/options,server/routes/onlineCatalog.ts,onlineCatalogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/analysis/receipts/rebuild,server/routes/receiptBatchRoutes.ts,receiptBatchRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/analysis
+api,GET,/api/analysis/receipts/summary,server/routes/receiptBatchRoutes.ts,receiptBatchRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/analysis
+api,POST,/api/expenses/upload-bank,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,POST,/api/expenses/upload-partner,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,GET,/api/expenses/pending,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,PATCH,/api/expenses/:id/approve,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,PATCH,/api/expenses/:id/reject,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,PATCH,/api/expenses/batch-approve,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,PATCH,/api/expenses/batch-reject,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,GET,/api/expenses/defaults,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,GET,/api/expenses/defaults/:supplier,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,POST,/api/expenses/defaults,server/routes/expenses-import.ts,expensesImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses
+api,GET,/api/balance/pos,server/routes/balance.ts,balanceRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/balance
+api,GET,/api/balance/forms,server/routes/balance.ts,balanceRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/balance
+api,GET,/api/balance/combined,server/routes/balance.ts,balanceRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/balance
+api,GET,/api/ingredients/legacy/,server/routes/ingredients-legacy.ts,legacyIngredientsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients/legacy
+api,GET,/api/ingredients/,server/routes/ingredients.ts,ingredientsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients
+api,POST,/api/ingredients/suggest,server/routes/ingredients.ts,ingredientsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients
+api,GET,/api/ingredients/canonical,server/routes/ingredients.ts,ingredientsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients
+api,POST,/api/ingredients/sync/:purchasingItemId,server/routes/ingredients.ts,ingredientsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients
+api,POST,/api/ingredients/sync-all,server/routes/ingredients.ts,ingredientsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients
+api,GET,/api/ingredients/management,server/routes/ingredients.ts,ingredientsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients
+api,PUT,/api/ingredients/:id,server/routes/ingredients.ts,ingredientsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/ingredients
+api,GET,/api/manager-check/questions,server/routes/managerChecks.ts,managerCheckRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/manager-check
+api,POST,/api/manager-check/submit,server/routes/managerChecks.ts,managerCheckRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/manager-check
+api,GET,/api/manager-check/admin/questions,server/routes/managerChecks.ts,managerCheckRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/manager-check
+api,GET,/api/shopping-list/latest,server/routes/shoppingListRoutes.ts,shoppingListRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shopping-list
+api,GET,/api/shopping-list/pdf/latest,server/routes/shoppingListRoutes.ts,shoppingListRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shopping-list
+api,GET,/api/shopping-list/pdf/range,server/routes/shoppingListRoutes.ts,shoppingListRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shopping-list
+api,GET,/api/shopping-list/history,server/routes/shoppingListRoutes.ts,shoppingListRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shopping-list
+api,GET,/api/purchasing-list/latest,server/routes/shoppingListNew.ts,shoppingListNewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-list
+api,GET,/api/purchasing-list/system-purchases,server/routes/shoppingListNew.ts,shoppingListNewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-list
+api,GET,/api/purchasing-list/:salesId,server/routes/shoppingListNew.ts,shoppingListNewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-list
+api,GET,/api/purchasing-list/:salesId/csv,server/routes/shoppingListNew.ts,shoppingListNewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-list
+api,GET,/api/purchasing-list/latest/csv,server/routes/shoppingListNew.ts,shoppingListNewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-list
+api,GET,/api/purchasing-field-mapping/field-keys,server/routes/purchasingFieldMapping.ts,purchasingFieldMappingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-field-mapping
+api,GET,/api/purchasing-field-mapping/items,server/routes/purchasingFieldMapping.ts,purchasingFieldMappingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-field-mapping
+api,POST,/api/purchasing-field-mapping/map,server/routes/purchasingFieldMapping.ts,purchasingFieldMappingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-field-mapping
+api,DELETE,/api/purchasing-field-mapping/map/:fieldKey,server/routes/purchasingFieldMapping.ts,purchasingFieldMappingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-field-mapping
+api,GET,/api/purchasing-field-mapping/export/csv,server/routes/purchasingFieldMapping.ts,purchasingFieldMappingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-field-mapping
+api,POST,/api/purchasing-field-mapping/import/csv,server/routes/purchasingFieldMapping.ts,purchasingFieldMappingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-field-mapping
+api,POST,/api/purchasing-field-mapping/items,server/routes/purchasingFieldMapping.ts,purchasingFieldMappingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-field-mapping
+api,GET,/api/purchasing-shift-log/purchasing-shift-matrix,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-shift-log
+api,POST,/api/purchasing-shift-log/purchasing-shift-sync/:stockId,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-shift-log
+api,POST,/api/purchasing-shift-log/purchasing-shift-backfill,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-shift-log
+api,GET,/api/purchasing-shift-log/,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-shift-log
+api,GET,/api/purchasing-analytics/,server/routes/purchasingAnalytics.ts,purchasingAnalyticsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/purchasing-analytics
+api,GET,/api/debug/purchasing-parity,server/routes/debugPurchasing.ts,debugPurchasingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/debug
+api,GET,/api/debug/ingredient-parity,server/routes/debugPurchasing.ts,debugPurchasingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/debug
+api,GET,/api/debug/ingredient-usage-summary,server/routes/debugPurchasing.ts,debugPurchasingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/debug
+api,POST,/api/debug/derive-ingredient-usage,server/routes/debugPurchasing.ts,debugPurchasingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/debug
+api,GET,/api/pnl/years,server/routes/pnlReadModel.ts,pnlReadModelRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pnl
+api,GET,/api/pnl/,server/routes/pnlReadModel.ts,pnlReadModelRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pnl
+api,GET,/api/pnl/year,server/routes/pnlReadModel.ts,pnlReadModelRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pnl
+api,POST,/api/pnl/rebuild,server/routes/pnlReadModel.ts,pnlReadModelRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pnl
+api,POST,/api/pnl/rebuild-range,server/routes/pnlReadModel.ts,pnlReadModelRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pnl
+api,GET,/api/pos-shift/:date,server/routes/shiftApproval.ts,shiftApprovalRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/pos-shift/:date/sync,server/routes/shiftApproval.ts,shiftApprovalRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/daily-sales-v2/:date,server/routes/shiftApproval.ts,shiftApprovalRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/approve-shift,server/routes/shiftApproval.ts,shiftApprovalRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/shift-snapshots,server/routes/shiftApproval.ts,shiftApprovalRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/latest-valid-shift,server/routes/shiftApproval.ts,shiftApprovalRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/pnl/:period,server/routes/shiftApproval.ts,shiftApprovalRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/issue-register/,server/routes/issueRegister.ts,issueRegisterRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/issue-register
+api,GET,/api/issue-register/by-shift/:date,server/routes/issueRegister.ts,issueRegisterRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/issue-register
+api,GET,/api/issue-register/:id,server/routes/issueRegister.ts,issueRegisterRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/issue-register
+api,POST,/api/issue-register/,server/routes/issueRegister.ts,issueRegisterRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/issue-register
+api,PATCH,/api/issue-register/:id,server/routes/issueRegister.ts,issueRegisterRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/issue-register
+api,POST,/api/issue-register/auto-create,server/routes/issueRegister.ts,issueRegisterRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/issue-register
+api,POST,/api/pnl/snapshot/rebuild,server/routes/pnlSnapshot.route.ts,pnlSnapshotRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pnl/snapshot
+api,GET,/api/pnl/snapshot/,server/routes/pnlSnapshot.route.ts,pnlSnapshotRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pnl/snapshot
+api,GET,/api/modifiers/menu-item/:menuItemId,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,POST,/api/modifiers/groups,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,PATCH,/api/modifiers/groups/:id,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,DELETE,/api/modifiers/groups/:id,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,POST,/api/modifiers/modifiers,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,PATCH,/api/modifiers/modifiers/:id,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,DELETE,/api/modifiers/modifiers/:id,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,POST,/api/modifiers/ingredients,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,DELETE,/api/modifiers/ingredients/:id,server/routes/modifiers.ts,modifiersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/modifiers
+api,POST,/api/products/:productId/ingredients,server/routes/productIngredients.ts,productIngredientsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/products
+api,POST,/api/products/:productId/activate,server/routes/productActivation.ts,productActivationRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/products
+api,POST,/api/membership/register,server/routes/membership.ts,membershipRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/membership
+api,POST,/api/membership/:id/spend,server/routes/membership.ts,membershipRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/membership
+api,GET,/api/membership/,server/routes/membership.ts,membershipRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/membership
+api,POST,/api/github/backup,server/routes/github.ts,githubRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/github
+api,POST,/api/expenses-v2/create,server/routes/expensesV2Routes.ts,expensesV2Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses-v2
+api,GET,/api/expenses-v2/all,server/routes/expensesV2Routes.ts,expensesV2Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses-v2
+api,GET,/api/expenses-v2/summary,server/routes/expensesV2Routes.ts,expensesV2Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/expenses-v2
+api,GET,/api/menu-ordering/categories,server/routes/menuOrderingRoutes.ts,menuOrderingRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-ordering
+api,GET,/api/menu-ordering/items/:categoryId,server/routes/menuOrderingRoutes.ts,menuOrderingRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-ordering
+api,GET,/api/menu-ordering/full,server/routes/menuOrderingRoutes.ts,menuOrderingRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-ordering
+api,POST,/api/orders-v2/create,server/routes/ordersV2Routes.ts,ordersV2Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/orders-v2
+api,GET,/api/orders-v2/all,server/routes/ordersV2Routes.ts,ordersV2Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/orders-v2
+api,GET,/api/orders-v2/status,server/routes/ordersV2Routes.ts,ordersV2Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/orders-v2
+api,POST,/api/orders-v2/manual-partner,server/routes/ordersV2Routes.ts,ordersV2Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/orders-v2
+api,GET,/api/loyverse-map/all,server/routes/loyverseMapRoutes.ts,loyverseMapRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse-map
+api,POST,/api/loyverse-map/save,server/routes/loyverseMapRoutes.ts,loyverseMapRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse-map
+api,GET,/api/payments-qr/generate,server/routes/qrRoutes.ts,qrRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/payments-qr
+api,POST,/api/payments/scb/webhook,server/routes/payments/scbRoutes.ts,scbRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/payments/scb
+api,GET,/api/payments/qr/dynamic,server/routes/payments/qrRoutes.ts,qrDynamicRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/payments/qr
+api,POST,/api/partners/create,server/routes/partners/partnerRoutes.ts,partnerBarRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/partners
+api,GET,/api/partners/all,server/routes/partners/partnerRoutes.ts,partnerBarRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/partners
+api,GET,/api/partners/:partnerId,server/routes/partners/partnerRoutes.ts,partnerBarRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/partners
+api,GET,/api/partners/analytics,server/routes/partners/partnerAnalyticsRoutes.ts,partnerAnalyticsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/partners
+api,GET,/api/partners/summary,server/routes/partners.ts,partnersRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/partners
+api,POST,/api/delivery/create,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,POST,/api/delivery/assign,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,POST,/api/delivery/update-status,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,GET,/api/delivery/active,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,GET,/api/delivery/history,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,POST,/api/delivery/drivers/add,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,POST,/api/delivery/drivers/status,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,GET,/api/delivery/drivers,server/routes/delivery/deliveryRoutes.ts,deliveryRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/delivery
+api,GET,/api/kds/active,server/routes/kds/kdsRoutes.ts,kdsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/kds
+api,POST,/api/kds/update-status,server/routes/kds/kdsRoutes.ts,kdsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/kds
+api,GET,/api/kds/history,server/routes/kds/kdsRoutes.ts,kdsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/kds
+api,GET,/api/menu-v3/categories,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/categories/create,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/categories/update,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/categories/reorder,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,GET,/api/menu-v3/items,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/items/create,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/items/update,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/items/toggle,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,GET,/api/menu-v3/modifiers/groups,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/modifiers/groups/create,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/modifiers/create,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/modifiers/apply,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,GET,/api/menu-v3/recipes/:itemId,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,POST,/api/menu-v3/recipes/set,server/routes/menu/menuV3Routes.ts,menuV3Routes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/menu-v3
+api,GET,/api/stock/live,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/manual-purchase,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/rolls,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/meat,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/drinks,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/lodge/rolls,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/lodge/meat,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/lodge/drinks,server/routes/stock/stockRoutes.ts,stockRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,GET,/api/stock/variance/shift,server/routes/stock/varianceRoutes.ts,varianceRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock/variance
+api,POST,/api/stock/baseline,server/routes/stockBaseline.ts,stockBaselineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,GET,/api/stock/baseline,server/routes/stockBaseline.ts,stockBaselineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/snapshot,server/routes/stockBaseline.ts,stockBaselineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/stock/variance/compute,server/routes/stockBaseline.ts,stockBaselineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,GET,/api/stock/variance,server/routes/stockBaseline.ts,stockBaselineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/stock
+api,POST,/api/refunds/log,server/routes/refunds.ts,refundsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/refunds
+api,GET,/api/refunds/,server/routes/refunds.ts,refundsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/refunds
+api,POST,/api/shift-review/,server/routes/shiftReview.ts,shiftReviewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shift-review
+api,GET,/api/shift-review/,server/routes/shiftReview.ts,shiftReviewRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/shift-review
+api,GET,/api/analytics/ingredients/daily,server/routes/analytics/ingredientUsageRoutes.ts,ingredientUsageRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/analytics/ingredients
+api,GET,/api/analytics/ingredients/top,server/routes/analytics/ingredientUsageRoutes.ts,ingredientUsageRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/analytics/ingredients
+api,POST,/api/admin/import/loyverse/menu,server/routes/loyverseMenuImport.ts,loyverseMenuImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/import
+api,GET,/api/admin/import/loyverse/menu/status,server/routes/loyverseMenuImport.ts,loyverseMenuImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/import
+api,POST,/api/admin/backup/run,server/routes/adminBackup.ts,adminBackupRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/backup
+api,GET,/api/admin/backup/status,server/routes/adminBackup.ts,adminBackupRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/backup
+api,POST,/api/admin/historical/import,server/routes/adminHistoricalImport.ts,adminHistoricalImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/historical
+api,GET,/api/admin/historical/status,server/routes/adminHistoricalImport.ts,adminHistoricalImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/historical
+api,GET,/api/admin/ingredient-authority/,server/routes/admin/ingredientAuthority.ts,ingredientAuthorityAdminRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/ingredient-authority
+api,GET,/api/admin/ingredient-authority/review-queue,server/routes/admin/ingredientAuthority.ts,ingredientAuthorityAdminRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/ingredient-authority
+api,POST,/api/admin/ingredient-authority/,server/routes/admin/ingredientAuthority.ts,ingredientAuthorityAdminRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/ingredient-authority
+api,PUT,/api/admin/ingredient-authority/:id,server/routes/admin/ingredientAuthority.ts,ingredientAuthorityAdminRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/ingredient-authority
+api,GET,/api/admin/ingredient-authority/:id/versions,server/routes/admin/ingredientAuthority.ts,ingredientAuthorityAdminRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/ingredient-authority
+api,GET,/api/admin/ingredient-authority/:id,server/routes/admin/ingredientAuthority.ts,ingredientAuthorityAdminRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/ingredient-authority
+api,PATCH,/api/admin/ingredient-authority/:id/deactivate,server/routes/admin/ingredientAuthority.ts,ingredientAuthorityAdminRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/admin/ingredient-authority
+api,GET,/api/system-health/,server/routes/systemHealth.ts,systemHealthRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/system-health
+api,GET,/api/system-health/run,server/routes/systemHealth.ts,systemHealthRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/system-health
+api,POST,/api/line/send,server/routes/lineNotify.ts,lineNotifyRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/line
+api,GET,/api/items/:id/variance-history,server/routes/varianceHistory.ts,varianceHistoryRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/items
+api,GET,/api/executive-metrics/,server/routes/executiveMetrics.ts,executiveMetricsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/executive-metrics
+api,GET,/api/executive-metrics/purchasing-demand,server/routes/executiveMetrics.ts,executiveMetricsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/executive-metrics
+api,GET,/api/loyverse/enhanced/test-connection,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,POST,/api/loyverse/enhanced/manual-sync,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,POST,/api/loyverse/enhanced/process-shift,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/status,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/history,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,POST,/api/loyverse/enhanced/schedule/start,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,POST,/api/loyverse/enhanced/schedule/stop,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/validation-stats,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,POST,/api/loyverse/enhanced/validation-stats/reset,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/analysis/:shiftDate,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/ingredient-usage/:shiftDate,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/anomalies/:shiftDate,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/staff-comparison/:shiftDate,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/loyverse/enhanced/health,server/routes/loyverseEnhanced.ts,loyverseEnhancedRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/loyverse
+api,GET,/api/analytics/latest,server/routes/analytics.ts,analyticsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/analytics
+api,GET,/api/analytics/window,server/routes/analytics.ts,analyticsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/analytics
+api,GET,/api/receipts/latest,server/routes/analytics.ts,analyticsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/receipts
+api,GET,/api/receipts/window,server/routes/analytics.ts,analyticsRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/receipts
+api,POST,/api/analysis/shift-summary/upload,server/routes/analysisShift.ts,analysisShift,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/analysis/shift-summary
+api,GET,/api/analysis/shift/items,server/routes/shiftAnalysis.ts,shiftAnalysis,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/analysis/shift/rebuild,server/routes/shiftAnalysis.ts,shiftAnalysis,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/analysis/shift/raw,server/routes/shiftAnalysis.ts,shiftAnalysis,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/analysis/shift/backfill,server/routes/shiftAnalysis.ts,shiftAnalysis,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,POST,/api/chef/chat,server/routes/chef.ts,chef,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/chef
+api,POST,/api/chef/describe,server/routes/chef.ts,chef,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/chef
+api,GET,/api/recipes/export/csv,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/cards,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/card-generate/:id,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/init-templates,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/templates/ensure,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/v2,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/v2/:id,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,PUT,/api/recipes/v2/:id,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/:id/cost-validation,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/:id/ingredients,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,PATCH,/api/recipes/:id/ingredient/:rowId,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/:id,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/:id/ingredients,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,PUT,/api/recipes/:id,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/:id/approve,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,DELETE,/api/recipes/:id,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/import,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/upload-image,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/ramsay,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/:id/optimize,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/:id/forecast,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,GET,/api/recipes/cross-ref-shift,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/save,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/recipes/save-with-photo,server/routes/recipes.ts,recipes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/recipes
+api,POST,/api/bank-imports/,server/routes/bankImport.ts,bankImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/bank-imports
+api,GET,/api/bank-imports/:batchId/txns,server/routes/bankImport.ts,bankImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/bank-imports
+api,POST,/api/bank-imports/:batchId/approve,server/routes/bankImport.ts,bankImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/bank-imports
+api,PATCH,/api/bank-imports/txns/:id,server/routes/bankImport.ts,bankImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/bank-imports
+api,DELETE,/api/bank-imports/txns/:id,server/routes/bankImport.ts,bankImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/bank-imports
+api,POST,/api/bank-imports/rules,server/routes/bankImport.ts,bankImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/bank-imports
+api,GET,/api/bank-imports/rules,server/routes/bankImport.ts,bankImportRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/bank-imports
+api,POST,/api/upload/menu-item-image,server/routes/imageUpload.ts,imageUploadRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,DELETE,/api/upload/menu-item-image,server/routes/imageUpload.ts,imageUploadRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api
+api,GET,/api/forms/,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,GET,/api/forms/library,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,GET,/api/forms/:id,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,POST,/api/forms/daily-sales,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,POST,/api/forms/daily-stock,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,POST,/api/forms/daily-sales-v2,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,PUT,/api/forms/:id,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,POST,/api/forms/:id/stock,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,POST,/api/forms/:id/complete,server/routes/forms.ts,formsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/forms
+api,GET,/api/pos/live-shift,server/routes/posLive.ts,posLive,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pos
+api,GET,/api/pos/live-items,server/routes/posItems.ts,posItems,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pos
+api,GET,/api/pos/ingredient-usage,server/routes/posUsage.ts,posUsage,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/pos
+api,GET,/api/health-safety/questions/,server/routes/healthSafety/questions.ts,healthSafetyQuestions,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/questions
+api,GET,/api/health-safety/questions/all,server/routes/healthSafety/questions.ts,healthSafetyQuestions,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/questions
+api,POST,/api/health-safety/questions/,server/routes/healthSafety/questions.ts,healthSafetyQuestions,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/questions
+api,PUT,/api/health-safety/questions/:id,server/routes/healthSafety/questions.ts,healthSafetyQuestions,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/questions
+api,DELETE,/api/health-safety/questions/:id,server/routes/healthSafety/questions.ts,healthSafetyQuestions,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/questions
+api,POST,/api/health-safety/audits/,server/routes/healthSafety/audits.ts,healthSafetyAudits,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/audits
+api,GET,/api/health-safety/audits/,server/routes/healthSafety/audits.ts,healthSafetyAudits,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/audits
+api,GET,/api/health-safety/pdf/:id,server/routes/healthSafety/pdf.ts,healthSafetyPdf,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/routes.ts at /api/health-safety/pdf
+api,POST,/api/pos/upload,server/routes/posUpload.ts,posUploadRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/pos
+api,GET,/api/pos/summary/:date,server/routes/posUpload.ts,posUploadRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/pos
+api,GET,/api/pos/shifts,server/routes/posUpload.ts,posUploadRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/pos
+api,POST,/api/pos/sync-daily,server/routes/posUpload.ts,posUploadRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/pos
+api,GET,/api/health,server/routes/health.ts,healthRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,GET,/api/ops/mtd,server/routes/ops_mtd.ts,opsMtdRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,GET,/api/purchasing/,server/routes/purchasing.ts,purchasingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing
+api,POST,/api/purchasing/plan,server/routes/purchasing.ts,purchasingRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing
+api,GET,/api/purchasing/drinks,server/routes/purchasingDrinks.ts,purchasingDrinksRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing
+api,GET,/api/purchasing-items/,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,POST,/api/purchasing-items/,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,PUT,/api/purchasing-items/:id,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,DELETE,/api/purchasing-items/:id,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,GET,/api/purchasing-items/export/csv,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,POST,/api/purchasing-items/import/csv,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,POST,/api/purchasing-items/sync-to-daily-stock,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,POST,/api/purchasing-items/populate-catalog,server/routes/purchasingItems.ts,purchasingItemsRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/purchasing-items
+api,GET,/api/purchasing-shift-matrix,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,POST,/api/purchasing-shift-sync/:stockId,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,POST,/api/purchasing-shift-backfill,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,GET,/api/,server/routes/purchasingShiftLog.ts,purchasingShiftLogRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,GET,/api/menu,server/routes/menuOnline.ts,menuOnlineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,GET,/api/menu-online,server/routes/menuOnline.ts,menuOnlineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,PATCH,/api/menu-online/item/:id,server/routes/menuOnline.ts,menuOnlineRouter,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api
+api,GET,/api/export/daily-sales-v2,server/routes/exportRoutes.ts,exportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/export
+api,GET,/api/export/daily-stock-v2,server/routes/exportRoutes.ts,exportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/export
+api,GET,/api/export/pos/shift-reports,server/routes/exportRoutes.ts,exportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/export
+api,GET,/api/export/pos/receipts,server/routes/exportRoutes.ts,exportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/export
+api,GET,/api/export/expenses,server/routes/exportRoutes.ts,exportRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/export
+api,POST,/api/reports/daily/generate,server/routes/reportsV2.ts,reportsV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/reports
+api,GET,/api/reports/daily/:date/pdf,server/routes/reportsV2.ts,reportsV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/reports
+api,GET,/api/reports/list,server/routes/reportsListV2.ts,reportsListV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/reports
+api,GET,/api/reports/:id/json,server/routes/reportsListV2.ts,reportsListV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/reports
+api,GET,/api/reports/:id/pdf,server/routes/reportsListV2.ts,reportsListV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/reports
+api,GET,/api/reports/search,server/routes/reportsListV2.ts,reportsListV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/reports
+api,GET,/api/reports/export-range,server/routes/reportsListV2.ts,reportsListV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/reports
+api,GET,/api/insights/:reportId/live,server/routes/insightsV2.ts,insightsV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/insights
+api,GET,/api/security/:reportId/live,server/routes/securityV2.ts,securityV2Router,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/security
+api,POST,/api/auth/register,server/routes/auth/authRoutes.ts,authRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/auth
+api,POST,/api/auth/login,server/routes/auth/authRoutes.ts,authRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/auth
+api,GET,/api/auth/session,server/routes/auth/authRoutes.ts,authRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/auth
+api,POST,/api/auth/logout,server/routes/auth/authRoutes.ts,authRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/auth
+api,GET,/api/payment-providers/list,server/routes/payments/providerRoutes.ts,providerRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/payment-providers
+api,POST,/api/payment-providers/save,server/routes/payments/providerRoutes.ts,providerRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/payment-providers
+api,POST,/api/payments/process,server/routes/payments/processRoutes.ts,paymentProcessRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/payments
+api,GET,/api/legacy-bridge/expenses,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/daily-sales,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/shopping-list,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/ingredients,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/recipes,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/suppliers,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/menu-items,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/partners,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/legacy-bridge/status,server/routes/legacyBridge.ts,legacyBridgeRoutes,unknown,unknown,,mounted router,unknown,VERIFIED,mounted in server/index.ts at /api/legacy-bridge
+api,GET,/api/ai-ops/bob/health,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/health,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/manifest,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/manifest,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/proxy-read,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/proxy-read,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/file-read,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/file-read,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/file-list,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/file-list,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/bob/analysis,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/bob/analysis,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/bob/adjustments,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/bob/adjustments,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/adjustments/:date,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/adjustments/:date,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,PATCH,/api/ai-ops/bob/adjustments/:id/review,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,PATCH,/api/ops/ai/bob/adjustments/:id/review,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/bob/email/trigger,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/bob/email/trigger,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/analysis-csv/:date,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/analysis-csv/:date,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/bob/run-analysis,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/bob/run-analysis,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/analysis/:date,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/analysis/:date,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/charter,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/charter,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/process-registry,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/process-registry,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/process-registry/:key,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/process-registry/:key,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/process-registry/:key,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/process-registry/:key,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/bob/onboarding-context,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/bob/onboarding-context,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/agents,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/agents,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,PUT,/api/ai-ops/agents/:agent/state,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,PUT,/api/ops/ai/agents/:agent/state,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/chat/threads,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/chat/threads,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/chat/threads,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/chat/threads,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/chat/threads/:id/messages,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/chat/threads/:id/messages,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,DELETE,/api/ai-ops/chat/threads/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,DELETE,/api/ops/ai/chat/threads/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/chat/threads/:id/messages,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/chat/threads/:id/messages,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/tasks,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/tasks,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/tasks,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/tasks,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,PUT,/api/ai-ops/tasks/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,PUT,/api/ops/ai/tasks/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,PUT,/api/ai-ops/tasks/:id/status,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,PUT,/api/ops/ai/tasks/:id/status,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/tasks/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/tasks/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/tasks/:id/messages,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/tasks/:id/messages,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/tasks/:id/review-request,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/tasks/:id/review-request,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/tasks/:id/review-decision,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/tasks/:id/review-decision,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/tasks/:id/archive,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/tasks/:id/archive,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/tasks/:id/restore,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/tasks/:id/restore,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/tasks/:id/submit,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/tasks/:id/submit,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/tasks/:id/activity,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/tasks/:id/activity,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/monitors,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/monitors,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/monitors/run,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/monitors/run,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/shift-rebuild-log,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/shift-rebuild-log,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/shift-rebuild-log/trigger,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/shift-rebuild-log/trigger,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/issues,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/issues,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/issues/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/issues/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,PUT,/api/ai-ops/issues/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,PUT,/api/ops/ai/issues/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,PUT,/api/ai-ops/issues/:id/status,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,PUT,/api/ops/ai/issues/:id/status,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues/:id/plan,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues/:id/plan,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues/:id/approve,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues/:id/approve,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues/:id/reject,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues/:id/reject,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues/:id/assign,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues/:id/assign,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues/:id/complete,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues/:id/complete,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues/:id/close,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues/:id/close,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/issues/:id/comments,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/issues/:id/comments,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/ideas,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/ideas,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/ideas,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/ideas,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/ai-ops/ideas/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,GET,/api/ops/ai/ideas/:id,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,PUT,/api/ai-ops/ideas/:id/status,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,PUT,/api/ops/ai/ideas/:id/status,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/ideas/:id/convert-to-issue,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/ideas/:id/convert-to-issue,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,POST,/api/ai-ops/ideas/:id/convert-to-task,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ai-ops from server/index.ts
+api,POST,/api/ops/ai/ideas/:id/convert-to-task,server/routes/aiOpsControl.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/ops/ai from server/index.ts
+api,GET,/api/bob/read/health,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/system-health,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/system-map,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/build-status,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/forms/daily-sales,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/forms/daily-stock,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/receipts/truth,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/usage/truth,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/issues,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/catalog,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/orders,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/roll-order,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/module-status,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/shift-snapshot,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/reports/item-sales,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/reports/modifier-sales,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/reports/category-totals,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/read/analysis/stock-usage,server/routes/bobRead.ts,router,unknown,unknown,,mounted router,unknown,VERIFIED,explicit mount /api/bob/read from server/index.ts
+api,GET,/api/bob/health,server/routes/aiOpsControl.ts,bobAliasRouter,unknown,unknown,,alias router,unknown,VERIFIED,"mounted via app.use(""/api/bob"", bobAliasRouter)"
+api,GET,/api/bob/charter,server/routes/aiOpsControl.ts,bobAliasRouter,unknown,unknown,,alias router,unknown,VERIFIED,"mounted via app.use(""/api/bob"", bobAliasRouter)"

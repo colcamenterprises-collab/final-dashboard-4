@@ -1,0 +1,7 @@
+file,trigger_mechanism,schedule_or_frequency,business_purpose,why_static_scan_can_miss_runtime,delete_risk,confidence
+server/jobs/cron.ts,node-cron schedules at module load,"02:55,03:05,03:15 BKK; hourly refresh",ensure shift ingest + analytics + ledger rebuild,may only run when imported by runtime entrypoint/environment,high,VERIFIED
+server/jobs/cronEnsureShift.ts,registerEnsureShiftCron() called from server/index.ts,03:05 BKK daily,ensure previous day shift exists,indirect function invocation; depends on bootstrap path,high,VERIFIED
+server/services/scheduler.ts,schedulerService.start() in server/index.ts,multiple daily times + 15min incremental sync,"Loyverse sync, summaries, analytics, finance, email prep",schedule uses setTimeout recursion not explicit cron route,high,VERIFIED
+server/services/cronEmailService.ts,CronEmailService.startEmailCron() when called,09:00 BKK daily,daily management review email,dynamic imports inside method and runtime env email config,high,VERIFIED
+server/services/monitorEngine.ts,startMonitorScheduler() called in aiOps router,13:00 BKK daily + manual trigger endpoint,monitor form submission and variance breaches,"started in router module, not obvious in plain route scans",medium,VERIFIED
+server/services/analysisBuildOrchestrator.ts,called by routes/services (AUTO_ON_READ / MANUAL / SCHEDULED),event-driven per request/build path,self-healing receipt truth + daily usage builds,dynamic import() of builders and status table upserts,high,VERIFIED
