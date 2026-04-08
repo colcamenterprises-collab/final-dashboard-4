@@ -403,17 +403,64 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
     staffData = buildStaffComparisonData(staffRow);
   }
 
+  // Extract wage entries from form payload for labour section
+  const rawWages = (staffRow?.payload as any)?.wages;
+  const wageEntries: { name: string; amount: number }[] = Array.isArray(rawWages)
+    ? rawWages
+        .filter((w: any) => w && (w.name || w.staffName) && (w.amount !== undefined || w.value !== undefined))
+        .map((w: any) => ({
+          name: String(w.name ?? w.staffName ?? "Staff"),
+          amount: Number(w.amount ?? w.value ?? 0),
+        }))
+    : [];
+  const wagesTotal = staffRow
+    ? (wageEntries.reduce((s, e) => s + e.amount, 0) || Number((staffRow as any).wagesTotal ?? (staffRow as any).wages_total ?? 0))
+    : 0;
+  const wageDetail = { entries: wageEntries, totalWages: wagesTotal, staffCount: wageEntries.length };
+
+  // POS: try Loyverse API first, then fall back to DB-stored pos_shift_report
   let posShiftReport: PosShiftReportData | { message: string } = { message: "Shift report unavailable" };
+  const tryDbPosFallback = async () => {
+    try {
+      const dbSource = await fetchPOSFromDB(date);
+      if (dbSource) {
+        posShiftReport = {
+          totalSales: dbSource.sales.total,
+          startingCash: dbSource.banking.startingCash,
+          cashPayments: dbSource.banking.cashPayments,
+          grab: dbSource.sales.grab,
+          scan: dbSource.sales.qr,
+          expenses: dbSource.banking.expensesTotal,
+          expectedCash: dbSource.banking.expectedCash,
+          actualCash: null,
+          difference: null,
+        };
+      }
+    } catch (_) {}
+  };
+
   try {
     const storeId = process.env.LOYVERSE_STORE_ID;
-    const shiftResult = await getShiftReport({ date, storeId });
-    const shift = shiftResult?.shifts?.[0] ?? null;
+    const timeoutMs = 3000;
+    const shiftResult = await Promise.race([
+      getShiftReport({ date, storeId }),
+      new Promise<null>((_, reject) => setTimeout(() => reject(new Error("LOYVERSE_TIMEOUT")), timeoutMs)),
+    ]);
+    const shift = (shiftResult as any)?.shifts?.[0] ?? null;
     if (shift) {
       posShiftReport = buildShiftReportData(shift);
+    } else {
+      await tryDbPosFallback();
     }
   } catch (error: any) {
-    console.error("[SHIFT_REPORT_FETCH_FAIL]", error?.message || error);
+    if (error?.message !== "LOYVERSE_TIMEOUT") {
+      console.error("[SHIFT_REPORT_FETCH_FAIL]", error?.message || error);
+    }
+    await tryDbPosFallback();
   }
+
+  // Receipt evidence (parallel with differences calc)
+  const receiptEvidence = await buildReceiptEvidence(date);
 
   const differences = {
     totalSales: staffData && "totalSales" in staffData && "totalSales" in posShiftReport
@@ -433,15 +480,15 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
       : null
   };
 
-  const payload: DailyComparisonShiftResponse = {
+  res.json({
     date,
     shiftWindow: "17:00-03:00",
     staffData,
     posShiftReport,
-    differences
-  };
-
-  res.json(payload);
+    differences,
+    receiptEvidence,
+    wageDetail,
+  });
 });
 
 analysisDailyReviewRouter.get("/daily-comparison-range", async (req, res) => {

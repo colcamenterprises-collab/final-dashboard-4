@@ -1,0 +1,296 @@
+TASK: Tighten the existing Daily Sales & Shift Analysis page so it becomes the single visual meeting place for all shift-level data, without replacing the source pages
+
+READ CAREFULLY
+This is a refinement patch, not a redesign from scratch.
+Do not remove Receipts Analysis.
+Do not remove Stock Reconciliation.
+Do not remove Finance.
+Those pages remain their own source pages.
+Daily Sales & Shift Analysis must pull the key outputs from them and present one clean shift-level view.
+
+This page is the MEETING PLACE for all shift data.
+
+==================================================
+LOCKED PAGE PURPOSE
+==================================================
+
+Daily Sales & Shift Analysis must show, for ONE selected shift:
+
+1. Form 1 sales + cash/banking summary
+2. Loyverse POS Shift Report comparison
+3. Receipt summary / receipt count / receipt match status
+4. Critical stock reconciliation outputs
+5. Staffing / labour summary
+6. Profit summary including net profit / prime cost where data exists
+7. Shift history
+
+It is NOT replacing:
+- Receipts Analysis
+- Stock Reconciliation
+- Finance
+
+Those continue to exist.
+This page simply brings their key shift outputs together in a clean visual summary.
+
+==================================================
+PART 1 — THEME / UI
+==================================================
+
+Change the page from dark theme to LIGHT theme.
+
+Requirements:
+- follow current style guide
+- modern white/light dashboard feel
+- keep current structure where useful
+- remove heavy black panels
+- keep it slick, minimal, and visual
+- do not turn it into a text dump
+
+This is a tightening pass, not a full redesign.
+
+==================================================
+PART 2 — DEFAULT DATE / SHIFT LOGIC
+==================================================
+
+Fix the default shift date logic.
+
+CURRENT PROBLEM
+The page defaults to the calendar/open date, which causes false missing-data errors.
+
+REQUIRED RULE
+The page must default to the latest COMPLETED SHIFT DATE.
+
+SHIFT RULE
+- shift window = 5:00 PM to 3:00 AM BKK
+- shift belongs to the START DATE
+- form submission timestamp does NOT define the shift date
+
+Example:
+- shift starts 2026-04-08 17:00
+- shift ends 2026-04-09 03:00
+- shift date = 2026-04-08
+
+Use Daily Sales & Stock v2 / stored shift form data to determine the latest completed shift.
+
+This same shift-date logic should be reused anywhere this page depends on shift-based data.
+
+==================================================
+PART 3 — PAGE COMPOSITION / WHAT MUST APPEAR
+==================================================
+
+The page must remain Daily Sales & Shift Analysis, but now clearly include these shift-level sections:
+
+A. SHIFT OVERVIEW / STATUS
+- selected shift date
+- data availability status chips for:
+  - Daily Form
+  - POS Shift Data
+  - Receipt Match
+  - Labour Data
+
+B. FORM VS POS CORE REVIEW
+Direct review of:
+- Daily Sales & Stock v2 Form 1
+VERSUS
+- Loyverse POS Shift Report
+
+Must include:
+- Total Sales
+- Cash
+- QR
+- Grab
+- Expenses
+- expected bank / balance-related figures where applicable
+
+IMPORTANT:
+Expenses must be ONE row only.
+POS calls it Cash Expenses.
+Form calls it Expenses Total.
+These are the same thing and must be shown as one unified row.
+
+C. RECEIPT SUMMARY
+Bring key receipt outputs into this page:
+- receipt count
+- receipt match status
+- receipt totals / sales number if available
+- mismatch alert if counts or totals do not align
+
+Do not rebuild the dedicated Receipts Analysis page.
+Just surface the key shift summary here.
+
+D. STOCK SUMMARY
+Bring key critical outputs from Stock Reconciliation into this page:
+- buns purchased / rolls purchased for shift
+- meat purchased for shift
+- drink stock alerts count
+- critical stock variances
+- top stock issues only
+
+Do not replace Stock Reconciliation.
+Just surface the shift-critical outputs here.
+
+E. LABOUR / STAFFING SUMMARY
+Use Daily Sales & Stock v2 wage entries to populate labour/staffing data.
+
+Rules:
+- each wage entry with staff name = one staff member worked
+- staff count = number of wage entries / named rows
+- wages total = sum from wage entries
+- staff names should be available if useful
+- typically 2–4 staff
+- paid shift usually 6pm–2am
+- usually one opener starts at 5pm for pre-setup
+
+This section must stop showing unavailable when wage data exists.
+
+F. PROFIT SNAPSHOT
+Where data exists, surface:
+- total sales
+- expenses
+- wages
+- food/bev cost if available
+- net profit
+- prime cost
+- prime cost %
+
+Use existing finance/calculated sources where available.
+Do not invent fake values.
+
+G. SHIFT HISTORY
+Keep shift history, but ensure it remains shift-date based and tied to real shift data.
+
+==================================================
+PART 4 — STAFFING / HEAT MAP FIX
+==================================================
+
+The staffing vs demand / heat mapping section is valuable and should remain if it can be populated correctly.
+
+Fix it so it is no longer empty when wage data exists.
+
+At minimum:
+- derive staff count from wage entries
+- populate labour summary
+- if hourly blocks are shown, use deterministic shift assumptions:
+  - opener from 5pm where applicable
+  - standard paid window 6pm–2am
+- do not leave the section blank if underlying wage data exists
+
+If true demand heat mapping depends on another unavailable source, still show a useful staffing summary instead of “unavailable”.
+
+==================================================
+PART 5 — POS SHIFT REPORT DATA RESTORATION
+==================================================
+
+The POS Shift Report column/data must populate again.
+
+It previously worked and must return.
+
+Investigate and restore the actual data path for:
+- sales totals
+- cash
+- QR
+- Grab
+- expenses / payouts
+- balance-related figures
+
+Do not leave “POS Shift Data: Missing” if the shift report exists for that shift.
+
+==================================================
+PART 6 — NO-DATA / ALERT BEHAVIOR
+==================================================
+
+False critical errors must stop.
+
+Rules:
+- only show missing/critical alerts when the selected completed shift truly lacks required data
+- do NOT use current calendar date to decide missing status
+- if the latest completed shift exists, load it and show real data
+- if one section is missing but others exist, show only the real missing section status
+
+==================================================
+PART 7 — WHAT MUST NOT CHANGE
+==================================================
+
+Do NOT:
+- remove Receipts Analysis page
+- remove Stock Reconciliation page
+- remove Finance page
+- redesign the entire app
+- turn this page into a raw spreadsheet
+- use dark theme
+- use form submission timestamp as shift date
+- split expenses into two rows
+- leave labour empty when wage data exists
+- break existing shift history
+
+==================================================
+PART 8 — TESTING REQUIRED
+==================================================
+
+You must test the real frontend.
+
+TEST 1 — Theme
+- page is now light theme
+
+TEST 2 — Default shift date
+- page defaults to latest completed shift date
+- not the current open date
+
+TEST 3 — False no-data issue removed
+- opening the page on a new calendar day does not create fake missing-data errors
+
+TEST 4 — Form vs POS
+- comparison loads real Form 1 and POS Shift Report data
+- expenses shown as one row only
+
+TEST 5 — Receipt summary
+- receipt count / receipt match status appears for selected shift
+
+TEST 6 — Stock summary
+- critical stock outputs from Stock Reconciliation appear for selected shift
+
+TEST 7 — Labour summary
+- labour/staffing section populates from wage entries
+- no unnecessary unavailable state when wage data exists
+
+TEST 8 — Profit snapshot
+- net profit / prime cost area shows real values where available
+
+TEST 9 — Shift history
+- still loads by shift date
+
+TEST 10 — No regressions
+- no console/runtime errors
+- no broken analysis routes
+
+==================================================
+PART 9 — SCREENSHOT PROOF REQUIRED
+==================================================
+
+Return screenshots showing:
+1. light-theme Daily Sales & Shift Analysis page
+2. default selected shift date = latest completed shift
+3. populated Form vs POS section
+4. receipt summary visible
+5. stock summary visible
+6. labour/staffing section populated
+7. profit snapshot visible
+8. console clean if possible
+
+==================================================
+PART 10 — DELIVERABLE
+==================================================
+
+Return:
+1. one full patch
+2. files changed
+3. exact explanation of how shift date is resolved
+4. exact explanation of how receipt summary is surfaced
+5. exact explanation of how stock summary is surfaced
+6. exact explanation of how labour data is derived
+7. exact explanation of how POS Shift Report data was restored
+8. test results
+9. screenshot proof
+
+FINAL RULE
+This task is not complete unless Daily Sales & Shift Analysis becomes the clean visual meeting place for all shift-level data while Receipts Analysis, Stock Reconciliation, and Finance remain intact as their own source pages.
