@@ -1,0 +1,87 @@
+This is a REVIEW-ONLY task.
+
+Do NOT implement changes.
+Do NOT refactor.
+Do NOT delete files.
+Do NOT tidy up anything.
+
+PR TO REVIEW:
+Dashboard 4.0 – Consolidation Execution Plan
+
+OBJECTIVE
+Review this planning-only PR and verify whether it is safe, practical, and complete enough to govern the actual Dashboard 4.0 consolidation work.
+
+You are NOT reviewing runtime code changes.
+You are reviewing whether the execution plan is strong enough to control future cleanup without causing damage.
+
+CHECK THESE AREAS SPECIFICALLY
+
+1. Protected systems
+Verify the plan properly protects:
+- daily sales
+- daily stock
+- purchasing
+- ingredient authority
+- recipes
+- products
+- receipts / shift reports
+- Bob / AI-Ops
+- critical scheduled jobs
+- email / PDF outputs
+
+2. Runtime validation gates
+Verify the plan correctly requires runtime proof before touching risky systems, especially:
+- Bob / AI-Ops full route verification
+- shopping list triple-router verification
+- background jobs validation
+- server/api import and mount verification
+- frontend route truth from RouteRegistry.ts and App.tsx
+- any _old files that may still be active
+
+3. Workstream order
+Verify whether the execution order is realistic and safe.
+Flag anything that is out of order or likely to break the app if followed as written.
+
+4. Deletion safety matrix
+Verify whether the deletion classifications are safe and conservative enough.
+Flag anything that should be reclassified upward in risk.
+
+5. Merge / retire / archive logic
+Verify whether the plan clearly separates:
+- merge later
+- archive first
+- retire after replacement
+- do not touch
+and does not blur these decisions.
+
+6. Planning blind spots
+List any major area the plan still does not control well enough before implementation starts.
+
+REQUIRED OUTPUT
+
+1. VERIFIED STRENGTHS
+What in this execution plan is solid and safe.
+
+2. PLANNING GAPS
+Anything missing, weak, or unclear.
+For each item include:
+- area
+- exact file if relevant
+- why it matters
+- confidence
+
+3. UNSAFE OR OUT-OF-ORDER ITEMS
+Anything in the plan that could cause damage if executed as written.
+
+4. RISK RECLASSIFICATIONS
+Anything in the deletion safety matrix or workstreams that should be upgraded in risk.
+
+5. FINAL STATUS
+Return one of:
+- APPROVED
+- APPROVED WITH MINOR CORRECTIONS
+- NOT APPROVED
+
+6. FINAL STATEMENT
+Answer directly:
+Is this consolidation execution plan safe to use as the governing document for Dashboard 4.0 cleanup implementation?
