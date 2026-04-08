@@ -99,7 +99,7 @@ const navigationGroups: NavGroup[] = [
       { to: "/operations/purchasing", label: "Purchasing Items", icon: ShoppingCart, testId: "nav-purchasing-list" },
       { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
       { to: "/operations/purchasing-shift-log", label: "Stock Order History", icon: Package, testId: "nav-purchasing-log" },
-      { to: "/operations/ingredient-purchasing", label: "Ingredient Purchasing", icon: Package, testId: "nav-ingredient-purchasing" },
+      // INTERNAL/ADMIN ONLY — route still active at /operations/ingredient-purchasing, hidden from normal nav
     ]
   },
   {
