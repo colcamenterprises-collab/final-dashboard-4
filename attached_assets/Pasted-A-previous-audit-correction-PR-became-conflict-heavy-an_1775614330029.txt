@@ -1,0 +1,118 @@
+A previous audit-correction PR became conflict-heavy and has been abandoned.
+
+A fresh replacement PR has now been created from the latest main branch.
+
+This is a REVIEW-ONLY task.
+Do NOT implement changes.
+Do NOT refactor.
+Do NOT delete files.
+Do NOT “tidy up”.
+Your job is to verify whether this fresh correction PR now properly fixes the gaps from your prior second-sign-off review.
+
+PR TO REVIEW:
+Dashboard 4.0 – Audit Corrections After Replit Review
+
+REVIEW OBJECTIVE
+Confirm whether this new clean PR is now strong enough to be used as the source document for Dashboard 4.0 consolidation planning.
+
+YOU MUST CHECK THESE AREAS SPECIFICALLY
+
+1. Bob / AI-Ops route coverage
+Verify whether the audit now correctly captures:
+- server/routes/aiOpsControl.ts
+- server/routes/bobRead.ts
+- Bob/OpenClaw route families
+- Bob-related tasks/chat/process registry/monitor endpoints
+- any Bob runtime connection notes that should remain documented
+
+2. server/api tree coverage
+Verify whether the audit now properly inventories:
+- server/api/forms.ts
+- server/api/daily-sales.legacy.ts
+- server/api/stock-catalog.ts
+- server/api/stock-catalog-new.ts
+- server/api/stock-master.ts
+- server/api/stockReview.ts
+- server/api/expenseImports.ts
+- server/api/finance.ts
+- server/api/db-health.ts
+- server/api/ingredients/*
+- server/api/library/*
+and whether import status / delete risk / likely role is now clearer and safer.
+
+3. Inline backend route coverage
+Verify whether the audit now includes major inline route families from server/routes.ts, especially:
+- /api/daily-stock-sales
+- /api/manager-checklist
+- any other important inline app.get/post/patch/delete route families
+
+4. Frontend route resolution
+Verify whether ROUTES.* constants were resolved properly using RouteRegistry and related router files.
+Check whether page and route inventories now contain actual URL paths where possible instead of UNKNOWN or unresolved constant strings.
+
+5. Dynamic imports / cron / background jobs
+Verify whether the audit now documents:
+- server/index.ts startup scheduling
+- server/jobs/cron.js
+- server/jobs/cronEnsureShift.js
+- server/services/analysisBuildOrchestrator.ts
+- server/services/cronEmailService.ts
+- server/services/scheduler.ts
+- server/services/monitorEngine.ts
+- any scheduled processes or runtime-loaded jobs that were previously missed
+
+6. Static-served operational pages
+Verify whether the audit now captures:
+- public/tablet-nuclear.html
+- public/tablet-reload.html
+- chatbox html pages
+- any operational static-served pages exposed by express.static or dedicated routes
+
+7. Delete-candidate safety
+Verify whether the delete candidate output is now actually usable and whether code/system delete candidates are clearly separated from archive/asset duplication noise.
+
+8. Keep/delete/legacy classification accuracy
+Verify whether obvious inaccuracies from the last review have been corrected, including:
+- legacy vs active pages
+- keep-register accuracy
+- daily review / analysis page classification if present
+- avoiding false duplicate classification of Bob workspace items
+
+9. Data-flow quality
+Verify whether the audit now improves source-of-truth analysis where the repo actually provides evidence, instead of leaving critical sections as blanket UNKNOWN.
+
+REQUIRED OUTPUT
+Return your review in these exact sections:
+
+1. CORRECTED ITEMS VERIFIED
+List what is now fixed properly.
+
+2. REMAINING GAPS
+List anything still missing, weak, or unclear.
+For each item include:
+- type
+- exact file path
+- exact route/endpoint if relevant
+- why it still matters
+- confidence
+
+3. UNSAFE ASSUMPTIONS STILL PRESENT
+List any places where the audit still sounds more certain than the evidence allows.
+
+4. HIGH-RISK AREAS STILL REQUIRING MANUAL OR RUNTIME VALIDATION
+List anything that should still not be deleted, merged, or consolidated without runtime checks.
+
+5. FINAL SIGN-OFF STATUS
+Return one of:
+- APPROVED
+- APPROVED WITH MINOR CORRECTIONS
+- NOT APPROVED
+
+6. FINAL STATEMENT
+Answer this directly:
+Is this audit now safe to use as the source document for Dashboard 4.0 consolidation planning?
+
+IMPORTANT
+Be critical.
+This is not a rubber stamp.
+We only move into consolidation planning if this fresh correction PR is genuinely good enough to rely on.
