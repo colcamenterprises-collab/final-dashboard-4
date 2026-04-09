@@ -418,45 +418,48 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
     : 0;
   const wageDetail = { entries: wageEntries, totalWages: wagesTotal, staffCount: wageEntries.length };
 
-  // POS: try Loyverse API first, then fall back to DB-stored pos_shift_report
+  // POS: DB-first strategy — use cached pos_shift_report if available (fast path),
+  // only call Loyverse API live when DB has no record for this date.
   let posShiftReport: PosShiftReportData | { message: string } = { message: "Shift report unavailable" };
-  const tryDbPosFallback = async () => {
-    try {
-      const dbSource = await fetchPOSFromDB(date);
-      if (dbSource) {
-        posShiftReport = {
-          totalSales: dbSource.sales.total,
-          startingCash: dbSource.banking.startingCash,
-          cashPayments: dbSource.banking.cashPayments,
-          grab: dbSource.sales.grab,
-          scan: dbSource.sales.qr,
-          expenses: dbSource.banking.expensesTotal,
-          expectedCash: dbSource.banking.expectedCash,
-          actualCash: null,
-          difference: null,
-        };
-      }
-    } catch (_) {}
-  };
 
+  const mapDbSourceToReport = (dbSource: DailySource): PosShiftReportData => ({
+    totalSales: dbSource.sales.total,
+    startingCash: dbSource.banking.startingCash,
+    cashPayments: dbSource.banking.cashPayments,
+    grab: dbSource.sales.grab,
+    scan: dbSource.sales.qr,
+    expenses: dbSource.banking.expensesTotal,
+    expectedCash: dbSource.banking.expectedCash,
+    actualCash: null,
+    difference: null,
+  });
+
+  // 1. Try DB cache first (milliseconds)
+  let dbSource: DailySource | null = null;
   try {
-    const storeId = process.env.LOYVERSE_STORE_ID;
-    const timeoutMs = 3000;
-    const shiftResult = await Promise.race([
-      getShiftReport({ date, storeId }),
-      new Promise<null>((_, reject) => setTimeout(() => reject(new Error("LOYVERSE_TIMEOUT")), timeoutMs)),
-    ]);
-    const shift = (shiftResult as any)?.shifts?.[0] ?? null;
-    if (shift) {
-      posShiftReport = buildShiftReportData(shift);
-    } else {
-      await tryDbPosFallback();
+    dbSource = await fetchPOSFromDB(date);
+  } catch (_) {}
+
+  if (dbSource) {
+    posShiftReport = mapDbSourceToReport(dbSource);
+  } else {
+    // 2. DB miss — try Loyverse API live (may take 3-8s)
+    try {
+      const storeId = process.env.LOYVERSE_STORE_ID;
+      const timeoutMs = 8000;
+      const shiftResult = await Promise.race([
+        getShiftReport({ date, storeId }),
+        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("LOYVERSE_TIMEOUT")), timeoutMs)),
+      ]);
+      const shift = (shiftResult as any)?.shifts?.[0] ?? null;
+      if (shift) {
+        posShiftReport = buildShiftReportData(shift);
+      }
+    } catch (error: any) {
+      if (error?.message !== "LOYVERSE_TIMEOUT") {
+        console.error("[SHIFT_REPORT_FETCH_FAIL]", error?.message || error);
+      }
     }
-  } catch (error: any) {
-    if (error?.message !== "LOYVERSE_TIMEOUT") {
-      console.error("[SHIFT_REPORT_FETCH_FAIL]", error?.message || error);
-    }
-    await tryDbPosFallback();
   }
 
   // Receipt evidence (parallel with differences calc)

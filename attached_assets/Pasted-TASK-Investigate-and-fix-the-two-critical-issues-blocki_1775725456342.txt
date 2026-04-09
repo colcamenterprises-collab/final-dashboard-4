@@ -1,0 +1,182 @@
+TASK: Investigate and fix the two critical issues blocking cleanup
+
+PRIORITY
+Do this before any further cleanup work.
+This is a diagnosis + fix task focused on:
+1. Sales & Shift Analysis → Loyverse Shift Report missing
+2. Stock Reconciliation → Daily Usage Summary “4 Unmapped Rows”
+
+IMPORTANT
+Everything in this app is based on the START OF SHIFT DATE in BKK TIMEZONE.
+That rule is locked.
+
+SHIFT RULE — MUST BE USED EVERYWHERE
+- Shift window = 5:00 PM to 3:00 AM BKK
+- Shift belongs to the START DATE
+- Example:
+  - opened 8 April 2026 at 16:43
+  - closed 9 April 2026 at 02:34
+  - shift date = 2026-04-08
+- Do NOT use the shift close date as the analysis date
+- Do NOT use the form submission timestamp as the shift date
+
+==================================================
+PART 1 — LOYVERSE SHIFT REPORT MISSING
+==================================================
+
+PROBLEM
+Sales & Shift Analysis says there is no Loyverse Shift Report Data.
+But the shift report does exist in Loyverse.
+
+LATEST KNOWN SHIFT EXAMPLE
+- Shift start date = 2026-04-08
+- opened at 2026-04-08 16:43
+- closed at 2026-04-09 02:34
+- this must be loaded as shift date 2026-04-08
+
+YOUR JOB
+Trace exactly why the page is not showing the Loyverse Shift Report.
+
+CHECK ALL OF THESE
+1. What backend/API route provides Loyverse Shift Report data to Sales & Shift Analysis
+2. What date parameter that route expects
+3. Whether it is wrongly using close date instead of shift start date
+4. Whether it is wrongly using current calendar date instead of latest completed shift date
+5. Whether timezone conversion is wrong
+6. Whether the frontend is requesting the wrong date
+7. Whether the backend is filtering by the wrong date field
+8. Whether the shift report is being stored/queried by close date but displayed by start date without mapping
+9. Whether the page defaults to the wrong shift date when opened
+10. Whether the latest completed shift exists in the store but is not being resolved correctly
+
+REQUIRED FIX
+Sales & Shift Analysis must retrieve the Loyverse Shift Report by the SHIFT START DATE in BKK time.
+The latest completed shift must load automatically by that shift date.
+
+EXPECTED RESULT
+For the example shift above, opening the page must load the shift report under 2026-04-08, not mark it missing.
+
+==================================================
+PART 2 — STOCK RECONCILIATION “4 UNMAPPED ROWS”
+==================================================
+
+PROBLEM
+Stock Reconciliation → Analysis tab → Daily Usage Summary says:
+“4 Unmapped Rows”
+
+I need to know exactly what those rows are and what is required to map them.
+
+YOUR JOB
+Investigate the unmapped rows end-to-end.
+
+RETURN EXACTLY:
+1. the 4 unmapped rows
+2. the raw source values causing them
+3. where they came from:
+   - receipt item name
+   - modifier
+   - SKU
+   - recipe ingredient
+   - product/category mapping
+4. why they are currently unmapped
+5. what exact field/rule is needed to map each one
+
+CHECK ALL OF THESE
+1. Are the unmapped rows caused by item-name mismatch?
+2. Are they caused by modifier text not matching recipe naming?
+3. Are they caused by missing SKU/product linkage?
+4. Are they caused by missing product-to-recipe mapping?
+5. Are they caused by case/spacing/alias mismatch?
+6. Are they caused by a real item existing in receipts that has no recipe definition?
+7. Are they caused by old test data / duplicate recipe names?
+
+REQUIRED OUTPUT
+Do NOT just say “4 unmapped rows”.
+List them explicitly.
+
+Format:
+- Raw receipt value
+- Current interpreted value
+- Why unmapped
+- Required fix
+
+Example format:
+- "Triple Smash Burger + Bacon"
+  - interpreted as: no mapped recipe
+  - cause: modifier alias missing
+  - required fix: add alias mapping to recipe X
+
+Or:
+- "COKE ZERO 330ML"
+  - interpreted as: unmatched drink
+  - cause: receipt label != canonical drink label
+  - required fix: add normalization rule / SKU map
+
+IMPORTANT
+Tell me whether you need:
+- SKU mapping
+- alias mapping
+- recipe linkage
+- product linkage
+- modifier normalization
+or something else for each row.
+
+==================================================
+PART 3 — DO NOT GUESS
+==================================================
+
+Do not guess.
+Do not give broad theory only.
+Inspect the real runtime/data and tell me the exact causes.
+
+==================================================
+PART 4 — FIX IF STRAIGHTFORWARD
+==================================================
+
+If the Loyverse Shift Report issue is straightforward once identified, fix it in the same pass.
+If the 4 unmapped rows can be safely mapped in the same pass, fix them too.
+If not, still return the exact diagnosis.
+
+==================================================
+PART 5 — TESTING REQUIRED
+==================================================
+
+You must test the real app after investigation/fix.
+
+TEST 1
+Open Sales & Shift Analysis
+Confirm the latest completed shift resolves by start-of-shift date in BKK
+
+TEST 2
+Confirm the Loyverse Shift Report data is visible for the latest completed shift
+
+TEST 3
+Open Stock Reconciliation / Analysis tab
+Confirm the 4 unmapped rows are identified explicitly
+
+TEST 4
+If mapping fixes were applied, confirm the unmapped count reduces correctly
+
+TEST 5
+Confirm no console/runtime errors
+
+==================================================
+PART 6 — DELIVERABLE
+==================================================
+
+Return:
+1. files checked
+2. exact root cause of missing Loyverse Shift Report
+3. exact fix made, if fixed
+4. the 4 unmapped rows listed explicitly
+5. exact mapping needed for each unmapped row
+6. test results
+7. screenshots proving:
+   - latest shift resolves correctly
+   - Loyverse Shift Report is visible or exact blocker is proven
+   - unmapped rows are identified
+
+FINAL RULE
+This is critical daily operational data.
+Do not respond with general guesses.
+Inspect the real data path and give exact answers.

@@ -60,7 +60,9 @@ export async function getShiftReport({ date, storeId }: { date: string; storeId?
   };
   
   let shiftsData = await loyverseGet('shifts', params);
-  shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
+  // Use buffered min/max so shifts opened slightly before 17:00 (e.g. 16:43) are not rejected.
+  // The API already limits to opened_at_min = min (1h before 17:00), so no extra broadening.
+  shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], min, max, 'opened_at') };
   return shiftsData;
 }
 

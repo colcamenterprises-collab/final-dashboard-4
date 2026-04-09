@@ -299,6 +299,7 @@ const RULE_SEEDS: UsageRuleSeed[] = [
   { sku: '10027', itemName: 'Fanta Orange', directDrinkCode: 'FANTA_ORANGE', notes: 'Standalone Fanta Orange' },
   { sku: '10028', itemName: 'Fanta Strawberry', directDrinkCode: 'FANTA_STRAWBERRY', notes: 'Standalone Fanta Strawberry' },
   { sku: '10021', itemName: 'Schweppes Lime', directDrinkCode: 'SCHWEPPES_MANAO', notes: 'Schweppes lime/manao treated as same stock item' },
+  { sku: '10029', itemName: 'Soda Water', directDrinkCode: 'WATER', notes: 'Standalone soda water — mapped to water stock column' },
 ];
 
 // ─── MODIFIER → DRINK MAP ────────────────────────────────────────────────────

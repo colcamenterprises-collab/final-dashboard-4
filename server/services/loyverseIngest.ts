@@ -214,7 +214,10 @@ export async function ingestPosForBusinessDate(storeId: string, businessDate: st
 
   const data = await r.json() as LoyverseShiftsResponse;
   
-  const startTime = new Date(startUtc).getTime();
+  // Use a 90-minute pre-shift buffer so shifts opened slightly early (e.g. 16:43)
+  // are captured. Canonical window is 17:00–03:00 BKK (10:00–20:00 UTC).
+  const bufferMs = 90 * 60 * 1000;
+  const startTime = new Date(startUtc).getTime() - bufferMs;
   const endTime = new Date(endUtc).getTime();
   
   const filteredShifts = data.shifts.filter(shift => {
