@@ -1,0 +1,211 @@
+REPLIT TESTING TASK — VALIDATE THE MERGED PR FOR STOCK ORDER HISTORY / STOCK RECONCILIATION / STOCK REVIEW
+
+This is a testing-only task.
+
+Do not redesign.
+Do not refactor.
+Do not add features unless a bug is found that blocks validation.
+Do not freestyle.
+Do not modify unrelated pages.
+Do not touch Sales and Shift Analysis in this task.
+
+Your job is to independently verify that the merged PR actually works as intended.
+
+WHAT SHOULD ALREADY BE TRUE AFTER THE MERGE
+
+1. Stock Reconciliation content has been moved into Stock Order History.
+2. Stock Order History now lives as the single purchasing intelligence page under Purchasing.
+3. Stock Reconciliation is hidden from navigation.
+4. Stock Review is hidden from navigation.
+5. No data has been deleted.
+6. Flag logic has been improved so slow-moving items are not falsely red-flagged.
+7. Date filters now support more than 30 days if historical data exists.
+8. Summary / category / insights sections now exist and are based on live data.
+
+YOUR TASK
+
+Validate all of the above independently and report the result clearly.
+
+TEST CHECKLIST
+
+1. NAVIGATION VALIDATION
+
+- Open the app navigation
+- Confirm Stock Reconciliation is no longer visible in the nav
+- Confirm Stock Review is no longer visible in the nav
+- Confirm Stock Order History is still visible under Purchasing
+- Confirm no broken nav links or console errors are created by hiding those pages
+
+2. STOCK ORDER HISTORY PAGE LOAD
+
+- Open Stock Order History
+- Confirm the page loads without runtime errors
+- Confirm it is no longer just a raw data dump
+- Confirm the page contains, in this order or close to it:
+  a. header / title / date controls
+  b. summary section
+  c. action insights section
+  d. category breakdown section
+  e. order history / detail tables
+  f. moved Stock Reconciliation content/tables
+
+3. DATA PRESERVATION
+
+- Confirm historical purchasing/order data still appears
+- Confirm tables that previously existed on Stock Reconciliation have not disappeared
+- Confirm no tables or visible datasets appear to have been lost in the move
+- If anything looks missing, identify exactly what is missing and from which page it came
+
+4. DATE FILTER TESTING
+   Test all date controls:
+
+- Last 7 Days
+- Last 30 Days
+- Last 90 Days
+- Custom Range
+
+For each:
+
+- confirm the page reloads or refreshes correctly
+- confirm the visible table data changes appropriately
+- confirm summary values change consistently with the filtered data
+- confirm whether data older than 30 days is actually available and now visible
+
+Important:
+
+- If older data does not exist, report that clearly
+- If older data exists but still does not show, treat that as a failure
+
+5. FLAG LOGIC VALIDATION
+   This is one of the main points.
+
+Test whether the labels now behave sensibly:
+
+- Unusually High
+- Zero
+- Normal
+
+Specifically validate:
+
+- a slow-moving item such as Jalapenos is not falsely red-flagged just because it is infrequently ordered
+- a normal frequent item behaves differently
+- zero logic only appears where it makes business sense
+- there is no blanket red-flag behavior across many unrelated items
+
+If possible, inspect a few examples:
+
+- one slow-moving item
+- one medium/frequent item
+- one high-use item
+
+Report whether the flags appear believable and business-usable.
+
+6. SUMMARY SECTION VALIDATION
+   Check the top summary section and verify:
+
+- Total Spend appears correctly if supported by the data
+- Number of Purchase Events appears
+- Average Spend per Order appears if supported
+- Top Purchased Items appears
+- Most Frequently Purchased Items appears
+- Items Not Recently Purchased But Normally Used appears if data supports it
+
+Validate that these summaries appear tied to real data and not hardcoded placeholders.
+
+7. CATEGORY BREAKDOWN VALIDATION
+   Confirm that category grouping works and reflects live categories from the purchasing/order data.
+
+Check whether categories such as these appear where supported by the real data:
+
+- Fresh Food
+- Frozen Food
+- Drinks
+- Packaging
+- Kitchen Supplies
+- Shelf Items
+
+Confirm category totals/counts change when date ranges change.
+
+8. ACTION INSIGHTS VALIDATION
+   Confirm the page now includes a management-facing summary/insight section.
+
+Validate:
+
+- the insights are based on live data
+- they are not nonsense filler
+- they are not empty boilerplate if there is insufficient data
+- they point to useful issues such as unusual ordering, missing regular purchases, frequency changes, or category shifts
+
+9. CONSOLE / RUNTIME / BUILD VALIDATION
+
+- Check browser console on affected page(s)
+- Confirm no frontend errors
+- Confirm no obvious API failures
+- Run the app/build validation flow used in this repo if available
+- Confirm no new TypeScript/runtime errors were introduced by the merge
+
+10. REGRESSION CHECK
+
+- Confirm unrelated pages were not changed accidentally
+- Confirm Sales and Shift Analysis was not modified as part of this task
+- Confirm purchasing still works normally outside the upgraded Stock Order History page
+
+OUTPUT FORMAT REQUIRED
+
+Return your findings in this exact structure:
+
+1. PASS / FAIL SUMMARY
+
+- overall result
+- whether page consolidation is successful
+- whether nav cleanup is successful
+- whether flag logic looks trustworthy
+- whether historical data beyond 30 days is now available
+
+2. FILES / ROUTES VERIFIED
+
+- page route tested
+- nav area tested
+- any backend/API endpoints observed during testing
+
+3. TEST RESULTS BY SECTION
+
+- Navigation
+- Stock Order History load
+- Data preservation
+- Date filters
+- Flag logic
+- Summary section
+- Category breakdown
+- Action insights
+- Console/build/runtime
+- Regression check
+
+4. DEFECTS FOUND
+   For each defect include:
+
+- exact issue
+- where it occurs
+- how to reproduce
+- severity
+- recommended fix
+
+5. SCREENSHOTS REQUIRED
+   Attach screenshots of:
+
+- Stock Order History top section
+- summary section
+- category breakdown
+- one detail table
+- nav showing Stock Reconciliation hidden
+- nav showing Stock Review hidden
+- one example of flag behavior
+
+RULES
+
+- Testing only
+- No broad implementation work
+- No cleanup outside scope
+- No assumptions without evidence
+- If something cannot be verified, say exactly why
+- Do not say complete unless the full checklist above is actually tested

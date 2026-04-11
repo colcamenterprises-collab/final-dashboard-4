@@ -107,7 +107,15 @@ export default function PurchasingShiftLog() {
     return "text-slate-900";
   };
 
-  if (query.isLoading) {
+  const summary = data?.summary;
+  const dateRange = data?.dateRange;
+  const availableHistory = data?.availableHistory;
+  const actionInsights = data?.actionInsights ?? [];
+  const categoryBreakdown = data?.categoryBreakdown ?? [];
+  const stockReconciliation = data?.stockReconciliation ?? [];
+  const stockReviewPurchases = data?.stockReviewPurchases ?? [];
+
+  if (query.isLoading || !data) {
     return <div className="p-4 text-sm text-slate-500">Loading stock order history...</div>;
   }
 
@@ -122,9 +130,11 @@ export default function PurchasingShiftLog() {
           <h1 className="text-2xl font-bold text-slate-900">Stock Order History</h1>
           <p className="text-xs text-slate-500">Consolidated purchasing intelligence and reconciliation review.</p>
           <p className="text-xs text-slate-400 mt-1">
-            Selected range: {formatDate(data!.dateRange.start)} - {formatDate(data!.dateRange.end)}
-            {data?.availableHistory?.minDate && (
-              <span> • Full history: {formatDate(data.availableHistory.minDate)} to {formatDate(data.availableHistory.maxDate || data.availableHistory.minDate)}</span>
+            {dateRange ? (
+              <>Selected range: {formatDate(dateRange.start)} - {formatDate(dateRange.end)}</>
+            ) : null}
+            {availableHistory?.minDate && (
+              <span> • Full history: {formatDate(availableHistory.minDate)} to {formatDate(availableHistory.maxDate || availableHistory.minDate)}</span>
             )}
           </p>
         </div>
@@ -148,17 +158,17 @@ export default function PurchasingShiftLog() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-3">
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Total Spend</div><div className="text-xl font-semibold">{formatMoney(data!.summary.totalSpend)}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Purchase Events</div><div className="text-xl font-semibold">{data!.summary.purchaseEvents}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Average Spend / Event</div><div className="text-xl font-semibold">{formatMoney(data!.summary.averageSpendPerEvent)}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Top Purchased Items</div><div className="text-sm mt-1">{data!.summary.topPurchasedItems.slice(0, 3).map(i => i.itemName).join(", ") || "No data"}</div></CardContent></Card>
-        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Not Recently Purchased</div><div className="text-xl font-semibold">{data!.summary.itemsNotRecentlyPurchasedButNormallyUsed.length}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Total Spend</div><div className="text-xl font-semibold">{formatMoney(summary?.totalSpend ?? 0)}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Purchase Events</div><div className="text-xl font-semibold">{summary?.purchaseEvents ?? 0}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Average Spend / Event</div><div className="text-xl font-semibold">{formatMoney(summary?.averageSpendPerEvent ?? 0)}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Top Purchased Items</div><div className="text-sm mt-1">{(summary?.topPurchasedItems ?? []).slice(0, 3).map(i => i.itemName).join(", ") || "No data"}</div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="text-xs text-slate-500">Not Recently Purchased</div><div className="text-xl font-semibold">{(summary?.itemsNotRecentlyPurchasedButNormallyUsed ?? []).length}</div></CardContent></Card>
       </div>
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-base">Action Insights</CardTitle></CardHeader>
         <CardContent className="space-y-2 text-sm text-slate-700">
-          {data!.actionInsights.map((insight, idx) => <div key={`${insight.type}-${idx}`}>{insight.message}</div>)}
+          {actionInsights.map((insight, idx) => <div key={`${insight.type}-${idx}`}>{insight.message}</div>)}
         </CardContent>
       </Card>
 
@@ -168,7 +178,7 @@ export default function PurchasingShiftLog() {
           <table className="min-w-full text-xs">
             <thead><tr className="border-b"><th className="text-left p-2">Category</th><th className="text-right p-2">Qty</th><th className="text-right p-2">Purchase Events</th><th className="text-right p-2">Spend</th><th className="text-right p-2">Share</th></tr></thead>
             <tbody>
-              {data!.categoryBreakdown.map((row) => (
+              {categoryBreakdown.map((row) => (
                 <tr key={row.category} className="border-b border-slate-100">
                   <td className="p-2">{row.category}</td><td className="p-2 text-right">{row.quantity.toFixed(1)}</td><td className="p-2 text-right">{row.purchaseCount}</td><td className="p-2 text-right">{formatMoney(row.spend)}</td><td className="p-2 text-right">{(row.share * 100).toFixed(1)}%</td>
                 </tr>
@@ -222,7 +232,7 @@ export default function PurchasingShiftLog() {
           <table className="min-w-full text-xs">
             <thead><tr className="border-b"><th className="p-2 text-left">Date</th><th className="p-2 text-left">Item</th><th className="p-2 text-right">Start</th><th className="p-2 text-right">Purchased</th><th className="p-2 text-right">Sold</th><th className="p-2 text-right">Expected End</th><th className="p-2 text-right">Actual End</th><th className="p-2 text-right">Variance</th></tr></thead>
             <tbody>
-              {data!.stockReconciliation.map((row, idx) => (
+              {stockReconciliation.map((row, idx) => (
                 <tr key={`${row.shift_date}-${row.item_name}-${idx}`} className="border-b border-slate-100">
                   <td className="p-2">{row.shift_date}</td><td className="p-2">{row.item_name}</td><td className="p-2 text-right">{row.start_qty}</td><td className="p-2 text-right">{row.purchased_qty}</td><td className="p-2 text-right">{row.number_sold_qty}</td><td className="p-2 text-right">{row.expected_end_qty}</td><td className="p-2 text-right">{row.actual_end_qty}</td><td className="p-2 text-right">{row.variance}</td>
                 </tr>
@@ -238,7 +248,7 @@ export default function PurchasingShiftLog() {
           <table className="min-w-full text-xs">
             <thead><tr className="border-b"><th className="p-2 text-left">Date</th><th className="p-2 text-left">Staff</th><th className="p-2 text-left">Supplier</th><th className="p-2 text-right">Rolls</th><th className="p-2 text-right">Meat (g)</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Notes</th></tr></thead>
             <tbody>
-              {data!.stockReviewPurchases.map((row) => (
+              {stockReviewPurchases.map((row) => (
                 <tr key={row.id} className="border-b border-slate-100">
                   <td className="p-2">{row.date}</td><td className="p-2">{row.staff || "NULL"}</td><td className="p-2">{row.supplier || "NULL"}</td><td className="p-2 text-right">{Number(row.rolls_pcs || 0)}</td><td className="p-2 text-right">{Number(row.meat_grams || 0)}</td><td className="p-2 text-right">{formatMoney(Number(row.amount_thb || 0))}</td><td className="p-2">{row.notes || "NULL"}</td>
                 </tr>
