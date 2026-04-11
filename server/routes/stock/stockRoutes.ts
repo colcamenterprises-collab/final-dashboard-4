@@ -370,4 +370,47 @@ router.post('/lodge/drinks', async (req, res) => {
   }
 });
 
+/**
+ * GET /api/stock/purchases-log
+ * Returns stock_received_log entries (from the Stock Received Modal).
+ * ?date=YYYY-MM-DD  — filter by shift_date (optional)
+ * ?days=N           — last N days (default 7 if no date given)
+ */
+router.get("/purchases-log", async (req, res) => {
+  try {
+    const prisma = db();
+    const { date, days } = req.query;
+
+    let where = "";
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(String(date))) {
+      where = `WHERE shift_date = '${date}'::date`;
+    } else {
+      const n = Math.min(Number(days) || 7, 90);
+      where = `WHERE shift_date >= (CURRENT_DATE - INTERVAL '${n} days')`;
+    }
+
+    const rows = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT
+        id,
+        shift_date::text,
+        item_type,
+        item_name,
+        qty,
+        weight_g,
+        source,
+        paid,
+        created_at::text AS logged_at
+      FROM stock_received_log
+      ${where}
+      ORDER BY created_at DESC
+      LIMIT 500
+    `);
+
+    res.json({ ok: true, rows });
+  } catch (error: any) {
+    console.error("[STOCK] purchases-log error:", error);
+    res.status(500).json({ error: error.message || "Failed to load purchases log" });
+  }
+});
+
 export default router;
