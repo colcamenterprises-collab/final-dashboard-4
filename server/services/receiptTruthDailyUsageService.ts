@@ -291,6 +291,11 @@ const RULE_SEEDS: UsageRuleSeed[] = [
   { sku: '10045', itemName: 'Dirty Fries (เดอร์ตี้ เฟรนช์ฟรายส์)', friesPerUnit: 1, beefGramsPerUnit: 95, notes: 'Dirty fries with beef — 95g safe default pending precise weight' },
   { sku: '10010', itemName: 'Cheesy Bacon Fries', friesPerUnit: 1, baconPerUnit: 1, notes: 'Cheesy bacon fries' },
 
+  // Sides — chicken nuggets (1kg bag, 41 nuggets = 24.4g per nugget)
+  { sku: '10000', itemName: 'Chicken Nuggets (6)',  chickenServesPerUnit: 6,  chickenGramsPerUnit: 146.4, notes: '6-piece nuggets — 6 × 24.4g (1kg bag / 41 nuggets)' },
+  { sku: '10001', itemName: 'Chicken Nuggets (9)',  chickenServesPerUnit: 9,  chickenGramsPerUnit: 219.6, notes: '9-piece nuggets — 9 × 24.4g (1kg bag / 41 nuggets)' },
+  { sku: '10002', itemName: 'Chicken Nuggets (12)', chickenServesPerUnit: 12, chickenGramsPerUnit: 292.8, notes: '12-piece nuggets — 12 × 24.4g (1kg bag / 41 nuggets)' },
+
   // Sides — coleslaw
   { sku: '10025', itemName: 'Coleslaw with Bacon', coleslawPerUnit: 1, baconPerUnit: 1, notes: 'Standalone coleslaw side with bacon portion' },
 

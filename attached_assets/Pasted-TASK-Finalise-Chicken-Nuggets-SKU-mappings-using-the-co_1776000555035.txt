@@ -1,0 +1,81 @@
+TASK: Finalise Chicken Nuggets SKU mappings using the confirmed nugget bag rule and remove the remaining unmapped rows
+
+LOCK THIS IN
+Receipt/usage reconciliation uses SKU as the canonical key.
+Do NOT switch back to name matching.
+Do NOT use guessed receipt titles if SKU exists.
+
+==================================================
+CONFIRMED NUGGET BASE RULE
+==================================================
+
+Chicken Nuggets are purchased as:
+- 1kg bag
+- 41 nuggets per bag
+
+Therefore:
+- 1000g / 41 = 24.39g per nugget
+Use rounded system value:
+- 1 nugget = 24.4g
+
+==================================================
+CONFIRMED SKU DEFINITIONS
+==================================================
+
+- SKU 10000 = Chicken Nuggets (6)
+- SKU 10001 = Chicken Nuggets (9)
+- SKU 10002 = Chicken Nuggets (12)
+
+Category:
+- Side Orders
+
+==================================================
+REQUIRED USAGE RULES
+==================================================
+
+Apply the following grams consumed per sold SKU:
+
+- SKU 10000 → Chicken Nuggets (6) → 146.4g used
+- SKU 10001 → Chicken Nuggets (9) → 219.6g used
+- SKU 10002 → Chicken Nuggets (12) → 292.8g used
+
+These must feed into:
+- Daily Usage Summary
+- Stock Reconciliation
+- Sales & Shift Analysis stock outputs where relevant
+
+==================================================
+IMPLEMENTATION RULE
+==================================================
+
+Add/complete these nugget rules in the SKU-driven usage mapping system.
+
+Do NOT leave nuggets unmapped.
+Do NOT create a name-only fallback for these.
+Do NOT hardcode different bag assumptions.
+
+==================================================
+AFTER MAPPING
+==================================================
+
+1. rebuild affected dates
+2. confirm unmapped count drops correctly
+3. confirm nugget sales contribute to food usage
+4. confirm no runtime/server errors
+
+==================================================
+VALIDATION REQUIRED
+==================================================
+
+Return:
+1. files changed
+2. exact rules added for:
+   - 10000
+   - 10001
+   - 10002
+3. updated unmapped count
+4. confirmation that nuggets now contribute to usage calculations
+5. screenshot proof from the relevant page(s)
+
+FINAL RULE
+This is the final nugget SKU mapping pass. Use the confirmed bag math above and close out the remaining unmapped nugget rows.
