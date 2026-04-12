@@ -77,6 +77,20 @@ type HistoryRow = {
 // ─── Helpers ─────────────────────────────────────────────────────────
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const thisMonth = () => todayISO().slice(0, 7);
+
+// Returns YYYY-MM-DD in Bangkok timezone (UTC+7), offset by daysBack
+const bkkDate = (daysBack: number): string => {
+  const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' }));
+  d.setDate(d.getDate() - daysBack);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+// Yesterday in BKK time — the latest shift that is guaranteed to be closed
+const bkkYesterday = () => bkkDate(1);
+// Today in BKK time — used to exclude still-open shifts
+const bkkToday = () => bkkDate(0);
 const thb = (n: number | null | undefined) => {
   if (n === null || n === undefined) return "—";
   return `฿${n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
@@ -175,8 +189,8 @@ function EmptyCard({ text }: { text: string }) {
 
 // ─── Main Page ───────────────────────────────────────────────────────
 export default function DailyReview() {
-  const [selectedDate, setSelectedDate] = useState(todayISO());
-  const [month, setMonth] = useState(thisMonth());
+  const [selectedDate, setSelectedDate] = useState(bkkYesterday);
+  const [month, setMonth] = useState(() => bkkYesterday().slice(0, 7));
   const autoDateSet = useRef(false);
 
   const { data: comparison, isLoading: loadingComparison } = useQuery<ComparisonPayload>({
@@ -208,13 +222,18 @@ export default function DailyReview() {
     enabled: Boolean(month),
   });
 
-  // Auto-select the most recent completed shift on first data load
+  // Auto-select the most recent COMPLETED shift on first data load.
+  // Exclude today's BKK date — its Loyverse shift is still open until 3 AM.
   useEffect(() => {
     if (!autoDateSet.current && history.length > 0) {
       autoDateSet.current = true;
-      const latest = [...history].sort((a, b) => b.shift_date.localeCompare(a.shift_date))[0].shift_date;
-      setSelectedDate(latest);
-      setMonth(latest.slice(0, 7));
+      const todayBKK = bkkToday();
+      const completedRows = history.filter((r) => r.shift_date < todayBKK);
+      if (completedRows.length > 0) {
+        const latest = [...completedRows].sort((a, b) => b.shift_date.localeCompare(a.shift_date))[0].shift_date;
+        setSelectedDate(latest);
+        setMonth(latest.slice(0, 7));
+      }
     }
   }, [history]);
 

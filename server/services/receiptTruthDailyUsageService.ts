@@ -291,6 +291,13 @@ const RULE_SEEDS: UsageRuleSeed[] = [
   { sku: '10045', itemName: 'Dirty Fries (เดอร์ตี้ เฟรนช์ฟรายส์)', friesPerUnit: 1, beefGramsPerUnit: 95, notes: 'Dirty fries with beef — 95g safe default pending precise weight' },
   { sku: '10010', itemName: 'Cheesy Bacon Fries', friesPerUnit: 1, baconPerUnit: 1, notes: 'Cheesy bacon fries' },
 
+  // Sides — coleslaw
+  { sku: '10025', itemName: 'Coleslaw with Bacon', coleslawPerUnit: 1, baconPerUnit: 1, notes: 'Standalone coleslaw side with bacon portion' },
+
+  // Pre-packaged juice boxes — no tracked ingredient impact, zero-mapped so not flagged unmapped
+  { sku: '10039', itemName: 'Juice Box (Orange)', notes: 'Pre-packaged juice box — no ingredient stock column, zero-mapped' },
+  { sku: '10040', itemName: 'Juice Box (Apple)', notes: 'Pre-packaged juice box — no ingredient stock column, zero-mapped' },
+
   // Standalone drinks
   { sku: '10012', itemName: 'Coke Can', directDrinkCode: 'COKE', notes: 'Standalone Coke can' },
   { sku: '10013', itemName: 'Coke Zero', directDrinkCode: 'COKE_ZERO', notes: 'Standalone Coke Zero' },
