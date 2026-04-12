@@ -264,7 +264,7 @@ export default function IssueRegisterPage() {
                 key={f.label}
                 value={f.current}
                 onChange={e => f.setter(e.target.value)}
-                className="border border-slate-200 rounded-[4px] px-2 py-1 text-sm"
+                className="border border-slate-200 rounded-[4px] px-2 py-1 text-xs"
               >
                 <option value="">{f.label}</option>
                 {f.options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -528,7 +528,7 @@ function ManualCreateForm({ onClose, onCreated }: { onClose: () => void; onCreat
         <div className="grid md:grid-cols-3 gap-3">
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">Shift Date</label>
-            <input type="date" value={form.shift_date} onChange={set("shift_date")} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-sm" />
+            <input type="date" value={form.shift_date} onChange={set("shift_date")} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-xs" />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">Issue Type</label>
@@ -540,13 +540,13 @@ function ManualCreateForm({ onClose, onCreated }: { onClose: () => void; onCreat
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">Category</label>
-            <select value={form.category} onChange={set("category")} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-sm">
+            <select value={form.category} onChange={set("category")} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-xs">
               {["STOCK","FINANCIAL","DATA","SYSTEM","OTHER"].map(o => <option key={o}>{o}</option>)}
             </select>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-500">Severity</label>
-            <select value={form.severity} onChange={set("severity")} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-sm">
+            <select value={form.severity} onChange={set("severity")} className="border border-slate-200 rounded-[4px] px-2 py-1.5 text-xs">
               {["LOW","MEDIUM","HIGH","CRITICAL"].map(o => <option key={o}>{o}</option>)}
             </select>
           </div>

@@ -90,11 +90,11 @@ export default function StockReview() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <label className="block">
             <div className="text-xs text-slate-500 mb-1">From</div>
-            <input type="date" max={today} value={from} onChange={(e) => setFrom(e.target.value)} className="w-full h-10 rounded-[4px] border border-slate-200 px-3 text-sm" />
+            <input type="date" max={today} value={from} onChange={(e) => setFrom(e.target.value)} className="w-full h-9 rounded-[4px] border border-slate-200 px-3 text-xs" />
           </label>
           <label className="block">
             <div className="text-xs text-slate-500 mb-1">To</div>
-            <input type="date" max={today} value={to} onChange={(e) => setTo(e.target.value)} className="w-full h-10 rounded-[4px] border border-slate-200 px-3 text-sm" />
+            <input type="date" max={today} value={to} onChange={(e) => setTo(e.target.value)} className="w-full h-9 rounded-[4px] border border-slate-200 px-3 text-xs" />
           </label>
           <div className="text-xs text-slate-600">Source: {(data?.source || ["purchase_tally", "purchase_tally_drink"]).join(", ")}</div>
           <div className="text-xs text-slate-600">Range: {formatDate(from)} → {formatDate(to)}</div>

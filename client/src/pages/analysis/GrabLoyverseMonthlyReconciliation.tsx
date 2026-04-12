@@ -418,7 +418,7 @@ export default function GrabLoyverseMonthlyReconciliation() {
               <Label htmlFor="tolerance">Tolerance (minutes)</Label>
               <select
                 id="tolerance"
-                className="h-10 border rounded px-3"
+                className="h-9 border rounded-[4px] px-3 text-xs"
                 value={toleranceMinutes}
                 onChange={(event) => setToleranceMinutes(Number(event.target.value) as 5 | 10 | 15)}
               >
@@ -468,7 +468,7 @@ export default function GrabLoyverseMonthlyReconciliation() {
             <Label htmlFor="status-filter">Filter</Label>
             <select
               id="status-filter"
-              className="h-10 border rounded px-3"
+              className="h-9 border rounded-[4px] px-3 text-xs"
               value={filter}
               onChange={(event) => setFilter(event.target.value as FilterOption)}
             >

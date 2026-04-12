@@ -198,7 +198,7 @@ export default function IngredientsTruth() {
                   value={selectedDate}
                   min="2024-07-01"
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-full sm:w-48 rounded-[4px] text-sm"
+                  className="w-full sm:w-48 rounded-[4px] text-xs"
                   data-testid="input-business-date"
                 />
               </div>

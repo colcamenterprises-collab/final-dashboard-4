@@ -342,6 +342,50 @@ router.get('/', async (req: Request, res: Response) => {
       endDateIso,
     );
 
+    // Augment categoryBreakdown with purchase_tally rolls/meat and purchase_tally_drink data
+    const augMap = new Map<string, { category: string; quantity: number; purchaseCount: number; spend: number }>(
+      categoryBreakdown.map(c => [c.category, { category: c.category, quantity: c.quantity, purchaseCount: c.purchaseCount, spend: c.spend }])
+    );
+
+    // Meat: from purchase_tally rows where meat_grams > 0
+    const meatTallyRows = purchaseRows.filter(r => Number(r.meat_grams || 0) > 0);
+    if (meatTallyRows.length > 0) {
+      const m = augMap.get('Meat') || { category: 'Meat', quantity: 0, purchaseCount: 0, spend: 0 };
+      // qty in kg for readability
+      m.quantity += meatTallyRows.reduce((s, r) => s + Number(r.meat_grams || 0) / 1000, 0);
+      m.purchaseCount += meatTallyRows.length;
+      m.spend += meatTallyRows.reduce((s, r) => s + Number(r.amount_thb || 0), 0);
+      augMap.set('Meat', m);
+    }
+
+    // Rolls (Fresh Food): from purchase_tally rows where rolls_pcs > 0
+    const rollsTallyRows = purchaseRows.filter(r => Number(r.rolls_pcs || 0) > 0);
+    if (rollsTallyRows.length > 0) {
+      const ff = augMap.get('Fresh Food') || { category: 'Fresh Food', quantity: 0, purchaseCount: 0, spend: 0 };
+      ff.quantity += rollsTallyRows.reduce((s, r) => s + Number(r.rolls_pcs || 0), 0);
+      ff.purchaseCount += rollsTallyRows.length;
+      ff.spend += rollsTallyRows.reduce((s, r) => s + Number(r.amount_thb || 0), 0);
+      augMap.set('Fresh Food', ff);
+    }
+
+    // Drinks: from purchase_tally_drink (group by distinct tally_id for purchase events)
+    if (drinkRows.length > 0) {
+      const dk = augMap.get('Drinks') || { category: 'Drinks', quantity: 0, purchaseCount: 0, spend: 0 };
+      dk.quantity += drinkRows.reduce((s, r) => s + Number(r.qty || 0), 0);
+      const distinctDrinkTallyIds = [...new Set(drinkRows.map(r => r.tally_id))];
+      dk.purchaseCount += distinctDrinkTallyIds.length;
+      dk.spend += distinctDrinkTallyIds.reduce((s, tid) => {
+        const row = drinkRows.find(r => r.tally_id === tid);
+        return s + Number(row?.amount_thb || 0);
+      }, 0);
+      augMap.set('Drinks', dk);
+    }
+
+    const totalCatQtyFinal = [...augMap.values()].reduce((sum, c) => sum + c.quantity, 0);
+    const categoryBreakdownFinal = [...augMap.values()]
+      .sort((a, b) => b.quantity - a.quantity)
+      .map(c => ({ ...c, share: totalCatQtyFinal > 0 ? c.quantity / totalCatQtyFinal : 0 }));
+
     res.json({
       items: responseItems,
       shifts: rangeShiftsSorted.map(s => ({ id: s.id, date: s.date })),
@@ -356,7 +400,7 @@ router.get('/', async (req: Request, res: Response) => {
         mostFrequentItems: topByFrequency,
         itemsNotRecentlyPurchasedButNormallyUsed: overdueRegularItems,
       },
-      categoryBreakdown,
+      categoryBreakdown: categoryBreakdownFinal,
       actionInsights: insights,
       stockReconciliation: reconciliationRows,
       stockReviewPurchases: purchaseRows,
