@@ -457,7 +457,7 @@ export default function PurchasingShiftLog() {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="space-y-4">
         {/* Rolls Purchases */}
         <Card>
           <CardHeader className="py-3 px-4 border-b border-slate-100">
