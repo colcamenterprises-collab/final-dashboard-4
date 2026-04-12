@@ -321,6 +321,27 @@ router.get('/', async (req: Request, res: Response) => {
       endDateIso,
     );
 
+    const drinkRows = await prisma.$queryRawUnsafe<Array<{
+      tally_id: string;
+      date: string;
+      staff: string | null;
+      supplier: string | null;
+      amount_thb: number | null;
+      item_name: string;
+      qty: number;
+      unit: string;
+    }>>(
+      `SELECT ptd.tally_id, pt.date::text AS date, pt.staff, pt.supplier, pt.amount_thb,
+              ptd.item_name, ptd.qty, ptd.unit
+       FROM purchase_tally_drink ptd
+       JOIN purchase_tally pt ON pt.id = ptd.tally_id
+       WHERE pt.date >= $1::date AND pt.date <= $2::date
+       ORDER BY pt.date DESC, pt.created_at DESC
+       LIMIT 1000`,
+      startDateIso,
+      endDateIso,
+    );
+
     res.json({
       items: responseItems,
       shifts: rangeShiftsSorted.map(s => ({ id: s.id, date: s.date })),
@@ -339,6 +360,7 @@ router.get('/', async (req: Request, res: Response) => {
       actionInsights: insights,
       stockReconciliation: reconciliationRows,
       stockReviewPurchases: purchaseRows,
+      drinksPurchases: drinkRows,
     });
   } catch (error) {
     console.error('Error fetching shift log:', error);

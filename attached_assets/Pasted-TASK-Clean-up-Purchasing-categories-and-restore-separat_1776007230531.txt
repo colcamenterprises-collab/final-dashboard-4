@@ -1,0 +1,229 @@
+TASK: Clean up Purchasing categories and restore separated stock purchase visibility
+
+PRIORITY
+This is a structural cleanup and data-consistency task.
+Do NOT redesign the whole page.
+Fix the category model and restore clear visibility for rolls, meat, and drinks purchases.
+
+==================================================
+LOCKED BUSINESS RULES
+==================================================
+
+The only valid purchasing categories in this system are:
+
+- Fresh Food
+- Frozen Food
+- Shelf Items
+- Kitchen Supplies
+- Packaging
+- Meat
+- Drinks
+
+No other purchasing categories are valid.
+
+INVALID / REMOVE / MERGE AWAY:
+- Chicken
+- Seasonings
+- Frozen Items
+- Vegetables
+- Sauces
+- BREAD
+- DAIRY
+- Meat (duplicate casing if MEAT and Meat both exist)
+- any other legacy/made-up category not in the approved list above
+
+The Daily Sales & Stock v2 flow is driven by the Purchasing List.
+That means any stock purchased / purchase history / purchasing needs / stock reconciliation views must reflect this exact category structure.
+
+==================================================
+PART 1 — PURCHASING ITEMS PAGE CATEGORY FIX
+==================================================
+
+PROBLEM
+The Purchasing Items page currently contains incorrect / duplicate / made-up categories.
+
+REQUIRED FIX
+1. Audit every purchasing item category
+2. Normalize all items so each belongs to ONE of the approved categories only
+3. Remove duplicate or legacy category labels from dropdowns / filters / displays
+4. Ensure the category selector only allows the approved list
+
+APPROVED CATEGORY LIST ONLY:
+- Fresh Food
+- Frozen Food
+- Shelf Items
+- Kitchen Supplies
+- Packaging
+- Meat
+- Drinks
+
+REQUIRED DATA ACTION
+Map existing items into the approved categories.
+Examples:
+- rolls / buns should go to the correct approved category
+- drinks should sit in Drinks
+- meat purchases should sit in Meat
+- packaging in Packaging
+- etc
+
+Do NOT leave old categories selectable anywhere once this is complete.
+
+==================================================
+PART 2 — CATEGORY BREAKDOWN FIX
+==================================================
+
+PROBLEM
+Category Breakdown is showing categories that do not exist in the real business model.
+
+REQUIRED FIX
+The Category Breakdown section must only use the approved purchasing categories and must be driven from the cleaned Purchasing Items source.
+
+It must NOT show:
+- Chicken
+- Seasonings
+- Frozen Items
+or any other invalid category
+
+EXPECTED RESULT
+Category Breakdown shows only:
+- Fresh Food
+- Frozen Food
+- Shelf Items
+- Kitchen Supplies
+- Packaging
+- Meat
+- Drinks
+
+==================================================
+PART 3 — RESTORE 3 SEPARATE PURCHASE TABLES
+==================================================
+
+PROBLEM
+Stock purchasing outside the shift for:
+- drinks
+- meat
+- rolls
+
+used to be shown in 3 separate tables.
+It is now combined and visibility is worse.
+Also, today’s meat purchase is not clearly showing.
+
+REQUIRED FIX
+Revert that section back to 3 separate tables:
+
+1. Rolls Purchases
+2. Meat Purchases
+3. Drinks Purchases
+
+This is the required visibility model.
+
+IMPORTANT
+Do NOT combine these back into one table.
+
+==================================================
+PART 4 — COLUMNS MUST MATCH THE MODAL INPUT STRUCTURE
+==================================================
+
+The 3 separate tables must use columns that match how data is entered in the modal/form for each stock type.
+
+Use the same field structure the user sees when entering:
+- rolls
+- meat
+- drinks
+
+Do not invent extra columns.
+Do not add unnecessary notes/time/source clutter.
+Match the actual modal structure as closely as possible.
+
+If the modal fields differ slightly by type, match each table to its own real input structure.
+
+==================================================
+PART 5 — MEAT PURCHASE VISIBILITY
+==================================================
+
+PROBLEM
+Today’s meat purchase is not showing clearly in the current combined layout.
+
+REQUIRED FIX
+After restoring separate tables, verify:
+- today’s meat purchase appears in Meat Purchases
+- latest records are visible correctly
+- no purchase rows are lost in the split
+
+==================================================
+PART 6 — SOURCE OF TRUTH RULE
+==================================================
+
+Use the Purchasing Items page / purchasing data as the source of truth for category-driven stock purchase views.
+
+Any page relying on purchased stock or purchasing needs must inherit the corrected categories from this source.
+
+==================================================
+PART 7 — DO NOT DO
+==================================================
+
+- do not redesign unrelated pages
+- do not create new made-up categories
+- do not keep legacy categories in filters/dropdowns
+- do not keep combined rolls/meat/drinks table
+- do not add unnecessary columns
+- do not break existing purchasing records
+- do not silently drop rows during category remap
+
+==================================================
+PART 8 — TESTING REQUIRED
+==================================================
+
+TEST 1
+Open Purchasing Items page
+- confirm only approved categories exist in selector/filter
+
+TEST 2
+Verify all existing items now sit inside approved categories only
+
+TEST 3
+Open Category Breakdown
+- confirm only approved categories display
+
+TEST 4
+Confirm invalid categories no longer appear:
+- Chicken
+- Seasonings
+- Frozen Items
+- any other legacy duplicates
+
+TEST 5
+Confirm the stock purchasing section is back to 3 separate tables:
+- Rolls Purchases
+- Meat Purchases
+- Drinks Purchases
+
+TEST 6
+Confirm table columns match the modal/form structure
+
+TEST 7
+Confirm today’s meat purchase is visible in the Meat Purchases table
+
+TEST 8
+Confirm no runtime/frontend errors
+
+==================================================
+DELIVERABLE
+==================================================
+
+Return:
+1. files changed
+2. exact category mapping cleanup performed
+3. list of old categories removed/merged
+4. confirmation that only approved categories remain
+5. confirmation that 3 separate purchase tables were restored
+6. confirmation that today’s meat purchase is visible
+7. screenshot proof of:
+   - Purchasing Items category selector
+   - Category Breakdown
+   - Rolls Purchases table
+   - Meat Purchases table
+   - Drinks Purchases table
+
+FINAL RULE
+The system must use only the approved purchasing categories and restore separated visibility for rolls, meat, and drinks.

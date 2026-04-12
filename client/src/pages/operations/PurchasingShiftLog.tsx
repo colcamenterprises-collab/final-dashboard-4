@@ -59,6 +59,16 @@ type ShiftLogResponse = {
     rolls_pcs: number | null;
     meat_grams: number | null;
   }>;
+  drinksPurchases: Array<{
+    tally_id: string;
+    date: string;
+    staff: string | null;
+    supplier: string | null;
+    amount_thb: number | null;
+    item_name: string;
+    qty: number;
+    unit: string;
+  }>;
 };
 
 const today = new Date().toISOString().slice(0, 10);
@@ -114,6 +124,12 @@ export default function PurchasingShiftLog() {
   const categoryBreakdown = data?.categoryBreakdown ?? [];
   const stockReconciliation = data?.stockReconciliation ?? [];
   const stockReviewPurchases = data?.stockReviewPurchases ?? [];
+  const drinksPurchases = data?.drinksPurchases ?? [];
+
+  const rollsPurchases = stockReviewPurchases.filter(r => r.rolls_pcs != null && Number(r.rolls_pcs) > 0);
+  const meatPurchases = stockReviewPurchases.filter(r => r.meat_grams != null && Number(r.meat_grams) > 0);
+
+  const APPROVED_CATEGORIES = ['Drinks', 'Fresh Food', 'Frozen Food', 'Kitchen Supplies', 'Meat', 'Packaging', 'Shelf Items'];
 
   if (query.isLoading || !data) {
     return <div className="p-4 text-sm text-slate-500">Loading stock order history...</div>;
@@ -193,7 +209,7 @@ export default function PurchasingShiftLog() {
           <CardTitle className="text-sm font-semibold text-slate-900">Order History Quantity Matrix</CardTitle>
           <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="text-xs px-3 py-1 border rounded-[4px]">
             <option value="">All Categories</option>
-            {categories.map(cat => <option key={cat} value={cat || ""}>{cat}</option>)}
+            {APPROVED_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
           </select>
         </CardHeader>
         <CardContent className="p-0 overflow-x-auto">
@@ -242,19 +258,104 @@ export default function PurchasingShiftLog() {
         </CardContent>
       </Card>
 
+      {/* Rolls Purchases */}
       <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Purchase Tally Raw Detail (Moved from Stock Review context)</CardTitle></CardHeader>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Rolls Purchases</CardTitle></CardHeader>
         <CardContent className="overflow-x-auto">
-          <table className="min-w-full text-xs">
-            <thead><tr className="border-b"><th className="p-2 text-left">Date</th><th className="p-2 text-left">Staff</th><th className="p-2 text-left">Supplier</th><th className="p-2 text-right">Rolls</th><th className="p-2 text-right">Meat (g)</th><th className="p-2 text-right">Amount</th><th className="p-2 text-left">Notes</th></tr></thead>
-            <tbody>
-              {stockReviewPurchases.map((row) => (
-                <tr key={row.id} className="border-b border-slate-100">
-                  <td className="p-2">{row.date}</td><td className="p-2">{row.staff || "NULL"}</td><td className="p-2">{row.supplier || "NULL"}</td><td className="p-2 text-right">{Number(row.rolls_pcs || 0)}</td><td className="p-2 text-right">{Number(row.meat_grams || 0)}</td><td className="p-2 text-right">{formatMoney(Number(row.amount_thb || 0))}</td><td className="p-2">{row.notes || "NULL"}</td>
+          {rollsPurchases.length === 0 ? (
+            <p className="text-xs text-slate-400 py-2">No rolls purchases in selected range.</p>
+          ) : (
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">Date</th>
+                  <th className="p-2 text-left">Staff</th>
+                  <th className="p-2 text-left">Supplier</th>
+                  <th className="p-2 text-right">Rolls (pcs)</th>
+                  <th className="p-2 text-right">Amount (฿)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {rollsPurchases.map((row) => (
+                  <tr key={row.id} className="border-b border-slate-100">
+                    <td className="p-2">{formatDate(row.date)}</td>
+                    <td className="p-2">{row.staff || "—"}</td>
+                    <td className="p-2">{row.supplier || "—"}</td>
+                    <td className="p-2 text-right font-semibold">{Number(row.rolls_pcs)}</td>
+                    <td className="p-2 text-right">{formatMoney(Number(row.amount_thb || 0))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Meat Purchases */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Meat Purchases</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          {meatPurchases.length === 0 ? (
+            <p className="text-xs text-slate-400 py-2">No meat purchases in selected range.</p>
+          ) : (
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">Date</th>
+                  <th className="p-2 text-left">Staff</th>
+                  <th className="p-2 text-left">Supplier</th>
+                  <th className="p-2 text-right">Meat (g)</th>
+                  <th className="p-2 text-right">Amount (฿)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {meatPurchases.map((row) => (
+                  <tr key={row.id} className="border-b border-slate-100">
+                    <td className="p-2">{formatDate(row.date)}</td>
+                    <td className="p-2">{row.staff || "—"}</td>
+                    <td className="p-2">{row.supplier || "—"}</td>
+                    <td className="p-2 text-right font-semibold">{Number(row.meat_grams).toLocaleString()}</td>
+                    <td className="p-2 text-right">{formatMoney(Number(row.amount_thb || 0))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Drinks Purchases */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Drinks Purchases</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto">
+          {drinksPurchases.length === 0 ? (
+            <p className="text-xs text-slate-400 py-2">No drinks purchases in selected range.</p>
+          ) : (
+            <table className="min-w-full text-xs">
+              <thead>
+                <tr className="border-b">
+                  <th className="p-2 text-left">Date</th>
+                  <th className="p-2 text-left">Staff</th>
+                  <th className="p-2 text-left">Supplier</th>
+                  <th className="p-2 text-left">Item</th>
+                  <th className="p-2 text-right">Qty</th>
+                  <th className="p-2 text-left">Unit</th>
+                </tr>
+              </thead>
+              <tbody>
+                {drinksPurchases.map((row, idx) => (
+                  <tr key={`${row.tally_id}-${row.item_name}-${idx}`} className="border-b border-slate-100">
+                    <td className="p-2">{formatDate(row.date)}</td>
+                    <td className="p-2">{row.staff || "—"}</td>
+                    <td className="p-2">{row.supplier || "—"}</td>
+                    <td className="p-2 font-medium">{row.item_name}</td>
+                    <td className="p-2 text-right font-semibold">{Number(row.qty)}</td>
+                    <td className="p-2">{row.unit}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </CardContent>
       </Card>
     </div>
