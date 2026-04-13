@@ -1,0 +1,190 @@
+Cam, here is the Replit patch brief for the UI lockdown.
+This is separate from Bob and must not interfere with his read layer or backend routes.
+REPLIT PATCH BRIEF — UI PASSWORD LOCKDOWN FOR ENTIRE APP
+Objective
+Lock down the entire internal app UI behind a password gate, while keeping the public website front page and public website pages accessible.
+This is a UI access control patch, not a Bob patch.
+It must:
+restore the original website/public access behavior where appropriate
+require a password before any internal app area can be used
+not break Bob
+not block Bob backend routes
+not interfere with agent read routes
+not break online ordering public pages unless explicitly protected already
+CORE REQUIREMENT
+Public access must remain allowed for:
+website front page
+any intentional public marketing pages
+online ordering public pages if they are meant to stay public
+any existing public customer-facing routes
+Password access must be required for:
+dashboard
+analysis
+operations
+purchasing
+finance
+forms
+reporting
+internal admin tools
+any internal page beyond the public website surface
+IMPORTANT RULE
+This patch is UI-only protection for internal app usage.
+It must not:
+interfere with Bob backend access
+interfere with /api/bob/read/...
+interfere with agent token auth
+interfere with internal API route behavior for valid backend use
+replace or weaken backend auth
+block public website routes that are intentionally public
+REQUIRED BEHAVIOR
+1. Password gate for internal UI
+A user visiting any protected internal route must be redirected to a password entry screen unless already authenticated for UI access.
+2. Public website remains visible
+The main front-facing website pages must still load without password.
+3. Session persistence
+Once the correct password is entered:
+allow continued UI access
+persist session reasonably
+survive page refresh
+allow logout / relock
+Use a simple safe session approach already compatible with the app.
+4. Minimal friction
+This is not a full staff user-management system. It is a simple shared password gate for internal app access.
+IMPLEMENTATION APPROACH
+Preferred approach
+Restore or rebuild the old password gate mechanism that was previously used when website pages were enabled.
+If any old code or route guard still exists:
+reuse it safely
+do not duplicate competing auth layers
+do not leave dead legacy logic half-active
+If the original was disabled:
+re-enable it cleanly
+patch it to current route structure
+REQUIRED TECHNICAL OUTCOME
+Protected route behavior
+All internal app routes must be protected by a UI auth guard.
+Examples likely requiring protection:
+/dashboard
+/analysis/...
+/operations/...
+/purchasing/...
+/finance/...
+/reports/...
+/daily-sales
+/daily-stock
+internal tools pages
+internal settings pages
+Public route behavior
+Routes likely remaining public:
+/
+website landing pages
+public menu / online ordering pages
+other intentional customer-facing pages
+Replit must inspect actual route structure and apply protection correctly.
+PASSWORD STORAGE / SECURITY
+Required
+Use a server-side environment variable for the shared internal UI password.
+Example:
+Plain text
+INTERNAL_APP_PASSWORD
+Do not hardcode the password in frontend code.
+Validation
+Password check must happen safely through backend or existing secure session logic.
+Session
+Use secure cookie/session or existing app-compatible auth session method.
+Do not store raw password permanently in localStorage as the only protection.
+A temporary “authenticated UI session” marker is fine only if backed by secure server validation or existing session logic.
+DO NOT DO THIS
+do not hardcode the password in React
+do not expose the password in bundle code
+do not break Bob routes
+do not block /api/bob/read/...
+do not make public website pages require password
+do not add a full user account system
+do not redesign the website
+do not create competing auth systems if one already exists
+do not lock down customer-facing online ordering unless explicitly intended
+REQUIRED FILE REVIEW
+Replit must inspect:
+current route structure in frontend router
+any old public/private route guard logic
+any previously disabled website-page protection logic
+current server auth/session support
+online ordering route behavior
+any middleware that may already support this
+Then implement the cleanest minimal patch.
+REQUIRED UX
+When unauthenticated and trying to access internal pages:
+show password page or redirect to password page
+When authenticated:
+allow access to all protected internal UI pages
+Must include:
+password form
+incorrect password error state
+logout/relock button or clear method
+refresh persistence during active session
+Keep it simple and professional.
+No icons. No fluff. No redesign.
+MUST NOT AFFECT BOB
+Replit must verify this patch does not interfere with:
+/api/bob/read/system-health
+/api/bob/read/proxy
+/api/bob/read/shift-report/latest
+any Bob read module
+backend token auth
+agent token auth foundation
+This is critical.
+The UI lock is for humans using the frontend, not for Bob.
+TESTING REQUIRED
+Replit must test all of the following after patch:
+Public routes
+front page loads without password
+public website pages load without password
+public online ordering pages still behave as intended
+Protected routes
+internal route redirects to password gate when not authenticated
+correct password grants access
+wrong password rejected
+refresh preserves access during session
+logout/relock works
+direct URL to internal route still blocked until authenticated
+Bob safety
+Bob routes still return correctly with valid token
+UI password gate does not affect Bob APIs
+Regression
+internal pages still work after authentication
+no routing loops
+no white screen
+no broken router state
+REQUIRED FINAL RETURN FROM REPLIT
+Return exactly:
+A. Files changed
+Exact list
+B. Public routes left open
+Exact list or route groups
+C. Protected routes locked
+Exact list or route groups
+D. Password/session approach
+How the shared password is validated and persisted
+E. Bob protection confirmation
+Explicit confirmation that Bob routes were unaffected
+F. Test report
+public route tests
+protected route tests
+wrong password test
+refresh persistence test
+logout test
+Bob API unaffected test
+G. Final verdict
+PASS
+PASS WITH FIXES
+FAIL
+FINAL INSTRUCTION TO REPLIT
+Implement this as a minimal, production-safe UI lockdown patch.
+The result should be:
+public website visible
+internal app locked behind password
+Bob unaffected
+no hardcoded password in frontend
+no damage to existing public ordering pages
+Do not freestyle. Do not redesign. Do not expand scope.

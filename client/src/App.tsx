@@ -118,6 +118,7 @@ import HealthSafetyQuestionManager from "./pages/operations/health-safety-audit/
 import RecipeMappingPage from "./pages/operations/recipe-mapping";
 import { AuthProvider } from "./auth/AuthProvider";
 import ProtectedRoute from "./auth/ProtectedRoute";
+import UiPasswordGate from "./components/UiPasswordGate";
 
 import HomePage from "./pages/public/HomePage";
 import PublicMembership from "./pages/public/PublicMembership";
@@ -132,6 +133,7 @@ export default function App() {
         <AuthProvider>
         <TooltipProvider>
           <BrowserRouter>
+            <UiPasswordGate>
             <Routes>
               {/* Root — redirect to app dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -291,6 +293,7 @@ export default function App() {
               </Route>
             </Routes>
             <Toaster />
+            </UiPasswordGate>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

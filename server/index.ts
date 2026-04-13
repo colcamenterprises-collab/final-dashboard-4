@@ -152,6 +152,7 @@ const API_PUBLIC_PREFIXES = [
   "/api/health",
   "/api/system-health",
   "/api/bob/read",
+  "/api/ui-auth",
 ];
 
 app.use((req, res, next) => {
@@ -550,6 +551,10 @@ async function checkSchema() {
   app.use('/api/ai-ops', aiOpsControlRouter);
   // /api/bob — alias prefix (e.g. /api/bob/health mirrors /api/ai-ops/bob/health)
   app.use('/api/bob', bobAliasRouter);
+
+  // /api/ui-auth — UI password gate (shared password, cookie session)
+  const uiAuthRouter = (await import('./routes/uiAuth')).default;
+  app.use('/api/ui-auth', uiAuthRouter);
 
   // /api/bob/read — Bob read-only API layer (token-protected, GET only)
   const bobReadRouter = (await import('./routes/bobRead')).default;

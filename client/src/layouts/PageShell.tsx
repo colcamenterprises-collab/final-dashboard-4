@@ -3,8 +3,10 @@ import { Outlet } from "react-router-dom";
 import { ModernHeader, ModernSidebar, BottomNav } from "@/components/navigation";
 import DataConfidenceBanner from "@/components/DataConfidenceBanner";
 import { cn } from "@/lib/utils";
+import { useUiAuth } from "@/components/UiPasswordGate";
 
 export default function PageShell() {
+  const { lock } = useUiAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -56,6 +58,14 @@ export default function PageShell() {
           <main className="flex-1 overflow-y-scroll bg-slate-50 dark:bg-slate-900">
             <div className="px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
               <Outlet />
+              <div className="mt-8 flex justify-end">
+                <button
+                  onClick={lock}
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                >
+                  Lock App
+                </button>
+              </div>
             </div>
           </main>
         </div>
