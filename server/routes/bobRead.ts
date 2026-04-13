@@ -22,6 +22,7 @@ const MODULES = [
   "reports/category-totals",
   "analysis/stock-usage",
   "roll-order",
+  "shift-report/latest",
 ] as const;
 
 type BobEnvelope<T> = {
@@ -225,6 +226,7 @@ router.get("/system-map", async (_req, res) => {
         { page: "/online-orders", purpose: "Order read model", endpoint: "/api/bob/read/orders", service: "online orders", table: "orders_online,order_lines_online", canonical_source: "orders_online" },
         { page: "/purchasing,/shopping-list,/stock-order-history,/ingredient-purchasing", purpose: "Purchasing chain visibility", endpoint: "/api/bob/read/module-status", service: "purchasing", table: "purchasing_items,purchasing_shift_items", canonical_source: "purchasing_items" },
         { page: "/ai-ops-control", purpose: "Bob governance + integrations", endpoint: "/api/bob/read/system-health", service: "ai-ops", table: "bob_documents,bob_read_logs", canonical_source: "bob_documents + bob_read_logs" },
+        { page: "/sales-shift-analysis,/shift-report", purpose: "Compiled shift report (POS+sales+stock+variances)", endpoint: "/api/bob/read/shift-report/latest", service: "shiftReportBuilder", table: "shift_report_v2", canonical_source: "shift_report_v2" },
       ],
     },
   });
@@ -745,6 +747,85 @@ router.get("/analysis/stock-usage", async (req, res) => {
   const qs = new URLSearchParams(req.query as Record<string, string>).toString();
   const suffix = qs ? `?${qs}` : "";
   return res.redirect(307, `/api/bob/read/usage/truth${suffix}`);
+});
+
+router.get("/shift-report/latest", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  if (date && !isValidDate(date)) {
+    await logRequest("/shift-report/latest", { date }, 400, false, elapsed());
+    return res.status(400).json(envelope({
+      source: "request",
+      scope: "shift-report/latest",
+      status: "error",
+      data: {},
+      blockers: [{ code: "INVALID_DATE", message: "date must be YYYY-MM-DD", where: "query.date", canonical_source: "shift_report_v2.shiftDate" }],
+    }));
+  }
+
+  const report = date
+    ? await pool.query(
+        `SELECT id, "shiftDate"::text AS shift_date, "salesId", "stockId",
+                "posData", "salesData", "stockData", "variances", "aiInsights",
+                "createdAt"::text AS created_at, "restaurantId"
+         FROM shift_report_v2
+         WHERE DATE("shiftDate" AT TIME ZONE 'Asia/Bangkok') = $1::date
+         ORDER BY "createdAt" DESC LIMIT 1`,
+        [date],
+      ).catch(() => ({ rows: [] } as any))
+    : await pool.query(
+        `SELECT id, "shiftDate"::text AS shift_date, "salesId", "stockId",
+                "posData", "salesData", "stockData", "variances", "aiInsights",
+                "createdAt"::text AS created_at, "restaurantId"
+         FROM shift_report_v2
+         ORDER BY "createdAt" DESC LIMIT 1`,
+      ).catch(() => ({ rows: [] } as any));
+
+  const row = report.rows[0] ?? null;
+
+  const blockers: BobEnvelope<any>["blockers"] = [];
+  if (!row) {
+    blockers.push({
+      code: "SHIFT_REPORT_MISSING",
+      message: date
+        ? `No shift_report_v2 row found for date ${date}`
+        : "No shift_report_v2 rows exist — run POST /api/shift-report/generate to build one",
+      where: "shift_report_v2",
+      canonical_source: "shift_report_v2.shiftDate",
+      auto_build_attempted: false,
+    });
+  }
+
+  const payload = envelope({
+    source: "shift_report_v2",
+    scope: date ? `date:${date}` : "latest",
+    date: date ?? row?.shift_date?.slice(0, 10) ?? undefined,
+    status: blockers.length ? "missing" : "ok",
+    data: {
+      found: Boolean(row),
+      report: row
+        ? {
+            id: row.id,
+            shift_date: row.shift_date,
+            sales_id: row.salesId,
+            stock_id: row.stockId,
+            pos_data: row.posData,
+            sales_data: row.salesData,
+            stock_data: row.stockData,
+            variances: row.variances,
+            ai_insights: row.aiInsights,
+            created_at: row.created_at,
+            restaurant_id: row.restaurantId,
+          }
+        : null,
+      generate_endpoint: "POST /api/shift-report/generate  body: { shiftDate: 'YYYY-MM-DD' }",
+    },
+    blockers,
+    warnings: row ? [] : ["shift_report_v2 is empty. Trigger a report generation to populate it."],
+  });
+
+  await logRequest("/shift-report/latest", { date }, 200, true, elapsed());
+  return res.json(payload);
 });
 
 export default router;
