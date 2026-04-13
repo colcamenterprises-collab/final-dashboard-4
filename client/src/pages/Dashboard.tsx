@@ -162,7 +162,7 @@ export default function Dashboard() {
         </Card>
 
         <Card title="Payments">
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
             {['CASH','QR','GRAB','CARD','OTHER'].map((k) => {
               const p = snap.payments.find(x => x.channel === k);
               return (
@@ -224,7 +224,7 @@ export default function Dashboard() {
         </Card>
 
         <Card title="Shift Report Balance">
-          <div className="grid grid-cols-2 gap-3 text-sm tabular-nums">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-sm tabular-nums">
             <div>
               <div className="text-gray-500 mb-1">Staff</div>
               <div className="flex justify-between py-1"><span>Closing Cash</span><span>{currency(data.balance?.staff.closingCashTHB ?? 0)}</span></div>

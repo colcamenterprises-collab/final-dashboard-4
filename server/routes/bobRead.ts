@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import { db, pool } from "../db";
 import { sql } from "drizzle-orm";
 import axios from "axios";
+import crypto from "crypto";
 
 const router = Router();
 
@@ -73,17 +74,30 @@ async function ensureLogTable() {
       duration_ms INTEGER
     )
   `);
+  await pool.query(`
+    ALTER TABLE bob_read_logs ADD COLUMN IF NOT EXISTS tenant_id INTEGER NOT NULL DEFAULT 1;
+    ALTER TABLE bob_read_logs ADD COLUMN IF NOT EXISTS auth_type TEXT;
+    ALTER TABLE bob_read_logs ADD COLUMN IF NOT EXISTS auth_subject TEXT;
+  `);
   logTableReady = true;
 }
 
 void ensureLogTable().catch((e) => console.error("[bobRead] log table bootstrap failed", e));
 
-async function logRequest(route: string, params: Record<string, unknown>, status: number, ok: boolean, durationMs: number) {
+async function logRequest(
+  route: string,
+  params: Record<string, unknown>,
+  status: number,
+  ok: boolean,
+  durationMs: number,
+  authContext?: { tenantId?: number; authType?: string; authSubject?: string },
+) {
   try {
     if (!pool) return;
     await pool.query(
-      `INSERT INTO bob_read_logs (route, params, status, ok, duration_ms) VALUES ($1, $2::jsonb, $3, $4, $5)`,
-      [route, JSON.stringify(params), status, ok, durationMs],
+      `INSERT INTO bob_read_logs (route, params, status, ok, duration_ms, tenant_id, auth_type, auth_subject)
+       VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8)`,
+      [route, JSON.stringify(params), status, ok, durationMs, authContext?.tenantId ?? 1, authContext?.authType ?? null, authContext?.authSubject ?? null],
     );
   } catch {
     // no-op
@@ -130,7 +144,47 @@ async function tableExists(name: string): Promise<boolean> {
   return Boolean(r.rows?.[0]?.reg);
 }
 
-function bobAuth(req: Request, res: Response, next: NextFunction) {
+type AgentAuth = {
+  authorized: boolean;
+  tenantId: number;
+  authType: "bob_readonly_token" | "agent_token";
+  authSubject: string;
+};
+
+async function resolveAgentAuth(token: string): Promise<AgentAuth | null> {
+  const legacyToken = process.env.BOB_READONLY_TOKEN;
+  if (legacyToken && token === legacyToken) {
+    return {
+      authorized: true,
+      tenantId: 1,
+      authType: "bob_readonly_token",
+      authSubject: "bob:readonly",
+    };
+  }
+
+  const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+  const r = await pool.query(
+    `SELECT id, tenant_id, token_type, COALESCE(agent_name, 'agent') AS agent_name
+     FROM agent_tokens
+     WHERE token_hash = $1
+       AND is_active = TRUE
+       AND revoked_at IS NULL
+     LIMIT 1`,
+    [tokenHash],
+  ).catch(() => ({ rows: [] } as any));
+  const row = r.rows?.[0];
+  if (!row) return null;
+
+  await pool.query(`UPDATE agent_tokens SET last_used_at = NOW() WHERE id = $1`, [row.id]).catch(() => undefined);
+  return {
+    authorized: true,
+    tenantId: Number(row.tenant_id || 1),
+    authType: "agent_token",
+    authSubject: `${row.agent_name}:${row.token_type || "agent_read"}`,
+  };
+}
+
+async function bobAuth(req: Request, res: Response, next: NextFunction) {
   const expectedToken = process.env.BOB_READONLY_TOKEN;
   if (!expectedToken) {
     return res.status(503).json(envelope({
@@ -143,7 +197,7 @@ function bobAuth(req: Request, res: Response, next: NextFunction) {
   }
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-  if (!token || token !== expectedToken) {
+  if (!token) {
     return res.status(401).json(envelope({
       source: "auth:bearer",
       scope: "auth",
@@ -152,6 +206,20 @@ function bobAuth(req: Request, res: Response, next: NextFunction) {
       blockers: [{ code: "UNAUTHORIZED", message: "valid Bearer token required", where: "Authorization header", canonical_source: "BOB_READONLY_TOKEN" }],
     }));
   }
+
+  const resolved = await resolveAgentAuth(token);
+  if (!resolved?.authorized) {
+    return res.status(401).json(envelope({
+      source: "auth:bearer",
+      scope: "auth",
+      status: "error",
+      data: { authorized: false },
+      blockers: [{ code: "UNAUTHORIZED", message: "valid Bearer token required", where: "Authorization header", canonical_source: "BOB_READONLY_TOKEN or agent_tokens.token_hash" }],
+    }));
+  }
+
+  (req as any).agentAuth = resolved;
+  (req as any).restaurantId = resolved.tenantId;
   return next();
 }
 
@@ -185,6 +253,7 @@ router.use((req, res, next) => {
 
 router.get("/health", async (_req, res) => {
   const elapsed = timed();
+  const auth = (_req as any).agentAuth;
   const body = envelope({
     source: "bob-read-router",
     scope: "global",
@@ -194,12 +263,13 @@ router.get("/health", async (_req, res) => {
       auth: "bearer-validated",
     },
   });
-  await logRequest("/health", {}, 200, true, elapsed());
+  await logRequest("/health", {}, 200, true, elapsed(), auth);
   return res.json(body);
 });
 
 router.get("/system-health", async (_req, res) => {
   const elapsed = timed();
+  const auth = (_req as any).agentAuth;
   const blockers: BobEnvelope<any>["blockers"] = [];
 
   const [routeCount, logRow, latestBuildRow] = await Promise.all([
@@ -225,12 +295,13 @@ router.get("/system-health", async (_req, res) => {
     blockers,
   });
 
-  await logRequest("/system-health", {}, 200, true, elapsed());
+  await logRequest("/system-health", {}, 200, true, elapsed(), auth);
   return res.json(payload);
 });
 
 router.get("/system-map", async (_req, res) => {
   const elapsed = timed();
+  const auth = (_req as any).agentAuth;
   const payload = envelope({
     source: "curated-map:v1",
     scope: "whole-app",
@@ -262,7 +333,7 @@ router.get("/system-map", async (_req, res) => {
       ],
     },
   });
-  await logRequest("/system-map", {}, 200, true, elapsed());
+  await logRequest("/system-map", {}, 200, true, elapsed(), auth);
   return res.json(payload);
 });
 
@@ -1190,9 +1261,11 @@ router.get("/operations/stock-review", async (req, res) => {
 
 router.get("/shift-report/latest", async (req, res) => {
   const elapsed = timed();
+  const auth = (req as any).agentAuth as AgentAuth | undefined;
+  const tenantId = Number((req as any).restaurantId ?? auth?.tenantId ?? 1);
   const date = req.query.date as string | undefined;
   if (date && !isValidDate(date)) {
-    await logRequest("/shift-report/latest", { date }, 400, false, elapsed());
+    await logRequest("/shift-report/latest", { date }, 400, false, elapsed(), auth);
     return res.status(400).json(envelope({
       source: "request",
       scope: "shift-report/latest",
@@ -1209,15 +1282,18 @@ router.get("/shift-report/latest", async (req, res) => {
                 "createdAt"::text AS created_at, "restaurantId"
          FROM shift_report_v2
          WHERE DATE("shiftDate" AT TIME ZONE 'Asia/Bangkok') = $1::date
+           AND COALESCE("restaurantId", $2::int) = $2::int
          ORDER BY "createdAt" DESC LIMIT 1`,
-        [date],
+        [date, tenantId],
       ).catch(() => ({ rows: [] } as any))
     : await pool.query(
         `SELECT id, "shiftDate"::text AS shift_date, "salesId", "stockId",
                 "posData", "salesData", "stockData", "variances", "aiInsights",
                 "createdAt"::text AS created_at, "restaurantId"
          FROM shift_report_v2
+         WHERE COALESCE("restaurantId", $1::int) = $1::int
          ORDER BY "createdAt" DESC LIMIT 1`,
+        [tenantId],
       ).catch(() => ({ rows: [] } as any));
 
   const row = report.rows[0] ?? null;
@@ -1245,16 +1321,16 @@ router.get("/shift-report/latest", async (req, res) => {
       report: row
         ? {
             id: row.id,
-            shift_date: row.shift_date,
-            sales_id: row.salesId,
-            stock_id: row.stockId,
-            pos_data: row.posData,
-            sales_data: row.salesData,
-            stock_data: row.stockData,
+            shiftDate: row.shift_date,
+            salesId: row.salesId,
+            stockId: row.stockId,
+            posData: row.posData,
+            salesData: row.salesData,
+            stockData: row.stockData,
             variances: row.variances,
-            ai_insights: row.aiInsights,
-            created_at: row.created_at,
-            restaurant_id: row.restaurantId,
+            aiInsights: row.aiInsights,
+            createdAt: row.created_at,
+            restaurantId: row.restaurantId,
           }
         : null,
       generate_endpoint: "POST /api/shift-report/generate  body: { shiftDate: 'YYYY-MM-DD' }",
@@ -1263,7 +1339,7 @@ router.get("/shift-report/latest", async (req, res) => {
     warnings: row ? [] : ["shift_report_v2 is empty. Trigger a report generation to populate it."],
   });
 
-  await logRequest("/shift-report/latest", { date }, 200, true, elapsed());
+  await logRequest("/shift-report/latest", { date }, 200, true, elapsed(), auth);
   return res.json(payload);
 });
 
@@ -1272,17 +1348,25 @@ router.get("/shift-report/latest", async (req, res) => {
 // Blocklisted paths cannot be proxied (auth mutations, payment processing, admin ops).
 
 const PROXY_BLOCKLIST = [
-  "/api/auth",
-  "/api/payment",
-  "/api/admin",
-  "/api/bob/read/proxy", // prevent self-loop
+  /^\/api\/auth(\/|$)/i,
+  /^\/api\/session(\/|$)/i,
+  /^\/api\/admin(\/|$)/i,
+  /^\/api\/payments?(\/|$)/i,
+  /^\/api\/payment-providers(\/|$)/i,
+  /^\/api\/config(\/|$)/i,
+  /^\/api\/secrets?(\/|$)/i,
+  /^\/api\/tokens?(\/|$)/i,
+  /^\/api\/internal\/(secrets?|keys?|config|credentials?)(\/|$)/i,
+  /^\/api\/bob\/read\/proxy(\/|$)/i,
 ];
 
 router.get("/proxy", async (req, res) => {
   const elapsed = timed();
+  const auth = (req as any).agentAuth as AgentAuth | undefined;
+  const tenantId = Number((req as any).restaurantId ?? auth?.tenantId ?? 1);
   const path = req.query.path as string | undefined;
   if (!path) {
-    await logRequest("/proxy", { path }, 400, false, elapsed());
+    await logRequest("/proxy", { path }, 400, false, elapsed(), auth);
     return res.status(400).json(envelope({
       source: "request",
       scope: "proxy",
@@ -1292,7 +1376,7 @@ router.get("/proxy", async (req, res) => {
     }));
   }
   if (!path.startsWith("/api/")) {
-    await logRequest("/proxy", { path }, 400, false, elapsed());
+    await logRequest("/proxy", { path }, 400, false, elapsed(), auth);
     return res.status(400).json(envelope({
       source: "request",
       scope: "proxy",
@@ -1301,9 +1385,9 @@ router.get("/proxy", async (req, res) => {
       blockers: [{ code: "INVALID_PATH", message: "path must start with /api/", where: "query.path", canonical_source: "any GET /api/* route" }],
     }));
   }
-  const blocked = PROXY_BLOCKLIST.find((b) => path.startsWith(b));
+  const blocked = PROXY_BLOCKLIST.find((re) => re.test(path));
   if (blocked) {
-    await logRequest("/proxy", { path }, 403, false, elapsed());
+    await logRequest("/proxy", { path }, 403, false, elapsed(), auth);
     return res.status(403).json(envelope({
       source: "request",
       scope: "proxy",
@@ -1320,22 +1404,22 @@ router.get("/proxy", async (req, res) => {
   const paramStr = forwardParams.toString();
   const targetUrl = `http://127.0.0.1:${process.env.PORT || 5000}${path}${paramStr ? `?${paramStr}` : ""}`;
   try {
-    const r = await axios.get(targetUrl, { timeout: 12000, validateStatus: () => true });
-    const payload = envelope({
-      source: `proxy:${path}`,
-      scope: path,
-      status: r.status >= 400 ? "error" : "ok",
-      data: {
-        proxied_path: path,
-        http_status: r.status,
-        response: r.data,
+    const r = await axios.get(targetUrl, {
+      timeout: 12000,
+      validateStatus: () => true,
+      headers: {
+        "x-agent-read-proxy": "bob-read",
+        "x-tenant-id": String(tenantId),
       },
-      warnings: r.status >= 400 ? [`Upstream returned HTTP ${r.status}`] : [],
     });
-    await logRequest("/proxy", { path }, r.status, r.status < 400, elapsed());
-    return res.status(r.status < 400 ? 200 : r.status).json(payload);
+    await logRequest("/proxy", { path, tenantId }, r.status, r.status < 400, elapsed(), auth);
+    return res.status(r.status).json({
+      proxied_path: path,
+      upstream_status: r.status,
+      upstream_response: r.data,
+    });
   } catch (err: any) {
-    await logRequest("/proxy", { path }, 502, false, elapsed());
+    await logRequest("/proxy", { path, tenantId }, 502, false, elapsed(), auth);
     return res.status(502).json(envelope({
       source: `proxy:${path}`,
       scope: path,

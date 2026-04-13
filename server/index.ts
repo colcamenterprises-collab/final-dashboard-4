@@ -556,10 +556,11 @@ async function checkSchema() {
   app.use('/api/bob/read', bobReadRouter);
 
   // /api/ai/chat — simple chat alias endpoints + idempotent table setup
-  const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables } = await import('./db');
+  const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables, ensureAgentReadFoundation } = await import('./db');
   await ensureAiChatTables();
   await ensureDailySalesAuditTable();
   await ensureWorkRegisterTables();
+  await ensureAgentReadFoundation();
   app.use('/api/ai/chat', chatAliasRouter);
 
   // Ingredient Master route (PACK F)

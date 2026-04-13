@@ -375,7 +375,7 @@ export default function DailyReview() {
           {/* 4 Summary Cards */}
           <section>
             <SectionLabel>Shift Overview</SectionLabel>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
 
               <Card title="Sales Summary">
                 {hasForm ? (
@@ -634,7 +634,7 @@ export default function DailyReview() {
               </div>
             ) : selectedHistoryRow && selectedHistoryRow.wages_total > 0 ? (
               <div className="rounded border border-gray-200 bg-white p-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-gray-400 mb-0.5">Total Wages</p>
                     <p className="text-sm font-bold text-gray-900">{thb(selectedHistoryRow.wages_total)}</p>
@@ -656,7 +656,7 @@ export default function DailyReview() {
             <section>
               <SectionLabel>Profit Detail</SectionLabel>
               <div className="rounded border border-gray-200 bg-white p-4">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <p className="text-xs text-gray-400 mb-0.5">Total Sales</p>
                     <p className="text-sm font-bold text-gray-900">{prime ? thb(prime.sales) : thb(selectedHistoryRow?.total_sales)}</p>
