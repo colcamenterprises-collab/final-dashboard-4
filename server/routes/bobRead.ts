@@ -1,28 +1,49 @@
 import { Router, Request, Response, NextFunction } from "express";
 import { db, pool } from "../db";
 import { sql } from "drizzle-orm";
+import axios from "axios";
 
 const router = Router();
 
 const MODULES = [
+  // ── Core health & maps ──────────────────────────────────────────
   "system-health",
   "system-map",
   "module-status",
   "build-status",
-  "shift-snapshot",
+  // ── Forms ───────────────────────────────────────────────────────
   "forms/daily-sales",
   "forms/daily-stock",
+  // ── Shift ───────────────────────────────────────────────────────
+  "shift-snapshot",
+  "shift-report/latest",
+  "roll-order",
+  // ── Analysis ────────────────────────────────────────────────────
   "receipts/truth",
   "usage/truth",
-  "issues",
+  "analysis/stock-usage",
+  "analysis/daily-comparison",
+  "analysis/prime-cost",
+  "analysis/finance",
+  "analysis/shift-analysis",
+  // ── Purchasing ──────────────────────────────────────────────────
+  "purchasing/items",
+  "purchasing/tally",
+  "purchasing/shift-log",
+  "purchasing/shopping-list",
+  // ── Operations ──────────────────────────────────────────────────
+  "operations/expenses",
+  "operations/balance",
+  "operations/stock-review",
+  // ── Catalog / orders / reports ──────────────────────────────────
   "catalog",
   "orders",
+  "issues",
   "reports/item-sales",
   "reports/modifier-sales",
   "reports/category-totals",
-  "analysis/stock-usage",
-  "roll-order",
-  "shift-report/latest",
+  // ── Universal passthrough proxy ──────────────────────────────────
+  "proxy",
 ] as const;
 
 type BobEnvelope<T> = {
@@ -219,14 +240,25 @@ router.get("/system-map", async (_req, res) => {
       routes: [
         { page: "/", purpose: "Homepage modules", endpoint: "/api/bob/read/module-status", service: "bobRead", table: "daily_sales_v2,daily_stock_v2,analysis_reports", canonical_source: "daily_sales_v2 + derived analysis" },
         { page: "/daily-stock-sales", purpose: "Daily forms", endpoint: "/api/bob/read/forms/daily-sales,/api/bob/read/forms/daily-stock,/api/bob/read/roll-order", service: "forms", table: "daily_sales_v2,daily_stock_v2,roll_order", canonical_source: "daily_sales_v2 + daily_stock_v2 + roll_order" },
-        { page: "/sales-shift-analysis", purpose: "Shift diagnostics", endpoint: "/api/bob/read/shift-snapshot", service: "analysisBuildOrchestrator + shift analytics", table: "receipt_truth_line,receipt_truth_daily_usage,analysis_reports", canonical_source: "receipt_truth_* tables + analysis_reports" },
+        { page: "/sales-shift-analysis", purpose: "Shift diagnostics snapshot", endpoint: "/api/bob/read/shift-snapshot", service: "analysisBuildOrchestrator", table: "receipt_truth_line,receipt_truth_daily_usage,analysis_reports", canonical_source: "receipt_truth_* + analysis_reports" },
+        { page: "/sales-shift-analysis,/shift-report", purpose: "Compiled shift report (POS+sales+stock+variances)", endpoint: "/api/bob/read/shift-report/latest", service: "shiftReportBuilder", table: "shift_report_v2", canonical_source: "shift_report_v2" },
+        { page: "/analysis/daily-review", purpose: "Daily comparison vs targets", endpoint: "/api/bob/read/analysis/daily-comparison", service: "analysisDailyReview", table: "daily_sales_v2,analysis_reports", canonical_source: "daily_sales_v2 + analysis_reports" },
+        { page: "/analysis/prime-cost", purpose: "Food & labour cost metrics", endpoint: "/api/bob/read/analysis/prime-cost", service: "primeCost", table: "receipt_truth_daily_usage,purchasing_items", canonical_source: "metrics/prime-cost" },
+        { page: "/finance", purpose: "Financial summary (MTD + today)", endpoint: "/api/bob/read/analysis/finance", service: "finance", table: "daily_sales_v2,expenses,bank_statements", canonical_source: "finance/summary" },
+        { page: "/analysis/shift", purpose: "Shift-level analysis", endpoint: "/api/bob/read/analysis/shift-analysis", service: "shiftAnalysis", table: "daily_sales_v2,receipt_truth_line", canonical_source: "analysisDailyReview" },
         { page: "/receipts-analysis", purpose: "Receipts truth", endpoint: "/api/bob/read/receipts/truth", service: "receipt truth pipeline", table: "receipt_truth_line,lv_receipt", canonical_source: "receipt_truth_line" },
         { page: "/issue-register", purpose: "Issue register", endpoint: "/api/bob/read/issues", service: "aiOps issues", table: "ai_issues", canonical_source: "ai_issues" },
         { page: "/catalog/menu", purpose: "Catalog and modifiers", endpoint: "/api/bob/read/catalog", service: "menu/catalog", table: "item_catalog,modifier_group,modifier,online_catalog_items", canonical_source: "item_catalog + online_catalog_items" },
         { page: "/online-orders", purpose: "Order read model", endpoint: "/api/bob/read/orders", service: "online orders", table: "orders_online,order_lines_online", canonical_source: "orders_online" },
-        { page: "/purchasing,/shopping-list,/stock-order-history,/ingredient-purchasing", purpose: "Purchasing chain visibility", endpoint: "/api/bob/read/module-status", service: "purchasing", table: "purchasing_items,purchasing_shift_items", canonical_source: "purchasing_items" },
+        { page: "/purchasing", purpose: "Purchasing items (supplier prices, stock)", endpoint: "/api/bob/read/purchasing/items", service: "purchasingItems", table: "purchasing_items", canonical_source: "purchasing_items" },
+        { page: "/purchasing/shift-log", purpose: "Roll/meat/drinks purchase tally log", endpoint: "/api/bob/read/purchasing/tally", service: "purchaseTally", table: "purchase_tally,purchase_tally_drink", canonical_source: "purchase_tally + purchase_tally_drink" },
+        { page: "/purchasing/shift-log", purpose: "Purchasing shift breakdown matrix", endpoint: "/api/bob/read/purchasing/shift-log", service: "purchasingShiftLog", table: "purchasing_items,purchase_tally", canonical_source: "purchasingShiftLog" },
+        { page: "/shopping-list", purpose: "Current shopping list items", endpoint: "/api/bob/read/purchasing/shopping-list", service: "shoppingList", table: "shopping_list_items", canonical_source: "shopping_list_items" },
+        { page: "/expenses", purpose: "Expense records", endpoint: "/api/bob/read/operations/expenses", service: "expenses", table: "expenses", canonical_source: "expenses" },
+        { page: "/operations/balance", purpose: "Cash & balance reconciliation", endpoint: "/api/bob/read/operations/balance", service: "balance", table: "daily_sales_v2,cash_balance", canonical_source: "balance" },
+        { page: "/operations/stock", purpose: "Stock review data", endpoint: "/api/bob/read/operations/stock-review", service: "stockReview", table: "stock_received_log,stock_baseline", canonical_source: "stock_received_log" },
         { page: "/ai-ops-control", purpose: "Bob governance + integrations", endpoint: "/api/bob/read/system-health", service: "ai-ops", table: "bob_documents,bob_read_logs", canonical_source: "bob_documents + bob_read_logs" },
-        { page: "/sales-shift-analysis,/shift-report", purpose: "Compiled shift report (POS+sales+stock+variances)", endpoint: "/api/bob/read/shift-report/latest", service: "shiftReportBuilder", table: "shift_report_v2", canonical_source: "shift_report_v2" },
+        { page: "*", purpose: "Universal GET passthrough to any /api/* endpoint", endpoint: "/api/bob/read/proxy?path=/api/ENDPOINT&queryParams=...", service: "all", table: "any", canonical_source: "any internal GET route" },
       ],
     },
   });
@@ -749,6 +781,413 @@ router.get("/analysis/stock-usage", async (req, res) => {
   return res.redirect(307, `/api/bob/read/usage/truth${suffix}`);
 });
 
+// ── ANALYSIS: daily comparison ───────────────────────────────────────────────
+router.get("/analysis/daily-comparison", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  if (date && !isValidDate(date)) {
+    await logRequest("/analysis/daily-comparison", { date }, 400, false, elapsed());
+    return res.status(400).json(envelope({ source: "request", scope: "analysis/daily-comparison", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date must be YYYY-MM-DD", where: "query.date", canonical_source: "daily_sales_v2.shiftDate" }] }));
+  }
+  const targetDate = date ?? new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const [sales, stock, receipts, analysis] = await Promise.all([
+    pool.query(
+      `SELECT id, "shiftDate"::text AS shift_date, "totalSales", "cashSales", "qrSales", "grabSales",
+              "totalExpenses", "cashFloat", "managerName", "submittedAtISO"::text AS submitted_at
+       FROM daily_sales_v2 WHERE "shiftDate" = $1 ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`,
+      [targetDate],
+    ).catch(() => ({ rows: [] } as any)),
+    pool.query(
+      `SELECT s."burgerBuns", s."meatWeightG", s."createdAt"::text AS created_at
+       FROM daily_stock_v2 s JOIN daily_sales_v2 d ON d.id = s."salesId" WHERE d."shiftDate" = $1 LIMIT 1`,
+      [targetDate],
+    ).catch(() => ({ rows: [] } as any)),
+    pool.query(
+      `SELECT COUNT(DISTINCT r.receipt_id)::int AS receipt_count,
+              SUM(CASE WHEN r.receipt_type='SALE' THEN r.total_money ELSE 0 END)::numeric(12,2) AS pos_gross
+       FROM lv_receipt r
+       WHERE r.datetime_bkk >= $1::timestamptz AND r.datetime_bkk < $2::timestamptz`,
+      [`${targetDate} 00:00:00+07`, `${nextDay(targetDate)} 00:00:00+07`],
+    ).catch(() => ({ rows: [{ receipt_count: 0, pos_gross: 0 }] } as any)),
+    pool.query(
+      `SELECT analysis_type, status, summary, created_at::text FROM analysis_reports WHERE shift_date = $1::date ORDER BY created_at DESC LIMIT 10`,
+      [targetDate],
+    ).catch(() => ({ rows: [] } as any)),
+  ]);
+  const salesRow = sales.rows[0] ?? null;
+  const blockers: BobEnvelope<any>["blockers"] = [];
+  if (!salesRow) blockers.push({ code: "SALES_FORM_MISSING", message: `No daily_sales_v2 row for ${targetDate}`, where: "daily_sales_v2", canonical_source: "daily_sales_v2.shiftDate", auto_build_attempted: false });
+  const payload = envelope({
+    source: "daily_sales_v2 + lv_receipt + analysis_reports",
+    scope: `date:${targetDate}`,
+    date: targetDate,
+    status: blockers.length ? "partial" : "ok",
+    data: {
+      sales_form: salesRow,
+      stock_form: stock.rows[0] ?? null,
+      pos_receipts: receipts.rows[0],
+      analysis_builds: analysis.rows,
+    },
+    blockers,
+  });
+  await logRequest("/analysis/daily-comparison", { date: targetDate }, 200, true, elapsed());
+  return res.json(payload);
+});
+
+// ── ANALYSIS: prime cost ─────────────────────────────────────────────────────
+router.get("/analysis/prime-cost", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  const port = process.env.PORT || 5000;
+  try {
+    const qs = date ? `?date=${date}` : "";
+    const r = await axios.get(`http://127.0.0.1:${port}/api/metrics/prime-cost${qs}`, { timeout: 8000 });
+    const payload = envelope({
+      source: "metrics/prime-cost (internal proxy)",
+      scope: date ? `date:${date}` : "latest",
+      date,
+      status: r.data?.ok === false ? "partial" : "ok",
+      data: r.data,
+    });
+    await logRequest("/analysis/prime-cost", { date }, 200, true, elapsed());
+    return res.json(payload);
+  } catch (err: any) {
+    await logRequest("/analysis/prime-cost", { date }, 502, false, elapsed());
+    return res.status(502).json(envelope({
+      source: "metrics/prime-cost (internal proxy)",
+      scope: date ? `date:${date}` : "latest",
+      status: "error",
+      data: {},
+      blockers: [{ code: "PROXY_FETCH_FAILED", message: err?.message ?? "Internal fetch failed", where: "/api/metrics/prime-cost", canonical_source: "primeCost route" }],
+    }));
+  }
+});
+
+// ── ANALYSIS: finance summary ─────────────────────────────────────────────────
+router.get("/analysis/finance", async (req, res) => {
+  const elapsed = timed();
+  const port = process.env.PORT || 5000;
+  try {
+    const [today, summary] = await Promise.all([
+      axios.get(`http://127.0.0.1:${port}/api/finance/summary/today`, { timeout: 8000 }).catch(() => null),
+      axios.get(`http://127.0.0.1:${port}/api/finance/summary`, { timeout: 8000 }).catch(() => null),
+    ]);
+    const payload = envelope({
+      source: "finance/summary + finance/summary/today (internal proxy)",
+      scope: "mtd+today",
+      status: "ok",
+      data: {
+        today: today?.data ?? null,
+        monthly_summary: summary?.data ?? null,
+      },
+    });
+    await logRequest("/analysis/finance", {}, 200, true, elapsed());
+    return res.json(payload);
+  } catch (err: any) {
+    await logRequest("/analysis/finance", {}, 502, false, elapsed());
+    return res.status(502).json(envelope({
+      source: "finance (internal proxy)",
+      scope: "mtd+today",
+      status: "error",
+      data: {},
+      blockers: [{ code: "PROXY_FETCH_FAILED", message: err?.message ?? "Internal fetch failed", where: "/api/finance/summary", canonical_source: "finance route" }],
+    }));
+  }
+});
+
+// ── ANALYSIS: shift analysis ─────────────────────────────────────────────────
+router.get("/analysis/shift-analysis", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string;
+  if (!date || !isValidDate(date)) {
+    await logRequest("/analysis/shift-analysis", { date }, 400, false, elapsed());
+    return res.status(400).json(envelope({ source: "request", scope: "shift-analysis", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date query param required (YYYY-MM-DD)", where: "query.date", canonical_source: "daily_sales_v2.shiftDate" }] }));
+  }
+  const [salesShift, categoryBreakdown, topItems] = await Promise.all([
+    pool.query(
+      `SELECT d.id, d."shiftDate"::text AS shift_date, d."totalSales", d."cashSales", d."qrSales", d."grabSales",
+              d."totalExpenses", d."cashFloat", d."managerName", d."submittedAtISO"::text AS submitted_at,
+              s."burgerBuns", s."meatWeightG"
+       FROM daily_sales_v2 d
+       LEFT JOIN daily_stock_v2 s ON s."salesId" = d.id
+       WHERE d."shiftDate" = $1
+       ORDER BY d."submittedAtISO" DESC NULLS LAST LIMIT 1`,
+      [date],
+    ).catch(() => ({ rows: [] } as any)),
+    pool.query(
+      `SELECT COALESCE(pos_category_name,'UNCATEGORIZED') AS category,
+              SUM(CASE WHEN receipt_type='SALE' THEN quantity ELSE 0 END)::int AS units,
+              SUM(CASE WHEN receipt_type='REFUND' THEN ABS(quantity) ELSE 0 END)::int AS refunds
+       FROM receipt_truth_line WHERE receipt_date = $1::date
+       GROUP BY 1 ORDER BY units DESC`,
+      [date],
+    ).catch(() => ({ rows: [] } as any)),
+    pool.query(
+      `SELECT item_name, pos_category_name AS category,
+              SUM(CASE WHEN receipt_type='SALE' THEN quantity ELSE 0 END)::int AS qty
+       FROM receipt_truth_line WHERE receipt_date = $1::date AND receipt_type='SALE'
+       GROUP BY item_name, pos_category_name ORDER BY qty DESC LIMIT 20`,
+      [date],
+    ).catch(() => ({ rows: [] } as any)),
+  ]);
+  const blockers: BobEnvelope<any>["blockers"] = [];
+  if (!salesShift.rows.length) blockers.push({ code: "SHIFT_DATA_MISSING", message: `No shift data for ${date}`, where: "daily_sales_v2", canonical_source: "daily_sales_v2.shiftDate", auto_build_attempted: false });
+  const payload = envelope({
+    source: "daily_sales_v2 + receipt_truth_line",
+    scope: `date:${date}`,
+    date,
+    status: blockers.length ? "partial" : "ok",
+    data: { shift: salesShift.rows[0] ?? null, category_breakdown: categoryBreakdown.rows, top_items: topItems.rows },
+    blockers,
+  });
+  await logRequest("/analysis/shift-analysis", { date }, 200, true, elapsed());
+  return res.json(payload);
+});
+
+// ── PURCHASING: items ────────────────────────────────────────────────────────
+router.get("/purchasing/items", async (req, res) => {
+  const elapsed = timed();
+  const category = req.query.category as string | undefined;
+  const activeOnly = (req.query.active ?? "true") === "true";
+  const limit = safeLimit(req.query.limit, 500, 1000);
+  const clauses: string[] = [];
+  const vals: any[] = [];
+  if (activeOnly) clauses.push(`active = true`);
+  if (category) { vals.push(category); clauses.push(`category = $${vals.length}`); }
+  vals.push(limit);
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  const items = await pool.query(
+    `SELECT id, item, category, "supplierName" AS supplier, brand, "orderUnit" AS order_unit,
+            "unitDescription" AS unit_desc, "unitCost" AS unit_cost_thb,
+            is_ingredient, active, "lastReviewDate"::text AS last_review_date
+     FROM purchasing_items ${where}
+     ORDER BY category, item LIMIT $${vals.length}`,
+    vals,
+  ).catch(() => ({ rows: [] } as any));
+  const cats = await pool.query(`SELECT DISTINCT category, COUNT(*)::int AS count FROM purchasing_items WHERE active=true GROUP BY 1 ORDER BY 1`).catch(() => ({ rows: [] } as any));
+  const payload = envelope({
+    source: "purchasing_items",
+    scope: category ? `category:${category}` : activeOnly ? "active" : "all",
+    status: "ok",
+    data: {
+      count: items.rows.length,
+      categories: cats.rows,
+      items: items.rows,
+    },
+  });
+  await logRequest("/purchasing/items", { category, activeOnly, limit }, 200, true, elapsed());
+  return res.json(payload);
+});
+
+// ── PURCHASING: tally (rolls/meat + drinks) ───────────────────────────────────
+router.get("/purchasing/tally", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  const limit = safeLimit(req.query.limit, 100, 500);
+  if (date && !isValidDate(date)) {
+    await logRequest("/purchasing/tally", { date }, 400, false, elapsed());
+    return res.status(400).json(envelope({ source: "request", scope: "purchasing/tally", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date must be YYYY-MM-DD", where: "query.date", canonical_source: "purchase_tally.date" }] }));
+  }
+  const dateFilter = date ? `WHERE t.date = $1::date` : `WHERE t.date >= NOW() - INTERVAL '90 days'`;
+  const dateVals = date ? [date] : [];
+  const [rolls, drinks] = await Promise.all([
+    pool.query(
+      `SELECT t.id, t.date::text, t.staff, t.supplier, t.rolls_pcs, t.meat_grams, t.amount_thb, t.notes, t.created_at::text
+       FROM purchase_tally t ${dateFilter} ORDER BY t.date DESC, t.created_at DESC LIMIT ${limit}`,
+      dateVals,
+    ).catch(() => ({ rows: [] } as any)),
+    pool.query(
+      `SELECT t.id, t.date::text, t.staff, t.supplier, t.amount_thb, t.notes, t.created_at::text,
+              json_agg(json_build_object('item', d.item_name, 'qty', d.qty, 'unit', d.unit)) AS drink_lines
+       FROM purchase_tally t
+       JOIN purchase_tally_drink d ON d.tally_id = t.id
+       ${dateFilter} GROUP BY t.id ORDER BY t.date DESC, t.created_at DESC LIMIT ${limit}`,
+      dateVals,
+    ).catch(() => ({ rows: [] } as any)),
+  ]);
+  const rollTotals = await pool.query(
+    `SELECT SUM(rolls_pcs)::int AS total_rolls, SUM(meat_grams)::numeric AS total_meat_g, COUNT(*)::int AS events
+     FROM purchase_tally ${dateFilter}`,
+    dateVals,
+  ).catch(() => ({ rows: [{}] } as any));
+  const payload = envelope({
+    source: "purchase_tally + purchase_tally_drink",
+    scope: date ? `date:${date}` : "last-90d",
+    date,
+    status: "ok",
+    data: {
+      rolls_meat_entries: rolls.rows,
+      drinks_entries: drinks.rows,
+      totals: rollTotals.rows[0],
+      count: { rolls_meat: rolls.rows.length, drinks: drinks.rows.length },
+    },
+  });
+  await logRequest("/purchasing/tally", { date, limit }, 200, true, elapsed());
+  return res.json(payload);
+});
+
+// ── PURCHASING: shift log ─────────────────────────────────────────────────────
+router.get("/purchasing/shift-log", async (req, res) => {
+  const elapsed = timed();
+  const port = process.env.PORT || 5000;
+  const qs = new URLSearchParams(req.query as Record<string, string>).toString();
+  const suffix = qs ? `?${qs}` : "";
+  try {
+    const r = await axios.get(`http://127.0.0.1:${port}/api/purchasing-shift-log${suffix}`, { timeout: 10000 });
+    const payload = envelope({
+      source: "purchasing-shift-log (internal proxy)",
+      scope: suffix || "all",
+      status: "ok",
+      data: r.data,
+    });
+    await logRequest("/purchasing/shift-log", Object.fromEntries(new URLSearchParams(qs)), 200, true, elapsed());
+    return res.json(payload);
+  } catch (err: any) {
+    await logRequest("/purchasing/shift-log", {}, 502, false, elapsed());
+    return res.status(502).json(envelope({
+      source: "purchasing-shift-log (internal proxy)",
+      scope: "all",
+      status: "error",
+      data: {},
+      blockers: [{ code: "PROXY_FETCH_FAILED", message: err?.message ?? "Internal fetch failed", where: "/api/purchasing-shift-log", canonical_source: "purchasingShiftLog route" }],
+    }));
+  }
+});
+
+// ── PURCHASING: shopping list ─────────────────────────────────────────────────
+router.get("/purchasing/shopping-list", async (req, res) => {
+  const elapsed = timed();
+  const lists = await pool.query(
+    `SELECT sl.id, sl.created_at::text, sl.status, sl.notes,
+            json_agg(json_build_object('id', si.id, 'item', si.ingredient_name, 'qty', si.requested_qty, 'unit', si.requested_unit, 'notes', si.notes) ORDER BY si.ingredient_name) AS items
+     FROM shopping_list sl
+     LEFT JOIN shopping_list_items si ON si.shopping_list_id = sl.id
+     GROUP BY sl.id ORDER BY sl.created_at DESC LIMIT 10`,
+  ).catch(() => ({ rows: [] } as any));
+  const recentPurchases = await pool.query(
+    `SELECT * FROM shopping_purchases ORDER BY created_at DESC LIMIT 20`,
+  ).catch(() => ({ rows: [] } as any));
+  const payload = envelope({
+    source: "shopping_list + shopping_list_items + shopping_purchases",
+    scope: "latest-10-lists",
+    status: "ok",
+    data: {
+      lists: lists.rows,
+      recent_purchases: recentPurchases.rows,
+      active_list: lists.rows.find((l: any) => l.status === "active") ?? null,
+    },
+  });
+  await logRequest("/purchasing/shopping-list", {}, 200, true, elapsed());
+  return res.json(payload);
+});
+
+// ── OPERATIONS: expenses ──────────────────────────────────────────────────────
+router.get("/operations/expenses", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  const limit = safeLimit(req.query.limit, 100, 500);
+  if (date && !isValidDate(date)) {
+    await logRequest("/operations/expenses", { date }, 400, false, elapsed());
+    return res.status(400).json(envelope({ source: "request", scope: "operations/expenses", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date must be YYYY-MM-DD", where: "query.date", canonical_source: "expenses.shiftDate" }] }));
+  }
+  const where = date ? `WHERE "shiftDate" = $1` : `WHERE "shiftDate" >= NOW() - INTERVAL '30 days'`;
+  const vals = date ? [date] : [];
+  vals.push(limit);
+  const rows = await pool.query(
+    `SELECT id, "shiftDate"::text AS shift_date, item, "costCents", supplier,
+            "expenseType" AS expense_type, wages, source, "createdAt"::text AS created_at
+     FROM expenses ${where} ORDER BY "shiftDate" DESC, "createdAt" DESC LIMIT $${vals.length}`,
+    vals,
+  ).catch(() => ({ rows: [] } as any));
+  const totals = await pool.query(
+    `SELECT "expenseType" AS expense_type, SUM("costCents")::bigint AS total_cents, COUNT(*)::int AS count
+     FROM expenses ${where.replace(`LIMIT $${vals.length}`, "")}
+     GROUP BY 1 ORDER BY total_cents DESC`,
+    date ? [date] : [],
+  ).catch(() => ({ rows: [] } as any));
+  const payload = envelope({
+    source: "expenses",
+    scope: date ? `date:${date}` : "last-30d",
+    date,
+    status: "ok",
+    data: {
+      count: rows.rows.length,
+      expenses: rows.rows,
+      by_type: totals.rows,
+      total_thb: totals.rows.reduce((s: number, r: any) => s + Number(r.total_cents || 0) / 100, 0).toFixed(2),
+    },
+  });
+  await logRequest("/operations/expenses", { date, limit }, 200, true, elapsed());
+  return res.json(payload);
+});
+
+// ── OPERATIONS: balance ───────────────────────────────────────────────────────
+router.get("/operations/balance", async (req, res) => {
+  const elapsed = timed();
+  const port = process.env.PORT || 5000;
+  try {
+    const [pos, forms, combined] = await Promise.all([
+      axios.get(`http://127.0.0.1:${port}/api/balance/pos`, { timeout: 6000 }).catch(() => null),
+      axios.get(`http://127.0.0.1:${port}/api/balance/forms`, { timeout: 6000 }).catch(() => null),
+      axios.get(`http://127.0.0.1:${port}/api/balance/combined`, { timeout: 6000 }).catch(() => null),
+    ]);
+    const payload = envelope({
+      source: "balance/pos + balance/forms + balance/combined (internal proxy)",
+      scope: "current",
+      status: "ok",
+      data: {
+        pos_balance: pos?.data ?? null,
+        forms_balance: forms?.data ?? null,
+        combined: combined?.data ?? null,
+      },
+    });
+    await logRequest("/operations/balance", {}, 200, true, elapsed());
+    return res.json(payload);
+  } catch (err: any) {
+    await logRequest("/operations/balance", {}, 502, false, elapsed());
+    return res.status(502).json(envelope({
+      source: "balance (internal proxy)",
+      scope: "current",
+      status: "error",
+      data: {},
+      blockers: [{ code: "PROXY_FETCH_FAILED", message: err?.message ?? "Internal fetch failed", where: "/api/balance/*", canonical_source: "balance routes" }],
+    }));
+  }
+});
+
+// ── OPERATIONS: stock review ──────────────────────────────────────────────────
+router.get("/operations/stock-review", async (req, res) => {
+  const elapsed = timed();
+  const date = req.query.date as string | undefined;
+  const limit = safeLimit(req.query.limit, 100, 500);
+  if (date && !isValidDate(date)) {
+    await logRequest("/operations/stock-review", { date }, 400, false, elapsed());
+    return res.status(400).json(envelope({ source: "request", scope: "operations/stock-review", status: "error", data: {}, blockers: [{ code: "INVALID_DATE", message: "date must be YYYY-MM-DD", where: "query.date", canonical_source: "stock_received_log.shift_date" }] }));
+  }
+  const where = date ? `WHERE shift_date = $1::date` : `WHERE shift_date >= NOW() - INTERVAL '14 days'`;
+  const vals = date ? [date] : [];
+  const rows = await pool.query(
+    `SELECT id, shift_date::text, item_type, item_name, qty, weight_g, paid, source, notes, created_at::text
+     FROM stock_received_log ${where} ORDER BY shift_date DESC, created_at DESC LIMIT ${limit}`,
+    vals,
+  ).catch(() => ({ rows: [] } as any));
+  const summary = await pool.query(
+    `SELECT item_type, item_name, SUM(qty)::numeric AS total_qty, SUM(COALESCE(weight_g,0))::numeric AS total_weight_g, COUNT(*)::int AS events
+     FROM stock_received_log ${where}
+     GROUP BY item_type, item_name ORDER BY item_type, total_qty DESC`,
+    vals,
+  ).catch(() => ({ rows: [] } as any));
+  const payload = envelope({
+    source: "stock_received_log",
+    scope: date ? `date:${date}` : "last-14d",
+    date,
+    status: "ok",
+    data: { count: rows.rows.length, log: rows.rows, summary: summary.rows },
+  });
+  await logRequest("/operations/stock-review", { date, limit }, 200, true, elapsed());
+  return res.json(payload);
+});
+
 router.get("/shift-report/latest", async (req, res) => {
   const elapsed = timed();
   const date = req.query.date as string | undefined;
@@ -826,6 +1265,85 @@ router.get("/shift-report/latest", async (req, res) => {
 
   await logRequest("/shift-report/latest", { date }, 200, true, elapsed());
   return res.json(payload);
+});
+
+// ── UNIVERSAL PASSTHROUGH PROXY ───────────────────────────────────────────────
+// Lets Bob read any GET endpoint in the app via /api/bob/read/proxy?path=/api/...
+// Blocklisted paths cannot be proxied (auth mutations, payment processing, admin ops).
+
+const PROXY_BLOCKLIST = [
+  "/api/auth",
+  "/api/payment",
+  "/api/admin",
+  "/api/bob/read/proxy", // prevent self-loop
+];
+
+router.get("/proxy", async (req, res) => {
+  const elapsed = timed();
+  const path = req.query.path as string | undefined;
+  if (!path) {
+    await logRequest("/proxy", { path }, 400, false, elapsed());
+    return res.status(400).json(envelope({
+      source: "request",
+      scope: "proxy",
+      status: "error",
+      data: {},
+      blockers: [{ code: "PATH_REQUIRED", message: "?path=/api/... query param is required", where: "query.path", canonical_source: "any GET /api/* route" }],
+    }));
+  }
+  if (!path.startsWith("/api/")) {
+    await logRequest("/proxy", { path }, 400, false, elapsed());
+    return res.status(400).json(envelope({
+      source: "request",
+      scope: "proxy",
+      status: "error",
+      data: {},
+      blockers: [{ code: "INVALID_PATH", message: "path must start with /api/", where: "query.path", canonical_source: "any GET /api/* route" }],
+    }));
+  }
+  const blocked = PROXY_BLOCKLIST.find((b) => path.startsWith(b));
+  if (blocked) {
+    await logRequest("/proxy", { path }, 403, false, elapsed());
+    return res.status(403).json(envelope({
+      source: "request",
+      scope: "proxy",
+      status: "error",
+      data: {},
+      blockers: [{ code: "PATH_BLOCKED", message: `${path} is blocked from Bob read proxy`, where: "query.path", canonical_source: "PROXY_BLOCKLIST" }],
+    }));
+  }
+  // Forward all query params except 'path' to the target
+  const forwardParams = new URLSearchParams();
+  for (const [k, v] of Object.entries(req.query)) {
+    if (k !== "path") forwardParams.append(k, v as string);
+  }
+  const paramStr = forwardParams.toString();
+  const targetUrl = `http://127.0.0.1:${process.env.PORT || 5000}${path}${paramStr ? `?${paramStr}` : ""}`;
+  try {
+    const r = await axios.get(targetUrl, { timeout: 12000, validateStatus: () => true });
+    const payload = envelope({
+      source: `proxy:${path}`,
+      scope: path,
+      status: r.status >= 400 ? "error" : "ok",
+      data: {
+        proxied_path: path,
+        http_status: r.status,
+        response: r.data,
+      },
+      warnings: r.status >= 400 ? [`Upstream returned HTTP ${r.status}`] : [],
+    });
+    await logRequest("/proxy", { path }, r.status, r.status < 400, elapsed());
+    return res.status(r.status < 400 ? 200 : r.status).json(payload);
+  } catch (err: any) {
+    await logRequest("/proxy", { path }, 502, false, elapsed());
+    return res.status(502).json(envelope({
+      source: `proxy:${path}`,
+      scope: path,
+      status: "error",
+      data: { proxied_path: path },
+      blockers: [{ code: "PROXY_FETCH_FAILED", message: err?.message ?? "Internal fetch failed", where: targetUrl, canonical_source: path }],
+    }));
+  }
 });
 
 export default router;
