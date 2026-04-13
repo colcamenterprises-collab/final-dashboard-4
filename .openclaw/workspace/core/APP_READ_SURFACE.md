@@ -1,9 +1,9 @@
 # APP_READ_SURFACE — Bob Read-Only Access Governance Map
 
 **Generated:** 2026-04-13  
-**Authority:** `/api/bob/read/*` (Bearer token required, GET-only enforced)  
+**Authority:** `/api/bob/read/*` (Bearer token required, GET-only enforced, tenant-scoped foundation)  
 **Base URL:** `http://host/api/bob/read/`  
-**Token env:** `BOB_READONLY_TOKEN`
+**Token auth:** legacy `BOB_READONLY_TOKEN` **or** hashed records in `agent_tokens` (`token_type='agent_read'`)
 
 ---
 
@@ -45,7 +45,7 @@
 | Module | Endpoint | Table / Source | Purpose | Status | Recurring Safe | Investigation Only |
 |---|---|---|---|---|---|---|
 | `shift-snapshot` | `GET /api/bob/read/shift-snapshot?date=` | `daily_sales_v2`, `daily_stock_v2`, `roll_order`, `lv_receipt`, `receipt_truth_daily_usage`, `analysis_reports`, `ai_issues` | Full multi-source shift confidence snapshot with blockers | **canonical** | ✅ yes | no |
-| `shift-report/latest` | `GET /api/bob/read/shift-report/latest?date=` | `shift_report_v2` (**0 rows — EMPTY**) | Compiled POS+sales+stock+variances shift report | **broken/empty** | ❌ no | ✅ investigation only — table unpopulated; trigger `POST /api/shift-report/generate` first |
+| `shift-report/latest` | `GET /api/bob/read/shift-report/latest?date=` | `shift_report_v2` (tenant-scoped by `restaurantId`) | Compiled POS+sales+stock+variances shift report (same shape as UI route) | **canonical** | ✅ yes when row exists | ✅ investigation if row missing (returns structured blocker) |
 | `roll-order` | `GET /api/bob/read/roll-order?date=` | `roll_order` (**0 rows — EMPTY**) | Bread roll order status and send confirmation | **broken/empty** | ❌ no | ✅ investigation only — no orders exist yet |
 
 > **Canonical for: Sales & Shift Analysis** → `shift-snapshot` (primary) + `analysis/shift-analysis` (secondary)
@@ -114,9 +114,10 @@
 | `proxy` | `GET /api/bob/read/proxy?path=/api/ENDPOINT&params=...` | Passes any GET request to any unblocked `/api/*` endpoint in the app | **utility** | ⚠️ **not default for recurring jobs** — use curated modules unless no module exists | ✅ **primary use: investigation, debugging, one-off reads** |
 
 **Proxy blocklist** (always returns 403):
-- `/api/auth` — session/login mutations
-- `/api/payment` — payment processing
-- `/api/admin` — admin operations
+- `/api/auth`, `/api/session` — session/login internals
+- `/api/payment*`, `/api/payments*`, `/api/payment-providers` — payment credentials/ops
+- `/api/admin` — admin non-data internals
+- `/api/config`, `/api/secrets`, `/api/tokens`, `/api/internal/(secrets|keys|config|credentials)` — secret/config surfaces
 - `/api/bob/read/proxy` — self-loop prevention
 
 **Example valid proxy calls:**
@@ -158,11 +159,13 @@ GET /api/bob/read/proxy?path=/api/loyalty/members
 ## AUTH & TRANSPORT
 
 ```
-Authorization: Bearer <BOB_READONLY_TOKEN>
+Authorization: Bearer <BOB_READONLY_TOKEN|AGENT_TOKEN>
 Method:        GET only (405 on all others)
 Content-Type:  application/json
 Envelope:      { ok, source, scope, date?, status, data, warnings[], blockers[], last_updated }
 ```
+
+`AGENT_TOKEN` values are never stored raw. Verification is by SHA-256 hash lookup in `agent_tokens`, with `tenant_id` bound to request context for downstream scoping.
 
 **Status field values:**
 - `ok` — data present, no blockers
