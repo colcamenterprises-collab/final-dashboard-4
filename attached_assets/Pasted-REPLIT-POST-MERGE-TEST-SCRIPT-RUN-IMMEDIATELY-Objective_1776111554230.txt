@@ -1,0 +1,246 @@
+REPLIT POST-MERGE TEST SCRIPT — RUN IMMEDIATELY
+
+Objective:
+Verify commit 59bc1ec works in the live running environment immediately after merge.
+
+Rules:
+
+- Do not redesign anything
+- Do not refactor unrelated code
+- Only test and report
+- Only apply a fix if there is a clearly proven break
+- Do not claim success unless the route/UI was actually tested
+
+1. SERVER / STARTUP
+
+- Pull merged code
+- Start the app normally
+- Confirm server boots without crash
+- Confirm migration "20260413_agent_read_foundation.sql" runs safely
+- Confirm "ensureAgentReadFoundation()" does not fail
+- Confirm no route registration failure from "server/routes/bobRead.ts"
+
+Return:
+
+- server boot pass/fail
+- any startup error exactly
+
+2. BASIC APP SANITY
+   Open these pages and confirm they load:
+
+- Dashboard
+- Analysis / Daily Review
+- Expense Upload
+- Shift Purchasing
+- any page that normally depends on existing sales/purchasing/operations data
+
+Return:
+
+- page name
+- loaded yes/no
+- console errors yes/no
+
+3. AUTH TEST MATRIX
+   Test Bob read auth with:
+
+- valid legacy "BOB_READONLY_TOKEN"
+- valid new "agent_tokens" token
+- missing token
+- invalid token
+- revoked token if revoke path exists
+
+Return for each:
+
+- token type
+- request used
+- expected result
+- actual result
+- pass/fail
+
+4. UNIVERSAL PROXY — ALLOW TESTS
+   Hit these through the Bob proxy with a valid token:
+
+- "GET /api/bob/read/proxy?path=/api/analysis/finance"
+- "GET /api/bob/read/proxy?path=/api/operations/balance"
+- "GET /api/bob/read/proxy?path=/api/purchasing/tally"
+- "GET /api/bob/read/proxy?path=/api/forms/daily-sales?date=2026-04-13"
+- "GET /api/bob/read/proxy?path=/api/forms/daily-stock?date=2026-04-13"
+
+Verify:
+
+- response returns
+- status code is correct
+- JSON is valid
+- upstream response is passed through properly
+
+Return for each:
+
+- route
+- status
+- short response summary
+- pass/fail
+
+5. UNIVERSAL PROXY — DENY TESTS
+   Attempt blocked routes with a valid token:
+
+- "GET /api/bob/read/proxy?path=/api/auth/me"
+- "GET /api/bob/read/proxy?path=/api/admin"
+- "GET /api/bob/read/proxy?path=/api/payment"
+- any obvious secret/config/auth route that should be blocked
+
+Verify:
+
+- route is denied
+- correct block status returned
+- no sensitive data leaks
+
+Return for each:
+
+- route
+- status
+- blocked yes/no
+- pass/fail
+
+6. CANONICAL SHIFT REPORT MODULE — MOST IMPORTANT TEST
+   Test:
+
+- "GET /api/bob/read/shift-report/latest?date=2026-04-13"
+
+Compare against the live UI-backed route:
+
+- "GET /api/shift-report/latest?date=2026-04-13"
+
+If needed, also inspect the underlying report JSON route if the UI resolves there.
+
+Verify:
+
+- same shift
+- same totals
+- same key values
+- same visible report data
+- no mismatch caused by field mapping
+- no fake fallback values
+
+Compare at minimum:
+
+- report id
+- shiftDate
+- salesId
+- stockId
+- posData
+- salesData
+- stockData
+- variances
+- aiInsights
+- createdAt
+- restaurantId
+
+Return:
+
+- exact Bob route tested
+- exact UI route tested
+- fields matched
+- fields mismatched
+- verdict pass/fail
+
+7. TENANT SCOPING
+   Verify:
+
+- valid token resolves tenant correctly
+- "shift-report/latest" respects tenant scope
+- proxy forwards "x-tenant-id" correctly where relevant
+- no obvious cross-tenant leak path exists
+
+If only one tenant exists, still verify the resolved tenant context and query behavior.
+
+Return:
+
+- tenant scoping pass/fail
+- notes
+
+8. TABLET LAYOUT TEST
+   Check these exact pages:
+
+- Dashboard
+- ExpenseUpload
+- DailyReview
+- ShiftPurchasing
+
+Test at these widths:
+
+- 1280
+- 1024
+- 820
+- 768
+- 540
+- 390
+
+Verify:
+
+- broken side-by-side sections now stack properly on tablet
+- no crushed cards
+- no unreadable side-by-side rows
+- no bad overflow
+- desktop still acceptable
+- mobile still acceptable
+
+Return for each page:
+
+- widths tested
+- layout pass/fail
+- any broken viewport
+- screenshot if broken
+
+9. APP_READ_SURFACE FILE
+   Verify file exists:
+
+- ".openclaw/workspace/core/APP_READ_SURFACE.md"
+
+Check:
+
+- file exists
+- canonical modules listed
+- proxy marked investigation/debug allowed
+- proxy not marked as default recurring source unless no canonical exists
+- broken/empty endpoints marked clearly
+
+Return:
+
+- exists yes/no
+- complete yes/no
+- missing items if any
+
+10. DATA SAFETY
+    Verify:
+
+- no existing data lost
+- sales/stock/purchasing/analysis pages still load old data
+- migration is additive in practice
+- no destructive behavior seen
+- no regression in existing workflows caused by this patch
+
+Return:
+
+- data safety pass/fail
+- any regression found
+
+FINAL RETURN FORMAT — USE THIS EXACT STRUCTURE
+
+1. Server health
+2. Basic app sanity
+3. Auth matrix
+4. Proxy allow tests
+5. Proxy deny tests
+6. Shift report module vs UI comparison
+7. Tenant scoping
+8. Tablet layout by page and width
+9. APP_READ_SURFACE verification
+10. Data safety
+11. Final verdict:
+
+- PASS
+- PASS WITH FIXES
+- FAIL
+
+Important:
+Do not say PASS unless the live routes and UI were actually tested after merge.
