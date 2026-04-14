@@ -68,7 +68,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
     if (isPublic) { setGateState("unlocked"); return; }
     const forcePin = new URLSearchParams(window.location.search).get("lock") === "1";
     if (process.env.NODE_ENV === "development" && !forcePin) {
-      // Dev bypass: auto-unlock with a synthetic owner
       setCurrentUser({
         id: 0,
         name: "Dev Owner",
@@ -120,7 +119,7 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
   if (gateState === "loading" && !isPublic) {
     return (
       <PinAuthContext.Provider value={contextValue}>
-        <div className="fixed inset-0 z-[9999]" style={{ background: "hsl(222,47%,4%)" }} />
+        <div className="fixed inset-0 z-[9999] bg-white" />
       </PinAuthContext.Provider>
     );
   }
@@ -147,7 +146,14 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 
 // ─── PIN Login Screen ────────────────────────────────────────────────────────
 
-const MAX_PIN_LENGTH = 8;
+const PIN_LENGTH = 4;
+
+const KEYPAD_ROWS = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  ["", "0", "⌫"],
+];
 
 function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
   const [staffUsers, setStaffUsers] = useState<StaffListUser[]>([]);
@@ -156,7 +162,6 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [shake, setShake] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/pin-auth/users", { credentials: "include" })
@@ -169,41 +174,43 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!selectedUser) return;
-      if (e.key >= "0" && e.key <= "9") {
-        appendDigit(e.key);
-      } else if (e.key === "Backspace") {
-        setPin((p) => p.slice(0, -1));
-        setStatus("idle");
-        setErrorMsg("");
-      } else if (e.key === "Enter") {
-        submitPin();
-      } else if (e.key === "Escape") {
-        setSelectedUser(null);
-        setPin("");
-        setStatus("idle");
-        setErrorMsg("");
-      }
+      if (e.key >= "0" && e.key <= "9") appendDigit(e.key);
+      else if (e.key === "Backspace") deleteDigit();
+      else if (e.key === "Escape") clearUser();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   });
 
   function appendDigit(d: string) {
-    if (pin.length >= MAX_PIN_LENGTH) return;
+    if (pin.length >= PIN_LENGTH) return;
     setStatus("idle");
     setErrorMsg("");
     setPin((p) => p + d);
   }
 
-  async function submitPin() {
-    if (!selectedUser || pin.length < 4) return;
+  function deleteDigit() {
+    setPin((p) => p.slice(0, -1));
+    setStatus("idle");
+    setErrorMsg("");
+  }
+
+  function clearUser() {
+    setSelectedUser(null);
+    setPin("");
+    setStatus("idle");
+    setErrorMsg("");
+  }
+
+  async function submitPin(currentPin: string) {
+    if (!selectedUser || currentPin.length < PIN_LENGTH) return;
     setStatus("loading");
     try {
       const res = await fetch("/api/pin-auth/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUser.id, pin }),
+        body: JSON.stringify({ userId: selectedUser.id, pin: currentPin }),
       });
       const data = await res.json();
       if (res.ok && data.user) {
@@ -213,7 +220,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
         setErrorMsg(data.error || "Incorrect PIN");
         setPin("");
         setShake(true);
-        setTimeout(() => setShake(false), 600);
+        setTimeout(() => setShake(false), 500);
       }
     } catch {
       setStatus("error");
@@ -222,99 +229,74 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
     }
   }
 
-  // Auto-submit when max PIN length reached or on Enter-like patterns
+  // Auto-submit when PIN_LENGTH digits entered
   useEffect(() => {
-    if (pin.length === 6 && selectedUser) {
-      submitPin();
+    if (pin.length === PIN_LENGTH && selectedUser && status === "idle") {
+      submitPin(pin);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin]);
 
-  const KEYPAD = [
-    ["1","2","3"],
-    ["4","5","6"],
-    ["7","8","9"],
-    ["⌫","0","✓"],
-  ];
-
-  const bg = "hsl(222,47%,4%)";
-  const surface = "hsl(222,35%,8%)";
-  const surfaceBorder = "hsl(222,30%,14%)";
-  const accent = "hsl(142,76%,45%)";
-  const muted = "hsl(215,16%,55%)";
-  const textPrimary = "hsl(213,31%,91%)";
+  const roleLabel = (role: string) =>
+    role.charAt(0).toUpperCase() + role.slice(1);
 
   return (
     <div
-      ref={containerRef}
-      className="fixed inset-0 z-[9999] overflow-y-auto"
-      style={{ background: bg, fontFamily: "'Poppins', 'Inter', system-ui, sans-serif" }}
+      className="fixed inset-0 z-[9999] bg-white overflow-y-auto"
+      style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      <div className="min-h-full flex items-center justify-center p-4 py-8">
-        <div className="w-full max-w-sm">
+      {/* ── Centered column — max-w-xs on mobile, max-w-sm on tablet+ ── */}
+      <div className="min-h-full flex flex-col items-center justify-center px-6 py-10">
+        <div className="w-full max-w-xs sm:max-w-sm">
 
-          {/* ── Brand header ───────────────────────────────────── */}
+          {/* ── Brand header ─────────────────────────────────────── */}
           <div className="mb-8 text-center">
-            <p
-              className="text-xs font-bold tracking-[0.2em] uppercase"
-              style={{ color: accent }}
-            >
-              Smash Brothers
-            </p>
-            <h1
-              className="mt-1 text-2xl font-bold tracking-tight"
-              style={{ color: textPrimary }}
-            >
-              Staff Access
+            <div className="inline-flex items-center gap-1.5 mb-3">
+              <span className="text-xs font-bold tracking-widest text-emerald-600 uppercase">
+                Smash Brothers
+              </span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              Staff Sign In
             </h1>
-            <p className="mt-1 text-xs" style={{ color: muted }}>
-              {selectedUser ? `Enter PIN for ${selectedUser.name}` : "Select your name to sign in"}
+            <p className="mt-1 text-sm text-gray-500">
+              {selectedUser
+                ? `Enter your 4-digit PIN`
+                : "Tap your name to continue"}
             </p>
           </div>
 
-          {/* ── User selection cards ────────────────────────────── */}
+          {/* ── User selection ───────────────────────────────────── */}
           {!selectedUser && (
-            <div className="mb-6">
+            <div className="mb-4">
               {staffUsers.length === 0 ? (
-                <div
-                  className="rounded-lg p-6 text-center text-sm"
-                  style={{ background: surface, border: `1px solid ${surfaceBorder}`, color: muted }}
-                >
-                  No staff accounts configured.
-                  <br />
-                  <span className="text-xs">Contact your manager to set up access.</span>
+                <div className="rounded border border-gray-200 p-6 text-center">
+                  <p className="text-sm text-gray-500">No staff accounts configured.</p>
+                  <p className="text-xs text-gray-400 mt-1">Contact your manager.</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-2">
                   {staffUsers.map((u) => (
                     <button
                       key={u.id}
-                      onClick={() => { setSelectedUser(u); setPin(""); setStatus("idle"); setErrorMsg(""); }}
-                      className="rounded-xl py-4 px-3 text-left transition-all duration-150 active:scale-95"
-                      style={{
-                        background: surface,
-                        border: `1px solid ${surfaceBorder}`,
+                      onClick={() => {
+                        setSelectedUser(u);
+                        setPin("");
+                        setStatus("idle");
+                        setErrorMsg("");
                       }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = accent;
-                        (e.currentTarget as HTMLButtonElement).style.background = "hsl(222,35%,11%)";
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLButtonElement).style.borderColor = surfaceBorder;
-                        (e.currentTarget as HTMLButtonElement).style.background = surface;
-                      }}
+                      className="flex items-center gap-3 w-full rounded border border-gray-200 px-4 py-3 text-left hover:border-emerald-500 hover:bg-emerald-50/40 active:scale-[0.99] transition-all"
                     >
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold mb-2"
-                        style={{ background: "hsl(222,35%,14%)", color: accent }}
-                      >
+                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
                         {u.name.slice(0, 1).toUpperCase()}
                       </div>
-                      <p className="text-sm font-semibold leading-tight" style={{ color: textPrimary }}>
-                        {u.name}
-                      </p>
-                      <p className="text-xs capitalize mt-0.5" style={{ color: muted }}>
-                        {u.role}
-                      </p>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{u.name}</p>
+                        <p className="text-xs text-gray-400">{roleLabel(u.role)}</p>
+                      </div>
+                      <svg className="ml-auto text-gray-300 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
                     </button>
                   ))}
                 </div>
@@ -322,117 +304,80 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
             </div>
           )}
 
-          {/* ── PIN entry + keypad ──────────────────────────────── */}
+          {/* ── PIN entry ────────────────────────────────────────── */}
           {selectedUser && (
             <div>
-              {/* Selected user indicator */}
-              <div className="flex items-center gap-2 mb-5">
+              {/* Who is signing in */}
+              <div className="flex items-center justify-between mb-6">
                 <button
-                  onClick={() => { setSelectedUser(null); setPin(""); setStatus("idle"); setErrorMsg(""); }}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs transition-opacity hover:opacity-70"
-                  style={{ background: "hsl(222,35%,11%)", color: muted }}
+                  onClick={clearUser}
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition-colors"
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                     <polyline points="15 18 9 12 15 6" />
                   </svg>
                   Back
                 </button>
                 <div className="flex items-center gap-2">
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold"
-                    style={{ background: "hsl(222,35%,14%)", color: accent }}
-                  >
+                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-700">
                     {selectedUser.name.slice(0, 1).toUpperCase()}
                   </div>
-                  <span className="text-sm font-semibold" style={{ color: textPrimary }}>
-                    {selectedUser.name}
-                  </span>
+                  <span className="text-sm font-semibold text-gray-800">{selectedUser.name}</span>
                 </div>
               </div>
 
-              {/* PIN dots */}
-              <div
-                className={`rounded-xl p-5 mb-4 flex items-center justify-center gap-3 transition-all ${shake ? "animate-shake" : ""}`}
-                style={{ background: surface, border: `1px solid ${status === "error" ? "hsl(0,70%,45%)" : surfaceBorder}` }}
-              >
-                {Array.from({ length: 6 }).map((_, i) => (
+              {/* PIN dots — 4 circles */}
+              <div className={`flex items-center justify-center gap-4 mb-2 ${shake ? "animate-shake" : ""}`}>
+                {Array.from({ length: PIN_LENGTH }).map((_, i) => (
                   <div
                     key={i}
                     className="rounded-full transition-all duration-150"
                     style={{
-                      width: i < pin.length ? 14 : 10,
-                      height: i < pin.length ? 14 : 10,
+                      width: i < pin.length ? 16 : 12,
+                      height: i < pin.length ? 16 : 12,
                       background: i < pin.length
-                        ? (status === "error" ? "hsl(0,70%,55%)" : accent)
-                        : "hsl(222,30%,20%)",
+                        ? (status === "error" ? "#ef4444" : "#10b981")
+                        : "#e5e7eb",
                     }}
                   />
                 ))}
               </div>
 
-              {/* Error message */}
-              <div className="h-6 mb-3 text-center">
+              {/* Error */}
+              <div className="h-6 mb-5 text-center">
                 {status === "error" && errorMsg && (
-                  <p className="text-xs font-medium" style={{ color: "hsl(0,70%,65%)" }}>
-                    {errorMsg}
-                  </p>
+                  <p className="text-xs text-red-500 font-medium">{errorMsg}</p>
                 )}
               </div>
 
-              {/* Keypad */}
+              {/* Phone-style keypad */}
               <div className="grid grid-cols-3 gap-3">
-                {KEYPAD.flat().map((key) => {
+                {KEYPAD_ROWS.flat().map((key, idx) => {
+                  if (key === "") {
+                    return <div key={idx} />;
+                  }
                   const isDelete = key === "⌫";
-                  const isSubmit = key === "✓";
-                  const isSubmitDisabled = isSubmit && pin.length < 4;
                   const isLoading = status === "loading";
 
                   return (
                     <button
                       key={key}
-                      disabled={isLoading || (isSubmit && pin.length < 4)}
+                      disabled={isLoading}
                       onClick={() => {
                         if (isLoading) return;
-                        if (isDelete) {
-                          setPin((p) => p.slice(0, -1));
-                          setStatus("idle");
-                          setErrorMsg("");
-                        } else if (isSubmit) {
-                          submitPin();
-                        } else {
-                          appendDigit(key);
-                        }
+                        if (isDelete) deleteDigit();
+                        else appendDigit(key);
                       }}
-                      className="rounded-xl text-lg font-semibold h-16 flex items-center justify-center transition-all duration-100 select-none active:scale-95 disabled:opacity-30"
-                      style={{
-                        background: isSubmit
-                          ? (pin.length >= 4 ? accent : "hsl(222,35%,12%)")
-                          : isDelete
-                          ? "hsl(222,35%,12%)"
-                          : "hsl(222,35%,10%)",
-                        color: isSubmit && pin.length >= 4 ? "hsl(222,47%,6%)" : textPrimary,
-                        border: `1px solid ${isSubmit && pin.length >= 4 ? accent : surfaceBorder}`,
-                        fontWeight: isSubmit || isDelete ? 600 : 400,
-                        fontSize: isDelete || isSubmit ? "1.1rem" : "1.25rem",
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!isLoading && !isSubmitDisabled) {
-                          const btn = e.currentTarget as HTMLButtonElement;
-                          if (!isSubmit) btn.style.background = "hsl(222,35%,16%)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        const btn = e.currentTarget as HTMLButtonElement;
-                        if (isSubmit && pin.length >= 4) btn.style.background = accent;
-                        else if (isDelete) btn.style.background = "hsl(222,35%,12%)";
-                        else btn.style.background = "hsl(222,35%,10%)";
-                      }}
+                      className={[
+                        "h-16 rounded flex items-center justify-center select-none transition-all duration-100",
+                        "active:scale-95 disabled:opacity-40",
+                        isDelete
+                          ? "bg-gray-100 text-gray-600 text-lg hover:bg-gray-200"
+                          : "bg-gray-50 border border-gray-200 text-gray-900 text-xl font-medium hover:bg-gray-100 hover:border-gray-300",
+                      ].join(" ")}
                     >
-                      {isLoading && isSubmit ? (
-                        <div
-                          className="w-4 h-4 rounded-full border-2 animate-spin"
-                          style={{ borderColor: "hsl(222,47%,6%) transparent transparent transparent" }}
-                        />
+                      {isLoading && !isDelete ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-emerald-500 animate-spin" />
                       ) : key}
                     </button>
                   );
@@ -441,8 +386,8 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
             </div>
           )}
 
-          {/* ── Footer ─────────────────────────────────────────── */}
-          <p className="mt-8 text-center text-xs" style={{ color: "hsl(222,30%,28%)" }}>
+          {/* ── Footer ───────────────────────────────────────────── */}
+          <p className="mt-10 text-center text-xs text-gray-300">
             Smash Brothers Burgers — Internal System
           </p>
         </div>
@@ -451,12 +396,12 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
       <style>{`
         @keyframes shake {
           0%,100% { transform: translateX(0); }
-          20% { transform: translateX(-6px); }
-          40% { transform: translateX(6px); }
-          60% { transform: translateX(-4px); }
-          80% { transform: translateX(4px); }
+          20% { transform: translateX(-8px); }
+          40% { transform: translateX(8px); }
+          60% { transform: translateX(-5px); }
+          80% { transform: translateX(5px); }
         }
-        .animate-shake { animation: shake 0.5s ease-in-out; }
+        .animate-shake { animation: shake 0.45s ease-in-out; }
       `}</style>
     </div>
   );
