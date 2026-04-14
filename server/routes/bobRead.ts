@@ -147,54 +147,55 @@ async function tableExists(name: string): Promise<boolean> {
 type AgentAuth = {
   authorized: boolean;
   tenantId: number;
-  authType: "bob_readonly_token" | "agent_token";
+  authType: "legacy_env" | "agent_token";
   authSubject: string;
+  agentTokenId?: number;
 };
 
 async function resolveAgentAuth(token: string): Promise<AgentAuth | null> {
-  const legacyToken = process.env.BOB_READONLY_TOKEN;
-  if (legacyToken && token === legacyToken) {
-    return {
-      authorized: true,
-      tenantId: 1,
-      authType: "bob_readonly_token",
-      authSubject: "bob:readonly",
-    };
-  }
-
   const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
-  const r = await pool.query(
+  const row = pool ? (await pool.query(
     `SELECT id, tenant_id, token_type, COALESCE(agent_name, 'agent') AS agent_name
      FROM agent_tokens
      WHERE token_hash = $1
        AND is_active = TRUE
        AND revoked_at IS NULL
+       AND tenant_id IS NOT NULL
+       AND (
+         metadata->>'expires_at' IS NULL
+         OR (
+           metadata->>'expires_at' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}(?:[ T][0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})?)?$'
+           AND (metadata->>'expires_at')::timestamptz > NOW()
+         )
+       )
      LIMIT 1`,
     [tokenHash],
-  ).catch(() => ({ rows: [] } as any));
-  const row = r.rows?.[0];
-  if (!row) return null;
+  ).catch(() => ({ rows: [] } as any))).rows?.[0] : null;
+  if (row) {
+    await pool?.query(`UPDATE agent_tokens SET last_used_at = NOW() WHERE id = $1`, [row.id]).catch(() => undefined);
+    return {
+      authorized: true,
+      tenantId: Number(row.tenant_id || 1),
+      authType: "agent_token",
+      authSubject: `${row.agent_name}:${row.token_type || "agent_read"}`,
+      agentTokenId: Number(row.id),
+    };
+  }
 
-  await pool.query(`UPDATE agent_tokens SET last_used_at = NOW() WHERE id = $1`, [row.id]).catch(() => undefined);
-  return {
-    authorized: true,
-    tenantId: Number(row.tenant_id || 1),
-    authType: "agent_token",
-    authSubject: `${row.agent_name}:${row.token_type || "agent_read"}`,
-  };
+  const legacyToken = process.env.BOB_READONLY_TOKEN;
+  if (legacyToken && token === legacyToken) {
+    return {
+      authorized: true,
+      tenantId: 1,
+      authType: "legacy_env",
+      authSubject: "bob:readonly",
+    };
+  }
+
+  return null;
 }
 
 async function bobAuth(req: Request, res: Response, next: NextFunction) {
-  const expectedToken = process.env.BOB_READONLY_TOKEN;
-  if (!expectedToken) {
-    return res.status(503).json(envelope({
-      source: "env:BOB_READONLY_TOKEN",
-      scope: "auth",
-      status: "error",
-      data: { authorized: false },
-      blockers: [{ code: "TOKEN_NOT_CONFIGURED", message: "BOB_READONLY_TOKEN missing", where: "server env", canonical_source: "BOB_READONLY_TOKEN" }],
-    }));
-  }
   const authHeader = req.headers.authorization || "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
   if (!token) {
@@ -220,6 +221,7 @@ async function bobAuth(req: Request, res: Response, next: NextFunction) {
 
   (req as any).agentAuth = resolved;
   (req as any).restaurantId = resolved.tenantId;
+  (req as any).tenantId = resolved.tenantId;
   return next();
 }
 
