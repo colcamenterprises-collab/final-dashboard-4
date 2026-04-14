@@ -1,0 +1,22 @@
+Motivation
+Complete Bob read auth wiring so runtime Bearer tokens can authenticate against DB-backed agent_tokens rather than only the legacy env token.
+Preserve legacy BOB_READONLY_TOKEN behavior as a clearly labelled fallback while enforcing secure, hashed DB-token checks.
+Description
+Files changed: server/routes/bobRead.ts updates auth resolution to check presented Bearer tokens (SHA-256) against agent_tokens.token_hash first, and fall back to BOB_READONLY_TOKEN as legacy_env.
+DB lookup enforces usability rules: is_active = TRUE, revoked_at IS NULL, tenant_id IS NOT NULL, and optional metadata.expires_at must be absent or a parseable timestamptz in the future.
+On DB-token success the middleware attaches agentAuth with tenantId, authType = "agent_token", authSubject, and agentTokenId, updates agent_tokens.last_used_at best-effort, and sets both req.restaurantId and req.tenantId.
+On legacy env success the middleware authenticates as authType = "legacy_env" and preserves the existing single-tenant behavior.
+Testing
+Ran static type check with npm run check, which failed due to pre-existing repo-wide TypeScript errors unrelated to this middleware change.
+Started dev server with BOB_READONLY_TOKEN=legacy-test-token NODE_ENV=development npm run dev to exercise runtime middleware (server ran but database pool was unavailable in this environment).
+Automated endpoint checks executed against the running server produced: GET /api/bob/read/system-health without a token → 401 (expected missing-token behavior), GET /api/bob/read/system-health with Authorization: Bearer not-valid → 401 (expected invalid-token behavior), and GET /api/bob/read/system-health with Authorization: Bearer legacy-test-token → 503 because the local environment had no DATABASE_URL and the DB-dependent route returned database-unavailable (legacy token remains fallback but route requires DB access).
+DB-backed token positive path, revoked/inactive rejection, and tenant-propagation tests could not be executed end-to-end here due to the environment missing a live Postgres DATABASE_URL; the middleware/query logic implementing those behaviors is present and exercised where possible.
+Codex Task
+
+@colcamenterprises-collab
+Wire bob read auth to agent_tokens with legacy fallback
+669e48d
+@colcamenterprises-collab colcamenterprises-collab added the codex label now — with  ChatGPT Codex Connector
+Merge info
+No conflicts with base branch
+Merging can be performed aut
