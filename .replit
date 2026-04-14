@@ -9,11 +9,15 @@ packages = ["unzipNLS", "lsof", "psmisc", "zip", "jq"]
 [deployment]
 deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
-run = ["npm", "run", "start"]
+run = ["bash", "-c", "NODE_ENV=production node dist/index.js"]
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
 
 [workflows]
 runButton = "Project"
