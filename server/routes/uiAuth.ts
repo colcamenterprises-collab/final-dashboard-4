@@ -31,6 +31,9 @@ function getCookieValue(req: Request): string | null {
 }
 
 router.get("/check", (req: Request, res: Response) => {
+  if (process.env.NODE_ENV === "development") {
+    return res.json({ authenticated: true, configured: true, devBypass: true });
+  }
   const expected = getExpectedToken();
   if (!expected) {
     return res.json({ authenticated: false, configured: false });

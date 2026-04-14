@@ -114,55 +114,123 @@ export default function UiPasswordGate({ children }: { children: ReactNode }) {
 
   if (state === "loading" && !isPublic) {
     return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-zinc-950">
-        <div className="text-sm text-zinc-500">Loading...</div>
-      </div>
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center"
+        style={{ background: "hsl(222, 47%, 4%)" }}
+      />
     );
   }
 
   if (state === "locked" && !isPublic) {
     return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-zinc-950 px-4">
+      <div
+        className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
+        style={{ background: "hsl(222, 47%, 4%)", fontFamily: "'Poppins', sans-serif" }}
+      >
         <div className="w-full max-w-sm">
+          {/* Header */}
           <div className="mb-8">
-            <p className="text-xs uppercase tracking-widest text-zinc-500">Smash Brothers</p>
-            <h1 className="mt-1 text-xl font-bold text-white">Internal Access</h1>
+            <p
+              className="text-xs font-semibold tracking-widest uppercase"
+              style={{ color: "hsl(142, 76%, 45%)" }}
+            >
+              Smash Brothers
+            </p>
+            <h1
+              className="mt-1 text-xl font-bold"
+              style={{ color: "hsl(213, 31%, 91%)" }}
+            >
+              Internal Access
+            </h1>
+            <p
+              className="mt-1 text-xs"
+              style={{ color: "hsl(215, 16%, 65%)" }}
+            >
+              Enter the shared password to continue.
+            </p>
           </div>
 
-          {notConfigured ? (
-            <div className="rounded border border-yellow-600/40 bg-yellow-900/20 p-4 text-sm text-yellow-300">
-              <p className="font-semibold">Password not configured.</p>
-              <p className="mt-1 text-yellow-400/80">
-                Set{" "}
-                <code className="rounded bg-zinc-800 px-1 py-0.5 text-xs">
-                  INTERNAL_APP_PASSWORD
-                </code>{" "}
-                in the environment secrets tab, then restart the server.
-              </p>
-            </div>
-          ) : (
-            <form onSubmit={submit} noValidate>
-              <label className="mb-1.5 block text-xs text-zinc-400">Password</label>
-              <input
-                ref={inputRef}
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter access password"
-                disabled={submitting}
-                className="w-full rounded border border-zinc-700 bg-zinc-900 px-3 py-2.5 text-sm text-white placeholder-zinc-600 outline-none focus:border-zinc-500 disabled:opacity-50"
-                autoComplete="current-password"
-              />
-              {error && <p className="mt-2 text-xs text-red-400">{error}</p>}
-              <button
-                type="submit"
-                disabled={submitting || !password.trim()}
-                className="mt-4 w-full rounded bg-white py-2.5 text-sm font-semibold text-zinc-900 transition-colors hover:bg-zinc-100 disabled:opacity-40"
+          {/* Card */}
+          <div
+            className="rounded p-6"
+            style={{
+              background: "hsl(222, 47%, 8%)",
+              border: "1px solid hsl(215, 28%, 17%)",
+            }}
+          >
+            {notConfigured ? (
+              <div
+                className="rounded p-4 text-xs"
+                style={{
+                  background: "hsl(45, 93%, 58%, 0.1)",
+                  border: "1px solid hsl(45, 93%, 58%, 0.3)",
+                  color: "hsl(45, 93%, 70%)",
+                }}
               >
-                {submitting ? "Checking..." : "Enter"}
-              </button>
-            </form>
-          )}
+                <p className="font-semibold">Password not configured.</p>
+                <p className="mt-1" style={{ color: "hsl(45, 93%, 60%)" }}>
+                  Set{" "}
+                  <code
+                    className="rounded px-1 py-0.5"
+                    style={{ background: "hsl(222, 47%, 4%)", fontSize: "11px" }}
+                  >
+                    INTERNAL_APP_PASSWORD
+                  </code>{" "}
+                  in environment secrets, then restart the server.
+                </p>
+              </div>
+            ) : (
+              <form onSubmit={submit} noValidate>
+                <label
+                  className="mb-1.5 block text-xs font-semibold"
+                  style={{ color: "hsl(215, 16%, 65%)" }}
+                >
+                  Password
+                </label>
+                <input
+                  ref={inputRef}
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter access password"
+                  disabled={submitting}
+                  className="w-full rounded px-3 py-2.5 text-sm outline-none transition-colors disabled:opacity-50"
+                  style={{
+                    background: "hsl(222, 47%, 4%)",
+                    border: `1px solid ${error ? "hsl(0, 84%, 60%)" : "hsl(215, 28%, 17%)"}`,
+                    color: "hsl(213, 31%, 91%)",
+                  }}
+                  autoComplete="current-password"
+                />
+                {error && (
+                  <p
+                    className="mt-2 text-xs"
+                    style={{ color: "hsl(0, 84%, 65%)" }}
+                  >
+                    {error}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={submitting || !password.trim()}
+                  className="mt-4 w-full rounded py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40"
+                  style={{
+                    background: "hsl(142, 76%, 45%)",
+                    color: "hsl(222, 47%, 8%)",
+                  }}
+                >
+                  {submitting ? "Checking..." : "Enter"}
+                </button>
+              </form>
+            )}
+          </div>
+
+          <p
+            className="mt-6 text-center text-xs"
+            style={{ color: "hsl(215, 28%, 25%)" }}
+          >
+            Management access only
+          </p>
         </div>
       </div>
     );
