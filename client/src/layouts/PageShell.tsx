@@ -3,10 +3,10 @@ import { Outlet } from "react-router-dom";
 import { ModernHeader, ModernSidebar, BottomNav } from "@/components/navigation";
 import DataConfidenceBanner from "@/components/DataConfidenceBanner";
 import { cn } from "@/lib/utils";
-import { useUiAuth } from "@/components/UiPasswordGate";
+import { usePinAuth } from "@/components/PinLoginGate";
 
 export default function PageShell() {
-  const { lock } = useUiAuth();
+  const { currentUser, logout } = usePinAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -60,10 +60,10 @@ export default function PageShell() {
               <Outlet />
               <div className="mt-8 flex justify-end">
                 <button
-                  onClick={lock}
+                  onClick={logout}
                   className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                 >
-                  Lock App
+                  {currentUser ? `Sign out (${currentUser.name})` : "Lock App"}
                 </button>
               </div>
             </div>

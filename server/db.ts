@@ -301,3 +301,23 @@ export async function checkDatabaseHealth(): Promise<boolean> {
     return false;
   }
 }
+
+export async function ensureInternalUsersTable(): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS internal_users (
+        id          SERIAL PRIMARY KEY,
+        name        TEXT    NOT NULL,
+        role        TEXT    NOT NULL DEFAULT 'staff',
+        pin_hash    TEXT    NOT NULL,
+        active      BOOLEAN NOT NULL DEFAULT TRUE,
+        permissions JSONB   NOT NULL DEFAULT '{}',
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+    `);
+    console.log('[pinAuth] internal_users table ready');
+  } catch (err) {
+    console.error('[pinAuth] Failed to ensure internal_users table:', err);
+  }
+}

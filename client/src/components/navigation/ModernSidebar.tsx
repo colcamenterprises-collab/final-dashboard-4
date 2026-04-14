@@ -15,7 +15,8 @@
  *
  * All navigation changes require explicit owner approval.
  */
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, Link } from "react-router-dom";
+import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
 import { 
   Home, 
@@ -150,6 +151,7 @@ interface ModernSidebarProps {
 
 export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapseToggle, className }: ModernSidebarProps) {
   const location = useLocation();
+  const { currentUser, logout, hasPermission } = usePinAuth();
   const sidebarRef = useRef<HTMLDivElement>(null);
   const [openGroups, setOpenGroups] = useState<Set<string>>(
     new Set(navigationGroups.filter(g => g.defaultOpen).map(g => g.title))
@@ -451,12 +453,51 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
           })}
         </nav>
 
-        {/* Footer */}
-        <div className={cn("p-4 border-t border-slate-200 dark:border-slate-800", isCollapsed && "px-2")}>
-          {!isCollapsed && (
-            <div className="text-xs text-slate-500 dark:text-slate-400 text-center">
-              v2.0.1 • Modern Dashboard
+        {/* Footer — current user + sign out */}
+        <div className={cn("border-t border-slate-200 dark:border-slate-800", isCollapsed ? "p-2" : "p-4")}>
+          {currentUser && !isCollapsed && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 px-1">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 bg-emerald-900/40 text-emerald-400">
+                  {currentUser.name.slice(0, 1).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{currentUser.name}</p>
+                  <p className="text-xs capitalize text-slate-400 dark:text-slate-500">{currentUser.role}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                {(currentUser.role === "owner" || currentUser.role === "manager" || hasPermission("staff_access.manage")) && (
+                  <Link
+                    to="/settings/staff-access"
+                    onClick={onClose}
+                    className="flex-1 rounded-lg py-1.5 text-center text-xs font-medium transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    Staff Access
+                  </Link>
+                )}
+                <button
+                  onClick={logout}
+                  className="flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
+                >
+                  Sign Out
+                </button>
+              </div>
             </div>
+          )}
+          {isCollapsed && currentUser && (
+            <button
+              onClick={logout}
+              title={`Sign out (${currentUser.name})`}
+              className="w-full flex items-center justify-center rounded-lg py-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
+            </button>
+          )}
+          {!currentUser && !isCollapsed && (
+            <div className="text-xs text-slate-400 dark:text-slate-500 text-center">v2.0.1</div>
           )}
         </div>
       </div>

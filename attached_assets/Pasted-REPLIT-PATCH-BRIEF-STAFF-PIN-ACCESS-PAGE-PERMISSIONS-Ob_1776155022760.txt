@@ -1,0 +1,141 @@
+REPLIT PATCH BRIEF — STAFF PIN ACCESS + PAGE PERMISSIONS
+
+Objective:
+Replace the current simple app password wall with a POS-style internal access system.
+
+Business requirements:
+
+1. Public website pages and online ordering must remain outside the wall and accessible publicly.
+2. Internal app pages must require login.
+3. Staff must log in using a PIN pad style screen.
+4. Owner and Manager must have full access.
+5. Staff access must be configurable by page/module using checkboxes similar to Loyverse access rights.
+6. Navigation must only show pages the logged-in user is allowed to access.
+7. Direct URL access to blocked pages must also be denied.
+8. This must not affect Bob or "/api/bob/read/..." routes in any way.
+
+Required implementation:
+
+1. Fix route split
+
+- Public routes outside auth wall:
+  - website landing page
+  - public website pages
+  - public online ordering pages
+- Internal routes behind auth wall:
+  - dashboard
+  - analysis
+  - operations
+  - purchasing
+  - finance
+  - forms
+  - reports
+  - internal admin/settings/tools
+
+2. Add internal user system
+   Create a simple internal app user model with:
+
+- name
+- role ("owner", "manager", "staff")
+- hashed PIN
+- active/inactive status
+- permissions
+
+3. Add permissions system
+   Permissions must be checkbox-based per module/page.
+   At minimum include:
+
+- dashboard.view
+- analysis.view
+- operations.view
+- purchasing.view
+- finance.view
+- reports.view
+- forms.daily_sales
+- forms.daily_stock
+- expenses.view
+- settings.view
+- staff_access.manage
+- website_admin.view
+- online_ordering_admin.view
+
+Owner preset:
+
+- all permissions on
+
+Manager preset:
+
+- all core business pages on
+- can be edited
+
+Staff preset:
+
+- only explicitly allowed pages on
+
+4. Add PIN login screen
+
+- numeric keypad UI
+- fast sign-in for tablet use
+- no icons/emojis
+- clean and simple
+- support logout / switch user
+
+Important:
+Start with PIN only.
+Do not build pattern unlock in this patch.
+
+5. Add protected route guard
+
+- internal pages require authenticated internal session
+- blocked routes redirect or show access denied
+- nav must hide unauthorized pages
+
+6. Add staff access management page
+   Accessible only to owner/manager with permission.
+   This page must allow:
+
+- create user
+- edit user
+- set/reset PIN
+- set role
+- activate/deactivate user
+- assign permissions with checkboxes
+
+Security rules:
+
+- hash PINs
+- do not store raw PINs
+- do not hardcode auth in frontend
+- do not affect Bob auth or agent auth
+- keep public routes public
+- keep internal routes protected
+
+Do not:
+
+- do not redesign unrelated pages
+- do not build full employee account/email/password auth
+- do not touch Bob auth
+- do not break website or online ordering public access
+
+Testing required:
+
+1. Public routes load without login
+2. Internal routes redirect to PIN login when logged out
+3. Correct PIN logs user in
+4. Wrong PIN rejected
+5. Owner can access everything
+6. Staff only sees allowed pages
+7. Direct blocked URL is denied
+8. Logout works
+9. Bob routes unaffected
+10. Website and online ordering remain public
+
+Required return:
+A. Files changed
+B. Public routes left open
+C. Protected route groups
+D. User/session/PIN approach
+E. Permission model summary
+F. Staff management page summary
+G. Test report
+H. Final verdict

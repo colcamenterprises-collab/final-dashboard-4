@@ -2543,3 +2543,95 @@ export const stockVariance = pgTable("stock_variance", {
 export const insertStockVarianceSchema = createInsertSchema(stockVariance).omit({ id: true, createdAt: true });
 export type StockVariance = typeof stockVariance.$inferSelect;
 export type InsertStockVariance = z.infer<typeof insertStockVarianceSchema>;
+
+// ─── Internal Staff Users (PIN Auth System) ───────────────────────────────────
+
+export type StaffPermissions = {
+  "dashboard.view"?: boolean;
+  "operations.view"?: boolean;
+  "purchasing.view"?: boolean;
+  "analysis.view"?: boolean;
+  "finance.view"?: boolean;
+  "menu.view"?: boolean;
+  "pos.view"?: boolean;
+  "membership.view"?: boolean;
+  "forms.daily_sales"?: boolean;
+  "forms.daily_stock"?: boolean;
+  "expenses.view"?: boolean;
+  "settings.view"?: boolean;
+  "staff_access.manage"?: boolean;
+  "website_admin.view"?: boolean;
+  "online_ordering_admin.view"?: boolean;
+};
+
+export const ALL_PERMISSIONS: (keyof StaffPermissions)[] = [
+  "dashboard.view",
+  "operations.view",
+  "purchasing.view",
+  "analysis.view",
+  "finance.view",
+  "menu.view",
+  "pos.view",
+  "membership.view",
+  "forms.daily_sales",
+  "forms.daily_stock",
+  "expenses.view",
+  "settings.view",
+  "staff_access.manage",
+  "website_admin.view",
+  "online_ordering_admin.view",
+];
+
+export const OWNER_PERMISSIONS: StaffPermissions = Object.fromEntries(
+  ALL_PERMISSIONS.map((k) => [k, true])
+) as StaffPermissions;
+
+export const MANAGER_PERMISSIONS: StaffPermissions = {
+  "dashboard.view": true,
+  "operations.view": true,
+  "purchasing.view": true,
+  "analysis.view": true,
+  "finance.view": true,
+  "menu.view": true,
+  "pos.view": true,
+  "membership.view": true,
+  "forms.daily_sales": true,
+  "forms.daily_stock": true,
+  "expenses.view": true,
+  "settings.view": false,
+  "staff_access.manage": false,
+  "website_admin.view": false,
+  "online_ordering_admin.view": true,
+};
+
+export const STAFF_PERMISSIONS: StaffPermissions = {
+  "dashboard.view": true,
+  "operations.view": false,
+  "purchasing.view": false,
+  "analysis.view": false,
+  "finance.view": false,
+  "menu.view": false,
+  "pos.view": true,
+  "membership.view": false,
+  "forms.daily_sales": true,
+  "forms.daily_stock": true,
+  "expenses.view": false,
+  "settings.view": false,
+  "staff_access.manage": false,
+  "website_admin.view": false,
+  "online_ordering_admin.view": false,
+};
+
+export const internalUsers = pgTable("internal_users", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("staff"),
+  pinHash: text("pin_hash").notNull(),
+  active: boolean("active").notNull().default(true),
+  permissions: jsonb("permissions").$type<StaffPermissions>().notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInternalUserSchema = createInsertSchema(internalUsers).omit({ id: true, createdAt: true });
+export type InternalUser = typeof internalUsers.$inferSelect;
+export type InsertInternalUser = z.infer<typeof insertInternalUserSchema>;

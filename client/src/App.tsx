@@ -118,7 +118,8 @@ import HealthSafetyQuestionManager from "./pages/operations/health-safety-audit/
 import RecipeMappingPage from "./pages/operations/recipe-mapping";
 import { AuthProvider } from "./auth/AuthProvider";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import UiPasswordGate from "./components/UiPasswordGate";
+import PinLoginGate from "./components/PinLoginGate";
+import StaffAccessPage from "./pages/settings/StaffAccess";
 
 import HomePage from "./pages/public/HomePage";
 import PublicMembership from "./pages/public/PublicMembership";
@@ -133,7 +134,7 @@ export default function App() {
         <AuthProvider>
         <TooltipProvider>
           <BrowserRouter>
-            <UiPasswordGate>
+            <PinLoginGate>
             <Routes>
               {/* Root — redirect to app dashboard */}
               <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -278,6 +279,7 @@ export default function App() {
                 <Route path="/saas" element={<ProtectedRoute><SaaSAdmin /></ProtectedRoute>} />
                 <Route path="/settings/tenant" element={<ProtectedRoute><TenantSwitcher /></ProtectedRoute>} />
                 <Route path="/settings/payments" element={<ProtectedRoute><PaymentProviders /></ProtectedRoute>} />
+                <Route path="/settings/staff-access" element={<ProtectedRoute><StaffAccessPage /></ProtectedRoute>} />
 
                 <Route path="/membership/dashboard" element={<ProtectedRoute><MemberDashboard /></ProtectedRoute>} />
                 <Route path="/membership/register" element={<ProtectedRoute><MemberRegistration /></ProtectedRoute>} />
@@ -293,7 +295,7 @@ export default function App() {
               </Route>
             </Routes>
             <Toaster />
-            </UiPasswordGate>
+            </PinLoginGate>
           </BrowserRouter>
         </TooltipProvider>
       </AuthProvider>

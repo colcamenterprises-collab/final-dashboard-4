@@ -556,16 +556,21 @@ async function checkSchema() {
   const uiAuthRouter = (await import('./routes/uiAuth')).default;
   app.use('/api/ui-auth', uiAuthRouter);
 
+  // /api/pin-auth — Staff PIN login system
+  const pinAuthRouter = (await import('./routes/pinAuth')).default;
+  app.use('/api/pin-auth', pinAuthRouter);
+
   // /api/bob/read — Bob read-only API layer (token-protected, GET only)
   const bobReadRouter = (await import('./routes/bobRead')).default;
   app.use('/api/bob/read', bobReadRouter);
 
   // /api/ai/chat — simple chat alias endpoints + idempotent table setup
-  const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables, ensureAgentReadFoundation } = await import('./db');
+  const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables, ensureAgentReadFoundation, ensureInternalUsersTable } = await import('./db');
   await ensureAiChatTables();
   await ensureDailySalesAuditTable();
   await ensureWorkRegisterTables();
   await ensureAgentReadFoundation();
+  await ensureInternalUsersTable();
   app.use('/api/ai/chat', chatAliasRouter);
 
   // Ingredient Master route (PACK F)
