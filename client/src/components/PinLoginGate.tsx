@@ -41,7 +41,13 @@ export function usePinAuth() {
 
 // ─── Public path bypass ───────────────────────────────────────────────────────
 
-const PUBLIC_PATH_PREFIXES = ["/website", "/order", "/login", "/pos-login"];
+const PUBLIC_PATH_PREFIXES = [
+  "/website",
+  "/order",
+  "/online-ordering",
+  "/login",
+  "/pos-login",
+];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATH_PREFIXES.some(
