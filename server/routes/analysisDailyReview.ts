@@ -6,15 +6,14 @@ import { extractFormExpenseTotals, extractPosExpenseTotals } from "../lib/expens
 import { shiftWindow } from "../services/time/shiftWindow";
 import { importReceiptsV2 } from "../services/loyverseImportV2";
 import { rebuildReceiptTruth } from "../services/receiptTruthSummary";
-import { getShiftReport } from "../utils/loyverse";
 import { normalizeDrinkStock } from "../forms/dailySalesV2";
 import { rebuildDate as rebuildPnLDate } from "../services/pnlReadModelService";
 import { spawn } from "child_process";
+import { getUsageReconciliation } from "./analysis/usageReconciliation";
 import type {
   DailyComparisonResponse,
   DailySource,
   ExpenseItem,
-  SalesBreakdown,
   Availability,
 } from "../../shared/analysisTypes";
 
@@ -52,6 +51,8 @@ type StaffComparisonData = {
   rollsEnd: number | null;
   meatEnd: number | null;
   drinksCount: number | null;
+  drinksBySku: { sku: string; count: number }[];
+  expectedBank: number | null;
 };
 
 type PosShiftReportData = {
@@ -64,20 +65,18 @@ type PosShiftReportData = {
   expectedCash: number | null;
   actualCash: number | null;
   difference: number | null;
+  receiptCount: number | null;
+  expectedBank: number | null;
 };
 
-type DailyComparisonShiftResponse = {
-  date: string;
-  shiftWindow: string;
-  staffData: StaffComparisonData | { message: string };
-  posShiftReport: PosShiftReportData | { message: string };
-  differences: {
-    totalSales: number | null;
-    cash: number | null;
-    grab: number | null;
-    scan: number | null;
-    expenses: number | null;
-  };
+type CriticalIssue = {
+  code: string;
+  type: string;
+  item: string;
+  expected: string;
+  actual: string;
+  variance: string;
+  severity: "critical" | "warning" | "info";
 };
 
 // K-4.1: Fetch POS receipt count from lv_receipt within shift window
@@ -181,36 +180,70 @@ function buildStaffComparisonData(row: any): StaffComparisonData {
   const expenseTotals = extractFormExpenseTotals(row);
   const drinks = normalizeDrinkStock(payload?.drinkStock);
   const drinksCount = drinks.reduce((sum, d) => sum + Number(d.quantity || 0), 0);
+  const cashSales = toNumberOrNull(payload?.cashSales ?? row?.cashSales);
+  const scanSales = toNumberOrNull(payload?.qrSales ?? row?.qrSales);
+  const expensesTotal = toNumberOrNull(expenseTotals?.grandTotal);
 
   return {
     totalSales: toNumberOrNull(payload?.totalSales ?? row?.totalSales),
-    cashSales: toNumberOrNull(payload?.cashSales ?? row?.cashSales),
+    cashSales,
     grabSales: toNumberOrNull(payload?.grabSales ?? row?.grabSales),
-    scanSales: toNumberOrNull(payload?.qrSales ?? row?.qrSales),
-    expensesTotal: toNumberOrNull(expenseTotals?.grandTotal),
+    scanSales,
+    expensesTotal,
     rollsEnd: toNumberOrNull(payload?.rollsEnd),
     meatEnd: toNumberOrNull(payload?.meatEnd),
-    drinksCount: toNumberOrNull(drinksCount)
-  };
-}
-
-function buildShiftReportData(shift: any): PosShiftReportData {
-  return {
-    totalSales: toNumberOrNull(shift?.gross_sales ?? shift?.net_sales ?? shift?.total_sales),
-    startingCash: toNumberOrNull(shift?.starting_cash),
-    cashPayments: toNumberOrNull(shift?.cash_sales ?? shift?.cash_payments),
-    grab: toNumberOrNull(shift?.grab_sales),
-    scan: toNumberOrNull(shift?.qr_sales),
-    expenses: toNumberOrNull(shift?.paid_out ?? shift?.expenses),
-    expectedCash: toNumberOrNull(shift?.expected_cash),
-    actualCash: toNumberOrNull(shift?.actual_cash),
-    difference: toNumberOrNull(shift?.cash_difference ?? shift?.difference)
+    drinksCount: toNumberOrNull(drinksCount),
+    drinksBySku: drinks.map((d) => ({
+      sku: String(d.name || d.label || d.sku || "Unknown"),
+      count: Number(d.quantity || 0),
+    })),
+    expectedBank:
+      cashSales !== null && scanSales !== null && expensesTotal !== null
+        ? THB(cashSales - expensesTotal + scanSales)
+        : null,
   };
 }
 
 function computeDifference(left: number | null, right: number | null) {
   if (left === null || right === null) return null;
   return THB(left - right);
+}
+
+const fmtTHB = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : `฿${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+const fmtNum = (n: number | null | undefined) =>
+  n === null || n === undefined ? "—" : Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+
+function severityFromRecon(level: string | null | undefined): "critical" | "warning" | "info" {
+  if (level === "critical") return "critical";
+  if (level === "warn") return "warning";
+  return "info";
+}
+
+async function fetchReceiptChannelSummary(businessDate: string) {
+  const { start, end } = dayRange(businessDate);
+  const row = await prisma.dailySalesV2.findFirst({
+    where: {
+      shift_date: { gte: start, lt: end },
+      deletedAt: null,
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  const payload: any = row?.payload ?? {};
+  const cash = toNumberOrNull(payload?.cashReceiptCount);
+  const qr = toNumberOrNull(payload?.qrReceiptCount);
+  const grab = toNumberOrNull(payload?.grabReceiptCount);
+  const other = toNumberOrNull(payload?.directReceiptCount);
+  const total =
+    cash !== null || qr !== null || grab !== null || other !== null
+      ? Number(cash ?? 0) + Number(qr ?? 0) + Number(grab ?? 0) + Number(other ?? 0)
+      : null;
+
+  return {
+    source: row ? "daily_sales_v2.payload.receiptCounts" : "missing",
+    channels: { cash, qr, grab, other },
+    total,
+  };
 }
 
 async function findSnapshotForDate(businessDate: string) {
@@ -281,7 +314,7 @@ async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null>
   ];
   if (otherExp) items.push({ id: "other", label: "Other", amount: otherExp, category: "other" });
 
-  return {
+  const source: any = {
     date: businessDate,
     sales: { cash, qr, grab, other, total },
     expenses: { shoppingTotal: shopping, wageTotal: wages, otherTotal: otherExp, items },
@@ -294,6 +327,8 @@ async function fetchPOSFromDB(businessDate: string): Promise<DailySource | null>
       estimatedNetBanked: THB(cash - expensesTotal + qr),
     },
   };
+  source.receiptCount = Number(row.receiptCount ?? 0);
+  return source;
 }
 
 async function fetchForm1FromDB(businessDate: string): Promise<DailySource | null> {
@@ -418,8 +453,7 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
     : 0;
   const wageDetail = { entries: wageEntries, totalWages: wagesTotal, staffCount: wageEntries.length };
 
-  // POS: DB-first strategy — use cached pos_shift_report if available (fast path),
-  // only call Loyverse API live when DB has no record for this date.
+  // POS availability is strict: POS exists only when pos_shift_report exists.
   let posShiftReport: PosShiftReportData | { message: string } = { message: "Shift report unavailable" };
 
   const mapDbSourceToReport = (dbSource: DailySource): PosShiftReportData => ({
@@ -432,9 +466,11 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
     expectedCash: dbSource.banking.expectedCash,
     actualCash: null,
     difference: null,
+    receiptCount: Number((dbSource as any)?.receiptCount ?? 0),
+    expectedBank: dbSource.banking.estimatedNetBanked,
   });
 
-  // 1. Try DB cache first (milliseconds)
+  // POS truth source: pos_shift_report table only.
   let dbSource: DailySource | null = null;
   try {
     dbSource = await fetchPOSFromDB(date);
@@ -442,28 +478,20 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
 
   if (dbSource) {
     posShiftReport = mapDbSourceToReport(dbSource);
-  } else {
-    // 2. DB miss — try Loyverse API live (may take 3-8s)
-    try {
-      const storeId = process.env.LOYVERSE_STORE_ID;
-      const timeoutMs = 8000;
-      const shiftResult = await Promise.race([
-        getShiftReport({ date, storeId }),
-        new Promise<null>((_, reject) => setTimeout(() => reject(new Error("LOYVERSE_TIMEOUT")), timeoutMs)),
-      ]);
-      const shift = (shiftResult as any)?.shifts?.[0] ?? null;
-      if (shift) {
-        posShiftReport = buildShiftReportData(shift);
-      }
-    } catch (error: any) {
-      if (error?.message !== "LOYVERSE_TIMEOUT") {
-        console.error("[SHIFT_REPORT_FETCH_FAIL]", error?.message || error);
-      }
-    }
   }
 
-  // Receipt evidence (parallel with differences calc)
-  const receiptEvidence = await buildReceiptEvidence(date);
+  const [receiptEvidence, usageRecon, receiptChannels, shiftReportRow] = await Promise.all([
+    buildReceiptEvidence(date),
+    getUsageReconciliation(date).catch(() => null),
+    fetchReceiptChannelSummary(date),
+    prisma.$queryRaw<{ id: string }[]>`
+      SELECT id::text
+      FROM shift_report_v2
+      WHERE DATE("shiftDate") = ${date}::date
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `.catch(() => [] as { id: string }[]),
+  ]);
 
   const differences = {
     totalSales: staffData && "totalSales" in staffData && "totalSales" in posShiftReport
@@ -483,6 +511,124 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
       : null
   };
 
+  const issues: CriticalIssue[] = [];
+  const hasPOS = "totalSales" in posShiftReport;
+  const hasForm = "totalSales" in staffData;
+  if (!hasPOS) {
+    issues.push({
+      code: "POS_MISSING",
+      type: "Missing Data",
+      item: "POS Shift Report",
+      expected: "Available",
+      actual: "Not Found",
+      variance: "—",
+      severity: "critical",
+    });
+  }
+  if (!hasForm) {
+    issues.push({
+      code: "FORM_MISSING",
+      type: "Missing Data",
+      item: "Daily Sales & Stock Form",
+      expected: "Submitted",
+      actual: "Not Found",
+      variance: "—",
+      severity: "critical",
+    });
+  }
+  if (differences.totalSales !== null && differences.totalSales !== 0) {
+    issues.push({
+      code: "TOTAL_SALES_MISMATCH",
+      type: "Sales Mismatch",
+      item: "Total Sales",
+      expected: fmtTHB(hasPOS ? posShiftReport.totalSales : null),
+      actual: fmtTHB(hasForm ? staffData.totalSales : null),
+      variance: fmtTHB(differences.totalSales),
+      severity: Math.abs(differences.totalSales) > 500 ? "critical" : "warning",
+    });
+  }
+  if (differences.cash !== null && differences.cash !== 0) {
+    issues.push({
+      code: "CASH_MISMATCH",
+      type: "Cash Mismatch",
+      item: "Cash",
+      expected: fmtTHB(hasPOS ? posShiftReport.cashPayments : null),
+      actual: fmtTHB(hasForm ? staffData.cashSales : null),
+      variance: fmtTHB(differences.cash),
+      severity: Math.abs(differences.cash) > 200 ? "critical" : "warning",
+    });
+  }
+  if (differences.scan !== null && differences.scan !== 0) {
+    issues.push({
+      code: "QR_MISMATCH",
+      type: "Sales Mismatch",
+      item: "QR / PromptPay",
+      expected: fmtTHB(hasPOS ? posShiftReport.scan : null),
+      actual: fmtTHB(hasForm ? staffData.scanSales : null),
+      variance: fmtTHB(differences.scan),
+      severity: Math.abs(differences.scan) > 200 ? "critical" : "warning",
+    });
+  }
+  if (differences.grab !== null && differences.grab !== 0) {
+    issues.push({
+      code: "GRAB_MISMATCH",
+      type: "Sales Mismatch",
+      item: "Grab",
+      expected: fmtTHB(hasPOS ? posShiftReport.grab : null),
+      actual: fmtTHB(hasForm ? staffData.grabSales : null),
+      variance: fmtTHB(differences.grab),
+      severity: Math.abs(differences.grab) > 200 ? "critical" : "warning",
+    });
+  }
+  if (!wageEntries.length) {
+    issues.push({
+      code: "LABOUR_MISSING",
+      type: "Missing Data",
+      item: "Labour Data",
+      expected: "Wage rows present",
+      actual: "No wage rows",
+      variance: "—",
+      severity: "warning",
+    });
+  }
+  if (usageRecon?.ok) {
+    if (usageRecon.buns.variance !== null && usageRecon.buns.severity !== "ok") {
+      issues.push({
+        code: "BUN_VARIANCE",
+        type: "Stock Variance",
+        item: "Burger Buns",
+        expected: fmtNum(usageRecon.buns.expected),
+        actual: fmtNum(usageRecon.buns.physicalUsed),
+        variance: fmtNum(usageRecon.buns.variance),
+        severity: severityFromRecon(usageRecon.buns.severity),
+      });
+    }
+    if (usageRecon.meat.varianceGrams !== null && usageRecon.meat.severity !== "ok") {
+      issues.push({
+        code: "MEAT_VARIANCE",
+        type: "Stock Variance",
+        item: "Meat (g)",
+        expected: fmtNum(usageRecon.meat.expectedGrams),
+        actual: fmtNum(usageRecon.meat.physicalUsedGrams),
+        variance: fmtNum(usageRecon.meat.varianceGrams),
+        severity: severityFromRecon(usageRecon.meat.severity),
+      });
+    }
+    for (const row of usageRecon.drinks.rows ?? []) {
+      if (row.variance !== null && row.severity !== "ok") {
+        issues.push({
+          code: "DRINK_VARIANCE",
+          type: "Stock Variance",
+          item: row.label,
+          expected: fmtNum(row.expected),
+          actual: fmtNum(row.physicalUsed),
+          variance: fmtNum(row.variance),
+          severity: severityFromRecon(row.severity),
+        });
+      }
+    }
+  }
+
   res.json({
     date,
     shiftWindow: "17:00-03:00",
@@ -491,6 +637,15 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
     differences,
     receiptEvidence,
     wageDetail,
+    receiptSummary: receiptChannels,
+    stockRecon: usageRecon?.ok ? {
+      buns: usageRecon.buns,
+      meat: usageRecon.meat,
+      drinks: usageRecon.drinks,
+    } : null,
+    labourSummary: usageRecon?.labourAnalysis ?? null,
+    criticalIssues: issues,
+    shiftReport: shiftReportRow?.[0] ? { id: shiftReportRow[0].id, pdfUrl: `/api/shift-report/pdf/${shiftReportRow[0].id}` } : null,
   });
 });
 
