@@ -448,10 +448,19 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
           amount: Number(w.amount ?? w.value ?? 0),
         }))
     : [];
-  const wagesTotal = staffRow
-    ? (wageEntries.reduce((s, e) => s + e.amount, 0) || Number((staffRow as any).wagesTotal ?? (staffRow as any).wages_total ?? 0))
-    : 0;
-  const wageDetail = { entries: wageEntries, totalWages: wagesTotal, staffCount: wageEntries.length };
+  const isItemised = wageEntries.length > 0;
+  // When no individual rows, fall back to form payload wage total (same source as prime-cost)
+  const formWageTotal = staffRow ? extractFormExpenseTotals(staffRow).wageTotal : 0;
+  const wagesTotal = isItemised
+    ? wageEntries.reduce((s, e) => s + e.amount, 0)
+    : formWageTotal;
+  const wageDetail = {
+    entries: wageEntries,
+    totalWages: wagesTotal,
+    staffCount: wageEntries.length,
+    isItemised,
+    ...(isItemised ? {} : { fallbackSource: "form_payload_wageTotal" }),
+  };
 
   // POS availability is strict: POS exists only when pos_shift_report exists.
   let posShiftReport: PosShiftReportData | { message: string } = { message: "Shift report unavailable" };
@@ -580,16 +589,31 @@ analysisDailyReviewRouter.get("/daily-comparison", async (req, res) => {
       severity: Math.abs(differences.grab) > 200 ? "critical" : "warning",
     });
   }
-  if (!wageEntries.length) {
-    issues.push({
-      code: "LABOUR_MISSING",
-      type: "Missing Data",
-      item: "Labour Data",
-      expected: "Wage rows present",
-      actual: "No wage rows",
-      variance: "—",
-      severity: "warning",
-    });
+  if (!isItemised) {
+    if (wagesTotal > 0) {
+      // Wages exist from form payload total but no individual staff rows
+      issues.push({
+        code: "LABOUR_NOT_ITEMISED",
+        type: "Labour Warning",
+        item: "Labour Data",
+        expected: "Itemised wage rows",
+        actual: `Total only (${fmtTHB(wagesTotal)})`,
+        variance: "—",
+        severity: "warning",
+      });
+    } else if (staffRow) {
+      // Form exists but no wage data at all
+      issues.push({
+        code: "LABOUR_MISSING",
+        type: "Missing Data",
+        item: "Labour Data",
+        expected: "Wage rows present",
+        actual: "No wage rows",
+        variance: "—",
+        severity: "warning",
+      });
+    }
+    // If no staffRow, FORM_MISSING already covers the missing shift state
   }
   if (usageRecon?.ok) {
     if (usageRecon.buns.variance !== null && usageRecon.buns.severity !== "ok") {

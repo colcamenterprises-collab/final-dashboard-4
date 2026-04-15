@@ -41,6 +41,8 @@ type WageDetail = {
   entries: { name: string; amount: number }[];
   totalWages: number;
   staffCount: number;
+  isItemised: boolean;
+  fallbackSource?: string;
 };
 
 type ReceiptEvidence = {
@@ -221,7 +223,7 @@ export default function DailyReview() {
 
   const hasForm = staffData !== null;
   const hasPOS = posShift !== null;
-  const hasLabour = Boolean(wages && wages.staffCount > 0);
+  const hasLabour = Boolean(wages && wages.totalWages > 0);
   const isTodayOrFuture = selectedDate >= todayISO();
   const isOpenShift = isTodayOrFuture && !hasForm;
 
@@ -379,8 +381,17 @@ export default function DailyReview() {
           <section>
             <SectionLabel>Labour Summary</SectionLabel>
             <div className="rounded border border-gray-200 bg-white p-4 grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div><p className="text-xs text-gray-400">Staff Count</p><p className="text-sm font-bold">{num(wages?.staffCount)}</p></div>
-              <div><p className="text-xs text-gray-400">Total Wages</p><p className="text-sm font-bold">{thb(wages?.totalWages)}</p></div>
+              <div>
+                <p className="text-xs text-gray-400">Staff Count</p>
+                <p className="text-sm font-bold">
+                  {wages
+                    ? wages.isItemised
+                      ? num(wages.staffCount)
+                      : <span className="text-gray-400 font-normal italic">Not itemised</span>
+                    : "—"}
+                </p>
+              </div>
+              <div><p className="text-xs text-gray-400">Total Wages</p><p className="text-sm font-bold">{wages?.totalWages ? thb(wages.totalWages) : "—"}</p></div>
               <div><p className="text-xs text-gray-400">Shift Window</p><p className="text-sm font-bold">{comparison?.shiftWindow || '17:00-03:00'}</p></div>
               <div><p className="text-xs text-gray-400">Labour Utilisation %</p><p className="text-sm font-bold">{labourSummary?.utilisation?.fullShiftUtilisationPercent !== undefined ? `${labourSummary.utilisation.fullShiftUtilisationPercent.toFixed(1)}%` : 'Unavailable'}</p></div>
             </div>

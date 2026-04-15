@@ -1,0 +1,74 @@
+CODEX PATCH BRIEF — LABOUR SUMMARY FALLBACK FIX
+
+Objective:
+Fix the Labour Summary on "/analysis/daily-review" so it does not mislead managers when wages exist in the form payload but individual wage rows are missing.
+
+Problem:
+Current live verification shows:
+
+- "prime-cost.wages" contains real wages from the daily form payload
+- "wageDetail.staffCount = 0"
+- "wageDetail.totalWages = 0" or empty
+- Labour Summary therefore shows misleading blank/zero labour state
+- Critical Issues fires "LABOUR_MISSING" even when wages total exists
+
+Required fix:
+Update labour logic so the page distinguishes between:
+
+1. labour truly missing
+2. labour present but not itemised
+
+Required behavior:
+
+1. Staff Count
+
+- primary source: number of wage rows
+- if no wage rows exist, do not invent a count
+- display "Not itemised" or equivalent clean text instead of fake "0" where appropriate for manager-facing UI
+
+2. Total Wages
+
+- primary source: wage row sum
+- fallback source: form payload / prime-cost wages total
+- if fallback is used, clearly allow the section to still show the wage amount
+
+3. Critical Issues
+   Replace current blanket "LABOUR_MISSING" behavior with:
+
+- "LABOUR_NOT_ITEMISED" when total wages exist but wage rows do not
+- "LABOUR_MISSING" only when no usable labour data exists at all
+
+4. Labour Summary rendering
+   The section should show:
+
+- Staff Count: real count if itemised, otherwise "Not itemised"
+- Total Wages: real amount if available from either source
+- Shift Window: keep existing
+- Labour Utilisation: only if supported by real backend data
+
+Do not:
+
+- do not fake staff count from total wages
+- do not remove the existing wage-row logic
+- do not change unrelated sections
+- do not redesign the page
+
+Files likely to touch:
+
+- "server/routes/analysisDailyReview.ts"
+- "client/src/pages/analysis/DailyReview.tsx"
+- only touch "prime-cost" route/service if absolutely required for a clean fallback contract
+
+Testing required:
+
+1. date with wage rows -> real staff count and wages display
+2. date with wages total but no wage rows -> wages shown, staff count shown as not itemised
+3. date with no labour data at all -> labour missing state shown
+4. critical issue state changes correctly between "LABOUR_NOT_ITEMISED" and "LABOUR_MISSING"
+
+Return:
+A. Files changed
+B. Labour fallback logic implemented
+C. Critical issue rule update
+D. Test results
+E. Remaining blockers
