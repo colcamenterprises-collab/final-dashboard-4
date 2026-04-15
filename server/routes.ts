@@ -1042,6 +1042,65 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  app.get("/api/analysis/owner-stock-control", async (req, res) => {
+    try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || user.role !== "owner") {
+        return res.status(403).json({ ok: false, error: "Owner access required" });
+      }
+
+      const date = typeof req.query.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date)
+        ? req.query.date
+        : new Date().toISOString().slice(0, 10);
+      const shift = typeof req.query.shift === "string" && req.query.shift.trim() ? req.query.shift.trim() : null;
+      const { loadHybridStockControl } = await import("./routes/analysis/hybridStockControl.js");
+      const payload = await loadHybridStockControl(date, shift);
+      return res.json(payload);
+    } catch (error: any) {
+      console.error("[OWNER_STOCK_CONTROL_LOAD_FAIL]", error);
+      return res.status(500).json({ ok: false, error: error?.message || String(error) });
+    }
+  });
+
+  app.post("/api/analysis/owner-stock-control/manual", async (req, res) => {
+    try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || user.role !== "owner") {
+        return res.status(403).json({ ok: false, error: "Owner access required" });
+      }
+
+      const date = typeof req.body?.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(req.body.date)
+        ? req.body.date
+        : null;
+      if (!date) return res.status(400).json({ ok: false, error: "date is required (YYYY-MM-DD)" });
+
+      const shift = typeof req.body?.shift === "string" && req.body.shift.trim() ? req.body.shift.trim() : null;
+      const entries = Array.isArray(req.body?.entries) ? req.body.entries : [];
+      const { saveManualInputs, loadHybridStockControl } = await import("./routes/analysis/hybridStockControl.js");
+
+      await saveManualInputs({
+        date,
+        shiftLabel: shift,
+        updatedBy: user.name,
+        entries: entries.map((entry: any) => ({
+          itemName: String(entry?.itemName || ""),
+          closingCount: entry?.closingCount == null ? null : Number(entry.closingCount),
+          openingOverride: entry?.openingOverride == null ? null : Number(entry.openingOverride),
+          purchaseCorrection: entry?.purchaseCorrection == null ? null : Number(entry.purchaseCorrection),
+          note: entry?.note == null ? null : String(entry.note),
+        })),
+      });
+
+      const payload = await loadHybridStockControl(date, shift);
+      return res.json(payload);
+    } catch (error: any) {
+      console.error("[OWNER_STOCK_CONTROL_SAVE_FAIL]", error);
+      return res.status(500).json({ ok: false, error: error?.message || String(error) });
+    }
+  });
+
   // POS engine vs Form 2 usage reconciliation
   app.get("/api/analysis/usage-reconciliation", async (req, res) => {
     try {
