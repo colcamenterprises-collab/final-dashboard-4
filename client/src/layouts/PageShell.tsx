@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { usePinAuth } from "@/components/PinLoginGate";
 
 export default function PageShell() {
-  const { currentUser, logout } = usePinAuth();
+  usePinAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
@@ -58,14 +58,6 @@ export default function PageShell() {
           <main className="flex-1 overflow-y-scroll bg-slate-50 dark:bg-slate-900">
             <div className="px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
               <Outlet />
-              <div className="mt-8 flex justify-end">
-                <button
-                  onClick={logout}
-                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                >
-                  {currentUser ? `Sign out (${currentUser.name})` : "Lock App"}
-                </button>
-              </div>
             </div>
           </main>
         </div>

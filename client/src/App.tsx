@@ -121,6 +121,7 @@ import { AuthProvider } from "./auth/AuthProvider";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import PinLoginGate from "./components/PinLoginGate";
 import StaffAccessPage from "./pages/settings/StaffAccess";
+import UserProfile from "./pages/settings/UserProfile";
 
 import HomePage from "./pages/public/HomePage";
 import PublicMembership from "./pages/public/PublicMembership";
@@ -282,6 +283,7 @@ export default function App() {
                 <Route path="/settings/tenant" element={<ProtectedRoute><TenantSwitcher /></ProtectedRoute>} />
                 <Route path="/settings/payments" element={<ProtectedRoute><PaymentProviders /></ProtectedRoute>} />
                 <Route path="/settings/staff-access" element={<ProtectedRoute><StaffAccessPage /></ProtectedRoute>} />
+                <Route path="/settings/profile" element={<ProtectedRoute><UserProfile /></ProtectedRoute>} />
 
                 <Route path="/membership/dashboard" element={<ProtectedRoute><MemberDashboard /></ProtectedRoute>} />
                 <Route path="/membership/register" element={<ProtectedRoute><MemberRegistration /></ProtectedRoute>} />

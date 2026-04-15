@@ -2629,6 +2629,7 @@ export const internalUsers = pgTable("internal_users", {
   pinHash: text("pin_hash").notNull(),
   active: boolean("active").notNull().default(true),
   permissions: jsonb("permissions").$type<StaffPermissions>().notNull().default({}),
+  avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

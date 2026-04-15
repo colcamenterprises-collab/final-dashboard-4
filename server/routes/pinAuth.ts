@@ -142,6 +142,82 @@ router.get("/me", (req: Request, res: Response) => {
   res.json({ authenticated: true, user: sessionUser });
 });
 
+// ─── GET /me/profile — full profile with avatar from DB ─────────────────────
+
+router.get("/me/profile", async (req: Request, res: Response) => {
+  const sessionUser = getPinSessionUser(req);
+  if (!sessionUser && process.env.NODE_ENV !== "development") {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  const userId = sessionUser?.id ?? 1;
+  try {
+    const [user] = await db
+      .select({
+        id: internalUsers.id,
+        name: internalUsers.name,
+        role: internalUsers.role,
+        active: internalUsers.active,
+        permissions: internalUsers.permissions,
+        avatarUrl: internalUsers.avatarUrl,
+        createdAt: internalUsers.createdAt,
+      })
+      .from(internalUsers)
+      .where(eq(internalUsers.id, userId))
+      .limit(1);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json({ user });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load profile" });
+  }
+});
+
+// ─── PATCH /me/profile — update own avatar ───────────────────────────────────
+
+router.patch("/me/profile", async (req: Request, res: Response) => {
+  const sessionUser = getPinSessionUser(req);
+  if (!sessionUser && process.env.NODE_ENV !== "development") {
+    return res.status(401).json({ error: "Not authenticated" });
+  }
+  const userId = sessionUser?.id ?? 1;
+  const { avatarUrl } = req.body as { avatarUrl?: string | null };
+  try {
+    const [updated] = await db
+      .update(internalUsers)
+      .set({ avatarUrl: avatarUrl ?? null })
+      .where(eq(internalUsers.id, userId))
+      .returning({ id: internalUsers.id, name: internalUsers.name, avatarUrl: internalUsers.avatarUrl });
+    if (!updated) return res.status(404).json({ error: "User not found" });
+    res.json({ ok: true, user: updated });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update profile" });
+  }
+});
+
+// ─── PATCH /me/pin — change own PIN ─────────────────────────────────────────
+
+router.patch("/me/pin", async (req: Request, res: Response) => {
+  const sessionUser = getPinSessionUser(req);
+  if (!sessionUser) return res.status(401).json({ error: "Not authenticated" });
+  const { currentPin, newPin } = req.body as { currentPin?: string; newPin?: string };
+  if (!currentPin || !newPin) {
+    return res.status(400).json({ error: "currentPin and newPin are required" });
+  }
+  if (String(newPin).length < 4 || String(newPin).length > 8) {
+    return res.status(400).json({ error: "New PIN must be 4–8 digits" });
+  }
+  try {
+    const [user] = await db.select().from(internalUsers).where(eq(internalUsers.id, sessionUser.id)).limit(1);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    const match = await bcrypt.compare(String(currentPin), user.pinHash);
+    if (!match) return res.status(401).json({ error: "Current PIN is incorrect" });
+    const pinHash = await bcrypt.hash(String(newPin), BCRYPT_ROUNDS);
+    await db.update(internalUsers).set({ pinHash }).where(eq(internalUsers.id, sessionUser.id));
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to change PIN" });
+  }
+});
+
 // ─── POST /logout — clear session cookie ────────────────────────────────────
 
 router.post("/logout", (_req: Request, res: Response) => {
@@ -172,6 +248,7 @@ router.get("/staff", async (req: Request, res: Response) => {
         role: internalUsers.role,
         active: internalUsers.active,
         permissions: internalUsers.permissions,
+        avatarUrl: internalUsers.avatarUrl,
         createdAt: internalUsers.createdAt,
       })
       .from(internalUsers)
