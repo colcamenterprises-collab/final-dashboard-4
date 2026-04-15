@@ -48,9 +48,9 @@ const CONFIG: Record<string, { minimumThreshold: number; varianceThreshold: numb
   "Bacon Long": { minimumThreshold: 10, varianceThreshold: 3, unit: "pcs" },
   "Sweet Potato Fries": { minimumThreshold: 12, varianceThreshold: 4, unit: "portion" },
   "French Fries": { minimumThreshold: 12, varianceThreshold: 4, unit: "portion" },
-  "Chicken Fillets": { minimumThreshold: 12, varianceThreshold: 4, unit: "pcs" },
-  "Karaage Chicken": { minimumThreshold: 12, varianceThreshold: 4, unit: "portion" },
-  "Chicken Nuggets": { minimumThreshold: 12, varianceThreshold: 4, unit: "portion" },
+  "Chicken Fillets": { minimumThreshold: 12, varianceThreshold: 4, unit: "g" },
+  "Karaage Chicken": { minimumThreshold: 12, varianceThreshold: 4, unit: "g" },
+  "Chicken Nuggets": { minimumThreshold: 12, varianceThreshold: 4, unit: "g" },
 };
 
 function normalizeDrinkName(value: string): string {
@@ -77,6 +77,57 @@ function toNum(v: unknown): number | null {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
+}
+
+export function resolveManualUsageValue(
+  item: string,
+  unit: string,
+  usage: { bacon_used?: unknown; fries_used?: unknown; chicken_grams_used?: unknown; nuggets_sold_count?: unknown },
+): number | null {
+  let usageValue: number | null = null;
+
+  if (unit === "g") {
+    if (item.includes("Bacon")) {
+      usageValue = toNum(usage.bacon_used);
+    } else if (item.includes("Fries")) {
+      usageValue = toNum(usage.fries_used);
+    } else if (item === "Chicken Nuggets") {
+      const soldCount = toNum(usage.nuggets_sold_count);
+      if (soldCount !== null && soldCount > 0) {
+        usageValue = soldCount * 22;
+      } else {
+        usageValue = null;
+      }
+    } else if (item.includes("Chicken")) {
+      usageValue = toNum(usage.chicken_grams_used);
+    }
+  } else {
+    usageValue = null;
+  }
+
+  return usageValue;
+}
+
+export function calculateManualExpectedVariance(
+  opening: number | null,
+  purchased: number,
+  actual: number | null,
+  usageValue: number | null,
+) {
+  let expectedClosing: number | null = null;
+  let variance: number | null = null;
+  let seedFlag: StockFlag = "Normal";
+
+  if (opening === null || actual === null || usageValue === null) {
+    expectedClosing = null;
+    variance = null;
+    seedFlag = "Needs Review";
+  } else {
+    expectedClosing = opening + purchased - usageValue;
+    variance = actual - expectedClosing;
+  }
+
+  return { expectedClosing, variance, seedFlag };
 }
 
 function computeFlag(row: HybridStockRow): { flag: StockFlag; riskScore: number } {
@@ -210,10 +261,16 @@ export async function loadHybridStockControl(date: string, shiftLabel: string | 
         SELECT 1 FROM information_schema.columns
         WHERE table_name='receipt_truth_daily_usage' AND column_name='fries_used'
       ) THEN (SELECT COALESCE(SUM(fries_used), 0) FROM receipt_truth_daily_usage WHERE business_date = $1::date) ELSE NULL END AS fries_used,
-      COALESCE((SELECT SUM(chicken_grams_used) FROM receipt_truth_daily_usage WHERE business_date = $1::date), 0) AS chicken_grams_used
+      COALESCE((SELECT SUM(chicken_grams_used) FROM receipt_truth_daily_usage WHERE business_date = $1::date), 0) AS chicken_grams_used,
+      COALESCE((
+        SELECT SUM(quantity_sold)
+        FROM receipt_truth_daily_usage
+        WHERE business_date = $1::date
+          AND lower(item_name) LIKE '%nugget%'
+      ), 0) AS nuggets_sold_count
     `,
     [date],
-  ).catch(() => ({ rows: [{ bacon_used: null, fries_used: null, chicken_grams_used: null }] } as any));
+  ).catch(() => ({ rows: [{ bacon_used: null, fries_used: null, chicken_grams_used: null, nuggets_sold_count: null }] } as any));
 
   const usage = usageResult.rows[0] || {};
   const rows: HybridStockRow[] = [];
@@ -248,12 +305,11 @@ export async function loadHybridStockControl(date: string, shiftLabel: string | 
   for (const item of MANUAL_ITEMS) {
     const cfg = CONFIG[item];
     const manual = manualByItem.get(item);
-    const usageValue = item.includes("Bacon") ? toNum(usage.bacon_used) : item.includes("Fries") ? toNum(usage.fries_used) : toNum(usage.chicken_grams_used);
+    const usageValue = resolveManualUsageValue(item, cfg.unit, usage);
     const opening = manual?.openingOverride ?? null;
     const purchased = manual?.purchaseCorrection ?? 0;
-    const expected = opening === null || usageValue === null ? null : opening + purchased - usageValue;
     const actual = manual?.closingCount ?? null;
-    const variance = expected === null || actual === null ? null : actual - expected;
+    const { expectedClosing, variance, seedFlag } = calculateManualExpectedVariance(opening, purchased, actual, usageValue);
 
     const notes: string[] = [];
     if (!manual) notes.push("Missing manual owner entry");
@@ -267,13 +323,13 @@ export async function loadHybridStockControl(date: string, shiftLabel: string | 
       opening,
       purchased,
       usage: usageValue,
-      expectedClosing: expected,
+      expectedClosing,
       actualClosing: actual,
       purchaseRequest: requestMap.get(item) ?? 0,
       variance,
       minimumThreshold: cfg.minimumThreshold,
       varianceThreshold: cfg.varianceThreshold,
-      flag: "Needs Review",
+      flag: seedFlag,
       riskScore: 80,
       notes,
     };
