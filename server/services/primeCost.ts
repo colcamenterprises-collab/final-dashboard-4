@@ -70,7 +70,7 @@ type PrimeCostRow = {
 
 export async function getPrimeCostForDate(
   dateYMD: string
-): Promise<PrimeCostRow> {
+): Promise<PrimeCostRow | null> {
   // Sales + Wages from daily_sales_v2 payload JSONB
   const ds = await pool.query(
     `SELECT 
@@ -87,6 +87,8 @@ export async function getPrimeCostForDate(
 
   const sales = Number(ds.rows?.[0]?.sales ?? 0);
   const wages = Number(ds.rows?.[0]?.wages ?? 0);
+  const hasShiftRow = (ds.rowCount ?? 0) > 0;
+  if (!hasShiftRow) return null;
 
   // F&B from Business Expenses modal (costCents stores whole THB despite name)
   const fnb = await pool.query(
