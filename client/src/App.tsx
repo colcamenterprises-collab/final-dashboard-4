@@ -61,6 +61,7 @@ import { LoyverseReports } from "./pages/operations/LoyverseReports";
 import PurchasingPage from "./pages/operations/Purchasing";
 import StockReview from "./pages/analysis/StockReview";
 import StockReconciliation from "./pages/analysis/StockReconciliation";
+import OwnerStockControl from "./pages/analysis/OwnerStockControl";
 import ShiftAnalyticsMM from "./pages/analysis/ShiftAnalyticsMM";
 import DailyShiftAnalysis from "./pages/operations/DailyShiftAnalysis";
 import AnalysisPrototype from "./pages/AnalysisPrototype";
@@ -197,6 +198,7 @@ export default function App() {
                 <Route path="/operations/analysis/stock-review" element={<Navigate to="/analysis/stock-review" replace />} />
                 <Route path="/analysis/stock-review" element={<ProtectedRoute><StockReview /></ProtectedRoute>} />
                 <Route path="/analysis/stock-reconciliation" element={<ProtectedRoute><StockReconciliation /></ProtectedRoute>} />
+                <Route path="/analysis/owner-stock-control" element={<ProtectedRoute><OwnerStockControl /></ProtectedRoute>} />
                 <Route path="/operations/analysis/rolls-ledger" element={<Navigate to="/analysis/stock-review" replace />} />
                 
                 <Route path="upload" element={<ProtectedRoute><UploadStatements /></ProtectedRoute>} />
