@@ -187,6 +187,7 @@ export function StockReceivedModal({ isOpen, onClose }: StockReceivedModalProps)
               <Input
                 type="number"
                 value={rollsQty || ""}
+                onWheel={(e) => e.currentTarget.blur()}
                 onChange={(e) => setRollsQty(Number(e.target.value))}
                 placeholder="Enter quantity"
                 className="text-xs h-8 rounded-[4px]"
@@ -233,6 +234,7 @@ export function StockReceivedModal({ isOpen, onClose }: StockReceivedModalProps)
                 type="number"
                 step="0.1"
                 value={meatWeightKg || ""}
+                onWheel={(e) => e.currentTarget.blur()}
                 onChange={(e) => setMeatWeightKg(Number(e.target.value))}
                 placeholder="Enter weight in kg"
                 className="text-xs h-8 rounded-[4px]"
@@ -257,6 +259,7 @@ export function StockReceivedModal({ isOpen, onClose }: StockReceivedModalProps)
                   <Input
                     type="number"
                     value={drinkCounts[drink] || ""}
+                    onWheel={(e) => e.currentTarget.blur()}
                     onChange={(e) =>
                       setDrinkCounts({ ...drinkCounts, [drink]: Number(e.target.value) })
                     }

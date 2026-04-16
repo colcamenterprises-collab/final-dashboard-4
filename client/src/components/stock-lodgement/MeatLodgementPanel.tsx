@@ -101,7 +101,7 @@ export function MeatLodgementPanel({ initialValues, isSubmitting, showCancel, su
         <FormField control={form.control} name="weightKg" render={({ field }) => (
           <FormItem>
             <FormLabel className="text-xs text-slate-600">{L.weightKg}</FormLabel>
-            <FormControl><Input className="h-9 text-sm rounded-[4px]" type="number" step="0.01" {...field} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+            <FormControl><Input className="h-9 text-sm rounded-[4px]" type="number" step="0.01" {...field} onWheel={(e) => e.currentTarget.blur()} onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
             <FormMessage />
           </FormItem>
         )} />

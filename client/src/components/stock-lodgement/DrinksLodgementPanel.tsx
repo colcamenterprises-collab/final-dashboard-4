@@ -124,6 +124,7 @@ export function DrinksLodgementPanel({
                         type="number"
                         min="0"
                         value={drinkCounts[String(drink.id)] || ""}
+                        onWheel={(e) => e.currentTarget.blur()}
                         onChange={(e) => setDrinkCounts((prev) => ({ ...prev, [String(drink.id)]: parseInt(e.target.value) || 0 }))}
                         className="!h-7 text-xs text-right w-16 ml-auto rounded-[4px]"
                         data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}

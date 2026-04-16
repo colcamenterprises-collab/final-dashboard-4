@@ -102,6 +102,7 @@ export function RollsLodgementPanel({
                 className="h-9 text-sm rounded-[4px]"
                 type="number"
                 {...field}
+                onWheel={(e) => e.currentTarget.blur()}
                 onChange={(e) => {
                   const quantity = parseInt(e.target.value) || 0;
                   field.onChange(quantity);
