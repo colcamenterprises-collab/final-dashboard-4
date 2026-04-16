@@ -351,7 +351,16 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
               </div>
 
               {/* Phone-style keypad */}
-              <div className="grid grid-cols-3 gap-3">
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  gap: "10px",
+                  width: "100%",
+                  maxWidth: "280px",
+                  margin: "0 auto",
+                }}
+              >
                 {KEYPAD_ROWS.flat().map((key, idx) => {
                   if (key === "") {
                     return <div key={idx} />;
@@ -368,12 +377,13 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
                         if (isDelete) deleteDigit();
                         else appendDigit(key);
                       }}
+                      style={{ height: "64px", borderRadius: "6px" }}
                       className={[
-                        "h-16 rounded flex items-center justify-center select-none transition-all duration-100",
+                        "flex items-center justify-center select-none transition-all duration-100",
                         "active:scale-95 disabled:opacity-40",
                         isDelete
                           ? "bg-gray-100 text-gray-600 text-lg hover:bg-gray-200"
-                          : "bg-gray-50 border border-gray-200 text-gray-900 text-xl font-medium hover:bg-gray-100 hover:border-gray-300",
+                          : "bg-gray-50 border border-gray-200 text-gray-900 text-xl font-semibold hover:bg-gray-100 hover:border-gray-300",
                       ].join(" ")}
                     >
                       {isLoading && !isDelete ? (
