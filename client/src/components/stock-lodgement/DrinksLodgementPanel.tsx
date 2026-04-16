@@ -108,32 +108,27 @@ export function DrinksLodgementPanel({
           ) : drinkIngredients.length === 0 ? (
             <div className="p-4 text-center text-xs text-slate-500">{L.noDrinks}</div>
           ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th className="text-left px-2 py-1.5 text-xs font-medium text-slate-600">{L.drinkType}</th>
-                  <th className="text-right px-2 py-1.5 text-xs font-medium text-slate-600 w-20">{L.qty}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drinkIngredients.map((drink) => (
-                  <tr key={drink.id} className="border-b border-slate-200 last:border-b-0">
-                    <td className="px-2 py-1 text-xs text-slate-700">{drink.name}</td>
-                    <td className="px-2 py-1">
-                      <Input
-                        type="number"
-                        min="0"
-                        value={drinkCounts[String(drink.id)] || ""}
-                        onWheel={(e) => e.currentTarget.blur()}
-                        onChange={(e) => setDrinkCounts((prev) => ({ ...prev, [String(drink.id)]: parseInt(e.target.value) || 0 }))}
-                        className="!h-7 text-xs text-right w-16 ml-auto rounded-[4px]"
-                        data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="divide-y divide-slate-200">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50">
+                <span className="text-xs font-medium text-slate-600">{L.drinkType}</span>
+                <span className="text-xs font-medium text-slate-600 w-16 text-right">{L.qty}</span>
+              </div>
+              {drinkIngredients.map((drink) => (
+                <div key={drink.id} className="flex items-center justify-between gap-3 px-3 py-1.5">
+                  <span className="text-xs text-slate-700 flex-1 min-w-0 truncate">{drink.name}</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    inputMode="numeric"
+                    value={drinkCounts[String(drink.id)] || ""}
+                    onWheel={(e) => e.currentTarget.blur()}
+                    onChange={(e) => setDrinkCounts((prev) => ({ ...prev, [String(drink.id)]: parseInt(e.target.value) || 0 }))}
+                    className="!h-8 text-sm text-right w-16 shrink-0 rounded-[4px]"
+                    data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}
+                  />
+                </div>
+              ))}
+            </div>
           )}
         </div>
 

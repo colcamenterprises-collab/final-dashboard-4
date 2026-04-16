@@ -42,7 +42,7 @@ export function StockLodgmentModal({ isOpen: controlledIsOpen, onOpenChange, onS
           <Button className={triggerClassName}>{triggerIcon}{triggerText}</Button>
         </DialogTrigger>
       )}
-      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center justify-between pr-6">
             <DialogTitle className="!text-sm font-semibold text-slate-900">{initialData?.id ? L.edit : L.lodge} {L.stockPurchase}</DialogTitle>
