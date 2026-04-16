@@ -152,6 +152,7 @@ const API_PUBLIC_PREFIXES = [
   "/api/health",
   "/api/system-health",
   "/api/bob/read",
+  "/api/agent/read",
   "/api/ui-auth",
 ];
 
@@ -563,6 +564,10 @@ async function checkSchema() {
   // /api/bob/read — Bob read-only API layer (token-protected, GET only)
   const bobReadRouter = (await import('./routes/bobRead')).default;
   app.use('/api/bob/read', bobReadRouter);
+
+  // /api/agent/read — Governed canonical read-only surface (6 structured endpoints)
+  const agentReadRouter = (await import('./routes/agentRead')).default;
+  app.use('/api/agent/read', agentReadRouter);
 
   // /api/ai/chat — simple chat alias endpoints + idempotent table setup
   const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables, ensureAgentReadFoundation, ensureInternalUsersTable } = await import('./db');

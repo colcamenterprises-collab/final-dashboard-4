@@ -1,9 +1,12 @@
-# APP_READ_SURFACE — Bob Read-Only Access Governance Map
+# APP_READ_SURFACE — Agent Read-Only Access Governance Map
 
-**Generated:** 2026-04-13  
-**Authority:** `/api/bob/read/*` (Bearer token required, GET-only enforced, tenant-scoped foundation)  
-**Base URL:** `http://host/api/bob/read/`  
-**Token auth:** legacy `BOB_READONLY_TOKEN` **or** hashed records in `agent_tokens` (`token_type='agent_read'`)
+**Updated:** 2026-04-16  
+**Two namespaces:**
+- `/api/bob/read/*` — 30-module curated Bob read layer (proxy + per-domain modules)
+- `/api/agent/read/*` — 6-endpoint canonical read surface (structured, blocker-aware, shift-window aware)
+
+**Shared auth:** Bearer token — legacy `BOB_READONLY_TOKEN` **or** hashed records in `agent_tokens` (`token_type='agent_read'`)  
+**Read-only enforced:** HTTP 405 on any non-GET request to either namespace
 
 ---
 
@@ -153,6 +156,68 @@ GET /api/bob/read/proxy?path=/api/loyalty/members
 | `shift_report_v2` | 0 | `shift-report/latest` | Run `POST /api/shift-report/generate` with `shiftDate` to populate |
 | `roll_order` | 0 | `roll-order` | Roll order system not yet in active use |
 | `shopping_list_items` | 0 | `purchasing/shopping-list` | Shopping list items empty — lists may exist but have no line items |
+
+---
+
+---
+
+## `/api/agent/read` — CANONICAL READ SURFACE (v1.0, 2026-04-16)
+
+This is the **second read namespace**. Six purpose-built endpoints that aggregate from canonical DB sources, include shift-window awareness, and always return a structured `AgentEnvelope` with `blockers[]` and `warnings[]`.
+
+### Rules
+1. All 6 endpoints are **recurring-safe** — they are the preferred entry points for agents running automated jobs.
+2. Each endpoint accepts `?date=YYYY-MM-DD` and resolves the correct Bangkok shift window automatically via `shiftWindow()`.
+3. Missing data is signalled via `blockers[]` with structured `code`, `where`, and `canonical_source` fields — never silent nulls.
+4. **Read-only enforced.** Any non-GET request returns 405.
+
+### ENDPOINT REGISTRY
+
+| Endpoint | Canonical Sources | Purpose | Recurring Safe |
+|---|---|---|---|
+| `GET /api/agent/read/shift-summary?date=` | `daily_sales_v2`, `lv_receipt`, `ai_issues` | Shift overview: form sales breakdown, POS receipt count + gross, variance, open issue count, status flags | ✅ yes |
+| `GET /api/agent/read/daily-operations?date=` | `daily_sales_v2`, `daily_stock_v2` | Full form data: sales channels, stock counts (buns/meat/drinks), labour | ✅ yes |
+| `GET /api/agent/read/receipt-summary?date=` | `lv_receipt`, `receipt_truth_line` | POS aggregates: receipt counts, gross/net sales, top 20 items by qty, category breakdown | ✅ yes |
+| `GET /api/agent/read/purchasing-summary?date=` | `purchase_tally`, `purchase_tally_drink`, `expenses` | Rolls/meat/drinks purchased + expenses by category for the date | ✅ yes |
+| `GET /api/agent/read/finance-summary?date=` | `daily_sales_v2`, `expenses`, `purchase_tally` | Sales, expenses, wages, gross profit estimate, prime cost %, labour cost % | ✅ yes |
+| `GET /api/agent/read/reconciliation-summary?date=` | `daily_sales_v2`, `lv_receipt`, `ai_issues`, `daily_stock_v2` | Form vs POS variance, issue list (open/resolved/severity), stock discrepancy, reconciliation verdict | ✅ yes |
+
+### RESPONSE ENVELOPE
+
+```json
+{
+  "ok": true,
+  "source": "daily_sales_v2 + lv_receipt + ai_issues",
+  "scope": "shift:2026-04-16",
+  "date": "2026-04-16",
+  "status": "ok | partial | missing | error",
+  "data": { ... },
+  "warnings": [],
+  "blockers": [
+    { "code": "SALES_FORM_MISSING", "message": "...", "where": "daily_sales_v2", "canonical_source": "daily_sales_v2.shiftDate" }
+  ],
+  "last_updated": "2026-04-16T12:00:00.000Z"
+}
+```
+
+### SOURCE OWNERSHIP
+
+| Data domain | Canonical table | Canonical field | Agent/read endpoint |
+|---|---|---|---|
+| Sales form | `daily_sales_v2` | `shiftDate`, `payload` | `shift-summary`, `daily-operations`, `finance-summary`, `reconciliation-summary` |
+| Stock form | `daily_stock_v2` | `salesId → daily_sales_v2.id`, `payload` | `daily-operations`, `reconciliation-summary` |
+| POS receipts | `lv_receipt` | `datetime_bkk` (shift window) | `shift-summary`, `receipt-summary`, `reconciliation-summary` |
+| POS item lines | `receipt_truth_line` | `receipt_date`, `item_name`, `qty`, `net_total` | `receipt-summary` |
+| Purchase tally | `purchase_tally` | `date`, `rolls_pcs`, `meat_grams`, `amount_thb` | `purchasing-summary`, `finance-summary` |
+| Drink tally | `purchase_tally_drink` | `tally_id`, `item_name`, `qty` | `purchasing-summary` |
+| Expenses | `expenses` | `date`, `category`, `amount_cents` | `purchasing-summary`, `finance-summary` |
+| Issues | `ai_issues` | `shift_date`, `issue_type`, `severity`, `status` | `shift-summary`, `reconciliation-summary` |
+
+### SHIFT WINDOW
+
+All time-based queries that filter `lv_receipt` use `shiftWindow(date)` from `server/services/time/shiftWindow.ts`:
+- Window: **17:00 Bangkok → 03:00 next day Bangkok**
+- Columns: `fromISO`, `toISO` passed as `::timestamptz` parameters
 
 ---
 

@@ -1,0 +1,434 @@
+REPLIT PATCH BRIEF — BUILD GOVERNED CANONICAL READ-ONLY APP SURFACE FOR BOB + FUTURE AGENTS
+
+Objective:
+Build the final missing runtime layer: a governed, authenticated, read-only canonical app surface that Bob can access live from runtime, and that future agents can use without rebuilding access.
+
+This is not a UI patch.
+This is not a proxy-only patch.
+This is not Bob-only hack work.
+
+This patch must create a clean, organized read-only app surface for live runtime access.
+
+==================================================
+
+1. CORE GOAL
+   ==================================================
+
+Bob must be able to read live canonical shift data for the app through stable authenticated endpoints/modules.
+
+This surface must support:
+
+- Bob verification runtime
+- Data Analyst verification runtime
+- recurring cron jobs
+- future agents later
+
+The read layer must use the real canonical sources used by the app today.
+
+Do not expose stale or legacy tables as truth if they are no longer canonical.
+
+==================================================
+2. SHIFT WINDOW RULE — MUST BE LOCKED
+
+All shift-based canonical endpoints must use this exact shift logic:
+
+- shift_start = 17:00 Asia/Bangkok
+- shift_end = 03:00 Asia/Bangkok next day
+- shift_date = date of shift start
+
+All queries and aggregations must respect this window.
+
+If existing app code already has a canonical helper for this, reuse it.
+Do not create conflicting shift window logic.
+
+==================================================
+3. IMPORTANT CANONICALITY RULE
+
+Do not blindly expose the old names below if they are no longer real truth sources:
+
+- sold_items
+- pnl_expense
+- shift_reconciliation
+- sale_canonical_authority
+- shopping_list_items
+
+Before building the endpoints, map each requested business area to the app’s actual canonical source today.
+
+If one of the requested items is legacy, replace it with the true canonical source.
+
+Examples likely canonical today:
+
+- daily_sales_v2
+- daily_stock_sales
+- pos_shift_report
+- lv_receipt
+- purchasing / expenses
+- analysis/daily-comparison
+- analysis/shift-analysis
+- prime-cost
+- shift report / reconciliation outputs actually used by the current UI
+
+==================================================
+4. BUILD A PRODUCTION READ SURFACE
+
+Create a governed read surface for agents.
+
+Preferred route pattern:
+
+- "/api/agent/read/..."
+
+Keep Bob routes working.
+Do not break "/api/bob/read/..."
+
+If easiest and safest, Bob routes can consume the same underlying module/service layer as the new agent routes.
+The important thing is that the canonical read modules exist and are organized properly.
+
+Do not rely on universal proxy as the production truth layer.
+Proxy stays for debug/investigation only.
+
+==================================================
+5. REQUIRED CANONICAL MODULES
+
+Build or finalize these canonical read modules using the real app truth sources.
+
+---
+
+A. SHIFT SUMMARY
+
+Route:
+"GET /api/agent/read/shift-summary?date=YYYY-MM-DD"
+
+Purpose:
+One canonical shift summary for sales, payments, receipt counts, and reconciliation state.
+
+Must return at minimum:
+
+- shift_date
+- shift_window.start
+- shift_window.end
+- total_sales
+- cash
+- qr
+- grab
+- receipt_count_total
+- receipt_count_by_channel
+- reconciliation state
+- status flags:
+  - form_connected
+  - pos_connected
+  - labour_connected
+
+This should power:
+
+- Bob shift verification
+- Sales & Shift Analysis core summary
+- any future shift overview consumers
+
+Classification:
+Canonical derived module
+
+---
+
+B. DAILY OPERATIONS
+
+Route:
+"GET /api/agent/read/daily-operations?date=YYYY-MM-DD"
+
+Purpose:
+Canonical read surface for form-based operations data.
+
+Must return at minimum:
+
+- shift_date
+- sales_form:
+  - submitted
+  - total_sales
+  - cash
+  - qr
+  - expenses_total
+- stock_form:
+  - submitted
+  - buns_remaining
+  - meat_remaining_g
+  - drinks by SKU/brand
+- labour:
+  - staff_count
+  - total_wages
+  - is_itemised
+
+This should power:
+
+- Daily Sales / Stock operational review
+- Labour Summary
+- Stock Summary
+- Bob verification
+
+Classification:
+Canonical
+
+---
+
+C. RECEIPT SUMMARY
+
+Route:
+"GET /api/agent/read/receipt-summary?date=YYYY-MM-DD"
+
+Purpose:
+Canonical receipt truth and aggregate summary for a shift.
+
+Must return at minimum:
+
+- shift_date
+- total_receipts
+- receipts_by_channel
+- sold item aggregates if already canonical in the app
+- receipt evidence source status
+
+This should power:
+
+- Receipt Summary
+- Verification
+- Future receipt/item analysis agents
+
+Classification:
+Canonical raw/aggregate module
+
+---
+
+D. PURCHASING SUMMARY
+
+Route:
+"GET /api/agent/read/purchasing-summary?date=YYYY-MM-DD"
+
+Purpose:
+Canonical view of what was purchased / logged for the shift window.
+
+Must return at minimum:
+
+- shift_date
+- purchasing items / purchases
+- category summary
+- total spend
+- shopping list state if operationally used and truly canonical
+- source status
+
+This should power:
+
+- Purchasing pages
+- Stock verification
+- Bob verification
+
+Classification:
+Canonical or derived-canonical depending on actual app source
+
+---
+
+E. FINANCE SUMMARY
+
+Route:
+"GET /api/agent/read/finance-summary?date=YYYY-MM-DD"
+
+Purpose:
+Canonical financial summary used by the app.
+
+Must return at minimum:
+
+- shift_date
+- sales total
+- expenses total
+- wages total
+- gross/net/prime-cost metrics actually used by the app today
+
+This should power:
+
+- Profit / Cost section
+- Bob verification
+- Finance agents later
+
+Classification:
+Canonical derived module
+
+---
+
+F. RECONCILIATION SUMMARY
+
+Route:
+"GET /api/agent/read/reconciliation-summary?date=YYYY-MM-DD"
+
+Purpose:
+Canonical shift reconciliation state.
+
+Must return at minimum:
+
+- shift_date
+- sales comparison
+- payment comparison
+- stock discrepancy summary
+- balance/reconciliation status
+- issue list / blocker list
+- source attribution
+
+This should power:
+
+- Critical Issues
+- Reconciliation review
+- Verification engine
+
+Classification:
+Canonical derived module
+
+==================================================
+6. AUTH REQUIREMENTS
+
+All new agent read endpoints must be authenticated.
+
+Use:
+
+- Bearer token
+- existing Bob/agent auth foundation
+- tenant-aware request context
+
+Requirements:
+
+- no auth weakening
+- no anonymous access
+- no UI session dependency
+- callable from cron/runtime
+- GET-only
+- read-only only
+
+If existing "agent_tokens" / Bob token middleware is already the correct path, reuse it.
+
+==================================================
+7. GOVERNANCE REQUIREMENTS
+
+For every canonical module, document:
+
+- route
+- underlying source(s)
+- purpose
+- classification:
+  - canonical
+  - derived
+  - legacy
+  - broken/empty
+- safe for recurring verification: yes/no
+- page(s) powered
+- Bob runtime accessible: yes/no
+
+Update:
+".openclaw/workspace/core/APP_READ_SURFACE.md"
+
+This file must reflect the new live runtime surface.
+
+==================================================
+8. DO NOT DO THIS
+
+- do not expose broken/empty tables as truth
+- do not use UI scraping
+- do not build a browser-dependent runtime path
+- do not rely on proxy as the default production read surface
+- do not create a second conflicting shift-window logic
+- do not touch unrelated UI pages
+- do not break existing Bob routes
+- do not invent values where source data is missing
+
+If data is missing:
+return a structured missing/blocker state
+
+==================================================
+9. RESPONSE SHAPE RULE
+
+All endpoints must return stable structured JSON.
+
+Each response should clearly include:
+
+- shift_date
+- shift_window where relevant
+- data payload
+- source attribution / source status where relevant
+- missing/blocker flags where relevant
+
+No fake zeroes.
+No ambiguous null blobs.
+No HTML wrappers.
+
+==================================================
+10. TESTING REQUIRED
+
+Replit must test this in the running environment.
+
+Required verification:
+
+1. Valid authenticated request works for each new endpoint
+2. Missing/invalid token is rejected
+3. Each route returns JSON
+4. Each route returns real shift-scoped data for a shift date with data
+5. Shift window matches 17:00–03:00 BKK logic
+6. Routes are usable without UI/browser
+7. Values align with app UI where the UI is already correct
+8. Broken/missing sources return a clean structured missing state
+9. APP_READ_SURFACE.md updated correctly
+
+==================================================
+11. REQUIRED FINAL RETURN
+
+Return exactly:
+
+A. Files changed
+
+B. Canonical endpoints/modules exposed
+For each:
+
+- exact path
+- exact purpose
+
+C. Response shape summary
+For each:
+
+- key fields returned
+
+D. Bob runtime accessibility
+For each module:
+
+- accessible yes/no
+- auth method used
+
+E. Canonicality map
+For each source/module used:
+
+- canonical / derived / legacy / broken
+
+F. App pages powered
+Map each canonical module to the page(s) it supports
+
+G. Remaining blockers
+Only real blockers
+
+H. Test report
+Include:
+
+- route tested
+- auth result
+- sample data result
+- pass/fail
+
+I. Final verdict
+
+- PASS
+- PASS WITH FIXES
+- FAIL
+
+==================================================
+12. FINAL INSTRUCTION
+
+Build this as the governed canonical runtime read surface for the app.
+
+The outcome must be:
+
+- Bob can verify the app live
+- Data Analyst can run verification cleanly
+- future agents can be added later without rebuilding runtime access
+
+This is the app’s AI-native read contract.
+Do not stop at partial endpoint patches.
