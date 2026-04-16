@@ -66,30 +66,13 @@ export default function StaffAccessPage() {
 
   const users = data?.users ?? [];
 
-  function openEdit(u: StaffUser) {
-    setEditUser(u);
-    setMode("edit");
-    setFormError("");
-    setSuccessMsg("");
-  }
-
-  function openCreate() {
-    setEditUser(null);
-    setMode("create");
-    setFormError("");
-    setSuccessMsg("");
-  }
-
-  function goList() {
-    setMode("list");
-    setEditUser(null);
-    setFormError("");
-    setSuccessMsg("");
-  }
+  function openEdit(u: StaffUser) { setEditUser(u); setMode("edit"); setFormError(""); setSuccessMsg(""); }
+  function openCreate() { setEditUser(null); setMode("create"); setFormError(""); setSuccessMsg(""); }
+  function goList() { setMode("list"); setEditUser(null); setFormError(""); setSuccessMsg(""); }
 
   if (!canManage) {
     return (
-      <div className="p-6 text-sm text-slate-500 dark:text-slate-400">
+      <div className="p-6 text-xs text-slate-500">
         You do not have permission to manage staff access.
       </div>
     );
@@ -100,16 +83,13 @@ export default function StaffAccessPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Staff Access</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Manage staff accounts, PINs, and page permissions
-          </p>
+          <h1 className="text-xl font-bold text-slate-900">Staff Access</h1>
+          <p className="text-xs text-slate-500 mt-0.5">Manage staff accounts, PINs, and page permissions</p>
         </div>
         {mode === "list" && (
           <button
             onClick={openCreate}
-            className="rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
-            style={{ background: "hsl(142,76%,45%)", color: "hsl(222,47%,6%)" }}
+            className="rounded px-4 py-2 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
           >
             Add Staff
           </button>
@@ -117,7 +97,7 @@ export default function StaffAccessPage() {
         {mode !== "list" && (
           <button
             onClick={goList}
-            className="rounded-lg px-4 py-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white border border-slate-200 dark:border-slate-700 transition-colors"
+            className="rounded px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 hover:border-slate-300 transition-colors"
           >
             Back to list
           </button>
@@ -125,7 +105,7 @@ export default function StaffAccessPage() {
       </div>
 
       {successMsg && (
-        <div className="rounded-lg px-4 py-3 text-sm font-medium" style={{ background: "hsl(142,76%,10%)", color: "hsl(142,76%,55%)", border: "1px solid hsl(142,76%,20%)" }}>
+        <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-medium text-emerald-700">
           {successMsg}
         </div>
       )}
@@ -160,7 +140,7 @@ export default function StaffAccessPage() {
   );
 }
 
-// ─── Staff list ───────────────────────────────────────────────────────────────
+// ─── Staff list ────────────────────────────────────────────────────────────────
 
 function StaffList({ users, isLoading, onEdit, onResetPin, qc, setSuccess }: {
   users: StaffUser[];
@@ -177,17 +157,14 @@ function StaffList({ users, isLoading, onEdit, onResetPin, qc, setSuccess }: {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active: !u.active }),
       }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["/api/pin-auth/staff"] });
-      setSuccess("User updated.");
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/pin-auth/staff"] }); setSuccess("User updated."); },
   });
 
   if (isLoading) {
     return (
       <div className="space-y-2">
         {[1, 2, 3].map((i) => (
-          <div key={i} className="rounded-xl h-20 animate-pulse bg-slate-100 dark:bg-slate-800" />
+          <div key={i} className="rounded border border-slate-200 h-16 animate-pulse bg-slate-100" />
         ))}
       </div>
     );
@@ -195,9 +172,9 @@ function StaffList({ users, isLoading, onEdit, onResetPin, qc, setSuccess }: {
 
   if (users.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-8 text-center">
-        <p className="text-sm text-slate-500 dark:text-slate-400">No staff accounts yet.</p>
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Click Add Staff to create the first account.</p>
+      <div className="rounded border border-slate-200 bg-white p-8 text-center">
+        <p className="text-xs text-slate-500">No staff accounts yet.</p>
+        <p className="text-xs text-slate-400 mt-1">Click Add Staff to create the first account.</p>
       </div>
     );
   }
@@ -210,64 +187,51 @@ function StaffList({ users, isLoading, onEdit, onResetPin, qc, setSuccess }: {
       {sorted.map((u) => (
         <div
           key={u.id}
-          className="rounded-xl border p-4 flex items-center gap-4 transition-colors"
-          style={{
-            background: u.active ? "hsl(222,35%,8%)" : "hsl(222,30%,6%)",
-            borderColor: u.active ? "hsl(222,30%,15%)" : "hsl(222,30%,11%)",
-          }}
+          className={`rounded border bg-white p-3 flex items-center gap-3 ${u.active ? "border-slate-200" : "border-slate-200 opacity-60"}`}
         >
           {/* Avatar */}
-          <div
-            className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-            style={{
-              background: u.active ? "hsl(222,35%,14%)" : "hsl(222,30%,10%)",
-              color: u.active ? "hsl(142,76%,45%)" : "hsl(215,16%,40%)",
-            }}
-          >
+          <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-700 shrink-0">
             {u.name.slice(0, 1).toUpperCase()}
           </div>
 
           {/* Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-semibold text-white truncate">{u.name}</span>
+              <span className="text-sm font-semibold text-slate-900 truncate">{u.name}</span>
               <RoleBadge role={u.role} />
               {!u.active && (
-                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "hsl(0,30%,10%)", color: "hsl(0,50%,55%)" }}>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100/60 text-red-600 font-medium">
                   Inactive
                 </span>
               )}
             </div>
-            <p className="text-xs mt-0.5" style={{ color: "hsl(215,16%,50%)" }}>
+            <p className="text-xs text-slate-500 mt-0.5">
               {Object.entries(u.permissions).filter(([, v]) => v).length} permissions
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               onClick={() => onResetPin(u.id)}
-              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
-              style={{ background: "hsl(222,35%,12%)", color: "hsl(215,16%,65%)", border: "1px solid hsl(222,30%,18%)" }}
+              className="text-xs px-3 py-1.5 rounded border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors"
             >
               PIN
             </button>
             <button
               onClick={() => onEdit(u)}
-              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
-              style={{ background: "hsl(222,35%,12%)", color: "hsl(215,16%,65%)", border: "1px solid hsl(222,30%,18%)" }}
+              className="text-xs px-3 py-1.5 rounded border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors"
             >
               Edit
             </button>
             <button
               onClick={() => toggleActive.mutate(u)}
               disabled={toggleActive.isPending}
-              className="text-xs px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
-              style={{
-                background: u.active ? "hsl(0,30%,10%)" : "hsl(142,30%,10%)",
-                color: u.active ? "hsl(0,70%,60%)" : "hsl(142,70%,50%)",
-                border: `1px solid ${u.active ? "hsl(0,30%,15%)" : "hsl(142,30%,15%)"}`,
-              }}
+              className={`text-xs px-3 py-1.5 rounded border transition-colors disabled:opacity-40 ${
+                u.active
+                  ? "border-red-200 text-red-600 hover:bg-red-50"
+                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+              }`}
             >
               {u.active ? "Deactivate" : "Activate"}
             </button>
@@ -278,7 +242,7 @@ function StaffList({ users, isLoading, onEdit, onResetPin, qc, setSuccess }: {
   );
 }
 
-// ─── User form (create / edit) ────────────────────────────────────────────────
+// ─── User form (create / edit) ─────────────────────────────────────────────────
 
 function UserForm({ user, onSuccess, onError, formError }: {
   user: StaffUser | null;
@@ -290,9 +254,7 @@ function UserForm({ user, onSuccess, onError, formError }: {
   const [name, setName] = useState(user?.name ?? "");
   const [role, setRole] = useState(user?.role ?? "staff");
   const [pin, setPin] = useState("");
-  const [permissions, setPermissions] = useState<StaffPermissions>(
-    user?.permissions ?? STAFF_PERMISSIONS
-  );
+  const [permissions, setPermissions] = useState<StaffPermissions>(user?.permissions ?? STAFF_PERMISSIONS);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -313,36 +275,24 @@ function UserForm({ user, onSuccess, onError, formError }: {
     onError: (e: Error) => onError(e.message),
   });
 
-  function applyRoleDefaults(r: string) {
-    setRole(r);
-    setPermissions(ROLE_DEFAULTS[r] ?? STAFF_PERMISSIONS);
-  }
-
-  function togglePerm(key: keyof StaffPermissions) {
-    setPermissions((prev) => ({ ...prev, [key]: !prev[key] }));
-  }
-
-  const labelStyle = "block text-xs font-semibold mb-1.5" as const;
-  const inputStyle = "w-full rounded-lg px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-colors" as const;
+  function applyRoleDefaults(r: string) { setRole(r); setPermissions(ROLE_DEFAULTS[r] ?? STAFF_PERMISSIONS); }
+  function togglePerm(key: keyof StaffPermissions) { setPermissions((prev) => ({ ...prev, [key]: !prev[key] })); }
 
   return (
-    <div
-      className="rounded-xl p-5 space-y-5"
-      style={{ background: "hsl(222,35%,8%)", border: "1px solid hsl(222,30%,14%)" }}
-    >
-      <h2 className="text-base font-bold text-white">{isEdit ? `Edit — ${user!.name}` : "New Staff Account"}</h2>
+    <div className="rounded border border-slate-200 bg-white p-5 space-y-4">
+      <h2 className="text-sm font-bold text-slate-900">{isEdit ? `Edit — ${user!.name}` : "New Staff Account"}</h2>
 
       {formError && (
-        <div className="rounded-lg px-4 py-2.5 text-sm" style={{ background: "hsl(0,30%,10%)", color: "hsl(0,70%,65%)", border: "1px solid hsl(0,30%,15%)" }}>
+        <div className="rounded border border-red-200 bg-red-100/40 px-4 py-2.5 text-xs text-red-700">
           {formError}
         </div>
       )}
 
       {/* Name */}
       <div>
-        <label className={labelStyle} style={{ color: "hsl(215,16%,65%)" }}>Name</label>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Name</label>
         <input
-          className={inputStyle}
+          className="w-full h-9 rounded border border-slate-200 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Staff member name"
@@ -352,9 +302,9 @@ function UserForm({ user, onSuccess, onError, formError }: {
 
       {/* Role */}
       <div>
-        <label className={labelStyle} style={{ color: "hsl(215,16%,65%)" }}>Role</label>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Role</label>
         <select
-          className={inputStyle}
+          className="w-full h-9 rounded border border-slate-200 px-3 text-sm text-slate-900 bg-white focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
           value={role}
           onChange={(e) => applyRoleDefaults(e.target.value)}
         >
@@ -362,17 +312,15 @@ function UserForm({ user, onSuccess, onError, formError }: {
           <option value="manager">Manager</option>
           <option value="staff">Staff</option>
         </select>
-        <p className="text-xs mt-1" style={{ color: "hsl(215,16%,45%)" }}>
-          Changing role applies default permissions. You can adjust below.
-        </p>
+        <p className="text-xs text-slate-400 mt-1">Changing role applies default permissions. Adjust below as needed.</p>
       </div>
 
       {/* PIN (create only) */}
       {!isEdit && (
         <div>
-          <label className={labelStyle} style={{ color: "hsl(215,16%,65%)" }}>PIN</label>
+          <label className="block text-xs font-semibold text-slate-600 mb-1.5">PIN</label>
           <input
-            className={inputStyle}
+            className="w-full h-9 rounded border border-slate-200 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-widest transition-colors"
             type="password"
             inputMode="numeric"
             value={pin}
@@ -384,41 +332,26 @@ function UserForm({ user, onSuccess, onError, formError }: {
 
       {/* Permissions */}
       <div>
-        <label className={labelStyle} style={{ color: "hsl(215,16%,65%)" }}>Page Access</label>
-        <div
-          className="rounded-lg p-4 space-y-2"
-          style={{ background: "hsl(222,30%,6%)", border: "1px solid hsl(222,30%,11%)" }}
-        >
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Page Access</label>
+        <div className="rounded border border-slate-200 bg-slate-50 divide-y divide-slate-100">
           {ALL_PERMISSIONS.map((key) => (
-            <label key={key} className="flex items-center gap-3 cursor-pointer group">
-              <div className="relative flex-shrink-0">
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={!!permissions[key]}
-                  onChange={() => togglePerm(key)}
-                />
-                <div
-                  className="w-5 h-5 rounded flex items-center justify-center transition-all"
-                  style={{
-                    background: permissions[key] ? "hsl(142,76%,45%)" : "hsl(222,30%,14%)",
-                    border: `1px solid ${permissions[key] ? "hsl(142,76%,45%)" : "hsl(222,30%,22%)"}`,
-                  }}
-                  onClick={() => togglePerm(key)}
-                >
-                  {permissions[key] && (
-                    <svg width="11" height="9" viewBox="0 0 11 9" fill="none">
-                      <path d="M1 4L4.5 7.5L10 1" stroke="hsl(222,47%,6%)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-              <span
-                className="text-sm transition-colors"
-                style={{ color: permissions[key] ? "hsl(213,31%,88%)" : "hsl(215,16%,50%)" }}
+            <label key={key} className="flex items-center gap-3 px-3 py-2 cursor-pointer hover:bg-white transition-colors">
+              <div
+                className="w-4 h-4 rounded shrink-0 flex items-center justify-center border transition-colors"
+                style={{
+                  background: permissions[key] ? "#059669" : "#fff",
+                  borderColor: permissions[key] ? "#059669" : "#cbd5e1",
+                }}
+                onClick={() => togglePerm(key)}
               >
-                {PERMISSION_LABELS[key] ?? key}
-              </span>
+                {permissions[key] && (
+                  <svg width="9" height="7" viewBox="0 0 11 9" fill="none">
+                    <path d="M1 4L4.5 7.5L10 1" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </div>
+              <input type="checkbox" className="sr-only" checked={!!permissions[key]} onChange={() => togglePerm(key)} />
+              <span className="text-xs text-slate-700">{PERMISSION_LABELS[key] ?? key}</span>
             </label>
           ))}
         </div>
@@ -428,8 +361,7 @@ function UserForm({ user, onSuccess, onError, formError }: {
       <button
         onClick={() => mutation.mutate()}
         disabled={mutation.isPending || !name.trim() || (!isEdit && pin.length < 4)}
-        className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-40 active:scale-95"
-        style={{ background: "hsl(142,76%,45%)", color: "hsl(222,47%,6%)" }}
+        className="w-full rounded py-2.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40"
       >
         {mutation.isPending ? "Saving..." : isEdit ? "Save Changes" : "Create Account"}
       </button>
@@ -437,7 +369,7 @@ function UserForm({ user, onSuccess, onError, formError }: {
   );
 }
 
-// ─── Reset PIN form ───────────────────────────────────────────────────────────
+// ─── Reset PIN form ────────────────────────────────────────────────────────────
 
 function ResetPinForm({ userId, onSuccess, onError, formError }: {
   userId: number;
@@ -465,26 +397,20 @@ function ResetPinForm({ userId, onSuccess, onError, formError }: {
     mutation.mutate();
   }
 
-  const inputStyle = "w-full rounded-lg px-3 py-2.5 text-sm bg-slate-800 border border-slate-700 text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition-colors tracking-widest" as const;
-  const labelStyle = "block text-xs font-semibold mb-1.5 text-slate-400" as const;
-
   return (
-    <div
-      className="rounded-xl p-5 space-y-4"
-      style={{ background: "hsl(222,35%,8%)", border: "1px solid hsl(222,30%,14%)" }}
-    >
-      <h2 className="text-base font-bold text-white">Set New PIN</h2>
+    <div className="rounded border border-slate-200 bg-white p-5 space-y-4">
+      <h2 className="text-sm font-bold text-slate-900">Set New PIN</h2>
 
       {formError && (
-        <div className="rounded-lg px-4 py-2.5 text-sm" style={{ background: "hsl(0,30%,10%)", color: "hsl(0,70%,65%)", border: "1px solid hsl(0,30%,15%)" }}>
+        <div className="rounded border border-red-200 bg-red-100/40 px-4 py-2.5 text-xs text-red-700">
           {formError}
         </div>
       )}
 
       <div>
-        <label className={labelStyle}>New PIN (4-8 digits)</label>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">New PIN (4–8 digits)</label>
         <input
-          className={inputStyle}
+          className="w-full h-9 rounded border border-slate-200 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-widest transition-colors"
           type="password"
           inputMode="numeric"
           value={pin}
@@ -493,9 +419,9 @@ function ResetPinForm({ userId, onSuccess, onError, formError }: {
         />
       </div>
       <div>
-        <label className={labelStyle}>Confirm PIN</label>
+        <label className="block text-xs font-semibold text-slate-600 mb-1.5">Confirm PIN</label>
         <input
-          className={inputStyle}
+          className="w-full h-9 rounded border border-slate-200 px-3 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 tracking-widest transition-colors"
           type="password"
           inputMode="numeric"
           value={confirm}
@@ -507,8 +433,7 @@ function ResetPinForm({ userId, onSuccess, onError, formError }: {
       <button
         onClick={submit}
         disabled={mutation.isPending || pin.length < 4 || confirm.length < 4}
-        className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-40 active:scale-95"
-        style={{ background: "hsl(142,76%,45%)", color: "hsl(222,47%,6%)" }}
+        className="w-full rounded py-2.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40"
       >
         {mutation.isPending ? "Saving..." : "Update PIN"}
       </button>
@@ -516,20 +441,16 @@ function ResetPinForm({ userId, onSuccess, onError, formError }: {
   );
 }
 
-// ─── Role badge ───────────────────────────────────────────────────────────────
+// ─── Role badge ────────────────────────────────────────────────────────────────
 
 function RoleBadge({ role }: { role: string }) {
-  const colors: Record<string, [string, string]> = {
-    owner: ["hsl(45,90%,10%)", "hsl(45,90%,60%)"],
-    manager: ["hsl(220,80%,10%)", "hsl(220,80%,65%)"],
-    staff: ["hsl(222,30%,12%)", "hsl(215,16%,55%)"],
+  const styles: Record<string, string> = {
+    owner: "bg-amber-100/60 text-amber-700",
+    manager: "bg-blue-100/60 text-blue-700",
+    staff: "bg-slate-100 text-slate-600",
   };
-  const [bg, text] = colors[role] ?? colors.staff;
   return (
-    <span
-      className="text-xs px-2 py-0.5 rounded-full font-medium capitalize"
-      style={{ background: bg, color: text }}
-    >
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${styles[role] ?? styles.staff}`}>
       {role}
     </span>
   );
