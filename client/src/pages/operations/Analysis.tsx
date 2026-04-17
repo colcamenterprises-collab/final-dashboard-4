@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { BarChart3, Upload, TrendingUp, AlertTriangle, Receipt } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import DrinksVarianceTable from '@/components/analysis/DrinksVarianceTable';
 
 export const Analysis = () => {
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0,10));
@@ -153,9 +152,6 @@ export const Analysis = () => {
           <p className="text-gray-600">Live POS analytics and reporting for restaurant operations</p>
         </div>
       )}
-
-      {/* Drinks Stock Variance Table — new, additive only, sits at top before Jussi */}
-      {isMainRoute && <DrinksVarianceTable date={startDate} />}
 
       {/* 🚨 Fort Knox: Always show Jussi report at top of Analysis page */}
       {isMainRoute && (

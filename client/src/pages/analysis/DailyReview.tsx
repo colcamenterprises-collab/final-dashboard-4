@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import DrinksVarianceTable from "@/components/analysis/DrinksVarianceTable";
 import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 
@@ -250,6 +251,8 @@ export default function DailyReview() {
           />
         </div>
       </div>
+
+      <DrinksVarianceTable date={selectedDate} />
 
       <div className="flex flex-wrap gap-2">
         <StatusPill label="Daily Form" ok={loadingComparison ? null : hasForm} />
