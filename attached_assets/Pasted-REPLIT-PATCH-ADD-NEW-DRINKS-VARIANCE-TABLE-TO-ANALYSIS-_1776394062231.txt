@@ -1,0 +1,295 @@
+REPLIT PATCH — ADD NEW DRINKS VARIANCE TABLE TO ANALYSIS PAGE ONLY
+
+Read this fully before making any changes.
+
+This patch is intentionally narrow.
+Do not redesign the page.
+Do not remove anything.
+Do not move anything.
+Do not alter any existing analysis cards, tables, filters, graphs, or logic.
+Do not “clean up” unrelated code.
+Do not touch Daily Sales and Stock Form v2.
+Do not touch stock ordering logic.
+Do not touch existing purchasing pages.
+Do not touch any existing tables on the analysis page.
+
+The only goal of this patch is:
+
+ADD A NEW DRINKS STOCK ANALYSIS TABLE AT THE VERY TOP OF THE ANALYSIS PAGE.
+
+That is all.
+
+BUSINESS INTENT
+
+The current analysis page is dumping data instead of giving simple, useful analysis.
+
+We are starting with one clean table only:
+a drinks stock variance table.
+
+This table must sit at the top of the analysis page and give a simple per-drink stock position by shift/day.
+
+The structure must match the screenshot exactly in concept and column order.
+
+REQUIRED TABLE COLUMNS
+
+Use these exact headers and order:
+
+1. Item name
+2. SKU
+3. Category
+4. Starting Stock
+5. Purchased
+6. Items sold
+7. Modifier Sold
+8. End Stock
+9. Adjustment
+10. Variance
+
+Do not rename these headers.
+Do not reorder them.
+
+TABLE SCOPE
+
+This table is for drinks only.
+
+Populate one row per drink SKU/item.
+
+At minimum include all currently active tracked drinks from the shop, using the real live drink list already used elsewhere in the system wherever possible.
+
+Expected examples include things like:
+
+- Coke Can / Coke
+- Coke Zero
+- Fanta Orange
+- Fanta Strawberry
+- Sprite
+- Schweppes Manao
+- Water
+- Kids Juice Apple
+- Kids Juice Orange
+
+Use the live canonical drink items already in the system if available.
+Do not hardcode a fake duplicate drink catalog if one already exists.
+
+DATA SOURCES / LOGIC
+
+Use the following logic only for this new table:
+
+1. Item name
+
+- drink item display name
+
+2. SKU
+
+- live SKU if available from current system data
+- if SKU is unavailable, leave blank safely or use existing canonical identifier already used in live data
+- do not invent fake SKUs
+
+3. Category
+
+- always "Drinks" for these rows unless the live system already supplies a canonical category label that matches this
+
+4. Starting Stock
+
+- this shift/day starting stock must equal the prior shift/day end stock for that same drink item
+- if prior shift/day end stock is unavailable, use the best existing opening value already stored by the system
+- do not guess randomly
+- if no prior value exists, show null/blank/0 according to current safe app convention, but document it clearly in code comments if needed
+
+5. Purchased
+
+- pull from the existing drink purchasing modal / stock ordering purchase source already used in the app
+- use the purchases during the selected day/shift for that drink item
+
+6. Items sold
+
+- pull from the live sales source for that drink item
+- this should be direct drink sales count for that specific SKU/item
+
+7. Modifier Sold
+
+- if modifiers or meal/deal logic already track drink usage separately, use that
+- if not currently available, use 0 safely
+- do not fake data
+- do not infer complex modifier logic unless it already exists and is reliable
+
+8. End Stock
+
+- pull from Daily Sales and Stock v2 Form 2 stock section for drinks
+- this is the recorded end-of-shift stock for that drink item
+
+9. Adjustment
+
+- default to 0 for now
+- do not build manual editing in this patch
+- just display 0 as the current standard value unless the current system already has a safe stored adjustment value for this table source
+
+10. Variance
+
+- calculate as:
+
+Variance = Starting Stock + Purchased - Items sold - Modifier Sold - End Stock + Adjustment
+
+Equivalent safe expression:
+Variance = (Starting Stock + Purchased + Adjustment) - (Items sold + Modifier Sold + End Stock)
+
+Use one clear formula and apply it consistently.
+
+PLACEMENT
+
+Add this new table at the top of the analysis page content.
+
+Order requirement:
+
+- page header stays as-is
+- then this new drinks stock analysis table appears first
+- everything else currently on the page remains below it exactly as-is
+
+Do not remove or reorder the existing lower content.
+
+BACKDATE SUPPORT
+
+This table must work historically.
+
+Required:
+
+- it should load historical rows for prior dates already stored in the system
+- starting stock for a date should use the previous recorded end stock for that item where available
+- purchased, sold, and end stock should all use historical data for the selected date/shift
+
+If the page already has a date selector or selected date context, use it.
+Do not create a second conflicting date system if the page already has one.
+
+If no date selector exists on this page, use the page’s current default date behavior and render historical values for that date context only.
+Do not build a whole new filter framework in this patch unless absolutely required.
+
+DO NOT CHANGE ANYTHING ELSE
+
+Again:
+
+- no removals
+- no redesign
+- no replacing current analysis blocks
+- no touching unrelated components
+- no touching staff forms
+- no touching purchasing flow
+- no touching stock review/stock order history
+- no hidden refactors
+
+ARCHITECTURE SAFETY
+
+Before editing, review the existing architecture for:
+
+- analysis page component
+- existing date/shift context on that page
+- live drink stock sources
+- Daily Sales and Stock v2 end stock drink source
+- purchasing modal drink purchase source
+- drink sales source
+- any existing helper utilities for stock reconciliation
+
+Use existing live sources.
+Do not create a conflicting parallel truth source.
+
+IMPLEMENTATION APPROACH
+
+Preferred approach:
+
+- add one new analysis table component
+- wire it into the analysis page at the top
+- use additive backend/API/helper logic only if needed
+- do not disturb existing page logic
+
+If an existing API already exposes enough data, reuse it.
+If not, create the smallest additive API/helper needed for this table only.
+
+UI REQUIREMENTS
+
+Keep styling aligned with the app.
+No icons.
+No emoji.
+No visual redesign.
+Just a clean professional table matching the screenshot structure.
+
+Suggested table title:
+Drinks Stock Variance
+or
+Drinks Stock Analysis
+
+Keep it simple.
+
+TESTING — MANDATORY
+
+Do not mark complete until all tests below are done.
+
+1. PAGE LOAD
+
+- analysis page loads successfully
+- no runtime errors
+- new table appears at top
+
+2. NO REGRESSION
+
+- existing analysis content still appears below
+- nothing else on page removed or shifted incorrectly
+- other analysis blocks still load
+
+3. COLUMN VALIDATION
+
+- confirm exact columns exist in exact order:
+  - Item name
+  - SKU
+  - Category
+  - Starting Stock
+  - Purchased
+  - Items sold
+  - Modifier Sold
+  - End Stock
+  - Adjustment
+  - Variance
+
+4. DRINK ROW VALIDATION
+
+- confirm multiple drink rows appear
+- confirm each row is drinks only
+- confirm category shows correctly
+
+5. DATA SOURCE VALIDATION
+   For at least 2 drink items, verify:
+
+- Starting Stock comes from prior end stock
+- Purchased comes from purchase modal/stock ordering source
+- End Stock comes from Daily Sales and Stock v2 Form 2
+- Items sold comes from live sales source
+
+6. VARIANCE VALIDATION
+   For at least 2 drink rows, manually verify:
+   Variance = Starting Stock + Purchased - Items sold - Modifier Sold - End Stock + Adjustment
+
+7. BACKDATE VALIDATION
+
+- load at least one historical date if current page supports date context
+- confirm historical values render
+- confirm prior shift/day end feeds starting stock where available
+
+8. NO UNWANTED CHANGES
+
+- confirm no changes were made to:
+  - Daily Sales and Stock Form v2
+  - purchasing pages
+  - stock order history
+  - stock reconciliation logic outside what is needed for this new table
+  - existing analysis sections below
+
+OUTPUT REQUIRED
+
+Return only:
+
+1. exact files changed
+2. exact data sources used for each column
+3. confirmation that nothing else on the analysis page was changed
+4. testing completed
+5. screenshots of:
+   - analysis page top with new table
+   - one populated drinks table example
+   - proof lower existing analysis content remains below

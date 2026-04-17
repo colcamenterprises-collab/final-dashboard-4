@@ -281,6 +281,10 @@ async function checkSchema() {
 (async () => {
   // Mount the POS upload router FIRST to avoid conflicts
   app.use("/api/pos", posUploadRouter);
+
+  // Mount drinks-variance BEFORE registerRoutes to prevent /api/analysis/:date wildcard conflict
+  const drinksVarianceRouter = (await import('./routes/drinksVariance.js')).default;
+  app.use('/api/analysis', drinksVarianceRouter);
   
   const server = await registerRoutes(app);
 
