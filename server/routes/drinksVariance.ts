@@ -9,7 +9,7 @@
  *                                   fallback: daily_sales_v2.payload->drinkStock (prior date)
  *   Purchased                    → purchase_tally_drink + purchase_tally (by date)
  *   Items Sold                   → receipt_truth_line (pos_category_name ILIKE '%drink%', receipt_date)
- *   Modifier Sold                → receipt_truth_modifier_aggregate (drink modifiers from set meals)
+ *   Modifier Sold                → receipt_truth_modifier (batch-aware ETL dedup: div/2 for qty=1 lines)
  *   End Stock                    → daily_stock_v2.drink_stock_json (current date)
  *                                   fallback: daily_sales_v2.payload->drinkStock
  *   Adjustment                   → 0 (manual, set in UI)
@@ -216,22 +216,38 @@ router.get('/drinks-variance', async (req, res) => {
       )
       .catch(() => ({ rows: [] } as any)),
 
-    // 8. Modifier sold — deduplicated from receipt_truth_modifier
-    //    (receipt_truth_modifier_aggregate has ETL duplicates — raw dedup is accurate)
+    // 8. Modifier sold — batch-aware ETL dedup from receipt_truth_modifier.
+    //    receipt_truth_modifier has a systematic 2× ETL duplication bug for single-qty lines.
+    //    However, when RTL shows qty > 1 (batch order, multiple sets in one line), the ETL
+    //    ran only once and the raw RTM count equals the real modifier count.
+    //    Strategy: pre-aggregate RTL max_qty and RTM count per (receipt,line_sku,modifier),
+    //    then divide by 2 only when max RTL qty = 1 (ETL-doubled rows).
     pool
       .query<{ modifier_name: string; total_quantity: number }>(
-        `SELECT modifier_name, SUM(quantity)::int AS total_quantity
-         FROM (
-           SELECT DISTINCT ON (rtm.receipt_id, rtm.line_sku, rtm.modifier_name)
-             rtm.modifier_name, rtm.quantity
-           FROM receipt_truth_modifier rtm
-           WHERE rtm.receipt_id IN (
-             SELECT DISTINCT receipt_id
-             FROM receipt_truth_line
-             WHERE receipt_date = $1::date AND receipt_type = 'SALE'
-           )
-           ORDER BY rtm.receipt_id, rtm.line_sku, rtm.modifier_name
-         ) deduped
+        `WITH rtl_info AS (
+           SELECT receipt_id, sku, MAX(quantity) AS max_qty
+           FROM receipt_truth_line
+           WHERE receipt_date = $1::date AND receipt_type = 'SALE'
+           GROUP BY receipt_id, sku
+         ),
+         rtm_counts AS (
+           SELECT receipt_id, line_sku::text AS line_sku, modifier_name, COUNT(*) AS cnt
+           FROM receipt_truth_modifier
+           WHERE receipt_id IN (SELECT DISTINCT receipt_id FROM rtl_info)
+           GROUP BY receipt_id, line_sku::text, modifier_name
+         ),
+         real_counts AS (
+           SELECT
+             rc.modifier_name,
+             CASE
+               WHEN COALESCE(ri.max_qty, 1) > 1 THEN rc.cnt
+               ELSE rc.cnt / 2
+             END AS real_count
+           FROM rtm_counts rc
+           LEFT JOIN rtl_info ri ON ri.receipt_id = rc.receipt_id AND ri.sku = rc.line_sku
+         )
+         SELECT modifier_name, SUM(real_count)::int AS total_quantity
+         FROM real_counts
          GROUP BY modifier_name`,
         [date],
       )
