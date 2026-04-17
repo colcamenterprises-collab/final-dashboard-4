@@ -216,12 +216,23 @@ router.get('/drinks-variance', async (req, res) => {
       )
       .catch(() => ({ rows: [] } as any)),
 
-    // 8. Modifier sold — receipt_truth_modifier_aggregate (drinks chosen in set meals)
+    // 8. Modifier sold — deduplicated from receipt_truth_modifier
+    //    (receipt_truth_modifier_aggregate has ETL duplicates — raw dedup is accurate)
     pool
       .query<{ modifier_name: string; total_quantity: number }>(
-        `SELECT modifier_name, total_quantity::int AS total_quantity
-         FROM receipt_truth_modifier_aggregate
-         WHERE business_date = $1::date`,
+        `SELECT modifier_name, SUM(quantity)::int AS total_quantity
+         FROM (
+           SELECT DISTINCT ON (rtm.receipt_id, rtm.line_sku, rtm.modifier_name)
+             rtm.modifier_name, rtm.quantity
+           FROM receipt_truth_modifier rtm
+           WHERE rtm.receipt_id IN (
+             SELECT DISTINCT receipt_id
+             FROM receipt_truth_line
+             WHERE receipt_date = $1::date AND receipt_type = 'SALE'
+           )
+           ORDER BY rtm.receipt_id, rtm.line_sku, rtm.modifier_name
+         ) deduped
+         GROUP BY modifier_name`,
         [date],
       )
       .catch(() => ({ rows: [] } as any)),
