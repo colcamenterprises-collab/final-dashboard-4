@@ -2636,3 +2636,19 @@ export const internalUsers = pgTable("internal_users", {
 export const insertInternalUserSchema = createInsertSchema(internalUsers).omit({ id: true, createdAt: true });
 export type InternalUser = typeof internalUsers.$inferSelect;
 export type InsertInternalUser = z.infer<typeof insertInternalUserSchema>;
+
+// Drinks Variance Adjustments — persisted notes for manual stock adjustments
+export const drinksVarianceAdjustments = pgTable("drinks_variance_adjustments", {
+  id: serial("id").primaryKey(),
+  shiftDate: date("shift_date").notNull(),
+  itemName: text("item_name").notNull(),
+  sku: text("sku"),
+  adjustmentQty: integer("adjustment_qty").notNull(),
+  note: text("note").notNull(),
+  adjustedBy: text("adjusted_by").notNull(),
+  adjustedAt: timestamp("adjusted_at").defaultNow().notNull(),
+});
+
+export const insertDrinksVarianceAdjustmentSchema = createInsertSchema(drinksVarianceAdjustments).omit({ id: true, adjustedAt: true });
+export type DrinksVarianceAdjustment = typeof drinksVarianceAdjustments.$inferSelect;
+export type InsertDrinksVarianceAdjustment = z.infer<typeof insertDrinksVarianceAdjustmentSchema>;

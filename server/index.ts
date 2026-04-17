@@ -285,6 +285,8 @@ async function checkSchema() {
   // Mount drinks-variance BEFORE registerRoutes to prevent /api/analysis/:date wildcard conflict
   const drinksVarianceRouter = (await import('./routes/drinksVariance.js')).default;
   app.use('/api/analysis', drinksVarianceRouter);
+  const drinksAdjustmentsRouter = (await import('./routes/drinksAdjustments.js')).default;
+  app.use('/api/analysis', drinksAdjustmentsRouter);
   
   const server = await registerRoutes(app);
 

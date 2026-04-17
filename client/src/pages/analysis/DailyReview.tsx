@@ -164,6 +164,76 @@ function EmptyCard({ text }: { text: string }) {
   return <div className="rounded border border-gray-200 bg-white px-4 py-5 text-center text-xs text-gray-400">{text}</div>;
 }
 
+interface AdjRecord {
+  id: number;
+  item_name: string;
+  sku: string | null;
+  adjustment_qty: number;
+  note: string;
+  adjusted_by: string;
+  adjusted_at: string;
+}
+
+function DrinkAdjustmentLog({ date }: { date: string }) {
+  const { data } = useQuery<{ ok: boolean; data: AdjRecord[] }>({
+    queryKey: ['/api/analysis/drinks-adjustments', date],
+    queryFn: () => fetch(`/api/analysis/drinks-adjustments?date=${date}`).then((r) => r.json()),
+    enabled: !!date,
+    staleTime: 30_000,
+  });
+
+  const records = data?.data ?? [];
+  if (records.length === 0) return null;
+
+  function fmtDateTime(iso: string) {
+    try {
+      return new Date(iso).toLocaleString('en-GB', {
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+      });
+    } catch { return iso; }
+  }
+
+  return (
+    <div className="bg-white border border-amber-200 rounded p-4">
+      <h3 className="text-xs font-bold text-slate-700 mb-3 flex items-center gap-1.5">
+        <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+        Drinks Stock Adjustments — {date}
+      </h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse">
+          <thead>
+            <tr className="bg-amber-50 border-b border-amber-200">
+              <th className="text-left px-3 py-2 font-semibold text-slate-600 whitespace-nowrap">Item</th>
+              <th className="text-center px-3 py-2 font-semibold text-slate-600 whitespace-nowrap">Qty</th>
+              <th className="text-left px-3 py-2 font-semibold text-slate-600 whitespace-nowrap">Reason</th>
+              <th className="text-left px-3 py-2 font-semibold text-slate-600 whitespace-nowrap">By</th>
+              <th className="text-left px-3 py-2 font-semibold text-slate-600 whitespace-nowrap">Timestamp</th>
+            </tr>
+          </thead>
+          <tbody>
+            {records.map((rec, i) => (
+              <tr key={rec.id} className={`border-b border-amber-100 ${i % 2 === 0 ? 'bg-white' : 'bg-amber-50/30'}`}>
+                <td className="px-3 py-2 text-slate-700 font-medium whitespace-nowrap">{rec.item_name}</td>
+                <td className={`px-3 py-2 text-center font-semibold tabular-nums whitespace-nowrap ${
+                  rec.adjustment_qty > 0 ? 'text-amber-600' : rec.adjustment_qty < 0 ? 'text-blue-600' : 'text-slate-500'
+                }`}>
+                  {rec.adjustment_qty > 0 ? `+${rec.adjustment_qty}` : rec.adjustment_qty}
+                </td>
+                <td className="px-3 py-2 text-slate-600 max-w-xs">{rec.note}</td>
+                <td className="px-3 py-2 text-slate-500 whitespace-nowrap">{rec.adjusted_by}</td>
+                <td className="px-3 py-2 text-slate-400 whitespace-nowrap">{fmtDateTime(rec.adjusted_at)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function DailyReview() {
   const [selectedDate, setSelectedDate] = useState(bkkYesterday);
   const [month, setMonth] = useState(() => bkkYesterday().slice(0, 7));
@@ -253,6 +323,8 @@ export default function DailyReview() {
       </div>
 
       <DrinksVarianceTable date={selectedDate} />
+
+      <DrinkAdjustmentLog date={selectedDate} />
 
       <div className="flex flex-wrap gap-2">
         <StatusPill label="Daily Form" ok={loadingComparison ? null : hasForm} />
