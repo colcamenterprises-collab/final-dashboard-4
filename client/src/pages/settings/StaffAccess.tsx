@@ -179,8 +179,8 @@ function StaffList({ users, isLoading, onEdit, onResetPin, qc, setSuccess }: {
     );
   }
 
-  const roleOrder = { owner: 0, manager: 1, staff: 2 };
-  const sorted = [...users].sort((a, b) => (roleOrder[a.role as keyof typeof roleOrder] ?? 3) - (roleOrder[b.role as keyof typeof roleOrder] ?? 3));
+  const roleOrder = { owner: 0, manager: 1, cashier: 2, kitchen_staff: 3 };
+  const sorted = [...users].sort((a, b) => (roleOrder[a.role as keyof typeof roleOrder] ?? 4) - (roleOrder[b.role as keyof typeof roleOrder] ?? 4));
 
   return (
     <div className="space-y-2">
@@ -310,7 +310,8 @@ function UserForm({ user, onSuccess, onError, formError }: {
         >
           <option value="owner">Owner</option>
           <option value="manager">Manager</option>
-          <option value="staff">Staff</option>
+          <option value="cashier">Cashier</option>
+          <option value="kitchen_staff">Kitchen Staff</option>
         </select>
         <p className="text-xs text-slate-400 mt-1">Changing role applies default permissions. Adjust below as needed.</p>
       </div>
@@ -447,11 +448,19 @@ function RoleBadge({ role }: { role: string }) {
   const styles: Record<string, string> = {
     owner: "bg-amber-100/60 text-amber-700",
     manager: "bg-blue-100/60 text-blue-700",
-    staff: "bg-slate-100 text-slate-600",
+    cashier: "bg-emerald-100/60 text-emerald-700",
+    kitchen_staff: "bg-purple-100/60 text-purple-700",
   };
+  const labels: Record<string, string> = {
+    owner: "Owner",
+    manager: "Manager",
+    cashier: "Cashier",
+    kitchen_staff: "Kitchen Staff",
+  };
+  const fallbackStyle = "bg-slate-100 text-slate-600";
   return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${styles[role] ?? styles.staff}`}>
-      {role}
+    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${styles[role] ?? fallbackStyle}`}>
+      {labels[role] ?? role}
     </span>
   );
 }
