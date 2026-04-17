@@ -9,10 +9,10 @@
  *                                   fallback: daily_sales_v2.payload->drinkStock (prior date)
  *   Purchased                    → purchase_tally_drink + purchase_tally (by date)
  *   Items Sold                   → receipt_truth_line (pos_category_name ILIKE '%drink%', receipt_date)
- *   Modifier Sold                → 0 (safe default — no reliable per-SKU modifier data)
+ *   Modifier Sold                → receipt_truth_modifier_aggregate (drink modifiers from set meals)
  *   End Stock                    → daily_stock_v2.drink_stock_json (current date)
  *                                   fallback: daily_sales_v2.payload->drinkStock
- *   Adjustment                   → 0 (safe default for this patch)
+ *   Adjustment                   → 0 (manual, set in UI)
  *   Variance                     → Starting + Purchased - Items Sold - Modifier Sold - End Stock + Adjustment
  */
 
@@ -26,6 +26,33 @@ function normKey(s: string): string {
 }
 
 /**
+ * Split a name into lowercase word tokens (min 3 chars).
+ */
+function tokens(s: string): string[] {
+  return s.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter((t) => t.length >= 3);
+}
+
+/**
+ * Token overlap score between two names.
+ * Returns count of matched token pairs (prefix match within first 5 chars).
+ */
+function tokenScore(a: string, b: string): number {
+  const tA = tokens(a);
+  const tB = tokens(b);
+  let score = 0;
+  for (const ta of tA) {
+    for (const tb of tB) {
+      const len = Math.min(5, ta.length, tb.length);
+      if (ta.slice(0, len) === tb.slice(0, len)) {
+        score++;
+        break;
+      }
+    }
+  }
+  return score;
+}
+
+/**
  * Given a raw JSONB value from postgres (may be object or null),
  * return a Map of normalized_name → qty.
  */
@@ -33,7 +60,7 @@ function jsonbToQtyMap(raw: any): Map<string, { qty: number; rawName: string }> 
   const map = new Map<string, { qty: number; rawName: string }>();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return map;
   for (const [k, v] of Object.entries(raw)) {
-    if (k && (Number(v) >= 0)) {
+    if (k && Number(v) >= 0) {
       map.set(normKey(k), { qty: Number(v) || 0, rawName: k });
     }
   }
@@ -50,14 +77,56 @@ function lookupQty(
   qtyMap: Map<string, { qty: number; rawName: string }>,
 ): number {
   const norm = normKey(canonicalName);
-  // Exact normalized match
   const exact = qtyMap.get(norm);
   if (exact !== undefined) return exact.qty;
-  // Partial match — canonical key is contained in map key or vice versa
   for (const [mapKey, mapVal] of qtyMap.entries()) {
     if (mapKey.includes(norm) || norm.includes(mapKey)) return mapVal.qty;
   }
   return 0;
+}
+
+/**
+ * Build a map of canonical_normKey → total modifier qty by scoring each
+ * modifier row against all canonical drink names and assigning it to the
+ * best match. Each modifier row is assigned to at most one canonical drink.
+ */
+function buildModifierSoldMap(
+  modifierRows: { modifier_name: string; total_quantity: number }[],
+  canonicalNames: Map<string, string>, // normKey → displayName
+): Map<string, number> {
+  const result = new Map<string, number>();
+
+  for (const mRow of modifierRows) {
+    const mName = mRow.modifier_name;
+    const mNorm = normKey(mName);
+    let bestNk = '';
+    let bestScore = -1;
+
+    for (const [nk, displayName] of canonicalNames.entries()) {
+      const dNorm = normKey(displayName);
+      // Score 1: exact normKey match
+      if (dNorm === mNorm) {
+        bestNk = nk;
+        bestScore = 100;
+        break;
+      }
+      // Score 2: partial contains
+      if (dNorm.includes(mNorm) || mNorm.includes(dNorm)) {
+        const s = 50;
+        if (s > bestScore) { bestScore = s; bestNk = nk; }
+        continue;
+      }
+      // Score 3: token overlap
+      const s = tokenScore(displayName, mName);
+      if (s > bestScore) { bestScore = s; bestNk = nk; }
+    }
+
+    if (bestNk && bestScore > 0) {
+      result.set(bestNk, (result.get(bestNk) ?? 0) + Number(mRow.total_quantity));
+    }
+  }
+
+  return result;
 }
 
 router.get('/drinks-variance', async (req, res) => {
@@ -66,12 +135,11 @@ router.get('/drinks-variance', async (req, res) => {
     return res.status(400).json({ ok: false, error: 'date query param required (YYYY-MM-DD)' });
   }
 
-  // Prior date for starting stock
   const prior = new Date(`${date}T00:00:00Z`);
   prior.setUTCDate(prior.getUTCDate() - 1);
   const prevDate = prior.toISOString().slice(0, 10);
 
-  const [catalog, endStk, prevStk, sales2End, sales2Prev, purchases, sold] = await Promise.all([
+  const [catalog, endStk, prevStk, sales2End, sales2Prev, purchases, sold, modifiers] = await Promise.all([
     // 1. Canonical drink list
     pool
       .query<{ name: string; sku: string | null }>(
@@ -82,35 +150,29 @@ router.get('/drinks-variance', async (req, res) => {
       )
       .catch(() => ({ rows: [] } as any)),
 
-    // 2. End stock — daily_stock_v2.drink_stock_json for the date
+    // 2. End stock — daily_stock_v2 for the date
     pool
       .query<{ drink_stock_json: any }>(
-        `SELECT drink_stock_json
-         FROM daily_stock_v2
-         WHERE shift_date = $1
-         ORDER BY created_at DESC LIMIT 1`,
+        `SELECT drink_stock_json FROM daily_stock_v2
+         WHERE shift_date = $1 ORDER BY created_at DESC LIMIT 1`,
         [date],
       )
       .catch(() => ({ rows: [] } as any)),
 
-    // 3. Start stock — daily_stock_v2.drink_stock_json for prior date
+    // 3. Start stock — daily_stock_v2 for prior date
     pool
       .query<{ drink_stock_json: any }>(
-        `SELECT drink_stock_json
-         FROM daily_stock_v2
-         WHERE shift_date = $1
-         ORDER BY created_at DESC LIMIT 1`,
+        `SELECT drink_stock_json FROM daily_stock_v2
+         WHERE shift_date = $1 ORDER BY created_at DESC LIMIT 1`,
         [prevDate],
       )
       .catch(() => ({ rows: [] } as any)),
 
-    // 4. End stock fallback — daily_sales_v2.payload->drinkStock for the date
+    // 4. End stock fallback — daily_sales_v2.payload->drinkStock
     pool
       .query<{ drinkstock: any }>(
-        `SELECT payload->'drinkStock' AS drinkstock
-         FROM daily_sales_v2
-         WHERE "shiftDate" = $1
-           AND "deletedAt" IS NULL
+        `SELECT payload->'drinkStock' AS drinkstock FROM daily_sales_v2
+         WHERE "shiftDate" = $1 AND "deletedAt" IS NULL
          ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`,
         [date],
       )
@@ -119,10 +181,8 @@ router.get('/drinks-variance', async (req, res) => {
     // 5. Start stock fallback — daily_sales_v2.payload->drinkStock for prior date
     pool
       .query<{ drinkstock: any }>(
-        `SELECT payload->'drinkStock' AS drinkstock
-         FROM daily_sales_v2
-         WHERE "shiftDate" = $1
-           AND "deletedAt" IS NULL
+        `SELECT payload->'drinkStock' AS drinkstock FROM daily_sales_v2
+         WHERE "shiftDate" = $1 AND "deletedAt" IS NULL
          ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`,
         [prevDate],
       )
@@ -135,8 +195,7 @@ router.get('/drinks-variance', async (req, res) => {
          FROM purchase_tally_drink d
          JOIN purchase_tally t ON t.id = d.tally_id
          WHERE t.date = $1::date
-         GROUP BY d.item_name
-         ORDER BY d.item_name`,
+         GROUP BY d.item_name ORDER BY d.item_name`,
         [date],
       )
       .catch(() => ({ rows: [] } as any)),
@@ -152,14 +211,22 @@ router.get('/drinks-variance', async (req, res) => {
              pos_category_name ILIKE '%drink%'
              OR pos_category_name ILIKE '%beverage%'
            )
-         GROUP BY item_name
-         ORDER BY item_name`,
+         GROUP BY item_name ORDER BY item_name`,
+        [date],
+      )
+      .catch(() => ({ rows: [] } as any)),
+
+    // 8. Modifier sold — receipt_truth_modifier_aggregate (drinks chosen in set meals)
+    pool
+      .query<{ modifier_name: string; total_quantity: number }>(
+        `SELECT modifier_name, total_quantity::int AS total_quantity
+         FROM receipt_truth_modifier_aggregate
+         WHERE business_date = $1::date`,
         [date],
       )
       .catch(() => ({ rows: [] } as any)),
   ]);
 
-  // Resolve end/start stock JSON (prefer daily_stock_v2, fallback to daily_sales_v2 payload)
   const endStockRaw: any =
     endStk.rows[0]?.drink_stock_json ?? sales2End.rows[0]?.drinkstock ?? {};
   const prevStockRaw: any =
@@ -168,17 +235,17 @@ router.get('/drinks-variance', async (req, res) => {
   const endStockMap = jsonbToQtyMap(endStockRaw);
   const prevStockMap = jsonbToQtyMap(prevStockRaw);
 
-  // Build lookup maps for purchases and sold
   const purchaseMap = new Map<string, number>();
   for (const r of purchases.rows) {
     purchaseMap.set(normKey(r.item_name), (purchaseMap.get(normKey(r.item_name)) ?? 0) + Number(r.qty));
   }
+
   const soldMap = new Map<string, number>();
   for (const r of sold.rows) {
     soldMap.set(normKey(r.item_name), (soldMap.get(normKey(r.item_name)) ?? 0) + Number(r.qty));
   }
 
-  // Union all drink names
+  // Union all drink names from catalog + stock maps + purchases + sales
   const allNames = new Map<string, string>(); // normKey → displayName
   for (const r of catalog.rows) allNames.set(normKey(r.name), r.name);
   for (const [nk, v] of endStockMap) if (!allNames.has(nk)) allNames.set(nk, v.rawName);
@@ -192,19 +259,20 @@ router.get('/drinks-variance', async (req, res) => {
     if (!allNames.has(nk)) allNames.set(nk, r.item_name);
   }
 
-  // Catalog lookup for SKU
+  // Build modifier sold map (scored matching: modifier name → canonical drink)
+  const modifierSoldMap = buildModifierSoldMap(modifiers.rows, allNames);
+
   const catalogMap = new Map<string, { sku: string | null }>();
   for (const r of catalog.rows) {
     catalogMap.set(normKey(r.name), { sku: r.sku || null });
   }
 
-  // Build per-drink rows
   const rows = [];
   for (const [nk, displayName] of allNames.entries()) {
     const startingStock = lookupQty(displayName, prevStockMap);
     const purchased = purchaseMap.get(nk) ?? 0;
     const itemsSold = soldMap.get(nk) ?? 0;
-    const modifierSold = 0;
+    const modifierSold = modifierSoldMap.get(nk) ?? 0;
     const endStock = lookupQty(displayName, endStockMap);
     const adjustment = 0;
     const variance = startingStock + purchased - itemsSold - modifierSold - endStock + adjustment;
@@ -224,7 +292,6 @@ router.get('/drinks-variance', async (req, res) => {
     });
   }
 
-  // Sort: catalog items first (alphabetically), then extras
   rows.sort((a, b) => {
     const aInCatalog = catalogMap.has(normKey(a.item_name));
     const bInCatalog = catalogMap.has(normKey(b.item_name));
@@ -238,18 +305,6 @@ router.get('/drinks-variance', async (req, res) => {
     date,
     prev_date: prevDate,
     row_count: rows.length,
-    sources: {
-      item_name: 'purchasing_items (category=Drinks)',
-      sku: 'purchasing_items.supplierSku',
-      category: 'always Drinks',
-      starting_stock: `daily_stock_v2.drink_stock_json for ${prevDate} (fallback: daily_sales_v2.payload->drinkStock)`,
-      purchased: 'purchase_tally_drink + purchase_tally',
-      items_sold: 'receipt_truth_line (pos_category_name ILIKE drink/beverage)',
-      modifier_sold: '0 (safe default — no per-SKU modifier mapping yet)',
-      end_stock: `daily_stock_v2.drink_stock_json for ${date} (fallback: daily_sales_v2.payload->drinkStock)`,
-      adjustment: '0 (safe default for this patch)',
-      variance: 'Starting + Purchased - Items Sold - Modifier Sold - End Stock + Adjustment',
-    },
     data: rows,
   });
 });
