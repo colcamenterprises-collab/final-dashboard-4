@@ -3,7 +3,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -18,8 +17,6 @@ export type PinUser = {
   role: string;
   permissions: StaffPermissions;
 };
-
-type StaffListUser = { id: number; name: string; role: string };
 
 // ─── Auth Context ────────────────────────────────────────────────────────────
 
@@ -155,28 +152,23 @@ const KEYPAD_ROWS = [
   ["", "0", "⌫"],
 ];
 
+type LoginStep = "email" | "pin";
+
 function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
-  const [staffUsers, setStaffUsers] = useState<StaffListUser[]>([]);
-  const [selectedUser, setSelectedUser] = useState<StaffListUser | null>(null);
+  const [step, setStep] = useState<LoginStep>("email");
+  const [email, setEmail] = useState("");
   const [pin, setPin] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [shake, setShake] = useState(false);
 
+  // Hardware keyboard support for PIN step
   useEffect(() => {
-    fetch("/api/pin-auth/users", { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setStaffUsers(data.users ?? []))
-      .catch(() => setStaffUsers([]));
-  }, []);
-
-  // Hardware keyboard support
-  useEffect(() => {
+    if (step !== "pin") return;
     const handler = (e: KeyboardEvent) => {
-      if (!selectedUser) return;
       if (e.key >= "0" && e.key <= "9") appendDigit(e.key);
       else if (e.key === "Backspace") deleteDigit();
-      else if (e.key === "Escape") clearUser();
+      else if (e.key === "Escape") goBack();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -195,22 +187,31 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
     setErrorMsg("");
   }
 
-  function clearUser() {
-    setSelectedUser(null);
+  function goBack() {
+    setStep("email");
+    setPin("");
+    setStatus("idle");
+    setErrorMsg("");
+  }
+
+  async function submitEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setStep("pin");
     setPin("");
     setStatus("idle");
     setErrorMsg("");
   }
 
   async function submitPin(currentPin: string) {
-    if (!selectedUser || currentPin.length < PIN_LENGTH) return;
+    if (!email || currentPin.length < PIN_LENGTH) return;
     setStatus("loading");
     try {
       const res = await fetch("/api/pin-auth/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: selectedUser.id, pin: currentPin }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), pin: currentPin }),
       });
       const data = await res.json();
       if (res.ok && data.user) {
@@ -231,25 +232,21 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
 
   // Auto-submit when PIN_LENGTH digits entered
   useEffect(() => {
-    if (pin.length === PIN_LENGTH && selectedUser && status === "idle") {
+    if (pin.length === PIN_LENGTH && step === "pin" && status === "idle") {
       submitPin(pin);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin]);
-
-  const roleLabel = (role: string) =>
-    role.charAt(0).toUpperCase() + role.slice(1);
 
   return (
     <div
       className="fixed inset-0 z-[9999] bg-white overflow-y-auto"
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      {/* ── Centered column — max-w-xs on mobile, max-w-sm on tablet+ ── */}
       <div className="min-h-full flex flex-col items-center justify-center px-6 py-10">
         <div className="w-full max-w-xs sm:max-w-sm">
 
-          {/* ── Brand header ─────────────────────────────────────── */}
+          {/* Brand header */}
           <div className="mb-8 text-center">
             <div className="inline-flex items-center gap-1.5 mb-3">
               <span className="text-xs font-bold tracking-widest text-emerald-600 uppercase">
@@ -260,57 +257,47 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
               Staff Sign In
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              {selectedUser
-                ? `Enter your 4-digit PIN`
-                : "Tap your name to continue"}
+              {step === "email" ? "Enter your email address to continue" : "Enter your 4-digit PIN"}
             </p>
           </div>
 
-          {/* ── User selection ───────────────────────────────────── */}
-          {!selectedUser && (
-            <div className="mb-4">
-              {staffUsers.length === 0 ? (
-                <div className="rounded border border-gray-200 p-6 text-center">
-                  <p className="text-sm text-gray-500">No staff accounts configured.</p>
-                  <p className="text-xs text-gray-400 mt-1">Contact your manager.</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {staffUsers.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setPin("");
-                        setStatus("idle");
-                        setErrorMsg("");
-                      }}
-                      className="flex items-center gap-3 w-full rounded border border-gray-200 px-4 py-3 text-left hover:border-emerald-500 hover:bg-emerald-50/40 active:scale-[0.99] transition-all"
-                    >
-                      <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-700 shrink-0">
-                        {u.name.slice(0, 1).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-gray-900">{u.name}</p>
-                        <p className="text-xs text-gray-400">{roleLabel(u.role)}</p>
-                      </div>
-                      <svg className="ml-auto text-gray-300 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          {/* ── Step 1: Email entry ──────────────────────────────── */}
+          {step === "email" && (
+            <form onSubmit={submitEmail} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  autoFocus
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full h-11 rounded-lg border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={!email.trim()}
+                className="w-full h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
+              >
+                Continue
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <polyline points="9 18 15 12 9 6" />
+                </svg>
+              </button>
+            </form>
           )}
 
-          {/* ── PIN entry ────────────────────────────────────────── */}
-          {selectedUser && (
+          {/* ── Step 2: PIN entry ─────────────────────────────────── */}
+          {step === "pin" && (
             <div>
-              {/* Who is signing in */}
+              {/* Email shown + back link */}
               <div className="flex items-center justify-between mb-6">
                 <button
-                  onClick={clearUser}
+                  onClick={goBack}
                   className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition-colors"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -319,14 +306,14 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
                   Back
                 </button>
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-700">
-                    {selectedUser.name.slice(0, 1).toUpperCase()}
+                  <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
+                    {email.slice(0, 1).toUpperCase()}
                   </div>
-                  <span className="text-sm font-semibold text-gray-800">{selectedUser.name}</span>
+                  <span className="text-xs text-gray-600 truncate max-w-[160px]">{email}</span>
                 </div>
               </div>
 
-              {/* PIN dots — 4 circles */}
+              {/* PIN dots */}
               <div className={`flex items-center justify-center gap-4 mb-2 ${shake ? "animate-shake" : ""}`}>
                 {Array.from({ length: PIN_LENGTH }).map((_, i) => (
                   <div
@@ -362,12 +349,9 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
                 }}
               >
                 {KEYPAD_ROWS.flat().map((key, idx) => {
-                  if (key === "") {
-                    return <div key={idx} />;
-                  }
+                  if (key === "") return <div key={idx} />;
                   const isDelete = key === "⌫";
                   const isLoading = status === "loading";
-
                   return (
                     <button
                       key={key}
@@ -396,7 +380,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
             </div>
           )}
 
-          {/* ── Footer ───────────────────────────────────────────── */}
+          {/* Footer */}
           <p className="mt-10 text-center text-xs text-gray-300">
             Smash Brothers Burgers — Internal System
           </p>

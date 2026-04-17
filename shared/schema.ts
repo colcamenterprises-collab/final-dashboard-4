@@ -2622,16 +2622,66 @@ export const STAFF_PERMISSIONS: StaffPermissions = {
   "online_ordering_admin.view": false,
 };
 
+export const CASHIER_PERMISSIONS: StaffPermissions = {
+  "dashboard.view": true,
+  "operations.view": false,
+  "purchasing.view": false,
+  "analysis.view": false,
+  "finance.view": false,
+  "menu.view": false,
+  "pos.view": true,
+  "membership.view": true,
+  "forms.daily_sales": true,
+  "forms.daily_stock": false,
+  "expenses.view": false,
+  "settings.view": false,
+  "staff_access.manage": false,
+  "website_admin.view": false,
+  "online_ordering_admin.view": false,
+};
+
+export const KITCHEN_STAFF_PERMISSIONS: StaffPermissions = {
+  "dashboard.view": true,
+  "operations.view": false,
+  "purchasing.view": false,
+  "analysis.view": false,
+  "finance.view": false,
+  "menu.view": false,
+  "pos.view": true,
+  "membership.view": false,
+  "forms.daily_sales": false,
+  "forms.daily_stock": false,
+  "expenses.view": false,
+  "settings.view": false,
+  "staff_access.manage": false,
+  "website_admin.view": false,
+  "online_ordering_admin.view": false,
+};
+
 export const internalUsers = pgTable("internal_users", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   role: text("role").notNull().default("staff"),
+  email: text("email"),
+  contactNumber: text("contact_number"),
   pinHash: text("pin_hash").notNull(),
   active: boolean("active").notNull().default(true),
   permissions: jsonb("permissions").$type<StaffPermissions>().notNull().default({}),
   avatarUrl: text("avatar_url"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Role-level permissions — Owner sets what each role can access
+export const rolePermissions = pgTable("role_permissions", {
+  id: serial("id").primaryKey(),
+  role: text("role").notNull().unique(),
+  permissions: jsonb("permissions").$type<StaffPermissions>().notNull().default({}),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRolePermissionsSchema = createInsertSchema(rolePermissions).omit({ id: true, updatedAt: true });
+export type RolePermission = typeof rolePermissions.$inferSelect;
+export type InsertRolePermission = z.infer<typeof insertRolePermissionsSchema>;
 
 export const insertInternalUserSchema = createInsertSchema(internalUsers).omit({ id: true, createdAt: true });
 export type InternalUser = typeof internalUsers.$inferSelect;

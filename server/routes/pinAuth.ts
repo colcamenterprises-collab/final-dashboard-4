@@ -2,16 +2,32 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "../db";
-import { internalUsers, OWNER_PERMISSIONS, MANAGER_PERMISSIONS, STAFF_PERMISSIONS, type StaffPermissions } from "../../shared/schema";
-import { eq } from "drizzle-orm";
+import {
+  internalUsers,
+  rolePermissions,
+  OWNER_PERMISSIONS,
+  MANAGER_PERMISSIONS,
+  CASHIER_PERMISSIONS,
+  KITCHEN_STAFF_PERMISSIONS,
+  STAFF_PERMISSIONS,
+  type StaffPermissions,
+} from "../../shared/schema";
+import { eq, ilike } from "drizzle-orm";
 
 const router = Router();
 
 const COOKIE_NAME = "sbb_pin_session";
-const COOKIE_MAX_AGE = 12 * 60 * 60 * 1000; // 12 hours
+const COOKIE_MAX_AGE = 12 * 60 * 60 * 1000;
 const BCRYPT_ROUNDS = 10;
 
-// ─── Cookie signing ─────────────────────────────────────────────────────────
+const ROLE_DEFAULTS: Record<string, StaffPermissions> = {
+  owner: OWNER_PERMISSIONS,
+  manager: MANAGER_PERMISSIONS,
+  cashier: CASHIER_PERMISSIONS,
+  kitchen_staff: KITCHEN_STAFF_PERMISSIONS,
+};
+
+// ─── Cookie signing ──────────────────────────────────────────────────────────
 
 function getSigningKey(): string {
   return process.env.INTERNAL_APP_PASSWORD || "sbb-pin-default-key-change-in-prod";
@@ -63,16 +79,31 @@ export function getPinSessionUser(req: Request): {
   };
 }
 
-function isManagerOrOwner(role: string): boolean {
-  return role === "owner" || role === "manager";
+function isOwner(role: string): boolean {
+  return role === "owner";
 }
 
-// ─── GET /users — list active users for login screen ────────────────────────
+// Resolve effective permissions: role-level table first, fallback to user-stored
+async function resolvePermissions(role: string): Promise<StaffPermissions> {
+  try {
+    const [row] = await db
+      .select({ permissions: rolePermissions.permissions })
+      .from(rolePermissions)
+      .where(eq(rolePermissions.role, role))
+      .limit(1);
+    if (row?.permissions && Object.keys(row.permissions).length > 0) {
+      return row.permissions;
+    }
+  } catch {}
+  return ROLE_DEFAULTS[role] ?? STAFF_PERMISSIONS;
+}
+
+// ─── GET /users — list active users for login screen (legacy, kept for compat) ─
 
 router.get("/users", async (_req: Request, res: Response) => {
   try {
     const rows = await db
-      .select({ id: internalUsers.id, name: internalUsers.name, role: internalUsers.role })
+      .select({ id: internalUsers.id, name: internalUsers.name, role: internalUsers.role, email: internalUsers.email })
       .from(internalUsers)
       .where(eq(internalUsers.active, true))
       .orderBy(internalUsers.name);
@@ -83,35 +114,52 @@ router.get("/users", async (_req: Request, res: Response) => {
   }
 });
 
-// ─── POST /login — verify PIN, set session cookie ───────────────────────────
+// ─── POST /login — verify email + PIN or userId + PIN ───────────────────────
 
 router.post("/login", async (req: Request, res: Response) => {
-  const { userId, pin } = req.body as { userId?: number; pin?: string };
-  if (!userId || !pin) {
-    return res.status(400).json({ error: "userId and pin are required" });
+  const { email, userId, pin } = req.body as { email?: string; userId?: number; pin?: string };
+  if (!pin) {
+    return res.status(400).json({ error: "pin is required" });
+  }
+  if (!email && !userId) {
+    return res.status(400).json({ error: "email or userId is required" });
   }
 
   try {
-    const [user] = await db
-      .select()
-      .from(internalUsers)
-      .where(eq(internalUsers.id, userId))
-      .limit(1);
+    let userRow: (typeof internalUsers.$inferSelect) | undefined;
 
-    if (!user || !user.active) {
-      return res.status(401).json({ error: "User not found or inactive" });
+    if (email) {
+      const [found] = await db
+        .select()
+        .from(internalUsers)
+        .where(ilike(internalUsers.email, email.trim()))
+        .limit(1);
+      userRow = found;
+    } else {
+      const [found] = await db
+        .select()
+        .from(internalUsers)
+        .where(eq(internalUsers.id, Number(userId)))
+        .limit(1);
+      userRow = found;
     }
 
-    const match = await bcrypt.compare(String(pin), user.pinHash);
+    if (!userRow || !userRow.active) {
+      return res.status(401).json({ error: "Account not found or inactive" });
+    }
+
+    const match = await bcrypt.compare(String(pin), userRow.pinHash);
     if (!match) {
       return res.status(401).json({ error: "Incorrect PIN" });
     }
 
+    const permissions = await resolvePermissions(userRow.role);
+
     const token = signPayload({
-      id: user.id,
-      name: user.name,
-      role: user.role,
-      permissions: user.permissions,
+      id: userRow.id,
+      name: userRow.name,
+      role: userRow.role,
+      permissions,
       exp: Date.now() + COOKIE_MAX_AGE,
     });
 
@@ -124,7 +172,7 @@ router.post("/login", async (req: Request, res: Response) => {
 
     res.json({
       authenticated: true,
-      user: { id: user.id, name: user.name, role: user.role, permissions: user.permissions },
+      user: { id: userRow.id, name: userRow.name, role: userRow.role, permissions },
     });
   } catch (err) {
     console.error("[pinAuth] POST /login error:", err);
@@ -142,7 +190,7 @@ router.get("/me", (req: Request, res: Response) => {
   res.json({ authenticated: true, user: sessionUser });
 });
 
-// ─── GET /me/profile — full profile with avatar from DB ─────────────────────
+// ─── GET /me/profile ─────────────────────────────────────────────────────────
 
 router.get("/me/profile", async (req: Request, res: Response) => {
   const sessionUser = getPinSessionUser(req);
@@ -166,7 +214,7 @@ router.get("/me/profile", async (req: Request, res: Response) => {
       .limit(1);
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ user });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to load profile" });
   }
 });
@@ -188,7 +236,7 @@ router.patch("/me/profile", async (req: Request, res: Response) => {
       .returning({ id: internalUsers.id, name: internalUsers.name, avatarUrl: internalUsers.avatarUrl });
     if (!updated) return res.status(404).json({ error: "User not found" });
     res.json({ ok: true, user: updated });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to update profile" });
   }
 });
@@ -213,39 +261,42 @@ router.patch("/me/pin", async (req: Request, res: Response) => {
     const pinHash = await bcrypt.hash(String(newPin), BCRYPT_ROUNDS);
     await db.update(internalUsers).set({ pinHash }).where(eq(internalUsers.id, sessionUser.id));
     res.json({ ok: true });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to change PIN" });
   }
 });
 
-// ─── POST /logout — clear session cookie ────────────────────────────────────
+// ─── POST /logout ────────────────────────────────────────────────────────────
 
 router.post("/logout", (_req: Request, res: Response) => {
   res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: "lax" });
   res.json({ ok: true });
 });
 
-// ─── Staff management — owner/manager only ───────────────────────────────────
+// ─── Auth guard — owner only ─────────────────────────────────────────────────
 
-function requireManagerOrOwner(req: Request, res: Response): boolean {
-  // Dev bypass
+function requireOwner(req: Request, res: Response): boolean {
   if (process.env.NODE_ENV === "development") return true;
   const user = getPinSessionUser(req);
-  if (!user || !isManagerOrOwner(user.role)) {
-    res.status(403).json({ error: "Manager or owner access required" });
+  if (!user || !isOwner(user.role)) {
+    res.status(403).json({ error: "Owner access required" });
     return false;
   }
   return true;
 }
 
+// ─── GET /staff — full staff list (owner only) ───────────────────────────────
+
 router.get("/staff", async (req: Request, res: Response) => {
-  if (!requireManagerOrOwner(req, res)) return;
+  if (!requireOwner(req, res)) return;
   try {
     const rows = await db
       .select({
         id: internalUsers.id,
         name: internalUsers.name,
         role: internalUsers.role,
+        email: internalUsers.email,
+        contactNumber: internalUsers.contactNumber,
         active: internalUsers.active,
         permissions: internalUsers.permissions,
         avatarUrl: internalUsers.avatarUrl,
@@ -259,30 +310,38 @@ router.get("/staff", async (req: Request, res: Response) => {
   }
 });
 
+// ─── POST /staff — create staff (owner only) ────────────────────────────────
+
 router.post("/staff", async (req: Request, res: Response) => {
-  if (!requireManagerOrOwner(req, res)) return;
-  const { name, role, pin, permissions } = req.body as {
-    name?: string; role?: string; pin?: string; permissions?: StaffPermissions;
+  if (!requireOwner(req, res)) return;
+  const { name, role, email, contactNumber, pin, avatarUrl } = req.body as {
+    name?: string; role?: string; email?: string; contactNumber?: string;
+    pin?: string; avatarUrl?: string;
   };
   if (!name || !role || !pin) {
     return res.status(400).json({ error: "name, role, and pin are required" });
   }
   if (String(pin).length < 4 || String(pin).length > 8) {
-    return res.status(400).json({ error: "PIN must be 4-8 digits" });
+    return res.status(400).json({ error: "PIN must be 4–8 digits" });
+  }
+  if (email) {
+    const [existing] = await db.select({ id: internalUsers.id }).from(internalUsers).where(ilike(internalUsers.email, email.trim())).limit(1);
+    if (existing) return res.status(400).json({ error: "A staff member with that email already exists" });
   }
 
-  const defaultPerms =
-    role === "owner" ? OWNER_PERMISSIONS :
-    role === "manager" ? MANAGER_PERMISSIONS : STAFF_PERMISSIONS;
+  const permissions = await resolvePermissions(role);
 
   try {
     const pinHash = await bcrypt.hash(String(pin), BCRYPT_ROUNDS);
     const [created] = await db.insert(internalUsers).values({
       name: String(name).trim(),
       role,
+      email: email?.trim().toLowerCase() || null,
+      contactNumber: contactNumber?.trim() || null,
       pinHash,
       active: true,
-      permissions: permissions ?? defaultPerms,
+      permissions,
+      avatarUrl: avatarUrl || null,
     }).returning();
     res.json({ user: { id: created.id, name: created.name, role: created.role } });
   } catch (err) {
@@ -290,29 +349,39 @@ router.post("/staff", async (req: Request, res: Response) => {
   }
 });
 
+// ─── PUT /staff/:id — update staff (owner only) ──────────────────────────────
+
 router.put("/staff/:id", async (req: Request, res: Response) => {
-  if (!requireManagerOrOwner(req, res)) return;
+  if (!requireOwner(req, res)) return;
   const id = Number(req.params.id);
-  const { name, role, active, permissions } = req.body as {
-    name?: string; role?: string; active?: boolean; permissions?: StaffPermissions;
+  const { name, role, email, contactNumber, active, avatarUrl } = req.body as {
+    name?: string; role?: string; email?: string; contactNumber?: string;
+    active?: boolean; avatarUrl?: string | null;
   };
   try {
     const updates: Partial<typeof internalUsers.$inferInsert> = {};
     if (name !== undefined) updates.name = String(name).trim();
-    if (role !== undefined) updates.role = role;
+    if (role !== undefined) {
+      updates.role = role;
+      updates.permissions = await resolvePermissions(role);
+    }
+    if (email !== undefined) updates.email = email?.trim().toLowerCase() || null;
+    if (contactNumber !== undefined) updates.contactNumber = contactNumber?.trim() || null;
     if (active !== undefined) updates.active = Boolean(active);
-    if (permissions !== undefined) updates.permissions = permissions;
+    if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
 
     const [updated] = await db.update(internalUsers).set(updates).where(eq(internalUsers.id, id)).returning();
     if (!updated) return res.status(404).json({ error: "User not found" });
-    res.json({ user: { id: updated.id, name: updated.name, role: updated.role, active: updated.active, permissions: updated.permissions } });
+    res.json({ user: updated });
   } catch (err) {
     res.status(500).json({ error: "Failed to update user" });
   }
 });
 
+// ─── PATCH /staff/:id/pin — reset a staff PIN (owner only) ──────────────────
+
 router.patch("/staff/:id/pin", async (req: Request, res: Response) => {
-  if (!requireManagerOrOwner(req, res)) return;
+  if (!requireOwner(req, res)) return;
   const id = Number(req.params.id);
   const { pin } = req.body as { pin?: string };
   if (!pin || String(pin).length < 4) {
@@ -323,12 +392,56 @@ router.patch("/staff/:id/pin", async (req: Request, res: Response) => {
     const [updated] = await db.update(internalUsers).set({ pinHash }).where(eq(internalUsers.id, id)).returning();
     if (!updated) return res.status(404).json({ error: "User not found" });
     res.json({ ok: true });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: "Failed to reset PIN" });
   }
 });
 
-// ─── Seed helper — exposed for dev bootstrap ────────────────────────────────
+// ─── GET /role-permissions — list permissions per role (owner only) ──────────
+
+router.get("/role-permissions", async (req: Request, res: Response) => {
+  if (!requireOwner(req, res)) return;
+  try {
+    const rows = await db.select().from(rolePermissions).orderBy(rolePermissions.role);
+    // Ensure all 4 roles exist in response
+    const roles = ["owner", "manager", "cashier", "kitchen_staff"];
+    const map = Object.fromEntries(rows.map((r) => [r.role, r]));
+    const result = roles.map((role) => map[role] ?? { id: null, role, permissions: ROLE_DEFAULTS[role] ?? {}, updatedAt: null });
+    res.json({ rolePermissions: result });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to load role permissions" });
+  }
+});
+
+// ─── PUT /role-permissions/:role — update permissions for a role (owner only) ─
+
+router.put("/role-permissions/:role", async (req: Request, res: Response) => {
+  if (!requireOwner(req, res)) return;
+  const { role } = req.params;
+  const validRoles = ["owner", "manager", "cashier", "kitchen_staff"];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: "Invalid role" });
+  }
+  const { permissions } = req.body as { permissions?: StaffPermissions };
+  if (!permissions || typeof permissions !== "object") {
+    return res.status(400).json({ error: "permissions object is required" });
+  }
+  try {
+    const [existing] = await db.select({ id: rolePermissions.id }).from(rolePermissions).where(eq(rolePermissions.role, role)).limit(1);
+    if (existing) {
+      await db.update(rolePermissions).set({ permissions, updatedAt: new Date() }).where(eq(rolePermissions.role, role));
+    } else {
+      await db.insert(rolePermissions).values({ role, permissions });
+    }
+    // Also update all users of this role so their cookie reflects new perms on next login
+    await db.update(internalUsers).set({ permissions }).where(eq(internalUsers.role, role));
+    res.json({ ok: true, role, permissions });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update role permissions" });
+  }
+});
+
+// ─── Seed helper ─────────────────────────────────────────────────────────────
 
 router.post("/seed-owner", async (req: Request, res: Response) => {
   if (process.env.NODE_ENV === "production") {
