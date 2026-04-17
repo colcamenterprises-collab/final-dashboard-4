@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 
 type Group = {
@@ -59,6 +59,7 @@ const groups: Group[] = [
   {
     title: "Analysis",
     items: [
+      { to: "/operations/analysis", label: "Analysis Dashboard" },
       { to: "/analysis/daily-review", label: "Sales & Shift Analysis" },
     ],
   },
@@ -110,10 +111,28 @@ export default function Sidebar({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // collapsible groups (desktop + mobile)
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  // collapsible groups — auto-expand the group containing the active route
+  const { pathname } = useLocation();
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    groups.forEach((g) => {
+      if (g.items.some((it) => pathname.startsWith(it.to))) {
+        initial[g.title] = true;
+      }
+    });
+    return initial;
+  });
   const toggle = (t: string) =>
-    setExpanded((p) => ({ ...p, [t]: p[t] ? false : true }));
+    setExpanded((p) => ({ ...p, [t]: !p[t] }));
+
+  // Keep active group expanded when navigating
+  useEffect(() => {
+    groups.forEach((g) => {
+      if (g.items.some((it) => pathname.startsWith(it.to))) {
+        setExpanded((p) => ({ ...p, [g.title]: true }));
+      }
+    });
+  }, [pathname]);
 
   const Wrapper = ({ children }: { children: React.ReactNode }) => (
     <aside
