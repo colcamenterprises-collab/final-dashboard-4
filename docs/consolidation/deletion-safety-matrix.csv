@@ -1,0 +1,20 @@
+area,scope,classification,required_proof,basis,notes
+Protected core flows,daily sales|daily stock|purchasing|ingredient authority|recipes|products|receipts/shift reports,Do not touch,Executive sign-off to alter protected status,Business critical keep register,Stability priority before Dashboard 5
+Bob read namespace,/api/bob/read/*,Freeze,Bob full route verification + token enforcement + blocker format checks,Audit + Bob contract,GET-only and token-protected
+AI-Ops control,server/routes/aiOpsControl.ts,Freeze,Runtime route + timer verification,Runtime blind spot + keep register,Includes event/timer behavior
+Shopping list overlap,server/shoppingList.ts|server/routes/shoppingList.ts|server/services/shoppingList.ts,Delete only after runtime validation,Triple-router mount/import execution proof + parity test,Duplicate conflict register,High-risk duplicate
+Background jobs,server/jobs/*|server/services/scheduler*|cron declarations,Delete only after runtime validation,Live scheduler registration/execution proof,Replit correction constraint,Static inventory is not deletion-safe
+Server mount orchestration,server/index.ts|server/routes.ts,Do not touch,Architecture-level approval + full regression suite,Business critical keep register,Controls entire runtime composition
+Duplicate service modules,duplicate conflict register entries,Merge later,Canonical owner decision + parity tests + runtime proof,Duplicate conflict register,Retire non-canonical only after proof
+Legacy/unmounted route files,server/routes/* unmounted candidates,Delete only after runtime validation,Dynamic import check + runtime probe + mount scan,Legacy/dead map,Some may be feature-flagged or conditionally loaded
+_old/legacy/autopatch files,files with old|legacy|autopatch|harden markers,Delete only after runtime validation,Import/mount zero-use proof,Runtime gates requirement,Treat as risky until proven inactive
+Frontend route aliases,App.tsx alias/redirect paths,Merge later,Deep-link + redirect parity proof,Route normalization workstream,Retire aliases only after clients migrated
+Frontend route registry truth,client/src/router/RouteRegistry.ts + client/src/App.tsx,Freeze,Route truth baseline capture + route probing,Replit correction constraint,Authoritative route source
+Orphan frontend pages,legacy/dead map orphan list,Archive first,Import/mount absence + route probe proof,Legacy/dead map,Archive before considering deletion
+Archive trees,archive/**,Archive first,None required for archive move,Delete candidate register,Do not delete first pass
+Attached assets,attached_assets/**,Archive first,None required for archive move,Delete candidate register,Non-runtime artifacts
+Temporary outputs,tmp/**,Safe to remove after parity test,Confirm not referenced by scripts/jobs + smoke test,Delete candidate register,Can remove after verification window
+Email stack duplicates,server/lib/email.ts|server/services/email.ts,Merge later,Send path verification + output parity checks,Duplicate conflict register,Protect operational emails
+PDF stack duplicates,server/lib/pdf.ts|server/services/pdf.ts|server/routes/healthSafety/pdf.ts,Merge later,PDF generation parity checks + endpoint verification,Duplicate conflict register,Protect compliance/report outputs
+Recipe service duplicates,server/services/recipeService.ts|server/services/menu/recipeService.ts,Merge later,Product/recipe integration parity tests,Duplicate conflict register,Dependent on menu and product flows
+Ingredient authority overlap,server/routes/ingredientAuthority.ts|server/routes/admin/ingredientAuthority.ts|server/lib/ingredientAuthority.ts,Merge later,Admin + operations behavior parity and auth checks,Duplicate conflict register,Critical source authority
