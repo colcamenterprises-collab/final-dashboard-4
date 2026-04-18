@@ -219,7 +219,7 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
       }),
     onSuccess: (_, u) => {
       qc.invalidateQueries({ queryKey: ["/api/pin-auth/staff"] });
-      onToast(u.active ? "Staff member deactivated." : "Staff member activated.");
+      onToast(u.active ? "Staff member deleted." : "Staff member activated.");
     },
   });
 
@@ -249,7 +249,7 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
   return (
     <div className="rounded border border-slate-200 bg-white overflow-hidden">
       {/* Table header */}
-      <div className="grid grid-cols-[48px_1fr_1fr_1fr_120px_140px] gap-3 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+      <div className="grid grid-cols-[40px_1fr_1.1fr_0.7fr_88px_auto] gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
         <div />
         <div>Name</div>
         <div>Email</div>
@@ -263,7 +263,7 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
         {users.map((u) => (
           <div
             key={u.id}
-            className={`grid grid-cols-[48px_1fr_1fr_1fr_120px_140px] gap-3 items-center px-4 py-3 ${
+            className={`grid grid-cols-[40px_1fr_1.1fr_0.7fr_88px_auto] gap-2 items-center px-4 py-3 ${
               !u.active ? "opacity-50 bg-slate-50/50" : "hover:bg-slate-50/50"
             } transition-colors`}
           >
@@ -324,7 +324,7 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
                     : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                 }`}
               >
-                {u.active ? "Deactivate" : "Activate"}
+                {u.active ? "Delete" : "Activate"}
               </button>
             </div>
           </div>
