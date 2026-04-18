@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,9 +120,24 @@ interface DailyUsageResponse {
   }>;
 }
 
+/** Returns the last completed shift's business date in BKK timezone.
+ *  Shift runs 17:00→03:00 BKK. Before 17:00 BKK = yesterday was the last shift date. */
+function getLastBusinessDateBKK(): string {
+  const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const nowBKK = new Date(Date.now() + BKK_OFFSET_MS);
+  const hourBKK = nowBKK.getUTCHours();
+  if (hourBKK < 17) {
+    // Before 5pm BKK — last shift started yesterday
+    const yesterday = new Date(nowBKK.getTime() - 24 * 60 * 60 * 1000);
+    return yesterday.toISOString().split('T')[0];
+  }
+  // 5pm or later — shift is underway/just started today
+  return nowBKK.toISOString().split('T')[0];
+}
+
 export default function ReceiptsTruth() {
-  const fallbackDate = new Date().toISOString().split('T')[0];
-  const [selectedDate, setSelectedDate] = useState(fallbackDate);
+  const [selectedDate, setSelectedDate] = useState(getLastBusinessDateBKK);
+  const userChangedDate = useRef(false);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const { data: latestShift } = useQuery<{ ok: boolean; date: string }>({
@@ -135,11 +150,13 @@ export default function ReceiptsTruth() {
     retry: false,
   });
 
+  // When API confirms the last real shift date, apply it — unless user already
+  // picked a date manually.
   useEffect(() => {
-    if (latestShift?.date && selectedDate === fallbackDate && latestShift.date !== selectedDate) {
+    if (latestShift?.date && !userChangedDate.current) {
       setSelectedDate(latestShift.date);
     }
-  }, [latestShift?.date, selectedDate, fallbackDate]);
+  }, [latestShift?.date]);
 
   const { data: summary, isLoading: summaryLoading } = useQuery<ReceiptTruthSummary>({
     queryKey: ['/api/analysis/receipts-truth', selectedDate],
@@ -247,7 +264,7 @@ export default function ReceiptsTruth() {
                   type="date"
                   value={selectedDate}
                   min="2024-07-01"
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  onChange={(e) => { userChangedDate.current = true; setSelectedDate(e.target.value); }}
                   className="w-full sm:w-48 rounded-[4px] text-xs"
                   data-testid="input-business-date"
                 />
