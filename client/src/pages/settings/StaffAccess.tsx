@@ -18,6 +18,7 @@ type StaffUser = {
   name: string;
   role: string;
   email: string | null;
+  username: string | null;
   contactNumber: string | null;
   active: boolean;
   permissions: StaffPermissions;
@@ -287,6 +288,7 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
             {/* Name */}
             <div>
               <p className="text-sm font-semibold text-slate-900 leading-tight">{u.name}</p>
+              {u.username && <p className="text-xs text-slate-400 font-mono mt-0.5">@{u.username}</p>}
               {!u.active && <span className="text-xs text-red-500">Inactive</span>}
             </div>
 
@@ -505,6 +507,8 @@ function StaffModal({ user, onClose, onSuccess }: {
   const isEdit = !!user;
   const [name, setName] = useState(user?.name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
+  const [username, setUsername] = useState(user?.username ?? "");
+  const [usernameManual, setUsernameManual] = useState(!!user?.username);
   const [contactNumber, setContactNumber] = useState(user?.contactNumber ?? "");
   const [role, setRole] = useState(user?.role ?? "cashier");
   const [pin, setPin] = useState("");
@@ -512,6 +516,18 @@ function StaffModal({ user, onClose, onSuccess }: {
   const [avatarPreview, setAvatarPreview] = useState<string>(user?.avatarUrl ?? "");
   const [formError, setFormError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+
+  function deriveUsername(fullName: string): string {
+    const parts = fullName.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return "";
+    if (parts.length === 1) return parts[0];
+    return parts[0][0] + parts[parts.length - 1];
+  }
+
+  function handleNameChange(val: string) {
+    setName(val);
+    if (!usernameManual) setUsername(deriveUsername(val));
+  }
 
   function handlePhotoChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -526,7 +542,7 @@ function StaffModal({ user, onClose, onSuccess }: {
     mutationFn: () => {
       if (!isEdit && pin !== confirmPin) throw new Error("PINs do not match");
       if (!isEdit && pin.length < 4) throw new Error("PIN must be at least 4 digits");
-      const body: Record<string, unknown> = { name, role, email, contactNumber, avatarUrl: avatarPreview || null };
+      const body: Record<string, unknown> = { name, role, email, username: username || undefined, contactNumber, avatarUrl: avatarPreview || null };
       if (!isEdit) body.pin = pin;
       return apiFetch(
         isEdit ? `/api/pin-auth/staff/${user!.id}` : "/api/pin-auth/staff",
@@ -594,14 +610,34 @@ function StaffModal({ user, onClose, onSuccess }: {
             <input
               className="input"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => handleNameChange(e.target.value)}
               placeholder="e.g. Jane Smith"
               maxLength={60}
             />
           </Field>
 
+          {/* Username */}
+          <Field label="Username">
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-mono select-none">@</span>
+              <input
+                className="input pl-7 font-mono"
+                value={username}
+                onChange={(e) => {
+                  setUsernameManual(true);
+                  setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""));
+                }}
+                placeholder="auto-generated from name"
+                maxLength={30}
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              {usernameManual ? "Custom username · can log in with this" : "Auto-generated from name · edit to override"}
+            </p>
+          </Field>
+
           {/* Email */}
-          <Field label="Email Address *">
+          <Field label="Email Address">
             <input
               className="input"
               type="email"
@@ -609,7 +645,7 @@ function StaffModal({ user, onClose, onSuccess }: {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="jane@example.com"
             />
-            <p className="text-xs text-slate-400 mt-1">Used to log in to the system</p>
+            <p className="text-xs text-slate-400 mt-1">Optional · can also log in with username or name</p>
           </Field>
 
           {/* Contact */}

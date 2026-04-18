@@ -257,7 +257,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
               Staff Sign In
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              {step === "email" ? "Enter your email address or name" : "Enter your 4-digit PIN"}
+              {step === "email" ? "Enter your email, username, or name" : "Enter your PIN"}
             </p>
           </div>
 
@@ -266,7 +266,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
             <form onSubmit={submitEmail} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Email address or name
+                  Email, username, or name
                 </label>
                 <input
                   type="text"
@@ -274,7 +274,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
                   autoComplete="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com or your name"
+                  placeholder="e.g. cparker, cameron@email.com"
                   className="w-full h-11 rounded-lg border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all"
                 />
               </div>

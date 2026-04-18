@@ -582,6 +582,9 @@ async function checkSchema() {
   await ensureWorkRegisterTables();
   await ensureAgentReadFoundation();
   await ensureInternalUsersTable();
+  // Backfill usernames for existing staff (safe no-op if already set)
+  const { backfillUsernames } = await import('./routes/pinAuth');
+  await backfillUsernames();
   app.use('/api/ai/chat', chatAliasRouter);
 
   // Ingredient Master route (PACK F)

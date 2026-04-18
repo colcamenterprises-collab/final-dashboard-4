@@ -316,6 +316,11 @@ export async function ensureInternalUsersTable(): Promise<void> {
         created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
     `);
+    // Additive migrations — safe to re-run
+    await pool.query(`ALTER TABLE internal_users ADD COLUMN IF NOT EXISTS email TEXT;`);
+    await pool.query(`ALTER TABLE internal_users ADD COLUMN IF NOT EXISTS contact_number TEXT;`);
+    await pool.query(`ALTER TABLE internal_users ADD COLUMN IF NOT EXISTS avatar_url TEXT;`);
+    await pool.query(`ALTER TABLE internal_users ADD COLUMN IF NOT EXISTS username TEXT;`);
     console.log('[pinAuth] internal_users table ready');
   } catch (err) {
     console.error('[pinAuth] Failed to ensure internal_users table:', err);

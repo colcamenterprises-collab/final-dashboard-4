@@ -2663,6 +2663,7 @@ export const internalUsers = pgTable("internal_users", {
   name: text("name").notNull(),
   role: text("role").notNull().default("staff"),
   email: text("email"),
+  username: text("username"),
   contactNumber: text("contact_number"),
   pinHash: text("pin_hash").notNull(),
   active: boolean("active").notNull().default(true),

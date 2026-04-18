@@ -27,6 +27,33 @@ const ROLE_DEFAULTS: Record<string, StaffPermissions> = {
   kitchen_staff: KITCHEN_STAFF_PERMISSIONS,
 };
 
+// ─── Username helpers ────────────────────────────────────────────────────────
+
+/** Derive a base username from a display name.
+ *  "Cameron Parker" → "cparker"   "Jane" → "jane"   "Mary Jane Watson" → "mwatson"
+ */
+function deriveUsername(fullName: string): string {
+  const parts = fullName.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "user";
+  if (parts.length === 1) return parts[0];
+  return parts[0][0] + parts[parts.length - 1];
+}
+
+/** Return a username that doesn't already exist in the DB (appends number if taken). */
+async function uniqueUsername(base: string, excludeId?: number): Promise<string> {
+  let candidate = base;
+  let attempt = 2;
+  while (true) {
+    const [existing] = await db
+      .select({ id: internalUsers.id })
+      .from(internalUsers)
+      .where(ilike(internalUsers.username, candidate))
+      .limit(1);
+    if (!existing || existing.id === excludeId) return candidate;
+    candidate = `${base}${attempt++}`;
+  }
+}
+
 // ─── Cookie signing ──────────────────────────────────────────────────────────
 
 function getSigningKey(): string {
@@ -137,7 +164,17 @@ router.post("/login", async (req: Request, res: Response) => {
         .limit(1);
       userRow = byEmail;
 
-      // Fallback: match by name (supports existing accounts with no email set)
+      // Fallback 1: match by username
+      if (!userRow) {
+        const [byUsername] = await db
+          .select()
+          .from(internalUsers)
+          .where(ilike(internalUsers.username, email.trim()))
+          .limit(1);
+        userRow = byUsername;
+      }
+
+      // Fallback 2: match by display name (legacy accounts with no email/username)
       if (!userRow) {
         const [byName] = await db
           .select()
@@ -307,6 +344,7 @@ router.get("/staff", async (req: Request, res: Response) => {
         name: internalUsers.name,
         role: internalUsers.role,
         email: internalUsers.email,
+        username: internalUsers.username,
         contactNumber: internalUsers.contactNumber,
         active: internalUsers.active,
         permissions: internalUsers.permissions,
@@ -325,9 +363,9 @@ router.get("/staff", async (req: Request, res: Response) => {
 
 router.post("/staff", async (req: Request, res: Response) => {
   if (!requireOwner(req, res)) return;
-  const { name, role, email, contactNumber, pin, avatarUrl } = req.body as {
+  const { name, role, email, contactNumber, pin, avatarUrl, username: requestedUsername } = req.body as {
     name?: string; role?: string; email?: string; contactNumber?: string;
-    pin?: string; avatarUrl?: string;
+    pin?: string; avatarUrl?: string; username?: string;
   };
   if (!name || !role || !pin) {
     return res.status(400).json({ error: "name, role, and pin are required" });
@@ -341,6 +379,8 @@ router.post("/staff", async (req: Request, res: Response) => {
   }
 
   const permissions = await resolvePermissions(role);
+  const base = requestedUsername ? requestedUsername.trim().toLowerCase().replace(/[^a-z0-9]/g, "") : deriveUsername(String(name));
+  const username = await uniqueUsername(base);
 
   try {
     const pinHash = await bcrypt.hash(String(pin), BCRYPT_ROUNDS);
@@ -348,13 +388,14 @@ router.post("/staff", async (req: Request, res: Response) => {
       name: String(name).trim(),
       role,
       email: email?.trim().toLowerCase() || null,
+      username,
       contactNumber: contactNumber?.trim() || null,
       pinHash,
       active: true,
       permissions,
       avatarUrl: avatarUrl || null,
     }).returning();
-    res.json({ user: { id: created.id, name: created.name, role: created.role } });
+    res.json({ user: { id: created.id, name: created.name, role: created.role, username: created.username } });
   } catch (err) {
     res.status(500).json({ error: "Failed to create user" });
   }
@@ -365,9 +406,9 @@ router.post("/staff", async (req: Request, res: Response) => {
 router.put("/staff/:id", async (req: Request, res: Response) => {
   if (!requireOwner(req, res)) return;
   const id = Number(req.params.id);
-  const { name, role, email, contactNumber, active, avatarUrl } = req.body as {
+  const { name, role, email, contactNumber, active, avatarUrl, username: requestedUsername } = req.body as {
     name?: string; role?: string; email?: string; contactNumber?: string;
-    active?: boolean; avatarUrl?: string | null;
+    active?: boolean; avatarUrl?: string | null; username?: string;
   };
   try {
     const updates: Partial<typeof internalUsers.$inferInsert> = {};
@@ -380,6 +421,10 @@ router.put("/staff/:id", async (req: Request, res: Response) => {
     if (contactNumber !== undefined) updates.contactNumber = contactNumber?.trim() || null;
     if (active !== undefined) updates.active = Boolean(active);
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+    if (requestedUsername !== undefined) {
+      const base = requestedUsername.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      updates.username = base ? await uniqueUsername(base, id) : null;
+    }
 
     const [updated] = await db.update(internalUsers).set(updates).where(eq(internalUsers.id, id)).returning();
     if (!updated) return res.status(404).json({ error: "User not found" });
@@ -478,5 +523,26 @@ router.post("/seed-owner", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Seed failed" });
   }
 });
+
+// ─── Startup: backfill usernames for existing staff ──────────────────────────
+
+export async function backfillUsernames(): Promise<void> {
+  try {
+    const users = await db
+      .select({ id: internalUsers.id, name: internalUsers.name, username: internalUsers.username })
+      .from(internalUsers)
+      .where(eq(internalUsers.active, true));
+
+    for (const u of users) {
+      if (u.username) continue;
+      const base = deriveUsername(u.name);
+      const username = await uniqueUsername(base, u.id);
+      await db.update(internalUsers).set({ username }).where(eq(internalUsers.id, u.id));
+    }
+    console.log(`[pinAuth] Username backfill complete (${users.filter(u => !u.username).length} updated)`);
+  } catch (err) {
+    console.error("[pinAuth] Username backfill failed:", err);
+  }
+}
 
 export default router;
