@@ -345,46 +345,62 @@ function RolePermissionsPanel({ qc, onToast }: {
     queryFn: () => apiFetch("/api/pin-auth/role-permissions"),
   });
 
-  const [editing, setEditing] = useState<string | null>(null);
+  // localPerms mirrors what the user is editing right now
   const [localPerms, setLocalPerms] = useState<Record<string, StaffPermissions>>({});
+  // savedPerms tracks what was last persisted so we can detect dirty state
+  const [savedPerms, setSavedPerms] = useState<Record<string, StaffPermissions>>({});
+  const [saving, setSaving] = useState<string | null>(null);
 
-  const saveMutation = useMutation({
-    mutationFn: ({ role, permissions }: { role: string; permissions: StaffPermissions }) =>
-      apiFetch(`/api/pin-auth/role-permissions/${role}`, {
+  // Initialise local state once data arrives
+  const initialised = Object.keys(localPerms).length > 0;
+  if (!isLoading && data && !initialised) {
+    const initial: Record<string, StaffPermissions> = {};
+    data.rolePermissions.forEach((r) => { initial[r.role] = { ...(r.permissions ?? DEFAULT_PERMS[r.role] ?? {}) }; });
+    setLocalPerms(initial);
+    setSavedPerms(initial);
+  }
+
+  function togglePerm(role: string, key: keyof StaffPermissions) {
+    setLocalPerms((p) => ({ ...p, [role]: { ...p[role], [key]: !p[role]?.[key] } }));
+  }
+
+  function isDirty(role: string): boolean {
+    const a = localPerms[role] ?? {};
+    const b = savedPerms[role] ?? {};
+    return JSON.stringify(a) !== JSON.stringify(b);
+  }
+
+  function discardRole(role: string) {
+    setLocalPerms((p) => ({ ...p, [role]: { ...(savedPerms[role] ?? DEFAULT_PERMS[role] ?? {}) } }));
+  }
+
+  async function saveRole(role: string) {
+    setSaving(role);
+    try {
+      await apiFetch(`/api/pin-auth/role-permissions/${role}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ permissions }),
-      }),
-    onSuccess: (_, { role }) => {
+        body: JSON.stringify({ permissions: localPerms[role] }),
+      });
+      setSavedPerms((p) => ({ ...p, [role]: { ...localPerms[role] } }));
       qc.invalidateQueries({ queryKey: ["/api/pin-auth/role-permissions"] });
       qc.invalidateQueries({ queryKey: ["/api/pin-auth/staff"] });
       onToast(`${ROLE_LABELS[role]} permissions saved.`);
-      setEditing(null);
-    },
-  });
+    } catch (e: unknown) {
+      onToast(`Failed to save: ${e instanceof Error ? e.message : "error"}`);
+    } finally {
+      setSaving(null);
+    }
+  }
 
   if (isLoading) {
     return <div className="h-48 rounded border border-slate-200 animate-pulse bg-slate-50" />;
   }
 
-  const rows = data?.rolePermissions ?? [];
-
-  function startEdit(role: string, perms: StaffPermissions) {
-    setEditing(role);
-    setLocalPerms((p) => ({ ...p, [role]: { ...perms } }));
-  }
-
-  function togglePerm(role: string, key: keyof StaffPermissions) {
-    setLocalPerms((p) => ({
-      ...p,
-      [role]: { ...p[role], [key]: !p[role]?.[key] },
-    }));
-  }
-
   return (
     <div className="space-y-4">
       <p className="text-xs text-slate-500">
-        Set what each role can access. Changes apply immediately to all staff of that role.
+        Click any checkbox to toggle access for that role. Save changes per column when done.
         The Owner role always has full access and cannot be restricted.
       </p>
 
@@ -394,11 +410,36 @@ function RolePermissionsPanel({ qc, onToast }: {
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
               <th className="text-left px-4 py-3 font-semibold text-slate-600 w-44">Permission</th>
-              {ROLES.map((role) => (
-                <th key={role} className="text-center px-3 py-3 font-semibold text-slate-700">
-                  <RoleBadge role={role} />
-                </th>
-              ))}
+              {ROLES.map((role) => {
+                const isOwnerRole = role === "owner";
+                const dirty = !isOwnerRole && isDirty(role);
+                const isSaving = saving === role;
+                return (
+                  <th key={role} className="text-center px-3 py-3 font-semibold text-slate-700">
+                    <div className="flex flex-col items-center gap-1.5">
+                      <RoleBadge role={role} />
+                      {!isOwnerRole && dirty && (
+                        <div className="flex gap-1 items-center">
+                          <button
+                            onClick={() => saveRole(role)}
+                            disabled={isSaving}
+                            className="text-xs px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-50 transition-colors"
+                          >
+                            {isSaving ? "Saving…" : "Save"}
+                          </button>
+                          <button
+                            onClick={() => discardRole(role)}
+                            disabled={isSaving}
+                            className="text-xs px-2 py-0.5 rounded border border-slate-200 text-slate-500 hover:text-slate-800 disabled:opacity-50 transition-colors"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -406,22 +447,21 @@ function RolePermissionsPanel({ qc, onToast }: {
               <tr key={key} className={`border-b border-slate-100 ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`}>
                 <td className="px-4 py-2.5 text-slate-700 font-medium">{PERMISSION_LABELS[key] ?? key}</td>
                 {ROLES.map((role) => {
-                  const row = rows.find((r) => r.role === role);
-                  const isEditing = editing === role;
                   const isOwnerRole = role === "owner";
-                  const perms = isEditing ? (localPerms[role] ?? {}) : (row?.permissions ?? DEFAULT_PERMS[role] ?? {});
+                  const perms = localPerms[role] ?? DEFAULT_PERMS[role] ?? {};
                   const checked = isOwnerRole ? true : !!perms[key];
 
                   return (
-                    <td key={role} className="px-3 py-2.5 text-center">
+                    <td key={role} className="px-3 py-2 text-center">
                       <button
-                        disabled={isOwnerRole || !isEditing}
-                        onClick={() => isEditing && !isOwnerRole && togglePerm(role, key)}
-                        className={`w-5 h-5 rounded flex items-center justify-center mx-auto border transition-colors ${
+                        disabled={isOwnerRole}
+                        onClick={() => !isOwnerRole && togglePerm(role, key)}
+                        title={isOwnerRole ? "Owner always has full access" : `Toggle ${PERMISSION_LABELS[key]} for ${ROLE_LABELS[role]}`}
+                        className={`w-5 h-5 rounded flex items-center justify-center mx-auto border transition-all ${
                           checked
                             ? "bg-emerald-500 border-emerald-500"
                             : "bg-white border-slate-300"
-                        } ${!isEditing || isOwnerRole ? "cursor-default" : "cursor-pointer hover:border-emerald-400"}`}
+                        } ${isOwnerRole ? "cursor-default opacity-60" : "cursor-pointer hover:scale-110 hover:border-emerald-400"}`}
                       >
                         {checked && (
                           <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
@@ -436,42 +476,17 @@ function RolePermissionsPanel({ qc, onToast }: {
             ))}
           </tbody>
           <tfoot>
-            <tr className="border-t border-slate-200 bg-slate-50">
-              <td className="px-4 py-3" />
-              {ROLES.map((role) => {
-                const isOwnerRole = role === "owner";
-                const isEditing = editing === role;
-                return (
-                  <td key={role} className="px-3 py-3 text-center">
-                    {isOwnerRole ? (
-                      <span className="text-xs text-slate-400 italic">Full access</span>
-                    ) : isEditing ? (
-                      <div className="flex gap-1.5 justify-center">
-                        <button
-                          onClick={() => saveMutation.mutate({ role, permissions: localPerms[role] ?? {} })}
-                          disabled={saveMutation.isPending}
-                          className="text-xs px-3 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-semibold disabled:opacity-40 transition-colors"
-                        >
-                          {saveMutation.isPending ? "Saving…" : "Save"}
-                        </button>
-                        <button
-                          onClick={() => setEditing(null)}
-                          className="text-xs px-3 py-1 rounded border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => startEdit(role, rows.find((r) => r.role === role)?.permissions ?? DEFAULT_PERMS[role] ?? {})}
-                        className="text-xs px-3 py-1 rounded border border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-700 transition-colors"
-                      >
-                        Edit
-                      </button>
-                    )}
-                  </td>
-                );
-              })}
+            <tr className="border-t border-slate-200 bg-slate-50/50">
+              <td className="px-4 py-2.5 text-xs text-slate-400 italic">Click checkboxes to edit</td>
+              {ROLES.map((role) => (
+                <td key={role} className="px-3 py-2.5 text-center text-xs text-slate-400">
+                  {role === "owner" ? "Full access" : isDirty(role) ? (
+                    <span className="text-amber-600 font-medium">● Unsaved</span>
+                  ) : (
+                    <span className="text-emerald-600">✓ Saved</span>
+                  )}
+                </td>
+              ))}
             </tr>
           </tfoot>
         </table>

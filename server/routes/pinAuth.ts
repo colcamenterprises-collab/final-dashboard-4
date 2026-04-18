@@ -129,12 +129,23 @@ router.post("/login", async (req: Request, res: Response) => {
     let userRow: (typeof internalUsers.$inferSelect) | undefined;
 
     if (email) {
-      const [found] = await db
+      // Try email match first
+      const [byEmail] = await db
         .select()
         .from(internalUsers)
         .where(ilike(internalUsers.email, email.trim()))
         .limit(1);
-      userRow = found;
+      userRow = byEmail;
+
+      // Fallback: match by name (supports existing accounts with no email set)
+      if (!userRow) {
+        const [byName] = await db
+          .select()
+          .from(internalUsers)
+          .where(ilike(internalUsers.name, email.trim()))
+          .limit(1);
+        userRow = byName;
+      }
     } else {
       const [found] = await db
         .select()
@@ -145,7 +156,7 @@ router.post("/login", async (req: Request, res: Response) => {
     }
 
     if (!userRow || !userRow.active) {
-      return res.status(401).json({ error: "Account not found or inactive" });
+      return res.status(401).json({ error: "Account not found. Enter your email or name, then your PIN." });
     }
 
     const match = await bcrypt.compare(String(pin), userRow.pinHash);
