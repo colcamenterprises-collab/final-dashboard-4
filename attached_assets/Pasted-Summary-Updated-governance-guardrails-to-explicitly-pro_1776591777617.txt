@@ -1,0 +1,82 @@
+Summary
+Updated governance guardrails to explicitly protect the Agent governed read surface (/api/agent/read/*) at Bob-equivalent strictness, and added server/routes/agentRead.ts plus server/middleware/agentAuth.ts to critical lock lists. 
+
+Added explicit hard-stop clarifications for orphan-page deletion risk, duplicate-endpoint mount-prefix resolution, and frontend route truth requirements (RouteRegistry.ts + App.tsx). 
+
+Added new drift entries DRIFT-007 and DRIFT-008 covering agent read governance scope and staff access rebuild scope (role_permissions, internal_users, pinAuth.ts, login flow). 
+
+Corrected duplicate-register accuracy for server/routes/ingredients-legacy.ts to state it is confirmed active – imported in server/routes.ts. 
+
+Revalidated protected runtime systems and added agent read/auth files in keep/readiness governance docs, including orchestrator/monitor/cron/AI ops/Bob/Agent/forms locks. 
+
+Tightened phase/scope governance in the execution plan to explicitly keep agent read immutable and prohibit deletes/moves/renames/merges/archives in PR #1. 
+
+Added a dedicated hard-stop governance document (docs/consolidation/cleanup-hard-stop-rules.md) to block unsafe cleanup assumptions before runtime-validated phases. 
+
+Also updated route-ownership and consolidation recommendation docs so Agent read protection is consistently represented across governance artifacts. 
+
+PR / Commit
+Commit created: dfb6fbd
+
+PR metadata recorded via make_pr:
+
+Title: Dashboard 4.0 – Cleanup Safety Rails Finalisation
+
+Body: governance-only, no runtime changes, with verification + rollback notes.
+
+Testing
+
+✅ git diff --check
+
+✅ rg -n "agentRead.ts|agentAuth.ts|/api/agent/read" docs/dashboard-4-consolidation-execution-plan.md docs/consolidation/*.md docs/final-sweep/*.md docs/audit/*.md | sed -n '1,220p'
+
+✅ rg -n "DRIFT-007|DRIFT-008|role_permissions|internal_users|pinAuth.ts|login flow" docs/final-sweep/change-drift-register.md
+
+✅ rg -n "confirmed active|ingredients-legacy" docs/audit/duplicate-conflict-register.md
+
+✅ git status --short
+
+
+Files (9)
+
+business-critical-keep-register.md
+docs/audit/business-critical-keep-register.md
++3
+-1
+
+consolidation-recommendation.md
+docs/audit/consolidation-recommendation.md
++5
+-4
+
+duplicate-conflict-register.md
+docs/audit/duplicate-conflict-register.md
++1
+-1
+
+cleanup-hard-stop-rules.md
+docs/consolidation/cleanup-hard-stop-rules.md
+New
+
+protection-rules-refresh.md
+docs/consolidation/protection-rules-refresh.md
++20
+-2
+
+route-ownership-current-state.md
+docs/consolidation/route-ownership-current-state.md
++1
+-0
+
+dashboard-4-consolidation-execution-plan.md
++3
+-0
+
+change-drift-register.md
+docs/final-sweep/change-drift-register.md
++2
+-0
+
+dashboard-4-final-sweep-readiness-report.md
++4
+-1
