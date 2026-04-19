@@ -1,0 +1,250 @@
+Fix this now. No back and forward. No architecture essay. No partial review. Implement the live Bob read-access layer end to end and return working endpoints plus test proof.
+
+Goal
+
+Bob is blocked because his runtime cannot read the app’s live canonical data.
+
+Your job is to implement a governed, authenticated, read-only Bob access layer so Bob can verify the latest completed shift from the real app.
+
+This is runtime access only. Do not touch protected write flows.
+
+Hard rules
+
+Do not modify:
+
+- Daily Sales & Stock submission logic
+- stock/sales write logic
+- POS sync behavior
+- shopping/reconciliation business rules
+- protected schema/routes unless strictly required for existing agent token support
+
+Do:
+
+- additive-only changes
+- read-only only
+- use existing token/auth patterns if already present
+- reuse existing canonical services/tables/routes where they already exist
+- no fake defaults
+- no silent fallbacks
+
+Implement now
+
+1) Add Bob auth middleware
+
+Create:
+
+"server/middleware/agentAuth.ts"
+
+Requirements:
+
+- accept "Authorization: Bearer <token>"
+- validate against existing agent token system if present
+- DB token lookup first
+- env fallback only if already used by the app
+- reject invalid / inactive / revoked tokens
+- update "last_used_at" on success
+- return 401 or 403 correctly
+
+Reuse existing "agent_tokens" logic if it already exists. Do not invent a second auth system.
+
+---
+
+2) Add Bob read-only route module
+
+Create:
+
+"server/routes/agentRead.ts"
+
+Mount at:
+
+"/api/ai-ops/bob"
+
+Add these endpoints:
+
+"GET /api/ai-ops/bob/health"
+
+Return simple ok payload.
+
+"GET /api/ai-ops/bob/manifest"
+
+Return supported Bob endpoints and shift window rules.
+
+"GET /api/ai-ops/bob/shift-window?date=YYYY-MM-DD"
+
+Return:
+
+- timezone = "Asia/Bangkok"
+- shift start = "17:00"
+- shift end = "03:00 next day"
+
+"GET /api/ai-ops/bob/read/shift-canonical?date=YYYY-MM-DD"
+
+This is the main endpoint.
+
+It must return one aggregated canonical snapshot with these sections:
+
+- "shift"
+- "dailySales"
+- "expenses"
+- "soldItems"
+- "reconciliation"
+- "purchases"
+- "ingredients"
+- "shoppingList"
+- "sourceStatus"
+
+If canonical sources are unavailable, return:
+
+{
+  "ok": false,
+  "status": "BLOCKED_BY_APP_ACCESS",
+  "reason": "Canonical app read surfaces unavailable",
+  "shiftDate": "2026-04-18",
+  "missingSources": []
+}
+
+Do not invent values.
+
+"GET /api/ai-ops/bob/read/proxy?path=<allowed-path>&..."
+
+Strict allowlist only.
+
+Allowed only for approved canonical read paths.
+Reject:
+
+- auth
+- admin
+- payments
+- writes
+- file mutation
+- user/session management
+- any non-allowlisted path
+
+No broad GET passthrough.
+
+---
+
+3) Add canonical aggregator service
+
+Create:
+
+"server/services/bobCanonicalReadService.ts"
+
+This service must:
+
+- compute Bangkok shift window
+- read real canonical app sources
+- build the aggregated payload for "/read/shift-canonical"
+- mark per-source status
+- never mutate data
+
+Implement helpers for:
+
+- shift window compute
+- daily sales canonical
+- expenses canonical
+- sold items canonical
+- reconciliation canonical
+- purchases canonical
+- ingredients canonical
+- shopping list canonical
+- final snapshot builder
+
+Reuse existing services/queries/routes where possible. Do not duplicate truth logic.
+
+---
+
+4) Mount safely
+
+Wire the router into the existing server bootstrap.
+
+Use current app pattern.
+
+Do not disturb protected route ordering.
+
+---
+
+5) Allowlist only
+
+Inside the Bob read layer, add an explicit allowlist for readable canonical paths.
+
+Only include real canonical paths already used by this app, such as:
+
+- "/api/forms/daily-sales/v3"
+- "/api/ingredients/canonical"
+- canonical reconciliation reads
+- canonical purchases reads
+- canonical shopping list reads
+- other approved truth-table reads already in repo
+
+Anything else must be denied.
+
+---
+
+6) Logging
+
+Add concise logs only for:
+
+- Bob auth success/failure
+- blocked canonical reads
+- denied proxy path
+- shift-canonical success/failure
+
+No noisy logs.
+
+---
+
+7) Tests
+
+Add and run tests for:
+
+- valid token access works
+- invalid token rejected
+- revoked/inactive token rejected
+- proxy denies forbidden paths
+- Bangkok shift window computes correctly
+- shift-canonical returns blocked status when canonical sources unavailable
+- shift-canonical returns structured canonical payload when available
+
+No claim of completion without tests.
+
+---
+
+Files to add
+
+- "server/middleware/agentAuth.ts"
+- "server/routes/agentRead.ts"
+- "server/services/bobCanonicalReadService.ts"
+
+Update whatever server bootstrap file is needed to mount the routes.
+
+---
+
+Acceptance criteria
+
+Done means all of this is true:
+
+1. "GET /api/ai-ops/bob/health" works with Bob token
+2. "GET /api/ai-ops/bob/manifest" works with Bob token
+3. "GET /api/ai-ops/bob/shift-window?date=2026-04-18" returns:
+   - "2026-04-18 17:00 Asia/Bangkok"
+   - "2026-04-19 03:00 Asia/Bangkok"
+4. "GET /api/ai-ops/bob/read/shift-canonical?date=2026-04-18" works
+5. blocked sources return explicit "BLOCKED_BY_APP_ACCESS"
+6. available sources return structured canonical data
+7. no protected write flows were changed
+8. tests pass
+
+---
+
+Return only this on completion
+
+1. files changed
+2. endpoints added
+3. auth method used
+4. one blocked response example
+5. one success response example
+6. exact test results
+7. exact canonical sources still missing, if any
+
+No discussion. Implement it.

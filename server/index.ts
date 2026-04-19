@@ -575,6 +575,11 @@ async function checkSchema() {
   const agentReadRouter = (await import('./routes/agentRead')).default;
   app.use('/api/agent/read', agentReadRouter);
 
+  // /api/ai-ops/bob — Additive canonical Bob read endpoints (shift-window, read/shift-canonical, read/proxy)
+  // Mounted AFTER aiOpsControl so existing /bob/health|manifest|proxy-read are unaffected.
+  const bobCanonicalReadRouter = (await import('./routes/bobCanonicalRead')).default;
+  app.use('/api/ai-ops/bob', bobCanonicalReadRouter);
+
   // /api/ai/chat — simple chat alias endpoints + idempotent table setup
   const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables, ensureAgentReadFoundation, ensureInternalUsersTable } = await import('./db');
   await ensureAiChatTables();
