@@ -704,7 +704,7 @@ function StaffModal({ user, onClose, onSuccess }: {
           </button>
           <button
             onClick={() => { setFormError(""); mutation.mutate(); }}
-            disabled={mutation.isPending || !name.trim() || !email.trim() || (!isEdit && pin.length < 4)}
+            disabled={mutation.isPending || !name.trim() || (!isEdit && pin.length < 4)}
             className="px-4 py-2 text-sm font-semibold rounded bg-emerald-600 hover:bg-emerald-700 text-white transition-colors disabled:opacity-40"
           >
             {mutation.isPending ? "Saving…" : isEdit ? "Save Changes" : "Add Staff"}
