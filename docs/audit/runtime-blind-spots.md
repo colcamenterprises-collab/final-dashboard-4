@@ -1,6 +1,11 @@
-# Runtime Blind Spots
+# Runtime Blind Spots (Final Sweep)
 
-- Auth and token enforcement cannot be proven for every route by static scan alone; runtime integration tests required.
-- Some dynamic imports are conditional and feature-flagged; static extraction may over-report potential surfaces.
-- Websocket/event-stream behavior in AI-Ops routes requires live environment verification for full path coverage.
-- Archive and attached assets intentionally excluded from runtime-critical inventories to reduce false positives.
+## Still blocked without runtime validation
+- Effective auth behavior across mixed protected/public prefixes in `server/index.ts`.
+- True endpoint precedence when duplicate or overlapping mounts exist in `server/routes.ts`.
+- Scheduler and cron execution behavior under deployed timezone/runtime settings.
+- Email/PDF delivery reliability and duplicate-email prevention in production integrations.
+- AI-Ops and Bob control-plane behavior requiring live token + database state.
+
+## Implication
+Cleanup implementation that changes ownership, route wiring, or runtime scheduling remains blocked until these are validated in runtime test environments.

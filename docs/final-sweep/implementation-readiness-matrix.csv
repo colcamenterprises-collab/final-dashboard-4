@@ -1,0 +1,12 @@
+workstream,status,blocking_type,why,required_evidence,safe_for_pr1
+Doc and audit refresh,READY,NONE,Documentation-only updates completed in final sweep,Updated docs in docs/dashboard-4-*.md and docs/final-sweep/*,YES
+Protected system lock list,READY,NONE,Critical runtime files and systems revalidated and locked in governance docs,Updated keep register and protection rules refresh docs,YES
+Route ownership normalization docs,READY,NONE,Current route truth sources documented without touching runtime wiring,docs/consolidation/route-ownership-current-state.md,YES
+Shopping list family consolidation,BLOCKED,RUNTIME_VALIDATION,Multiple active route/service surfaces require live precedence verification,Route-level runtime tests and staged rollback proof,NO
+Analysis family consolidation,BLOCKED,RUNTIME_VALIDATION,Inline and modular analysis endpoints overlap and need runtime verification,Endpoint contract tests and source-of-truth assertions,NO
+Product/menu/order surface consolidation,BLOCKED,RUNTIME_VALIDATION,Multi-generation endpoints and page routes need business-safe migration sequence,Owner-approved migration map and runtime parity checks,NO
+Finance/expenses import consolidation,BLOCKED,RUNTIME_VALIDATION,Parallel v1/v2/import surfaces require reconciled contract matrix,Finance endpoint parity tests and non-regression evidence,NO
+Auth/public-protected prefix cleanup,BLOCKED,RUNTIME_VALIDATION,Mixed prefix strategy in server bootstrap is runtime sensitive,Auth matrix tests for all protected/public API groups,NO
+Daily cron/monitor adjustments,BLOCKED,RUNTIME_VALIDATION,Critical readiness/reporting jobs must remain stable,Cron dry-run evidence and monitor event verification,NO
+Email/PDF flow cleanup,BLOCKED,RUNTIME_VALIDATION,Reporting delivery is production-critical and duplication-sensitive,End-to-end staging email/PDF validation,NO
+Manual business ownership decisions (future merge strategy),BLOCKED,MANUAL_BUSINESS_DECISION,Canonical owners for overlapping families require management decision,Signed ownership decision log,NO
