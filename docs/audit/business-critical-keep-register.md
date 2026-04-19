@@ -1,16 +1,32 @@
-# Business-Critical Keep Register
+# Business-Critical Keep Register (Final Sweep)
 
-Must-keep runtime surfaces confirmed from router mounts and direct imports.
+## Purpose
+Runtime-protection register for Dashboard 4 cleanup sequencing. Items listed here are protected from cleanup PR #1 scope.
 
-## API and orchestration
-- `server/routes.ts` (primary API composition and mounts).
-- `server/index.ts` (boot, middleware, scheduler wiring, static serves).
-- `server/routes/aiOpsControl.ts` (AI-Ops and Bob proxy/read surface).
-- `server/routes/bobRead.ts` (canonical `/api/bob/read/*` endpoints).
+## Hard-stop protected systems
+- Daily sales source capture and library read surfaces.
+- Daily stock source capture and reconciliation surfaces.
+- Purchasing pipeline (list, mapping, shift log, analytics).
+- Ingredient authority and canonical ingredient mapping controls.
+- Recipes and product/menu linkage surfaces.
+- Receipts, shift reports, and shift snapshot/reporting surfaces.
+- Bob / AI-Ops operational control and read planes.
+- Critical background jobs and schedulers.
+- Email/PDF report generation flows.
 
-## Source-of-truth forms and ingestion
-- `server/forms/dailySalesV2.ts` (daily sales ingest + audit trail hooks).
-- `server/api/**` and mounted ingestion routes under `server/routes/**`.
+## Mandatory keep files (runtime-protected)
+- `server/services/analysisBuildOrchestrator.ts`
+- `server/services/monitorEngine.ts`
+- `server/cron/dailyReportCron.ts`
+- `server/routes/aiOpsControl.ts`
+- `server/routes/bobRead.ts`
+- `server/routes.ts`
+- `client/src/router/RouteRegistry.ts`
+- `server/api/forms.ts`
 
-## Frontend route authority
-- `client/src/router/RouteRegistry.ts` (canonical ROUTES constants used for frontend path resolution).
+## Protection rationale
+- These files anchor either source-of-truth intake, daily operational readiness signaling, or executive reporting outputs.
+- Any cleanup touching these files requires explicit runtime validation gates before merge.
+
+## Verification note
+Final sweep confirms these files are present in the current repository and remain referenced by active routing/scheduler wiring.

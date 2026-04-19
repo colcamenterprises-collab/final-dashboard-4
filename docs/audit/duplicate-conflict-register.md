@@ -1,108 +1,57 @@
-# Duplicate / Conflict Register
+# Duplicate / Conflict Register (Final Sweep)
 
-Focused register after Replit second-sign-off: runtime conflicts only; archive/assets tracked separately.
+## Scope
+Refreshed for current repository state with focus on active runtime conflict families.
 
-## 1. `drinksLedger.ts`
-- exact files: `server/routes/drinksLedger.ts`, `server/services/drinksLedger.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+## A. Shopping list families (active overlap risk)
+- `server/routes/shoppingList.ts`
+- `server/routes/shoppingListNew.ts`
+- `server/routes/shoppingListRoutes.ts`
+- Inline shopping-list handlers in `server/routes.ts`
+- `server/services/shoppingList.ts`
 
-## 2. `email.ts`
-- exact files: `server/lib/email.ts`, `server/services/email.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+Risk:
+- Multiple route families and service entry points can drift in behavior or ownership.
 
-## 3. `ensureShift.ts`
-- exact files: `server/routes/ensureShift.ts`, `server/services/ensureShift.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+## B. Analysis route families (active overlap risk)
+- Inline `/api/analysis/*` handlers in `server/routes.ts`
+- `server/routes/analysis*` modules
+- Receipt truth and usage endpoints served across multiple mounts
 
-## 4. `finance.ts`
-- exact files: `server/routes/finance.ts`, `server/api/finance.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+Risk:
+- Competing ownership and duplicated endpoint surfaces for similar analysis domains.
 
-## 5. `forms.ts`
-- exact files: `server/routes/forms.ts`, `server/api/forms.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+## C. Product/menu/order surfaces (active overlap risk)
+- `server/routes/menu.ts`
+- `server/routes/menuManagement.ts`
+- `server/routes/menu/menuV3Routes.ts`
+- `server/routes/onlineMenu.ts`
+- `server/routes/onlineOrders.ts`
+- `server/routes/menuOrderingRoutes.ts`
+- `server/routes/ordersV2Routes.ts`
+- `server/routes/products.ts`, `productMenu.ts`, `productIngredients.ts`, `productActivation.ts`
 
-## 6. `ingredientAuthority.ts`
-- exact files: `server/routes/ingredientAuthority.ts`, `server/routes/admin/ingredientAuthority.ts`, `server/lib/ingredientAuthority.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+Risk:
+- Parallel generations (legacy + v2/v3) increase ownership ambiguity for cleanup.
 
-## 7. `ingredients.ts`
-- exact files: `server/routes/ingredients.ts`, `server/forms/ingredients.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+## D. Finance/expenses import overlap
+- `server/routes/expenses.ts`
+- `server/routes/expenses-import.ts`
+- `server/routes/expensesV2Routes.ts`
+- `server/api/finance.ts`
+- `server/routes/finance.ts`
 
-## 8. `loyverse.js`
-- exact files: `server/services/pos-ingestion/loyverse.js`, `server/utils/loyverse.js`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+Risk:
+- Multiple expense and finance surfaces can create mixed canonical read/write assumptions.
 
-## 9. `loyverse.ts`
-- exact files: `server/services/loyverse.ts`, `server/utils/loyverse.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+## E. Legacy-named service/file presence to track
+- `server/loyverseAPI_old.ts`
+- `server/api/daily-sales.legacy.ts`
+- `server/routes/ingredients-legacy.ts`
 
-## 10. `meatLedger.ts`
-- exact files: `server/routes/meatLedger.ts`, `server/services/meatLedger.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+Risk:
+- Legacy naming may imply inactive code but can still be mounted/used.
 
-## 11. `pdf.ts`
-- exact files: `server/routes/healthSafety/pdf.ts`, `server/lib/pdf.ts`, `server/services/pdf.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 12. `primeCost.ts`
-- exact files: `server/routes/primeCost.ts`, `server/services/primeCost.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 13. `qrRoutes.ts`
-- exact files: `server/routes/qrRoutes.ts`, `server/routes/payments/qrRoutes.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 14. `recipeService.ts`
-- exact files: `server/services/recipeService.ts`, `server/services/menu/recipeService.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 15. `rollsLedger.ts`
-- exact files: `server/routes/rollsLedger.ts`, `server/services/rollsLedger.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 16. `seedExpenses.ts`
-- exact files: `server/seedExpenses.ts`, `server/scripts/seedExpenses.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 17. `seedIngredients.ts`
-- exact files: `server/scripts/seedIngredients.ts`, `server/lib/seedIngredients.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 18. `shiftWindow.ts`
-- exact files: `server/lib/shiftWindow.ts`, `server/services/time/shiftWindow.ts`, `server/utils/shiftWindow.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 19. `shoppingList.ts`
-- exact files: `server/shoppingList.ts`, `server/routes/shoppingList.ts`, `server/services/shoppingList.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 20. `skuMap.ts`
-- exact files: `server/routes/skuMap.ts`, `server/services/skuMap.ts`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
-
-## 21. `summaryGenerator.js`
-- exact files: `server/services/summaryGenerator.js`, `server/services/jussi/summaryGenerator.js`
-- impact: potential implementation overlap; verify active import/mount path.
-- disposition: keep canonical mounted route/service; mark others as legacy only if unreferenced.
+## Disposition for cleanup readiness
+- No merges/deletions executed in this sweep.
+- These conflict families are retained for runtime-validated consolidation phases only.
