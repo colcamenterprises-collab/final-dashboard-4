@@ -1,57 +1,26 @@
-# Duplicate / Conflict Register (Final Sweep)
+# Duplicate / Conflict Register (Final Structural Classification)
 
 ## Scope
-Refreshed for current repository state with focus on active runtime conflict families.
+Non-destructive classification for cleanup sequencing.
+No merge/deletion/refactor action is taken in this register update.
 
-## A. Shopping list families (active overlap risk)
-- `server/routes/shoppingList.ts`
-- `server/routes/shoppingListNew.ts`
-- `server/routes/shoppingListRoutes.ts`
-- Inline shopping-list handlers in `server/routes.ts`
-- `server/services/shoppingList.ts`
+## Classification matrix
+| Conflict family | Canonical system | Secondary system(s) | Legacy system(s) | Merge now? |
+|---|---|---|---|---|
+| Shopping list vs purchasing list | `/api/purchasing-list*` family in `server/routes.ts` | `/api/shopping-list*` family (`server/routes/shoppingListRoutes.ts` + inline handlers), `server/services/shoppingList.ts` | historical shopping list naming and route variants | **No** (classification only) |
+| Analysis route overlap | `/api/analysis*` core in `server/routes.ts` | mounted analysis modules in `server/index.ts`; receipts analytics overlap surfaces | legacy aliases and transitional analysis paths | **No** (classification only) |
+| Product/menu/order multi-generation | canonical `products + menu-management + orders-v2` ownership set (planned) | `menu-v3`, `menu-ordering`, `productMenu`, split product subrouters | older menu/order family modules and aliases | **No** (classification only) |
+| Finance/expenses/import overlap | `/api/finance` (index-mounted) + canonical expenses-v2 trajectory | `server/routes/finance.ts`, `server/routes/expenses-import.ts`, inline expenses handlers | older expenses/import route patterns | **No** (classification only) |
+| Daily stock overlap | `/api/daily-stock` index-mounted router family | inline `/api/daily-stock*` handlers in `server/routes.ts` | older stock helper endpoints | **No** (classification only) |
+| System-health dual mount | `/api/system-health` canonical health family | duplicate mount points in both `server/index.ts` and `server/routes.ts` | n/a | **No** (classification only) |
 
-Risk:
-- Multiple route families and service entry points can drift in behavior or ownership.
-
-## B. Analysis route families (active overlap risk)
-- Inline `/api/analysis/*` handlers in `server/routes.ts`
-- `server/routes/analysis*` modules
-- Receipt truth and usage endpoints served across multiple mounts
-
-Risk:
-- Competing ownership and duplicated endpoint surfaces for similar analysis domains.
-
-## C. Product/menu/order surfaces (active overlap risk)
-- `server/routes/menu.ts`
-- `server/routes/menuManagement.ts`
-- `server/routes/menu/menuV3Routes.ts`
-- `server/routes/onlineMenu.ts`
-- `server/routes/onlineOrders.ts`
-- `server/routes/menuOrderingRoutes.ts`
-- `server/routes/ordersV2Routes.ts`
-- `server/routes/products.ts`, `productMenu.ts`, `productIngredients.ts`, `productActivation.ts`
-
-Risk:
-- Parallel generations (legacy + v2/v3) increase ownership ambiguity for cleanup.
-
-## D. Finance/expenses import overlap
-- `server/routes/expenses.ts`
-- `server/routes/expenses-import.ts`
-- `server/routes/expensesV2Routes.ts`
-- `server/api/finance.ts`
-- `server/routes/finance.ts`
-
-Risk:
-- Multiple expense and finance surfaces can create mixed canonical read/write assumptions.
-
-## E. Legacy-named service/file presence to track
-- `server/loyverseAPI_old.ts`
+## Legacy-presence watch list
 - `server/api/daily-sales.legacy.ts`
-- `server/routes/ingredients-legacy.ts`
+- `server/routes/ingredients-legacy.ts` (active)
+- `server/loyverseAPI_old.ts`
 
-Risk:
-- `server/routes/ingredients-legacy.ts` is confirmed active – imported in `server/routes.ts` (not a static orphan candidate).
-
-## Disposition for cleanup readiness
-- No merges/deletions executed in this sweep.
-- These conflict families are retained for runtime-validated consolidation phases only.
+## Disposition
+- Canonical/secondary/legacy ownership is now explicit.
+- Do not merge yet.
+- Do not retire yet.
+- Keep runtime unchanged until later runtime-validated consolidation PRs.
