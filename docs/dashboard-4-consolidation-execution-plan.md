@@ -8,6 +8,7 @@ Governed cleanup execution plan after final readiness sweep. This document is pl
 - No source-of-truth schema/data flow changes.
 - No write-path changes for sales, stock, purchasing, ingredient authority, recipes/products.
 - Bob read contracts remain immutable during first implementation slice.
+- Agent governed read contracts (`/api/agent/read/*`) remain immutable during first implementation slice.
 
 ## Execution phases
 
@@ -21,7 +22,9 @@ Governed cleanup execution plan after final readiness sweep. This document is pl
 Scope:
 - Documentation and route ownership normalization artifacts only.
 - Additive governance files/checklists for runtime validation.
+- Safety-rail corrections only (protection lists, drift register, hard-stop governance).
 - No runtime code path changes.
+- No deletes/moves/renames/merges/archives in this phase.
 
 Exit criteria:
 - Owner can approve deterministic runtime validation checklist for Phase 2.

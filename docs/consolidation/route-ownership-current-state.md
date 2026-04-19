@@ -11,6 +11,7 @@
 
 ## Protected ownership zones
 - Bob read: `server/routes/bobRead.ts` mounted at `/api/bob/read`.
+- Agent governed read: `server/routes/agentRead.ts` + `server/middleware/agentAuth.ts` mounted under `/api/agent/read`.
 - AI/Ops control: `server/routes/aiOpsControl.ts` mounted at `/api/ops/ai` and `/api/ai-ops`.
 - Forms source surfaces include `server/api/forms.ts`, `server/forms/dailySalesV2.ts`, and mounted `/api/forms` handlers.
 

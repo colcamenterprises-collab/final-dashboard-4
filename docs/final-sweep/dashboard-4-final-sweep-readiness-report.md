@@ -15,6 +15,7 @@ These changes required a full sweep refresh of audit/planning docs before cleanu
 ## 2) What previous findings are still valid
 - API runtime truth is still centered in `server/index.ts` + `server/routes.ts`.
 - Bob canonical read namespace remains `/api/bob/read/*` and stays read-only (GET guard) and token-protected.
+- Agent governed read namespace `/api/agent/read/*` is active and must remain protected at Bob-equivalent governance level.
 - Frontend route truth still depends on `RouteRegistry.ts` + `App.tsx` together.
 - Critical orchestrator/monitor/cron systems remain active and protected.
 
@@ -32,7 +33,7 @@ Refreshed safety rails now explicitly lock:
 - recipes
 - products
 - receipts / shift reports
-- Bob / AI-Ops
+- Bob / Agent read / AI-Ops
 - critical background jobs
 - email / PDF flows
 
@@ -42,6 +43,8 @@ Critical runtime-protected files reconfirmed and preserved in governance docs:
 - `server/cron/dailyReportCron.ts`
 - `server/routes/aiOpsControl.ts`
 - `server/routes/bobRead.ts`
+- `server/routes/agentRead.ts`
+- `server/middleware/agentAuth.ts`
 - `server/routes.ts`
 - `client/src/router/RouteRegistry.ts`
 - `server/api/forms.ts`

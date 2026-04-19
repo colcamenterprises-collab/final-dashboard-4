@@ -50,7 +50,7 @@ Risk:
 - `server/routes/ingredients-legacy.ts`
 
 Risk:
-- Legacy naming may imply inactive code but can still be mounted/used.
+- `server/routes/ingredients-legacy.ts` is confirmed active – imported in `server/routes.ts` (not a static orphan candidate).
 
 ## Disposition for cleanup readiness
 - No merges/deletions executed in this sweep.

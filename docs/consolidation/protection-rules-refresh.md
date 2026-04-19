@@ -7,8 +7,9 @@
 4. Do not alter recipes/products authority behavior.
 5. Do not alter receipts/shift reports logic before baseline verification.
 6. Do not alter Bob read GET-only contract under `/api/bob/read/*`.
-7. Do not alter monitor/cron/reporting runtime jobs in cleanup PR #1.
-8. Do not alter email/PDF flow behavior in cleanup PR #1.
+7. Do not alter Agent governed read GET-only contract under `/api/agent/read/*`.
+8. Do not alter monitor/cron/reporting runtime jobs in cleanup PR #1.
+9. Do not alter email/PDF flow behavior in cleanup PR #1.
 
 ## Critical file lock list
 - `server/services/analysisBuildOrchestrator.ts`
@@ -16,9 +17,26 @@
 - `server/cron/dailyReportCron.ts`
 - `server/routes/aiOpsControl.ts`
 - `server/routes/bobRead.ts`
+- `server/routes/agentRead.ts`
+- `server/middleware/agentAuth.ts`
 - `server/routes.ts`
 - `client/src/router/RouteRegistry.ts`
 - `server/api/forms.ts`
+
+## Hard-stop rule clarifications for safe cleanup
+### Orphan pages
+- NEVER delete based on a static list alone.
+- MUST verify re-exports before classification.
+- MUST verify lazy imports before classification.
+- MUST verify indirect imports before classification.
+
+### Duplicate endpoints
+- Router-local paths are not global duplicates by default.
+- MUST resolve final mounted path with mount prefixes first.
+
+### Frontend routes
+- `docs/audit/page-inventory.csv` is not route truth by itself.
+- MUST use `client/src/router/RouteRegistry.ts` and `client/src/App.tsx` as canonical runtime route truth.
 
 ## Validation gate requirement (future runtime phases)
 Any change touching locked files requires:
