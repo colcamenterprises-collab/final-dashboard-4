@@ -10,7 +10,7 @@ Runtime-protection register for Dashboard 4 cleanup sequencing. Items listed her
 - Ingredient authority and canonical ingredient mapping controls.
 - Recipes and product/menu linkage surfaces.
 - Receipts, shift reports, and shift snapshot/reporting surfaces.
-- Bob / AI-Ops operational control and read planes.
+- Bob / Agent read / AI-Ops operational control and read planes.
 - Critical background jobs and schedulers.
 - Email/PDF report generation flows.
 
@@ -20,6 +20,8 @@ Runtime-protection register for Dashboard 4 cleanup sequencing. Items listed her
 - `server/cron/dailyReportCron.ts`
 - `server/routes/aiOpsControl.ts`
 - `server/routes/bobRead.ts`
+- `server/routes/agentRead.ts`
+- `server/middleware/agentAuth.ts`
 - `server/routes.ts`
 - `client/src/router/RouteRegistry.ts`
 - `server/api/forms.ts`

@@ -14,6 +14,8 @@
 | DRIFT-004 | Analysis/drinks | New analysis/drinks work and related routes/pages landed post-audit | Duplicate/conflict register needed focused refresh on active overlap families | Reconciled |
 | DRIFT-005 | Planning package completeness | `docs/dashboard-4-consolidation-execution-plan.md` and `docs/consolidation/*` absent | Package was incomplete for controlled execution handoff | Reconciled (files created) |
 | DRIFT-006 | Runtime certainty | Auth precedence, mount precedence, cron/scheduler behavior still not provable by static review only | Prior and current docs must preserve explicit runtime block conditions | Open (intentionally blocked) |
+| DRIFT-007 | Agent governed read surface | Agent read surface and auth controls now require explicit governance protection: `/api/agent/read`, `server/routes/agentRead.ts`, `server/middleware/agentAuth.ts`, `agent_tokens`, `BOB_READONLY_TOKEN` fallback, `.openclaw/workspace/core/APP_READ_SURFACE.md` | Existing drift docs did not explicitly capture the governed agent read safety surface | Reconciled |
+| DRIFT-008 | Staff access rebuild | Staff access path changed via `role_permissions`, `internal_users` schema updates, `pinAuth.ts` updates, and login flow changes | Prior docs needed explicit caution flags for auth/access ownership and cleanup blocking | Reconciled (governance only; runtime untouched) |
 
 ## Notes
 - No runtime code behavior was altered during this final sweep.
