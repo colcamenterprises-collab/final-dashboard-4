@@ -10,14 +10,37 @@ const router = express.Router();
  */
 async function proxyInternal(path: string, req: Request) {
   const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+  const query = new URLSearchParams();
 
-  const response = await fetch(`${baseUrl}${path}`, {
+  for (const [key, raw] of Object.entries(req.query || {})) {
+    if (Array.isArray(raw)) {
+      for (const value of raw) {
+        query.append(key, String(value));
+      }
+    } else if (raw !== undefined && raw !== null) {
+      query.append(key, String(raw));
+    }
+  }
+
+  const queryString = query.toString();
+  const fullPath = queryString ? `${path}?${queryString}` : path;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+
+  const response = await fetch(`${baseUrl}${fullPath}`, {
     method: "GET",
+    signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
-      // forward auth/session if needed later
     },
   });
+
+  clearTimeout(timeout);
+
+  if (!response.ok) {
+    throw new Error(`GET ${fullPath} failed with ${response.status}`);
+  }
 
   const data = await response.json();
   return data;
@@ -86,7 +109,7 @@ router.get("/daily-stock", bobAuth, async (req: Request, res: Response) => {
  */
 router.get("/purchase-history", bobAuth, async (req: Request, res: Response) => {
   try {
-    const data = await proxyInternal("/api/purchase-history", req);
+    const data = await proxyInternal("/api/analysis/stock-review/purchase-history", req);
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch purchase history" });
