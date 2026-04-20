@@ -26,7 +26,7 @@ type ComparisonRow = {
 };
 
 async function internalGet(path: string) {
-  const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+  const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
   const request = fetch(`${baseUrl}${path}`, {
     method: "GET",
     headers: {
@@ -290,7 +290,7 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
 
   comparisons.push(buildThresholdCheck("meat_expected_vs_closing_g", expectedClosingMeat, closingMeat, 500));
 
-  const stockUsageDrinks = toNumber(stockUsage?.summary?.drinksTotal) ?? toNumber(stockUsage?.totals?.drinks);
+  const stockUsageDrinks = toNumber(stockUsage?.summary?.totalDrinks) ?? toNumber(stockUsage?.totals?.drinks);
   const purchasedDrinkCount = Array.isArray(purchaseHistory?.drinks)
     ? purchaseHistory.drinks.reduce((sum: number, row: any) => {
         const items = Array.isArray(row?.items) ? row.items : [];
