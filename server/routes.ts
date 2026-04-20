@@ -114,6 +114,7 @@ import adminBackupRouter from "./routes/adminBackup";
 import adminHistoricalImportRouter from "./routes/adminHistoricalImport";
 import systemHealthRouter from "./routes/systemHealth";
 import bobReadRouter from "./routes/bobRead";
+import bobVerifyRouter from "./routes/bobVerify";
 import executiveMetricsRouter from "./routes/executiveMetrics";
 import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./services/menuCanonicalService";
 import dashboard4Routes from "./routes/dashboard4Routes";
@@ -1250,6 +1251,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Shift Report V2
   app.use("/api/shift-report", shiftReportRoutes);
   app.use("/api/bob/read", bobReadRouter);
+  app.use("/api/bob/read/verify", bobVerifyRouter);
 
   // Purchases import
   app.use("/api/purchases", purchasesRouter);
