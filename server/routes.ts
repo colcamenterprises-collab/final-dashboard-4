@@ -118,6 +118,7 @@ import bobVerifyRouter from "./routes/bobVerify";
 import executiveMetricsRouter from "./routes/executiveMetrics";
 import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./services/menuCanonicalService";
 import dashboard4Routes from "./routes/dashboard4Routes";
+import { pool } from "./db";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
 import healthSafetyPdf from "./routes/healthSafety/pdf";
@@ -1793,6 +1794,34 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.status(500).json({ error: e.message || String(e) });
     }
   });
+
+  // Canonical stock-usage endpoint.
+  // Reuses Bob proxy-read analysis module to avoid duplicating stock-usage business logic.
+  app.get("/api/analysis/stock-usage", async (req: Request, res: Response) => {
+    const date = typeof req.query.date === "string" ? req.query.date : "";
+    if (!date) {
+      return res.status(400).json({ ok: false, error: "date query param required (YYYY-MM-DD)" });
+    }
+
+    const readToken = process.env.BOB_READONLY_TOKEN || process.env.BOBS_LOYVERSE_TOKEN;
+    if (!readToken) {
+      return res.status(503).json({ ok: false, error: "Bob read token is not configured" });
+    }
+
+    const qs = new URLSearchParams({
+      path: "analysis/stock-usage",
+      date,
+      token: readToken,
+    });
+
+    try {
+      const upstream = await fetch(`http://localhost:${process.env.PORT || 8080}/api/ai-ops/bob/proxy-read?${qs.toString()}`);
+      const payload = await upstream.json().catch(() => ({ ok: false, error: "Invalid upstream response" }));
+      return res.status(upstream.status).json(payload);
+    } catch (error: any) {
+      return res.status(502).json({ ok: false, error: error?.message || "Failed to fetch stock usage" });
+    }
+  });
   
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
@@ -3078,6 +3107,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         LIMIT ${limit}
       `;
 
+      if (!pool) {
+        return res.json({
+          ok: true,
+          source: ["purchase_tally", "purchase_tally_drink"],
+          filters: { from, to, limit },
+          rolls: [],
+          meat: [],
+          drinks: [],
+        });
+      }
+
       const purchasesResult = await pool.query(purchasesQuery, params);
       const tallyIds = purchasesResult.rows.map((row: any) => row.id).filter(Boolean);
 
@@ -3087,10 +3127,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           `
             SELECT tally_id, item_name, qty, unit
             FROM purchase_tally_drink
-            WHERE tally_id = ANY($1::uuid[])
+            WHERE tally_id::text = ANY($1::text[])
             ORDER BY item_name ASC
           `,
-          [tallyIds],
+          [tallyIds.map((id: unknown) => String(id))],
         );
 
         drinksByTallyId = drinksResult.rows.reduce((map: Map<string, any[]>, row: any) => {

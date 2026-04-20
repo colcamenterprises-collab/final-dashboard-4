@@ -26,7 +26,7 @@ type ComparisonRow = {
 };
 
 async function internalGet(path: string) {
-  const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+  const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
   const request = fetch(`${baseUrl}${path}`, {
     method: "GET",
     headers: {
