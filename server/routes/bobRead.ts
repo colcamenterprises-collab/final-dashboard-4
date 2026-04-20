@@ -9,8 +9,9 @@ const router = express.Router();
  * Calls existing app endpoints
  */
 async function proxyInternal(path: string, req: Request) {
-  const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
-  const query = new URLSearchParams();
+  const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
+  const [pathname, rawQuery = ""] = path.split("?");
+  const query = new URLSearchParams(rawQuery);
 
   for (const [key, raw] of Object.entries(req.query || {})) {
     if (Array.isArray(raw)) {
@@ -23,20 +24,23 @@ async function proxyInternal(path: string, req: Request) {
   }
 
   const queryString = query.toString();
-  const fullPath = queryString ? `${path}?${queryString}` : path;
+  const fullPath = queryString ? `${pathname}?${queryString}` : pathname;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
-
-  const response = await fetch(`${baseUrl}${fullPath}`, {
-    method: "GET",
-    signal: controller.signal,
-    headers: {
-      "Content-Type": "application/json",
-    },
-  });
-
-  clearTimeout(timeout);
+  const timeoutMs = Number(process.env.BOB_READ_PROXY_TIMEOUT_MS || 20000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  let response;
+  try {
+    response = await fetch(`${baseUrl}${fullPath}`, {
+      method: "GET",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
 
   if (!response.ok) {
     throw new Error(`GET ${fullPath} failed with ${response.status}`);
@@ -121,7 +125,10 @@ router.get("/purchase-history", bobAuth, async (req: Request, res: Response) => 
  */
 router.get("/stock-usage", bobAuth, async (req: Request, res: Response) => {
   try {
-    const data = await proxyInternal("/api/analysis/stock-usage", req);
+    const data = await proxyInternal(
+      `/api/ai-ops/bob/proxy-read?path=analysis/stock-usage&token=${encodeURIComponent(process.env.BOB_READONLY_TOKEN || "")}`,
+      req
+    );
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch stock usage" });
