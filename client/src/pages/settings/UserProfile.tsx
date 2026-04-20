@@ -45,9 +45,9 @@ export default function UserProfile() {
   const [avatarSuccess, setAvatarSuccess] = useState("");
 
   const { data, isLoading } = useQuery<{ user: ProfileUser }>({
-    queryKey: ["/api/pin/me/profile"],
+    queryKey: ["/api/pin-auth/me/profile"],
     queryFn: async () => {
-      const r = await fetch("/api/pin/me/profile", { credentials: "include" });
+      const r = await fetch("/api/pin-auth/me/profile", { credentials: "include" });
       if (!r.ok) throw new Error("Failed to load profile");
       return r.json();
     },
@@ -55,7 +55,7 @@ export default function UserProfile() {
 
   const avatarMutation = useMutation({
     mutationFn: async (avatarUrl: string | null) => {
-      const r = await fetch("/api/pin/me/profile", {
+      const r = await fetch("/api/pin-auth/me/profile", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -78,7 +78,7 @@ export default function UserProfile() {
 
   const pinMutation = useMutation({
     mutationFn: async (body: { currentPin: string; newPin: string }) => {
-      const r = await fetch("/api/pin/me/pin", {
+      const r = await fetch("/api/pin-auth/me/pin", {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },

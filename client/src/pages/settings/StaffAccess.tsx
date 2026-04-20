@@ -249,12 +249,21 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
 
   return (
     <div className="rounded border border-slate-200 bg-white overflow-hidden">
-      {/* Table header */}
-      <div className="grid grid-cols-[36px_minmax(0,1.5fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_84px_148px] gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+      {/* Table header
+           Mobile  (<md):  avatar | name | role | actions
+           Tablet  (md+):  avatar | name | email | role | actions
+           Desktop (lg+):  avatar | name | email | contact | role | actions  */}
+      <div className="
+        grid gap-2 px-4 py-2.5 bg-slate-50 border-b border-slate-200
+        text-xs font-semibold text-slate-500 uppercase tracking-wide
+        grid-cols-[32px_1fr_72px_116px]
+        md:grid-cols-[32px_minmax(0,1.6fr)_minmax(0,1.3fr)_76px_130px]
+        lg:grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(0,0.7fr)_76px_140px]
+      ">
         <div />
         <div>Name</div>
-        <div>Email</div>
-        <div>Contact</div>
+        <div className="hidden md:block">Email</div>
+        <div className="hidden lg:block">Contact</div>
         <div>Role</div>
         <div className="text-right">Actions</div>
       </div>
@@ -264,9 +273,13 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
         {users.map((u) => (
           <div
             key={u.id}
-            className={`grid grid-cols-[36px_minmax(0,1.5fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_84px_148px] gap-2 items-center px-4 py-3 ${
-              !u.active ? "opacity-50 bg-slate-50/50" : "hover:bg-slate-50/50"
-            } transition-colors`}
+            className={`
+              grid gap-2 items-center px-4 py-3 transition-colors
+              grid-cols-[32px_1fr_72px_116px]
+              md:grid-cols-[32px_minmax(0,1.6fr)_minmax(0,1.3fr)_76px_130px]
+              lg:grid-cols-[32px_minmax(0,1.4fr)_minmax(0,1.1fr)_minmax(0,0.7fr)_76px_140px]
+              ${!u.active ? "opacity-50 bg-slate-50/50" : "hover:bg-slate-50/50"}
+            `}
           >
             {/* Avatar */}
             <div className="shrink-0">
@@ -274,10 +287,10 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
                 <img
                   src={u.avatarUrl}
                   alt={u.name}
-                  className="w-9 h-9 rounded-full object-cover border border-slate-200"
+                  className="w-8 h-8 rounded-full object-cover border border-slate-200"
                 />
               ) : (
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                   ROLE_BADGE_STYLES[u.role]?.replace("/60", "") ?? "bg-slate-100 text-slate-600"
                 }`}>
                   {u.name.slice(0, 1).toUpperCase()}
@@ -286,17 +299,21 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
             </div>
 
             {/* Name */}
-            <div>
-              <p className="text-sm font-semibold text-slate-900 leading-tight">{u.name}</p>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-slate-900 leading-tight truncate">{u.name}</p>
               {u.username && <p className="text-xs text-slate-400 font-mono mt-0.5">@{u.username}</p>}
               {!u.active && <span className="text-xs text-red-500">Inactive</span>}
             </div>
 
-            {/* Email */}
-            <div className="text-xs text-slate-500 truncate min-w-0">{u.email || <span className="text-slate-300">—</span>}</div>
+            {/* Email — tablet+ only */}
+            <div className="hidden md:block text-xs text-slate-500 truncate min-w-0">
+              {u.email || <span className="text-slate-300">—</span>}
+            </div>
 
-            {/* Contact */}
-            <div className="text-xs text-slate-500 truncate min-w-0">{u.contactNumber || <span className="text-slate-300">—</span>}</div>
+            {/* Contact — desktop only */}
+            <div className="hidden lg:block text-xs text-slate-500 truncate min-w-0">
+              {u.contactNumber || <span className="text-slate-300">—</span>}
+            </div>
 
             {/* Role badge */}
             <div>
@@ -307,20 +324,20 @@ function StaffDirectory({ qc, onEdit, onResetPin, onToast }: {
             <div className="flex items-center gap-1 justify-end">
               <button
                 onClick={() => onResetPin(u.id)}
-                className="text-xs px-2.5 py-1 rounded border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors"
+                className="text-xs px-2 py-1 rounded border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors"
               >
                 PIN
               </button>
               <button
                 onClick={() => onEdit(u)}
-                className="text-xs px-2.5 py-1 rounded border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors"
+                className="text-xs px-2 py-1 rounded border border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900 transition-colors"
               >
                 Edit
               </button>
               <button
                 onClick={() => toggleActive.mutate(u)}
                 disabled={toggleActive.isPending}
-                className={`text-xs px-2.5 py-1 rounded border transition-colors disabled:opacity-40 ${
+                className={`text-xs px-2 py-1 rounded border transition-colors disabled:opacity-40 ${
                   u.active
                     ? "border-red-200 text-red-600 hover:bg-red-50"
                     : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
@@ -673,7 +690,7 @@ function StaffModal({ user, onClose, onSuccess }: {
 
           {/* PIN — create only */}
           {!isEdit && (
-            <>
+            <div className="grid grid-cols-2 gap-3">
               <Field label="PIN (4–8 digits) *">
                 <input
                   className="input tracking-widest"
@@ -694,7 +711,7 @@ function StaffModal({ user, onClose, onSuccess }: {
                   placeholder="Re-enter PIN"
                 />
               </Field>
-            </>
+            </div>
           )}
         </div>
 
@@ -758,26 +775,28 @@ function PinResetModal({ userId, onClose, onSuccess }: {
           {formError && (
             <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{formError}</div>
           )}
-          <Field label="New PIN (4–8 digits)">
-            <input
-              className="input tracking-widest"
-              type="password"
-              inputMode="numeric"
-              value={pin}
-              onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
-              placeholder="Enter new PIN"
-            />
-          </Field>
-          <Field label="Confirm PIN">
-            <input
-              className="input tracking-widest"
-              type="password"
-              inputMode="numeric"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value.replace(/\D/g, "").slice(0, 8))}
-              placeholder="Re-enter PIN"
-            />
-          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="New PIN (4–8 digits)">
+              <input
+                className="input tracking-widest"
+                type="password"
+                inputMode="numeric"
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                placeholder="Enter new PIN"
+              />
+            </Field>
+            <Field label="Confirm PIN">
+              <input
+                className="input tracking-widest"
+                type="password"
+                inputMode="numeric"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value.replace(/\D/g, "").slice(0, 8))}
+                placeholder="Re-enter PIN"
+              />
+            </Field>
+          </div>
         </div>
         <div className="px-5 py-4 border-t border-slate-100 flex gap-2 justify-end">
           <button onClick={onClose} className="px-4 py-2 text-sm rounded border border-slate-200 text-slate-600 hover:text-slate-900 transition-colors">

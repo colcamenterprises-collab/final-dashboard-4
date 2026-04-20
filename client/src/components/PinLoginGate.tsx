@@ -64,10 +64,23 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
   const checkSession = useCallback(async () => {
     if (isPublic) { setGateState("unlocked"); return; }
     const forcePin = new URLSearchParams(window.location.search).get("lock") === "1";
+
+    // Always check the real session first — so logged-in users see their actual name
+    try {
+      const res = await fetch("/api/pin-auth/me", { credentials: "include" });
+      const data = await res.json();
+      if (data.authenticated && data.user) {
+        setCurrentUser(data.user);
+        setGateState("unlocked");
+        return;
+      }
+    } catch {}
+
+    // Dev bypass — only when no real session exists and not force-locked
     if (process.env.NODE_ENV === "development" && !forcePin) {
       setCurrentUser({
-        id: 0,
-        name: "Dev Owner",
+        id: 1,
+        name: "Cam",
         role: "owner",
         permissions: Object.fromEntries(
           ["dashboard.view","operations.view","purchasing.view","analysis.view",
@@ -79,19 +92,9 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       setGateState("unlocked");
       return;
     }
-    try {
-      const res = await fetch("/api/pin-auth/me", { credentials: "include" });
-      const data = await res.json();
-      if (data.authenticated && data.user) {
-        setCurrentUser(data.user);
-        setGateState("unlocked");
-      } else {
-        setCurrentUser(null);
-        setGateState("locked");
-      }
-    } catch {
-      setGateState("locked");
-    }
+
+    setCurrentUser(null);
+    setGateState("locked");
   }, [isPublic]);
 
   useEffect(() => { checkSession(); }, [checkSession]);
