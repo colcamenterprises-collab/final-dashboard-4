@@ -605,14 +605,34 @@ export async function updateDailySalesV2Form1(req: Request, res: Response) {
       toTHB(nextPayload.grabSales ?? 0) +
       toTHB(nextPayload.otherSales ?? 0);
 
+    // Also update top-level columns that the library reads directly
+    const columnUpdates: string[] = ['payload = $1'];
+    const columnValues: any[] = [JSON.stringify(nextPayload)];
+    let paramIdx = 2;
+
+    if (body.shiftDate) {
+      // Normalise to ISO datetime so shiftDate::timestamp casts work
+      const sd = body.shiftDate.slice(0, 10); // keep YYYY-MM-DD part
+      columnUpdates.push(`"shiftDate" = $${paramIdx}`);
+      columnValues.push(`${sd}T00:00:00.000Z`);
+      paramIdx++;
+    }
+    if (typeof body.completedBy !== 'undefined') {
+      columnUpdates.push(`"completedBy" = $${paramIdx}`);
+      columnValues.push(body.completedBy);
+      paramIdx++;
+    }
+
+    columnValues.push(id);
     await pool.query(
-      `UPDATE daily_sales_v2 SET payload = $1 WHERE id = $2`,
-      [JSON.stringify(nextPayload), id]
+      `UPDATE daily_sales_v2 SET ${columnUpdates.join(', ')} WHERE id = $${paramIdx}`,
+      columnValues
     );
 
     const changedFields = diffFields(existingPayload, nextPayload, [
       'completedBy','startingCash','cashSales','qrSales','grabSales','otherSales','expenses','wages','closingCash','cashBanked','qrTransfer','grabReceiptCount','cashReceiptCount','qrReceiptCount','directReceiptCount','refunds','totalSales'
     ]);
+    if (body.shiftDate) changedFields.push({ field: 'shiftDate', from: (existingResult.rows[0] as any).shiftDate, to: body.shiftDate });
     await appendAuditLog(id, req, 'UPDATE_FORM1', changedFields);
 
     return res.json({ ok: true, id });
