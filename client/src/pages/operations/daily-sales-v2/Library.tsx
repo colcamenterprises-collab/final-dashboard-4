@@ -8,10 +8,12 @@
 // – Only apply exactly what is written below
 
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Eye, Printer, Download, AlertTriangle } from 'lucide-react';
 import { ConfirmDialog, SuccessDialog } from '@/components/ui/confirm-dialog';
+import { usePinAuth } from "@/components/PinLoginGate";
 
 // MEGA PATCH V3: Safe number helpers
 const safeNumber = (v: any) => (v === 0 || typeof v === "number") ? v : (Number(v) || 0);
@@ -115,6 +117,8 @@ function DrinksRequisitionSection({ requisition }: { requisition: any[] }) {
 }
 
 export default function DailySalesV2Library() {
+  const { currentUser } = usePinAuth();
+  const navigate = useNavigate();
   const [records, setRecords] = useState<RecordType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -125,6 +129,17 @@ export default function DailySalesV2Library() {
   const [deleteDialog, setDeleteDialog] = useState<{ isOpen: boolean; id: string | null }>({ isOpen: false, id: null });
   const [successDialog, setSuccessDialog] = useState<{ isOpen: boolean; message: string }>({ isOpen: false, message: '' });
   const [errorDialog, setErrorDialog] = useState<{ isOpen: boolean; message: string }>({ isOpen: false, message: '' });
+
+  // Owner-only guard
+  useEffect(() => {
+    if (currentUser && currentUser.role !== "owner") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [currentUser, navigate]);
+
+  if (currentUser && currentUser.role !== "owner") {
+    return null;
+  }
 
   async function fetchRecords() {
     setLoading(true);

@@ -5128,6 +5128,22 @@ app.use("/api/bank-imports", bankUploadRouter);
     }
   });
   
+  // Owner-only protection for Form Library read endpoints
+  // All GET requests to /api/forms/daily-sales/v2* are library-read only (owners)
+  // Staff submit via POST/PATCH — those are not blocked here
+  // Guard: only block if a PIN session IS active and the role is NOT owner
+  // (No session = default Cam/owner context — allowed through)
+  app.use("/api/forms/daily-sales/v2", async (req: Request, res: Response, next: NextFunction) => {
+    if (req.method === "GET") {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const sessionUser = getPinSessionUser(req);
+      if (sessionUser && sessionUser.role !== "owner") {
+        return res.status(403).json({ ok: false, error: "Access denied. Owner access only." });
+      }
+    }
+    next();
+  });
+
   // Register Forms routes
   app.use("/api/forms", dailySalesV2Router);
   app.get('/api/daily-sales-v2/latest-proof', async (req: Request, res: Response) => {

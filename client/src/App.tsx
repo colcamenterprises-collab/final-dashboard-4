@@ -119,7 +119,7 @@ import HealthSafetyQuestionManager from "./pages/operations/health-safety-audit/
 import RecipeMappingPage from "./pages/operations/recipe-mapping";
 import { AuthProvider } from "./auth/AuthProvider";
 import ProtectedRoute from "./auth/ProtectedRoute";
-import PinLoginGate from "./components/PinLoginGate";
+import PinLoginGate, { usePinAuth } from "./components/PinLoginGate";
 import StaffAccessPage from "./pages/settings/StaffAccess";
 import UserProfile from "./pages/settings/UserProfile";
 
@@ -128,6 +128,14 @@ import PublicMembership from "./pages/public/PublicMembership";
 import PublicOnlineOrdering from "./pages/public/PublicOnlineOrdering";
 
 import { ROUTES } from "./router/RouteRegistry";
+
+function OwnerRoute({ children }: { children: JSX.Element }) {
+  const { currentUser } = usePinAuth();
+  if (currentUser?.role !== "owner") {
+    return <Navigate to="/dashboard" replace />;
+  }
+  return children;
+}
 
 export default function App() {
   return (
@@ -154,8 +162,8 @@ export default function App() {
                 <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                 <Route path="/home" element={<Navigate to="/dashboard" replace />} />
 
-                <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<ProtectedRoute><DailySalesV2Library /></ProtectedRoute>} />
-                <Route path="/operations/daily-sales-library" element={<ProtectedRoute><DailySalesV2Library /></ProtectedRoute>} />
+                <Route path={ROUTES.DAILY_SALES_LIBRARY} element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} />
+                <Route path="/operations/daily-sales-library" element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} />
                 <Route path={ROUTES.SHOPPING_LIST} element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />
                 <Route path="/operations/purchasing-list/:id" element={<ProtectedRoute><PurchasingList /></ProtectedRoute>} />
                 <Route path="/operations/purchasing-mapping" element={<ProtectedRoute><PurchasingFieldMapping /></ProtectedRoute>} />

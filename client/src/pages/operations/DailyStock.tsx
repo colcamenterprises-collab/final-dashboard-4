@@ -55,6 +55,7 @@ const labels = {
     endOfShiftCounts: 'End-of-Shift Counts',
     rollsEnd: 'Rolls (pcs)',
     meatCount: 'Meat (grams)',
+    friesEnd: 'French Fries (bags)',
     drinksEnd: 'Drinks Count',
     drinkStock: 'Drink Stock',
     requisition: 'Requisition Items',
@@ -92,6 +93,7 @@ const labels = {
     endOfShiftCounts: 'จำนวนปิดกะ',
     rollsEnd: 'โรล (ชิ้น)',
     meatCount: 'เนื้อ (กรัม)',
+    friesEnd: 'เฟรนช์ฟรายส์ (ถุง)',
     drinksEnd: 'จำนวนเครื่องดื่ม',
     drinkStock: 'สต๊อกเครื่องดื่ม',
     requisition: 'รายการสั่งซื้อ',
@@ -142,6 +144,7 @@ const DailyStock: React.FC = () => {
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
+  const [friesEnd, setFriesEnd] = useState<number>(0);
   const [drinkQuantities, setDrinkQuantities] = useState<Record<string, number>>({});
   
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -314,8 +317,12 @@ const DailyStock: React.FC = () => {
     if (!Array.isArray(ingredients)) return [];
     const map = new Map<string, IngredientItem[]>();
     
-    // Filter out drinks and meat from requisition (drinks have separate section, meat should be hidden)
-    const allIngredients = ingredients.filter(item => item.category !== 'Drinks' && item.category !== 'Meat');
+    // Filter out drinks, meat, and French Fries from requisition (those have dedicated count fields)
+    const allIngredients = ingredients.filter(item =>
+      item.category !== 'Drinks' &&
+      item.category !== 'Meat' &&
+      item.name !== 'French Fries 7mm'
+    );
     
     for (const ingredient of allIngredients) {
       if (!map.has(ingredient.category)) map.set(ingredient.category, []);
@@ -519,6 +526,7 @@ const DailyStock: React.FC = () => {
     const payload: Record<string, any> = {
       rollsEnd: rolls,
       meatEnd: meatGrams,
+      friesEnd: friesEnd,
       drinkStock: drinkStockObj,
       requisition: requisitionItems,
       notes: notes.trim()
@@ -749,7 +757,7 @@ const DailyStock: React.FC = () => {
           <h2 className="text-sm font-semibold mb-4">{L.endOfShiftCounts}</h2>
           {validationErrors?.rollsEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.rollsEnd}</div>}
           {validationErrors?.meatEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.meatEnd}</div>}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm mb-1 font-medium">{L.rollsEnd}</label>
               <input
@@ -778,6 +786,18 @@ const DailyStock: React.FC = () => {
                   {(meatGrams / 1000).toFixed(1)}{L.kg} or {meatGrams.toLocaleString()} {L.g}
                 </div>
               )}
+            </div>
+            <div>
+              <label className="block text-sm mb-1 font-medium">{L.friesEnd}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={friesEnd || ''}
+                onChange={(e) => setFriesEnd(safeInt(e.target.value))}
+                placeholder=""
+                aria-label="French Fries bags remaining"
+              />
             </div>
           </div>
         </div>

@@ -1,0 +1,54 @@
+FINAL DB V2-1 — BLIND INPUT LOCKDOWN + FRENCH FRIES STOCK FIX
+
+Apply the following changes with minimum disruption.
+
+Locked rules:
+- Do not change the current Daily Sales & Stock V2 form layout
+- Do not change form flow
+- Do not redesign the UI
+- Do not restructure schema unless absolutely required for the French Fries correction
+- Keep the form working exactly as it does now except for the changes below
+
+Required changes:
+
+1. Blind input requirement
+The form must no longer provide any indication to non-owner users whether sales figures balance.
+
+Approved implementation:
+- restrict Form Library access to owners only
+- all other access types must have no access to the Form Library at all
+
+Implement all of the following:
+- hide/remove Form Library navigation for non-owners
+- block direct route/page access for non-owners
+- block backend/API access to Form Library data for non-owners if applicable
+- return appropriate forbidden behavior or redirect for non-owner access attempts
+
+2. French Fries correction
+- French Fries must be added to the stock count section
+- French Fries must be removed from the stock to purchase section
+
+This should be treated like the other counted stock items, not as a purchase request item.
+
+Important:
+- do not change any other form sections
+- do not change the owner workflow
+- do not break drafts
+- do not break submit flow
+- do not break shopping list logic except for removing French Fries from purchase-request behavior
+- do not break form library for owners
+
+Required runtime validation:
+1. owner can access Form Library
+2. non-owner cannot access Form Library from UI
+3. non-owner cannot access Form Library by direct route
+4. French Fries appears in stock count
+5. French Fries does not appear in stock to purchase
+6. form submission flow still works unchanged
+
+Return:
+- exact files changed
+- how owner-only Form Library access is enforced
+- how non-owner access is blocked
+- confirmation French Fries now appears only in stock count
+- runtime test results for all 6 validation points

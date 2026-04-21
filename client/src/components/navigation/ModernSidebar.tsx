@@ -44,6 +44,7 @@ type NavItem = {
   subItems?: NavItem[];
   external?: boolean;
   isButton?: boolean;
+  ownerOnly?: boolean;
 };
 
 type NavGroup = {
@@ -87,7 +88,7 @@ const navigationGroups: NavGroup[] = [
         icon: Receipt, 
         testId: "nav-daily-sales",
         subItems: [
-          { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library" }
+          { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library", ownerOnly: true }
         ]
       },
       { to: "/operations/ai-ops-control", label: "AI Ops Control", icon: Bot, testId: "nav-ai-ops-control" },
@@ -391,7 +392,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                           {/* Sub-items if they exist */}
                           {item.subItems && (
                             <div className="ml-6 mt-1 space-y-1">
-                              {item.subItems.map((subItem) => {
+                              {item.subItems.filter(subItem => !subItem.ownerOnly || currentUser?.role === "owner").map((subItem) => {
                                 const subActive = isActive(subItem.to);
                                 
                                 return (
