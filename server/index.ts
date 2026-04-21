@@ -287,6 +287,8 @@ async function checkSchema() {
   app.use('/api/analysis', drinksVarianceRouter);
   const drinksAdjustmentsRouter = (await import('./routes/drinksAdjustments.js')).default;
   app.use('/api/analysis', drinksAdjustmentsRouter);
+  const analysisV2Router = (await import('./routes/analysisV2.js')).default;
+  app.use('/api/analysis', analysisV2Router);
   
   const server = await registerRoutes(app);
 
