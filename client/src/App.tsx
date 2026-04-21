@@ -107,6 +107,7 @@ import StockVariance from "./pages/analysis/StockVariance";
 import ReceiptsTruth from "./pages/analysis/ReceiptsTruth";
 import IngredientsTruth from "./pages/analysis/IngredientsTruth";
 import GrabLoyverseMonthlyReconciliation from "./pages/analysis/GrabLoyverseMonthlyReconciliation";
+import AnalysisV2 from "./pages/analysis/AnalysisV2";
 import SaaSAdmin from "./pages/saas/SaaSAdmin";
 import Login from "./pages/auth/Login";
 import TenantSwitcher from "./pages/settings/TenantSwitcher";
@@ -286,6 +287,7 @@ export default function App() {
                 <Route path="/analysis/receipts" element={<ProtectedRoute><ReceiptsTruth /></ProtectedRoute>} />
                 <Route path="/analysis/ingredients" element={<ProtectedRoute><IngredientsTruth /></ProtectedRoute>} />
                 <Route path="/analysis/grab-loyverse-monthly-reconciliation" element={<ProtectedRoute><GrabLoyverseMonthlyReconciliation /></ProtectedRoute>} />
+                <Route path="/analysis/v2" element={<ProtectedRoute><AnalysisV2 /></ProtectedRoute>} />
 
                 <Route path="/saas" element={<ProtectedRoute><SaaSAdmin /></ProtectedRoute>} />
                 <Route path="/settings/tenant" element={<ProtectedRoute><TenantSwitcher /></ProtectedRoute>} />
