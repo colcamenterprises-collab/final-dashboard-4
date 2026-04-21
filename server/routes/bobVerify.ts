@@ -115,10 +115,21 @@ function pickShiftDateRows(payload: any, shiftDate: string): any[] {
 
 function pickCanonicalRows(payload: any): any[] {
   if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.forms)) return payload.forms;
   if (Array.isArray(payload?.rows)) return payload.rows;
+  if (Array.isArray(payload?.data?.forms)) return payload.data.forms;
   if (Array.isArray(payload?.data?.rows)) return payload.data.rows;
   if (Array.isArray(payload?.data)) return payload.data;
   return [];
+}
+
+function getEffectiveBobReadToken(): string {
+  return (
+    process.env.BOB_READONLY_TOKEN ||
+    process.env.BOB_API_TOKEN ||
+    process.env.BOBS_LOYVERSE_TOKEN ||
+    ""
+  );
 }
 
 function buildThresholdCheck(
@@ -200,11 +211,13 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
   const legacySalesRowsForShift = pickShiftDateRows(dailySales, shift.shiftDate);
   const legacyStockRowsForShift = pickShiftDateRows(dailyStock, shift.shiftDate);
 
+  const bobReadToken = getEffectiveBobReadToken();
+
   const canonicalSalesProbe = await internalGetSafe(
-    `/api/ai-ops/bob/proxy-read?path=forms/daily-sales&date=${shift.shiftDate}&token=${encodeURIComponent(process.env.BOB_READONLY_TOKEN || "")}`
+    `/api/ai-ops/bob/proxy-read?path=forms/daily-sales&date=${shift.shiftDate}&token=${encodeURIComponent(bobReadToken)}`
   );
   const canonicalStockProbe = await internalGetSafe(
-    `/api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=${shift.shiftDate}&token=${encodeURIComponent(process.env.BOB_READONLY_TOKEN || "")}`
+    `/api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=${shift.shiftDate}&token=${encodeURIComponent(bobReadToken)}`
   );
 
   const canonicalSalesRows = pickCanonicalRows(canonicalSalesProbe.payload);
