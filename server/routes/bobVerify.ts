@@ -19,6 +19,7 @@ type ComparisonRow = {
   key: string;
   sourceA?: number | string | null;
   sourceB?: number | string | null;
+  sourceBOrigin?: "v2_canonical" | "legacy_fallback";
   variance?: number | null;
   threshold?: number | null;
   withinThreshold?: boolean | null;
@@ -240,6 +241,10 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
 
   const mappedDailySales = legacySalesRowsForShift[0] ?? null;
   const mappedDailyStock = legacyStockRowsForShift[0] ?? null;
+  const canonicalDailyStock = canonicalStockRows[0] ?? null;
+  const stockComparisonSource: "v2_canonical" | "legacy_fallback" =
+    canonicalDailyStock ? "v2_canonical" : "legacy_fallback";
+  const stockComparisonRow = stockComparisonSource === "v2_canonical" ? canonicalDailyStock : mappedDailyStock;
 
   if (!shiftReport) missingData.push("missing_loyverse_shift_report");
   if (!mappedDailySales && canonicalSalesRows.length === 0) missingData.push("missing_daily_sales_form");
@@ -312,18 +317,20 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     toNumber(stockUsage?.totals?.burgers);
 
   const rollsOpening =
-    toNumber(mappedDailyStock?.burgerBunsOpening) ??
-    toNumber(mappedDailyStock?.rollsOpening) ??
-    toNumber(mappedDailyStock?.opening?.burgerBuns) ??
-    toNumber(canonicalStockRows[0]?.rolls_start) ??
-    toNumber(canonicalStockRows[0]?.rollsOpening);
+    stockComparisonSource === "v2_canonical"
+      ? toNumber(stockComparisonRow?.rolls_start) ??
+        toNumber(stockComparisonRow?.rollsOpening)
+      : toNumber(stockComparisonRow?.burgerBunsOpening) ??
+        toNumber(stockComparisonRow?.rollsOpening) ??
+        toNumber(stockComparisonRow?.opening?.burgerBuns);
 
   const rollsClosing =
-    toNumber(mappedDailyStock?.burgerBunsStock) ??
-    toNumber(mappedDailyStock?.rollsClosing) ??
-    toNumber(mappedDailyStock?.closing?.burgerBuns) ??
-    toNumber(canonicalStockRows[0]?.rolls_end) ??
-    toNumber(canonicalStockRows[0]?.rollsClosing);
+    stockComparisonSource === "v2_canonical"
+      ? toNumber(stockComparisonRow?.rolls_end) ??
+        toNumber(stockComparisonRow?.rollsClosing)
+      : toNumber(stockComparisonRow?.burgerBunsStock) ??
+        toNumber(stockComparisonRow?.rollsClosing) ??
+        toNumber(stockComparisonRow?.closing?.burgerBuns);
 
   let rollsPurchased: number | null = null;
   const purchaseRollRows = purchaseHistory?.rolls;
@@ -348,20 +355,25 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
       ? rollsOpening + rollsPurchased - burgersSold
       : null;
 
-  comparisons.push(buildThresholdCheck("rolls_expected_vs_closing", expectedRolls, rollsClosing, 5));
+  comparisons.push({
+    ...buildThresholdCheck("rolls_expected_vs_closing", expectedRolls, rollsClosing, 5),
+    sourceBOrigin: stockComparisonSource,
+  });
 
   const closingMeat =
-    toNumber(mappedDailyStock?.meatWeight) ??
-    toNumber(mappedDailyStock?.meatClosing) ??
-    toNumber(mappedDailyStock?.closing?.meatWeight) ??
-    toNumber(canonicalStockRows[0]?.meat_end_g) ??
-    toNumber(canonicalStockRows[0]?.meatWeightG);
+    stockComparisonSource === "v2_canonical"
+      ? toNumber(stockComparisonRow?.meat_end_g) ??
+        toNumber(stockComparisonRow?.meatWeightG)
+      : toNumber(stockComparisonRow?.meatWeight) ??
+        toNumber(stockComparisonRow?.meatClosing) ??
+        toNumber(stockComparisonRow?.closing?.meatWeight);
 
   const openingMeat =
-    toNumber(mappedDailyStock?.meatOpening) ??
-    toNumber(mappedDailyStock?.opening?.meatWeight) ??
-    toNumber(canonicalStockRows[0]?.meat_start_g) ??
-    toNumber(canonicalStockRows[0]?.meatOpening);
+    stockComparisonSource === "v2_canonical"
+      ? toNumber(stockComparisonRow?.meat_start_g) ??
+        toNumber(stockComparisonRow?.meatOpening)
+      : toNumber(stockComparisonRow?.meatOpening) ??
+        toNumber(stockComparisonRow?.opening?.meatWeight);
 
   let purchasedMeat: number | null = null;
   const purchaseMeatRows = purchaseHistory?.meat;
@@ -387,7 +399,10 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
       ? openingMeat + purchasedMeat - expectedMeatUsage
       : null;
 
-  comparisons.push(buildThresholdCheck("meat_expected_vs_closing_g", expectedClosingMeat, closingMeat, 500));
+  comparisons.push({
+    ...buildThresholdCheck("meat_expected_vs_closing_g", expectedClosingMeat, closingMeat, 500),
+    sourceBOrigin: stockComparisonSource,
+  });
 
   const stockUsageDrinks = toNumber(stockUsage?.summary?.totalDrinks) ?? toNumber(stockUsage?.totals?.drinks);
   const purchasedDrinkCount = Array.isArray(purchaseHistory?.drinks)
@@ -576,6 +591,7 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
       shiftReport: shiftReportTruth,
       forms: formTruth,
       drinks: drinksTruth,
+      stockComparisonSource,
       probes: {
         canonicalSalesProbeOk: canonicalSalesProbe.ok,
         canonicalStockProbeOk: canonicalStockProbe.ok,
