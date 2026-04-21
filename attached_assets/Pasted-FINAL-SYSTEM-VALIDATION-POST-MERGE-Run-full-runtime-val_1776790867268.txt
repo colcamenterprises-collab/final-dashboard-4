@@ -1,0 +1,105 @@
+FINAL SYSTEM VALIDATION — POST MERGE
+
+Run full runtime validation across:
+
+1. Bob verification
+2. Canonical data parsing
+3. Analysis V2 page
+4. Daily form changes (fries + library lock)
+
+--------------------------------
+
+PART 1 — VERIFY ENDPOINT
+
+GET /api/bob/read/verify/latest-shift
+(with valid x-bob-token)
+
+Return:
+- full JSON
+- status (PASS / FAIL / BLOCKED)
+- sourceState
+- blockers
+- comparisons
+
+Validation:
+- MUST NOT falsely mark forms as missing if data exists (forms payload fix)
+- MUST correctly read canonicalSalesRows and canonicalStockRows
+
+--------------------------------
+
+PART 2 — ANALYSIS V2 PAGE
+
+Open:
+/analysis-v2
+
+Return:
+- confirmation page loads
+- list of 4 tables present:
+  1. Drinks
+  2. Burgers & Sets
+  3. Side Orders
+  4. Modifiers
+
+For DRINKS table:
+- confirm direct sales are present
+- confirm modifier-driven drink counts are included
+- confirm total sold = direct + modifier
+
+For MODIFIERS table:
+- confirm set count detected
+- confirm drinks from sets = set count
+- confirm fries from sets = set count
+
+--------------------------------
+
+PART 3 — DAILY FORM CHANGES
+
+Check:
+
+1. Form UI
+- French Fries appears in End-of-Shift Counts
+- French Fries NOT present in purchase/requisition
+
+2. Payload
+- friesEnd exists in submission payload
+
+3. Library access
+- owner can access Form Library
+- non-owner cannot access via UI
+- non-owner cannot access via direct route
+
+--------------------------------
+
+PART 4 — DATA TRUTH CHECK
+
+Using current shift:
+
+Confirm:
+- if forms exist → they are read correctly
+- if forms do not exist → marked missing correctly
+- no silent zero fallback values
+- comparisons only calculated when data exists
+
+--------------------------------
+
+FINAL OUTPUT REQUIRED
+
+Return:
+
+1. Verify status:
+   PASS / FAIL / BLOCKED
+
+2. Any incorrect classifications:
+   (especially forms being marked missing incorrectly)
+
+3. Drinks logic check:
+   - is modifier drink count working correctly? yes/no
+
+4. Set logic check:
+   - does 1 set = 1 drink + 1 fries correctly? yes/no
+
+5. Any broken or empty tables in Analysis V2
+
+6. List of any remaining blockers or bugs
+
+Do not mark complete without runtime evidence.
