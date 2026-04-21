@@ -25,6 +25,12 @@ type ComparisonRow = {
   note?: string;
 };
 
+type MissingDataCode =
+  | "missing_loyverse_shift_report"
+  | "missing_daily_sales_form"
+  | "missing_daily_stock_form"
+  | "missing_purchase_data";
+
 async function internalGet(path: string) {
   const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
   const request = fetch(`${baseUrl}${path}`, {
@@ -47,6 +53,19 @@ async function internalGet(path: string) {
   }
 
   return response.json();
+}
+
+async function internalGetSafe(path: string) {
+  try {
+    const payload = await internalGet(path);
+    return { ok: true as const, payload, error: null as string | null };
+  } catch (error: any) {
+    return {
+      ok: false as const,
+      payload: null,
+      error: error?.message || "Unknown load failure",
+    };
+  }
 }
 
 
@@ -84,6 +103,22 @@ function toNumber(value: unknown): number | null {
     return Number.isFinite(n) ? n : null;
   }
   return null;
+}
+
+function pickShiftDateRows(payload: any, shiftDate: string): any[] {
+  const rows = Array.isArray(payload) ? payload : Array.isArray(payload?.rows) ? payload.rows : [];
+  return rows.filter((row: any) => {
+    const raw = String(row?.shiftDate ?? row?.shift_date ?? row?.date ?? "").slice(0, 10);
+    return raw === shiftDate;
+  });
+}
+
+function pickCanonicalRows(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.rows)) return payload.rows;
+  if (Array.isArray(payload?.data?.rows)) return payload.data.rows;
+  if (Array.isArray(payload?.data)) return payload.data;
+  return [];
 }
 
 function buildThresholdCheck(
@@ -136,6 +171,7 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
   let purchaseHistory: any = null;
 
   const blockers: string[] = [];
+  const missingData: MissingDataCode[] = [];
 
   async function loadSource<T = any>(key: keyof typeof sourceState, path: string): Promise<T | null> {
     try {
@@ -161,6 +197,33 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
   stockUsage = await loadSource("stockUsage", sourceState.stockUsage.path);
   purchaseHistory = await loadSource("purchaseHistory", sourceState.purchaseHistory.path);
 
+  const legacySalesRowsForShift = pickShiftDateRows(dailySales, shift.shiftDate);
+  const legacyStockRowsForShift = pickShiftDateRows(dailyStock, shift.shiftDate);
+
+  const canonicalSalesProbe = await internalGetSafe(
+    `/api/ai-ops/bob/proxy-read?path=forms/daily-sales&date=${shift.shiftDate}&token=${encodeURIComponent(process.env.BOB_READONLY_TOKEN || "")}`
+  );
+  const canonicalStockProbe = await internalGetSafe(
+    `/api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=${shift.shiftDate}&token=${encodeURIComponent(process.env.BOB_READONLY_TOKEN || "")}`
+  );
+
+  const canonicalSalesRows = pickCanonicalRows(canonicalSalesProbe.payload);
+  const canonicalStockRows = pickCanonicalRows(canonicalStockProbe.payload);
+
+  const mappedDailySales = legacySalesRowsForShift[0] ?? null;
+  const mappedDailyStock = legacyStockRowsForShift[0] ?? null;
+
+  if (!shiftReport) missingData.push("missing_loyverse_shift_report");
+  if (!mappedDailySales && canonicalSalesRows.length === 0) missingData.push("missing_daily_sales_form");
+  if (!mappedDailyStock && canonicalStockRows.length === 0) missingData.push("missing_daily_stock_form");
+
+  const purchaseRollCount = Array.isArray(purchaseHistory?.rolls) ? purchaseHistory.rolls.length : 0;
+  const purchaseMeatCount = Array.isArray(purchaseHistory?.meat) ? purchaseHistory.meat.length : 0;
+  const purchaseDrinkCount = Array.isArray(purchaseHistory?.drinks) ? purchaseHistory.drinks.length : 0;
+  if (sourceState.purchaseHistory.ok && purchaseRollCount + purchaseMeatCount + purchaseDrinkCount === 0) {
+    missingData.push("missing_purchase_data");
+  }
+
   const comparisons: ComparisonRow[] = [];
 
   const shiftTotalSales =
@@ -170,11 +233,12 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     toNumber(shiftReport?.totals?.sales);
 
   const formTotalSales =
-    toNumber(dailySales?.totalSales) ??
-    toNumber(dailySales?.sales?.totalSales) ??
-    toNumber(dailySales?.summary?.totalSales) ??
-    toNumber(dailySales?.rows?.[0]?.netSales) ??
-    toNumber(dailySales?.rows?.[0]?.totalSales);
+    toNumber(mappedDailySales?.totalSales) ??
+    toNumber(mappedDailySales?.sales?.totalSales) ??
+    toNumber(mappedDailySales?.summary?.totalSales) ??
+    toNumber(mappedDailySales?.netSales) ??
+    toNumber(canonicalSalesRows[0]?.total_sales) ??
+    toNumber(canonicalSalesRows[0]?.totalSales);
 
   comparisons.push(buildThresholdCheck("total_sales", shiftTotalSales, formTotalSales, 5));
 
@@ -183,10 +247,11 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     toNumber(shiftReport?.salesSummary?.cashSales) ??
     toNumber(shiftReport?.payments?.cash);
   const formCash =
-    toNumber(dailySales?.cashSales) ??
-    toNumber(dailySales?.sales?.cashSales) ??
-    toNumber(dailySales?.summary?.cashSales) ??
-    toNumber(dailySales?.rows?.[0]?.cashSales);
+    toNumber(mappedDailySales?.cashSales) ??
+    toNumber(mappedDailySales?.sales?.cashSales) ??
+    toNumber(mappedDailySales?.summary?.cashSales) ??
+    toNumber(canonicalSalesRows[0]?.cash_sales) ??
+    toNumber(canonicalSalesRows[0]?.cashSales);
   comparisons.push(buildThresholdCheck("sales_cash", shiftCash, formCash, 5));
 
   const shiftQr =
@@ -194,10 +259,11 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     toNumber(shiftReport?.salesSummary?.qrSales) ??
     toNumber(shiftReport?.payments?.qr);
   const formQr =
-    toNumber(dailySales?.qrSales) ??
-    toNumber(dailySales?.sales?.qrSales) ??
-    toNumber(dailySales?.summary?.qrSales) ??
-    toNumber(dailySales?.rows?.[0]?.qrSales);
+    toNumber(mappedDailySales?.qrSales) ??
+    toNumber(mappedDailySales?.sales?.qrSales) ??
+    toNumber(mappedDailySales?.summary?.qrSales) ??
+    toNumber(canonicalSalesRows[0]?.qr_sales) ??
+    toNumber(canonicalSalesRows[0]?.qrSales);
   comparisons.push(buildThresholdCheck("sales_qr", shiftQr, formQr, 5));
 
   const shiftDelivery =
@@ -205,10 +271,11 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     toNumber(shiftReport?.salesSummary?.deliverySales) ??
     toNumber(shiftReport?.payments?.delivery);
   const formDelivery =
-    toNumber(dailySales?.deliverySales) ??
-    toNumber(dailySales?.sales?.deliverySales) ??
-    toNumber(dailySales?.summary?.deliverySales) ??
-    toNumber(dailySales?.rows?.[0]?.deliverySales);
+    toNumber(mappedDailySales?.deliverySales) ??
+    toNumber(mappedDailySales?.sales?.deliverySales) ??
+    toNumber(mappedDailySales?.summary?.deliverySales) ??
+    toNumber(canonicalSalesRows[0]?.grab_sales) ??
+    toNumber(canonicalSalesRows[0]?.grabSales);
   comparisons.push(buildThresholdCheck("sales_delivery", shiftDelivery, formDelivery, 5));
 
   const burgersSold =
@@ -217,16 +284,18 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     toNumber(stockUsage?.totals?.burgers);
 
   const rollsOpening =
-    toNumber(dailyStock?.burgerBunsOpening) ??
-    toNumber(dailyStock?.rollsOpening) ??
-    toNumber(dailyStock?.opening?.burgerBuns) ??
-    toNumber(dailyStock?.rows?.[0]?.burgerBunsOpening);
+    toNumber(mappedDailyStock?.burgerBunsOpening) ??
+    toNumber(mappedDailyStock?.rollsOpening) ??
+    toNumber(mappedDailyStock?.opening?.burgerBuns) ??
+    toNumber(canonicalStockRows[0]?.rolls_start) ??
+    toNumber(canonicalStockRows[0]?.rollsOpening);
 
   const rollsClosing =
-    toNumber(dailyStock?.burgerBunsStock) ??
-    toNumber(dailyStock?.rollsClosing) ??
-    toNumber(dailyStock?.closing?.burgerBuns) ??
-    toNumber(dailyStock?.rows?.[0]?.burgerBunsStock);
+    toNumber(mappedDailyStock?.burgerBunsStock) ??
+    toNumber(mappedDailyStock?.rollsClosing) ??
+    toNumber(mappedDailyStock?.closing?.burgerBuns) ??
+    toNumber(canonicalStockRows[0]?.rolls_end) ??
+    toNumber(canonicalStockRows[0]?.rollsClosing);
 
   let rollsPurchased: number | null = null;
   const purchaseRollRows = purchaseHistory?.rolls;
@@ -254,15 +323,17 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
   comparisons.push(buildThresholdCheck("rolls_expected_vs_closing", expectedRolls, rollsClosing, 5));
 
   const closingMeat =
-    toNumber(dailyStock?.meatWeight) ??
-    toNumber(dailyStock?.meatClosing) ??
-    toNumber(dailyStock?.closing?.meatWeight) ??
-    toNumber(dailyStock?.rows?.[0]?.meatWeight);
+    toNumber(mappedDailyStock?.meatWeight) ??
+    toNumber(mappedDailyStock?.meatClosing) ??
+    toNumber(mappedDailyStock?.closing?.meatWeight) ??
+    toNumber(canonicalStockRows[0]?.meat_end_g) ??
+    toNumber(canonicalStockRows[0]?.meatWeightG);
 
   const openingMeat =
-    toNumber(dailyStock?.meatOpening) ??
-    toNumber(dailyStock?.opening?.meatWeight) ??
-    toNumber(dailyStock?.rows?.[0]?.meatOpening);
+    toNumber(mappedDailyStock?.meatOpening) ??
+    toNumber(mappedDailyStock?.opening?.meatWeight) ??
+    toNumber(canonicalStockRows[0]?.meat_start_g) ??
+    toNumber(canonicalStockRows[0]?.meatOpening);
 
   let purchasedMeat: number | null = null;
   const purchaseMeatRows = purchaseHistory?.meat;
@@ -329,6 +400,69 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
       ? "Latest completed shift loaded, but one or more core metrics exceeded allowed thresholds."
       : "Latest completed shift could not be fully verified because required canonical data was missing or incomplete.";
 
+  const shiftReportTruth =
+    !shiftReport
+      ? {
+          cause: "no_db_record",
+          detail: "GET /api/shift-report/latest returned null; no shift_report_v2 row is currently available for latest retrieval.",
+          where: "shift_report_v2",
+        }
+      : {
+          cause: String(shiftReport?.shiftDate ?? "").slice(0, 10) !== shift.shiftDate ? "wrong_shift_resolution" : "ok",
+          detail:
+            String(shiftReport?.shiftDate ?? "").slice(0, 10) !== shift.shiftDate
+              ? `latest shift_report_v2 is for ${String(shiftReport?.shiftDate).slice(0, 10)}, while verifier target shiftDate is ${shift.shiftDate}.`
+              : "Latest shift report exists and aligns with verifier shift date.",
+          where: "shift_report_v2.shiftDate",
+        };
+
+  const formTruth = {
+    dailySales: {
+      cause:
+        legacySalesRowsForShift.length === 0 && canonicalSalesRows.length > 0
+          ? "wrong_source_mapping"
+          : legacySalesRowsForShift.length === 0 && canonicalSalesRows.length === 0
+          ? "not_submitted_or_save_missing"
+          : "ok",
+      detail:
+        legacySalesRowsForShift.length === 0 && canonicalSalesRows.length > 0
+          ? "Bob verify reads /api/bob/read/daily-sales -> /api/daily-stock-sales (legacy table) while canonical forms endpoint has rows."
+          : legacySalesRowsForShift.length === 0 && canonicalSalesRows.length === 0
+          ? "No row found in either legacy mapped read or canonical forms read for the shift date."
+          : "Sales form row found for target shift date.",
+    },
+    dailyStock: {
+      cause:
+        legacyStockRowsForShift.length === 0 && canonicalStockRows.length > 0
+          ? "wrong_source_mapping"
+          : legacyStockRowsForShift.length === 0 && canonicalStockRows.length === 0
+          ? "not_submitted_or_save_missing"
+          : "ok",
+      detail:
+        legacyStockRowsForShift.length === 0 && canonicalStockRows.length > 0
+          ? "Bob verify reads /api/bob/read/daily-stock -> /api/daily-stock-sales (legacy table) while canonical stock forms endpoint has rows."
+          : legacyStockRowsForShift.length === 0 && canonicalStockRows.length === 0
+          ? "No row found in either legacy mapped read or canonical forms read for the shift date."
+          : "Stock form row found for target shift date.",
+    },
+  };
+
+  const drinksTruth = {
+    interpretation:
+      stockUsageDrinks !== null && purchasedDrinkCount !== null
+        ? "comparison_design_issue"
+        : "insufficient_data",
+    detail:
+      stockUsageDrinks !== null && purchasedDrinkCount !== null
+        ? "Current check compares same-day drinks sold vs same-day purchases. This can fail even when operations are correct because drinks are inventory-carried across days."
+        : "Unable to fully interpret drinks mismatch due to missing usage or purchase numeric input.",
+    recommendedBasis: "opening_drinks + purchased_drinks - sold_drinks = closing_drinks (per SKU, per shift date)",
+    purchaseHistoryEvidence: {
+      rows: purchaseDrinkCount,
+      source: "purchase_tally + purchase_tally_drink via /api/analysis/stock-review/purchase-history",
+    },
+  };
+
   return res.json({
     status,
     shift,
@@ -340,7 +474,21 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     },
     sourceState,
     blockers,
+    missingData,
     comparisons,
+    truthChecks: {
+      shiftReport: shiftReportTruth,
+      forms: formTruth,
+      drinks: drinksTruth,
+      probes: {
+        canonicalSalesProbeOk: canonicalSalesProbe.ok,
+        canonicalStockProbeOk: canonicalStockProbe.ok,
+        canonicalSalesProbeError: canonicalSalesProbe.error,
+        canonicalStockProbeError: canonicalStockProbe.error,
+        canonicalSalesRowCount: canonicalSalesRows.length,
+        canonicalStockRowCount: canonicalStockRows.length,
+      },
+    },
     summary,
   });
   } catch (error: any) {
