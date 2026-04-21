@@ -31,6 +31,20 @@ type MissingDataCode =
   | "missing_daily_stock_form"
   | "missing_purchase_data";
 
+type MissingDataDetail = {
+  flag: MissingDataCode;
+  owner: string;
+  cause:
+    | "no_row_in_db"
+    | "query_bug"
+    | "not_submitted_or_save_missing"
+    | "missing_purchase_rows"
+    | "unknown";
+  message: string;
+  where: string;
+  canonical_source: string;
+};
+
 async function internalGet(path: string) {
   const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
   const request = fetch(`${baseUrl}${path}`, {
@@ -429,14 +443,23 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
           where: "shift_report_v2.shiftDate",
         };
 
+  const dailySalesCause =
+    legacySalesRowsForShift.length === 0 && canonicalSalesRows.length > 0
+      ? "query_bug"
+      : legacySalesRowsForShift.length === 0 && canonicalSalesRows.length === 0
+      ? "not_submitted_or_save_missing"
+      : "ok";
+
+  const dailyStockCause =
+    legacyStockRowsForShift.length === 0 && canonicalStockRows.length > 0
+      ? "query_bug"
+      : legacyStockRowsForShift.length === 0 && canonicalStockRows.length === 0
+      ? "not_submitted_or_save_missing"
+      : "ok";
+
   const formTruth = {
     dailySales: {
-      cause:
-        legacySalesRowsForShift.length === 0 && canonicalSalesRows.length > 0
-          ? "wrong_source_mapping"
-          : legacySalesRowsForShift.length === 0 && canonicalSalesRows.length === 0
-          ? "not_submitted_or_save_missing"
-          : "ok",
+      cause: dailySalesCause,
       detail:
         legacySalesRowsForShift.length === 0 && canonicalSalesRows.length > 0
           ? "Bob verify reads /api/bob/read/daily-sales -> /api/daily-stock-sales (legacy table) while canonical forms endpoint has rows."
@@ -445,12 +468,7 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
           : "Sales form row found for target shift date.",
     },
     dailyStock: {
-      cause:
-        legacyStockRowsForShift.length === 0 && canonicalStockRows.length > 0
-          ? "wrong_source_mapping"
-          : legacyStockRowsForShift.length === 0 && canonicalStockRows.length === 0
-          ? "not_submitted_or_save_missing"
-          : "ok",
+      cause: dailyStockCause,
       detail:
         legacyStockRowsForShift.length === 0 && canonicalStockRows.length > 0
           ? "Bob verify reads /api/bob/read/daily-stock -> /api/daily-stock-sales (legacy table) while canonical stock forms endpoint has rows."
@@ -470,11 +488,73 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
         ? "Current check compares same-day drinks sold vs same-day purchases. This can fail even when operations are correct because drinks are inventory-carried across days."
         : "Unable to fully interpret drinks mismatch due to missing usage or purchase numeric input.",
     recommendedBasis: "opening_drinks + purchased_drinks - sold_drinks = closing_drinks (per SKU, per shift date)",
+    designCheck: {
+      sameDayPurchasesAsBasis: "not_reliable",
+      reason:
+        "Same-day purchases are replenishment events, not consumption bounds. Drinks can be sold from prior-day inventory.",
+      preferredMethod: "inventory_equation_per_sku",
+      includeOutOfShiftPurchases: "yes_if_within_inventory_carry_window",
+    },
     purchaseHistoryEvidence: {
       rows: purchaseDrinkCount,
       source: "purchase_tally + purchase_tally_drink via /api/analysis/stock-review/purchase-history",
     },
   };
+
+  const missingDataFlags: Record<MissingDataCode, boolean> = {
+    missing_loyverse_shift_report: missingData.includes("missing_loyverse_shift_report"),
+    missing_daily_sales_form: missingData.includes("missing_daily_sales_form"),
+    missing_daily_stock_form: missingData.includes("missing_daily_stock_form"),
+    missing_purchase_data: missingData.includes("missing_purchase_data"),
+  };
+
+  const missingDataDetails: MissingDataDetail[] = [];
+  if (missingDataFlags.missing_loyverse_shift_report) {
+    missingDataDetails.push({
+      flag: "missing_loyverse_shift_report",
+      owner: "shift-report pipeline",
+      cause: "no_row_in_db",
+      message: "No row available from /api/shift-report/latest for latest retrieval.",
+      where: "shift_report_v2",
+      canonical_source: "/api/shift-report/latest",
+    });
+  }
+  if (missingDataFlags.missing_daily_sales_form) {
+    missingDataDetails.push({
+      flag: "missing_daily_sales_form",
+      owner: "forms/daily-sales read mapping",
+      cause: canonicalSalesRows.length > 0 ? "query_bug" : "not_submitted_or_save_missing",
+      message:
+        canonicalSalesRows.length > 0
+          ? "Canonical sales forms exist but Bob mapped legacy read returned no shift-date row."
+          : "No sales form row found in either Bob mapped read or canonical forms read.",
+      where: "bobVerify -> /api/bob/read/daily-sales and forms/daily-sales probe",
+      canonical_source: "/api/ai-ops/bob/proxy-read?path=forms/daily-sales",
+    });
+  }
+  if (missingDataFlags.missing_daily_stock_form) {
+    missingDataDetails.push({
+      flag: "missing_daily_stock_form",
+      owner: "forms/daily-stock read mapping",
+      cause: canonicalStockRows.length > 0 ? "query_bug" : "not_submitted_or_save_missing",
+      message:
+        canonicalStockRows.length > 0
+          ? "Canonical stock forms exist but Bob mapped legacy read returned no shift-date row."
+          : "No stock form row found in either Bob mapped read or canonical forms read.",
+      where: "bobVerify -> /api/bob/read/daily-stock and forms/daily-stock probe",
+      canonical_source: "/api/ai-ops/bob/proxy-read?path=forms/daily-stock",
+    });
+  }
+  if (missingDataFlags.missing_purchase_data) {
+    missingDataDetails.push({
+      flag: "missing_purchase_data",
+      owner: "purchase ingest / read",
+      cause: "missing_purchase_rows",
+      message: "Purchase history endpoint returned no rolls, meat, or drinks rows for target shift date.",
+      where: "/api/analysis/stock-review/purchase-history",
+      canonical_source: "/api/bob/read/purchase-history",
+    });
+  }
 
   return res.json({
     status,
@@ -488,6 +568,8 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     sourceState,
     blockers,
     missingData,
+    missingDataFlags,
+    missingDataDetails,
     comparisons,
     truthChecks: {
       shiftReport: shiftReportTruth,
