@@ -165,6 +165,28 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
     new Set(navigationGroups.filter(g => g.defaultOpen).map(g => g.title))
   );
 
+  // Auto-expand the group that contains the current active path
+  useEffect(() => {
+    const path = location.pathname;
+    for (const group of navigationGroups) {
+      if (group.isStandalone) continue;
+      const hasActiveItem = group.items.some(item => {
+        if (path === item.to || path.startsWith(item.to + "/")) return true;
+        if (item.subItems?.some(sub => path === sub.to || path.startsWith(sub.to + "/"))) return true;
+        return false;
+      });
+      if (hasActiveItem) {
+        setOpenGroups(prev => {
+          if (prev.has(group.title)) return prev;
+          const next = new Set(prev);
+          next.add(group.title);
+          return next;
+        });
+        break;
+      }
+    }
+  }, [location.pathname]);
+
   // Handle Escape key and focus management
   useEffect(() => {
     if (!isOpen) return;
