@@ -109,13 +109,14 @@ export function DrinksLodgementPanel({
             <div className="p-4 text-center text-xs text-slate-500">{L.noDrinks}</div>
           ) : (
             <div className="divide-y divide-slate-200">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50">
+              {/* Header row — grid mirrors the data rows exactly */}
+              <div className="grid grid-cols-[1fr_5rem] items-center px-3 py-1.5 bg-slate-50">
                 <span className="text-xs font-medium text-slate-600">{L.drinkType}</span>
-                <span className="text-xs font-medium text-slate-600 w-16 text-right">{L.qty}</span>
+                <span className="text-xs font-medium text-slate-600 text-right">{L.qty}</span>
               </div>
               {drinkIngredients.map((drink) => (
-                <div key={drink.id} className="flex items-center justify-between gap-3 px-3 py-1.5">
-                  <span className="text-xs text-slate-700 flex-1 min-w-0 truncate">{drink.name}</span>
+                <div key={drink.id} className="grid grid-cols-[1fr_5rem] items-center gap-2 px-3 py-1.5">
+                  <span className="text-xs text-slate-700 truncate">{drink.name}</span>
                   <Input
                     type="number"
                     min="0"
@@ -123,7 +124,7 @@ export function DrinksLodgementPanel({
                     value={drinkCounts[String(drink.id)] || ""}
                     onWheel={(e) => e.currentTarget.blur()}
                     onChange={(e) => setDrinkCounts((prev) => ({ ...prev, [String(drink.id)]: parseInt(e.target.value) || 0 }))}
-                    className="!h-8 text-sm text-right w-16 shrink-0 rounded-[4px]"
+                    className="h-8 text-sm text-right rounded-[4px] w-full"
                     data-testid={`input-drink-${drink.name.toLowerCase().replace(/\s+/g, "-")}`}
                   />
                 </div>
