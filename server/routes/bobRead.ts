@@ -1,6 +1,8 @@
 import express, { Request, Response } from "express";
 import fetch from "node-fetch";
 import { bobAuth } from "../middleware/bobAuth";
+import { getDailyAnalysis } from "../services/dataAnalystService";
+import { buildBobInterpretationFromDailyAnalysis } from "../services/bobInterpretationService";
 
 const router = express.Router();
 
@@ -132,6 +134,45 @@ router.get("/stock-usage", bobAuth, async (req: Request, res: Response) => {
     res.json(data);
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch stock usage" });
+  }
+});
+
+
+
+/**
+ * BOB INTERPRETATION (Analysis V2 aligned)
+ */
+router.get("/analysis/interpretation", bobAuth, async (req: Request, res: Response) => {
+  try {
+    const date = String(req.query.date || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        ok: false,
+        error: "date query parameter required (YYYY-MM-DD)",
+      });
+    }
+
+    const analyst = await getDailyAnalysis(date);
+    const interpretation = buildBobInterpretationFromDailyAnalysis(analyst);
+
+    res.json({
+      ok: true,
+      date,
+      source: {
+        data_analyst: "/api/analysis/v2?date=YYYY-MM-DD (same service: getDailyAnalysis)",
+      },
+      analyst_tables: {
+        drinks: analyst.data.drinks,
+        burgers: analyst.data.burgers,
+        sides: analyst.data.sides,
+        modifiers: analyst.data.modifiers,
+      },
+      blockers: analyst.blockers,
+      interpretation,
+    });
+  } catch (err) {
+    console.error("BOB INTERPRETATION ERROR:", err);
+    res.status(500).json({ error: "Failed to build Bob interpretation" });
   }
 });
 

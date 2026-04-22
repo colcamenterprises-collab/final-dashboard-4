@@ -38,6 +38,7 @@ const PROXY_ALLOWLIST: string[] = [
   "/api/bob/read/purchasing/shopping-list",
   "/api/bob/read/operations/expenses",
   "/api/bob/read/analysis/finance",
+  "/api/bob/read/analysis/interpretation",
   "/api/bob/read/system-health",
   "/api/latest-valid-shift",
   "/api/analysis/build-status",

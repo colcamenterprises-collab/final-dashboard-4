@@ -1,5 +1,6 @@
 import { pool } from "../db";
 import { getDailyAnalysis } from "./dataAnalystService";
+import { buildBobInterpretationFromDailyAnalysis } from "./bobInterpretationService";
 
 export type BobAnalysisRunResult = {
   ok: true;
@@ -73,6 +74,7 @@ export async function runBobShiftAnalysis(shiftDate: string): Promise<BobAnalysi
   const stock = stockResult.rows[0] || null;
 
   const analyst = await getDailyAnalysis(shiftDate);
+  const interpretation = buildBobInterpretationFromDailyAnalysis(analyst);
 
   const formTotalBaht = form ? Number(form.totalSales) / 100 : 0;
   const salesDiff = Math.abs(posTotalBaht - formTotalBaht);
@@ -135,6 +137,7 @@ export async function runBobShiftAnalysis(shiftDate: string): Promise<BobAnalysi
     stock: stock ? { rolls_variance: rollsVariance, meat_variance_g: meatVarianceG } : null,
     analyst: analyst.data,
     analyst_blockers: analyst.blockers,
+    interpretation,
     issues,
     recommendations,
     codex_handoff: codexHandoff,
