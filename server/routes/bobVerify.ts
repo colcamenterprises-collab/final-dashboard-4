@@ -220,13 +220,19 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     const prevShiftDate = DateTime.fromISO(shift.shiftDate, { zone: BKK_ZONE })
       .minus({ days: 1 })
       .toFormat("yyyy-LL-dd");
+    const purchaseWindow = {
+      from: prevShiftDate,
+      to: shift.shiftDate,
+      inclusive: true as const,
+      effectiveDateField: "purchase_tally.date",
+    };
 
   const sourceState: Record<string, SourceState> = {
     shiftReport: { ok: false, path: "/api/bob/read/shift-report/latest" },
     dailySales: { ok: false, path: `/api/bob/read/daily-sales?date=${shift.shiftDate}` },
     dailyStock: { ok: false, path: `/api/bob/read/daily-stock?date=${shift.shiftDate}` },
     stockUsage: { ok: false, path: `/api/bob/read/stock-usage?date=${shift.shiftDate}` },
-    purchaseHistory: { ok: false, path: `/api/bob/read/purchase-history?from=${shift.shiftDate}&to=${shift.shiftDate}` },
+    purchaseHistory: { ok: false, path: `/api/bob/read/purchase-history?from=${purchaseWindow.from}&to=${purchaseWindow.to}` },
     previousDailyStockCanonical: { ok: false, path: `/api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=${prevShiftDate}&token=<redacted>` },
   };
 
@@ -520,7 +526,19 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     }
   }
 
-  const purchaseRows = Array.isArray(purchaseHistory?.purchases) ? purchaseHistory.purchases : [];
+  const purchaseRowsFromStructuredDrinks = Array.isArray(purchaseHistory?.drinks)
+    ? purchaseHistory.drinks.flatMap((row: any) => {
+        const items = Array.isArray(row?.items) ? row.items : [];
+        return items.map((item: any) => ({
+          category: "drinks",
+          item: item?.itemName,
+          qty: item?.quantity,
+          effectiveDate: row?.date ?? null,
+        }));
+      })
+    : [];
+  const purchaseRowsFromLegacy = Array.isArray(purchaseHistory?.purchases) ? purchaseHistory.purchases : [];
+  const purchaseRows = purchaseRowsFromStructuredDrinks.length > 0 ? purchaseRowsFromStructuredDrinks : purchaseRowsFromLegacy;
   for (const row of purchaseRows) {
     const category = String(row?.category || "").trim().toLowerCase();
     if (category !== "drinks") continue;
@@ -655,12 +673,13 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
       "Drinks verification now uses stock equation per canonical SKU: start + purchased - sold = expected end, then compares expected vs form2 end.",
     equation: {
       start: "previous_shift_closing_stock",
-      purchased: "purchase_history(category=Drinks)",
+      purchased: "purchase_history(category=Drinks, effective_purchase_date in window)",
       sold: "receipt_truth_daily_usage (includes modifier-driven selections in canonical rebuild)",
       end: "forms/daily-stock V2 drinksJson for target shift",
       expected: "start + purchased - sold",
       variance: "end - expected",
     },
+    purchaseWindow,
     ambiguity: {
       unresolvedMappings: drinksUnknownMappings,
       duplicateCanonicalMappings: drinksAmbiguities,
