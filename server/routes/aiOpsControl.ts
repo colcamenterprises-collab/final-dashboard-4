@@ -12,7 +12,7 @@ import {
   executeWorkspaceTools,
   WORKSPACE_TOOLS_BLOCK,
 } from "../services/bobWorkspace";
-import { getDailyAnalysis } from "../services/dataAnalystService";
+import { runBobShiftAnalysis, runDailyBobAnalystAiOpsLoop } from "../services/dailyBobAnalystAiOpsLoop";
 
 const router = Router();
 
@@ -2985,139 +2985,32 @@ router.get("/bob/analysis-csv/:date", async (req, res) => {
 // Loads shift data + POS data, compares them, writes to analysis_reports,
 // and returns the result immediately. Used by the "Run Bob Analysis" button.
 router.post("/bob/run-analysis", async (req, res) => {
-  if (!pool) return res.status(503).json({ ok: false, error: "Database unavailable" });
   const { shift_date } = req.body as { shift_date?: string };
   if (!shift_date || !/^\d{4}-\d{2}-\d{2}$/.test(shift_date)) {
     return res.status(400).json({ ok: false, error: "shift_date required (YYYY-MM-DD)" });
   }
   try {
-    // 1. POS data — aggregate from receipt_truth_line
-    // net_amount is already in baht (numeric); receipt_type is 'SALE' or 'REFUND'
-    const posResult = await pool.query(
-      `SELECT
-         ROUND(SUM(CASE WHEN receipt_type='SALE' THEN COALESCE(net_amount,0) ELSE 0 END)::numeric, 2) AS pos_total,
-         ROUND(SUM(CASE WHEN receipt_type='REFUND' THEN ABS(COALESCE(net_amount,0)) ELSE 0 END)::numeric, 2) AS pos_refunds,
-         COUNT(DISTINCT CASE WHEN receipt_type='SALE' THEN receipt_id END)::int  AS pos_txn_count,
-         COUNT(DISTINCT CASE WHEN receipt_type='SALE' THEN item_name END)::int   AS pos_item_types
-       FROM receipt_truth_line WHERE receipt_date=$1::date`,
-      [shift_date]);
-    const pos = posResult.rows[0] || {};
-    const posTotalBaht = Number(pos.pos_total || 0);
-    const posRefundBaht = Number(pos.pos_refunds || 0);
-
-    // 2. Form data — from daily_sales_v2
-    const formResult = await pool.query(
-      `SELECT "totalSales","cashSales","qrSales","grabSales","totalExpenses","completedBy","submittedAtISO"
-       FROM daily_sales_v2 WHERE "shiftDate"=$1
-       ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`,
-      [shift_date]);
-    const form = formResult.rows[0] || null;
-
-    // 3. Stock ledger — rolls and meat variance
-    const stockResult = await pool.query(
-      `SELECT rolls_variance, meat_variance_g, completed_by
-       FROM manual_stock_ledger WHERE shift_date=$1::date ORDER BY created_at DESC LIMIT 1`,
-      [shift_date]);
-    const stock = stockResult.rows[0] || null;
-
-    // 4. Canonical daily analyst output (deterministic read-model)
-    const analyst = await getDailyAnalysis(shift_date);
-
-    // 5. Determine status and build summary
-    const formTotalBaht = form ? Number(form.totalSales) / 100 : 0; // stored in satang
-    const salesDiff = Math.abs(posTotalBaht - formTotalBaht);
-    const salesDiffPct = posTotalBaht > 0 ? (salesDiff / posTotalBaht) * 100 : 0;
-    const rollsVariance = stock ? Number(stock.rolls_variance) : null;
-    const meatVarianceG = stock ? Number(stock.meat_variance_g) : null;
-
-    let status = "ok";
-    const issues: string[] = [];
-    const recommendations: string[] = [];
-
-    if (!form) {
-      status = "warning";
-      issues.push("No staff daily sales form found for this shift.");
-      recommendations.push("Staff must submit the daily sales form for this shift.");
-    } else if (salesDiffPct > 10) {
-      status = "critical";
-      issues.push(`Sales variance: Form ฿${formTotalBaht.toFixed(2)} vs POS ฿${posTotalBaht.toFixed(2)} (${salesDiffPct.toFixed(1)}% gap).`);
-      recommendations.push("Investigate cash handling — gap exceeds 10%. Review Loyverse receipts vs form entry.");
-    } else if (salesDiffPct > 5) {
-      status = "warning";
-      issues.push(`Sales variance: ${salesDiffPct.toFixed(1)}% gap between form and POS data.`);
-      recommendations.push("Follow up with shift manager on reconciliation.");
-    }
-
-    if (rollsVariance !== null && Math.abs(rollsVariance) > 10) {
-      status = status === "ok" ? "warning" : status;
-      issues.push(`Rolls variance: ${rollsVariance > 0 ? "+" : ""}${rollsVariance} pcs (threshold: ±10).`);
-      recommendations.push("Check rolls delivery records and burger count for this shift.");
-    }
-    if (meatVarianceG !== null && Math.abs(meatVarianceG) > 1000) {
-      status = status === "ok" ? "warning" : status;
-      issues.push(`Meat variance: ${meatVarianceG > 0 ? "+" : ""}${meatVarianceG}g (threshold: ±1000g).`);
-      recommendations.push("Cross-check meat delivery with supplier receipts.");
-    }
-    if (posTotalBaht === 0) {
-      // Only upgrade, never downgrade — if already critical, keep critical
-      if (status === "ok") status = "warning";
-      issues.push("No POS receipts found for this date — Loyverse data may not have been synced.");
-      recommendations.push("Run a Loyverse sync for this date, or verify the business date mapping.");
-    }
-
-    const summaryText = issues.length === 0
-      ? `Shift ${shift_date} — all checks passed. POS total ฿${posTotalBaht.toFixed(2)}, ${pos.pos_txn_count || 0} transactions.`
-      : `Shift ${shift_date} — ${issues.length} issue(s) found. ${issues[0]}`;
-
-    const codexHandoff = issues.length > 0 ? {
-      handoff_type: "RECOMMENDED_FIX",
-      shift_date,
-      status,
-      issues,
-      recommendations,
-      prepared_for: "Codex",
-      requires_approval: true,
-      instruction: recommendations[0] || "Review shift data manually.",
-    } : null;
-
-    const dataJson = {
-      pos: { total_baht: posTotalBaht, refunds_baht: posRefundBaht, txn_count: Number(pos.pos_txn_count || 0), item_types: Number(pos.pos_item_types || 0) },
-      form: form ? { total_baht: formTotalBaht, submitted_by: form.completedBy, submitted_at: form.submittedAtISO } : null,
-      stock: stock ? { rolls_variance: rollsVariance, meat_variance_g: meatVarianceG } : null,
-      analyst: analyst.data,
-      analyst_blockers: analyst.blockers,
-      issues,
-      recommendations,
-      codex_handoff: codexHandoff,
-      run_at: new Date().toISOString(),
-    };
-
-    // 6. Write to analysis_reports (upsert — one record per date per type)
-    await pool.query(
-      `INSERT INTO analysis_reports (shift_date, analysis_type, status, summary, data_json, created_by)
-       VALUES ($1::date, 'shift_review', $2, $3, $4, 'system')
-       ON CONFLICT DO NOTHING`,
-      [shift_date, status, summaryText, JSON.stringify(dataJson)]);
-    // Always insert a fresh one (allow history)
-    const insertResult = await pool.query(
-      `INSERT INTO analysis_reports (shift_date, analysis_type, status, summary, data_json, created_by)
-       VALUES ($1::date, 'shift_review', $2, $3, $4, 'system')
-       RETURNING id::text, created_at::text`,
-      [shift_date, status, summaryText, JSON.stringify(dataJson)]);
-
-    return res.json({
-      ok: true,
-      shift_date,
-      status,
-      summary: summaryText,
-      issues,
-      recommendations,
-      data: dataJson,
-      report_id: insertResult.rows[0]?.id,
-      codex_handoff: codexHandoff,
-    });
+    const result = await runBobShiftAnalysis(shift_date);
+    return res.json(result);
   } catch (err: any) {
     console.error("[bob/run-analysis] error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// POST /api/ai-ops/ops-loop/daily-analysis/run — manual entrypoint for Bob → Analyst → AI Ops loop
+// Deterministic run for one shift date. Safe to rerun: AI Ops issue creation is deduplicated per issue evidence.
+router.post("/ops-loop/daily-analysis/run", async (req, res) => {
+  const { shift_date } = req.body as { shift_date?: string };
+  if (!shift_date || !/^\d{4}-\d{2}-\d{2}$/.test(shift_date)) {
+    return res.status(400).json({ ok: false, error: "shift_date required (YYYY-MM-DD)" });
+  }
+
+  try {
+    const loopResult = await runDailyBobAnalystAiOpsLoop(shift_date);
+    return res.json(loopResult);
+  } catch (err: any) {
+    console.error("[ops-loop/daily-analysis/run] error:", err.message);
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
