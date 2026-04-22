@@ -1,6 +1,6 @@
 /**
  * 🔒 NAVIGATION LOCK — APPROVED STRUCTURE
- * Date: Jan 28, 2026
+ * Date: Jan 28, 2026 | Updated: Apr 22, 2026 (FINAL DB 7 — owner approved)
  *
  * Sidebar sections are FINAL:
  * - Operations
@@ -8,10 +8,11 @@
  * - Analysis
  * - Finance
  * - Menu Management
+ * - AI Operations  ← added Apr 22, 2026 (moved from Operations, owner approved)
  *
  * Do NOT:
  * - Move Ingredient Authority out of Menu Management
- * - Add new root sections
+ * - Add new root sections without explicit owner approval
  *
  * All navigation changes require explicit owner approval.
  */
@@ -91,7 +92,6 @@ const navigationGroups: NavGroup[] = [
           { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library", ownerOnly: true }
         ]
       },
-      { to: "/operations/ai-ops-control", label: "AI Ops Control", icon: Bot, testId: "nav-ai-ops-control" },
       { to: "/operations/health-safety-audit", label: "Health & Safety Audit", icon: Settings, testId: "nav-health-safety" }
     ]
   },
@@ -110,6 +110,14 @@ const navigationGroups: NavGroup[] = [
       { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
       { to: "/analysis/grab-loyverse-monthly-reconciliation", label: "Grab vs Loyverse", icon: BarChart3, testId: "nav-grab-loyverse-reconciliation" },
       { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
+    ]
+  },
+  {
+    title: "AI Operations",
+    items: [
+      { to: "/ai-ops/control", label: "AI Ops Control", icon: Bot, testId: "nav-ai-ops-control" },
+      { to: "/ai-ops/issue-register", label: "Issue Register", icon: Settings, testId: "nav-issue-register" },
+      { to: "/ai-ops/variance-monitor", label: "Variance Monitor", icon: BarChart3, testId: "nav-variance-monitor" },
     ]
   },
   {

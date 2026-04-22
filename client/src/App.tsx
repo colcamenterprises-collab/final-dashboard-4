@@ -1,6 +1,6 @@
 /**
  * 🔒 NAVIGATION LOCK — APPROVED STRUCTURE
- * Date: Jan 28, 2026
+ * Date: Jan 28, 2026 | Updated: Apr 22, 2026 (FINAL DB 7 — owner approved)
  *
  * Sidebar sections are FINAL:
  * - Operations
@@ -8,10 +8,11 @@
  * - Analysis
  * - Finance
  * - Menu Management
+ * - AI Operations  ← added Apr 22, 2026 (moved from Operations, owner approved)
  *
  * Do NOT:
  * - Move Ingredient Authority out of Menu Management
- * - Add new root sections
+ * - Add new root sections without explicit owner approval
  *
  * All navigation changes require explicit owner approval.
  */
@@ -187,15 +188,25 @@ export default function App() {
                 
                 <Route path="/operations/daily-reports" element={<ProtectedRoute><DailySummaryReportsPage /></ProtectedRoute>} />
                 <Route path="/operations/system-health" element={<ProtectedRoute><SystemHealthPage /></ProtectedRoute>} />
-                <Route path="/operations/ai-ops-control" element={<ProtectedRoute><AiOpsControlPage /></ProtectedRoute>} />
-                <Route path="/operations/tasks/:id" element={<ProtectedRoute><TaskDetailPage /></ProtectedRoute>} />
                 <Route path="/operations/purchase-history" element={<ProtectedRoute><PurchaseHistory /></ProtectedRoute>} />
                 <Route path="/operations/health-safety-audit" element={<ProtectedRoute><HealthSafetyAuditPage /></ProtectedRoute>} />
                 <Route path="/operations/health-safety-audit/questions" element={<ProtectedRoute><HealthSafetyQuestionManager /></ProtectedRoute>} />
                 <Route path="/operations/ingredients-master" element={<ProtectedRoute><IngredientsMaster /></ProtectedRoute>} />
                 <Route path="/operations/recipe-mapping" element={<ProtectedRoute><RecipeMappingPage /></ProtectedRoute>} />
-                <Route path="/operations/variance-monitor" element={<ProtectedRoute><VarianceMonitorPage /></ProtectedRoute>} />
-                <Route path="/operations/issue-register" element={<ProtectedRoute><IssueRegisterPage /></ProtectedRoute>} />
+
+                {/* AI Operations — primary routes (FINAL DB 7) */}
+                <Route path="/ai-ops/control" element={<ProtectedRoute><AiOpsControlPage /></ProtectedRoute>} />
+                <Route path="/ai-ops/issue-register" element={<ProtectedRoute><IssueRegisterPage /></ProtectedRoute>} />
+                <Route path="/ai-ops/variance-monitor" element={<ProtectedRoute><VarianceMonitorPage /></ProtectedRoute>} />
+                <Route path="/ai-ops/tasks/:id" element={<ProtectedRoute><TaskDetailPage /></ProtectedRoute>} />
+                <Route path="/ai-ops" element={<Navigate to="/ai-ops/control" replace />} />
+
+                {/* AI Operations — backward-compatible redirects from old /operations/* paths */}
+                <Route path="/operations/ai-ops-control" element={<Navigate to="/ai-ops/control" replace />} />
+                <Route path="/operations/issue-register" element={<Navigate to="/ai-ops/issue-register" replace />} />
+                <Route path="/operations/variance-monitor" element={<Navigate to="/ai-ops/variance-monitor" replace />} />
+                {/* Tasks route: serve directly at both paths (dynamic redirect not supported in React Router v6) */}
+                <Route path="/operations/tasks/:id" element={<ProtectedRoute><TaskDetailPage /></ProtectedRoute>} />
                 
                 <Route path="/operations/analysis" element={<ProtectedRoute><Analysis /></ProtectedRoute>}>
                   <Route index element={null} />

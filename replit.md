@@ -23,7 +23,8 @@ Manager Checklist System (Fort Knox Locked): Golden database schema and API endp
   - API endpoints: /api/checklists/random, /api/checklists/complete, /api/checklists/history (server-side validation enforced)
   - Frontend: ManagerChecklistModal.tsx locked - enforces completion before shift closure
 Layout Protection: Clean app shell architecture (App.tsx + Sidebar.tsx) with automated prebuild validation preventing margin-left hacks. Layout uses proper flex-1 min-w-0 structure with 256px → 78px collapsible sidebar.
-Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashboard, Operations, Finance, Menu Management, Marketing) featuring emerald pill active states, monochrome SVG icons, and smooth expand/collapse animations with chevron indicators.
+Accordion Navigation: Advanced grouped sidebar with collapsible sections (Dashboard, Operations, Purchasing, Analysis, AI Operations, Finance, Menu Management, POS & Kitchen, Membership, Settings) featuring emerald pill active states, monochrome SVG icons, and smooth expand/collapse animations with chevron indicators.
+AI Operations Navigation (FINAL DB 7 — Apr 22, 2026): Standalone top-level sidebar section. Primary routes: `/ai-ops/control` (AI Ops Control Board), `/ai-ops/issue-register` (Issue Register), `/ai-ops/variance-monitor` (Variance Monitor), `/ai-ops/tasks/:id` (Task Detail). Backward-compatible redirects: `/operations/ai-ops-control` → `/ai-ops/control`, `/operations/issue-register` → `/ai-ops/issue-register`, `/operations/variance-monitor` → `/ai-ops/variance-monitor`.
 
 ## System Architecture
 ### Frontend Architecture
