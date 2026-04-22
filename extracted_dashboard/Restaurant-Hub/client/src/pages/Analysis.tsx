@@ -8,15 +8,25 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface LoyverseData {
-  shiftInfo: {
+  shift: {
     reportId: string;
     shiftDate: string;
     shiftStart: string;
     shiftEnd: string;
     totalSales: string;
     totalReceipts: number;
-  };
-  items: Array<{
+  } | null;
+  drinks: Array<{
+    name: string;
+    quantity: number;
+    totalSales: number;
+  }>;
+  burgers: Array<{
+    name: string;
+    quantity: number;
+    totalSales: number;
+  }>;
+  sides: Array<{
     name: string;
     quantity: number;
     totalSales: number;
@@ -27,12 +37,13 @@ interface LoyverseData {
     count: number;
     totalAmount: number;
   }>;
-  summary: {
-    totalUniqueItems: number;
-    totalUniqueModifiers: number;
-    totalItemsSold: number;
-    totalModifiersUsed: number;
-  };
+  blockers: Array<{
+    code: string;
+    message: string;
+    where: string;
+    canonical_source: string;
+    auto_build_attempted: boolean;
+  }>;
 }
 
 interface StaffFormData {
@@ -123,9 +134,19 @@ export default function Analysis() {
   };
 
   const currentStaffForm = staffFormData?.[0];
-  const loyverseSales = loyverseData ? parseFloat(loyverseData.shiftInfo.totalSales) : 0;
+  const loyverseSales = loyverseData?.shift ? parseFloat(loyverseData.shift.totalSales) : 0;
   const staffSales = currentStaffForm ? parseFloat(currentStaffForm.totalSales) : 0;
   const salesVarianceStatus = getVarianceStatus(loyverseSales, staffSales);
+  const topItems = loyverseData
+    ? [...loyverseData.burgers, ...loyverseData.drinks, ...loyverseData.sides].sort((a, b) => b.quantity - a.quantity)
+    : [];
+  const totalUniqueItems = loyverseData ? topItems.length : 0;
+  const totalItemsSold = loyverseData
+    ? topItems.reduce((sum, item) => sum + item.quantity, 0)
+    : 0;
+  const totalModifiersUsed = loyverseData
+    ? loyverseData.modifiers.reduce((sum, mod) => sum + mod.count, 0)
+    : 0;
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -196,8 +217,8 @@ export default function Analysis() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Items Tracked</p>
-                <p className="text-lg font-semibold">
-                  {loyverseData?.summary.totalUniqueItems || 0}
+                  <p className="text-lg font-semibold">
+                  {totalUniqueItems}
                 </p>
               </div>
               <Package className="h-6 w-6 text-green-500" />
@@ -248,20 +269,20 @@ export default function Analysis() {
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Total Sales</p>
                       <p className="font-semibold text-green-600">
-                        {formatCurrency(loyverseData.shiftInfo.totalSales)}
+                        {formatCurrency(loyverseData.shift?.totalSales || 0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Total Orders</p>
-                      <p className="font-semibold">{loyverseData.shiftInfo.totalReceipts}</p>
+                      <p className="font-semibold">{loyverseData.shift?.totalReceipts || 0}</p>
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Items Sold</p>
-                      <p className="font-semibold">{loyverseData.summary.totalItemsSold}</p>
+                      <p className="font-semibold">{totalItemsSold}</p>
                     </div>
                     <div>
                       <p className="text-gray-600 dark:text-gray-400">Modifiers Used</p>
-                      <p className="font-semibold">{loyverseData.summary.totalModifiersUsed}</p>
+                      <p className="font-semibold">{totalModifiersUsed}</p>
                     </div>
                   </div>
                 </div>
@@ -272,7 +293,7 @@ export default function Analysis() {
                     Top Items Sold
                   </h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {loyverseData.items.slice(0, 8).map((item, index) => (
+                    {topItems.slice(0, 8).map((item, index) => (
                       <div key={index} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-gray-800 rounded">
                         <div className="flex-1">
                           <p className="font-medium text-sm">{item.name}</p>
@@ -466,16 +487,16 @@ export default function Analysis() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>Unique Items:</span>
-                    <span className="font-semibold">{loyverseData.summary.totalUniqueItems}</span>
+                    <span className="font-semibold">{totalUniqueItems}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Total Sold:</span>
-                    <span className="font-semibold">{loyverseData.summary.totalItemsSold}</span>
+                    <span className="font-semibold">{totalItemsSold}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Avg per Order:</span>
                     <span className="font-semibold">
-                      {(loyverseData.summary.totalItemsSold / loyverseData.shiftInfo.totalReceipts).toFixed(1)}
+                      {(totalItemsSold / (loyverseData.shift?.totalReceipts || 1)).toFixed(1)}
                     </span>
                   </div>
                 </div>
