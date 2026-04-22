@@ -1,6 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 type Blocker = {
   code: string;
@@ -22,138 +23,328 @@ type AnalysisV2Response = {
   };
 };
 
-function defaultDateUTC(): string {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * Returns today's date in BKK timezone as YYYY-MM-DD.
+ */
+function todayBkk(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 }
 
-function Cell({ children, right = false }: { children: ReactNode; right?: boolean }) {
-  return <td className={`border px-3 py-2 text-sm ${right ? 'text-right' : ''}`}>{children}</td>;
+/**
+ * Returns the last CLOSED shift date in BKK timezone.
+ *
+ * Shift window: opens 17:00 BKK, closes 03:00 BKK next day.
+ * - BKK 00:00–02:59  → yesterday's shift is still open  → last closed = 2 days ago (BKK)
+ * - BKK 03:00–23:59  → yesterday's shift has closed     → last closed = yesterday (BKK)
+ */
+function lastClosedShiftDateBkk(): string {
+  const bkkHourStr = new Date().toLocaleString('en-US', {
+    timeZone: 'Asia/Bangkok',
+    hour: 'numeric',
+    hour12: false,
+  });
+  const bkkHour = parseInt(bkkHourStr, 10);
+  const daysBack = bkkHour < 3 ? 2 : 1;
+  const base = new Date(todayBkk() + 'T00:00:00Z');
+  base.setUTCDate(base.getUTCDate() - daysBack);
+  return base.toISOString().slice(0, 10);
+}
+
+function shiftStep(date: string, delta: -1 | 1): string {
+  const d = new Date(date + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatShiftLabel(date: string): string {
+  const d = new Date(date + 'T00:00:00Z');
+  return d.toLocaleDateString('en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
+}
+
+function Cell({ children, right = false, bold = false }: { children: ReactNode; right?: boolean; bold?: boolean }) {
+  return (
+    <td className={`border border-gray-200 px-3 py-2 text-xs ${right ? 'text-right tabular-nums' : ''} ${bold ? 'font-semibold' : ''}`}>
+      {children}
+    </td>
+  );
+}
+
+function Th({ children, right = false }: { children: ReactNode; right?: boolean }) {
+  return (
+    <th className={`border border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold text-gray-600 ${right ? 'text-right' : 'text-left'}`}>
+      {children}
+    </th>
+  );
+}
+
+function EmptyRow({ cols }: { cols: number }) {
+  return (
+    <tr>
+      <td colSpan={cols} className="border border-gray-200 px-3 py-4 text-center text-xs text-gray-400">
+        No data for this shift
+      </td>
+    </tr>
+  );
 }
 
 export default function AnalysisV2() {
-  const [date, setDate] = useState(defaultDateUTC());
+  const [shiftDate, setShiftDate] = useState<string>(lastClosedShiftDateBkk);
+  const [isLastClosed, setIsLastClosed] = useState(true);
 
-  const { data, isLoading, error } = useQuery<AnalysisV2Response>({
-    queryKey: ['/api/analysis/v2', date],
+  useEffect(() => {
+    fetch('/api/latest-valid-shift')
+      .then((r) => r.json())
+      .then((j) => {
+        if (j?.ok && j?.date) {
+          setShiftDate(j.date);
+          setIsLastClosed(true);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const { data, isLoading } = useQuery<AnalysisV2Response>({
+    queryKey: ['/api/analysis/v2', shiftDate],
     queryFn: async () => {
-      const res = await fetch(`/api/analysis/v2?date=${date}`);
+      const res = await fetch(`/api/analysis/v2?date=${shiftDate}`);
       if (!res.ok) throw new Error('Failed to load Analysis V2');
       return res.json();
     },
   });
 
-  return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Analysis V2</h1>
+  const lastClosed = lastClosedShiftDateBkk();
+  const isAtLastClosed = shiftDate === lastClosed;
 
-      <div className="max-w-xs">
-        <label className="mb-1 block text-xs font-medium">Business Date</label>
-        <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+  function handleDateInput(value: string) {
+    setShiftDate(value);
+    setIsLastClosed(false);
+  }
+
+  function handleStep(delta: -1 | 1) {
+    setShiftDate((d) => shiftStep(d, delta));
+    setIsLastClosed(false);
+  }
+
+  function jumpToLastClosed() {
+    setShiftDate(lastClosed);
+    setIsLastClosed(true);
+  }
+
+  return (
+    <div className="p-4 md:p-6 space-y-5 max-w-5xl">
+
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-lg font-bold text-gray-900">Sales &amp; Shift Analysis V2</h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Drinks · Burgers · Side Orders · Modifiers — per shift
+          </p>
+        </div>
+
+        {!isAtLastClosed && (
+          <button
+            onClick={jumpToLastClosed}
+            className="text-xs text-emerald-700 border border-emerald-300 bg-emerald-50 px-3 py-1.5 rounded hover:bg-emerald-100 transition-colors"
+          >
+            ↩ Jump to last closed shift
+          </button>
+        )}
       </div>
 
-      {isLoading && <div className="text-sm">Loading…</div>}
-      {error && <div className="text-sm text-red-600">{(error as Error).message}</div>}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => handleStep(-1)}
+          className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors"
+          title="Previous shift"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        <div className="flex-1 max-w-xs">
+          <label className="block text-xs text-gray-500 mb-1 font-medium">Shift Date</label>
+          <Input
+            type="date"
+            value={shiftDate}
+            max={todayBkk()}
+            onChange={(e) => handleDateInput(e.target.value)}
+            className="text-sm h-9"
+          />
+        </div>
+
+        <button
+          onClick={() => handleStep(1)}
+          disabled={shiftDate >= lastClosed}
+          className="p-1.5 rounded border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          title="Next shift"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+
+        <div className="text-xs text-gray-500 self-end pb-2 leading-tight">
+          <span className="font-medium text-gray-700">{formatShiftLabel(shiftDate)}</span>
+          <br />
+          <span className="text-gray-400">17:00 BKK → 03:00 BKK+1</span>
+        </div>
+      </div>
+
+      {isAtLastClosed && (
+        <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 inline-block">
+          Showing last closed shift
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="text-xs text-gray-400 py-6 text-center">Loading shift data…</div>
+      )}
 
       {!!data?.blockers?.length && (
-        <div className="border border-amber-300 bg-amber-50 p-3 text-sm">
+        <div className="border border-amber-300 bg-amber-50 rounded p-3 space-y-1">
           {data.blockers.map((b) => (
-            <div key={`${b.code}-${b.where}`}>
-              <strong>{b.code}</strong>: {b.message}
+            <div key={`${b.code}-${b.where}`} className="text-xs">
+              <span className="font-semibold text-amber-800">{b.code}</span>
+              <span className="text-amber-700">: {b.message}</span>
             </div>
           ))}
         </div>
       )}
 
       {data && (
-        <>
+        <div className="space-y-6">
+
           <section>
-            <h2 className="mb-2 text-lg font-semibold">1. Drinks</h2>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="border px-3 py-2 text-left text-sm">SKU</th>
-                  <th className="border px-3 py-2 text-right text-sm">Sold (Direct)</th>
-                  <th className="border px-3 py-2 text-right text-sm">Sold (From Modifiers)</th>
-                  <th className="border px-3 py-2 text-right text-sm">Total Sold</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tables.drinks.map((row) => (
-                  <tr key={row.sku}>
-                    <Cell>{row.sku}</Cell>
-                    <Cell right>{row.soldDirect}</Cell>
-                    <Cell right>{row.soldFromModifiers}</Cell>
-                    <Cell right>{row.totalSold}</Cell>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              1. Drinks
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr>
+                    <Th>SKU</Th>
+                    <Th right>Sold (Direct)</Th>
+                    <Th right>Sold (From Modifiers)</Th>
+                    <Th right>Total Sold</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.tables.drinks.length === 0 ? (
+                    <EmptyRow cols={4} />
+                  ) : (
+                    data.tables.drinks.map((row) => (
+                      <tr key={row.sku} className="hover:bg-gray-50">
+                        <Cell>{row.sku}</Cell>
+                        <Cell right>{row.soldDirect}</Cell>
+                        <Cell right>{row.soldFromModifiers}</Cell>
+                        <Cell right bold>{row.totalSold}</Cell>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section>
-            <h2 className="mb-2 text-lg font-semibold">2. Burgers &amp; Burger Sets</h2>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="border px-3 py-2 text-left text-sm">Item Name</th>
-                  <th className="border px-3 py-2 text-right text-sm">Sold Count</th>
-                  <th className="border px-3 py-2 text-left text-sm">Type (Single / Double / Set)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tables.burgersAndSets.map((row) => (
-                  <tr key={`${row.itemName}-${row.type}`}>
-                    <Cell>{row.itemName}</Cell>
-                    <Cell right>{row.soldCount}</Cell>
-                    <Cell>{row.type}</Cell>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              2. Burgers &amp; Burger Sets
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr>
+                    <Th>Item Name</Th>
+                    <Th right>Sold Count</Th>
+                    <Th>Type</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.tables.burgersAndSets.length === 0 ? (
+                    <EmptyRow cols={3} />
+                  ) : (
+                    data.tables.burgersAndSets.map((row) => (
+                      <tr key={`${row.itemName}-${row.type}`} className="hover:bg-gray-50">
+                        <Cell>{row.itemName}</Cell>
+                        <Cell right bold>{row.soldCount}</Cell>
+                        <Cell>
+                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium
+                            ${row.type === 'Set' ? 'bg-blue-50 text-blue-700' :
+                              row.type === 'Double' ? 'bg-purple-50 text-purple-700' :
+                              'bg-gray-50 text-gray-700'}`}>
+                            {row.type}
+                          </span>
+                        </Cell>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section>
-            <h2 className="mb-2 text-lg font-semibold">3. Side Orders</h2>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="border px-3 py-2 text-left text-sm">Item Name</th>
-                  <th className="border px-3 py-2 text-right text-sm">Sold Count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tables.sideOrders.map((row) => (
-                  <tr key={row.itemName}>
-                    <Cell>{row.itemName}</Cell>
-                    <Cell right>{row.soldCount}</Cell>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              3. Side Orders
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr>
+                    <Th>Item Name</Th>
+                    <Th right>Sold Count</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.tables.sideOrders.length === 0 ? (
+                    <EmptyRow cols={2} />
+                  ) : (
+                    data.tables.sideOrders.map((row) => (
+                      <tr key={row.itemName} className="hover:bg-gray-50">
+                        <Cell>{row.itemName}</Cell>
+                        <Cell right bold>{row.soldCount}</Cell>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <section>
-            <h2 className="mb-2 text-lg font-semibold">4. Modifiers</h2>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="border px-3 py-2 text-left text-sm">Modifier Type</th>
-                  <th className="border px-3 py-2 text-left text-sm">Item</th>
-                  <th className="border px-3 py-2 text-right text-sm">Count</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.tables.modifiers.map((row, idx) => (
-                  <tr key={`${row.modifierType}-${row.item}-${idx}`}>
-                    <Cell>{row.modifierType}</Cell>
-                    <Cell>{row.item}</Cell>
-                    <Cell right>{row.count}</Cell>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              4. Modifiers
+            </h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  <tr>
+                    <Th>Modifier Type</Th>
+                    <Th>Item</Th>
+                    <Th right>Count</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.tables.modifiers.length === 0 ? (
+                    <EmptyRow cols={3} />
+                  ) : (
+                    data.tables.modifiers.map((row, idx) => (
+                      <tr key={`${row.modifierType}-${row.item}-${idx}`} className="hover:bg-gray-50">
+                        <Cell>{row.modifierType}</Cell>
+                        <Cell>{row.item}</Cell>
+                        <Cell right bold>{row.count}</Cell>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </section>
-        </>
+
+        </div>
       )}
     </div>
   );
