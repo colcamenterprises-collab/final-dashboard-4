@@ -372,7 +372,35 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                   >
                     {group.items.map((item) => {
                       const active = isActive(item.to);
-                      
+                      /* Standalone items (e.g. Online Ordering) render as section-header-level
+                         links — same font/colour as Operations/Purchasing/etc. headers.       */
+                      if (group.isStandalone) {
+                        const standaloneClass = cn(
+                          "flex items-center gap-3 px-3 py-2 text-xs font-semibold transition-all duration-200 rounded-lg",
+                          isCollapsed && "lg:justify-center lg:px-2",
+                          active
+                            ? "text-slate-900 bg-slate-100 dark:text-white dark:bg-slate-800"
+                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800"
+                        );
+                        return (
+                          <div key={item.to}>
+                            {item.external ? (
+                              <a href={item.to} onClick={onClose} target="_blank" rel="noopener noreferrer"
+                                className={standaloneClass} data-testid={item.testId}>
+                                <item.icon className="h-4 w-4 text-slate-500 transition-colors" />
+                                <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
+                              </a>
+                            ) : (
+                              <NavLink to={item.to} onClick={onClose}
+                                className={standaloneClass} data-testid={item.testId}>
+                                <item.icon className="h-4 w-4 text-slate-500 transition-colors" />
+                                <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
+                              </NavLink>
+                            )}
+                          </div>
+                        );
+                      }
+
                       return (
                         <div key={item.to}>
                           {/* Main item */}
