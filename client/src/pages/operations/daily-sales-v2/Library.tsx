@@ -50,6 +50,7 @@ type RecordType = {
   payload?: { 
     balanced?: boolean;
     drinkStock?: { name: string; quantity: number; unit: string }[] | Record<string, number>;
+    friesEnd?: number | null;
   };
   deletedAt?: string | null;
 };
@@ -298,6 +299,7 @@ export default function DailySalesV2Library() {
         stock: {
           rolls: p.rollsEnd ?? 0,
           meat: p.meatEnd ?? 0,
+          fries: p.friesEnd ?? null,
           drinks: drinksArray,
           zeroConfirmation: p.zeroConfirmation || null
         },
@@ -404,7 +406,7 @@ export default function DailySalesV2Library() {
                   return (
                     <div className="text-sm text-slate-700">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium">Rolls: {rec.buns ?? "-"} | Meat: {rec.meat ?? "-"} | Receipts: {receipt.total}</p>
+                        <p className="font-medium">Rolls: {rec.buns ?? "-"} | Meat: {rec.meat ?? "-"} | Fries: {rec.payload?.friesEnd ?? "-"} | Receipts: {receipt.total}</p>
                         {hasZeroCount && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 whitespace-nowrap">
                             <AlertTriangle className="h-2.5 w-2.5" />
@@ -593,6 +595,7 @@ export default function DailySalesV2Library() {
                   <h4 className="text-xs font-semibold mb-2">End Count</h4>
                   <p className="text-xs"><strong>Rolls:</strong> {selected.stock.rolls ?? 0} pcs</p>
                   <p className="text-xs"><strong>Meat:</strong> {selected.stock.meat ?? 0} grams</p>
+                  <p className="text-xs"><strong>French Fries:</strong> {selected.stock.fries !== null && selected.stock.fries !== undefined ? `${selected.stock.fries} bags` : <span className="text-slate-400 italic">not recorded</span>}</p>
 
                   {selected.stock.zeroConfirmation ? (
                     <div className="mt-3 p-2 bg-amber-50 border border-amber-300 rounded">
