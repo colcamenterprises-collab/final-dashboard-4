@@ -24,6 +24,11 @@ type ComparisonRow = {
   threshold?: number | null;
   withinThreshold?: boolean | null;
   note?: string;
+  start?: number | null;
+  purchased?: number | null;
+  sold?: number | null;
+  end?: number | null;
+  expected?: number | null;
 };
 
 type MissingDataCode =
@@ -179,9 +184,42 @@ function buildThresholdCheck(
   };
 }
 
+const DRINK_NAME_ALIASES: Record<string, string> = {
+  coke: "Coke",
+  "cokezero": "Coke Zero",
+  "coke-zero": "Coke Zero",
+  sprite: "Sprite",
+  water: "Water",
+  bottledwater: "Water",
+  bottlewater: "Water",
+  sodawater: "Water",
+  "น้ำเปล่า": "Water",
+  fantaorange: "Fanta Orange",
+  orangefanta: "Fanta Orange",
+  fantastrawberry: "Fanta Strawberry",
+  strawberryfanta: "Fanta Strawberry",
+  schweppesmanao: "Schweppes Manao",
+  schweppesmanow: "Schweppes Manao",
+  schweppeslime: "Schweppes Manao",
+};
+
+function normalizeDrinkKey(raw: string): string {
+  return raw.toLowerCase().trim().replace(/[^a-z0-9\u0E00-\u0E7F]/g, "");
+}
+
+function canonicalDrinkName(raw: unknown): string | null {
+  if (typeof raw !== "string" || raw.trim() === "") return null;
+  const nk = normalizeDrinkKey(raw);
+  if (!nk) return null;
+  return DRINK_NAME_ALIASES[nk] || null;
+}
+
 router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
   try {
     const shift = getLatestCompletedShiftWindow();
+    const prevShiftDate = DateTime.fromISO(shift.shiftDate, { zone: BKK_ZONE })
+      .minus({ days: 1 })
+      .toFormat("yyyy-LL-dd");
 
   const sourceState: Record<string, SourceState> = {
     shiftReport: { ok: false, path: "/api/bob/read/shift-report/latest" },
@@ -189,6 +227,7 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     dailyStock: { ok: false, path: `/api/bob/read/daily-stock?date=${shift.shiftDate}` },
     stockUsage: { ok: false, path: `/api/bob/read/stock-usage?date=${shift.shiftDate}` },
     purchaseHistory: { ok: false, path: `/api/bob/read/purchase-history?from=${shift.shiftDate}&to=${shift.shiftDate}` },
+    previousDailyStockCanonical: { ok: false, path: `/api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=${prevShiftDate}&token=<redacted>` },
   };
 
   let shiftReport: any = null;
@@ -235,9 +274,17 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
   const canonicalStockProbe = await internalGetSafe(
     `/api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=${shift.shiftDate}&token=${encodeURIComponent(bobReadToken)}`
   );
+  const prevCanonicalStockProbe = await internalGetSafe(
+    `/api/ai-ops/bob/proxy-read?path=forms/daily-stock&date=${prevShiftDate}&token=${encodeURIComponent(bobReadToken)}`
+  );
+  sourceState.previousDailyStockCanonical.ok = prevCanonicalStockProbe.ok;
+  if (!prevCanonicalStockProbe.ok) {
+    sourceState.previousDailyStockCanonical.reason = prevCanonicalStockProbe.error || "Unknown load failure";
+  }
 
   const canonicalSalesRows = pickCanonicalRows(canonicalSalesProbe.payload);
   const canonicalStockRows = pickCanonicalRows(canonicalStockProbe.payload);
+  const prevCanonicalStockRows = pickCanonicalRows(prevCanonicalStockProbe.payload);
 
   const mappedDailySales = legacySalesRowsForShift[0] ?? null;
   const mappedDailyStock = legacyStockRowsForShift[0] ?? null;
@@ -404,18 +451,126 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
     sourceBOrigin: stockComparisonSource,
   });
 
-  const stockUsageDrinks = toNumber(stockUsage?.summary?.totalDrinks) ?? toNumber(stockUsage?.totals?.drinks);
-  const purchasedDrinkCount = Array.isArray(purchaseHistory?.drinks)
-    ? purchaseHistory.drinks.reduce((sum: number, row: any) => {
-        const items = Array.isArray(row?.items) ? row.items : [];
-        const rowQty = items
-          .map((item: any) => toNumber(item?.quantity))
-          .filter((n: number | null) => n !== null)
-          .reduce((itemSum: number, n: number | null) => itemSum + (n || 0), 0);
-        return sum + rowQty;
-      }, 0)
-    : null;
-  comparisons.push(buildThresholdCheck("drinks_usage_vs_purchased", stockUsageDrinks, purchasedDrinkCount, 2));
+  const stockUsageDrinkSoldByCanonical: Record<string, number | null> = {
+    Coke: toNumber(stockUsage?.summary?.coke),
+    "Coke Zero": toNumber(stockUsage?.summary?.cokeZero),
+    Sprite: toNumber(stockUsage?.summary?.sprite),
+    Water: toNumber(stockUsage?.summary?.water),
+    "Fanta Orange": toNumber(stockUsage?.summary?.fantaOrange),
+    "Fanta Strawberry": toNumber(stockUsage?.summary?.fantaStrawberry),
+    "Schweppes Manao": toNumber(stockUsage?.summary?.schweppesManao),
+  };
+
+  const currentDrinksRaw = stockComparisonSource === "v2_canonical"
+    ? stockComparisonRow?.drinksJson
+    : stockComparisonRow?.drinkStock;
+  const prevDrinksRaw = prevCanonicalStockRows[0]?.drinksJson;
+
+  const drinksEndMap = new Map<string, number>();
+  const drinksStartMap = new Map<string, number>();
+  const drinksPurchasedMap = new Map<string, number>();
+
+  const drinksAmbiguities: string[] = [];
+  const drinksMissingComponents: string[] = [];
+  const drinksUnknownMappings: string[] = [];
+
+  const endMapByCanonical = new Map<string, string[]>();
+  if (currentDrinksRaw && typeof currentDrinksRaw === "object" && !Array.isArray(currentDrinksRaw)) {
+    for (const [rawKey, rawValue] of Object.entries(currentDrinksRaw)) {
+      const canonical = canonicalDrinkName(rawKey);
+      const qty = toNumber(rawValue);
+      if (!canonical) {
+        drinksUnknownMappings.push(`end_stock:${String(rawKey)}`);
+        continue;
+      }
+      if (qty === null) {
+        drinksMissingComponents.push(`end_stock_qty_not_numeric:${canonical}`);
+        continue;
+      }
+      drinksEndMap.set(canonical, (drinksEndMap.get(canonical) ?? 0) + qty);
+      endMapByCanonical.set(canonical, [...(endMapByCanonical.get(canonical) ?? []), rawKey]);
+    }
+  }
+  for (const [canonical, rawKeys] of endMapByCanonical.entries()) {
+    if (rawKeys.length > 1) {
+      drinksAmbiguities.push(`end_stock_duplicate_keys:${canonical}<=${rawKeys.join("|")}`);
+    }
+  }
+
+  const startMapByCanonical = new Map<string, string[]>();
+  if (prevDrinksRaw && typeof prevDrinksRaw === "object" && !Array.isArray(prevDrinksRaw)) {
+    for (const [rawKey, rawValue] of Object.entries(prevDrinksRaw)) {
+      const canonical = canonicalDrinkName(rawKey);
+      const qty = toNumber(rawValue);
+      if (!canonical) {
+        drinksUnknownMappings.push(`start_stock:${String(rawKey)}`);
+        continue;
+      }
+      if (qty === null) {
+        drinksMissingComponents.push(`start_stock_qty_not_numeric:${canonical}`);
+        continue;
+      }
+      drinksStartMap.set(canonical, (drinksStartMap.get(canonical) ?? 0) + qty);
+      startMapByCanonical.set(canonical, [...(startMapByCanonical.get(canonical) ?? []), rawKey]);
+    }
+  }
+  for (const [canonical, rawKeys] of startMapByCanonical.entries()) {
+    if (rawKeys.length > 1) {
+      drinksAmbiguities.push(`start_stock_duplicate_keys:${canonical}<=${rawKeys.join("|")}`);
+    }
+  }
+
+  const purchaseRows = Array.isArray(purchaseHistory?.purchases) ? purchaseHistory.purchases : [];
+  for (const row of purchaseRows) {
+    const category = String(row?.category || "").trim().toLowerCase();
+    if (category !== "drinks") continue;
+    const canonical = canonicalDrinkName(row?.item);
+    const qty = toNumber(row?.qty);
+    if (!canonical) {
+      drinksUnknownMappings.push(`purchase_item:${String(row?.item ?? "")}`);
+      continue;
+    }
+    if (qty === null) {
+      drinksMissingComponents.push(`purchase_qty_not_numeric:${canonical}`);
+      continue;
+    }
+    drinksPurchasedMap.set(canonical, (drinksPurchasedMap.get(canonical) ?? 0) + qty);
+  }
+
+  const canonicalDrinkSet = new Set<string>([
+    ...Object.keys(stockUsageDrinkSoldByCanonical),
+    ...Array.from(drinksStartMap.keys()),
+    ...Array.from(drinksEndMap.keys()),
+    ...Array.from(drinksPurchasedMap.keys()),
+  ]);
+
+  for (const canonicalDrink of Array.from(canonicalDrinkSet).sort()) {
+    const start = drinksStartMap.has(canonicalDrink) ? (drinksStartMap.get(canonicalDrink) ?? null) : null;
+    const purchased = drinksPurchasedMap.has(canonicalDrink) ? (drinksPurchasedMap.get(canonicalDrink) ?? null) : null;
+    const sold = stockUsageDrinkSoldByCanonical[canonicalDrink];
+    const end = drinksEndMap.has(canonicalDrink) ? (drinksEndMap.get(canonicalDrink) ?? null) : null;
+
+    const hasMissingComponent = start === null || purchased === null || sold === null || end === null;
+    const expected = hasMissingComponent ? null : (start + purchased - sold);
+    const variance = hasMissingComponent || expected === null ? null : (end - expected);
+    const withinThreshold = variance === null ? null : Math.abs(variance) <= 2;
+
+    comparisons.push({
+      key: `drinks_stock_${canonicalDrink.toLowerCase().replace(/\s+/g, "_")}`,
+      sourceA: expected,
+      sourceB: end,
+      sourceBOrigin: stockComparisonSource,
+      variance,
+      threshold: 2,
+      withinThreshold,
+      start,
+      purchased,
+      sold,
+      end,
+      expected,
+      note: hasMissingComponent ? "incomplete_component_data" : undefined,
+    });
+  }
 
   const failedChecks = comparisons.filter((row) => row.withinThreshold === false);
   const blockedChecks = comparisons.filter((row) => row.withinThreshold === null);
@@ -495,25 +650,26 @@ router.get("/latest-shift", bobAuth, async (_req: Request, res: Response) => {
   };
 
   const drinksTruth = {
-    interpretation:
-      stockUsageDrinks !== null && purchasedDrinkCount !== null
-        ? "comparison_design_issue"
-        : "insufficient_data",
+    interpretation: "stock_equation_per_sku",
     detail:
-      stockUsageDrinks !== null && purchasedDrinkCount !== null
-        ? "Current check compares same-day drinks sold vs same-day purchases. This can fail even when operations are correct because drinks are inventory-carried across days."
-        : "Unable to fully interpret drinks mismatch due to missing usage or purchase numeric input.",
-    recommendedBasis: "opening_drinks + purchased_drinks - sold_drinks = closing_drinks (per SKU, per shift date)",
-    designCheck: {
-      sameDayPurchasesAsBasis: "not_reliable",
-      reason:
-        "Same-day purchases are replenishment events, not consumption bounds. Drinks can be sold from prior-day inventory.",
-      preferredMethod: "inventory_equation_per_sku",
-      includeOutOfShiftPurchases: "yes_if_within_inventory_carry_window",
+      "Drinks verification now uses stock equation per canonical SKU: start + purchased - sold = expected end, then compares expected vs form2 end.",
+    equation: {
+      start: "previous_shift_closing_stock",
+      purchased: "purchase_history(category=Drinks)",
+      sold: "receipt_truth_daily_usage (includes modifier-driven selections in canonical rebuild)",
+      end: "forms/daily-stock V2 drinksJson for target shift",
+      expected: "start + purchased - sold",
+      variance: "end - expected",
     },
-    purchaseHistoryEvidence: {
-      rows: purchaseDrinkCount,
-      source: "purchase_tally + purchase_tally_drink via /api/analysis/stock-review/purchase-history",
+    ambiguity: {
+      unresolvedMappings: drinksUnknownMappings,
+      duplicateCanonicalMappings: drinksAmbiguities,
+      missingComponents: drinksMissingComponents,
+      surfacedAs: "comparison.note=incomplete_component_data and null expected/variance",
+    },
+    previousShift: {
+      shiftDate: prevShiftDate,
+      canonicalRowFound: prevCanonicalStockRows.length > 0,
     },
   };
 
