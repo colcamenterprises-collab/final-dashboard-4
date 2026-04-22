@@ -3,6 +3,7 @@ import { db } from "../../lib/prisma";
 import { computeAndUpsertRollsLedger, getRollsLedgerRange } from "../../services/rollsLedger";
 import { computeAndUpsertMeatLedger, getMeatLedgerRange } from "../../services/meatLedger";
 import { computeAndUpsertDrinksLedger, getDrinksLedgerRange } from "../../services/drinksLedger";
+import { classifyLedgerIssue, deriveIssueOutcome } from "../../services/stockLodgementRefresh";
 
 const router = Router();
 
@@ -306,9 +307,26 @@ router.post('/lodge/rolls', async (req, res) => {
       VALUES (${shiftDate}::date, 'rolls', 'Burger Buns', ${Number(rollsPurchased)}, ${String(staffName).trim()}, 'stock_lodgement_home', false, NOW())
     `;
 
+    const beforeRows = await getRollsLedgerRange(shiftDate, shiftDate);
+    const beforeLedger = beforeRows[0] ?? null;
+    const beforeIssue = classifyLedgerIssue("rolls", beforeLedger);
+
     await computeAndUpsertRollsLedger(shiftDate);
     const ledgerRows = await getRollsLedgerRange(shiftDate, shiftDate);
-    return res.json({ ok: true, shiftDate, ledger: ledgerRows[0] ?? null });
+    const refreshedLedger = ledgerRows[0] ?? null;
+    const afterIssue = classifyLedgerIssue("rolls", refreshedLedger);
+
+    return res.json({
+      ok: true,
+      shiftDate,
+      refreshTriggered: "computeAndUpsertRollsLedger",
+      ledger: refreshedLedger,
+      reviewIssue: {
+        before: beforeIssue,
+        after: afterIssue,
+        outcome: deriveIssueOutcome(beforeIssue.code, afterIssue.code),
+      },
+    });
   } catch (error: any) {
     console.error('[STOCK] Rolls lodgement error:', error);
     return res.status(500).json({ ok: false, error: error.message || 'Failed to lodge rolls' });
@@ -330,9 +348,26 @@ router.post('/lodge/meat', async (req, res) => {
       VALUES (${shiftDate}::date, 'meat', 'Meat Lodgement', 1, ${weightG}, ${String(staffName).trim()}, 'stock_lodgement_home', false, NOW())
     `;
 
+    const beforeRows = await getMeatLedgerRange(shiftDate, shiftDate);
+    const beforeLedger = beforeRows[0] ?? null;
+    const beforeIssue = classifyLedgerIssue("meat", beforeLedger);
+
     await computeAndUpsertMeatLedger(shiftDate);
     const ledgerRows = await getMeatLedgerRange(shiftDate, shiftDate);
-    return res.json({ ok: true, shiftDate, ledger: ledgerRows[0] ?? null });
+    const refreshedLedger = ledgerRows[0] ?? null;
+    const afterIssue = classifyLedgerIssue("meat", refreshedLedger);
+
+    return res.json({
+      ok: true,
+      shiftDate,
+      refreshTriggered: "computeAndUpsertMeatLedger",
+      ledger: refreshedLedger,
+      reviewIssue: {
+        before: beforeIssue,
+        after: afterIssue,
+        outcome: deriveIssueOutcome(beforeIssue.code, afterIssue.code),
+      },
+    });
   } catch (error: any) {
     console.error('[STOCK] Meat lodgement error:', error);
     return res.status(500).json({ ok: false, error: error.message || 'Failed to lodge meat' });
@@ -361,9 +396,27 @@ router.post('/lodge/drinks', async (req, res) => {
       `;
     }
 
+    const beforeRows = await getDrinksLedgerRange(shiftDate, shiftDate);
+    const beforeLedger = beforeRows[0] ?? null;
+    const beforeIssue = classifyLedgerIssue("drinks", beforeLedger);
+
     await computeAndUpsertDrinksLedger(shiftDate);
     const ledgerRows = await getDrinksLedgerRange(shiftDate, shiftDate);
-    return res.json({ ok: true, shiftDate, insertedItems: validItems.length, ledger: ledgerRows[0] ?? null });
+    const refreshedLedger = ledgerRows[0] ?? null;
+    const afterIssue = classifyLedgerIssue("drinks", refreshedLedger);
+
+    return res.json({
+      ok: true,
+      shiftDate,
+      insertedItems: validItems.length,
+      refreshTriggered: "computeAndUpsertDrinksLedger",
+      ledger: refreshedLedger,
+      reviewIssue: {
+        before: beforeIssue,
+        after: afterIssue,
+        outcome: deriveIssueOutcome(beforeIssue.code, afterIssue.code),
+      },
+    });
   } catch (error: any) {
     console.error('[STOCK] Drinks lodgement error:', error);
     return res.status(500).json({ ok: false, error: error.message || 'Failed to lodge drinks' });

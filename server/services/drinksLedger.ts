@@ -46,14 +46,14 @@ async function getDrinksPurchased(shiftDate: string): Promise<{ qty: number }> {
   }
 }
 
-async function getActualDrinksEnd(shiftDate: string): Promise<{ count: number }> {
+async function getActualDrinksEnd(shiftDate: string): Promise<{ count: number | null }> {
   const form = await db.daily_sales_v2.findFirst({
     where: { shiftDate, deletedAt: null },
     orderBy: { createdAt: 'desc' },
     select: { payload: true },
   });
 
-  if (!form) return { count: 0 };
+  if (!form) return { count: null };
 
   const payload = (form as any).payload || {};
   const drinksEnd = Number(payload.drinksEnd ?? 0);
@@ -64,7 +64,8 @@ async function getActualDrinksEnd(shiftDate: string): Promise<{ count: number }>
     return { count: total };
   }
 
-  return { count: drinksEnd || 0 };
+  const hasDrinksEnd = payload.drinksEnd !== undefined && payload.drinksEnd !== null;
+  return { count: hasDrinksEnd ? (drinksEnd || 0) : null };
 }
 
 async function getDrinksStart(shiftDate: string): Promise<number> {
@@ -87,7 +88,7 @@ export interface DrinksLedgerEntry {
   drinksPurchased: number;
   drinksSold: number;
   estimatedDrinksEnd: number;
-  actualDrinksEnd: number;
+  actualDrinksEnd: number | null;
   wasteAllowance: number;
   variance: number;
   status: 'PENDING' | 'OK' | 'WARNING' | 'ALERT';
@@ -108,13 +109,15 @@ export async function computeDrinksLedger(shiftDate: string): Promise<DrinksLedg
   const { count: actualDrinksEnd } = await getActualDrinksEnd(normalizedShiftDate);
 
   const estimatedDrinksEnd = drinksStart + drinksPurchased - drinksSold;
-  const variance = actualDrinksEnd - estimatedDrinksEnd;
+  const variance = (actualDrinksEnd ?? estimatedDrinksEnd) - estimatedDrinksEnd;
 
   let status: 'PENDING' | 'OK' | 'WARNING' | 'ALERT' = 'PENDING';
-  const absVariance = Math.abs(variance);
-  if (absVariance <= WASTE_ALLOWANCE) status = 'OK';
-  else if (absVariance <= WASTE_ALLOWANCE * 2) status = 'WARNING';
-  else status = 'ALERT';
+  if (actualDrinksEnd !== null) {
+    const absVariance = Math.abs(variance);
+    if (absVariance <= WASTE_ALLOWANCE) status = 'OK';
+    else if (absVariance <= WASTE_ALLOWANCE * 2) status = 'WARNING';
+    else status = 'ALERT';
+  }
 
   console.info('DRINKS LEDGER', { shiftDate: normalizedShiftDate, purchases: drinksPurchased, soldTotal: drinksSold, actualEnd: actualDrinksEnd });
 
