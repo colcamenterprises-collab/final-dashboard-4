@@ -77,6 +77,7 @@ const labels = {
     validationError: 'Cannot proceed: Missing/invalid fields (non-negative required). Correct highlighted areas.',
     rollsRequired: 'Rolls count is required (0 allowed).',
     meatRequired: 'Meat count (grams) is required (0 allowed).',
+    friesRequired: 'French Fries count is required (0 allowed).',
     expandAll: 'Expand All',
     collapseAll: 'Collapse All',
     kg: 'kg',
@@ -115,6 +116,7 @@ const labels = {
     validationError: 'ไม่สามารถดำเนินการต่อได้: ฟิลด์ไม่ครบ/ไม่ถูกต้อง กรุณาแก้ไขช่องที่ไฮไลท์',
     rollsRequired: 'ต้องระบุจำนวนโรล (ใส่ 0 ได้)',
     meatRequired: 'ต้องระบุจำนวนเนื้อเป็นกรัม (ใส่ 0 ได้)',
+    friesRequired: 'ต้องระบุจำนวนเฟรนช์ฟรายส์ (ใส่ 0 ได้)',
     expandAll: 'ขยายทั้งหมด',
     collapseAll: 'ยุบทั้งหมด',
     kg: 'กก.',
@@ -144,7 +146,7 @@ const DailyStock: React.FC = () => {
   const [ingredients, setIngredients] = useState<IngredientItem[]>([]);
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
-  const [friesEnd, setFriesEnd] = useState<number>(0);
+  const [friesEnd, setFriesEnd] = useState<number | null>(null);
   const [drinkQuantities, setDrinkQuantities] = useState<Record<string, number>>({});
   
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -459,6 +461,7 @@ const DailyStock: React.FC = () => {
     
     const rollsNum = N(rolls);
     const meatNum = N(meatGrams);
+    const friesNum = N(friesEnd);
     
     if (Number.isNaN(rollsNum) || rollsNum < 0) {
       validationErrs.rollsEnd = "Rolls count is required (0 allowed).";
@@ -467,6 +470,9 @@ const DailyStock: React.FC = () => {
     if (Number.isNaN(meatNum) || meatNum < 0) {
       validationErrs.meatEnd = "Meat count (grams) is required (0 allowed).";
       details.meat = "Meat count (grams) is missing or invalid";
+    }
+    if (friesEnd === null || Number.isNaN(friesNum) || friesNum < 0) {
+      validationErrs.friesEnd = L.friesRequired;
     }
     
     // Check drinks - all required drinks must have valid counts (0 allowed)
@@ -757,6 +763,7 @@ const DailyStock: React.FC = () => {
           <h2 className="text-sm font-semibold mb-4">{L.endOfShiftCounts}</h2>
           {validationErrors?.rollsEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.rollsEnd}</div>}
           {validationErrors?.meatEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.meatEnd}</div>}
+          {validationErrors?.friesEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.friesEnd}</div>}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-sm mb-1 font-medium">{L.rollsEnd}</label>
@@ -793,8 +800,11 @@ const DailyStock: React.FC = () => {
                 type="text"
                 inputMode="numeric"
                 className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                value={friesEnd || ''}
-                onChange={(e) => setFriesEnd(safeInt(e.target.value))}
+                value={friesEnd === null ? '' : friesEnd}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^\d]/g, '');
+                  setFriesEnd(v === '' ? null : parseInt(v, 10));
+                }}
                 placeholder=""
                 aria-label="French Fries bags remaining"
               />

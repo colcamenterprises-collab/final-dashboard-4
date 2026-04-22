@@ -286,7 +286,11 @@ export default function DailySalesV2Library() {
           qr: p.qrSales || 0,
           grab: p.grabSales || 0,
           other: p.otherSales || 0,
-          total: p.totalSales || 0
+          total: p.totalSales || 0,
+          grabReceipts: p.grabReceiptCount || 0,
+          cashReceipts: p.cashReceiptCount || 0,
+          qrReceipts: p.qrReceiptCount || 0,
+          totalReceipts: (p.grabReceiptCount || 0) + (p.cashReceiptCount || 0) + (p.qrReceiptCount || 0)
         },
         expenses: p.expenses || [],
         wages: p.wages || [],
@@ -504,6 +508,13 @@ export default function DailySalesV2Library() {
                   <p className="text-xs"><strong>Grab Sales:</strong> ฿{selected.sales.grab.toLocaleString()}</p>
                   <p className="text-xs"><strong>Other Sales:</strong> ฿{selected.sales.other.toLocaleString()}</p>
                   <p className="text-xs font-bold border-t pt-2 mt-1"><strong>Total Sales:</strong> ฿{selected.sales.total.toLocaleString()}</p>
+                  <div className="border-t pt-2 mt-2 space-y-0.5">
+                    <h5 className="text-xs font-medium mb-1">Receipt Count</h5>
+                    <p className="text-xs"><strong>Grab Receipts:</strong> {selected.sales.grabReceipts}</p>
+                    <p className="text-xs"><strong>Cash Receipts:</strong> {selected.sales.cashReceipts}</p>
+                    <p className="text-xs"><strong>QR Receipts:</strong> {selected.sales.qrReceipts}</p>
+                    <p className="text-xs font-semibold"><strong>Total Receipts:</strong> {selected.sales.totalReceipts}</p>
+                  </div>
                 </div>
 
                 <div className="bg-red-50 p-3 rounded text-xs">
