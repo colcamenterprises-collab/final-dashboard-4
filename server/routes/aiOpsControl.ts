@@ -12,6 +12,7 @@ import {
   executeWorkspaceTools,
   WORKSPACE_TOOLS_BLOCK,
 } from "../services/bobWorkspace";
+import { getDailyAnalysis } from "../services/dataAnalystService";
 
 const router = Router();
 
@@ -3019,14 +3020,8 @@ router.post("/bob/run-analysis", async (req, res) => {
       [shift_date]);
     const stock = stockResult.rows[0] || null;
 
-    // 4. Top 5 POS items
-    const itemsResult = await pool.query(
-      `SELECT item_name, SUM(CASE WHEN receipt_type='SALE' THEN quantity ELSE 0 END)::int AS sold,
-              COALESCE(pos_category_name,'?') AS category
-       FROM receipt_truth_line WHERE receipt_date=$1::date AND receipt_type='SALE'
-       GROUP BY item_name, pos_category_name ORDER BY sold DESC LIMIT 5`,
-      [shift_date]);
-    const topItems = itemsResult.rows;
+    // 4. Canonical daily analyst output (deterministic read-model)
+    const analyst = await getDailyAnalysis(shift_date);
 
     // 5. Determine status and build summary
     const formTotalBaht = form ? Number(form.totalSales) / 100 : 0; // stored in satang
@@ -3089,7 +3084,8 @@ router.post("/bob/run-analysis", async (req, res) => {
       pos: { total_baht: posTotalBaht, refunds_baht: posRefundBaht, txn_count: Number(pos.pos_txn_count || 0), item_types: Number(pos.pos_item_types || 0) },
       form: form ? { total_baht: formTotalBaht, submitted_by: form.completedBy, submitted_at: form.submittedAtISO } : null,
       stock: stock ? { rolls_variance: rollsVariance, meat_variance_g: meatVarianceG } : null,
-      top_items: topItems.map(i => ({ name: i.item_name, sold: i.sold, category: i.category })),
+      analyst: analyst.data,
+      analyst_blockers: analyst.blockers,
       issues,
       recommendations,
       codex_handoff: codexHandoff,
