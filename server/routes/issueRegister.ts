@@ -385,6 +385,7 @@ router.post("/auto-create", async (req, res) => {
         description: `Physical buns used (${recon.buns.physicalUsed}) differs from expected (${recon.buns.expected}) by ${v} buns. Threshold: warn >5, critical >10.`,
         source_ref: `BUNS_VARIANCE::${date}`,
         metadata_json: {
+          stockSource: recon.stockSource,
           variance: recon.buns.variance,
           expected: recon.buns.expected,
           physicalUsed: recon.buns.physicalUsed,
@@ -411,6 +412,7 @@ router.post("/auto-create", async (req, res) => {
         description: `Physical meat used (${recon.meat.physicalUsedGrams}g) differs from expected (${recon.meat.expectedGrams}g) by ${v}g. Threshold: warn >500g, critical >1000g.`,
         source_ref: `MEAT_VARIANCE::${date}`,
         metadata_json: {
+          stockSource: recon.stockSource,
           varianceGrams: recon.meat.varianceGrams,
           expectedGrams: recon.meat.expectedGrams,
           physicalUsedGrams: recon.meat.physicalUsedGrams,
@@ -438,6 +440,7 @@ router.post("/auto-create", async (req, res) => {
           description: `Physical ${row.label} used (${row.physicalUsed}) differs from expected (${row.expected}) by ${v}. Threshold: warn >2, critical >4.`,
           source_ref: `DRINK_VARIANCE::${row.field}::${date}`,
           metadata_json: {
+            stockSource: recon.stockSource,
             drinkField: row.field,
             drinkLabel: row.label,
             variance: row.variance,
@@ -464,7 +467,7 @@ router.post("/auto-create", async (req, res) => {
         title: `Invalid buns stock count for ${date} — negative physical usage`,
         description: `Buns physical usage is ${recon.buns.physicalUsed}, which is impossible. Check opening (${recon.buns.opening}), received (${recon.buns.received}), and closing (${recon.buns.closing}) counts.`,
         source_ref: `INVALID_STOCK_INPUT::buns::${date}`,
-        metadata_json: { field: "buns", physicalUsed: recon.buns.physicalUsed, opening: recon.buns.opening, received: recon.buns.received, closing: recon.buns.closing },
+        metadata_json: { stockSource: recon.stockSource, field: "buns", physicalUsed: recon.buns.physicalUsed, opening: recon.buns.opening, received: recon.buns.received, closing: recon.buns.closing },
       });
       created.push("INVALID_STOCK_INPUT:buns");
     }
@@ -477,7 +480,7 @@ router.post("/auto-create", async (req, res) => {
         title: `Invalid meat stock count for ${date} — negative physical usage`,
         description: `Meat physical usage is ${recon.meat.physicalUsedGrams}g, which is impossible. Check opening (${recon.meat.openingGrams}g), received (${recon.meat.receivedGrams}g), and closing (${recon.meat.closingGrams}g) counts.`,
         source_ref: `INVALID_STOCK_INPUT::meat::${date}`,
-        metadata_json: { field: "meat", physicalUsedGrams: recon.meat.physicalUsedGrams },
+        metadata_json: { stockSource: recon.stockSource, field: "meat", physicalUsedGrams: recon.meat.physicalUsedGrams },
       });
       created.push("INVALID_STOCK_INPUT:meat");
     }
@@ -491,7 +494,7 @@ router.post("/auto-create", async (req, res) => {
           title: `Invalid ${row.label} stock count for ${date} — negative physical usage`,
           description: `${row.label} physical usage is ${row.physicalUsed}, which is impossible. Check counts.`,
           source_ref: `INVALID_STOCK_INPUT::${row.field}::${date}`,
-          metadata_json: { field: row.field, physicalUsed: row.physicalUsed, opening: row.opening, received: row.received, closing: row.closing },
+          metadata_json: { stockSource: recon.stockSource, field: row.field, physicalUsed: row.physicalUsed, opening: row.opening, received: row.received, closing: row.closing },
         });
         created.push(`INVALID_STOCK_INPUT:${row.label}`);
       }

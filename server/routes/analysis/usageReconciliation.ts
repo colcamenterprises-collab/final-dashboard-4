@@ -79,6 +79,33 @@ function collapseDrinksJson(drinksJson: Record<string, number> | null): Record<s
   return out;
 }
 
+type StockSource = "v2_canonical" | "legacy_fallback";
+
+type ShiftStockSnapshot = {
+  buns: number | null;
+  meat_g: number | null;
+  fries: number | null;
+  drinksJson: Record<string, number> | null;
+  submitted_at: string | null;
+};
+
+function toNumericOrNull(value: unknown): number | null {
+  if (value === null || typeof value === "undefined") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function readCanonicalStockFromPayload(payload: any): ShiftStockSnapshot {
+  const drinkStock = payload?.drinkStock;
+  return {
+    buns: toNumericOrNull(payload?.rollsEnd),
+    meat_g: toNumericOrNull(payload?.meatEnd),
+    fries: toNumericOrNull(payload?.friesEnd),
+    drinksJson: drinkStock && typeof drinkStock === "object" && !Array.isArray(drinkStock) ? drinkStock : null,
+    submitted_at: null,
+  };
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export async function getUsageReconciliation(date: string) {
@@ -116,8 +143,33 @@ export async function getUsageReconciliation(date: string) {
   const eng = engineResult.rows[0];
   const engineBuilt = eng && Number(eng.row_count) > 0;
 
-  // 2. Current shift Form 2 closing counts
-  const currentForm2 = await pool.query(
+  // 2. Current shift canonical stock source selection:
+  //    - v2_canonical from daily_sales_v2.payload (owner-corrected truth)
+  //    - legacy_fallback from daily_stock_v2 only when canonical does not exist for target date
+  const canonicalCurrentForm = await pool.query(
+    `SELECT ds.payload, ds."submittedAtISO"::text AS submitted_at
+     FROM daily_sales_v2 ds
+     WHERE ds.shift_date = $1::date
+       AND ds."deletedAt" IS NULL
+     ORDER BY ds."submittedAtISO" DESC NULLS LAST, ds."createdAt" DESC
+     LIMIT 1`,
+    [date]
+  );
+
+  const canonicalCurrentPayload = canonicalCurrentForm.rows[0]?.payload ?? null;
+  const canonicalCurrentStock = canonicalCurrentPayload ? readCanonicalStockFromPayload(canonicalCurrentPayload) : null;
+  const canonicalExistsForTarget =
+    canonicalCurrentStock !== null &&
+    (
+      canonicalCurrentStock.buns !== null ||
+      canonicalCurrentStock.meat_g !== null ||
+      canonicalCurrentStock.fries !== null ||
+      canonicalCurrentStock.drinksJson !== null
+    );
+
+  const stockSource: StockSource = canonicalExistsForTarget ? "v2_canonical" : "legacy_fallback";
+
+  const legacyCurrentForm2 = await pool.query(
     `SELECT dsv2."burgerBuns" AS buns, dsv2."meatWeightG" AS meat_g, dsv2."drinksJson",
             dsv2."createdAt"::text AS submitted_at
      FROM daily_stock_v2 dsv2
@@ -129,8 +181,18 @@ export async function getUsageReconciliation(date: string) {
     [date]
   );
 
-  // 3. Previous shift Form 2 closing counts (= opening for this shift)
-  const prevForm2 = await pool.query(
+  const canonicalPrevForm = await pool.query(
+    `SELECT ds.payload, ds."submittedAtISO"::text AS submitted_at
+     FROM daily_sales_v2 ds
+     WHERE ds.shift_date = $1::date
+       AND ds."deletedAt" IS NULL
+     ORDER BY ds."submittedAtISO" DESC NULLS LAST, ds."createdAt" DESC
+     LIMIT 1`,
+    [prev]
+  );
+
+  // 3. Previous shift closing counts (= opening for this shift)
+  const legacyPrevForm2 = await pool.query(
     `SELECT dsv2."burgerBuns" AS buns, dsv2."meatWeightG" AS meat_g, dsv2."drinksJson"
      FROM daily_stock_v2 dsv2
      JOIN daily_sales_v2 ds ON ds.id = dsv2."salesId"
@@ -161,11 +223,22 @@ export async function getUsageReconciliation(date: string) {
     [date]
   );
 
-  const form2Available = currentForm2.rows.length > 0;
-  const prevForm2Available = prevForm2.rows.length > 0;
+  const canonicalPrevPayload = canonicalPrevForm.rows[0]?.payload ?? null;
+  const canonicalPrevStock = canonicalPrevPayload ? readCanonicalStockFromPayload(canonicalPrevPayload) : null;
 
-  const curr = form2Available ? currentForm2.rows[0] : null;
-  const opening = prevForm2Available ? prevForm2.rows[0] : null;
+  const curr = stockSource === "v2_canonical"
+    ? {
+      ...canonicalCurrentStock,
+      submitted_at: canonicalCurrentForm.rows[0]?.submitted_at ?? null,
+    }
+    : (legacyCurrentForm2.rows[0] ?? null);
+
+  const opening = stockSource === "v2_canonical"
+    ? canonicalPrevStock
+    : (legacyPrevForm2.rows[0] ?? null);
+
+  const form2Available = !!curr;
+  const prevForm2Available = !!opening;
 
   // Received buns (rolls) and meat from canonical purchase_tally
   const tallyRow = receivedTallyResult.rows[0];
@@ -292,6 +365,7 @@ export async function getUsageReconciliation(date: string) {
     prevForm2Available,
     overallSeverity,
     noPurchasesLogged,
+    stockSource,
     receivedStock: { buns: receivedBuns, meatG: receivedMeatG, drinks: receivedDrinks },
     buns: {
       expected: bunsExpected,
