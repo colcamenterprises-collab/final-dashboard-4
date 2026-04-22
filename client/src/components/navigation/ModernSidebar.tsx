@@ -339,23 +339,21 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                     <NavLink
                       to="/dashboard"
                       onClick={onClose}
-                      className="w-full flex items-center px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
+                      className="w-full flex items-center px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
                       data-testid="nav-dashboard-home"
                     >
-                      <span className="uppercase tracking-wider">{isCollapsed ? "Home" : group.title}</span>
+                      <span>{isCollapsed ? "Home" : group.title}</span>
                     </NavLink>
                   ) : null
                 ) : !group.isStandalone && !isCollapsed && (
                   <button
                     onClick={() => toggleGroup(group.title)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
+                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
                     aria-expanded={isGroupOpen}
                     aria-controls={`group-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
                     data-testid={`group-toggle-${group.title.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    <span className="uppercase tracking-wider">
-                      {group.title}
-                    </span>
+                    <span>{group.title}</span>
                     <ChevronDown className={cn(
                       "h-3 w-3 transition-transform duration-200",
                       isGroupOpen ? "rotate-180" : "rotate-0"
