@@ -224,9 +224,18 @@ router.get("/members/:id", async (req, res) => {
   } catch (err) { handleError(res, err, "getStaffMember"); }
 });
 
+function sanitizeMember(body: Record<string, unknown>) {
+  const out = { ...body };
+  if (out.displayName === "") out.displayName = null;
+  if (out.notes === "") out.notes = null;
+  if (out.secondaryRoles === undefined) out.secondaryRoles = [];
+  if (out.customCapabilities === undefined) out.customCapabilities = {};
+  return out;
+}
+
 router.post("/members", async (req, res) => {
   try {
-    const parsed = insertStaffMemberSchema.safeParse(req.body);
+    const parsed = insertStaffMemberSchema.safeParse(sanitizeMember(req.body));
     if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     const [row] = await db.insert(staffMembers).values(parsed.data).returning();
     res.status(201).json(row);
@@ -236,7 +245,7 @@ router.post("/members", async (req, res) => {
 router.patch("/members/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const parsed = insertStaffMemberSchema.partial().safeParse(req.body);
+    const parsed = insertStaffMemberSchema.partial().safeParse(sanitizeMember(req.body));
     if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
     const [row] = await db.update(staffMembers).set({ ...parsed.data, updatedAt: new Date() })
       .where(eq(staffMembers.id, id)).returning();
