@@ -5787,6 +5787,10 @@ app.use("/api/bank-imports", bankUploadRouter);
     });
   });
 
+  // Phase 1 — Staff Operations Architecture
+  const { default: staffOpsRouter } = await import('./routes/staffOps');
+  app.use('/api/operations/staff', staffOpsRouter);
+
   // PATCH A — Health & Safety Audit Routes
   app.use("/api/health-safety/questions", healthSafetyQuestions);
   app.use("/api/health-safety/audits", healthSafetyAudits);

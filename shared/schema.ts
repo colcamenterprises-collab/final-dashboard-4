@@ -2703,3 +2703,353 @@ export const drinksVarianceAdjustments = pgTable("drinks_variance_adjustments", 
 export const insertDrinksVarianceAdjustmentSchema = createInsertSchema(drinksVarianceAdjustments).omit({ id: true, adjustedAt: true });
 export type DrinksVarianceAdjustment = typeof drinksVarianceAdjustments.$inferSelect;
 export type InsertDrinksVarianceAdjustment = z.infer<typeof insertDrinksVarianceAdjustmentSchema>;
+
+// ============================================================
+// PHASE 1 — Staff Operations Architecture
+// Multi-business / multi-location. businessLocationId scopes
+// all records; defaults to 1 for single-tenant deployments.
+// ============================================================
+
+// --- Enums ---
+
+export const staffRosterStatusEnum = pgEnum('staff_roster_status', [
+  'draft', 'published', 'active', 'closed', 'cancelled'
+]);
+
+export const staffAttendanceStatusEnum = pgEnum('staff_attendance_status', [
+  'expected', 'present', 'late', 'absent', 'sick', 'left_early', 'replaced'
+]);
+
+export const staffBreakTypeEnum = pgEnum('staff_break_type', [
+  'main', 'short', 'custom'
+]);
+
+export const cleaningTaskTypeEnum = pgEnum('cleaning_task_type', [
+  'daily', 'weekly', 'monthly', 'deep', 'custom'
+]);
+
+export const cleaningTaskFrequencyEnum = pgEnum('cleaning_task_frequency', [
+  'daily', 'weekly', 'fortnightly', 'monthly', 'quarterly'
+]);
+
+export const shiftCleaningTaskStatusEnum = pgEnum('shift_cleaning_task_status', [
+  'pending', 'in_progress', 'completed', 'skipped', 'reassigned'
+]);
+
+export const deepCleaningStatusEnum = pgEnum('deep_cleaning_status', [
+  'pending', 'in_progress', 'completed', 'overdue', 'rolled_over'
+]);
+
+export const shiftChangeTypeEnum = pgEnum('shift_change_type', [
+  'create', 'update', 'delete', 'reassign', 'replace', 'override', 'attendance'
+]);
+
+// --- 1. operations_settings ---
+export const operationsSettings = pgTable("operations_settings", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  defaultMaxStaffPerShift: integer("default_max_staff_per_shift").notNull().default(5),
+  breakMainMinutes: integer("break_main_minutes").notNull().default(45),
+  breakShortMinutes: integer("break_short_minutes").notNull().default(15),
+  breakShortCount: integer("break_short_count").notNull().default(2),
+  allowPrepShift: boolean("allow_prep_shift").notNull().default(true),
+  defaultShiftMode: text("default_shift_mode").notNull().default("standard"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("ops_settings_location_idx").on(t.businessLocationId),
+  unique("ops_settings_location_unique").on(t.businessLocationId),
+]);
+
+export const insertOperationsSettingsSchema = createInsertSchema(operationsSettings).omit({ id: true, createdAt: true, updatedAt: true });
+export type OperationsSettings = typeof operationsSettings.$inferSelect;
+export type InsertOperationsSettings = z.infer<typeof insertOperationsSettingsSchema>;
+
+// --- 2. operating_hours ---
+export const operatingHours = pgTable("operating_hours", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Sun … 6=Sat
+  isOpen: boolean("is_open").notNull().default(true),
+  openTime: text("open_time"), // HH:MM
+  closeTime: text("close_time"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("op_hours_location_idx").on(t.businessLocationId),
+  unique("op_hours_location_day_unique").on(t.businessLocationId, t.dayOfWeek),
+]);
+
+export const insertOperatingHoursSchema = createInsertSchema(operatingHours).omit({ id: true, createdAt: true, updatedAt: true });
+export type OperatingHours = typeof operatingHours.$inferSelect;
+export type InsertOperatingHours = z.infer<typeof insertOperatingHoursSchema>;
+
+// --- 3. work_areas ---
+export const workAreas = pgTable("work_areas", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("work_areas_location_idx").on(t.businessLocationId),
+]);
+
+export const insertWorkAreaSchema = createInsertSchema(workAreas).omit({ id: true, createdAt: true, updatedAt: true });
+export type WorkArea = typeof workAreas.$inferSelect;
+export type InsertWorkArea = z.infer<typeof insertWorkAreaSchema>;
+
+// --- 4. shift_templates ---
+export const shiftTemplates = pgTable("shift_templates", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  templateName: text("template_name").notNull(),
+  startTime: text("start_time").notNull(), // HH:MM
+  endTime: text("end_time").notNull(),
+  isPrepShift: boolean("is_prep_shift").notNull().default(false),
+  maxStaff: integer("max_staff").notNull().default(5),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("shift_templates_location_idx").on(t.businessLocationId),
+]);
+
+export const insertShiftTemplateSchema = createInsertSchema(shiftTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type ShiftTemplate = typeof shiftTemplates.$inferSelect;
+export type InsertShiftTemplate = z.infer<typeof insertShiftTemplateSchema>;
+
+// --- 5. staff_members ---
+export const staffMembers = pgTable("staff_members", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  fullName: text("full_name").notNull(),
+  displayName: text("display_name"),
+  isActive: boolean("is_active").notNull().default(true),
+  primaryRole: text("primary_role").notNull().default("staff"),
+  secondaryRoles: jsonb("secondary_roles").$type<string[]>().default([]),
+  canCashier: boolean("can_cashier").notNull().default(false),
+  canBurgers: boolean("can_burgers").notNull().default(false),
+  canSideOrders: boolean("can_side_orders").notNull().default(false),
+  canPrep: boolean("can_prep").notNull().default(false),
+  canCleaning: boolean("can_cleaning").notNull().default(true),
+  customCapabilities: jsonb("custom_capabilities").$type<Record<string, boolean>>().default({}),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("staff_members_location_idx").on(t.businessLocationId),
+]);
+
+export const insertStaffMemberSchema = createInsertSchema(staffMembers).omit({ id: true, createdAt: true, updatedAt: true });
+export type StaffMember = typeof staffMembers.$inferSelect;
+export type InsertStaffMember = z.infer<typeof insertStaffMemberSchema>;
+
+// --- 6. staff_availability ---
+export const staffAvailability = pgTable("staff_availability", {
+  id: serial("id").primaryKey(),
+  staffMemberId: integer("staff_member_id").notNull(),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Sun … 6=Sat
+  isAvailable: boolean("is_available").notNull().default(true),
+  defaultStartTime: text("default_start_time"),
+  defaultEndTime: text("default_end_time"),
+  canPrepStart: boolean("can_prep_start").notNull().default(false),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("staff_avail_member_idx").on(t.staffMemberId),
+  unique("staff_avail_member_day_unique").on(t.staffMemberId, t.dayOfWeek),
+]);
+
+export const insertStaffAvailabilitySchema = createInsertSchema(staffAvailability).omit({ id: true, createdAt: true, updatedAt: true });
+export type StaffAvailability = typeof staffAvailability.$inferSelect;
+export type InsertStaffAvailability = z.infer<typeof insertStaffAvailabilitySchema>;
+
+// --- 7. shift_rosters ---
+export const shiftRosters = pgTable("shift_rosters", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  shiftDate: date("shift_date").notNull(),
+  shiftName: text("shift_name").notNull(),
+  templateId: integer("template_id"), // nullable — custom shifts have no template
+  shiftStartTime: text("shift_start_time").notNull(),
+  shiftEndTime: text("shift_end_time").notNull(),
+  maxStaff: integer("max_staff").notNull().default(5),
+  isCustomShift: boolean("is_custom_shift").notNull().default(false),
+  status: staffRosterStatusEnum("status").notNull().default("draft"),
+  notes: text("notes"),
+  createdBy: text("created_by").notNull().default("system"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("shift_rosters_location_idx").on(t.businessLocationId),
+  index("shift_rosters_date_idx").on(t.shiftDate),
+]);
+
+export const insertShiftRosterSchema = createInsertSchema(shiftRosters).omit({ id: true, createdAt: true, updatedAt: true });
+export type ShiftRoster = typeof shiftRosters.$inferSelect;
+export type InsertShiftRoster = z.infer<typeof insertShiftRosterSchema>;
+
+// --- 8. shift_staff_assignments ---
+export const shiftStaffAssignments = pgTable("shift_staff_assignments", {
+  id: serial("id").primaryKey(),
+  shiftRosterId: integer("shift_roster_id").notNull(),
+  staffMemberId: integer("staff_member_id").notNull(),
+  isPrepStarter: boolean("is_prep_starter").notNull().default(false),
+  scheduledStartTime: text("scheduled_start_time").notNull(),
+  scheduledEndTime: text("scheduled_end_time").notNull(),
+  primaryStation: text("primary_station"),
+  secondaryStation: text("secondary_station"),
+  flexStation: text("flex_station"),
+  isOffDay: boolean("is_off_day").notNull().default(false),
+  shiftNotes: text("shift_notes"),
+  originalAssignmentSnapshot: jsonb("original_assignment_snapshot"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("shift_assign_roster_idx").on(t.shiftRosterId),
+  index("shift_assign_staff_idx").on(t.staffMemberId),
+]);
+
+export const insertShiftStaffAssignmentSchema = createInsertSchema(shiftStaffAssignments).omit({ id: true, createdAt: true, updatedAt: true });
+export type ShiftStaffAssignment = typeof shiftStaffAssignments.$inferSelect;
+export type InsertShiftStaffAssignment = z.infer<typeof insertShiftStaffAssignmentSchema>;
+
+// --- 9. shift_breaks ---
+export const shiftBreaks = pgTable("shift_breaks", {
+  id: serial("id").primaryKey(),
+  shiftStaffAssignmentId: integer("shift_staff_assignment_id").notNull(),
+  breakType: staffBreakTypeEnum("break_type").notNull().default("main"),
+  plannedStartTime: text("planned_start_time").notNull(),
+  plannedEndTime: text("planned_end_time").notNull(),
+  actualStartTime: text("actual_start_time"),
+  actualEndTime: text("actual_end_time"),
+  isManualOverride: boolean("is_manual_override").notNull().default(false),
+  overrideReason: text("override_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("shift_breaks_assignment_idx").on(t.shiftStaffAssignmentId),
+]);
+
+export const insertShiftBreakSchema = createInsertSchema(shiftBreaks).omit({ id: true, createdAt: true, updatedAt: true });
+export type ShiftBreak = typeof shiftBreaks.$inferSelect;
+export type InsertShiftBreak = z.infer<typeof insertShiftBreakSchema>;
+
+// --- 10. cleaning_task_templates ---
+export const cleaningTaskTemplates = pgTable("cleaning_task_templates", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  taskName: text("task_name").notNull(),
+  areaName: text("area_name").notNull(),
+  taskType: cleaningTaskTypeEnum("task_type").notNull().default("daily"),
+  defaultFrequency: cleaningTaskFrequencyEnum("default_frequency"),
+  estimatedMinutes: integer("estimated_minutes").notNull().default(10),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("cleaning_tmpl_location_idx").on(t.businessLocationId),
+]);
+
+export const insertCleaningTaskTemplateSchema = createInsertSchema(cleaningTaskTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type CleaningTaskTemplate = typeof cleaningTaskTemplates.$inferSelect;
+export type InsertCleaningTaskTemplate = z.infer<typeof insertCleaningTaskTemplateSchema>;
+
+// --- 11. shift_cleaning_tasks ---
+export const shiftCleaningTasks = pgTable("shift_cleaning_tasks", {
+  id: serial("id").primaryKey(),
+  shiftRosterId: integer("shift_roster_id").notNull(),
+  cleaningTaskTemplateId: integer("cleaning_task_template_id").notNull(),
+  assignedStaffId: integer("assigned_staff_id"),
+  status: shiftCleaningTaskStatusEnum("status").notNull().default("pending"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+  managerOverride: boolean("manager_override").notNull().default(false),
+  reassignedFromStaffId: integer("reassigned_from_staff_id"),
+  reassignedToStaffId: integer("reassigned_to_staff_id"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("shift_clean_roster_idx").on(t.shiftRosterId),
+]);
+
+export const insertShiftCleaningTaskSchema = createInsertSchema(shiftCleaningTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type ShiftCleaningTask = typeof shiftCleaningTasks.$inferSelect;
+export type InsertShiftCleaningTask = z.infer<typeof insertShiftCleaningTaskSchema>;
+
+// --- 12. deep_cleaning_tasks ---
+export const deepCleaningTasks = pgTable("deep_cleaning_tasks", {
+  id: serial("id").primaryKey(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  taskName: text("task_name").notNull(),
+  areaName: text("area_name").notNull(),
+  frequency: cleaningTaskFrequencyEnum("frequency").notNull().default("monthly"),
+  dueDate: date("due_date").notNull(),
+  assignedStaffId: integer("assigned_staff_id"),
+  status: deepCleaningStatusEnum("status").notNull().default("pending"),
+  completedAt: timestamp("completed_at"),
+  notes: text("notes"),
+  rolloverCount: integer("rollover_count").notNull().default(0),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("deep_clean_location_idx").on(t.businessLocationId),
+  index("deep_clean_due_date_idx").on(t.dueDate),
+]);
+
+export const insertDeepCleaningTaskSchema = createInsertSchema(deepCleaningTasks).omit({ id: true, createdAt: true, updatedAt: true });
+export type DeepCleaningTask = typeof deepCleaningTasks.$inferSelect;
+export type InsertDeepCleaningTask = z.infer<typeof insertDeepCleaningTaskSchema>;
+
+// --- 13. shift_attendance_logs ---
+export const shiftAttendanceLogs = pgTable("shift_attendance_logs", {
+  id: serial("id").primaryKey(),
+  shiftRosterId: integer("shift_roster_id").notNull(),
+  shiftStaffAssignmentId: integer("shift_staff_assignment_id").notNull(),
+  staffMemberId: integer("staff_member_id").notNull(),
+  attendanceStatus: staffAttendanceStatusEnum("attendance_status").notNull().default("expected"),
+  replacementStaffId: integer("replacement_staff_id"),
+  latenessMinutes: integer("lateness_minutes"),
+  clockInTime: text("clock_in_time"),
+  clockOutTime: text("clock_out_time"),
+  absenceReason: text("absence_reason"),
+  managerNotes: text("manager_notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("attendance_roster_idx").on(t.shiftRosterId),
+  index("attendance_staff_idx").on(t.staffMemberId),
+]);
+
+export const insertShiftAttendanceLogSchema = createInsertSchema(shiftAttendanceLogs).omit({ id: true, createdAt: true, updatedAt: true });
+export type ShiftAttendanceLog = typeof shiftAttendanceLogs.$inferSelect;
+export type InsertShiftAttendanceLog = z.infer<typeof insertShiftAttendanceLogSchema>;
+
+// --- 14. shift_change_log ---
+export const shiftChangeLog = pgTable("shift_change_log", {
+  id: serial("id").primaryKey(),
+  shiftRosterId: integer("shift_roster_id").notNull(),
+  entityType: text("entity_type").notNull(), // e.g. 'assignment', 'attendance', 'cleaning'
+  entityId: integer("entity_id").notNull(),
+  changeType: shiftChangeTypeEnum("change_type").notNull(),
+  beforeJson: jsonb("before_json"),
+  afterJson: jsonb("after_json"),
+  changedBy: text("changed_by").notNull().default("system"),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+  reason: text("reason"),
+}, (t) => [
+  index("shift_changelog_roster_idx").on(t.shiftRosterId),
+  index("shift_changelog_at_idx").on(t.changedAt),
+]);
+
+export const insertShiftChangeLogSchema = createInsertSchema(shiftChangeLog).omit({ id: true, changedAt: true });
+export type ShiftChangeLog = typeof shiftChangeLog.$inferSelect;
+export type InsertShiftChangeLog = z.infer<typeof insertShiftChangeLogSchema>;

@@ -77,6 +77,13 @@ import MemberDashboard from "./pages/membership/MemberDashboard";
 import MemberRegistration from "./pages/membership/MemberRegistration";
 import DailySummaryReportsPage from "./pages/operations/daily-reports";
 import SystemHealthPage from "./pages/operations/system-health";
+import StaffOpsDashboard from "./pages/operations/staff/StaffOpsDashboard";
+import StaffOpsSettings from "./pages/operations/staff/StaffOpsSettings";
+import StaffManagement from "./pages/operations/staff/StaffManagement";
+import WeeklyRosterPlanner from "./pages/operations/staff/WeeklyRosterPlanner";
+import DailyCleaningTasks from "./pages/operations/staff/DailyCleaningTasks";
+import DeepCleaningSchedule from "./pages/operations/staff/DeepCleaningSchedule";
+import AttendanceLog from "./pages/operations/staff/AttendanceLog";
 import AiOpsControlPage from "./pages/operations/AiOpsControl";
 import TaskDetailPage from "./pages/operations/tasks/TaskDetail";
 import VarianceMonitorPage from "./pages/operations/VarianceMonitor";
@@ -193,6 +200,15 @@ export default function App() {
                 <Route path="/operations/health-safety-audit/questions" element={<ProtectedRoute><HealthSafetyQuestionManager /></ProtectedRoute>} />
                 <Route path="/operations/ingredients-master" element={<ProtectedRoute><IngredientsMaster /></ProtectedRoute>} />
                 <Route path="/operations/recipe-mapping" element={<ProtectedRoute><RecipeMappingPage /></ProtectedRoute>} />
+
+                {/* Staff Operations — Phase 1 Architecture */}
+                <Route path="/operations/staff" element={<ProtectedRoute><StaffOpsDashboard /></ProtectedRoute>} />
+                <Route path="/operations/staff/settings" element={<ProtectedRoute><StaffOpsSettings /></ProtectedRoute>} />
+                <Route path="/operations/staff/management" element={<ProtectedRoute><StaffManagement /></ProtectedRoute>} />
+                <Route path="/operations/staff/roster" element={<ProtectedRoute><WeeklyRosterPlanner /></ProtectedRoute>} />
+                <Route path="/operations/staff/cleaning" element={<ProtectedRoute><DailyCleaningTasks /></ProtectedRoute>} />
+                <Route path="/operations/staff/deep-cleaning" element={<ProtectedRoute><DeepCleaningSchedule /></ProtectedRoute>} />
+                <Route path="/operations/staff/attendance" element={<ProtectedRoute><AttendanceLog /></ProtectedRoute>} />
 
                 {/* AI Operations — primary routes (FINAL DB 7) */}
                 <Route path="/ai-ops/control" element={<ProtectedRoute><AiOpsControlPage /></ProtectedRoute>} />

@@ -66,6 +66,7 @@ AI Operations Navigation (FINAL DB 7 — Apr 22, 2026): Standalone top-level sid
     - **Ingredient Management**: Decoupled canonical ingredients table (`ingredient_authority`).
     - **Unified Stock Logging**: `StockReceivedModal` logs into `stock_received_log`.
     - **Ingredient Authority System**: Admin-only, versioned approval system, isolated from recipe builder.
+- **Staff Operations Module (Phase 1 — Architecture)**: Multi-business / multi-location staff management architecture. DB: 14 new tables (`operations_settings`, `operating_hours`, `work_areas`, `shift_templates`, `staff_members`, `staff_availability`, `shift_rosters`, `shift_staff_assignments`, `shift_breaks`, `cleaning_task_templates`, `shift_cleaning_tasks`, `deep_cleaning_tasks`, `shift_attendance_logs`, `shift_change_log`) + 8 enums. API: 40+ endpoints at `/api/operations/staff/...`. Service layer: `server/services/staffOpsService.ts`. Routes: `server/routes/staffOps.ts`. Frontend: 7 placeholder pages at `/operations/staff/*`. Sidebar: Staff Operations group under Operations. No hardcoded shift times, roles, or business-specific logic — fully configurable. `businessLocationId` defaults to 1 for single-location use. Phase 2 = UI build, Phase 3 = test suite.
 
 ## External Dependencies
 - **AI Services**: OpenAI API (GPT-4o), Google Gemini.

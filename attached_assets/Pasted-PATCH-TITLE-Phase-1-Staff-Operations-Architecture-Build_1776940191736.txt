@@ -1,0 +1,512 @@
+PATCH TITLE
+Phase 1 — Staff Operations Architecture Build
+
+OBJECTIVE
+Build the backend architecture and route/navigation scaffolding for a configurable Staff Operations module inside the Operations section.
+
+This module must support:
+- staff management
+- roster/shift setup
+- work area allocation
+- break rules
+- cleaning task allocation
+- attendance logging
+- sickness/replacement handling
+- audit/change history
+
+This is NOT Smash Brothers Burgers specific.
+Do NOT hardcode SBB shift times, roles, stations, break rules, or cleaning tasks.
+Build this as a configurable multi-business / multi-location operations system from day one.
+
+PHASE RULE
+This patch is Phase 1 only:
+1. Architectural Build
+Do NOT build the final polished UI yet.
+Do include:
+- schema
+- migrations
+- backend routes
+- services
+- validation
+- sidebar navigation entry
+- route registration
+- placeholder pages that render successfully
+
+Do NOT do Phase 2 UI polish or Phase 3 test suite in this patch.
+
+NON-NEGOTIABLE RULES
+1. Additive only
+Do not break or refactor unrelated systems.
+Do not disturb:
+- Daily Sales / Stock flows
+- existing Operations features
+- Bob / Dashboard functionality
+- existing protected forms or reporting flows
+
+2. Multi-business / multi-location
+All operational records must be scoped to the existing business/location/tenant pattern already used in the app.
+If a canonical business/location model already exists, use it.
+Do NOT create duplicate tenancy logic if one already exists.
+
+3. No assumed shift times
+Shift times must be entered/configured in the app.
+Do NOT assume:
+- 5:45 PM to 2:15 AM
+- 5:00 PM prep
+- 3 staff max
+- 45 minute break + 2 x 15 minute breaks
+These may be seeded as examples later, but runtime logic must come from settings/config tables.
+
+4. Multiple shifts per day
+The system must support more than one shift on the same date.
+Do NOT design this as one roster row per date only.
+
+5. Service-layer logic
+Do not bury all logic inside route handlers.
+Use route module + service layer + validation.
+
+6. Audit trail required
+Any meaningful roster change must be loggable in a shift change log table/service.
+
+WORK TO COMPLETE NOW
+
+A. DATABASE / SCHEMA
+Follow existing DB conventions in the repo first.
+If the project already has canonical business/location tables, attach to them instead of creating duplicate structures.
+
+Add the following tables or equivalent schema models using the existing stack conventions.
+
+1. operations_settings
+Fields:
+- id
+- businessLocationId
+- defaultMaxStaffPerShift
+- breakMainMinutes
+- breakShortMinutes
+- breakShortCount
+- allowPrepShift
+- defaultShiftMode
+- notes
+- createdAt
+- updatedAt
+
+2. operating_hours
+Fields:
+- id
+- businessLocationId
+- dayOfWeek
+- isOpen
+- openTime
+- closeTime
+- createdAt
+- updatedAt
+
+3. work_areas
+Fields:
+- id
+- businessLocationId
+- name
+- isActive
+- sortOrder
+- createdAt
+- updatedAt
+
+4. shift_templates
+Fields:
+- id
+- businessLocationId
+- templateName
+- startTime
+- endTime
+- isPrepShift
+- maxStaff
+- isActive
+- sortOrder
+- createdAt
+- updatedAt
+
+5. staff_members
+Fields:
+- id
+- businessLocationId
+- fullName
+- displayName
+- isActive
+- primaryRole
+- secondaryRoles
+- canCashier
+- canBurgers
+- canSideOrders
+- canPrep
+- canCleaning
+- customCapabilities
+- notes
+- createdAt
+- updatedAt
+
+6. staff_availability
+Fields:
+- id
+- staffMemberId
+- dayOfWeek
+- isAvailable
+- defaultStartTime
+- defaultEndTime
+- canPrepStart
+- notes
+- createdAt
+- updatedAt
+
+7. shift_rosters
+This must support multiple shifts per day.
+Fields:
+- id
+- businessLocationId
+- shiftDate
+- shiftName
+- templateId nullable
+- shiftStartTime
+- shiftEndTime
+- maxStaff
+- isCustomShift
+- status
+- notes
+- createdBy
+- createdAt
+- updatedAt
+
+8. shift_staff_assignments
+Fields:
+- id
+- shiftRosterId
+- staffMemberId
+- isPrepStarter
+- scheduledStartTime
+- scheduledEndTime
+- primaryStation
+- secondaryStation
+- flexStation
+- isOffDay
+- shiftNotes
+- originalAssignmentSnapshot
+- createdAt
+- updatedAt
+
+9. shift_breaks
+Fields:
+- id
+- shiftStaffAssignmentId
+- breakType
+- plannedStartTime
+- plannedEndTime
+- actualStartTime nullable
+- actualEndTime nullable
+- isManualOverride
+- overrideReason
+- createdAt
+- updatedAt
+
+10. cleaning_task_templates
+Fields:
+- id
+- businessLocationId
+- taskName
+- areaName
+- taskType
+- defaultFrequency nullable
+- estimatedMinutes
+- isActive
+- sortOrder
+- createdAt
+- updatedAt
+
+11. shift_cleaning_tasks
+Fields:
+- id
+- shiftRosterId
+- cleaningTaskTemplateId
+- assignedStaffId nullable
+- status
+- completedAt nullable
+- notes
+- managerOverride
+- reassignedFromStaffId nullable
+- reassignedToStaffId nullable
+- createdAt
+- updatedAt
+
+12. deep_cleaning_tasks
+Fields:
+- id
+- businessLocationId
+- taskName
+- areaName
+- frequency
+- dueDate
+- assignedStaffId nullable
+- status
+- completedAt nullable
+- notes
+- rolloverCount
+- isActive
+- createdAt
+- updatedAt
+
+13. shift_attendance_logs
+Fields:
+- id
+- shiftRosterId
+- shiftStaffAssignmentId
+- staffMemberId
+- attendanceStatus
+- replacementStaffId nullable
+- latenessMinutes nullable
+- clockInTime nullable
+- clockOutTime nullable
+- absenceReason nullable
+- managerNotes
+- createdAt
+- updatedAt
+
+14. shift_change_log
+Fields:
+- id
+- shiftRosterId
+- entityType
+- entityId
+- changeType
+- beforeJson
+- afterJson
+- changedBy
+- changedAt
+- reason
+
+IMPORTANT SCHEMA RULES
+- Use the existing app’s naming/style conventions
+- Add indexes where obviously needed
+- Add foreign keys where safe
+- Do not invent a conflicting tenant model
+- Keep the schema future-safe for payroll/overtime/reporting later
+- If enums are already used in the project, use the existing enum approach
+
+B. MIGRATIONS
+Create the required migration(s) for the new structures.
+Keep them isolated and reversible within existing project standards.
+Do not alter unrelated existing tables unless needed for safe relation wiring.
+
+C. BACKEND ROUTES
+Create additive route modules under the existing server architecture conventions.
+
+Preferred route group:
+`/api/operations/staff`
+
+Add these endpoints.
+
+SETTINGS
+- GET /api/operations/staff/settings
+- PATCH /api/operations/staff/settings
+
+OPERATING HOURS
+- GET /api/operations/staff/operating-hours
+- POST /api/operations/staff/operating-hours
+- PATCH /api/operations/staff/operating-hours/:id
+
+WORK AREAS
+- GET /api/operations/staff/work-areas
+- POST /api/operations/staff/work-areas
+- PATCH /api/operations/staff/work-areas/:id
+- DELETE /api/operations/staff/work-areas/:id
+
+SHIFT TEMPLATES
+- GET /api/operations/staff/shift-templates
+- POST /api/operations/staff/shift-templates
+- PATCH /api/operations/staff/shift-templates/:id
+- DELETE /api/operations/staff/shift-templates/:id
+
+STAFF MEMBERS
+- GET /api/operations/staff/members
+- GET /api/operations/staff/members/:id
+- POST /api/operations/staff/members
+- PATCH /api/operations/staff/members/:id
+- PATCH /api/operations/staff/members/:id/status
+
+STAFF AVAILABILITY
+- GET /api/operations/staff/availability
+- POST /api/operations/staff/availability
+- PATCH /api/operations/staff/availability/:id
+
+ROSTERS
+- GET /api/operations/staff/rosters
+- GET /api/operations/staff/rosters/:id
+- POST /api/operations/staff/rosters
+- PATCH /api/operations/staff/rosters/:id
+
+ASSIGNMENTS
+- POST /api/operations/staff/rosters/:id/assignments
+- PATCH /api/operations/staff/assignments/:id
+- DELETE /api/operations/staff/assignments/:id
+
+BREAKS
+- POST /api/operations/staff/rosters/:id/breaks/auto-generate
+- GET /api/operations/staff/assignments/:id/breaks
+- POST /api/operations/staff/assignments/:id/breaks
+- PATCH /api/operations/staff/breaks/:id
+- DELETE /api/operations/staff/breaks/:id
+
+CLEANING TEMPLATES / TASKS
+- GET /api/operations/staff/cleaning/templates
+- POST /api/operations/staff/cleaning/templates
+- PATCH /api/operations/staff/cleaning/templates/:id
+- GET /api/operations/staff/rosters/:id/cleaning
+- POST /api/operations/staff/rosters/:id/cleaning/generate
+- PATCH /api/operations/staff/cleaning/tasks/:id
+
+DEEP CLEANING
+- GET /api/operations/staff/deep-cleaning
+- POST /api/operations/staff/deep-cleaning
+- PATCH /api/operations/staff/deep-cleaning/:id
+- POST /api/operations/staff/deep-cleaning/:id/complete
+- POST /api/operations/staff/deep-cleaning/:id/rollover
+
+ATTENDANCE
+- GET /api/operations/staff/rosters/:id/attendance
+- POST /api/operations/staff/rosters/:id/attendance
+- PATCH /api/operations/staff/attendance/:id
+- POST /api/operations/staff/attendance/:id/mark-present
+- POST /api/operations/staff/attendance/:id/mark-late
+- POST /api/operations/staff/attendance/:id/mark-sick
+- POST /api/operations/staff/attendance/:id/mark-absent
+- POST /api/operations/staff/attendance/:id/mark-left-early
+
+REPLACEMENT FLOW
+- POST /api/operations/staff/attendance/:id/replace
+
+CHANGE LOG
+- GET /api/operations/staff/rosters/:id/change-log
+
+D. SERVICE LAYER
+Implement service functions rather than giant inline route logic.
+
+Minimum services:
+- getOperationsSettings
+- updateOperationsSettings
+- createShiftRoster
+- updateShiftRoster
+- createShiftAssignment
+- updateShiftAssignment
+- generateBreaksForRoster
+- generateCleaningTasksForRoster
+- logAttendanceStatus
+- replaceStaffOnShift
+- writeShiftChangeLog
+
+SERVICE RULES
+1. Break generation must read configuration/settings, not hardcoded constants.
+2. Cleaning generation must read cleaning task templates, not hardcoded task names.
+3. Replacement flow must preserve original assignment history.
+4. Shift creation must support:
+   - template-based shifts
+   - custom shifts
+   - multiple shifts per day
+5. Any important update should be able to write a change log entry.
+
+E. REQUEST VALIDATION
+Add request validation for all create/update endpoints using the project’s existing validation pattern.
+Do not accept loose unvalidated payloads.
+
+At minimum validate:
+- required ids
+- date formats
+- time fields
+- max staff values
+- attendance status values
+- break type values
+- cleaning task type values
+- active/inactive toggles
+- location/business scope presence where required
+
+F. SIDEBAR NAVIGATION + ROUTES
+Add a new sidebar item under Operations:
+- Staff Operations
+
+Register these routes/pages in the app’s route registry/sidebar structure:
+
+- /operations/staff
+- /operations/staff/settings
+- /operations/staff/management
+- /operations/staff/roster
+- /operations/staff/cleaning
+- /operations/staff/deep-cleaning
+- /operations/staff/attendance
+
+If the app uses grouped sections under Operations, place these cleanly there.
+Do not break existing sidebar ordering.
+
+G. PLACEHOLDER PAGES
+Create minimal page shells only so routes render successfully in Phase 1.
+
+Pages required:
+1. Staff Operations Dashboard
+2. Operations Settings
+3. Staff Management
+4. Weekly Roster Planner
+5. Daily Cleaning
+6. Deep Cleaning
+7. Attendance Log
+
+These pages only need:
+- proper route wiring
+- proper page title/header
+- safe placeholder shell
+- no heavy UI build yet
+
+Do NOT spend time on final UI polish in this patch.
+
+H. SAFE DEFAULTS
+If seed/default data is added, it must be non-destructive and clearly sample/config driven.
+Do not inject Smash Brothers Burgers logic as runtime assumptions.
+
+Allowed example seed style:
+- sample work areas
+- sample break settings
+- sample shift template
+Only if clearly optional and tied to a location/business scope.
+
+I. IMPLEMENTATION STANDARD
+Before coding:
+1. Inspect current DB structure
+2. Inspect current route module conventions
+3. Inspect current sidebar/route registry conventions
+4. Reuse existing patterns instead of inventing parallel architecture
+
+Do not:
+- create conflicting route styles
+- create conflicting DB access styles
+- create orphaned placeholder pages with no route registration
+- refactor unrelated modules
+- change existing live operational logic outside of what is required for this patch
+
+J. PATCH OUTPUT REQUIREMENT
+Deliver one complete Phase 1 architecture patch containing:
+- schema/model additions
+- migrations
+- route modules
+- service layer
+- validation
+- sidebar navigation wiring
+- page route registration
+- placeholder pages
+
+Do not leave this half wired.
+
+K. SUCCESS CRITERIA FOR THIS PATCH
+This patch is complete only if:
+- DB structures exist cleanly
+- migrations run cleanly
+- backend endpoints exist and compile
+- service layer exists
+- navigation entry appears in sidebar
+- all new routes load without crashing
+- module is location-configurable
+- no SBB-specific runtime assumptions exist
+- no existing critical operations flows are broken
