@@ -57,6 +57,33 @@ function asNum(v: unknown): number {
 export async function getDailyAnalysis(date: string): Promise<DailyAnalysisResult> {
   const blockers: Blocker[] = [];
 
+  if (!pool) {
+    blockers.push({
+      code: "DB_UNAVAILABLE",
+      message: "Database connection is unavailable; cannot read receipt_truth_daily_usage or receipt_truth_usage_rule.",
+      where: "server/db",
+      canonical_source: "DATABASE_URL / Postgres",
+      auto_build_attempted: false,
+    });
+
+    return {
+      ok: true,
+      date,
+      source: {
+        receipts_items: "receipt_truth_daily_usage / receipt_truth_line derived",
+        receipts_modifiers: "receipt_truth_daily_usage (set drink usage from modifiers)",
+        daily_sales_stock_v2: "reserved for later phases",
+      },
+      blockers,
+      data: {
+        drinks: [],
+        burgers: [],
+        sides: [],
+        modifiers: [],
+      },
+    };
+  }
+
   const [usageRowsResult, usageRulesResult] = await Promise.all([
     pool.query(
       `SELECT category_name, sku, item_name, quantity_sold,
