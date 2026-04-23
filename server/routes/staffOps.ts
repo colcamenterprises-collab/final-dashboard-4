@@ -9,7 +9,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
 import {
   operationsSettings,
   operatingHours,
@@ -300,8 +300,13 @@ router.patch("/availability/:id", async (req, res) => {
 
 router.get("/rosters", async (req, res) => {
   try {
+    const locationId = getLocationId(req);
+    const { from, to } = req.query as { from?: string; to?: string };
+    const conditions = [eq(shiftRosters.businessLocationId, locationId)];
+    if (from) conditions.push(gte(shiftRosters.shiftDate, from));
+    if (to) conditions.push(lte(shiftRosters.shiftDate, to));
     const rows = await db.select().from(shiftRosters)
-      .where(eq(shiftRosters.businessLocationId, getLocationId(req)))
+      .where(and(...conditions))
       .orderBy(desc(shiftRosters.shiftDate), asc(shiftRosters.shiftStartTime));
     res.json(rows);
   } catch (err) { handleError(res, err, "getRosters"); }
@@ -309,9 +314,13 @@ router.get("/rosters", async (req, res) => {
 
 router.get("/rosters/:id", async (req, res) => {
   try {
-    const [row] = await db.select().from(shiftRosters).where(eq(shiftRosters.id, Number(req.params.id))).limit(1);
+    const id = Number(req.params.id);
+    const [row] = await db.select().from(shiftRosters).where(eq(shiftRosters.id, id)).limit(1);
     if (!row) return res.status(404).json({ error: "Not found" });
-    res.json(row);
+    const assignments = await db.select().from(shiftStaffAssignments)
+      .where(eq(shiftStaffAssignments.shiftRosterId, id))
+      .orderBy(asc(shiftStaffAssignments.scheduledStartTime));
+    res.json({ ...row, assignments });
   } catch (err) { handleError(res, err, "getRoster"); }
 });
 
@@ -456,10 +465,19 @@ router.patch("/cleaning/templates/:id", async (req, res) => {
 
 router.get("/rosters/:id/cleaning", async (req, res) => {
   try {
-    const rows = await db.select().from(shiftCleaningTasks)
-      .where(eq(shiftCleaningTasks.shiftRosterId, Number(req.params.id)))
+    const rosterId = Number(req.params.id);
+    const tasks = await db.select().from(shiftCleaningTasks)
+      .where(eq(shiftCleaningTasks.shiftRosterId, rosterId))
       .orderBy(asc(shiftCleaningTasks.id));
-    res.json(rows);
+    if (tasks.length === 0) return res.json([]);
+    const templates = await db.select().from(cleaningTaskTemplates)
+      .where(and(eq(cleaningTaskTemplates.businessLocationId, getLocationId(req))));
+    const templateMap = new Map(templates.map(t => [t.id, t]));
+    const enriched = tasks.map(t => ({
+      ...t,
+      template: templateMap.get(t.cleaningTaskTemplateId) ?? null,
+    }));
+    res.json(enriched);
   } catch (err) { handleError(res, err, "getRosterCleaning"); }
 });
 

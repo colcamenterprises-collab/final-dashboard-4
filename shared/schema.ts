@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum, unique, numeric } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, decimal, timestamp, jsonb, date, varchar, uuid, index, pgEnum, unique, numeric, uniqueIndex } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -1692,7 +1692,11 @@ export const purchasingItems = pgTable("purchasing_items", {
   purchaseUnitLabel: varchar("purchase_unit_label"),
   createdAt: timestamp("createdAt").notNull().defaultNow(),
   updatedAt: timestamp("updatedAt").notNull().defaultNow(),
-});
+}, (t) => [
+  // Path A fix: drizzle-managed expression index (replaces raw COALESCE index)
+  uniqueIndex("purchasing_items_item_supplier_brand_idx")
+    .on(t.item, sql`COALESCE("supplierName", ''::text)`, sql`COALESCE(brand, ''::text)`),
+]);
 
 // Purchasing Field Map - Maps Daily Stock V2 fields to purchasing items
 export const purchasingFieldMap = pgTable("purchasing_field_map", {
@@ -2197,7 +2201,11 @@ export const receiptTruthDailyUsage = pgTable('receipt_truth_daily_usage', {
   fantaStrawberryUsed: decimal('fanta_strawberry_used', { precision: 12, scale: 4 }),
   schweppesManaoUsed: decimal('schweppes_manao_used', { precision: 12, scale: 4 }),
   builtAt: timestamp('built_at').notNull().defaultNow(),
-});
+}, (t) => [
+  // Path A fix: drizzle-managed expression index (replaces raw COALESCE index)
+  uniqueIndex("receipt_truth_daily_usage_unique_row_idx")
+    .on(t.businessDate, t.categoryName, sql`COALESCE(sku, ''::character varying)`, t.itemName),
+]);
 
 export type ModifierIngredientRule = typeof modifierIngredientRules.$inferSelect;
 export type InsertModifierIngredientRule = typeof modifierIngredientRules.$inferInsert;
