@@ -1,0 +1,142 @@
+PATCH TITLE
+Staff Operations — Delete Roster Functionality
+
+OBJECTIVE
+Add safe delete roster functionality to the Staff Operations Weekly Roster Planner.
+
+SCOPE
+Backend + frontend only for deleting a roster.
+Do not redesign the Staff Operations module.
+Do not touch unrelated systems.
+
+FILES TO INSPECT FIRST
+- server/routes/staffOps.ts
+- server/services/staffOpsService.ts
+- shared/schema.ts
+- client/src/pages/operations/staff/WeeklyRosterPlanner.tsx
+
+BACKEND REQUIREMENTS
+
+1. Add/confirm endpoint:
+DELETE /api/operations/staff/rosters/:id
+
+2. Delete behaviour:
+Use the safest available approach.
+
+Preferred:
+- If shift_rosters has status support, soft-delete by setting status to deleted/cancelled if enum allows it.
+
+If no deleted/cancelled status exists:
+- Perform controlled delete of dependent operational records first, then roster.
+
+Delete dependent records in safe order:
+- shift_breaks linked to assignments
+- shift_cleaning_tasks linked to roster
+- shift_attendance_logs linked to roster
+- shift_staff_assignments linked to roster
+- then shift_rosters
+
+Do not delete:
+- staff_members
+- cleaning_task_templates
+- shift_templates
+- work_areas
+- operations_settings
+
+3. Audit log:
+Before deleting anything:
+- load full roster
+- load assignments if available
+- write shift_change_log entry
+
+Use:
+- entityType: "roster"
+- entityId: roster id
+- changeType: "delete"
+- beforeJson: full roster snapshot, including assignments if possible
+- afterJson: null
+- changedBy: existing current-user pattern or "system"
+- reason: optional request body reason or "Roster deleted from Weekly Roster Planner"
+
+Important:
+If hard-deleting the roster would also delete the change log because of FK constraints, adjust the delete strategy:
+- either soft-delete the roster instead
+- or ensure shift_change_log remains preserved according to existing DB constraints
+
+Do not silently lose the audit trail.
+
+4. Service layer:
+Add a service function:
+deleteShiftRoster(rosterId, options)
+
+It should:
+- fetch roster snapshot
+- write change log
+- delete/soft-delete safely
+- return success payload
+
+Do not put all logic inline in the route.
+
+5. Error handling:
+Return:
+- 404 if roster does not exist
+- 200 with success true if deleted
+- useful error message if delete fails
+
+FRONTEND REQUIREMENTS
+
+1. WeeklyRosterPlanner.tsx
+On each roster card:
+- add Delete action/button
+- use existing UI style
+- do not add icons if avoidable
+
+2. Confirmation:
+Before deleting, show a confirmation modal/dialog:
+
+Title:
+Delete roster?
+
+Message:
+This will remove the shift and its related assignments, breaks, cleaning tasks, and attendance records. This cannot be undone.
+
+Buttons:
+- Cancel
+- Delete Roster
+
+3. API call:
+Call:
+DELETE /api/operations/staff/rosters/:id
+
+4. After success:
+- invalidate the roster query
+- remove the roster card from the selected day
+- show success feedback if existing toast pattern supports it
+
+5. On failure:
+- show clear error message
+- do not remove the roster from UI
+
+RULES
+- Keep this patch small and focused.
+- Do not change staff member deletion.
+- Do not touch Daily Sales / Stock.
+- Do not touch Bob.
+- Do not redesign the roster UI.
+- Preserve existing create/edit roster functionality.
+- Preserve audit history.
+
+VERIFICATION REQUIRED
+After implementation, verify:
+1. Create a test roster.
+2. Delete it from Weekly Roster Planner.
+3. Confirm it disappears from the weekly view.
+4. Confirm the backend returns success.
+5. Confirm related assignments/breaks/cleaning/attendance do not leave broken UI state.
+6. Confirm shift_change_log contains a delete entry or, if FK constraints prevent hard delete, confirm soft-delete preserves audit trail.
+
+RETURN IN REPORT
+- Files changed
+- Endpoint added
+- Delete strategy used: soft delete or controlled hard delete
+- Verification result
