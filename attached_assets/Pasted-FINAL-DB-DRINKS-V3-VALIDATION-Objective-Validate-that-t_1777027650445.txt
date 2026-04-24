@@ -1,0 +1,112 @@
+FINAL DB — DRINKS V3 VALIDATION
+
+Objective:
+Validate that the Drinks reconciliation table in Analysis V2 is mathematically correct and matches real operational data.
+
+Target:
+Use ONE completed shift with known data (e.g. 2026-04-21).
+
+--------------------------------------------------
+
+STEP 1 — SELECT TEST SKU
+
+Pick at least 2 SKUs:
+1. One with direct + modifier sales (e.g. Coke Zero)
+2. One that is modifier-only (no direct sales)
+
+--------------------------------------------------
+
+STEP 2 — MANUAL CALCULATION
+
+For each SKU, calculate manually:
+
+Start = previous shift closing stock  
+Purchased = total purchases (using purchase_tally.date)  
+Sold Direct = from receipts  
+Sold via Modifiers = from modifiers dataset  
+
+Total Sold = Direct + Modifiers  
+
+Expected = Start + Purchased - Total Sold  
+Variance = End - Expected  
+
+--------------------------------------------------
+
+STEP 3 — COMPARE WITH SYSTEM
+
+Compare manual results vs Analysis V2 table:
+
+Check:
+- Sold Direct matches receipts
+- Sold via Modifiers matches modifier dataset
+- Total Sold = Direct + Modifiers
+- Start is correct (previous shift)
+- Purchased includes backdated entries
+- End matches form
+- Expected is correct
+- Variance is correct
+
+Result:
+All values must match EXACTLY.
+
+--------------------------------------------------
+
+STEP 4 — MODIFIER-ONLY VALIDATION (CRITICAL)
+
+For SKU with zero direct sales:
+
+Check:
+- SKU appears in table
+- Sold Direct = 0
+- Sold via Modifiers > 0
+- Total Sold is correct
+
+If missing:
+FAIL — modifier logic incomplete
+
+--------------------------------------------------
+
+STEP 5 — PURCHASE VALIDATION
+
+Test backdated purchase:
+
+- Create or use a purchase entered today but dated for previous shift
+- Confirm it appears in Purchased for correct shift
+
+--------------------------------------------------
+
+STEP 6 — EDGE CASE VALIDATION
+
+Check for any rows with:
+
+- AMBIGUOUS_MAPPING
+- incomplete_component_data
+
+Confirm:
+- system does NOT guess values
+- missing/ambiguous data is clearly flagged
+
+--------------------------------------------------
+
+STEP 7 — OUTPUT REQUIRED
+
+Return:
+
+1. Shift date tested
+2. 2 example SKUs with:
+   - full manual calculation
+   - system values
+3. Confirmation of:
+   - modifier-only SKU handled correctly
+   - backdated purchases working
+4. Any mismatches found (if any)
+
+--------------------------------------------------
+
+SUCCESS CONDITION
+
+Drinks V3 is considered VALID only if:
+- all calculations match manual results exactly
+- modifier-only SKUs are included
+- purchases (including backdated) are correct
+- no silent data corruption occurs
