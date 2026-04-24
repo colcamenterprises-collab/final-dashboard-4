@@ -349,7 +349,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                     <NavLink
                       to="/dashboard"
                       onClick={onClose}
-                      className="w-full flex items-center px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-50 transition-colors dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
                       data-testid="nav-dashboard-home"
                     >
                       <span>{isCollapsed ? "Home" : group.title}</span>
@@ -385,25 +385,30 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                       /* Standalone items (e.g. Online Ordering) render as section-header-level
                          links — same font/colour as Operations/Purchasing/etc. headers.       */
                       if (group.isStandalone) {
-                        const standaloneClass = cn(
-                          "flex items-center gap-3 px-3 py-2 text-xs font-semibold transition-all duration-200 rounded-lg",
-                          isCollapsed && "lg:justify-center lg:px-2",
-                          active
-                            ? "text-slate-900 bg-slate-100 dark:text-white dark:bg-slate-800"
-                            : "text-slate-700 hover:text-slate-900 hover:bg-slate-50 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800"
-                        );
+                        const standaloneClass = item.isButton
+                          ? cn(
+                              "flex items-center gap-3 px-3 py-2 text-xs font-semibold transition-all duration-200 bg-black text-white hover:bg-gray-800 rounded-[4px]",
+                              isCollapsed && "lg:justify-center lg:px-2"
+                            )
+                          : cn(
+                              "flex items-center justify-between px-3 py-2 text-xs font-semibold transition-all duration-200 rounded-lg",
+                              isCollapsed && "lg:justify-center lg:px-2",
+                              active
+                                ? "text-slate-900 bg-slate-100 dark:text-white dark:bg-slate-800"
+                                : "text-slate-500 hover:text-slate-800 hover:bg-slate-50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800"
+                            );
                         return (
                           <div key={item.to}>
                             {item.external ? (
                               <a href={item.to} onClick={onClose} target="_blank" rel="noopener noreferrer"
                                 className={standaloneClass} data-testid={item.testId}>
-                                <item.icon className="h-4 w-4 text-slate-500 transition-colors" />
+                                <item.icon className={cn("h-4 w-4 transition-colors", item.isButton ? "text-white" : "text-slate-500")} />
                                 <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
                               </a>
                             ) : (
                               <NavLink to={item.to} onClick={onClose}
                                 className={standaloneClass} data-testid={item.testId}>
-                                <item.icon className="h-4 w-4 text-slate-500 transition-colors" />
+                                <item.icon className={cn("h-4 w-4 transition-colors", item.isButton ? "text-white" : "text-slate-500")} />
                                 <span className={cn("truncate", isCollapsed && "hidden lg:inline")}>{item.label}</span>
                               </NavLink>
                             )}
