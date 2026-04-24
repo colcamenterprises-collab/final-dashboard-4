@@ -333,13 +333,71 @@ router.get("/rosters/:id", async (req, res) => {
   } catch (err) { handleError(res, err, "getRoster"); }
 });
 
+// Normalize "HH:mm", "H:mm", "HH:mm:ss", "h:mm AM/PM" → "HH:mm"
+function normalizeTime(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  const s = raw.trim();
+  // Already HH:mm or H:mm
+  const hhmm = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (hhmm) return `${hhmm[1].padStart(2, "0")}:${hhmm[2]}`;
+  // 12h AM/PM  e.g. "6:00 PM"
+  const ampm = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let h = parseInt(ampm[1], 10);
+    const m = ampm[2];
+    const period = ampm[3].toUpperCase();
+    if (period === "PM" && h !== 12) h += 12;
+    if (period === "AM" && h === 12) h = 0;
+    return `${String(h).padStart(2, "0")}:${m}`;
+  }
+  return null;
+}
+
+const createRosterBodySchema = z.object({
+  shiftName:      z.string().min(1, "Roster name is required"),
+  shiftDate:      z.string().min(8, "shiftDate required (YYYY-MM-DD)"),
+  shiftStartTime: z.string().min(1, "Start time required"),
+  shiftEndTime:   z.string().min(1, "End time required"),
+  maxStaff:       z.coerce.number().int().min(1).max(50).default(5),
+  isCustomShift:  z.boolean().default(true),
+  templateId:     z.coerce.number().int().nullable().optional(),
+  notes:          z.string().nullable().optional(),
+  status:         z.string().optional().default("draft"),
+  createdBy:      z.string().optional().default("manager"),
+});
+
 router.post("/rosters", async (req, res) => {
   try {
-    const parsed = insertShiftRosterSchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
-    const roster = await createShiftRoster(parsed.data);
+    const parsed = createRosterBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Validation failed", details: parsed.error.flatten() });
+    }
+
+    const d = parsed.data;
+    const startTime = normalizeTime(d.shiftStartTime);
+    const endTime   = normalizeTime(d.shiftEndTime);
+    if (!startTime) return res.status(400).json({ error: "Invalid start time format", received: d.shiftStartTime });
+    if (!endTime)   return res.status(400).json({ error: "Invalid end time format",   received: d.shiftEndTime });
+
+    const insertData = {
+      businessLocationId: getLocationId(req),
+      shiftDate:          d.shiftDate,
+      shiftName:          d.shiftName.trim(),
+      shiftStartTime:     startTime,
+      shiftEndTime:       endTime,
+      maxStaff:           d.maxStaff,
+      isCustomShift:      d.isCustomShift,
+      templateId:         d.templateId ?? null,
+      notes:              d.notes?.trim() || null,
+      status:             (d.status as any) ?? "draft",
+      createdBy:          d.createdBy ?? "manager",
+    };
+
+    const roster = await createShiftRoster(insertData as any);
     res.status(201).json(roster);
-  } catch (err) { handleError(res, err, "createRoster"); }
+  } catch (err) {
+    handleError(res, err, "createRoster");
+  }
 });
 
 router.patch("/rosters/:id", async (req, res) => {

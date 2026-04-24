@@ -61,12 +61,12 @@ function fmtDate(d: Date) { return d.toLocaleDateString("en-CA"); }
 function fmtDisplay(iso: string) { return new Date(iso + "T12:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" }); }
 
 const rosterSchema = z.object({
-  shiftName: z.string().min(1),
-  shiftStartTime: z.string().regex(/^\d{2}:\d{2}$/),
-  shiftEndTime: z.string().regex(/^\d{2}:\d{2}$/),
-  maxStaff: z.coerce.number().min(1).max(50),
+  shiftName: z.string().min(1, "Roster name is required"),
+  shiftStartTime: z.string().min(1, "Start time required"),
+  shiftEndTime: z.string().min(1, "End time required"),
+  maxStaff: z.coerce.number().int().min(1).max(50),
   isCustomShift: z.boolean(),
-  templateId: z.coerce.number().nullable().optional(),
+  templateId: z.number().nullable().optional(),
   notes: z.string().optional(),
 });
 
@@ -146,7 +146,8 @@ export default function WeeklyRosterPlanner() {
       setModal(null); rosterForm.reset();
       toast({ title: "Roster created" });
     },
-    onError: () => toast({ title: "Create failed", variant: "destructive" }),
+    onError: (err: Error) =>
+      toast({ title: "Create failed", description: err.message, variant: "destructive" }),
   });
 
   const updateStatusMut = useMutation({
