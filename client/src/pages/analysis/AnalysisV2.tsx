@@ -16,7 +16,18 @@ type AnalysisV2Response = {
   date: string;
   blockers: Blocker[];
   tables: {
-    drinks: Array<{ sku: string; soldDirect: number; soldFromModifiers: number; totalSold: number }>;
+    drinks: Array<{
+      sku: string;
+      itemName?: string | null;
+      soldDirect: number;
+      soldFromModifiers: number;
+      totalSold: number;
+      start?: number | null;
+      purchased?: number | null;
+      end?: number | null;
+      expected?: number | null;
+      variance?: number | null;
+    }>;
     burgersAndSets: Array<{ itemName: string; soldCount: number; type: 'Single' | 'Double' | 'Set' }>;
     sideOrders: Array<{ itemName: string; soldCount: number }>;
     modifiers: Array<{ modifierType: string; item: string; count: number }>;
@@ -226,21 +237,33 @@ export default function AnalysisV2() {
                 <thead>
                   <tr>
                     <Th>SKU</Th>
-                    <Th right>Sold (Direct)</Th>
-                    <Th right>Sold (From Modifiers)</Th>
+                    <Th>Item Name</Th>
+                    <Th right>Sold Direct</Th>
+                    <Th right>Sold via Modifiers</Th>
                     <Th right>Total Sold</Th>
+                    <Th right>Start</Th>
+                    <Th right>Purchased</Th>
+                    <Th right>End</Th>
+                    <Th right>Expected</Th>
+                    <Th right>Variance</Th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.tables.drinks.length === 0 ? (
-                    <EmptyRow cols={4} />
+                    <EmptyRow cols={10} />
                   ) : (
                     data.tables.drinks.map((row) => (
                       <tr key={row.sku} className="hover:bg-gray-50">
                         <Cell>{row.sku}</Cell>
+                        <Cell>{row.itemName ?? row.sku}</Cell>
                         <Cell right>{row.soldDirect}</Cell>
                         <Cell right>{row.soldFromModifiers}</Cell>
                         <Cell right bold>{row.totalSold}</Cell>
+                        <Cell right>{row.start ?? 0}</Cell>
+                        <Cell right>{row.purchased ?? 0}</Cell>
+                        <Cell right>{row.end ?? 0}</Cell>
+                        <Cell right>{row.expected ?? 0}</Cell>
+                        <Cell right>{row.variance ?? 0}</Cell>
                       </tr>
                     ))
                   )}
