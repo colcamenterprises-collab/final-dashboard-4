@@ -112,6 +112,7 @@ export default function WeeklyRosterPlanner() {
   const [modal, setModal] = useState<"create-roster" | "add-assignment" | null>(null);
   const [activeRosterId, setActiveRosterId] = useState<number | null>(null);
   const [breakModal, setBreakModal] = useState<{ assignmentId: number; breaks: ShiftBreak[] } | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => fmtDate(addDays(weekStart, i)));
 
@@ -158,9 +159,17 @@ export default function WeeklyRosterPlanner() {
   });
 
   const deleteRosterMut = useMutation({
-    mutationFn: (id: number) => sapi("PATCH", `/api/operations/staff/rosters/${id}`, { status: "closed" }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters"] }); toast({ title: "Roster closed" }); },
-    onError: () => toast({ title: "Failed", variant: "destructive" }),
+    mutationFn: (id: number) => sapi("DELETE", `/api/operations/staff/rosters/${id}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters"] });
+      setDeleteConfirmId(null);
+      if (expandedRosterId === deleteConfirmId) setExpandedRosterId(null);
+      toast({ title: "Roster deleted" });
+    },
+    onError: (err: Error) => {
+      setDeleteConfirmId(null);
+      toast({ title: "Delete failed", description: err.message, variant: "destructive" });
+    },
   });
 
   const addAssignmentMut = useMutation({
@@ -294,6 +303,8 @@ export default function WeeklyRosterPlanner() {
                     <button onClick={() => updateStatusMut.mutate({ id: roster.id, status: "closed" })}
                       className="px-2 py-1 text-xs bg-slate-600 text-white rounded hover:bg-slate-700">Close</button>
                   )}
+                  <button onClick={() => setDeleteConfirmId(roster.id)}
+                    className="px-2 py-1 text-xs text-red-500 border border-red-200 rounded hover:bg-red-50">Delete</button>
                   <button onClick={() => setExpandedRosterId(isExpanded ? null : roster.id)}
                     className="p-1.5 rounded hover:bg-slate-100 text-slate-500">
                     {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -433,6 +444,33 @@ export default function WeeklyRosterPlanner() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteConfirmId !== null && (
+        <Modal title="Delete roster?" onClose={() => setDeleteConfirmId(null)}>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">
+              This will remove the shift and its related assignments, breaks, cleaning tasks, and attendance records.
+              This cannot be undone.
+            </p>
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmId(null)}
+                className="px-3 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-50">
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteRosterMut.isPending}
+                onClick={() => deleteRosterMut.mutate(deleteConfirmId)}
+                className="px-3 py-1.5 text-xs bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50">
+                {deleteRosterMut.isPending ? "Deleting..." : "Delete Roster"}
+              </button>
+            </div>
+          </div>
         </Modal>
       )}
     </div>

@@ -9,7 +9,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db";
-import { eq, and, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, ne } from "drizzle-orm";
 import {
   operationsSettings,
   operatingHours,
@@ -44,6 +44,7 @@ import {
   updateOperationsSettings,
   createShiftRoster,
   updateShiftRoster,
+  deleteShiftRoster,
   createShiftAssignment,
   updateShiftAssignment,
   generateBreaksForRoster,
@@ -311,7 +312,10 @@ router.get("/rosters", async (req, res) => {
   try {
     const locationId = getLocationId(req);
     const { from, to } = req.query as { from?: string; to?: string };
-    const conditions = [eq(shiftRosters.businessLocationId, locationId)];
+    const conditions = [
+      eq(shiftRosters.businessLocationId, locationId),
+      ne(shiftRosters.status, "cancelled"),  // exclude soft-deleted rosters
+    ];
     if (from) conditions.push(gte(shiftRosters.shiftDate, from));
     if (to) conditions.push(lte(shiftRosters.shiftDate, to));
     const rows = await db.select().from(shiftRosters)
@@ -408,6 +412,19 @@ router.patch("/rosters/:id", async (req, res) => {
     const roster = await updateShiftRoster(id, parsed.data, req.body.changedBy ?? "manager");
     res.json(roster);
   } catch (err) { handleError(res, err, "updateRoster"); }
+});
+
+router.delete("/rosters/:id", async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const reason = typeof req.body?.reason === "string" ? req.body.reason : undefined;
+    const changedBy = typeof req.body?.changedBy === "string" ? req.body.changedBy : "manager";
+    const result = await deleteShiftRoster(id, changedBy, reason);
+    res.json(result);
+  } catch (err) {
+    if (String(err).includes("not found")) return res.status(404).json({ error: String(err) });
+    handleError(res, err, "deleteRoster");
+  }
 });
 
 // ----------------------------------------------------------------

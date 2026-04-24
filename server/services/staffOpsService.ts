@@ -327,6 +327,52 @@ export async function replaceStaffOnShift(
 }
 
 // ----------------------------------------------------------------
+// Delete (soft)
+// ----------------------------------------------------------------
+
+export async function deleteShiftRoster(
+  rosterId: number,
+  changedBy = "manager",
+  reason = "Roster deleted from Weekly Roster Planner"
+) {
+  // 1. Load full roster snapshot (404 if missing)
+  const [roster] = await db
+    .select()
+    .from(shiftRosters)
+    .where(eq(shiftRosters.id, rosterId))
+    .limit(1);
+  if (!roster) throw new Error(`Roster ${rosterId} not found`);
+
+  // 2. Load assignments to include in snapshot
+  const assignments = await db
+    .select()
+    .from(shiftStaffAssignments)
+    .where(eq(shiftStaffAssignments.shiftRosterId, rosterId));
+
+  // 3. Write audit log BEFORE any modification
+  await writeShiftChangeLog({
+    shiftRosterId: rosterId,
+    entityType: "roster",
+    entityId: rosterId,
+    changeType: "delete",
+    beforeJson: { ...roster, assignments },
+    afterJson: null,
+    changedBy,
+    reason,
+  });
+
+  // 4. Soft-delete: status → cancelled
+  // Preserves all dependent rows (assignments, breaks, cleaning, attendance)
+  // and avoids any FK cascade risk on shift_change_log.
+  await db
+    .update(shiftRosters)
+    .set({ status: "cancelled", updatedAt: new Date() })
+    .where(eq(shiftRosters.id, rosterId));
+
+  return { ok: true, id: rosterId, status: "cancelled" };
+}
+
+// ----------------------------------------------------------------
 // Change log
 // ----------------------------------------------------------------
 
