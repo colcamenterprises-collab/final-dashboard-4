@@ -9,7 +9,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { db } from "../db";
-import { eq, and, desc, asc, gte, lte, ne } from "drizzle-orm";
+import { eq, and, desc, asc, gte, lte, ne, inArray, sql } from "drizzle-orm";
 import {
   operationsSettings,
   operatingHours,
@@ -314,13 +314,29 @@ router.get("/rosters", async (req, res) => {
     const { from, to } = req.query as { from?: string; to?: string };
     const conditions = [
       eq(shiftRosters.businessLocationId, locationId),
-      ne(shiftRosters.status, "cancelled"),  // exclude soft-deleted rosters
+      ne(shiftRosters.status, "cancelled"),
     ];
     if (from) conditions.push(gte(shiftRosters.shiftDate, from));
     if (to) conditions.push(lte(shiftRosters.shiftDate, to));
     const rows = await db.select().from(shiftRosters)
       .where(and(...conditions))
       .orderBy(desc(shiftRosters.shiftDate), asc(shiftRosters.shiftStartTime));
+
+    // Attach assignment counts so the collapsed card can display "X/Y staff"
+    if (rows.length > 0) {
+      const rosterIds = rows.map(r => r.id);
+      const countRows = await db
+        .select({
+          shiftRosterId: shiftStaffAssignments.shiftRosterId,
+          count: sql<number>`cast(count(*) as int)`,
+        })
+        .from(shiftStaffAssignments)
+        .where(inArray(shiftStaffAssignments.shiftRosterId, rosterIds))
+        .groupBy(shiftStaffAssignments.shiftRosterId);
+      const countMap: Record<number, number> = {};
+      for (const c of countRows) countMap[c.shiftRosterId] = c.count;
+      return res.json(rows.map(r => ({ ...r, assignmentCount: countMap[r.id] ?? 0 })));
+    }
     res.json(rows);
   } catch (err) { handleError(res, err, "getRosters"); }
 });

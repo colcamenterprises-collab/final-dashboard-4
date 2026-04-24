@@ -26,7 +26,7 @@ async function sapi(method: string, url: string, data?: unknown) {
 type ShiftRoster = {
   id: number; shiftDate: string; shiftName: string; templateId: number | null;
   shiftStartTime: string; shiftEndTime: string; maxStaff: number; isCustomShift: boolean;
-  status: string; notes: string | null; createdBy: string;
+  status: string; notes: string | null; createdBy: string; assignmentCount?: number;
 };
 type ShiftTemplate = { id: number; templateName: string; startTime: string; endTime: string; maxStaff: number; isPrepShift: boolean };
 type StaffMember = { id: number; fullName: string; displayName: string | null; isActive: boolean; primaryRole: string };
@@ -113,6 +113,7 @@ export default function WeeklyRosterPlanner() {
   const [activeRosterId, setActiveRosterId] = useState<number | null>(null);
   const [breakModal, setBreakModal] = useState<{ assignmentId: number; breaks: ShiftBreak[] } | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [editAssignment, setEditAssignment] = useState<ShiftAssignment | null>(null);
 
   const weekDates = Array.from({ length: 7 }, (_, i) => fmtDate(addDays(weekStart, i)));
 
@@ -136,6 +137,10 @@ export default function WeeklyRosterPlanner() {
   }});
   const assignForm = useForm({ resolver: zodResolver(assignmentSchema), defaultValues: {
     staffMemberId: 0, scheduledStartTime: "17:00", scheduledEndTime: "03:00",
+    primaryStation: "", secondaryStation: "", isPrepStarter: false, shiftNotes: "",
+  }});
+  const editAssignForm = useForm({ resolver: zodResolver(assignmentSchema.partial()), defaultValues: {
+    scheduledStartTime: "", scheduledEndTime: "",
     primaryStation: "", secondaryStation: "", isPrepStarter: false, shiftNotes: "",
   }});
 
@@ -187,9 +192,22 @@ export default function WeeklyRosterPlanner() {
     mutationFn: (id: number) => sapi("DELETE", `/api/operations/staff/assignments/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", expandedRosterId, "assignments"] });
+      qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters"] });
       toast({ title: "Removed" });
     },
     onError: () => toast({ title: "Remove failed", variant: "destructive" }),
+  });
+
+  const editAssignMut = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: object }) =>
+      sapi("PATCH", `/api/operations/staff/assignments/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", expandedRosterId, "assignments"] });
+      qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters"] });
+      setEditAssignment(null);
+      toast({ title: "Assignment updated" });
+    },
+    onError: (err: Error) => toast({ title: "Update failed", description: err.message, variant: "destructive" }),
   });
 
   const generateBreaksMut = useMutation({
@@ -291,8 +309,14 @@ export default function WeeklyRosterPlanner() {
                       {roster.status}
                     </span>
                     {roster.isCustomShift && <span className="px-1.5 py-0.5 rounded text-xs bg-violet-100 text-violet-700">Custom</span>}
+                    {typeof roster.assignmentCount === "number" && (
+                      <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium ${roster.assignmentCount === 0 ? "bg-slate-100 text-slate-400" : roster.assignmentCount >= roster.maxStaff ? "bg-amber-100 text-amber-700" : "bg-blue-50 text-blue-600"}`}>
+                        <Users className="w-3 h-3" />
+                        {roster.assignmentCount}/{roster.maxStaff}
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{roster.shiftStartTime} – {roster.shiftEndTime} · Max {roster.maxStaff} staff</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{roster.shiftStartTime} – {roster.shiftEndTime}</p>
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
                   {roster.status === "draft" && (
@@ -342,11 +366,32 @@ export default function WeeklyRosterPlanner() {
                               <p className="text-xs font-medium text-slate-800">{member?.fullName ?? `Staff #${a.staffMemberId}`}</p>
                               <p className="text-xs text-slate-500">
                                 {a.scheduledStartTime} – {a.scheduledEndTime}
-                                {a.primaryStation && ` · ${a.primaryStation}`}
-                                {a.isPrepStarter && " · Prep start"}
+                                {a.primaryStation && (
+                                  <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-xs">{a.primaryStation}</span>
+                                )}
+                                {a.secondaryStation && (
+                                  <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded bg-slate-50 text-slate-400 text-xs">{a.secondaryStation}</span>
+                                )}
+                                {a.isPrepStarter && <span className="ml-1 text-amber-600">· Prep</span>}
                               </p>
+                              {a.shiftNotes && <p className="text-xs text-slate-400 italic mt-0.5 truncate">{a.shiftNotes}</p>}
                             </div>
                             <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => {
+                                  setEditAssignment(a);
+                                  editAssignForm.reset({
+                                    scheduledStartTime: a.scheduledStartTime,
+                                    scheduledEndTime: a.scheduledEndTime,
+                                    primaryStation: a.primaryStation ?? "",
+                                    secondaryStation: a.secondaryStation ?? "",
+                                    isPrepStarter: a.isPrepStarter,
+                                    shiftNotes: a.shiftNotes ?? "",
+                                  });
+                                }}
+                                className="p-1 rounded hover:bg-blue-50 text-blue-400" title="Edit">
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
                               <button onClick={() => removeAssignmentMut.mutate(a.id)}
                                 className="p-1 rounded hover:bg-red-50 text-red-400" title="Remove">
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -446,6 +491,54 @@ export default function WeeklyRosterPlanner() {
           </form>
         </Modal>
       )}
+
+      {/* Edit Assignment Modal */}
+      {editAssignment !== null && (() => {
+        const member = members.find(m => m.id === editAssignment.staffMemberId);
+        return (
+          <Modal title={`Edit — ${member?.fullName ?? "Assignment"}`} onClose={() => setEditAssignment(null)}>
+            <form onSubmit={editAssignForm.handleSubmit(d => editAssignMut.mutate({ id: editAssignment.id, data: d }))} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Start Time">
+                  <input type="time" {...editAssignForm.register("scheduledStartTime")} className={inputCls} />
+                </Field>
+                <Field label="End Time">
+                  <input type="time" {...editAssignForm.register("scheduledEndTime")} className={inputCls} />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Primary Station">
+                  <select {...editAssignForm.register("primaryStation")} className={inputCls}>
+                    <option value="">None</option>
+                    {workAreas.filter(w => w.isActive).map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
+                  </select>
+                </Field>
+                <Field label="Secondary Station">
+                  <select {...editAssignForm.register("secondaryStation")} className={inputCls}>
+                    <option value="">None</option>
+                    {workAreas.filter(w => w.isActive).map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
+                  </select>
+                </Field>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" {...editAssignForm.register("isPrepStarter")} className="w-4 h-4 accent-amber-500" />
+                <span className="text-xs text-slate-600">Prep start (arrives early for prep shift)</span>
+              </div>
+              <Field label="Notes">
+                <input {...editAssignForm.register("shiftNotes")} className={inputCls} placeholder="Optional" />
+              </Field>
+              <div className="flex justify-end gap-2 pt-1">
+                <button type="button" onClick={() => setEditAssignment(null)}
+                  className="px-3 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-50">Cancel</button>
+                <button type="submit" disabled={editAssignMut.isPending}
+                  className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50">
+                  {editAssignMut.isPending ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
 
       {/* Delete Confirmation Modal */}
       {deleteConfirmId !== null && (
