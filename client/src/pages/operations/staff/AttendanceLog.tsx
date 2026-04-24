@@ -1,7 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { UserCheck, UserX, Clock, AlertTriangle, LogOut, RefreshCw } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+async function sapi(method: string, url: string, data?: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: data !== undefined ? JSON.stringify(data) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
 import { useToast } from "@/hooks/use-toast";
 
 type ShiftRoster = { id: number; shiftDate: string; shiftName: string; status: string; shiftStartTime: string; shiftEndTime: string };
@@ -108,7 +120,7 @@ export default function AttendanceLog() {
   });
 
   const logAttendanceMut = useMutation({
-    mutationFn: (d: object) => apiRequest("POST", `/api/operations/staff/rosters/${selectedRosterId}/attendance`, d),
+    mutationFn: (d: object) => sapi("POST", `/api/operations/staff/rosters/${selectedRosterId}/attendance`, d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", selectedRosterId, "attendance"] });
       setAttendanceModal(null);
@@ -119,7 +131,7 @@ export default function AttendanceLog() {
 
   const updateLogMut = useMutation({
     mutationFn: ({ id, data }: { id: number; data: object }) =>
-      apiRequest("PATCH", `/api/operations/staff/attendance/${id}`, data),
+      sapi("PATCH", `/api/operations/staff/attendance/${id}`, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", selectedRosterId, "attendance"] });
       setAttendanceModal(null);
@@ -130,7 +142,7 @@ export default function AttendanceLog() {
 
   const replaceMut = useMutation({
     mutationFn: ({ logId, replacementStaffId, notes }: { logId: number; replacementStaffId: number; notes?: string }) =>
-      apiRequest("POST", `/api/operations/staff/attendance/${logId}/replace`, { replacementStaffId, notes }),
+      sapi("POST", `/api/operations/staff/attendance/${logId}/replace`, { replacementStaffId, notes: notes || null }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", selectedRosterId, "attendance"] });
       setReplacementModal(null);

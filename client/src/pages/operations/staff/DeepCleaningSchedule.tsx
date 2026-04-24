@@ -4,7 +4,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, CheckCircle2, RotateCcw, AlertCircle, CalendarDays } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+async function sapi(method: string, url: string, data?: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: data !== undefined ? JSON.stringify(data) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
 import { useToast } from "@/hooks/use-toast";
 
 type DeepCleaningTask = {
@@ -86,21 +98,21 @@ export default function DeepCleaningSchedule() {
   }});
 
   const createMut = useMutation({
-    mutationFn: (d: z.infer<typeof taskSchema>) => apiRequest("POST", `/api/operations/staff/deep-cleaning`, d),
+    mutationFn: (d: z.infer<typeof taskSchema>) => sapi("POST", `/api/operations/staff/deep-cleaning`, { ...d, notes: (d as any).notes || null }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/deep-cleaning"] }); setShowModal(false); form.reset(); toast({ title: "Task created" }); },
     onError: () => toast({ title: "Create failed", variant: "destructive" }),
   });
 
   const completeMut = useMutation({
     mutationFn: ({ id, notes }: { id: number; notes?: string }) =>
-      apiRequest("POST", `/api/operations/staff/deep-cleaning/${id}/complete`, { notes }),
+      sapi("POST", `/api/operations/staff/deep-cleaning/${id}/complete`, { notes: notes || null }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/deep-cleaning"] }); setCompleteModal(null); toast({ title: "Task completed — next due date scheduled" }); },
     onError: () => toast({ title: "Failed", variant: "destructive" }),
   });
 
   const rolloverMut = useMutation({
     mutationFn: ({ id, notes }: { id: number; notes?: string }) =>
-      apiRequest("POST", `/api/operations/staff/deep-cleaning/${id}/rollover`, { notes }),
+      sapi("POST", `/api/operations/staff/deep-cleaning/${id}/rollover`, { notes: notes || null }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/deep-cleaning"] }); setCompleteModal(null); toast({ title: "Rolled over — due date extended" }); },
     onError: () => toast({ title: "Failed", variant: "destructive" }),
   });

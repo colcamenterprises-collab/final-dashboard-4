@@ -4,7 +4,19 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Plus, Pencil, Trash2, Save, Clock, MapPin, Layout } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+async function sapi(method: string, url: string, data?: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: data !== undefined ? JSON.stringify(data) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
 import { useToast } from "@/hooks/use-toast";
 
 type Settings = {
@@ -115,7 +127,7 @@ function BreakRulesPanel({ settings, loading, qc, toast }: {
   } : undefined });
 
   const saveMut = useMutation({
-    mutationFn: (data: z.infer<typeof settingsSchema>) => apiRequest("PATCH", "/api/operations/staff/settings", data),
+    mutationFn: (data: z.infer<typeof settingsSchema>) => sapi("PATCH", "/api/operations/staff/settings", data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/settings"] }); toast({ title: "Settings saved" }); },
     onError: () => toast({ title: "Save failed", variant: "destructive" }),
   });
@@ -160,8 +172,8 @@ function OperatingHoursPanel({ opHours, qc, toast }: {
 }) {
   const saveMut = useMutation({
     mutationFn: ({ id, data }: { id?: number; data: object }) =>
-      id ? apiRequest("PATCH", `/api/operations/staff/operating-hours/${id}`, data)
-         : apiRequest("POST", `/api/operations/staff/operating-hours`, data),
+      id ? sapi("PATCH", `/api/operations/staff/operating-hours/${id}`, data)
+         : sapi("POST", `/api/operations/staff/operating-hours`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/operating-hours"] }); toast({ title: "Hours saved" }); },
     onError: () => toast({ title: "Save failed", variant: "destructive" }),
   });
@@ -228,13 +240,13 @@ function WorkAreasPanel({ workAreas, loading, qc, toast }: {
 
   const saveMut = useMutation({
     mutationFn: (d: z.infer<typeof workAreaSchema> & { id?: number }) =>
-      d.id ? apiRequest("PATCH", `/api/operations/staff/work-areas/${d.id}`, d)
-            : apiRequest("POST", `/api/operations/staff/work-areas`, d),
+      d.id ? sapi("PATCH", `/api/operations/staff/work-areas/${d.id}`, d)
+            : sapi("POST", `/api/operations/staff/work-areas`, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/work-areas"] }); setModal(null); form.reset(); toast({ title: "Saved" }); },
     onError: () => toast({ title: "Save failed", variant: "destructive" }),
   });
   const delMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/operations/staff/work-areas/${id}`),
+    mutationFn: (id: number) => sapi("DELETE", `/api/operations/staff/work-areas/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/work-areas"] }); toast({ title: "Deleted" }); },
     onError: () => toast({ title: "Delete failed", variant: "destructive" }),
   });
@@ -313,13 +325,13 @@ function TemplatesPanel({ templates, loading, qc, toast }: {
 
   const saveMut = useMutation({
     mutationFn: (d: z.infer<typeof templateSchema> & { id?: number }) =>
-      d.id ? apiRequest("PATCH", `/api/operations/staff/shift-templates/${d.id}`, d)
-            : apiRequest("POST", `/api/operations/staff/shift-templates`, d),
+      d.id ? sapi("PATCH", `/api/operations/staff/shift-templates/${d.id}`, d)
+            : sapi("POST", `/api/operations/staff/shift-templates`, d),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/shift-templates"] }); setModal(null); form.reset(); toast({ title: "Template saved" }); },
     onError: () => toast({ title: "Save failed", variant: "destructive" }),
   });
   const delMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/operations/staff/shift-templates/${id}`),
+    mutationFn: (id: number) => sapi("DELETE", `/api/operations/staff/shift-templates/${id}`),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/shift-templates"] }); toast({ title: "Deleted" }); },
     onError: () => toast({ title: "Delete failed", variant: "destructive" }),
   });

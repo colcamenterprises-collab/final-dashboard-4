@@ -7,8 +7,21 @@ import {
   ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Users,
   Clock, CheckCircle2, ChevronDown, ChevronUp, Zap
 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+
+async function sapi(method: string, url: string, data?: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: data !== undefined ? JSON.stringify(data) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
 
 type ShiftRoster = {
   id: number; shiftDate: string; shiftName: string; templateId: number | null;
@@ -127,7 +140,7 @@ export default function WeeklyRosterPlanner() {
 
   const createRosterMut = useMutation({
     mutationFn: (d: z.infer<typeof rosterSchema>) =>
-      apiRequest("POST", `/api/operations/staff/rosters`, { ...d, shiftDate: selectedDate }),
+      sapi("POST", `/api/operations/staff/rosters`, { ...d, shiftDate: selectedDate, notes: d.notes || null }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters"] });
       setModal(null); rosterForm.reset();
@@ -138,20 +151,20 @@ export default function WeeklyRosterPlanner() {
 
   const updateStatusMut = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
-      apiRequest("PATCH", `/api/operations/staff/rosters/${id}`, { status }),
+      sapi("PATCH", `/api/operations/staff/rosters/${id}`, { status }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters"] }); toast({ title: "Status updated" }); },
     onError: () => toast({ title: "Update failed", variant: "destructive" }),
   });
 
   const deleteRosterMut = useMutation({
-    mutationFn: (id: number) => apiRequest("PATCH", `/api/operations/staff/rosters/${id}`, { status: "closed" }),
+    mutationFn: (id: number) => sapi("PATCH", `/api/operations/staff/rosters/${id}`, { status: "closed" }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters"] }); toast({ title: "Roster closed" }); },
     onError: () => toast({ title: "Failed", variant: "destructive" }),
   });
 
   const addAssignmentMut = useMutation({
     mutationFn: (d: z.infer<typeof assignmentSchema>) =>
-      apiRequest("POST", `/api/operations/staff/rosters/${activeRosterId}/assignments`, d),
+      sapi("POST", `/api/operations/staff/rosters/${activeRosterId}/assignments`, d),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", expandedRosterId, "assignments"] });
       setModal(null); assignForm.reset();
@@ -161,7 +174,7 @@ export default function WeeklyRosterPlanner() {
   });
 
   const removeAssignmentMut = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/operations/staff/assignments/${id}`),
+    mutationFn: (id: number) => sapi("DELETE", `/api/operations/staff/assignments/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", expandedRosterId, "assignments"] });
       toast({ title: "Removed" });
@@ -170,13 +183,13 @@ export default function WeeklyRosterPlanner() {
   });
 
   const generateBreaksMut = useMutation({
-    mutationFn: (rosterId: number) => apiRequest("POST", `/api/operations/staff/rosters/${rosterId}/breaks/auto-generate`, {}),
+    mutationFn: (rosterId: number) => sapi("POST", `/api/operations/staff/rosters/${rosterId}/breaks/auto-generate`, {}),
     onSuccess: () => { toast({ title: "Breaks generated" }); refetchAssignments(); },
     onError: () => toast({ title: "Failed", variant: "destructive" }),
   });
 
   const updateBreakMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: object }) => apiRequest("PATCH", `/api/operations/staff/breaks/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: object }) => sapi("PATCH", `/api/operations/staff/breaks/${id}`, data),
     onSuccess: () => { toast({ title: "Break updated" }); },
     onError: () => toast({ title: "Failed", variant: "destructive" }),
   });

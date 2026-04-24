@@ -1,7 +1,19 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, Circle, Plus, RefreshCw, ClipboardList, Users } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+async function sapi(method: string, url: string, data?: unknown) {
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: data !== undefined ? JSON.stringify(data) : undefined,
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(`${res.status}: ${text}`);
+  }
+  return res.json();
+}
 import { useToast } from "@/hooks/use-toast";
 
 type ShiftRoster = { id: number; shiftDate: string; shiftName: string; status: string; shiftStartTime: string; shiftEndTime: string };
@@ -43,13 +55,13 @@ export default function DailyCleaningTasks() {
   });
 
   const generateMut = useMutation({
-    mutationFn: (rosterId: number) => apiRequest("POST", `/api/operations/staff/rosters/${rosterId}/cleaning/generate`, {}),
+    mutationFn: (rosterId: number) => sapi("POST", `/api/operations/staff/rosters/${rosterId}/cleaning/generate`, {}),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", selectedRosterId, "cleaning"] }); toast({ title: "Tasks generated" }); },
     onError: () => toast({ title: "Generate failed", variant: "destructive" }),
   });
 
   const updateTaskMut = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: object }) => apiRequest("PATCH", `/api/operations/staff/cleaning/tasks/${id}`, data),
+    mutationFn: ({ id, data }: { id: number; data: object }) => sapi("PATCH", `/api/operations/staff/cleaning/tasks/${id}`, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["/api/operations/staff/rosters", selectedRosterId, "cleaning"] }); setAssignModal(null); toast({ title: "Task updated" }); },
     onError: () => toast({ title: "Update failed", variant: "destructive" }),
   });
