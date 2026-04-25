@@ -161,6 +161,13 @@ const autoGenerateSchema = z.object({
   allowBackToBackCloseOpen: z.boolean(),
 });
 
+const toNullablePositiveNumber = (value: unknown): number | null => {
+  if (value === '' || value === null || value === undefined) return null;
+  const numberValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numberValue) || numberValue <= 0) return null;
+  return numberValue;
+};
+
 function Modal({
   title,
   onClose,
@@ -417,10 +424,10 @@ export default function WeeklyRosterPlanner() {
         includeDailyCleaning: d.includeDailyCleaning,
         includeDeepCleaning: d.includeDeepCleaning,
         ownerRules: {
-          maxShiftsPerStaffPerWeek: d.maxShiftsPerStaffPerWeek ?? null,
+          maxShiftsPerStaffPerWeek: toNullablePositiveNumber(d.maxShiftsPerStaffPerWeek),
           minHoursPerStaffPerWeek: null,
-          maxHoursPerStaffPerWeek: d.maxHoursPerStaffPerWeek ?? null,
-          preferredBusyDayStaffCount: d.preferredBusyDayStaffCount ?? null,
+          maxHoursPerStaffPerWeek: toNullablePositiveNumber(d.maxHoursPerStaffPerWeek),
+          preferredBusyDayStaffCount: toNullablePositiveNumber(d.preferredBusyDayStaffCount),
           allowBackToBackCloseOpen: d.allowBackToBackCloseOpen,
         },
       }),
