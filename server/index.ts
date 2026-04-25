@@ -287,6 +287,9 @@ async function checkSchema() {
   app.use('/api/analysis', drinksVarianceRouter);
   const drinksAdjustmentsRouter = (await import('./routes/drinksAdjustments.js')).default;
   app.use('/api/analysis', drinksAdjustmentsRouter);
+  // Mount burgers-sets table (PATCH 1) — completely separate from drinks logic
+  const burgersVarianceRouter = (await import('./routes/burgersVariance.js')).default;
+  app.use('/api/analysis', burgersVarianceRouter);
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
   

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import DrinksVarianceTable from '@/components/analysis/DrinksVarianceTable';
+import BurgersSetsTable from '@/components/analysis/BurgersSetsTable';
 
 type Blocker = {
   code: string;
@@ -238,39 +239,9 @@ export default function AnalysisV2() {
 
           <section>
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
-              2. Burgers &amp; Burger Sets
+              2. Burgers &amp; Sets
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-xs">
-                <thead>
-                  <tr>
-                    <Th>Item Name</Th>
-                    <Th right>Sold Count</Th>
-                    <Th>Type</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.tables.burgersAndSets.length === 0 ? (
-                    <EmptyRow cols={3} />
-                  ) : (
-                    data.tables.burgersAndSets.map((row) => (
-                      <tr key={`${row.itemName}-${row.type}`} className="hover:bg-gray-50">
-                        <Cell>{row.itemName}</Cell>
-                        <Cell right bold>{row.soldCount}</Cell>
-                        <Cell>
-                          <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium
-                            ${row.type === 'Set' ? 'bg-blue-50 text-blue-700' :
-                              row.type === 'Double' ? 'bg-purple-50 text-purple-700' :
-                              'bg-gray-50 text-gray-700'}`}>
-                            {row.type}
-                          </span>
-                        </Cell>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <BurgersSetsTable date={shiftDate} />
           </section>
 
           <section>
