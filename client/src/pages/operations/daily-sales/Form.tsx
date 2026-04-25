@@ -272,11 +272,7 @@ export default function DailySales() {
   
   const [completedBy, setCompletedBy] = useState("");
   const [cashStart, setCashStart] = useState(0);
-  const [cash, setCash] = useState(0);
-  const [qr, setQr] = useState(0);
-  const [grab, setGrab] = useState(0);
-  const [aroi, setAroi] = useState(0);
-  
+
   // Expenses state
   const [shiftExpenses, setShiftExpenses] = useState<ShiftExpenseRow[]>([{ id: uid(), item: "", cost: 0, shop: "" }]);
   const [staffWages, setStaffWages] = useState<WageRow[]>([{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
@@ -355,10 +351,6 @@ export default function DailySales() {
           const p = data.record.payload || {};
           setCompletedBy(data.record.staff || "");
           setCashStart(p.startingCash || 0);
-          setCash(p.cashSales || 0);
-          setQr(p.qrSales || 0);
-          setGrab(p.grabSales || 0);
-          setAroi(p.otherSales || 0);
           setClosingCash(p.closingCash || 0);
           setCashBanked(p.cashBanked || 0);
           setQrBanked(p.qrTransfer || 0);
@@ -482,10 +474,6 @@ export default function DailySales() {
         const draft = JSON.parse(raw);
         setCompletedBy(draft.completedBy || "");
         setCashStart(draft.cashStart || 0);
-        setCash(draft.cash || 0);
-        setQr(draft.qr || 0);
-        setGrab(draft.grab || 0);
-        setAroi(draft.aroi || 0);
         setClosingCash(draft.closingCash || 0);
         setCashBanked(draft.cashBanked || 0);
         setQrBanked(draft.qrBanked || 0);
@@ -505,10 +493,6 @@ export default function DailySales() {
   const resetForm = () => {
     setCompletedBy("");
     setCashStart(0);
-    setCash(0);
-    setQr(0);
-    setGrab(0);
-    setAroi(0);
     setShiftExpenses([{ id: uid(), item: "", cost: 0, shop: "" }]);
     setStaffWages([{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
     setOtherPayments([{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
@@ -530,14 +514,10 @@ export default function DailySales() {
     e?.preventDefault(); // allow call from button with no event
     if (submitting) return;
     
-    // EXACT VALIDATION from consolidated patch - prevent Form 2 progression without proper data
+    // VALIDATION - prevent Form 2 progression without proper data
     const formData = {
       completedBy,
       startingCash: cashStart,
-      cashSales: cash,
-      qrSales: qr,
-      grabSales: grab,
-      otherSales: aroi,
       closingCash,
       cashBanked,
       qrBanked,
@@ -547,7 +527,7 @@ export default function DailySales() {
       directReceiptCount
     };
     
-    const required = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'closingCash', 'cashBanked', 'qrBanked', 'grabReceiptCount', 'cashReceiptCount', 'qrReceiptCount', 'directReceiptCount'];
+    const required = ['completedBy', 'startingCash', 'closingCash', 'cashBanked', 'qrBanked', 'grabReceiptCount', 'cashReceiptCount', 'qrReceiptCount', 'directReceiptCount'];
     const newErrors = required.filter((f) => {
       const value = formData[f as keyof typeof formData];
       if (f === 'completedBy') return !value || value.toString().trim() === '';
@@ -578,10 +558,6 @@ export default function DailySales() {
       const fieldLabels: Record<string, string> = {
         completedBy: 'Please enter the name of who completed this form',
         startingCash: 'Starting cash amount is missing or invalid',
-        cashSales: 'Cash sales amount is missing or invalid',
-        qrSales: 'QR sales amount is missing or invalid',
-        grabSales: 'Grab sales amount is missing or invalid',
-        otherSales: 'Other sales amount is missing or invalid',
         closingCash: 'Closing cash amount is required — enter the cash remaining in the register',
         cashBanked: 'Cash banked amount is required — enter how much cash was banked',
         qrBanked: 'QR transfer amount is required — enter how much QR was transferred',
@@ -615,11 +591,11 @@ export default function DailySales() {
       const submitData = {
         completedBy,
         startingCash: cashStart,
-        cashSales: cash,
-        qrSales: qr,
-        grabSales: grab,
-        otherSales: aroi,
-        totalSales: cash + qr + grab + aroi,
+        cashSales: 0,
+        qrSales: 0,
+        grabSales: 0,
+        otherSales: 0,
+        totalSales: 0,
         refunds: {
           status: refundStatus,
           rows: refundStatus === 'YES' ? refundRows : [],
@@ -724,10 +700,6 @@ export default function DailySales() {
   const collectDailySalesValues = () => ({
     completedBy,
     cashStart,
-    cash,
-    qr,
-    grab,
-    aroi,
     shiftExpenses,
     staffWages,
     otherPayments,
@@ -855,57 +827,6 @@ export default function DailySales() {
               </div>
             </div>
             <p className="mt-2 text-xs text-gray-500">{L.autoTimestamp}: {new Date().toISOString()}</p>
-          </section>
-
-          <section className="rounded-[4px] border bg-white p-5">
-            <h2 className="text-sm font-bold mb-4">{L.salesInfo}</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].cashSales}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].cashSales}
-                  value={cash} 
-                  onChange={e=>setCash(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('cashSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].qrSales}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].qrSales}
-                  value={qr} 
-                  onChange={e=>setQr(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('qrSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].grabSales}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].grabSales}
-                  value={grab} 
-                  onChange={e=>setGrab(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('grabSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">{labels[lang].otherSales}</label>
-                <input 
-                  type="number" 
-                  min="0"
-                  placeholder={labels[lang].otherSales}
-                  value={aroi} 
-                  onChange={e=>setAroi(+e.target.value||0)} 
-                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm ${errors.includes('otherSales') ? 'border-red-500' : ''}`}
-                />
-              </div>
-            </div>
-            <div className="mt-3 font-semibold text-right">{L.totalSales}: ฿{(cash + qr + grab + aroi).toLocaleString()}</div>
           </section>
 
           {/* Expenses Section */}
@@ -1385,29 +1306,6 @@ export default function DailySales() {
             <h3 className="mb-4 text-sm font-semibold">{L.summary}</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between font-medium">
-                <span>{L.totalSales}:</span>
-                <span>฿{(cash + qr + grab + aroi).toLocaleString()}</span>
-              </div>
-              <div className="ml-4 space-y-1 text-xs text-gray-600">
-                <div className="flex justify-between">
-                  <span>• {L.cashSales}:</span>
-                  <span>฿{cash.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• {L.qrSales}:</span>
-                  <span>฿{qr.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• {L.grabSales}:</span>
-                  <span>฿{grab.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>• {L.otherSales}:</span>
-                  <span>฿{aroi.toLocaleString()}</span>
-                </div>
-              </div>
-              
-              <div className="flex justify-between font-medium">
                 <span>{L.totalExpenses}:</span>
                 <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
               </div>
@@ -1425,11 +1323,9 @@ export default function DailySales() {
                   <span>฿{otherPayments.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
                 </div>
               </div>
-              <div className="flex justify-between font-bold text-base border-t pt-2">
-                <span>{L.netPosition}:</span>
-                <span className={(cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0)) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                  ฿{((cash + qr + grab + aroi) - (shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0))).toLocaleString()}
-                </span>
+              <div className="flex justify-between font-medium border-t pt-2">
+                <span>{L.closingCash}:</span>
+                <span>฿{closingCash.toLocaleString()}</span>
               </div>
             </div>
           </section>

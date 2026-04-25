@@ -171,8 +171,8 @@ export async function createDailySalesV2(req: Request, res: Response) {
   try {
     const body = req.body;
     
-    // EXACT VALIDATION from consolidated patch - FIXED to allow zero values
-    const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'cashBanked', 'qrTransfer', 'grabReceiptCount', 'cashReceiptCount', 'qrReceiptCount'];
+    // ANTI-MANIPULATION PATCH: Sales figures removed from required fields (sourced from POS, not staff)
+    const requiredFields = ['completedBy', 'startingCash', 'cashBanked', 'qrTransfer', 'grabReceiptCount', 'cashReceiptCount', 'qrReceiptCount'];
     const missing = requiredFields.filter(field => {
       const value = body[field];
       if (field === 'completedBy') return !value || value.toString().trim() === '';
@@ -599,11 +599,9 @@ export async function updateDailySalesV2Form1(req: Request, res: Response) {
       ...(typeof body.refunds !== 'undefined' ? { refunds: body.refunds } : {}),
     } as Record<string, any>;
 
-    nextPayload.totalSales =
-      toTHB(nextPayload.cashSales ?? 0) +
-      toTHB(nextPayload.qrSales ?? 0) +
-      toTHB(nextPayload.grabSales ?? 0) +
-      toTHB(nextPayload.otherSales ?? 0);
+    // ANTI-MANIPULATION PATCH: totalSales is now sourced from POS, not recalculated from staff-entered fields
+    // Preserve existing totalSales from payload; do not overwrite with zeroes
+    nextPayload.totalSales = nextPayload.totalSales ?? 0;
 
     // Also update top-level columns that the library reads directly
     const columnUpdates: string[] = ['payload = $1'];
