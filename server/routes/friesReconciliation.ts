@@ -4,7 +4,7 @@
  *
  * Single-row table: French Fries
  *   Start     = previous shift closing friesEnd (canonical source priority below)
- *   Purchased = 0 (not implemented in Patch 1)
+ *   Purchased = SUM(purchase_tally.fries_grams) for the shift date; 0 if no record
  *   Used      = (SUM of FRIES_USAGE_SKUS sold + total SET_SKUS sold) × 130g per serving
  *   End       = current shift friesEnd (same priority)
  *   Expected  = Start + Purchased − Used
@@ -75,8 +75,14 @@ router.get('/fries-reconciliation', async (req, res) => {
     const end: number | null = endResolved.value;
     const endSource = endResolved.source;
 
-    // ── Purchased: 0 (Patch 1 — not implemented) ─────────────────────────
-    const purchased = 0;
+    // ── Purchased: sum of fries_grams from purchase_tally for this date ──
+    const purchasedRes = await pool.query(
+      `SELECT COALESCE(SUM(fries_grams), 0) AS purchased_fries_grams
+       FROM purchase_tally
+       WHERE date::date = $1::date`,
+      [date],
+    );
+    const purchased = Number(purchasedRes.rows[0]?.purchased_fries_grams ?? 0);
 
     // ── Fries item sales (usage SKUs) ─────────────────────────────────────
     const friesSalesRes = await pool.query(

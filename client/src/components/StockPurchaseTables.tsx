@@ -43,6 +43,9 @@ export function StockPurchaseTables() {
   const meat = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries))
     ? purchaseTallyData.entries.filter((item: any) => item.meatGrams != null && item.meatGrams > 0)
     : [];
+  const fries = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries))
+    ? purchaseTallyData.entries.filter((item: any) => item.friesGrams != null && item.friesGrams > 0)
+    : [];
   const drinks = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries))
     ? purchaseTallyData.entries.filter((item: any) => {
         if (Array.isArray(item.drinks) && item.drinks.length > 0) return true;
@@ -301,6 +304,75 @@ export function StockPurchaseTables() {
             {meat.length === 0 && (
               <tr>
                 <td colSpan={6} className="border p-4 text-center text-gray-500">No meat purchases this month</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      {/* Fries Table */}
+      <div className="bg-white rounded-[4px] border border-slate-200 p-4" data-testid="section-fries-purchases">
+        <h2 className="text-sm font-semibold mb-2">French Fries Purchases</h2>
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <table className="w-full border-collapse text-xs" data-testid="table-fries-purchases">
+          <thead>
+            <tr className="border-b-2 border-slate-200">
+              <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Staff</th>
+              <th className="p-1 border text-left text-xs">Weight</th>
+              <th className="p-1 border text-left text-xs">Supplier</th>
+              <th className="p-1 border text-center text-xs">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {fries.map((f: any, i: number) => (
+              <tr key={i} className="border-b border-slate-100 hover:bg-slate-100/40 transition-colors" data-testid={`row-fries-${f.id}`}>
+                <td className="border p-1">
+                  <div>{formatDateDDMMYYYY(f.date)}</div>
+                  {f.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(f.createdAt)}</div>}
+                </td>
+                <td className="border p-1">{f.staff || '-'}</td>
+                <td className="border p-1">{f.friesGrams ? (f.friesGrams / 1000).toFixed(2) + ' kg (' + f.friesGrams + 'g)' : 'N/A'}</td>
+                <td className="border p-1">{f.supplier || '-'}</td>
+                <td className="border p-1 text-center">
+                  <div className="flex justify-center gap-1">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                          disabled={deleteStockMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Fries Purchase</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this fries purchase ({f.friesGrams}g)? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteStockMutation.mutate(f.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {fries.length === 0 && (
+              <tr>
+                <td colSpan={5} className="border p-4 text-center text-gray-500">No fries purchases this month</td>
               </tr>
             )}
           </tbody>

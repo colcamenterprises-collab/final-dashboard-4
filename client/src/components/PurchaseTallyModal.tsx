@@ -25,7 +25,8 @@ const purchaseTallySchema = z.object({
   supplier: z.string().optional(),
   amountTHB: z.string().optional(),
   rollsPcs: z.string().optional(),
-  meatGrams: z.string().optional(), 
+  meatGrams: z.string().optional(),
+  friesGrams: z.string().optional(),
   notes: z.string().optional(),
   staff: z.string().optional(),
   drinks: z.array(drinkItemSchema).default([]),
@@ -79,6 +80,7 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
       amountTHB: entry?.amountTHB || "",
       rollsPcs: entry?.rollsPcs?.toString() || "",
       meatGrams: entry?.meatGrams?.toString() || "",
+      friesGrams: entry?.friesGrams?.toString() || "",
       notes: entry?.notes || "",
       staff: entry?.staff || "",
       drinks: [],
@@ -176,6 +178,7 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
       amountTHB: data.amountTHB ? parseFloat(data.amountTHB) : undefined,
       rollsPcs: data.rollsPcs ? parseInt(data.rollsPcs) : undefined,
       meatGrams: data.meatGrams ? parseInt(data.meatGrams) : undefined,
+      friesGrams: data.friesGrams ? Math.round(Number(data.friesGrams)) : undefined,
     };
 
     if (entry) {
@@ -274,6 +277,20 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Meat (grams)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="friesGrams"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fries (grams) <span className="text-xs font-normal text-slate-400">e.g. 4300</span></FormLabel>
                     <FormControl>
                       <Input type="number" placeholder="0" {...field} />
                     </FormControl>

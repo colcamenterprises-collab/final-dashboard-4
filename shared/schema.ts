@@ -1214,7 +1214,8 @@ export const purchaseTally = pgTable("purchase_tally", {
 
   // Purchase quantities
   rollsPcs: integer("rolls_pcs"),
-  meatGrams: integer("meat_grams"), 
+  meatGrams: integer("meat_grams"),
+  friesGrams: integer("fries_grams"),
   // drinksPcs removed - replaced with itemized drinks
 });
 

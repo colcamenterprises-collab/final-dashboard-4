@@ -1,0 +1,133 @@
+FINAL DB — FRIES PURCHASE INTEGRATION (SAME SYSTEM)
+
+Objective:
+Add French Fries into the existing purchasing system (same pipeline as rolls, meat, drinks).
+
+CRITICAL RULES:
+- Do NOT create a new standalone purchase table
+- Do NOT modify Drinks, Burgers, Buns, Meat, Side Orders logic
+- Do NOT change Analysis formulas
+- Extend existing purchase_tally system only
+
+--------------------------------
+
+BACKEND
+
+1. Extend purchase_tally (or equivalent purchase system)
+
+Add support for:
+French Fries
+
+Field:
+fries_grams
+
+Rules:
+- Store all values in grams
+- Accept inputs like:
+  4300 → 4300g
+  4.3 → convert to 4300g (if decimal input exists)
+- Use same effective date logic:
+  purchase_tally.date = TRUE purchase date (not createdAt)
+
+--------------------------------
+
+2. Purchase query integration
+
+Wherever purchases are aggregated (same logic used for meat/drinks):
+
+Include:
+SUM(fries_grams) grouped by effective date
+
+Return as:
+purchased_fries_grams
+
+--------------------------------
+
+FRONTEND — PURCHASING PAGE
+
+3. Add Fries section (same structure as others)
+
+New section:
+
+[ Fries ]
+
+Fields:
+- Quantity (grams)
+- Date (same date picker as other purchase entries)
+
+Behavior:
+- Same submit flow as meat/drinks
+- Same validation rules
+- Same persistence flow
+
+--------------------------------
+
+4. Stock Order History
+
+Add Fries into existing purchasing history view:
+
+- Show fries entries alongside:
+  rolls
+  meat
+  drinks
+
+- Use same structure:
+  Date | Item | Quantity
+
+--------------------------------
+
+ANALYSIS V2 — FRIES TABLE
+
+5. Replace Purchased = 0 logic
+
+Instead:
+Read fries purchase from purchase_tally
+
+Rules:
+- Match by effective date
+- Sum fries_grams
+- If no record → Purchased = 0 (valid)
+
+--------------------------------
+
+CALCULATIONS (UNCHANGED)
+
+Expected = Start + Purchased - Used
+Variance = End - Expected
+
+--------------------------------
+
+VALIDATION
+
+Run against a completed shift:
+
+1. Enter fries purchase
+2. Confirm:
+   - saved to purchase_tally
+   - appears in Stock Order History
+   - correct effective date
+
+3. Analysis V2:
+   - Purchased column updates
+   - Expected recalculates
+   - Variance changes correctly
+
+4. If no purchase exists:
+   - Purchased remains 0
+   - system still works
+
+5. Confirm:
+   - Drinks table unchanged
+   - Meat table unchanged
+   - Buns table unchanged
+   - Side Orders unchanged
+
+--------------------------------
+
+RETURN
+
+- files modified
+- where fries_grams is stored
+- sample purchase row
+- fries table before/after purchase example
+- confirmation no new tables created
