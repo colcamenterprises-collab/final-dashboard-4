@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import DrinksVarianceTable from '@/components/analysis/DrinksVarianceTable';
 import BurgersSetsTable from '@/components/analysis/BurgersSetsTable';
+import BunsReconciliationTable from '@/components/analysis/BunsReconciliationTable';
 
 type Blocker = {
   code: string;
@@ -246,7 +247,14 @@ export default function AnalysisV2() {
 
           <section>
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
-              3. Side Orders
+              3. Core Stock — Buns
+            </h2>
+            <BunsReconciliationTable date={shiftDate} />
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              4. Side Orders
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-xs">
@@ -274,7 +282,7 @@ export default function AnalysisV2() {
 
           <section>
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
-              4. Modifiers
+              5. Modifiers
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-xs">

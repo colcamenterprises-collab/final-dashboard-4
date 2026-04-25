@@ -290,6 +290,9 @@ async function checkSchema() {
   // Mount burgers-sets table (PATCH 1) — completely separate from drinks logic
   const burgersVarianceRouter = (await import('./routes/burgersVariance.js')).default;
   app.use('/api/analysis', burgersVarianceRouter);
+  // Mount buns reconciliation (CORE STOCK V1 PATCH 1) — isolated from drinks and burgers
+  const bunsReconciliationRouter = (await import('./routes/bunsReconciliation.js')).default;
+  app.use('/api/analysis', bunsReconciliationRouter);
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
   
