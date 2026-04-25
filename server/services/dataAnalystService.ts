@@ -103,6 +103,8 @@ function codeFromModifierName(modifierName: string): string | null {
 
 export async function getDailyAnalysis(date: string): Promise<DailyAnalysisResult> {
   const blockers: Blocker[] = [];
+  let purchaseBySkuQueryFailed = false;
+  let purchaseUnresolvedQueryFailed = false;
 
   if (!pool) {
     blockers.push({
@@ -218,7 +220,10 @@ export async function getDailyAnalysis(date: string): Promise<DailyAnalysisResul
        WHERE t.date = $1::date
        GROUP BY COALESCE(NULLIF(d.item_sku, ''), utr.sku)`,
       [date],
-    ).catch(() => ({ rows: [] } as any)),
+    ).catch(() => {
+      purchaseBySkuQueryFailed = true;
+      return { rows: [] } as any;
+    }),
     pool.query(
       `SELECT d.item_name, SUM(d.qty)::numeric AS qty
        FROM purchase_tally_drink d
@@ -230,8 +235,21 @@ export async function getDailyAnalysis(date: string): Promise<DailyAnalysisResul
          AND COALESCE(NULLIF(d.item_sku, ''), utr.sku) IS NULL
        GROUP BY d.item_name`,
       [date],
-    ).catch(() => ({ rows: [] } as any)),
+    ).catch(() => {
+      purchaseUnresolvedQueryFailed = true;
+      return { rows: [] } as any;
+    }),
   ]);
+
+  if (purchaseBySkuQueryFailed || purchaseUnresolvedQueryFailed) {
+    blockers.push({
+      code: "PURCHASE_QUERY_FAILED",
+      message: `Purchase data query failed for ${date}; purchased values are incomplete and should not be treated as zero-confirmed.`,
+      where: "purchase_tally + purchase_tally_drink",
+      canonical_source: "purchase_tally.date + purchase_tally_drink",
+      auto_build_attempted: false,
+    });
+  }
 
   if (usageRows.length === 0) {
     blockers.push({
@@ -328,7 +346,7 @@ export async function getDailyAnalysis(date: string): Promise<DailyAnalysisResul
 
   for (const row of purchaseUnresolvedResult.rows as any[]) {
     blockers.push({
-      code: "AMBIGUOUS_MAPPING",
+      code: "UNMAPPED_PURCHASE",
       message: `Purchased drink "${String(row.item_name)}" (${asNum(row.qty)}) has no deterministic SKU mapping.`,
       where: "purchase_tally_drink.item_name",
       canonical_source: "purchase_tally_drink + receipt_truth_usage_rule",
