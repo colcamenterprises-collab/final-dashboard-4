@@ -822,16 +822,9 @@ router.patch('/cleaning/templates/:id', async (req, res) => {
 router.post('/cleaning/templates/seed', async (req, res) => {
   try {
     const locationId = getLocationId(req);
-    const existing = await db
-      .select({ id: cleaningTaskTemplates.id })
-      .from(cleaningTaskTemplates)
-      .where(eq(cleaningTaskTemplates.businessLocationId, locationId));
-    if (existing.length > 0) {
-      return res.json({ seeded: 0, message: `${existing.length} templates already exist — skipped.` });
-    }
 
     type TaskSeed = { taskName: string; areaName: string; timing: string; role: string; estimatedMinutes: number; required: boolean; sortOrder: number };
-    const tasks: TaskSeed[] = [
+    const ALL_TASKS: TaskSeed[] = [
       // --- START OF SHIFT ---
       { taskName: 'Staff in full uniform and presentable', areaName: 'Staff Readiness', timing: 'start_shift', role: 'manager', estimatedMinutes: 2, required: true, sortOrder: 10 },
       { taskName: 'All staff clocked in on time', areaName: 'Staff Readiness', timing: 'start_shift', role: 'manager', estimatedMinutes: 2, required: true, sortOrder: 11 },
@@ -891,17 +884,31 @@ router.post('/cleaning/templates/seed', async (req, res) => {
       { taskName: 'All rubbish removed from shop', areaName: 'Waste & External', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: true, sortOrder: 250 },
       { taskName: 'Front and side areas cleared', areaName: 'Waste & External', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: true, sortOrder: 251 },
       { taskName: 'External area cleaned', areaName: 'Waste & External', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: false, sortOrder: 252 },
+      { taskName: 'Starting cash verified for next shift', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 5, required: true, sortOrder: 258 },
+      { taskName: 'Mid-shift cash count completed', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 5, required: false, sortOrder: 259 },
       { taskName: 'End-of-shift cash counted and logged', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 10, required: true, sortOrder: 260 },
       { taskName: 'Grab/online sales reconciled', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 5, required: true, sortOrder: 261 },
       { taskName: 'Shift report completed', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 5, required: true, sortOrder: 262 },
     ];
 
+    // Idempotent: only insert tasks not already present (matched by taskName + businessLocationId)
+    const existing = await db
+      .select({ taskName: cleaningTaskTemplates.taskName })
+      .from(cleaningTaskTemplates)
+      .where(eq(cleaningTaskTemplates.businessLocationId, locationId));
+    const existingNames = new Set(existing.map((r) => r.taskName));
+    const toInsert = ALL_TASKS.filter((t) => !existingNames.has(t.taskName));
+
+    if (toInsert.length === 0) {
+      return res.json({ seeded: 0, message: `All ${existing.length} templates already present — nothing to add.` });
+    }
+
     const inserted = await db
       .insert(cleaningTaskTemplates)
-      .values(tasks.map((t) => ({ ...t, businessLocationId: locationId, taskType: 'daily' as const })))
+      .values(toInsert.map((t) => ({ ...t, businessLocationId: locationId, taskType: 'daily' as const })))
       .returning({ id: cleaningTaskTemplates.id });
 
-    res.status(201).json({ seeded: inserted.length, message: `Seeded ${inserted.length} task templates.` });
+    res.status(201).json({ seeded: inserted.length, total: existing.length + inserted.length, message: `Added ${inserted.length} missing task template(s). Total: ${existing.length + inserted.length}.` });
   } catch (err) {
     handleError(res, err, 'seedCleaningTemplates');
   }

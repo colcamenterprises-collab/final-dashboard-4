@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Users,
   AlertCircle,
+  MessageSquare,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -87,6 +88,8 @@ export default function DailyCleaningTasks() {
   const [selectedDate, setSelectedDate] = useState(today);
   const [selectedRosterId, setSelectedRosterId] = useState<number | null>(null);
   const [assignModal, setAssignModal] = useState<CleaningTask | null>(null);
+  const [notesOpen, setNotesOpen] = useState<Set<number>>(new Set());
+  const [notesDraft, setNotesDraft] = useState<Record<number, string>>({});
 
   const { data: rosters = [], isLoading: loadingRosters } = useQuery<ShiftRoster[]>({
     queryKey: ['/api/operations/staff/rosters', selectedDate],
@@ -130,6 +133,26 @@ export default function DailyCleaningTasks() {
     },
     onError: () => toast({ title: 'Update failed', variant: 'destructive' }),
   });
+
+  function toggleNotes(taskId: number, currentNotes: string | null) {
+    setNotesOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) {
+        next.delete(taskId);
+      } else {
+        next.add(taskId);
+        // Pre-fill draft with existing notes only if not already set
+        setNotesDraft((d) => ({ ...d, [taskId]: d[taskId] ?? (currentNotes ?? '') }));
+      }
+      return next;
+    });
+  }
+
+  function saveNotes(taskId: number) {
+    const notes = notesDraft[taskId] ?? '';
+    updateTaskMut.mutate({ id: taskId, data: { notes: notes || null } });
+    setNotesOpen((prev) => { const next = new Set(prev); next.delete(taskId); return next; });
+  }
 
   const selectedRoster = rosters.find((r) => r.id === selectedRosterId);
 
@@ -286,95 +309,148 @@ export default function DailyCleaningTasks() {
                         return (
                           <div
                             key={task.id}
-                            className={`flex items-start gap-3 px-4 py-3 border-b border-slate-50 last:border-b-0 ${
+                            className={`border-b border-slate-50 last:border-b-0 ${
                               isDone ? 'bg-emerald-50/30' : isSkipped ? 'bg-red-50/30' : ''
                             }`}
                           >
-                            {/* Status toggle */}
-                            <button
-                              onClick={() =>
-                                updateTaskMut.mutate({
-                                  id: task.id,
-                                  data: { status: isDone ? 'pending' : 'completed' },
-                                })
-                              }
-                              className={`shrink-0 mt-0.5 transition-colors ${
-                                isDone
-                                  ? 'text-emerald-500 hover:text-slate-300'
-                                  : 'text-slate-300 hover:text-emerald-400'
-                              }`}
-                            >
-                              {isDone ? (
-                                <CheckCircle2 className="w-5 h-5" />
-                              ) : (
-                                <Circle className="w-5 h-5" />
-                              )}
-                            </button>
-
-                            {/* Task info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <p
-                                  className={`text-xs font-medium ${
-                                    isDone
-                                      ? 'line-through text-slate-400'
-                                      : isSkipped
-                                      ? 'text-slate-400'
-                                      : 'text-slate-800'
-                                  }`}
-                                >
-                                  {task.template?.taskName ?? `Task #${task.id}`}
-                                </p>
-                                {isRequired && !isDone && (
-                                  <AlertCircle className="w-3 h-3 text-red-400 shrink-0" title="Required" />
+                            {/* Main row */}
+                            <div className="flex items-start gap-3 px-4 py-3">
+                              {/* Status toggle */}
+                              <button
+                                onClick={() =>
+                                  updateTaskMut.mutate({
+                                    id: task.id,
+                                    data: { status: isDone ? 'pending' : 'completed' },
+                                  })
+                                }
+                                className={`shrink-0 mt-0.5 transition-colors ${
+                                  isDone
+                                    ? 'text-emerald-500 hover:text-slate-300'
+                                    : 'text-slate-300 hover:text-emerald-400'
+                                }`}
+                              >
+                                {isDone ? (
+                                  <CheckCircle2 className="w-5 h-5" />
+                                ) : (
+                                  <Circle className="w-5 h-5" />
                                 )}
-                              </div>
-                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                                <span className="text-xs text-slate-400">
-                                  {task.template?.areaName}
-                                </span>
-                                {task.template?.estimatedMinutes && (
-                                  <span className="text-xs text-slate-400">
-                                    · ~{task.template.estimatedMinutes} min
-                                  </span>
-                                )}
-                                <span className={`px-1 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[role]}`}>
-                                  {ROLE_LABELS[role]}
-                                </span>
-                              </div>
-                            </div>
+                              </button>
 
-                            {/* Right side controls */}
-                            <div className="flex flex-col items-end gap-1.5 shrink-0">
-                              {/* Incomplete button (only show if not already completed/skipped) */}
-                              <div className="flex items-center gap-1">
-                                {!isDone && (
-                                  <button
-                                    onClick={() =>
-                                      updateTaskMut.mutate({
-                                        id: task.id,
-                                        data: { status: isSkipped ? 'pending' : 'skipped' },
-                                      })
-                                    }
-                                    className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded border transition-colors ${
-                                      isSkipped
-                                        ? 'border-red-400 bg-red-50 text-red-600'
-                                        : 'border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-400'
+                              {/* Task info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p
+                                    className={`text-xs font-medium ${
+                                      isDone
+                                        ? 'line-through text-slate-400'
+                                        : isSkipped
+                                        ? 'text-slate-400'
+                                        : 'text-slate-800'
                                     }`}
                                   >
-                                    <XCircle className="w-3 h-3" />
-                                    {isSkipped ? 'Marked incomplete' : 'Incomplete'}
+                                    {task.template?.taskName ?? `Task #${task.id}`}
+                                  </p>
+                                  {isRequired && !isDone && (
+                                    <AlertCircle className="w-3 h-3 text-red-400 shrink-0" title="Required" />
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                  <span className="text-xs text-slate-400">
+                                    {task.template?.areaName}
+                                  </span>
+                                  {task.template?.estimatedMinutes && (
+                                    <span className="text-xs text-slate-400">
+                                      · ~{task.template.estimatedMinutes} min
+                                    </span>
+                                  )}
+                                  <span className={`px-1 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[role]}`}>
+                                    {ROLE_LABELS[role]}
+                                  </span>
+                                  {task.notes && !notesOpen.has(task.id) && (
+                                    <span className="text-xs text-blue-500 italic truncate max-w-[120px]" title={task.notes}>
+                                      "{task.notes}"
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Right side controls */}
+                              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                                <div className="flex items-center gap-1 flex-wrap justify-end">
+                                  {!isDone && (
+                                    <button
+                                      onClick={() =>
+                                        updateTaskMut.mutate({
+                                          id: task.id,
+                                          data: { status: isSkipped ? 'pending' : 'skipped' },
+                                        })
+                                      }
+                                      className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded border transition-colors ${
+                                        isSkipped
+                                          ? 'border-red-400 bg-red-50 text-red-600'
+                                          : 'border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-400'
+                                      }`}
+                                    >
+                                      <XCircle className="w-3 h-3" />
+                                      {isSkipped ? 'Marked incomplete' : 'Incomplete'}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => setAssignModal(task)}
+                                    className="flex items-center gap-1 px-2 py-0.5 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-600"
+                                  >
+                                    <Users className="w-3 h-3" />
+                                    {assignedMember ? assignedMember.fullName : 'Assign'}
                                   </button>
-                                )}
-                                <button
-                                  onClick={() => setAssignModal(task)}
-                                  className="flex items-center gap-1 px-2 py-0.5 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-600"
-                                >
-                                  <Users className="w-3 h-3" />
-                                  {assignedMember ? assignedMember.fullName : 'Assign'}
-                                </button>
+                                  <button
+                                    onClick={() => toggleNotes(task.id, task.notes)}
+                                    className={`flex items-center gap-1 px-2 py-0.5 text-xs border rounded transition-colors ${
+                                      notesOpen.has(task.id)
+                                        ? 'border-blue-400 bg-blue-50 text-blue-600'
+                                        : task.notes
+                                        ? 'border-blue-200 text-blue-500 hover:bg-blue-50'
+                                        : 'border-slate-200 text-slate-400 hover:border-blue-300 hover:text-blue-400'
+                                    }`}
+                                    title={task.notes ? `Note: ${task.notes}` : 'Add note'}
+                                  >
+                                    <MessageSquare className="w-3 h-3" />
+                                    {task.notes && !notesOpen.has(task.id) ? 'Note' : 'Note'}
+                                  </button>
+                                </div>
                               </div>
                             </div>
+
+                            {/* Inline notes drawer */}
+                            {notesOpen.has(task.id) && (
+                              <div className="px-12 pb-3 flex items-start gap-2">
+                                <textarea
+                                  autoFocus
+                                  rows={2}
+                                  value={notesDraft[task.id] ?? task.notes ?? ''}
+                                  onChange={(e) =>
+                                    setNotesDraft((d) => ({ ...d, [task.id]: e.target.value }))
+                                  }
+                                  placeholder="Add a note for this task…"
+                                  className="flex-1 text-xs border border-slate-200 rounded px-2 py-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-blue-300 bg-white text-slate-700 placeholder:text-slate-400"
+                                />
+                                <div className="flex flex-col gap-1 shrink-0">
+                                  <button
+                                    onClick={() => saveNotes(task.id)}
+                                    className="px-2.5 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    onClick={() =>
+                                      setNotesOpen((prev) => { const next = new Set(prev); next.delete(task.id); return next; })
+                                    }
+                                    className="px-2.5 py-1 text-xs border border-slate-200 text-slate-500 rounded hover:bg-slate-50 transition-colors"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
