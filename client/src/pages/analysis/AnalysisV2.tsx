@@ -254,8 +254,12 @@ export default function AnalysisV2() {
                   ) : (
                     data.tables.drinks.map((row) => (
                       <tr key={row.sku} className="hover:bg-gray-50">
-                        <Cell>{row.sku}</Cell>
-                        <Cell>{row.itemName ?? row.sku}</Cell>
+                        <Cell>
+                          <span className="text-[11px] text-gray-500">{row.sku}</span>
+                        </Cell>
+                        <Cell>
+                          <span className="font-semibold text-gray-900">{row.itemName ?? row.sku}</span>
+                        </Cell>
                         <Cell right>{row.soldDirect}</Cell>
                         <Cell right>{row.soldFromModifiers}</Cell>
                         <Cell right bold>{row.totalSold}</Cell>
