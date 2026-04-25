@@ -21,6 +21,7 @@ purchaseTallyRouter.post("/", async (req, res) => {
       rollsPcs: tallyData.rollsPcs ? parseInt(tallyData.rollsPcs) : null,
       meatGrams: tallyData.meatGrams ? parseInt(tallyData.meatGrams) : null,
       friesGrams: tallyData.friesGrams ? Math.round(Number(tallyData.friesGrams)) : null,
+      sweetPotatoGrams: tallyData.sweetPotatoGrams ? Math.round(Number(tallyData.sweetPotatoGrams)) : null,
     }).returning();
 
     // Add drink line items if provided
@@ -119,6 +120,7 @@ purchaseTallyRouter.patch("/:id", async (req, res) => {
       rollsPcs: tallyData.rollsPcs ? parseInt(tallyData.rollsPcs) : null,
       meatGrams: tallyData.meatGrams ? parseInt(tallyData.meatGrams) : null,
       friesGrams: tallyData.friesGrams ? Math.round(Number(tallyData.friesGrams)) : null,
+      sweetPotatoGrams: tallyData.sweetPotatoGrams ? Math.round(Number(tallyData.sweetPotatoGrams)) : null,
     }).where(eq(purchaseTally.id, id));
 
     // Replace drink line items
@@ -192,6 +194,7 @@ purchaseTallyRouter.get("/summary", async (req, res) => {
         totalRolls: sql`COALESCE(SUM(${purchaseTally.rollsPcs}), 0)`.as('totalRolls'),
         totalMeat: sql`COALESCE(SUM(${purchaseTally.meatGrams}), 0)`.as('totalMeat'),
         totalFries: sql`COALESCE(SUM(${purchaseTally.friesGrams}), 0)`.as('totalFries'),
+        totalSweetPotato: sql`COALESCE(SUM(${purchaseTally.sweetPotatoGrams}), 0)`.as('totalSweetPotato'),
         entryCount: sql`COUNT(*)`.as('entryCount'),
       })
       .from(purchaseTally)

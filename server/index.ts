@@ -302,6 +302,9 @@ async function checkSchema() {
   // Mount french fries reconciliation (CORE STOCK V4 PATCH 1) — isolated from all other sections
   const friesReconciliationRouter = (await import('./routes/friesReconciliation.js')).default;
   app.use('/api/analysis', friesReconciliationRouter);
+  // Mount sweet potato reconciliation — isolated from all other stock sections
+  const sweetPotatoReconciliationRouter = (await import('./routes/sweetPotatoReconciliation.js')).default;
+  app.use('/api/analysis', sweetPotatoReconciliationRouter);
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
   

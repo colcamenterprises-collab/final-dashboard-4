@@ -644,7 +644,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const salesId = id;
-    const { rollsEnd, meatEnd, friesEnd, requisition, drinkStock } = req.body;
+    const { rollsEnd, meatEnd, friesEnd, sweetPotatoEnd, requisition, drinkStock } = req.body;
 
     console.log("[DAILY_STOCK_PATCH] start", { salesId, time: new Date().toISOString() });
 
@@ -733,6 +733,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       ...(typeof rollsEnd !== 'undefined' ? { rollsEnd: Number(rollsEnd) || 0 } : {}),
       ...(typeof meatEnd !== 'undefined' ? { meatEnd: Number(meatEnd) || 0 } : {}),
       ...(typeof friesEnd !== 'undefined' ? { friesEnd: Number(friesEnd) || 0 } : {}),
+      ...(typeof sweetPotatoEnd !== 'undefined' ? { sweetPotatoEnd: Number(sweetPotatoEnd) || 0 } : {}),
       ...(typeof drinkStock !== 'undefined' ? { drinkStock: normalizedDrinkStock } : {}),
       ...(typeof requisition !== 'undefined' ? { requisition } : {}),
       ...(hadForm2Data ? {} : { recoveredAt: new Date().toISOString() }),
@@ -920,7 +921,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       }
     `;
     
-    const changedFields = diffFields(existingPayload, mergedPayload, ['rollsEnd', 'meatEnd', 'friesEnd', 'drinkStock', 'requisition', 'notes', 'purchasingJson']);
+    const changedFields = diffFields(existingPayload, mergedPayload, ['rollsEnd', 'meatEnd', 'friesEnd', 'sweetPotatoEnd', 'drinkStock', 'requisition', 'notes', 'purchasingJson']);
     await appendAuditLog(id, req, hadForm2Data ? 'UPDATE_FORM2' : 'RECOVERY_UPDATE', changedFields);
 
     // Respond immediately — all data is synced; email is non-blocking

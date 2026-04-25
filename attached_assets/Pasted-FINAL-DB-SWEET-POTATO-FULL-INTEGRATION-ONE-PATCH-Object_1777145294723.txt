@@ -1,0 +1,156 @@
+FINAL DB — SWEET POTATO FULL INTEGRATION (ONE PATCH)
+
+Objective:
+Integrate Sweet Potato Fries into the full stock system using the exact same structure as French Fries.
+
+CRITICAL RULES:
+- Do NOT modify French Fries logic
+- Do NOT modify Drinks, Burgers, Buns, Meat
+- Use identical patterns already working for fries
+- This is an extension, not a redesign
+
+--------------------------------
+
+1. DAILY SALES & STOCK V2 FORM
+
+Add new stock count field:
+
+sweetPotatoEnd
+
+Placement:
+- Same section as:
+  - Rolls
+  - Meat
+  - Drinks
+  - French Fries
+
+Label:
+Sweet Potato Fries (grams)
+
+Rules:
+- Stored in grams
+- Saved in daily_sales_v2.payload
+
+--------------------------------
+
+2. FORM LIBRARY
+
+Ensure sweetPotatoEnd:
+- is saved
+- is displayed in merged view
+- is included in PDF/email outputs
+
+--------------------------------
+
+3. PURCHASE SYSTEM
+
+Extend purchase_tally:
+
+Add column:
+sweet_potato_grams (integer)
+
+Rules:
+- grams only
+- uses effective date (purchase_tally.date)
+
+--------------------------------
+
+4. PURCHASE MODAL
+
+Add field:
+Sweet Potato Fries (grams)
+
+Same behavior as:
+- friesGrams
+- meatGrams
+
+--------------------------------
+
+5. STOCK ORDER HISTORY
+
+Add Sweet Potato Fries to:
+
+- PurchaseTallyList
+- StockPurchaseTables
+
+Display:
+Date | Item | Quantity
+
+--------------------------------
+
+6. ANALYSIS V2 — NEW TABLE
+
+Create:
+
+Sweet Potato Fries reconciliation table
+
+Structure:
+Item | Start | Purchased | Used | End | Expected | Variance | Review
+
+Row:
+Sweet Potato Fries
+
+--------------------------------
+
+7. LOGIC
+
+Start:
+previous shift sweetPotatoEnd
+(source priority same as fries)
+
+Purchased:
+SUM(sweet_potato_grams) by date
+
+Used:
+ONLY SKU 10022
+
+Used grams:
+qty_sold × 130
+
+IMPORTANT:
+- Do NOT include sets
+- Do NOT include any other SKUs
+
+End:
+current shift sweetPotatoEnd
+
+--------------------------------
+
+8. CALCULATIONS
+
+Expected = Start + Purchased - Used
+Variance = End - Expected
+
+--------------------------------
+
+9. RULES
+
+- All values in grams
+- Purchased = 0 is valid
+- Any variance ≠ 0 → red cell
+- Review button required
+- Do NOT mix with French Fries
+- Keep completely isolated
+
+--------------------------------
+
+VALIDATION
+
+1. sweetPotatoEnd saves in Form 2
+2. Appears in Form Library
+3. Purchase entry saves correctly
+4. Appears in Stock Order History
+5. Analysis V2 shows Sweet Potato table
+6. Used = SKU 10022 × 130g
+7. Purchased reads correctly
+8. Expected and variance correct
+9. French Fries table unchanged
+10. All other tables unchanged
+
+RETURN
+
+- files modified
+- DB column added
+- sample purchase entry
+- sample analysis row
+- confirmation no existing logic was broken

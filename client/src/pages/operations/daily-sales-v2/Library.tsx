@@ -51,6 +51,7 @@ type RecordType = {
     balanced?: boolean;
     drinkStock?: { name: string; quantity: number; unit: string }[] | Record<string, number>;
     friesEnd?: number | null;
+    sweetPotatoEnd?: number | null;
   };
   deletedAt?: string | null;
 };
@@ -410,7 +411,7 @@ export default function DailySalesV2Library() {
                   return (
                     <div className="text-sm text-slate-700">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium">Rolls: {rec.buns ?? "-"} | Meat: {rec.meat ?? "-"} | Fries: {rec.payload?.friesEnd ?? "-"} | Receipts: {receipt.total}</p>
+                        <p className="font-medium">Rolls: {rec.buns ?? "-"} | Meat: {rec.meat ?? "-"} | Fries: {rec.payload?.friesEnd ?? "-"} | Sw.Potato: {rec.payload?.sweetPotatoEnd ?? "-"} | Receipts: {receipt.total}</p>
                         {hasZeroCount && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-300 whitespace-nowrap">
                             <AlertTriangle className="h-2.5 w-2.5" />

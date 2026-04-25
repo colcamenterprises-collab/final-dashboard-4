@@ -178,6 +178,7 @@ export function PurchaseTallyList() {
                     <TableHead className="text-right">Rolls</TableHead>
                     <TableHead className="text-right">Meat (g)</TableHead>
                     <TableHead className="text-right">Fries (g)</TableHead>
+                    <TableHead className="text-right">Sw. Potato (g)</TableHead>
                     <TableHead className="text-right">Drinks</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Notes</TableHead>
@@ -206,6 +207,9 @@ export function PurchaseTallyList() {
                         </TableCell>
                         <TableCell className="text-right num">
                           {entry.friesGrams ? Number(entry.friesGrams).toLocaleString() : "-"}
+                        </TableCell>
+                        <TableCell className="text-right num">
+                          {entry.sweetPotatoGrams ? Number(entry.sweetPotatoGrams).toLocaleString() : "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           {entry.drinks && entry.drinks.length > 0 ? (

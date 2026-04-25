@@ -46,6 +46,9 @@ export function StockPurchaseTables() {
   const fries = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries))
     ? purchaseTallyData.entries.filter((item: any) => item.friesGrams != null && item.friesGrams > 0)
     : [];
+  const sweetPotato = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries))
+    ? purchaseTallyData.entries.filter((item: any) => item.sweetPotatoGrams != null && item.sweetPotatoGrams > 0)
+    : [];
   const drinks = (purchaseTallyData?.entries && Array.isArray(purchaseTallyData.entries))
     ? purchaseTallyData.entries.filter((item: any) => {
         if (Array.isArray(item.drinks) && item.drinks.length > 0) return true;
@@ -373,6 +376,75 @@ export function StockPurchaseTables() {
             {fries.length === 0 && (
               <tr>
                 <td colSpan={5} className="border p-4 text-center text-gray-500">No fries purchases this month</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </div>
+      </div>
+
+      {/* Sweet Potato Table */}
+      <div className="bg-white rounded-[4px] border border-slate-200 p-4" data-testid="section-sweet-potato-purchases">
+        <h2 className="text-sm font-semibold mb-2">Sweet Potato Fries Purchases</h2>
+        <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <table className="w-full border-collapse text-xs" data-testid="table-sweet-potato-purchases">
+          <thead>
+            <tr className="border-b-2 border-slate-200">
+              <th className="p-1 border text-left text-xs">Date</th>
+              <th className="p-1 border text-left text-xs">Staff</th>
+              <th className="p-1 border text-left text-xs">Amount</th>
+              <th className="p-1 border text-left text-xs">Supplier</th>
+              <th className="p-1 border text-center text-xs">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sweetPotato.map((sp: any, i: number) => (
+              <tr key={i} className="border-b border-slate-100 hover:bg-slate-100/40 transition-colors" data-testid={`row-sweet-potato-${sp.id}`}>
+                <td className="border p-1">
+                  <div>{formatDateDDMMYYYY(sp.date)}</div>
+                  {sp.createdAt && <div className="text-[10px] text-slate-400">{formatDateTimeDDMMYYYY(sp.createdAt)}</div>}
+                </td>
+                <td className="border p-1">{sp.staff || '-'}</td>
+                <td className="border p-1">{sp.sweetPotatoGrams ? (sp.sweetPotatoGrams / 1000).toFixed(2) + ' kg (' + sp.sweetPotatoGrams + 'g)' : 'N/A'}</td>
+                <td className="border p-1">{sp.supplier || '-'}</td>
+                <td className="border p-1 text-center">
+                  <div className="flex justify-center gap-1">
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                          disabled={deleteStockMutation.isPending}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Sweet Potato Purchase</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete this sweet potato purchase ({sp.sweetPotatoGrams}g)? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => deleteStockMutation.mutate(sp.id)}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {sweetPotato.length === 0 && (
+              <tr>
+                <td colSpan={5} className="border p-4 text-center text-gray-500">No sweet potato purchases this month</td>
               </tr>
             )}
           </tbody>

@@ -8,6 +8,7 @@ import BunsReconciliationTable from '@/components/analysis/BunsReconciliationTab
 import MeatReconciliationTable from '@/components/analysis/MeatReconciliationTable';
 import SideOrdersTable from '@/components/analysis/SideOrdersTable';
 import FriesReconciliationTable from '@/components/analysis/FriesReconciliationTable';
+import SweetPotatoReconciliationTable from '@/components/analysis/SweetPotatoReconciliationTable';
 
 type Blocker = {
   code: string;
@@ -271,9 +272,10 @@ export default function AnalysisV2() {
 
           <section>
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
-              6. Core Stock — French Fries
+              6. Core Stock — Fries
             </h2>
             <FriesReconciliationTable date={shiftDate} />
+            <SweetPotatoReconciliationTable date={shiftDate} />
           </section>
 
           <section>

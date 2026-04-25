@@ -56,6 +56,7 @@ const labels = {
     rollsEnd: 'Rolls (pcs)',
     meatCount: 'Meat (grams)',
     friesEnd: 'French Fries (bags)',
+    sweetPotatoEnd: 'Sweet Potato Fries (g)',
     drinksEnd: 'Drinks Count',
     drinkStock: 'Drink Stock',
     requisition: 'Requisition Items',
@@ -95,6 +96,7 @@ const labels = {
     rollsEnd: 'โรล (ชิ้น)',
     meatCount: 'เนื้อ (กรัม)',
     friesEnd: 'เฟรนช์ฟรายส์ (ถุง)',
+    sweetPotatoEnd: 'มันฝรั่งหวาน (กรัม)',
     drinksEnd: 'จำนวนเครื่องดื่ม',
     drinkStock: 'สต๊อกเครื่องดื่ม',
     requisition: 'รายการสั่งซื้อ',
@@ -147,6 +149,7 @@ const DailyStock: React.FC = () => {
   const [rolls, setRolls] = useState<number>(0);
   const [meatGrams, setMeatGrams] = useState<number>(0);
   const [friesEnd, setFriesEnd] = useState<number | null>(null);
+  const [sweetPotatoEnd, setSweetPotatoEnd] = useState<number | null>(null);
   const [drinkQuantities, setDrinkQuantities] = useState<Record<string, number>>({});
   
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -533,6 +536,7 @@ const DailyStock: React.FC = () => {
       rollsEnd: rolls,
       meatEnd: meatGrams,
       friesEnd: friesEnd,
+      sweetPotatoEnd: sweetPotatoEnd,
       drinkStock: drinkStockObj,
       requisition: requisitionItems,
       notes: notes.trim()
@@ -764,7 +768,7 @@ const DailyStock: React.FC = () => {
           {validationErrors?.rollsEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.rollsEnd}</div>}
           {validationErrors?.meatEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.meatEnd}</div>}
           {validationErrors?.friesEnd && <div className="mt-1 mb-2 text-xs text-red-600">{validationErrors.friesEnd}</div>}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <div>
               <label className="block text-sm mb-1 font-medium">{L.rollsEnd}</label>
               <input
@@ -808,6 +812,26 @@ const DailyStock: React.FC = () => {
                 placeholder=""
                 aria-label="French Fries bags remaining"
               />
+            </div>
+            <div>
+              <label className="block text-sm mb-1 font-medium">{L.sweetPotatoEnd}</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                className="w-full border border-slate-200 rounded-[4px] px-3 py-2 text-xs text-left focus:outline-none focus:ring-2 focus:ring-emerald-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                value={sweetPotatoEnd === null ? '' : sweetPotatoEnd}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/[^\d]/g, '');
+                  setSweetPotatoEnd(v === '' ? null : parseInt(v, 10));
+                }}
+                placeholder=""
+                aria-label="Sweet Potato Fries grams remaining"
+              />
+              {sweetPotatoEnd !== null && sweetPotatoEnd > 0 && (
+                <div className="text-xs text-slate-600 mt-1">
+                  {(sweetPotatoEnd / 1000).toFixed(2)}kg
+                </div>
+              )}
             </div>
           </div>
         </div>
