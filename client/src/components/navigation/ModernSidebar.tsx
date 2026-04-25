@@ -92,7 +92,7 @@ const navigationGroups: NavGroup[] = [
           { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library", ownerOnly: true }
         ]
       },
-      { to: "/operations/health-safety-audit", label: "Health & Safety Audit", icon: Settings, testId: "nav-health-safety" },
+      { to: "/operations/health-safety-audit", label: "Operations Audit", icon: Settings, testId: "nav-health-safety" },
       { to: "/operations/staff", label: "Staff Operations", icon: Users, testId: "nav-staff-ops",
         subItems: [
           { to: "/operations/staff/management", label: "Staff Management", icon: Users, testId: "nav-staff-management" },
