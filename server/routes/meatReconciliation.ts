@@ -3,12 +3,16 @@
  * /api/analysis/meat-reconciliation/reviews — Review persistence
  *
  * Single-row table: Meat
- *   Start     = previous shift closing meatWeightG (daily_stock_v2 via daily_sales_v2.shiftDate)
+ *   Start     = previous shift closing meat weight (canonical source priority below)
  *   Purchased = SUM(purchase_tally.meat_grams) WHERE date = shift_date
  *   Used      = total patties × 90g  (patties derived from PATTY_MAP keyed by SKU)
- *   End       = current shift closing meatWeightG
+ *   End       = current shift closing meat weight (canonical source priority below)
  *   Expected  = Start + Purchased − Used
  *   Variance  = End − Expected   (negative = missing meat)
+ *
+ * Stock source priority (per shift date):
+ *   1. daily_sales_v2.payload->>'meatEnd'  (v2_canonical  — owner-verified value)
+ *   2. daily_stock_v2.meatWeightG          (legacy_fallback — raw form entry)
  *
  * Chicken burgers (10066, 10068, 10070, 10071) → 0 patties.
  * If SKU has no PATTY_MAP entry → MISSING_PATTY_MAPPING flagged and used=null.
@@ -69,29 +73,40 @@ router.get('/meat-reconciliation', async (req, res) => {
     prevDate.setUTCDate(prevDate.getUTCDate() - 1);
     const prevDateStr = prevDate.toISOString().slice(0, 10);
 
-    // ── Start: previous shift's closing meat weight ───────────────────────
-    const startRes = await pool.query(
-      `SELECT dsv."meatWeightG"
-       FROM daily_stock_v2 dsv
-       JOIN daily_sales_v2 ds ON dsv."salesId" = ds.id
-       WHERE ds."shiftDate" = $1`,
-      [prevDateStr],
-    );
-    const start: number | null = startRes.rows[0]
-      ? Number(startRes.rows[0].meatWeightG)
-      : null;
+    // ── Helper: resolve canonical meat weight for a shift date ───────────
+    // Priority 1: daily_sales_v2.payload->>'meatEnd'  (owner-verified, v2_canonical)
+    // Priority 2: daily_stock_v2.meatWeightG          (raw form entry, legacy_fallback)
+    async function resolveMeatWeight(shiftDate: string): Promise<{
+      value: number | null;
+      source: 'v2_canonical' | 'legacy_fallback' | 'missing';
+    }> {
+      const r = await pool.query(
+        `SELECT
+           (ds.payload->>'meatEnd')::int  AS v2_canonical,
+           dsv."meatWeightG"              AS legacy_raw
+         FROM daily_sales_v2 ds
+         LEFT JOIN daily_stock_v2 dsv ON dsv."salesId" = ds.id
+         WHERE ds."shiftDate" = $1
+         LIMIT 1`,
+        [shiftDate],
+      );
+      if (!r.rows[0]) return { value: null, source: 'missing' };
+      const v2 = r.rows[0].v2_canonical !== null ? Number(r.rows[0].v2_canonical) : null;
+      const legacy = r.rows[0].legacy_raw !== null ? Number(r.rows[0].legacy_raw) : null;
+      if (v2 !== null) return { value: v2, source: 'v2_canonical' };
+      if (legacy !== null) return { value: legacy, source: 'legacy_fallback' };
+      return { value: null, source: 'missing' };
+    }
 
-    // ── End: current shift's closing meat weight ─────────────────────────
-    const endRes = await pool.query(
-      `SELECT dsv."meatWeightG"
-       FROM daily_stock_v2 dsv
-       JOIN daily_sales_v2 ds ON dsv."salesId" = ds.id
-       WHERE ds."shiftDate" = $1`,
-      [date],
-    );
-    const end: number | null = endRes.rows[0]
-      ? Number(endRes.rows[0].meatWeightG)
-      : null;
+    // ── Start: previous shift's canonical closing meat weight ─────────────
+    const startResolved = await resolveMeatWeight(prevDateStr);
+    const start: number | null = startResolved.value;
+    const startSource = startResolved.source;
+
+    // ── End: current shift's canonical closing meat weight ────────────────
+    const endResolved = await resolveMeatWeight(date);
+    const end: number | null = endResolved.value;
+    const endSource = endResolved.source;
 
     // ── Purchased: sum of meat_grams from purchase_tally ─────────────────
     const purchRes = await pool.query(
@@ -197,6 +212,10 @@ router.get('/meat-reconciliation', async (req, res) => {
           ...(start === null ? ['start_stock'] : []),
           ...(end === null ? ['end_stock'] : []),
         ],
+        stock_source: {
+          start: startSource,
+          end: endSource,
+        },
         data: null,
       });
     }
@@ -211,6 +230,10 @@ router.get('/meat-reconciliation', async (req, res) => {
       has_unmapped: hasUnmapped,
       unmapped_items: unmappedItems,
       item_breakdown: itemBreakdown,
+      stock_source: {
+        start: startSource,
+        end: endSource,
+      },
       data: {
         item: 'Meat',
         start,
