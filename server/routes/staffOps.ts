@@ -816,6 +816,98 @@ router.patch('/cleaning/templates/:id', async (req, res) => {
 });
 
 // ----------------------------------------------------------------
+// CLEANING TEMPLATES — SEED (idempotent, only inserts if count is 0)
+// ----------------------------------------------------------------
+
+router.post('/cleaning/templates/seed', async (req, res) => {
+  try {
+    const locationId = getLocationId(req);
+    const existing = await db
+      .select({ id: cleaningTaskTemplates.id })
+      .from(cleaningTaskTemplates)
+      .where(eq(cleaningTaskTemplates.businessLocationId, locationId));
+    if (existing.length > 0) {
+      return res.json({ seeded: 0, message: `${existing.length} templates already exist — skipped.` });
+    }
+
+    type TaskSeed = { taskName: string; areaName: string; timing: string; role: string; estimatedMinutes: number; required: boolean; sortOrder: number };
+    const tasks: TaskSeed[] = [
+      // --- START OF SHIFT ---
+      { taskName: 'Staff in full uniform and presentable', areaName: 'Staff Readiness', timing: 'start_shift', role: 'manager', estimatedMinutes: 2, required: true, sortOrder: 10 },
+      { taskName: 'All staff clocked in on time', areaName: 'Staff Readiness', timing: 'start_shift', role: 'manager', estimatedMinutes: 2, required: true, sortOrder: 11 },
+      { taskName: 'Roles assigned and understood', areaName: 'Staff Readiness', timing: 'start_shift', role: 'manager', estimatedMinutes: 3, required: true, sortOrder: 12 },
+      { taskName: 'Staff have required tools and equipment', areaName: 'Staff Readiness', timing: 'start_shift', role: 'all', estimatedMinutes: 2, required: false, sortOrder: 13 },
+      { taskName: 'POS system powered on and tested', areaName: 'Systems & Setup', timing: 'start_shift', role: 'manager', estimatedMinutes: 3, required: true, sortOrder: 20 },
+      { taskName: 'Grab system online and accepting orders', areaName: 'Systems & Setup', timing: 'start_shift', role: 'manager', estimatedMinutes: 2, required: true, sortOrder: 21 },
+      { taskName: 'Receipt printer test completed', areaName: 'Systems & Setup', timing: 'start_shift', role: 'manager', estimatedMinutes: 2, required: false, sortOrder: 22 },
+      { taskName: 'Tablets cleaned and operational', areaName: 'Systems & Setup', timing: 'start_shift', role: 'all', estimatedMinutes: 2, required: false, sortOrder: 23 },
+      { taskName: 'Drinks fridge fully stocked', areaName: 'Stock & Prep', timing: 'start_shift', role: 'kitchen', estimatedMinutes: 5, required: true, sortOrder: 30 },
+      { taskName: 'Napkins restocked at front', areaName: 'Stock & Prep', timing: 'start_shift', role: 'all', estimatedMinutes: 2, required: false, sortOrder: 31 },
+      { taskName: 'Ingredients prepped and ready', areaName: 'Stock & Prep', timing: 'start_shift', role: 'kitchen', estimatedMinutes: 10, required: true, sortOrder: 32 },
+      { taskName: 'Expired items checked and removed', areaName: 'Stock & Prep', timing: 'start_shift', role: 'kitchen', estimatedMinutes: 5, required: true, sortOrder: 33 },
+      { taskName: 'Benches wiped down', areaName: 'Opening Clean', timing: 'start_shift', role: 'all', estimatedMinutes: 5, required: true, sortOrder: 40 },
+      { taskName: 'Under-bench areas checked and cleaned', areaName: 'Opening Clean', timing: 'start_shift', role: 'kitchen', estimatedMinutes: 5, required: false, sortOrder: 41 },
+      { taskName: 'External area swept', areaName: 'Opening Clean', timing: 'start_shift', role: 'all', estimatedMinutes: 5, required: true, sortOrder: 42 },
+      { taskName: 'Signage and displays cleaned', areaName: 'Opening Clean', timing: 'start_shift', role: 'all', estimatedMinutes: 3, required: false, sortOrder: 43 },
+      { taskName: 'POS devices and tablets wiped clean', areaName: 'Opening Clean', timing: 'start_shift', role: 'all', estimatedMinutes: 3, required: false, sortOrder: 44 },
+      { taskName: 'Fryer alarms checked and working', areaName: 'Safety', timing: 'start_shift', role: 'manager', estimatedMinutes: 3, required: true, sortOrder: 50 },
+      { taskName: 'Cooking areas safe and compliant', areaName: 'Safety', timing: 'start_shift', role: 'manager', estimatedMinutes: 3, required: true, sortOrder: 51 },
+
+      // --- DURING SHIFT ---
+      { taskName: 'Staff remain in assigned stations', areaName: 'Staff Performance', timing: 'during_shift', role: 'manager', estimatedMinutes: 2, required: false, sortOrder: 110 },
+      { taskName: 'Staff performing efficiently', areaName: 'Staff Performance', timing: 'during_shift', role: 'manager', estimatedMinutes: 2, required: false, sortOrder: 111 },
+      { taskName: 'Hygiene standards maintained throughout', areaName: 'Staff Performance', timing: 'during_shift', role: 'all', estimatedMinutes: 2, required: true, sortOrder: 112 },
+      { taskName: 'Customer issues handled promptly', areaName: 'Staff Performance', timing: 'during_shift', role: 'manager', estimatedMinutes: 3, required: false, sortOrder: 113 },
+      { taskName: 'Prep areas wiped between orders', areaName: 'Ongoing Cleaning', timing: 'during_shift', role: 'kitchen', estimatedMinutes: 3, required: true, sortOrder: 120 },
+      { taskName: 'Tables cleaned after each customer', areaName: 'Ongoing Cleaning', timing: 'during_shift', role: 'all', estimatedMinutes: 2, required: true, sortOrder: 121 },
+      { taskName: 'Seating kept organised', areaName: 'Ongoing Cleaning', timing: 'during_shift', role: 'all', estimatedMinutes: 2, required: false, sortOrder: 122 },
+      { taskName: 'Trash bins emptied when full', areaName: 'Ongoing Cleaning', timing: 'during_shift', role: 'all', estimatedMinutes: 3, required: true, sortOrder: 123 },
+      { taskName: 'Menus and displays kept clean', areaName: 'Ongoing Cleaning', timing: 'during_shift', role: 'all', estimatedMinutes: 2, required: false, sortOrder: 124 },
+      { taskName: 'Handwashing protocols followed', areaName: 'Food Safety', timing: 'during_shift', role: 'all', estimatedMinutes: 1, required: true, sortOrder: 130 },
+      { taskName: 'Meat handling guidelines followed', areaName: 'Food Safety', timing: 'during_shift', role: 'kitchen', estimatedMinutes: 1, required: true, sortOrder: 131 },
+      { taskName: 'Prep areas kept sanitary', areaName: 'Food Safety', timing: 'during_shift', role: 'kitchen', estimatedMinutes: 2, required: true, sortOrder: 132 },
+
+      // --- END OF SHIFT ---
+      { taskName: 'Grill cleaned thoroughly', areaName: 'Kitchen Deep Clean', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 15, required: true, sortOrder: 210 },
+      { taskName: 'Fryer cleaned including underneath', areaName: 'Kitchen Deep Clean', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 15, required: true, sortOrder: 211 },
+      { taskName: 'Fans and ventilation cleaned', areaName: 'Kitchen Deep Clean', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 10, required: false, sortOrder: 212 },
+      { taskName: 'Grease removed from all surfaces', areaName: 'Kitchen Deep Clean', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 10, required: true, sortOrder: 213 },
+      { taskName: 'Grease traps cleaned', areaName: 'Kitchen Deep Clean', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 10, required: true, sortOrder: 214 },
+      { taskName: 'Cooking areas sanitised', areaName: 'Kitchen Deep Clean', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 10, required: true, sortOrder: 215 },
+      { taskName: 'All benches cleaned inside and out', areaName: 'General Cleaning', timing: 'end_shift', role: 'all', estimatedMinutes: 10, required: true, sortOrder: 220 },
+      { taskName: 'Dishwashing area cleaned and organised', areaName: 'General Cleaning', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 8, required: true, sortOrder: 221 },
+      { taskName: 'All utensils washed and sanitised', areaName: 'General Cleaning', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 10, required: true, sortOrder: 222 },
+      { taskName: 'Prep surfaces sanitised', areaName: 'General Cleaning', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 5, required: true, sortOrder: 223 },
+      { taskName: 'Tables and chairs cleaned', areaName: 'Front of House', timing: 'end_shift', role: 'all', estimatedMinutes: 10, required: true, sortOrder: 230 },
+      { taskName: 'Chairs aligned and tidy', areaName: 'Front of House', timing: 'end_shift', role: 'all', estimatedMinutes: 3, required: false, sortOrder: 231 },
+      { taskName: 'Counters cleaned', areaName: 'Front of House', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: true, sortOrder: 232 },
+      { taskName: 'Napkin holders cleaned and restocked', areaName: 'Front of House', timing: 'end_shift', role: 'all', estimatedMinutes: 3, required: false, sortOrder: 233 },
+      { taskName: 'Signage wiped down', areaName: 'Front of House', timing: 'end_shift', role: 'all', estimatedMinutes: 3, required: false, sortOrder: 234 },
+      { taskName: 'POS devices cleaned and stored', areaName: 'Front of House', timing: 'end_shift', role: 'cashier', estimatedMinutes: 5, required: true, sortOrder: 235 },
+      { taskName: 'Drinks fridge restocked for next shift', areaName: 'Stock Reset', timing: 'end_shift', role: 'kitchen', estimatedMinutes: 5, required: true, sortOrder: 240 },
+      { taskName: 'Napkins restocked', areaName: 'Stock Reset', timing: 'end_shift', role: 'all', estimatedMinutes: 2, required: false, sortOrder: 241 },
+      { taskName: 'Shelves organised and tidy', areaName: 'Stock Reset', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: false, sortOrder: 242 },
+      { taskName: 'Incorrect items removed from display', areaName: 'Stock Reset', timing: 'end_shift', role: 'manager', estimatedMinutes: 3, required: false, sortOrder: 243 },
+      { taskName: 'All rubbish removed from shop', areaName: 'Waste & External', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: true, sortOrder: 250 },
+      { taskName: 'Front and side areas cleared', areaName: 'Waste & External', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: true, sortOrder: 251 },
+      { taskName: 'External area cleaned', areaName: 'Waste & External', timing: 'end_shift', role: 'all', estimatedMinutes: 5, required: false, sortOrder: 252 },
+      { taskName: 'End-of-shift cash counted and logged', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 10, required: true, sortOrder: 260 },
+      { taskName: 'Grab/online sales reconciled', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 5, required: true, sortOrder: 261 },
+      { taskName: 'Shift report completed', areaName: 'Cash & Reporting', timing: 'end_shift', role: 'manager', estimatedMinutes: 5, required: true, sortOrder: 262 },
+    ];
+
+    const inserted = await db
+      .insert(cleaningTaskTemplates)
+      .values(tasks.map((t) => ({ ...t, businessLocationId: locationId, taskType: 'daily' as const })))
+      .returning({ id: cleaningTaskTemplates.id });
+
+    res.status(201).json({ seeded: inserted.length, message: `Seeded ${inserted.length} task templates.` });
+  } catch (err) {
+    handleError(res, err, 'seedCleaningTemplates');
+  }
+});
+
+// ----------------------------------------------------------------
 // CLEANING TASKS (per roster)
 // ----------------------------------------------------------------
 

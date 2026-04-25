@@ -54,6 +54,9 @@ type CleaningTemplate = {
   estimatedMinutes: number;
   isActive: boolean;
   sortOrder: number;
+  timing: string | null;
+  role: string | null;
+  required: boolean;
 };
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -83,7 +86,10 @@ const templateSchema = z.object({
 const cleaningTemplateSchema = z.object({
   taskName: z.string().min(1),
   areaName: z.string().min(1),
+  timing: z.string().default('end_shift'),
+  role: z.string().default('all'),
   estimatedMinutes: z.coerce.number().int().min(1).max(240),
+  required: z.boolean().default(false),
   sortOrder: z.coerce.number().int().min(0).default(0),
   isActive: z.boolean().default(true),
 });
@@ -734,6 +740,29 @@ function TemplatesPanel({
   );
 }
 
+const TIMING_LABELS: Record<string, string> = {
+  start_shift: 'Start of Shift',
+  during_shift: 'During Shift',
+  end_shift: 'End of Shift',
+};
+const TIMING_COLORS: Record<string, string> = {
+  start_shift: 'bg-blue-100 text-blue-700',
+  during_shift: 'bg-amber-100 text-amber-700',
+  end_shift: 'bg-slate-100 text-slate-600',
+};
+const ROLE_LABELS: Record<string, string> = {
+  manager: 'Manager',
+  cashier: 'Cashier',
+  kitchen: 'Kitchen',
+  all: 'All Staff',
+};
+const ROLE_COLORS: Record<string, string> = {
+  manager: 'bg-purple-100 text-purple-700',
+  cashier: 'bg-sky-100 text-sky-700',
+  kitchen: 'bg-orange-100 text-orange-700',
+  all: 'bg-slate-100 text-slate-600',
+};
+
 function DailyCleaningTemplatesPanel({
   templates,
   loading,
@@ -745,9 +774,8 @@ function DailyCleaningTemplatesPanel({
   qc: ReturnType<typeof useQueryClient>;
   toast: ReturnType<typeof useToast>['toast'];
 }) {
-  const [modal, setModal] = useState<{ mode: 'add' | 'edit'; item?: CleaningTemplate } | null>(
-    null
-  );
+  const [modal, setModal] = useState<{ mode: 'add' | 'edit'; item?: CleaningTemplate } | null>(null);
+  const [filter, setFilter] = useState<string>('all');
   const form = useForm({ resolver: zodResolver(cleaningTemplateSchema) });
 
   const saveMut = useMutation({
@@ -759,52 +787,102 @@ function DailyCleaningTemplatesPanel({
       qc.invalidateQueries({ queryKey: ['/api/operations/staff/cleaning/templates'] });
       setModal(null);
       form.reset();
-      toast({ title: 'Daily cleaning requirement saved' });
+      toast({ title: 'Task template saved' });
     },
     onError: () => toast({ title: 'Save failed', variant: 'destructive' }),
   });
+
+  const seedMut = useMutation({
+    mutationFn: () => sapi('POST', '/api/operations/staff/cleaning/templates/seed', {}),
+    onSuccess: (data: { seeded: number; message: string }) => {
+      qc.invalidateQueries({ queryKey: ['/api/operations/staff/cleaning/templates'] });
+      toast({ title: data.message });
+    },
+    onError: () => toast({ title: 'Seed failed', variant: 'destructive' }),
+  });
+
+  const filteredTemplates = filter === 'all' ? templates : templates.filter((t) => t.timing === filter);
 
   if (loading) return <div className="text-xs text-slate-400 p-4">Loading...</div>;
   return (
     <>
       <div className="bg-white border border-slate-200 rounded-lg">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-          <p className="text-xs font-semibold text-slate-700">
-            Daily Cleaning Requirements ({templates.length})
-          </p>
-          <button
-            onClick={() => {
-              form.reset({
-                taskName: '',
-                areaName: '',
-                estimatedMinutes: 10,
-                sortOrder: templates.length,
-                isActive: true,
-              });
-              setModal({ mode: 'add' });
-            }}
-            className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700"
-          >
-            <Plus className="w-3 h-3" /> Add Task
-          </button>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 flex-wrap gap-2">
+          <div className="flex items-center gap-3">
+            <p className="text-xs font-semibold text-slate-700">
+              Shift Task Templates ({templates.length})
+            </p>
+            <div className="flex gap-1">
+              {(['all', 'start_shift', 'during_shift', 'end_shift'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setFilter(t)}
+                  className={`px-2 py-0.5 text-xs rounded border transition-colors ${filter === t ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-300 text-slate-600 hover:border-slate-400'}`}
+                >
+                  {t === 'all' ? 'All' : TIMING_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {templates.length === 0 && (
+              <button
+                onClick={() => seedMut.mutate()}
+                disabled={seedMut.isPending}
+                className="flex items-center gap-1 px-2.5 py-1 border border-emerald-500 text-emerald-700 text-xs rounded hover:bg-emerald-50 disabled:opacity-50"
+              >
+                {seedMut.isPending ? 'Seeding...' : 'Seed Default Tasks'}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                form.reset({
+                  taskName: '',
+                  areaName: '',
+                  timing: 'end_shift',
+                  role: 'all',
+                  estimatedMinutes: 10,
+                  required: false,
+                  sortOrder: templates.length,
+                  isActive: true,
+                });
+                setModal({ mode: 'add' });
+              }}
+              className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700"
+            >
+              <Plus className="w-3 h-3" /> Add Task
+            </button>
+          </div>
         </div>
         <table className="w-full text-xs">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
               <th className="text-left px-4 py-2 font-medium text-slate-600">Task</th>
-              <th className="text-left px-4 py-2 font-medium text-slate-600">Zone/Area</th>
-              <th className="text-left px-4 py-2 font-medium text-slate-600">Estimated</th>
-              <th className="text-left px-4 py-2 font-medium text-slate-600">Status</th>
+              <th className="text-left px-4 py-2 font-medium text-slate-600">Zone</th>
+              <th className="text-left px-4 py-2 font-medium text-slate-600">Timing</th>
+              <th className="text-left px-4 py-2 font-medium text-slate-600">Role</th>
+              <th className="text-left px-4 py-2 font-medium text-slate-600">Min</th>
+              <th className="text-left px-4 py-2 font-medium text-slate-600">Req</th>
               <th />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {templates.map((t) => (
-              <tr key={t.id}>
+            {filteredTemplates.map((t) => (
+              <tr key={t.id} className={t.isActive ? '' : 'opacity-40'}>
                 <td className="px-4 py-2.5 font-medium text-slate-800">{t.taskName}</td>
-                <td className="px-4 py-2.5 text-slate-600">{t.areaName}</td>
-                <td className="px-4 py-2.5 text-slate-600">{t.estimatedMinutes} min</td>
-                <td className="px-4 py-2.5 text-slate-600">{t.isActive ? 'Active' : 'Inactive'}</td>
+                <td className="px-4 py-2.5 text-slate-500">{t.areaName}</td>
+                <td className="px-4 py-2.5">
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${TIMING_COLORS[t.timing ?? 'end_shift'] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {TIMING_LABELS[t.timing ?? 'end_shift'] ?? t.timing}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5">
+                  <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[t.role ?? 'all'] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {ROLE_LABELS[t.role ?? 'all'] ?? t.role}
+                  </span>
+                </td>
+                <td className="px-4 py-2.5 text-slate-500">{t.estimatedMinutes}</td>
+                <td className="px-4 py-2.5">{t.required ? <span className="text-red-500 font-bold">✓</span> : <span className="text-slate-300">–</span>}</td>
                 <td className="px-4 py-2.5 text-right">
                   <div className="flex gap-1 justify-end">
                     <button
@@ -812,7 +890,10 @@ function DailyCleaningTemplatesPanel({
                         form.reset({
                           taskName: t.taskName,
                           areaName: t.areaName,
+                          timing: t.timing ?? 'end_shift',
+                          role: t.role ?? 'all',
                           estimatedMinutes: t.estimatedMinutes,
+                          required: t.required,
                           sortOrder: t.sortOrder,
                           isActive: t.isActive,
                         });
@@ -828,12 +909,16 @@ function DailyCleaningTemplatesPanel({
                           id: t.id,
                           taskName: t.taskName,
                           areaName: t.areaName,
+                          timing: t.timing ?? 'end_shift',
+                          role: t.role ?? 'all',
                           estimatedMinutes: t.estimatedMinutes,
+                          required: t.required,
                           sortOrder: t.sortOrder,
                           isActive: !t.isActive,
                         })
                       }
                       className="p-1 rounded hover:bg-red-50 text-red-400"
+                      title={t.isActive ? 'Deactivate' : 'Activate'}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -843,14 +928,17 @@ function DailyCleaningTemplatesPanel({
             ))}
           </tbody>
         </table>
+        {filteredTemplates.length === 0 && (
+          <div className="px-4 py-8 text-center text-xs text-slate-400">
+            {templates.length === 0
+              ? 'No templates yet. Use "Seed Default Tasks" to load the standard shift task list.'
+              : 'No tasks match this filter.'}
+          </div>
+        )}
       </div>
       {modal && (
         <Modal
-          title={
-            modal.mode === 'add'
-              ? 'Add Daily Cleaning Requirement'
-              : 'Edit Daily Cleaning Requirement'
-          }
+          title={modal.mode === 'add' ? 'Add Shift Task Template' : 'Edit Shift Task Template'}
           onClose={() => setModal(null)}
         >
           <form
@@ -864,9 +952,26 @@ function DailyCleaningTemplatesPanel({
               <input
                 {...form.register('areaName')}
                 className={inputCls}
-                placeholder="Use work area names where possible"
+                placeholder="e.g. Kitchen Deep Clean, Front of House"
               />
             </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Timing *">
+                <select {...form.register('timing')} className={inputCls}>
+                  <option value="start_shift">Start of Shift</option>
+                  <option value="during_shift">During Shift</option>
+                  <option value="end_shift">End of Shift</option>
+                </select>
+              </Field>
+              <Field label="Role *">
+                <select {...form.register('role')} className={inputCls}>
+                  <option value="all">All Staff</option>
+                  <option value="manager">Manager</option>
+                  <option value="cashier">Cashier</option>
+                  <option value="kitchen">Kitchen</option>
+                </select>
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Estimated Minutes">
                 <input type="number" {...form.register('estimatedMinutes')} className={inputCls} />
@@ -875,14 +980,16 @@ function DailyCleaningTemplatesPanel({
                 <input type="number" {...form.register('sortOrder')} className={inputCls} />
               </Field>
             </div>
-            <label className="flex items-center gap-2 text-xs text-slate-700">
-              <input
-                type="checkbox"
-                {...form.register('isActive')}
-                className="w-4 h-4 accent-emerald-600"
-              />{' '}
-              Active
-            </label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 text-xs text-slate-700">
+                <input type="checkbox" {...form.register('required')} className="w-4 h-4 accent-red-500" />
+                Required task
+              </label>
+              <label className="flex items-center gap-2 text-xs text-slate-700">
+                <input type="checkbox" {...form.register('isActive')} className="w-4 h-4 accent-emerald-600" />
+                Active
+              </label>
+            </div>
             <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"

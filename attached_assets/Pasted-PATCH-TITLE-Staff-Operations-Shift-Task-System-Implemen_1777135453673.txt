@@ -1,0 +1,221 @@
+PATCH TITLE
+Staff Operations — Shift Task System Implementation
+
+OBJECTIVE
+Convert the approved daily checklist into real assignable shift tasks.
+
+This system must create operational tasks for each shift, grouped by:
+- Start of Shift
+- During Shift
+- End of Shift
+
+Each task must be:
+- assignable to staff
+- linked to a zone/work area
+- role-aware
+- trackable as complete/incomplete
+- editable by owner/manager
+- usable by the auto-roster/cleaning allocation engine
+
+DO NOT hardcode this only for Smash Brothers Burgers.
+Tasks must be configurable by business/location.
+
+SOURCE LIST TO IMPLEMENT
+
+START OF SHIFT TASKS
+
+Staff Readiness
+- Staff in full uniform and presentable
+- All staff clocked in on time
+- Roles assigned and understood
+- Staff have required tools/equipment
+
+Systems & Setup
+- POS system powered on and tested
+- Grab system online and accepting orders
+- Receipt printer test completed
+- Tablets cleaned and operational
+
+Stock & Prep
+- Drinks fridge fully stocked
+- Napkins restocked
+- Ingredients prepped and ready
+- Expired items checked and removed
+
+Cleaning
+- Benches wiped down
+- Under-bench areas cleaned
+- External area swept
+- Signage and displays cleaned
+- Equipment cleaned: POS, tablets, printers
+
+Safety
+- Fryer alarms checked and working
+- Cooking areas safe and compliant
+
+
+DURING SHIFT TASKS
+
+Staff Performance
+- Staff remain in assigned stations
+- Staff performing efficiently
+- Hygiene standards maintained
+- Customer issues handled
+
+Ongoing Cleaning
+- Prep areas wiped regularly
+- Tables cleaned after each customer
+- Seating kept organised
+- Trash bins emptied regularly
+- Menus and displays kept clean
+
+Food Safety
+- Handwashing protocols followed
+- Meat handling guidelines followed
+- Prep areas kept sanitary
+
+
+END OF SHIFT TASKS
+
+Kitchen Deep Clean
+- Grill cleaned thoroughly
+- Fryer cleaned including underneath
+- Fans and ventilation cleaned
+- Grease removed from all surfaces
+- Grease traps cleaned
+- Cooking areas sanitised
+
+General Cleaning
+- All benches cleaned inside and out
+- Dishwashing area cleaned and organised
+- All utensils washed and sanitised
+- Prep surfaces sanitised
+
+Front of House
+- Tables and chairs cleaned
+- Chairs aligned and tidy
+- Counters cleaned
+- Napkin holders cleaned and restocked
+- Signage wiped down
+- POS devices cleaned and stored
+
+Stock Reset
+- Drinks fridge restocked
+- Napkins restocked
+- Shelves organised
+- Incorrect items removed
+
+Waste & External
+- All rubbish removed from shop
+- Front and side areas cleared
+- External area cleaned
+
+Cash & Reporting
+- Starting cash verified
+- Mid-shift cash count completed
+- End-of-shift cash counted and logged
+
+
+DATA MODEL REQUIREMENTS
+
+Use existing cleaning_task_templates / shift_cleaning_tasks if possible.
+
+If fields do not exist, add minimal additive fields:
+
+cleaning_task_templates:
+- timing: start_shift | during_shift | end_shift
+- role: manager | cashier | kitchen | all
+- zoneId nullable OR areaName
+- estimatedMinutes
+- required boolean
+- isActive
+- sortOrder
+
+shift_cleaning_tasks:
+- assignedStaffId nullable
+- status: pending | complete | incomplete | reassigned
+- completedAt nullable
+- notes
+- managerOverride
+
+Do not create duplicate task systems unless necessary.
+
+UI REQUIREMENTS
+
+1. Operations Settings
+Add Daily Task Template Manager:
+- add task
+- edit task
+- deactivate task
+- assign timing
+- assign role
+- assign zone/work area
+- estimated minutes
+- sort order
+
+2. Daily Cleaning / Shift Tasks Page
+Group generated tasks by:
+- Start of Shift
+- During Shift
+- End of Shift
+
+Each task row/card must show:
+- task name
+- zone
+- role
+- assigned staff
+- status
+- complete button
+- incomplete button
+- notes
+- reassign staff
+
+3. Weekly Roster Shift Card
+Show compact summary:
+- total shift tasks
+- completed count
+- incomplete count
+
+Example:
+Tasks: 12/28 complete
+
+GENERATION LOGIC
+
+When generating tasks for a roster:
+- pull active cleaning_task_templates for businessLocationId
+- create one shift_cleaning_task per active template
+- keep timing/role/zone context
+- auto-assign where possible to rostered staff
+- prefer staff matching role/capability
+- balance estimated minutes across staff
+- leave unassigned with warning if no suitable staff
+
+RULES
+- No hardcoded business-specific logic
+- No duplicate task creation if tasks already exist for roster
+- Generated tasks remain editable
+- Manual reassignment must be allowed
+- Completion must be tracked
+- Notes must be saved
+
+VERIFICATION
+
+Test:
+1. Add/edit/deactivate a task template.
+2. Generate tasks for a roster.
+3. Confirm tasks grouped by Start / During / End.
+4. Assign staff to a task.
+5. Mark task complete.
+6. Mark task incomplete.
+7. Add notes.
+8. Confirm weekly roster card task count updates.
+9. Confirm no duplicate tasks on repeated generate.
+10. Confirm existing roster, attendance, breaks, and Daily Sales/Stock are untouched.
+
+RETURN REPORT
+- files changed
+- schema changes
+- task fields added
+- UI pages changed
+- generation logic summary
+- verification result

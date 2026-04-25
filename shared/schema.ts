@@ -2960,6 +2960,10 @@ export const cleaningTaskTemplates = pgTable("cleaning_task_templates", {
   estimatedMinutes: integer("estimated_minutes").notNull().default(10),
   isActive: boolean("is_active").notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
+  // Shift task system additions
+  timing: text("timing").default("end_shift"),
+  role: text("role").default("all"),
+  required: boolean("required").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [

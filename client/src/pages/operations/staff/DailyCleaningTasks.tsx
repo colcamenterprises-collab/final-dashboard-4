@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, Circle, Plus, RefreshCw, ClipboardList, Users } from 'lucide-react';
+import {
+  CheckCircle2,
+  XCircle,
+  Circle,
+  RefreshCw,
+  ClipboardList,
+  Users,
+  AlertCircle,
+} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
 async function sapi(method: string, url: string, data?: unknown) {
   const res = await fetch(url, {
     method,
@@ -14,7 +24,6 @@ async function sapi(method: string, url: string, data?: unknown) {
   }
   return res.json();
 }
-import { useToast } from '@/hooks/use-toast';
 
 type ShiftRoster = {
   id: number;
@@ -33,18 +42,42 @@ type CleaningTask = {
   status: string;
   completedAt: string | null;
   notes: string | null;
-  template?: { taskName: string; areaName: string; estimatedMinutes: number };
+  template?: {
+    taskName: string;
+    areaName: string;
+    estimatedMinutes: number;
+    timing: string | null;
+    role: string | null;
+    required: boolean;
+  };
 };
 
 function todayBkk() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  pending: 'bg-slate-100 text-slate-500',
-  in_progress: 'bg-amber-100 text-amber-700',
-  completed: 'bg-emerald-100 text-emerald-700',
-  skipped: 'bg-red-100 text-red-500',
+const TIMING_ORDER = ['start_shift', 'during_shift', 'end_shift'] as const;
+const TIMING_LABELS: Record<string, string> = {
+  start_shift: 'Start of Shift',
+  during_shift: 'During Shift',
+  end_shift: 'End of Shift',
+};
+const TIMING_COLORS: Record<string, { header: string; dot: string }> = {
+  start_shift: { header: 'bg-blue-50 border-blue-200 text-blue-800', dot: 'bg-blue-500' },
+  during_shift: { header: 'bg-amber-50 border-amber-200 text-amber-800', dot: 'bg-amber-500' },
+  end_shift: { header: 'bg-slate-50 border-slate-200 text-slate-700', dot: 'bg-slate-400' },
+};
+const ROLE_LABELS: Record<string, string> = {
+  manager: 'Mgr',
+  cashier: 'Cash',
+  kitchen: 'Kitchen',
+  all: 'All',
+};
+const ROLE_COLORS: Record<string, string> = {
+  manager: 'bg-purple-100 text-purple-700',
+  cashier: 'bg-sky-100 text-sky-700',
+  kitchen: 'bg-orange-100 text-orange-700',
+  all: 'bg-slate-100 text-slate-600',
 };
 
 export default function DailyCleaningTasks() {
@@ -81,7 +114,7 @@ export default function DailyCleaningTasks() {
       qc.invalidateQueries({
         queryKey: ['/api/operations/staff/rosters', selectedRosterId, 'cleaning'],
       });
-      toast({ title: 'Tasks generated' });
+      toast({ title: 'Shift tasks generated' });
     },
     onError: () => toast({ title: 'Generate failed', variant: 'destructive' }),
   });
@@ -94,27 +127,33 @@ export default function DailyCleaningTasks() {
         queryKey: ['/api/operations/staff/rosters', selectedRosterId, 'cleaning'],
       });
       setAssignModal(null);
-      toast({ title: 'Task updated' });
     },
     onError: () => toast({ title: 'Update failed', variant: 'destructive' }),
   });
 
   const selectedRoster = rosters.find((r) => r.id === selectedRosterId);
-  const pendingCount = tasks.filter((t) => t.status === 'pending').length;
-  const completedCount = tasks.filter((t) => t.status === 'completed').length;
-  const groupedTasks = tasks.reduce<Record<string, CleaningTask[]>>((acc, task) => {
-    const key = task.template?.areaName || 'Unassigned Area';
-    acc[key] = acc[key] ?? [];
-    acc[key].push(task);
+
+  // Group tasks by timing
+  const grouped = TIMING_ORDER.reduce<Record<string, CleaningTask[]>>((acc, timing) => {
+    acc[timing] = tasks.filter((t) => (t.template?.timing ?? 'end_shift') === timing);
     return acc;
-  }, {});
+  }, {} as Record<string, CleaningTask[]>);
+
+  // Stats
+  const totalCount = tasks.length;
+  const completedCount = tasks.filter((t) => t.status === 'completed').length;
+  const pendingCount = tasks.filter((t) => t.status === 'pending').length;
+  const skippedCount = tasks.filter((t) => t.status === 'skipped').length;
+  const requiredIncomplete = tasks.filter(
+    (t) => t.template?.required && t.status !== 'completed'
+  ).length;
 
   return (
     <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-5">
       <div>
-        <h1 className="text-lg font-bold text-slate-900">Daily Cleaning Tasks</h1>
+        <h1 className="text-lg font-bold text-slate-900">Shift Tasks</h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Per-shift cleaning task allocation and completion tracking.
+          Assignable shift tasks grouped by Start · During · End of Shift.
         </p>
       </div>
 
@@ -139,7 +178,11 @@ export default function DailyCleaningTasks() {
               <button
                 key={r.id}
                 onClick={() => setSelectedRosterId(r.id)}
-                className={`px-3 py-1 text-xs rounded border transition-colors ${selectedRosterId === r.id ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-300 text-slate-600 hover:border-slate-400'}`}
+                className={`px-3 py-1 text-xs rounded border transition-colors ${
+                  selectedRosterId === r.id
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'border-slate-300 text-slate-600 hover:border-slate-400'
+                }`}
               >
                 {r.shiftName} ({r.shiftStartTime})
               </button>
@@ -151,34 +194,45 @@ export default function DailyCleaningTasks() {
       {selectedRosterId === null ? (
         <div className="bg-white border border-slate-200 rounded-lg p-10 text-center">
           <ClipboardList className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">Select a roster to view cleaning tasks.</p>
+          <p className="text-sm text-slate-500">Select a roster to view shift tasks.</p>
         </div>
       ) : (
         <>
           {/* Stats */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white border border-slate-200 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-slate-800">{tasks.length}</p>
+              <p className="text-xl font-bold text-slate-800">{totalCount}</p>
               <p className="text-xs text-slate-500 mt-0.5">Total tasks</p>
-            </div>
-            <div className="bg-white border border-slate-200 rounded-lg p-3 text-center">
-              <p className="text-xl font-bold text-amber-600">{pendingCount}</p>
-              <p className="text-xs text-slate-500 mt-0.5">Pending</p>
             </div>
             <div className="bg-white border border-slate-200 rounded-lg p-3 text-center">
               <p className="text-xl font-bold text-emerald-600">{completedCount}</p>
               <p className="text-xs text-slate-500 mt-0.5">Completed</p>
             </div>
+            <div className="bg-white border border-slate-200 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-amber-600">{pendingCount}</p>
+              <p className="text-xs text-slate-500 mt-0.5">Pending</p>
+            </div>
+            {requiredIncomplete > 0 ? (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-red-600">{requiredIncomplete}</p>
+                <p className="text-xs text-red-500 mt-0.5">Required outstanding</p>
+              </div>
+            ) : (
+              <div className="bg-white border border-slate-200 rounded-lg p-3 text-center">
+                <p className="text-xl font-bold text-slate-500">{skippedCount}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Incomplete</p>
+              </div>
+            )}
           </div>
 
-          {/* Task List */}
+          {/* Task sections by timing */}
           <div className="bg-white border border-slate-200 rounded-lg">
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
               <p className="text-xs font-semibold text-slate-700">
-                {selectedRoster?.shiftName} — Cleaning Tasks
+                {selectedRoster?.shiftName} — Shift Tasks
               </p>
               <button
-                onClick={() => generateMut.mutate(selectedRosterId)}
+                onClick={() => generateMut.mutate(selectedRosterId!)}
                 disabled={generateMut.isPending}
                 className="flex items-center gap-1.5 px-2.5 py-1 border border-slate-300 text-xs rounded hover:bg-slate-50 disabled:opacity-50 text-slate-600"
               >
@@ -194,9 +248,9 @@ export default function DailyCleaningTasks() {
             ) : tasks.length === 0 ? (
               <div className="p-10 text-center">
                 <ClipboardList className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500 mb-3">No cleaning tasks generated yet.</p>
+                <p className="text-sm text-slate-500 mb-3">No shift tasks generated yet.</p>
                 <button
-                  onClick={() => generateMut.mutate(selectedRosterId)}
+                  onClick={() => generateMut.mutate(selectedRosterId!)}
                   disabled={generateMut.isPending}
                   className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700 disabled:opacity-50"
                 >
@@ -205,73 +259,128 @@ export default function DailyCleaningTasks() {
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
-                {Object.entries(groupedTasks).map(([areaName, areaTasks]) => (
-                  <div key={areaName}>
-                    <div className="px-4 py-2 bg-slate-50 border-y border-slate-100 text-xs font-semibold text-slate-600">
-                      {areaName}
-                    </div>
-                    {areaTasks.map((task) => {
-                      const assignedMember = members.find((m) => m.id === task.assignedStaffId);
-                      const isDone = task.status === 'completed';
-                      return (
-                        <div
-                          key={task.id}
-                          className={`flex items-center gap-3 px-4 py-3 ${isDone ? 'opacity-60' : ''}`}
-                        >
-                          <button
-                            onClick={() =>
-                              updateTaskMut.mutate({
-                                id: task.id,
-                                data: { status: isDone ? 'pending' : 'completed' },
-                              })
-                            }
-                            className={`shrink-0 ${isDone ? 'text-emerald-500' : 'text-slate-300 hover:text-emerald-400'} transition-colors`}
+                {TIMING_ORDER.map((timing) => {
+                  const sectionTasks = grouped[timing];
+                  if (sectionTasks.length === 0) return null;
+                  const colors = TIMING_COLORS[timing];
+                  const sectionCompleted = sectionTasks.filter((t) => t.status === 'completed').length;
+                  return (
+                    <div key={timing}>
+                      {/* Section header */}
+                      <div className={`flex items-center gap-2 px-4 py-2.5 border-b ${colors.header}`}>
+                        <span className={`w-2 h-2 rounded-full ${colors.dot} shrink-0`} />
+                        <span className="text-xs font-semibold flex-1">
+                          {TIMING_LABELS[timing]}
+                        </span>
+                        <span className="text-xs font-medium">
+                          {sectionCompleted}/{sectionTasks.length}
+                        </span>
+                      </div>
+                      {/* Tasks in this section */}
+                      {sectionTasks.map((task) => {
+                        const assignedMember = members.find((m) => m.id === task.assignedStaffId);
+                        const isDone = task.status === 'completed';
+                        const isSkipped = task.status === 'skipped';
+                        const role = task.template?.role ?? 'all';
+                        const isRequired = task.template?.required ?? false;
+                        return (
+                          <div
+                            key={task.id}
+                            className={`flex items-start gap-3 px-4 py-3 border-b border-slate-50 last:border-b-0 ${
+                              isDone ? 'bg-emerald-50/30' : isSkipped ? 'bg-red-50/30' : ''
+                            }`}
                           >
-                            {isDone ? (
-                              <CheckCircle2 className="w-5 h-5" />
-                            ) : (
-                              <Circle className="w-5 h-5" />
-                            )}
-                          </button>
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className={`text-xs font-medium ${isDone ? 'line-through text-slate-400' : 'text-slate-800'}`}
-                            >
-                              {task.template?.taskName ?? `Task #${task.id}`}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {task.template?.areaName}
-                              {task.template?.estimatedMinutes &&
-                                ` · ~${task.template.estimatedMinutes} min`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`px-1.5 py-0.5 rounded text-xs font-medium ${STATUS_STYLE[task.status] ?? 'bg-slate-100 text-slate-500'}`}
-                            >
-                              {task.status.replace('_', ' ')}
-                            </span>
+                            {/* Status toggle */}
                             <button
-                              onClick={() => setAssignModal(task)}
-                              className="flex items-center gap-1 px-2 py-1 text-xs border border-slate-300 rounded hover:bg-slate-50 text-slate-600"
+                              onClick={() =>
+                                updateTaskMut.mutate({
+                                  id: task.id,
+                                  data: { status: isDone ? 'pending' : 'completed' },
+                                })
+                              }
+                              className={`shrink-0 mt-0.5 transition-colors ${
+                                isDone
+                                  ? 'text-emerald-500 hover:text-slate-300'
+                                  : 'text-slate-300 hover:text-emerald-400'
+                              }`}
                             >
-                              <Users className="w-3 h-3" />
-                              {assignedMember ? assignedMember.fullName : 'Assign'}
+                              {isDone ? (
+                                <CheckCircle2 className="w-5 h-5" />
+                              ) : (
+                                <Circle className="w-5 h-5" />
+                              )}
                             </button>
+
+                            {/* Task info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p
+                                  className={`text-xs font-medium ${
+                                    isDone
+                                      ? 'line-through text-slate-400'
+                                      : isSkipped
+                                      ? 'text-slate-400'
+                                      : 'text-slate-800'
+                                  }`}
+                                >
+                                  {task.template?.taskName ?? `Task #${task.id}`}
+                                </p>
+                                {isRequired && !isDone && (
+                                  <AlertCircle className="w-3 h-3 text-red-400 shrink-0" title="Required" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className="text-xs text-slate-400">
+                                  {task.template?.areaName}
+                                </span>
+                                {task.template?.estimatedMinutes && (
+                                  <span className="text-xs text-slate-400">
+                                    · ~{task.template.estimatedMinutes} min
+                                  </span>
+                                )}
+                                <span className={`px-1 py-0.5 rounded text-xs font-medium ${ROLE_COLORS[role]}`}>
+                                  {ROLE_LABELS[role]}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Right side controls */}
+                            <div className="flex flex-col items-end gap-1.5 shrink-0">
+                              {/* Incomplete button (only show if not already completed/skipped) */}
+                              <div className="flex items-center gap-1">
+                                {!isDone && (
+                                  <button
+                                    onClick={() =>
+                                      updateTaskMut.mutate({
+                                        id: task.id,
+                                        data: { status: isSkipped ? 'pending' : 'skipped' },
+                                      })
+                                    }
+                                    className={`flex items-center gap-1 px-2 py-0.5 text-xs rounded border transition-colors ${
+                                      isSkipped
+                                        ? 'border-red-400 bg-red-50 text-red-600'
+                                        : 'border-slate-200 text-slate-400 hover:border-red-300 hover:text-red-400'
+                                    }`}
+                                  >
+                                    <XCircle className="w-3 h-3" />
+                                    {isSkipped ? 'Marked incomplete' : 'Incomplete'}
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setAssignModal(task)}
+                                  className="flex items-center gap-1 px-2 py-0.5 text-xs border border-slate-200 rounded hover:bg-slate-50 text-slate-600"
+                                >
+                                  <Users className="w-3 h-3" />
+                                  {assignedMember ? assignedMember.fullName : 'Assign'}
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                          <input
-                            defaultValue={task.notes ?? ''}
-                            onBlur={(e) =>
-                              updateTaskMut.mutate({ id: task.id, data: { notes: e.target.value } })
-                            }
-                            placeholder="Notes"
-                            className="w-32 border border-slate-300 rounded px-2 py-1 text-xs"
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                ))}
+                        );
+                      })}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -293,14 +402,19 @@ export default function DailyCleaningTasks() {
             </div>
             <div className="p-4">
               <p className="text-xs text-slate-600 mb-3">
-                Task: <strong>{assignModal.template?.taskName ?? `Task #${assignModal.id}`}</strong>
+                Task:{' '}
+                <strong>{assignModal.template?.taskName ?? `Task #${assignModal.id}`}</strong>
               </p>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 max-h-72 overflow-y-auto">
                 <button
                   onClick={() =>
                     updateTaskMut.mutate({ id: assignModal.id, data: { assignedStaffId: null } })
                   }
-                  className={`w-full text-left px-3 py-2 text-xs rounded border ${assignModal.assignedStaffId === null ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-slate-200 hover:bg-slate-50 text-slate-600'}`}
+                  className={`w-full text-left px-3 py-2 text-xs rounded border ${
+                    assignModal.assignedStaffId === null
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                  }`}
                 >
                   — Unassigned
                 </button>
@@ -315,7 +429,11 @@ export default function DailyCleaningTasks() {
                           data: { assignedStaffId: m.id },
                         })
                       }
-                      className={`w-full text-left px-3 py-2 text-xs rounded border ${assignModal.assignedStaffId === m.id ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium' : 'border-slate-200 hover:bg-slate-50 text-slate-700'}`}
+                      className={`w-full text-left px-3 py-2 text-xs rounded border ${
+                        assignModal.assignedStaffId === m.id
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium'
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
                     >
                       {m.fullName}
                     </button>

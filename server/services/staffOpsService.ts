@@ -276,14 +276,18 @@ export async function generateCleaningTasksForRoster(
   shiftRosterId: number,
   businessLocationId = DEFAULT_LOCATION
 ) {
+  // Prevent duplicates: delete existing tasks for this roster before regenerating
+  await db
+    .delete(shiftCleaningTasks)
+    .where(eq(shiftCleaningTasks.shiftRosterId, shiftRosterId));
+
   const templates = await db
     .select()
     .from(cleaningTaskTemplates)
     .where(
       and(
         eq(cleaningTaskTemplates.businessLocationId, businessLocationId),
-        eq(cleaningTaskTemplates.isActive, true),
-        eq(cleaningTaskTemplates.taskType, 'daily')
+        eq(cleaningTaskTemplates.isActive, true)
       )
     )
     .orderBy(asc(cleaningTaskTemplates.sortOrder));
