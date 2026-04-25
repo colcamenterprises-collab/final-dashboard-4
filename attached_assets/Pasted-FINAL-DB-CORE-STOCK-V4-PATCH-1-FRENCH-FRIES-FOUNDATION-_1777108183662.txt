@@ -1,0 +1,91 @@
+FINAL DB — CORE STOCK V4 PATCH 1 (FRENCH FRIES FOUNDATION)
+
+Objective:
+Add French Fries reconciliation table to Analysis V2 using the locked French Fries usage map.
+
+CRITICAL RULES:
+- Do NOT modify Drinks table
+- Do NOT modify Burgers & Sets table
+- Do NOT modify Buns table
+- Do NOT modify Meat table
+- Do NOT modify Side Orders table structure
+- Do NOT include Sweet Potato Fries in French Fries usage
+
+Table:
+Item | Start | Purchased | Used | End | Expected | Variance | Review
+
+Row:
+French Fries
+
+FRENCH FRIES USAGE MAP
+
+Count as French Fries usage, 130g each:
+- 10018 Cajun Fries
+- 10010 Cheesy Bacon Fries
+- 10045 Dirty Fries
+- 10030 French Fries
+- 10035 Loaded Fries (Original)
+
+Do NOT count as French Fries usage:
+- 10022 Sweet Potato Fries
+- 10002 Chicken Nuggets 12
+- 10016 Chicken Nuggets 24
+- 10000 Chicken Nuggets 6
+- 10001 Chicken Nuggets 9
+- 10025 Coleslaw with Bacon
+- 10020 Onion Rings
+
+Sweet Potato Fries are separate stock and must not be included in the French Fries reconciliation table.
+
+LOGIC
+
+Start:
+- previous shift closing fries
+- source priority:
+  1. daily_sales_v2.payload->>'friesEnd'
+  2. fallback daily_stock_v2
+
+Purchased:
+- return 0 for now
+- do NOT implement purchase logic yet
+
+Used:
+Used servings =
+SUM(total sold of all French Fries usage SKUs)
++ total sets sold
+
+Used grams =
+Used servings × 130g
+
+End:
+- current shift friesEnd
+- same source priority as Start
+
+Expected:
+Start + Purchased - Used
+
+Variance:
+End - Expected
+
+RULES:
+- all values in grams
+- purchased = 0 is valid for now
+- any non-zero variance = red cell
+- no thresholds
+- review button required for variance
+- if data missing, show incomplete_component_data
+- expose stockSource:
+  - v2_canonical
+  - legacy_fallback
+
+VALIDATION:
+1. All other tables unchanged
+2. Fries table shows exactly one row
+3. Used includes all French Fries usage SKUs
+4. Used excludes Sweet Potato Fries
+5. Used includes set fries
+6. Used grams = used servings × 130g
+7. Purchased = 0
+8. Expected and variance calculated correctly
+9. Variance cell red if non-zero
+10. Review button appears

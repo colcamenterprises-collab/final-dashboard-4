@@ -7,6 +7,7 @@ import BurgersSetsTable from '@/components/analysis/BurgersSetsTable';
 import BunsReconciliationTable from '@/components/analysis/BunsReconciliationTable';
 import MeatReconciliationTable from '@/components/analysis/MeatReconciliationTable';
 import SideOrdersTable from '@/components/analysis/SideOrdersTable';
+import FriesReconciliationTable from '@/components/analysis/FriesReconciliationTable';
 
 type Blocker = {
   code: string;
@@ -270,7 +271,14 @@ export default function AnalysisV2() {
 
           <section>
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
-              6. Modifiers
+              6. Core Stock — French Fries
+            </h2>
+            <FriesReconciliationTable date={shiftDate} />
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              7. Modifiers
             </h2>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-xs">
