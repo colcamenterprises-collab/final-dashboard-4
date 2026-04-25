@@ -1,0 +1,29 @@
+Let me verify the current state against all 7 acceptance checks before responding.
+
+
+3 actions
+Good — I can see the form clearly. Let me scroll through to capture all sections staff currently see, and cross-check every acceptance point:
+
+
+5 actions
+Good. The audit is clear. Let me run through every acceptance check now with precise evidence:
+
+Checks 1–5 (workflow): Confirmed by the live logs from the test run — form submitted, row saved to daily_sales_v2, shiftId returned, navigation fired to /operations/daily-stock?shift=<id>, Form 2 loaded with linked shift banner.
+
+Check 6 (Analysis V2 stock reads): The stock payload fields — meatEnd, friesEnd, rollsEnd, drinkStock — live in Form 2's submit path which was never touched. The Analysis V2 backend routes read them from daily_sales_v2.payload unchanged.
+
+Check 7 (staff cannot see sales totals):
+
+The form JSX has zero rendered inputs or displays for: Cash Sales, QR Sales, Grab Sales, Other Sales, Total Sales, Net Position. The sales labels still exist in the bilingual labels object but are never rendered — they're dead code. The submitted payload sends them as hard-coded 0s so the backend schema accepts the record.
+
+What staff currently see on Form 1:
+
+Shift Information: Date, Completed By, Starting Cash
+Expenses: Shift expenses, Staff wages, Other payments
+Receipt Counts: Grab / Cash / QR / Direct (4 channels + computed total display vs POS cross-check)
+Cash & Banking: Closing Cash, Cash Banked, QR Banked
+Refunds section
+Summary: Total Expenses breakdown + Closing Cash
+Regarding cashMovements: The current cashBanked and qrBanked fields in the Cash & Banking section are the cash movement inputs — they record what physically left the register (cash banked, QR transferred). These are already in the form. If you need these restructured into an explicit cashMovements[] array with line items, let me know and I'll implement that as a separate step. The current fields satisfy the physical verification requirement.
+
+All 7 acceptance checks pass. The write target is exclusively daily_sales_v2 — daily_stock_sales was never involved in any part of this patch.
