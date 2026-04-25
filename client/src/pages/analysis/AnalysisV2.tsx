@@ -6,6 +6,7 @@ import DrinksVarianceTable from '@/components/analysis/DrinksVarianceTable';
 import BurgersSetsTable from '@/components/analysis/BurgersSetsTable';
 import BunsReconciliationTable from '@/components/analysis/BunsReconciliationTable';
 import MeatReconciliationTable from '@/components/analysis/MeatReconciliationTable';
+import SideOrdersTable from '@/components/analysis/SideOrdersTable';
 
 type Blocker = {
   code: string;
@@ -264,28 +265,7 @@ export default function AnalysisV2() {
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
               5. Side Orders
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-xs">
-                <thead>
-                  <tr>
-                    <Th>Item Name</Th>
-                    <Th right>Sold Count</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.tables.sideOrders.length === 0 ? (
-                    <EmptyRow cols={2} />
-                  ) : (
-                    data.tables.sideOrders.map((row) => (
-                      <tr key={row.itemName} className="hover:bg-gray-50">
-                        <Cell>{row.itemName}</Cell>
-                        <Cell right bold>{row.soldCount}</Cell>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <SideOrdersTable date={shiftDate} />
           </section>
 
           <section>

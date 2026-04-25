@@ -296,6 +296,9 @@ async function checkSchema() {
   // Mount meat reconciliation (CORE STOCK V2 PATCH 1) — isolated from all other sections
   const meatReconciliationRouter = (await import('./routes/meatReconciliation.js')).default;
   app.use('/api/analysis', meatReconciliationRouter);
+  // Mount side orders variance (V3 PATCH 1) — isolated from drinks, burgers, buns, meat
+  const sideOrdersVarianceRouter = (await import('./routes/sideOrdersVariance.js')).default;
+  app.use('/api/analysis', sideOrdersVarianceRouter);
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
   
