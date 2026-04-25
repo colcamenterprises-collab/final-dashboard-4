@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Input } from '@/components/ui/input';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import DrinksVarianceTable from '@/components/analysis/DrinksVarianceTable';
 
 type Blocker = {
   code: string;
@@ -225,56 +226,15 @@ export default function AnalysisV2() {
         </div>
       )}
 
+      <section>
+        <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+          1. Drinks
+        </h2>
+        <DrinksVarianceTable date={shiftDate} />
+      </section>
+
       {data && (
         <div className="space-y-6">
-
-          <section>
-            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
-              1. Drinks
-            </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-xs">
-                <thead>
-                  <tr>
-                    <Th>SKU</Th>
-                    <Th>Item Name</Th>
-                    <Th right>Sold Direct</Th>
-                    <Th right>Sold via Modifiers</Th>
-                    <Th right>Total Sold</Th>
-                    <Th right>Start</Th>
-                    <Th right>Purchased</Th>
-                    <Th right>End</Th>
-                    <Th right>Expected</Th>
-                    <Th right>Variance</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.tables.drinks.length === 0 ? (
-                    <EmptyRow cols={10} />
-                  ) : (
-                    data.tables.drinks.map((row) => (
-                      <tr key={row.sku} className="hover:bg-gray-50">
-                        <Cell>
-                          <span className="text-[11px] text-gray-500">{row.sku}</span>
-                        </Cell>
-                        <Cell>
-                          <span className="font-semibold text-gray-900">{row.itemName ?? row.sku}</span>
-                        </Cell>
-                        <Cell right>{row.soldDirect}</Cell>
-                        <Cell right>{row.soldFromModifiers}</Cell>
-                        <Cell right bold>{row.totalSold}</Cell>
-                        <Cell right>{row.start ?? 0}</Cell>
-                        <Cell right>{row.purchased ?? 0}</Cell>
-                        <Cell right>{row.end ?? 0}</Cell>
-                        <Cell right>{row.expected ?? 0}</Cell>
-                        <Cell right>{row.variance ?? 0}</Cell>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
 
           <section>
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">

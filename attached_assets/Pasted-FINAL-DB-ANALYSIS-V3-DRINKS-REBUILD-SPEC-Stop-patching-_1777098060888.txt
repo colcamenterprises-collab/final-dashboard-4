@@ -1,0 +1,104 @@
+FINAL DB — ANALYSIS V3 DRINKS REBUILD SPEC
+
+Stop patching the current mixed data-dump table.
+
+Objective:
+Rebuild the Analysis V2 drinks section into a proper shift reconciliation control table.
+
+This is NOT a sales report.
+This is a reconciliation table.
+
+LOCKED REQUIREMENTS
+
+1. Categories
+Use POS categories for future grouping:
+- Drinks
+- Burgers
+- Burger Sets
+- Kids
+- Sideorders
+- Promotions
+
+For this patch, only rebuild the Drinks section.
+
+2. Drinks rows
+Show all drink SKUs/items, even if:
+- sold = 0
+- purchased = 0
+- modifier sold = 0
+
+Reason:
+If start and end stock differ with no sales/purchases, that is still a variance.
+
+3. Drinks columns
+Use exactly:
+
+SKU
+Item Name
+Sold Direct
+Sold via Modifiers
+Total Sold
+Start
+Purchased
+End
+Expected
+Variance
+Review
+
+4. Formula
+For each SKU:
+
+Total Sold = Sold Direct + Sold via Modifiers
+Expected = Start + Purchased - Total Sold
+Variance = End - Expected
+
+5. Variance display
+- Any non-zero variance must show red in the Variance cell
+- Zero variance can remain normal/neutral
+- Do not apply thresholds yet
+- No green/red threshold logic; only variance vs no variance
+
+6. Review requirement
+Every non-zero variance must have a Review action.
+
+Use the existing variance review modal if available.
+If not available, add a minimal owner-only review modal.
+
+Review modal must capture:
+- item/SKU
+- shift date
+- variance amount
+- owner note
+- reviewed by
+- reviewed timestamp
+
+Do not block the table if review persistence is not already available; add minimally and safely.
+
+7. Data rules
+- SKU is the primary key
+- Item name is the readable display name
+- Do not show all POS SKUs in drinks table — only drinks category SKUs
+- Do not merge different SKUs unless explicitly mapped
+- Modifier drinks must map to SKU where possible
+- If ambiguous, show clear warning and do not guess
+
+8. Purchases
+- Purchased may be 0 legitimately
+- 0 purchases is not a failure
+- If purchase records exist for the effective purchase date, they must be included
+- Use effective purchase date, not createdAt
+
+9. No data dump
+The current issue is that the drinks table includes non-drinks like Chicken Nuggets, Burgers, Fries, Sets, etc.
+Fix this.
+Drinks table must contain drinks only.
+
+10. Required validation
+After patch, validate one completed shift.
+
+Return:
+- screenshot or table output showing only drinks
+- one manual calculation example
+- confirmation all drink SKUs display with item names
+- confirmation variance cell turns red when variance is non-zero
+- confirmation review action appears for non-zero variance
