@@ -56,7 +56,7 @@ export async function listShiftSnapshots(): Promise<any[]> {
     receipt_numbers AS (
       SELECT
         receipt_date::date AS d,
-        ARRAY_AGG(DISTINCT COALESCE(receipt_number, receipt_id)::text ORDER BY COALESCE(receipt_number, receipt_id)::text) AS receipt_numbers
+        ARRAY_AGG(DISTINCT receipt_id::text ORDER BY receipt_id::text) AS receipt_numbers
       FROM receipt_truth_line
       GROUP BY receipt_date::date
     )

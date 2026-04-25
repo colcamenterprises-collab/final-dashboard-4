@@ -178,9 +178,13 @@ router.post('/pos-shift/:date/sync', requireManager, async (req, res) => {
 });
 
 router.get('/daily-sales-v2/:date', async (req, res) => {
+  const { date } = req.params;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: 'Invalid date parameter. Expected YYYY-MM-DD.' });
+  }
   try {
-    const normalized = await getDailySalesFormNormalized(req.params.date);
-    await upsertFormSnapshot(req.params.date, normalized);
+    const normalized = await getDailySalesFormNormalized(date);
+    await upsertFormSnapshot(date, normalized);
     res.json(normalized);
   } catch (error) {
     console.error('[shiftApproval.daily-sales-v2] error', error);
