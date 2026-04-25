@@ -452,11 +452,11 @@ export async function assignStaffToGeneratedRoster(input: {
     if (created.length >= input.maxStaff) break;
     const currentLoad = input.weeklyLoadMap.get(member.id);
     if (!currentLoad) continue;
-    if (maxShifts !== null && currentLoad.shiftCount >= maxShifts) {
+    if (maxShifts != null && currentLoad.shiftCount >= maxShifts) {
       currentLoad.warnings.push(`Max shifts reached (${maxShifts})`);
       continue;
     }
-    if (maxHours !== null && currentLoad.totalHours + shiftHours > maxHours) {
+    if (maxHours != null && currentLoad.totalHours + shiftHours > maxHours) {
       currentLoad.warnings.push(`Max hours exceeded (${maxHours})`);
       input.warnings.push(`Staff ${member.fullName} skipped due to max weekly hours.`);
       continue;

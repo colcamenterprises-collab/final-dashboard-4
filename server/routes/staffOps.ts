@@ -59,6 +59,16 @@ const router = Router();
 
 const DEFAULT_LOCATION = 1;
 
+const nullablePositiveNumber = z.preprocess(
+  (val) => {
+    if (val === '' || val === null || val === undefined) return null;
+    const num = typeof val === 'number' ? val : Number(val);
+    if (!Number.isFinite(num) || num <= 0) return null;
+    return num;
+  },
+  z.number().positive().nullable().optional()
+);
+
 const autoGenerateWeekSchema = z.object({
   businessLocationId: z.coerce.number().int().positive().default(DEFAULT_LOCATION),
   weekStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -70,10 +80,10 @@ const autoGenerateWeekSchema = z.object({
   includeDeepCleaning: z.boolean().default(true),
   ownerRules: z
     .object({
-      maxShiftsPerStaffPerWeek: z.coerce.number().int().positive().nullable().optional(),
+      maxShiftsPerStaffPerWeek: nullablePositiveNumber,
       minHoursPerStaffPerWeek: z.coerce.number().nonnegative().nullable().optional(),
-      maxHoursPerStaffPerWeek: z.coerce.number().nonnegative().nullable().optional(),
-      preferredBusyDayStaffCount: z.coerce.number().int().positive().nullable().optional(),
+      maxHoursPerStaffPerWeek: nullablePositiveNumber,
+      preferredBusyDayStaffCount: nullablePositiveNumber,
       allowBackToBackCloseOpen: z.boolean().nullable().optional(),
     })
     .optional(),
