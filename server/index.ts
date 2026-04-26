@@ -307,6 +307,8 @@ async function checkSchema() {
   app.use('/api/analysis', sweetPotatoReconciliationRouter);
   const modifierPipelineRouter = (await import('./routes/modifierPipeline.js')).default;
   app.use('/api/analysis', modifierPipelineRouter);
+  const promoMixMatchRouter = (await import('./routes/promoMixMatch.js')).default;
+  app.use('/api/analysis', promoMixMatchRouter);
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
   

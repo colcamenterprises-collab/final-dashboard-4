@@ -11,6 +11,7 @@ import FriesReconciliationTable from '@/components/analysis/FriesReconciliationT
 import SweetPotatoReconciliationTable from '@/components/analysis/SweetPotatoReconciliationTable';
 import { DrinkModifiersTable } from '@/components/analysis/DrinkModifiersTable';
 import { OtherModifiersTable } from '@/components/analysis/OtherModifiersTable';
+import { PromoMixMatchTable } from '@/components/analysis/PromoMixMatchTable';
 
 type Blocker = {
   code: string;
@@ -225,8 +226,8 @@ export default function AnalysisV2() {
 
       {!!data?.blockers?.length && (
         <div className="border border-amber-300 bg-amber-50 rounded p-3 space-y-1">
-          {data.blockers.map((b) => (
-            <div key={`${b.code}-${b.where}`} className="text-xs">
+          {data.blockers.map((b, idx) => (
+            <div key={`${b.code}-${b.where}-${idx}`} className="text-xs">
               <span className="font-semibold text-amber-800">{b.code}</span>
               <span className="text-amber-700">: {b.message}</span>
             </div>
@@ -292,6 +293,13 @@ export default function AnalysisV2() {
               7B. Other Modifiers
             </h2>
             <OtherModifiersTable date={shiftDate} />
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              8. Promotions — Mix and Match Meal Deal (SKU 10069)
+            </h2>
+            <PromoMixMatchTable date={shiftDate} />
           </section>
 
         </div>
