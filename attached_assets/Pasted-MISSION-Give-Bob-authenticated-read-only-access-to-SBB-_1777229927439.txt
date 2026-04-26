@@ -1,0 +1,157 @@
+MISSION:
+Give Bob authenticated read-only access to SBB canonical business data so his daily cron can actually verify the business.
+
+PROBLEM:
+Bob’s daily cron cannot query the app’s canonical modules. He currently reports “cannot reach/query canonical modules,” meaning the app does not expose a stable read surface for him.
+
+DO NOT:
+- Do not modify Daily Sales & Stock V2 forms.
+- Do not modify staff-facing UI.
+- Do not change existing schemas unless absolutely required.
+- Do not expose write access.
+- Do not use fallback/proxy data as normal operation.
+- Do not fake missing values.
+
+BUILD:
+
+1. Add protected Bob read auth middleware
+
+File:
+server/middleware/bobReadAuth.ts
+
+Behavior:
+- Require header: x-bob-token
+- Compare against env var: BOB_READ_TOKEN
+- Return 401 if missing or invalid
+- Read-only only
+
+2. Add Bob canonical read route
+
+File:
+server/routes/bobRead.ts
+
+Base route:
+GET /api/bob/read/latest-shift
+
+This endpoint must:
+- Compute latest completed SBB shift:
+  - shift_start = 17:00 Asia/Bangkok
+  - shift_end = 03:00 Asia/Bangkok next day
+  - shift_date = date of shift start
+- Query canonical app data using timestamp window:
+  - start <= record timestamp < end
+- Return one JSON response with:
+
+{
+  "status": "ok" | "partial" | "blocked",
+  "shift": {
+    "shiftDate": "YYYY-MM-DD",
+    "startBkk": "...",
+    "endBkk": "...",
+    "startUtc": "...",
+    "endUtc": "..."
+  },
+  "sources": {
+    "dailySalesForm": {
+      "available": true/false,
+      "records": [],
+      "error": null
+    },
+    "dailyStockForm": {
+      "available": true/false,
+      "records": [],
+      "error": null
+    },
+    "posReceipts": {
+      "available": true/false,
+      "records": [],
+      "error": null
+    },
+    "shiftReport": {
+      "available": true/false,
+      "records": [],
+      "error": null
+    },
+    "purchases": {
+      "available": true/false,
+      "records": [],
+      "error": null
+    }
+  },
+  "verificationInputs": {
+    "rolls": {},
+    "meat": {},
+    "drinks": {},
+    "salesChannels": {},
+    "receipts": {}
+  },
+  "missingSources": [],
+  "generatedAt": "..."
+}
+
+3. Add source-level error handling
+
+Each canonical source must be queried independently.
+
+If one source fails:
+- Do not crash whole endpoint
+- Mark that source as available: false
+- Add the error to missingSources
+- Set top-level status to "partial"
+
+If all core sources fail:
+- status = "blocked"
+
+4. Register route in server/index.ts or route registry
+
+Mount:
+app.use("/api/bob/read", bobReadRouter)
+
+5. Add quick health endpoint
+
+GET /api/bob/read/health
+
+Returns:
+{
+  "status": "ok",
+  "service": "bob-read",
+  "readOnly": true,
+  "time": "..."
+}
+
+Still requires x-bob-token.
+
+6. Add test script or manual test notes
+
+Test with:
+
+curl -H "x-bob-token: $BOB_READ_TOKEN" \
+https://YOUR_APP_URL/api/bob/read/health
+
+curl -H "x-bob-token: $BOB_READ_TOKEN" \
+https://YOUR_APP_URL/api/bob/read/latest-shift
+
+Expected:
+- 401 with no token
+- 200 with valid token
+- JSON response even if some sources are missing
+- No HTML response
+- No Vite fallback
+- No staff-facing changes
+
+SUCCESS CRITERIA:
+Bob’s cron must stop saying:
+“cannot reach/query canonical modules”
+
+Instead it must receive:
+- shift window
+- available canonical records
+- missing source list
+- verification inputs
+- explicit partial/blocked status if incomplete
+
+FINAL OUTPUT REQUIRED:
+- Files changed
+- Endpoint URLs
+- Test results
+- Example JSON response from latest completed shift
