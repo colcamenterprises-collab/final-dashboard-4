@@ -12,6 +12,7 @@ import SweetPotatoReconciliationTable from '@/components/analysis/SweetPotatoRec
 import { DrinkModifiersTable } from '@/components/analysis/DrinkModifiersTable';
 import { OtherModifiersTable } from '@/components/analysis/OtherModifiersTable';
 import { PromoMixMatchTable } from '@/components/analysis/PromoMixMatchTable';
+import FinancialControlCards from '@/components/analysis/FinancialControlCards';
 
 type Blocker = {
   code: string;
@@ -234,6 +235,13 @@ export default function AnalysisV2() {
           ))}
         </div>
       )}
+
+      <section>
+        <h2 className="text-sm font-semibold text-gray-800 mb-3 pb-1 border-b border-gray-100">
+          Shift Financial Control
+        </h2>
+        <FinancialControlCards date={shiftDate} />
+      </section>
 
       <section>
         <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">

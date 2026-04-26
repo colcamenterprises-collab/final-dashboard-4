@@ -44,6 +44,7 @@ Email automation requirement: Every completed daily shift form must automaticall
 - **Staff Access System**: Owner-only access with Staff Directory and Role Permissions matrix. Login uses email and PIN.
 - **Analytics & Reporting**: Sales Heatmap, Email Notifications, Data-Driven Dashboard, F&B Analysis, Stock Reconciliation & Security.
 - **Management Tools**: Manager Checklist System (locked schema and API), Source-Based Expense Management, Banking Reconciliation, Online Ordering, Membership, Rolls & Meat Ledger.
+- **Shift Financial Control**: `GET /api/analysis/financial-control?date=YYYY-MM-DD` returns 5-section financial snapshot: receipt count check (staff vs POS per channel), register cash position (POS-sourced expected vs staff closing), banking position (cash + QR), pay-in/pay-out control, and Loyverse sales summary. Frontend `FinancialControlCards.tsx` rendered above Drinks in Analysis V2. Uses `pos_shift_report` (primary) and `lv_receipt` aggregation (fallback). Staff-entered sales totals are NOT used — POS is the truth source.
 - **Theft-Control Issue Register**: `issue_register` table with CRUD API and auto-detection logic for discrepancies.
 - **Security & Accountability Layer (SA-1)**: Refund logging, manager shift sign-off, stock baseline seeding, stock snapshots, and variance engine.
 - **Canonical Data Architecture**: Centralized `purchasing_items` for purchasing, canonical `recipe` and `recipe_ingredient` for recipes, decoupled `ingredient_authority` for ingredients, and `stock_received_log` for unified stock logging.

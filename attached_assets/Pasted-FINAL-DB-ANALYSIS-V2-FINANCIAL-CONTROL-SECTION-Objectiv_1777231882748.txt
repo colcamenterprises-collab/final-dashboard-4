@@ -1,0 +1,190 @@
+FINAL DB — ANALYSIS V2 FINANCIAL CONTROL SECTION
+
+Objective:
+Add a visual Shift Financial Control section to the top of Analysis V2.
+
+This is NOT a table.
+Use styled summary cards/boxes similar to the old Shift Summary visual design.
+
+Context:
+Staff no longer enter Cash / QR / Grab / Other sales amounts.
+Staff only enter:
+- Starting cash
+- Closing cash
+- Receipt counts by channel
+- Wages
+- Other staff payments
+- Expenses / Pay In / Pay Out
+- Cash banked
+- QR banked
+- Refunds
+
+Sales truth must come from Loyverse/POS shift report.
+
+Add this section above Drinks on /analysis/v2.
+
+==================================================
+DATA SOURCES
+==================================================
+
+Use:
+1. Loyverse shift report / POS shift report
+2. daily_sales_v2 payload/form values
+3. purchase/expense/payment entries where relevant
+
+Do NOT use staff-entered sales totals.
+Do NOT rely on old daily_stock_sales.
+
+==================================================
+VISUAL STRUCTURE
+==================================================
+
+Create styled cards/boxes, not tables.
+
+Cards required:
+
+1. Receipt Count Check
+
+Compare:
+- Staff Grab receipt count
+- Staff Cash receipt count
+- Staff QR receipt count
+- Staff Other receipt count
+- Staff total receipts
+
+Against:
+- POS/Loyverse receipt counts by payment/channel
+- POS/Loyverse total receipts
+
+Display:
+- Staff count
+- POS count
+- Variance
+- Status: Match / Variance
+
+Green if variance = 0.
+Red if variance != 0.
+
+2. Register Cash Position
+
+Calculate:
+Expected Closing Cash =
+Starting Cash
++ POS Cash Sales
++ POS Pay Ins
+- POS Pay Outs
+- Refunds
+- Cash Banked
+
+Compare to:
+Staff Closing Cash
+
+Display:
+- Starting Cash
+- POS Cash Sales
+- Pay Ins
+- Pay Outs
+- Refunds
+- Cash Banked
+- Expected Closing Cash
+- Staff Closing Cash
+- Variance
+
+Green if variance = 0.
+Red if variance != 0.
+
+3. Banking Position
+
+Display:
+- Cash expected to bank
+- Staff cash banked
+- Cash banking variance
+- QR expected
+- Staff QR banked
+- QR variance
+
+Green if variance = 0.
+Red if variance != 0.
+
+4. Pay In / Pay Out Control
+
+Display:
+- POS pay-ins
+- POS pay-outs
+- Staff-entered expenses/payments
+- Difference
+
+Green if match.
+Red if mismatch.
+
+5. Loyverse Sales Summary
+
+Display POS values only:
+- Gross sales
+- Net sales
+- Cash sales
+- QR sales
+- Grab / delivery sales
+- Refunds
+- Receipt count
+
+==================================================
+RULES
+==================================================
+
+- Owner-only or Analysis page access only.
+- Do not show this to staff on form pages.
+- Do not change Form 1/Form 2 fields.
+- Do not reintroduce staff-entered sales totals.
+- If POS shift report data is missing, show “POS data missing” card instead of fake zeros.
+- If staff form data is missing, show “Staff form missing” card.
+- All variances must be explicit, not hidden.
+- Keep existing Analysis V2 stock sections unchanged.
+
+==================================================
+IMPLEMENTATION
+==================================================
+
+Create isolated backend endpoint, for example:
+GET /api/analysis/financial-control?date=YYYY-MM-DD
+
+Return normalized object:
+{
+  shiftDate,
+  posAvailable,
+  formAvailable,
+  receiptCounts,
+  salesSummary,
+  cashPosition,
+  bankingPosition,
+  payInPayOut,
+  warnings
+}
+
+Create frontend component:
+FinancialControlCards.tsx
+
+Add it above Drinks in AnalysisV2.
+
+==================================================
+VALIDATION
+==================================================
+
+For a completed shift:
+1. Analysis V2 loads with Financial Control section first.
+2. Styled cards render, not tables.
+3. Receipt count variance calculated.
+4. Cash position variance calculated.
+5. Banking variance calculated.
+6. POS sales summary visible.
+7. If POS shift report missing, section shows clear missing data warning.
+8. Existing Analysis V2 sections unchanged:
+   - Drinks
+   - Burgers & Sets
+   - Buns
+   - Meat
+   - Side Orders
+   - Fries
+   - Sweet Potato
+   - Modifiers
+   - Promotions
