@@ -1,0 +1,87 @@
+URGENT FINAL DB PATCH — STOCK LODGEMENT MODAL + ANALYSIS V2 WARNING CLEANUP
+
+Objective:
+Fix two urgent live issues in one patch.
+
+1. Stock Lodgement modal is missing Fries and Sweet Potato purchase inputs.
+2. Analysis V2 is still showing stale non-drink modifier warnings in the top warning block.
+
+Do both in one patch.
+
+==================================================
+PART A — STOCK LODGEMENT MODAL
+==================================================
+
+Current live modal only shows:
+- Rolls
+- Meat
+- Drinks
+
+Required tabs/buttons:
+- Rolls
+- Meat
+- Drinks
+- Fries
+- Sweet Potato
+
+Rules:
+- Do NOT break existing Rolls, Meat, or Drinks flows.
+- Keep the old modal behaviour exactly the same.
+- Add Fries and Sweet Potato using the same pattern as Meat grams.
+
+Fries tab:
+- Staff Name
+- Quantity (grams)
+- Submit field: friesGrams
+- Save to existing purchase_tally.fries_grams
+
+Sweet Potato tab:
+- Staff Name
+- Quantity (grams)
+- Submit field: sweetPotatoGrams
+- Save to existing purchase_tally.sweet_potato_grams
+
+Validation:
+1. Open Stock Lodgement modal.
+2. Confirm tabs show:
+   Rolls | Meat | Drinks | Fries | Sweet Potato
+3. Lodge Fries purchase.
+4. Lodge Sweet Potato purchase.
+5. Confirm both save to purchase_tally.
+6. Confirm Rolls, Meat, and Drinks still work.
+
+==================================================
+PART B — ANALYSIS V2 WARNING CLEANUP
+==================================================
+
+Problem:
+Analysis V2 top yellow warning block still shows stale warnings for non-drink modifiers, such as:
+- Crunchy Fried Onions cannot be mapped to drink SKU
+- Jalapenos cannot be mapped to drink SKU
+- No Tomato cannot be mapped to drink SKU
+- No Burger Sauce cannot be mapped to drink SKU
+
+This is wrong because non-drink modifiers are now handled by Other Modifiers V2.
+
+Required:
+1. Drinks warnings should only include actual drink modifier mapping issues.
+2. Do NOT warn for:
+   - Make it Better
+   - Please No
+   - Burger options
+   - Other Modifiers
+3. Keep Drink Modifiers table visible.
+4. Keep Other Modifiers table visible.
+5. Remove stale non-drink modifier warnings from the top warning block.
+
+Validation:
+1. Open /analysis/v2 for 2026-04-25.
+2. Confirm yellow warning block no longer shows non-drink modifier warnings.
+3. Confirm Drink Modifiers table still works.
+4. Confirm Other Modifiers table still shows add-ons/removals.
+5. Confirm Drinks reconciliation still uses drink modifiers only.
+6. Confirm no 500 errors or console warnings.
+
+Do not change unrelated Analysis V2 calculations.
+Do not change Drinks table structure.
+Do not change Burgers, Buns, Meat, Side Orders, Fries, or Sweet Potato logic.

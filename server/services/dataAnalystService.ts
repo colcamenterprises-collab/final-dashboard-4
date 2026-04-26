@@ -101,6 +101,17 @@ function codeFromModifierName(modifierName: string): string | null {
   return map[n] || null;
 }
 
+// Known drink-like prefixes — only modifiers starting with these prefixes can
+// generate an AMBIGUOUS_MAPPING blocker. Non-drink modifiers (burger add-ons,
+// removals, upgrades, etc.) are silently skipped as they are handled by the
+// OtherModifiers pipeline.
+const DRINK_LIKE_PREFIXES = ["coke", "coca", "sprite", "water", "bottle", "fanta", "schweppes", "soda"];
+
+function isDrinkLikeModifier(modifierName: string): boolean {
+  const lower = modifierName.toLowerCase().trim();
+  return DRINK_LIKE_PREFIXES.some((prefix) => lower.startsWith(prefix));
+}
+
 export async function getDailyAnalysis(date: string): Promise<DailyAnalysisResult> {
   const blockers: Blocker[] = [];
   let purchaseBySkuQueryFailed = false;
@@ -322,13 +333,18 @@ export async function getDailyAnalysis(date: string): Promise<DailyAnalysisResul
   for (const row of modifierAggResult.rows as any[]) {
     const code = codeFromModifierName(String(row.modifier_name || ""));
     if (!code) {
-      blockers.push({
-        code: "AMBIGUOUS_MAPPING",
-        message: `Modifier "${String(row.modifier_name)}" cannot be mapped deterministically to a drink code/SKU.`,
-        where: "receipt_truth_modifier_aggregate.modifier_name",
-        canonical_source: "receipt_truth_modifier_aggregate",
-        auto_build_attempted: false,
-      });
+      // Only warn if this looks like a drink modifier that failed to map.
+      // Non-drink modifiers (burger add-ons, removals, etc.) are handled by
+      // the OtherModifiers pipeline and must NOT generate warnings here.
+      if (isDrinkLikeModifier(String(row.modifier_name || ""))) {
+        blockers.push({
+          code: "AMBIGUOUS_MAPPING",
+          message: `Modifier "${String(row.modifier_name)}" cannot be mapped deterministically to a drink code/SKU.`,
+          where: "receipt_truth_modifier_aggregate.modifier_name",
+          canonical_source: "receipt_truth_modifier_aggregate",
+          auto_build_attempted: false,
+        });
+      }
       continue;
     }
     modifierDrinkByCode[code] = (modifierDrinkByCode[code] || 0) + asNum(row.qty);

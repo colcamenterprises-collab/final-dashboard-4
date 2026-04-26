@@ -3061,6 +3061,48 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         return res.json({ ok: true, tally: tallyResult.rows[0], drinks: drinkResults });
       }
 
+      if (req.body.type === "fries") {
+        const { friesGrams, submittedBy, submittedAt } = req.body;
+
+        const result = await db.execute(sql`
+          INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, fries_grams)
+          VALUES (
+            gen_random_uuid(),
+            ${submittedAt ? new Date(submittedAt).toISOString() : new Date().toISOString()}::timestamp,
+            ${purchaseDate}::date,
+            ${submittedBy || null},
+            ${'Fries Supplier'},
+            0,
+            ${'Fries stock lodgement'},
+            ${Math.round(Number(friesGrams))}
+          )
+          RETURNING id, created_at, date, staff, fries_grams, notes as item
+        `);
+
+        return res.json({ ok: true, stock: result.rows[0] });
+      }
+
+      if (req.body.type === "sweetpotato") {
+        const { sweetPotatoGrams, submittedBy, submittedAt } = req.body;
+
+        const result = await db.execute(sql`
+          INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, sweet_potato_grams)
+          VALUES (
+            gen_random_uuid(),
+            ${submittedAt ? new Date(submittedAt).toISOString() : new Date().toISOString()}::timestamp,
+            ${purchaseDate}::date,
+            ${submittedBy || null},
+            ${'Sweet Potato Supplier'},
+            0,
+            ${'Sweet potato stock lodgement'},
+            ${Math.round(Number(sweetPotatoGrams))}
+          )
+          RETURNING id, created_at, date, staff, sweet_potato_grams, notes as item
+        `);
+
+        return res.json({ ok: true, stock: result.rows[0] });
+      }
+
       res.status(400).json({ ok: false, error: "Invalid stock type" });
     } catch (err) {
       console.error("Stock lodge error:", err);

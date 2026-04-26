@@ -4,8 +4,12 @@ import { apiRequest } from "@/lib/queryClient";
 import { RollsLodgementPanel, RollsForm } from "./RollsLodgementPanel";
 import { MeatLodgementPanel, MeatForm } from "./MeatLodgementPanel";
 import { DrinksLodgementPanel, DrinksForm, DrinkIngredient } from "./DrinksLodgementPanel";
+import { FriesLodgementPanel, FriesForm } from "./FriesLodgementPanel";
+import { SweetPotatoLodgementPanel, SweetPotatoForm } from "./SweetPotatoLodgementPanel";
 import { useState } from "react";
 import { CalendarDays } from "lucide-react";
+
+type TabType = "rolls" | "meat" | "drinks" | "fries" | "sweetpotato";
 
 interface StockInitialData {
   type: "rolls" | "meat" | "drinks";
@@ -33,10 +37,13 @@ function getMinBackdateDate(): string {
   return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
 }
 
-const tabLabels = {
-  en: { rolls: "Rolls", meat: "Meat", drinks: "Drinks" },
-  th: { rolls: "ขนมปัง", meat: "เนื้อ", drinks: "เครื่องดื่ม" },
-};
+const TAB_LABELS: { key: TabType; label: string }[] = [
+  { key: "rolls", label: "Rolls" },
+  { key: "meat", label: "Meat" },
+  { key: "drinks", label: "Drinks" },
+  { key: "fries", label: "Fries" },
+  { key: "sweetpotato", label: "Sweet Potato" },
+];
 
 interface StockLodgementPanelsProps {
   mode: "tabs" | "columns";
@@ -49,10 +56,11 @@ interface StockLodgementPanelsProps {
 export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel, lang = "en" }: StockLodgementPanelsProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"rolls" | "meat" | "drinks">(initialData?.type || "rolls");
+  const [activeTab, setActiveTab] = useState<TabType>(
+    (initialData?.type as TabType) || "rolls"
+  );
   const [effectiveDate, setEffectiveDate] = useState<string>(getBangkokTodayDate());
   const isEditMode = !!initialData?.id;
-  const T = tabLabels[lang];
 
   const todayBkk = getBangkokTodayDate();
   const minDate = getMinBackdateDate();
@@ -75,7 +83,10 @@ export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel, l
       return apiRequest(endpoint, { method, body: JSON.stringify(payload) });
     },
     onSuccess: (_, variables) => {
-      const stockType = variables.type === "rolls" ? "Rolls" : variables.type === "meat" ? "Meat" : "Drinks";
+      const labelMap: Record<string, string> = {
+        rolls: "Rolls", meat: "Meat", drinks: "Drinks", fries: "Fries", sweetpotato: "Sweet Potato",
+      };
+      const stockType = labelMap[variables.type] || variables.type;
       const action = isEditMode ? "Updated" : "Lodged";
       const dateNote = variables.effectiveDate && variables.effectiveDate !== todayBkk ? ` for ${variables.effectiveDate}` : "";
       toast({ title: `${stockType} ${action} Successfully`, description: `Stock purchase has been ${isEditMode ? "updated" : "recorded"}${dateNote}`, variant: "success" as any, duration: 3000 });
@@ -92,6 +103,8 @@ export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel, l
 
   const submitRolls = (data: RollsForm) => stockMutation.mutate({ type: "rolls", quantity: data.quantity, cost: data.cost, paid: data.paid, submittedBy: data.staffName, submittedAt: getBangkokNowIso(), effectiveDate });
   const submitMeat = (data: MeatForm) => stockMutation.mutate({ type: "meat", meatType: data.meatType, weightKg: data.weightKg, submittedBy: data.staffName, submittedAt: getBangkokNowIso(), effectiveDate });
+  const submitFries = (data: FriesForm) => stockMutation.mutate({ type: "fries", friesGrams: data.friesGrams, submittedBy: data.staffName, submittedAt: getBangkokNowIso(), effectiveDate });
+  const submitSweetPotato = (data: SweetPotatoForm) => stockMutation.mutate({ type: "sweetpotato", sweetPotatoGrams: data.sweetPotatoGrams, submittedBy: data.staffName, submittedAt: getBangkokNowIso(), effectiveDate });
 
   const submitDrinks = (data: DrinksForm, drinkCounts: Record<string, number>) => {
     const items = Object.entries(drinkCounts).filter(([_, qty]) => qty > 0).map(([ingredientId, quantity]) => {
@@ -137,19 +150,34 @@ export function StockLodgementPanels({ mode, initialData, onSuccess, onCancel, l
       <div>
         {effectiveDatePicker}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4" data-testid="homepage-stock-lodgement-grid">
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">{T.rolls}</h2><RollsLodgementPanel {...panelProps} onSubmit={submitRolls} /></div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">{T.meat}</h2><MeatLodgementPanel {...panelProps} onSubmit={submitMeat} /></div>
-          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">{T.drinks}</h2><DrinksLodgementPanel {...panelProps} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} /></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">Rolls</h2><RollsLodgementPanel {...panelProps} onSubmit={submitRolls} /></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">Meat</h2><MeatLodgementPanel {...panelProps} onSubmit={submitMeat} /></div>
+          <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-semibold text-slate-900 mb-3">Drinks</h2><DrinksLodgementPanel {...panelProps} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} /></div>
         </div>
       </div>
     );
   }
 
-  return <>
-    {effectiveDatePicker}
-    <div className="flex border-b border-slate-200 mb-4">{(["rolls", "meat", "drinks"] as const).map((tab) => <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`px-4 py-2 text-sm ${activeTab === tab ? "border-b-2 border-emerald-600 text-emerald-600 font-medium" : "text-slate-600 hover:text-slate-800"}`}>{T[tab]}</button>)}</div>
-    {activeTab === "rolls" && <RollsLodgementPanel {...panelProps} initialValues={initialData?.type === "rolls" ? { quantity: initialData.quantity, cost: initialData.cost, paid: initialData.paid } : undefined} onSubmit={submitRolls} />}
-    {activeTab === "meat" && <MeatLodgementPanel {...panelProps} initialValues={initialData?.type === "meat" ? { meatType: initialData.meatType, weightKg: initialData.weightKg } : undefined} onSubmit={submitMeat} />}
-    {activeTab === "drinks" && <DrinksLodgementPanel {...panelProps} initialValues={initialData?.type === "drinks" ? {} : undefined} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} />}
-  </>;
+  return (
+    <>
+      {effectiveDatePicker}
+      <div className="flex flex-wrap border-b border-slate-200 mb-4">
+        {TAB_LABELS.map(({ key, label }) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setActiveTab(key)}
+            className={`px-4 py-2 text-sm ${activeTab === key ? "border-b-2 border-emerald-600 text-emerald-600 font-medium" : "text-slate-600 hover:text-slate-800"}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {activeTab === "rolls" && <RollsLodgementPanel {...panelProps} initialValues={initialData?.type === "rolls" ? { quantity: initialData.quantity, cost: initialData.cost, paid: initialData.paid } : undefined} onSubmit={submitRolls} />}
+      {activeTab === "meat" && <MeatLodgementPanel {...panelProps} initialValues={initialData?.type === "meat" ? { meatType: initialData.meatType, weightKg: initialData.weightKg } : undefined} onSubmit={submitMeat} />}
+      {activeTab === "drinks" && <DrinksLodgementPanel {...panelProps} initialValues={initialData?.type === "drinks" ? {} : undefined} drinkIngredients={drinkIngredients} drinksLoading={drinksLoading} onSubmit={submitDrinks} />}
+      {activeTab === "fries" && <FriesLodgementPanel {...panelProps} onSubmit={submitFries} />}
+      {activeTab === "sweetpotato" && <SweetPotatoLodgementPanel {...panelProps} onSubmit={submitSweetPotato} />}
+    </>
+  );
 }
