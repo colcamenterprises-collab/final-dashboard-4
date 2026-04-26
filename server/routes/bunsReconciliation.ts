@@ -44,27 +44,36 @@ router.get('/buns-reconciliation', async (req, res) => {
     const prevDateStr = prevDate.toISOString().slice(0, 10);
 
     // ── Start: previous shift's closing bun count ─────────────────────────
+    // Source: daily_sales_v2.payload.rollsEnd for the previous shift date.
+    // Pick the most complete row: prefer rows where rollsEnd is set, then most recent.
     const startRes = await pool.query(
-      `SELECT dsv."burgerBuns"
-       FROM daily_stock_v2 dsv
-       JOIN daily_sales_v2 ds ON dsv."salesId" = ds.id
-       WHERE ds."shiftDate" = $1`,
+      `SELECT (payload->>'rollsEnd')::int AS rolls_end
+       FROM daily_sales_v2
+       WHERE "shiftDate" = $1
+         AND (payload->>'rollsEnd') IS NOT NULL
+       ORDER BY (payload->>'rollsEnd') IS NOT NULL DESC, "createdAt" DESC
+       LIMIT 1`,
       [prevDateStr],
     );
     const start: number | null = startRes.rows[0]
-      ? Number(startRes.rows[0].burgerBuns)
+      ? Number(startRes.rows[0].rolls_end)
       : null;
 
     // ── End: current shift's closing bun count ────────────────────────────
+    // Source: daily_sales_v2.payload.rollsEnd for the current shift date.
+    // Must pick the most complete row: prefer rows where rollsEnd is set, then most recent.
+    // DO NOT estimate from meat, receipts, SKUs, or fallback values.
     const endRes = await pool.query(
-      `SELECT dsv."burgerBuns"
-       FROM daily_stock_v2 dsv
-       JOIN daily_sales_v2 ds ON dsv."salesId" = ds.id
-       WHERE ds."shiftDate" = $1`,
+      `SELECT (payload->>'rollsEnd')::int AS rolls_end
+       FROM daily_sales_v2
+       WHERE "shiftDate" = $1
+         AND (payload->>'rollsEnd') IS NOT NULL
+       ORDER BY (payload->>'rollsEnd') IS NOT NULL DESC, "createdAt" DESC
+       LIMIT 1`,
       [date],
     );
     const end: number | null = endRes.rows[0]
-      ? Number(endRes.rows[0].burgerBuns)
+      ? Number(endRes.rows[0].rolls_end)
       : null;
 
     // ── Purchased: sum of rolls_pcs from purchase_tally for this date ─────
