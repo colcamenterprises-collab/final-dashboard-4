@@ -1,0 +1,90 @@
+FINAL DB — MODIFIER PIPELINE FIX + OTHER MODIFIERS V2
+
+Objective:
+Fix modifier handling so drink modifiers are captured correctly and non-drink modifiers are preserved separately.
+
+Problem:
+Current app modifier logic is undercounting drink modifiers and trying to map unrelated modifiers like Jalapenos, Fried Onions, No Tomato, etc. into drink SKUs.
+
+Required fix:
+
+1. Drink modifier pipeline
+Only include drink modifiers from:
+- Drink Options (Sets)
+- Mix and Match - Drink Options
+
+Group by option_name and sum quantity.
+
+Expected output for 2026-04-25 should match Loyverse:
+- Bottle Water = 3
+- Coke = 8
+- Coke Zero = 2
+- Fanta Orange = 7
+- Fanta Strawberry = 3
+- Schweppes Manow = 3
+- Soda Water = 3
+- Sprite = 1
+
+Important:
+- Bottle Water total includes 2 from Drink Options (Sets) + 1 from Mix and Match - Drink Options
+- Do not include Make it Better
+- Do not include Please No
+- Do not include burger option modifiers in drink calculation
+
+2. Drink SKU mapping
+Map drink options deterministically:
+- Coke → 10012
+- Coke Zero → 10013
+- Fanta Orange → 10027
+- Fanta Strawberry → 10028
+- Schweppes Manow / Schweppes Manao / Schweppes Lime → 10021
+- Soda Water → 10029
+- Bottle Water / Bottled Water → 10031
+- Sprite → 10026
+
+Rules:
+- no guessing
+- if unmapped, flag UNMAPPED_DRINK_MODIFIER
+- do not silently drop rows
+
+3. Other Modifiers V2
+Create a separate modifier output/table for all non-drink modifiers.
+
+Include:
+- Modifier Name
+- Option Name
+- Quantity Sold
+- Category/Type if available
+- Notes
+
+This should capture:
+- Make it Better
+- Mix and Match - Burger Option
+- Please No
+- any other non-drink modifiers
+
+4. Analysis V2 UI
+Replace current Modifiers section with two clear sections:
+A. Drink Modifiers
+B. Other Modifiers
+
+5. Drinks reconciliation
+Update Drinks table to use the corrected Drink Modifiers output.
+Sold via Modifiers must match the drink modifier totals above.
+
+6. Do not touch:
+- Drinks table structure
+- Burgers table
+- Buns table
+- Meat table
+- Side Orders table
+- Fries table
+- Sweet Potato table
+
+Validation:
+For 2026-04-25:
+1. Drink Modifiers table matches Loyverse totals exactly.
+2. Drinks reconciliation Sold via Modifiers uses those same totals.
+3. Other Modifiers table includes Jalapenos, Fried Onions, No Tomato, No Sauce, etc.
+4. No ambiguous drink warnings appear for non-drink modifiers.
+5. All other Analysis V2 sections unchanged.

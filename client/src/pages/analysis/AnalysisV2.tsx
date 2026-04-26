@@ -9,6 +9,8 @@ import MeatReconciliationTable from '@/components/analysis/MeatReconciliationTab
 import SideOrdersTable from '@/components/analysis/SideOrdersTable';
 import FriesReconciliationTable from '@/components/analysis/FriesReconciliationTable';
 import SweetPotatoReconciliationTable from '@/components/analysis/SweetPotatoReconciliationTable';
+import { DrinkModifiersTable } from '@/components/analysis/DrinkModifiersTable';
+import { OtherModifiersTable } from '@/components/analysis/OtherModifiersTable';
 
 type Blocker = {
   code: string;
@@ -280,32 +282,16 @@ export default function AnalysisV2() {
 
           <section>
             <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
-              7. Modifiers
+              7A. Drink Modifiers
             </h2>
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-xs">
-                <thead>
-                  <tr>
-                    <Th>Modifier Type</Th>
-                    <Th>Item</Th>
-                    <Th right>Count</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.tables.modifiers.length === 0 ? (
-                    <EmptyRow cols={3} />
-                  ) : (
-                    data.tables.modifiers.map((row, idx) => (
-                      <tr key={`${row.modifierType}-${row.item}-${idx}`} className="hover:bg-gray-50">
-                        <Cell>{row.modifierType}</Cell>
-                        <Cell>{row.item}</Cell>
-                        <Cell right bold>{row.count}</Cell>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <DrinkModifiersTable date={shiftDate} />
+          </section>
+
+          <section>
+            <h2 className="text-sm font-semibold text-gray-800 mb-2 pb-1 border-b border-gray-100">
+              7B. Other Modifiers
+            </h2>
+            <OtherModifiersTable date={shiftDate} />
           </section>
 
         </div>

@@ -305,6 +305,8 @@ async function checkSchema() {
   // Mount sweet potato reconciliation — isolated from all other stock sections
   const sweetPotatoReconciliationRouter = (await import('./routes/sweetPotatoReconciliation.js')).default;
   app.use('/api/analysis', sweetPotatoReconciliationRouter);
+  const modifierPipelineRouter = (await import('./routes/modifierPipeline.js')).default;
+  app.use('/api/analysis', modifierPipelineRouter);
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
   

@@ -2,40 +2,34 @@
  * /api/analysis/drinks-variance  — Drinks Stock Reconciliation
  * /api/analysis/drinks-variance/reviews — Review persistence
  *
- * Rebuilt per FINAL DB spec (Apr 2026):
- * - Only drink SKUs (10 canonical items, no burgers/fries/sets)
- * - Modifiers sourced from receipt_truth_daily_usage set-row columns (not modifier aggregate)
- * - daily_stock_v2 uses correct column "drinksJson" + "createdAt"::date
- * - Explicit SKU→stock-key mapping (no fuzzy matching)
- * - Formula: Total Sold = Direct + Modifiers, Expected = Start + Purchased − Total Sold, Variance = End − Expected
- * - WATER code ambiguity: cannot split water_used between Soda Water and Bottle Water → shown as null/warning
+ * Modifier source: lv_modifier JOIN lv_receipt (Loyverse raw data)
+ * Modifiers filtered via deterministic name mapping from modifierPipeline.ts
+ * Water ambiguity resolved — Soda Water and Bottle Water are separately named in Loyverse.
  */
 
 import { Router } from 'express';
 import { pool } from '../db';
+import { getDrinkEntryForModifier } from './modifierPipeline.js';
 
 const router = Router();
 
 // ─── Canonical drink list ──────────────────────────────────────────────────
-// Each entry defines the exact mapping between data sources.
-// stockKey must match the JSON keys in daily_stock_v2.drinksJson.
-// modifierCol is the column in receipt_truth_daily_usage on set rows.
-// null modifierCol = not sold via modifiers.
-// 'AMBIGUOUS' = WATER code shared by Soda Water & Bottle Water; cannot split.
+// modifierNames: exact lv_modifier.name values that map to this drink SKU.
+// null = not sold via modifiers (Kids Juice).
 const DRINK_CATALOG = [
-  { sku: '10012', displayName: 'Coke Can',            stockKey: 'Coke',                modifierCol: 'coke_used'              },
-  { sku: '10013', displayName: 'Coke Zero',           stockKey: 'Coke Zero',           modifierCol: 'coke_zero_used'         },
-  { sku: '10021', displayName: 'Schweppes Lime',      stockKey: 'Schweppes Manow',     modifierCol: 'schweppes_manao_used'   },
-  { sku: '10026', displayName: 'Sprite',              stockKey: 'Sprite',              modifierCol: 'sprite_used'            },
-  { sku: '10027', displayName: 'Fanta Orange',        stockKey: 'Fanta Orange',        modifierCol: 'fanta_orange_used'      },
-  { sku: '10028', displayName: 'Fanta Strawberry',    stockKey: 'Fanta Strawberry',    modifierCol: 'fanta_strawberry_used'  },
-  { sku: '10029', displayName: 'Soda Water',          stockKey: 'Soda Water',          modifierCol: 'AMBIGUOUS'              },
-  { sku: '10031', displayName: 'Bottle Water',        stockKey: 'Bottled Water',       modifierCol: 'AMBIGUOUS'              },
-  { sku: '10039', displayName: 'Kids Juice (Orange)', stockKey: 'Kids Juice (Orange)', modifierCol: null                     },
-  { sku: '10040', displayName: 'Kids Juice (Apple)',  stockKey: 'Kids Juice (Apple)',  modifierCol: null                     },
+  { sku: '10012', displayName: 'Coke Can',            stockKey: 'Coke',                modifierNames: ['Coke', 'Coca Cola', 'Coca-Cola']                             },
+  { sku: '10013', displayName: 'Coke Zero',           stockKey: 'Coke Zero',           modifierNames: ['Coke Zero', 'Coca Cola Zero', 'Coca-Cola Zero']               },
+  { sku: '10021', displayName: 'Schweppes Lime',      stockKey: 'Schweppes Manow',     modifierNames: ['Schweppes Manow', 'Schweppes Manao', 'Schweppes Lime']        },
+  { sku: '10026', displayName: 'Sprite',              stockKey: 'Sprite',              modifierNames: ['Sprite']                                                      },
+  { sku: '10027', displayName: 'Fanta Orange',        stockKey: 'Fanta Orange',        modifierNames: ['Fanta Orange']                                                },
+  { sku: '10028', displayName: 'Fanta Strawberry',    stockKey: 'Fanta Strawberry',    modifierNames: ['Fanta Strawberry']                                            },
+  { sku: '10029', displayName: 'Soda Water',          stockKey: 'Soda Water',          modifierNames: ['Soda Water']                                                  },
+  { sku: '10031', displayName: 'Bottle Water',        stockKey: 'Bottled Water',       modifierNames: ['Bottle Water', 'Bottled Water']                               },
+  { sku: '10039', displayName: 'Kids Juice (Orange)', stockKey: 'Kids Juice (Orange)', modifierNames: null                                                            },
+  { sku: '10040', displayName: 'Kids Juice (Apple)',  stockKey: 'Kids Juice (Apple)',  modifierNames: null                                                            },
 ] as const;
 
-type DrinkEntry = typeof DRINK_CATALOG[number];
+type DrinkEntry = (typeof DRINK_CATALOG)[number];
 
 function normKey(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -53,7 +47,6 @@ router.get('/drinks-variance', async (req, res) => {
   const prevDate = prior.toISOString().slice(0, 10);
 
   const drinkSkus = DRINK_CATALOG.map((d) => d.sku);
-  const setSkusSql = `(SELECT sku FROM receipt_truth_usage_rule WHERE requires_drink_modifier = true AND active = true)`;
 
   const [endStk, prevStk, sales2End, sales2Prev, purchases, directSold, modifierTotals, reviews] =
     await Promise.all([
@@ -122,27 +115,17 @@ router.get('/drinks-variance', async (req, res) => {
         )
         .catch(() => ({ rows: [] } as any)),
 
-      // 7. Modifier totals — SUM each drink column from set rows on this business_date
+      // 7. Modifier totals — from lv_modifier (Loyverse raw, complete source of truth)
       pool
-        .query<{
-          coke_total: number; coke_zero_total: number; sprite_total: number;
-          water_total: number; fanta_orange_total: number; fanta_strawberry_total: number;
-          schweppes_total: number;
-        }>(
-          `SELECT
-             COALESCE(SUM(coke_used), 0)::int              AS coke_total,
-             COALESCE(SUM(coke_zero_used), 0)::int          AS coke_zero_total,
-             COALESCE(SUM(sprite_used), 0)::int             AS sprite_total,
-             COALESCE(SUM(water_used), 0)::int              AS water_total,
-             COALESCE(SUM(fanta_orange_used), 0)::int       AS fanta_orange_total,
-             COALESCE(SUM(fanta_strawberry_used), 0)::int   AS fanta_strawberry_total,
-             COALESCE(SUM(schweppes_manao_used), 0)::int    AS schweppes_total
-           FROM receipt_truth_daily_usage
-           WHERE business_date = $1
-             AND sku IN ${setSkusSql}`,
+        .query<{ modifier_name: string; total: string }>(
+          `SELECT m.name AS modifier_name, SUM(m.qty)::int AS total
+           FROM lv_modifier m
+           JOIN lv_receipt r ON r.receipt_id = m.receipt_id
+           WHERE r.datetime_bkk::date = $1::date
+           GROUP BY m.name`,
           [date],
         )
-        .catch(() => ({ rows: [{ coke_total:0, coke_zero_total:0, sprite_total:0, water_total:0, fanta_orange_total:0, fanta_strawberry_total:0, schweppes_total:0 }] } as any)),
+        .catch(() => ({ rows: [] } as any)),
 
       // 8. Reviews for this date
       pool
@@ -193,21 +176,14 @@ router.get('/drinks-variance', async (req, res) => {
     directSoldMap.set(r.sku, Number(r.qty));
   }
 
-  // ── Modifier totals ─────────────────────────────────────────────────
-  const mt = modifierTotals.rows[0] ?? {
-    coke_total:0, coke_zero_total:0, sprite_total:0, water_total:0,
-    fanta_orange_total:0, fanta_strawberry_total:0, schweppes_total:0,
-  };
-
-  const MODIFIER_TOTALS: Record<string, number> = {
-    coke_used:              Number(mt.coke_total),
-    coke_zero_used:         Number(mt.coke_zero_total),
-    sprite_used:            Number(mt.sprite_total),
-    water_used:             Number(mt.water_total),
-    fanta_orange_used:      Number(mt.fanta_orange_total),
-    fanta_strawberry_used:  Number(mt.fanta_strawberry_total),
-    schweppes_manao_used:   Number(mt.schweppes_total),
-  };
+  // ── Modifier totals from lv_modifier rows ────────────────────────────
+  // Build a map: sku → totalQty from drink modifier names in lv_modifier
+  const modifierBySku = new Map<string, number>();
+  for (const row of modifierTotals.rows as Array<{ modifier_name: string; total: string }>) {
+    const entry = getDrinkEntryForModifier(row.modifier_name);
+    if (!entry) continue; // non-drink modifier — ignored here
+    modifierBySku.set(entry.sku, (modifierBySku.get(entry.sku) ?? 0) + Number(row.total));
+  }
 
   // ── Reviewed items set ──────────────────────────────────────────────
   const reviewedItems = new Set(reviews.rows.map((r: any) => r.item_name));
@@ -220,15 +196,12 @@ router.get('/drinks-variance', async (req, res) => {
     const soldDirect = directSoldMap.get(entry.sku) ?? 0;
 
     let soldViaModifiers: number | null = null;
-    let ambiguousModifier = false;
 
-    if (entry.modifierCol === 'AMBIGUOUS') {
-      ambiguousModifier = true;
-      soldViaModifiers = null;
-    } else if (entry.modifierCol === null) {
+    if (entry.modifierNames === null) {
+      // Not sold via modifiers (Kids Juice)
       soldViaModifiers = 0;
     } else {
-      soldViaModifiers = MODIFIER_TOTALS[entry.modifierCol] ?? 0;
+      soldViaModifiers = modifierBySku.get(entry.sku) ?? 0;
     }
 
     const totalSold = soldDirect + (soldViaModifiers ?? 0);
@@ -249,7 +222,6 @@ router.get('/drinks-variance', async (req, res) => {
       stock_key:          entry.stockKey,
       sold_direct:        soldDirect,
       sold_via_modifiers: soldViaModifiers,
-      ambiguous_modifier: ambiguousModifier,
       total_sold:         totalSold,
       start,
       purchased,
