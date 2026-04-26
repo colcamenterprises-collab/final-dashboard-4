@@ -137,11 +137,34 @@ router.get('/fries-reconciliation', async (req, res) => {
       });
     }
 
+    // ── Promo fries: Mix and Match Meal Deal (SKU 10069) = 2 servings per sale ─
+    // Rule: each Mix and Match includes 2 French Fries servings. Not Sweet Potato.
+    // SKU 10069 is category "Promotions", excluded from SET_SKUS above.
+    const PROMO_FRIES_PER_SALE = 2;
+    const promoFriesRes = await pool.query(
+      `SELECT COALESCE(SUM(quantity_sold), 0) AS total
+       FROM receipt_truth_daily_usage
+       WHERE business_date = $1 AND sku = '10069'`,
+      [date],
+    );
+    const promoQty = Number(promoFriesRes.rows[0]?.total ?? 0);
+    const promoServings = promoQty * PROMO_FRIES_PER_SALE;
+
+    if (promoServings > 0) {
+      usageBreakdown.push({
+        sku: '10069',
+        item_name: 'Mix and Match Meal Deal (promo fries)',
+        servings: promoServings,
+        grams: promoServings * GRAMS_PER_SERVING,
+        source: 'promo',
+      });
+    }
+
     const directServings = friesSalesRes.rows.reduce(
       (s: number, r: any) => s + Number(r.qty_sold),
       0,
     );
-    const totalServings = directServings + totalSets;
+    const totalServings = directServings + totalSets + promoServings;
     const usedGrams = totalServings * GRAMS_PER_SERVING;
 
     // ── Formula ───────────────────────────────────────────────────────────
@@ -186,6 +209,7 @@ router.get('/fries-reconciliation', async (req, res) => {
       total_servings: totalServings,
       direct_servings: directServings,
       set_servings: totalSets,
+      promo_servings: promoServings,
       usage_breakdown: usageBreakdown,
       stock_source: { start: startSource, end: endSource },
       data: {

@@ -85,7 +85,22 @@ router.get('/buns-reconciliation', async (req, res) => {
          AND item_name NOT LIKE 'Add-ons%'`,
       [date, BURGER_CATEGORIES],
     );
-    const used = Number(usedRes.rows[0]?.total ?? 0);
+    const usedFromCategories = Number(usedRes.rows[0]?.total ?? 0);
+
+    // ── Promo buns: Mix and Match Meal Deal (SKU 10069) = 2 buns per sale ─
+    // Rule: each Mix and Match sale includes 2 burgers → 2 buns.
+    // SKU 10069 is category "Promotions", excluded from BURGER_CATEGORIES above.
+    const PROMO_BUNS_PER_SALE = 2;
+    const promoRes = await pool.query(
+      `SELECT COALESCE(SUM(quantity_sold), 0) AS total
+       FROM receipt_truth_daily_usage
+       WHERE business_date = $1 AND sku = '10069'`,
+      [date],
+    );
+    const promoQty = Number(promoRes.rows[0]?.total ?? 0);
+    const promoBunsContribution = promoQty * PROMO_BUNS_PER_SALE;
+
+    const used = usedFromCategories + promoBunsContribution;
 
     // ── Formula ───────────────────────────────────────────────────────────
     const expected = start !== null ? start + purchased - used : null;
@@ -121,6 +136,12 @@ router.get('/buns-reconciliation', async (req, res) => {
       date,
       prev_date: prevDateStr,
       status: 'complete',
+      promo_breakdown: {
+        regular_burger_categories_buns: usedFromCategories,
+        mix_and_match_promo_buns: promoBunsContribution,
+        promo_qty_sold: promoQty,
+        buns_per_promo_sale: PROMO_BUNS_PER_SALE,
+      },
       data: {
         item: 'Burger Buns',
         start,
