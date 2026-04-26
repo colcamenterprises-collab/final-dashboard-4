@@ -574,6 +574,11 @@ async function checkSchema() {
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
   app.use('/api/system-health', systemHealthRouter);
 
+  // /api/bob/read — Bob read-only API layer (token-protected, GET only)
+  // MUST be mounted BEFORE /api/bob alias router to prevent prefix-match interception.
+  const bobReadRouter = (await import('./routes/bobRead')).default;
+  app.use('/api/bob/read', bobReadRouter);
+
   // AI Ops Control Room routes
   const aiOpsModule = await import('./routes/aiOpsControl');
   const aiOpsControlRouter = aiOpsModule.default;
@@ -581,6 +586,7 @@ async function checkSchema() {
   app.use('/api/ops/ai', aiOpsControlRouter);
   app.use('/api/ai-ops', aiOpsControlRouter);
   // /api/bob — alias prefix (e.g. /api/bob/health mirrors /api/ai-ops/bob/health)
+  // Mounted AFTER /api/bob/read to avoid prefix-match shadowing.
   app.use('/api/bob', bobAliasRouter);
 
   // /api/ui-auth — UI password gate (shared password, cookie session)
@@ -590,10 +596,6 @@ async function checkSchema() {
   // /api/pin-auth — Staff PIN login system
   const pinAuthRouter = (await import('./routes/pinAuth')).default;
   app.use('/api/pin-auth', pinAuthRouter);
-
-  // /api/bob/read — Bob read-only API layer (token-protected, GET only)
-  const bobReadRouter = (await import('./routes/bobRead')).default;
-  app.use('/api/bob/read', bobReadRouter);
 
   // /api/agent/read — Governed canonical read-only surface (6 structured endpoints)
   const agentReadRouter = (await import('./routes/agentRead')).default;
@@ -626,6 +628,15 @@ async function checkSchema() {
   const ingredientSearchRouter = ingredientAuthorityModule.ingredientSearchRouter;
   app.use('/api/ingredient-authority', ingredientAuthorityRouter);
   app.use('/', ingredientSearchRouter);
+
+  // JSON 404 guard — any /api/* path not matched above returns JSON, never HTML.
+  // This MUST sit before errorGuard and before Vite/serveStatic catch-all.
+  app.use('/api', (req: Request, res: Response) => {
+    res.status(404).json({
+      error: 'API_ROUTE_NOT_FOUND',
+      path: req.originalUrl,
+    });
+  });
 
   // Error guard middleware - must be LAST
   app.use(errorGuard);
