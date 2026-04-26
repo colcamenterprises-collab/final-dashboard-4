@@ -31,6 +31,7 @@ async function resolveSweetPotatoWeight(shiftDate: string): Promise<{
     `SELECT (payload->>'sweetPotatoEnd')::numeric AS v2_canonical
      FROM daily_sales_v2
      WHERE "shiftDate" = $1
+     ORDER BY (payload->>'sweetPotatoEnd') IS NOT NULL DESC, "createdAt" DESC
      LIMIT 1`,
     [shiftDate],
   );
