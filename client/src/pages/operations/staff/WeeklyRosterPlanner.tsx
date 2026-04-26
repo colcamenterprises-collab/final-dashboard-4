@@ -164,7 +164,8 @@ const autoGenerateSchema = z.object({
 const toNullablePositiveNumber = (value: unknown): number | null => {
   if (value === '' || value === null || value === undefined) return null;
   const numberValue = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(numberValue) || numberValue <= 0) return null;
+  if (!Number.isFinite(numberValue) || numberValue < 0) return null;
+  if (numberValue === 0) return null; // 0 = no limit
   return numberValue;
 };
 
@@ -1089,14 +1090,16 @@ export default function WeeklyRosterPlanner() {
                   className={inputCls}
                 />
               </Field>
-              <Field label="Max hours per staff">
+              <Field label="Max hours per staff (optional)">
                 <input
                   type="number"
+                  min={0}
                   {...autoGenerateForm.register('maxHoursPerStaffPerWeek', {
-                    setValueAs: (v) => (v === '' ? null : Number(v)),
+                    setValueAs: (v) => (v === '' || v === null ? null : Number(v)),
                   })}
                   className={inputCls}
                 />
+                <p className="mt-0.5 text-[11px] text-slate-500">0 = no limit</p>
               </Field>
             </div>
             <Field label="Preferred busy day staff count">

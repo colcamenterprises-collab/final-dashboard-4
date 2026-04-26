@@ -438,10 +438,18 @@ export async function assignStaffToGeneratedRoster(input: {
   const maxShifts = input.ownerRules?.maxShiftsPerStaffPerWeek ?? null;
   const shiftHours = timeDiffHours(input.shiftStartTime, input.shiftEndTime);
 
+  // Sort: fairness-first, then soft-deprioritise staff who would exceed maxHours.
+  // Staff over the hours limit move to the back but are NEVER excluded entirely.
   const ranked = [...input.eligibleStaff].sort((a, b) => {
     const la = input.weeklyLoadMap.get(a.id);
     const lb = input.weeklyLoadMap.get(b.id);
     if (!la || !lb) return 0;
+    // Soft weighting: push over-limit staff to the back, never skip them
+    if (maxHours != null) {
+      const aOver = la.totalHours + shiftHours > maxHours ? 1 : 0;
+      const bOver = lb.totalHours + shiftHours > maxHours ? 1 : 0;
+      if (aOver !== bOver) return aOver - bOver;
+    }
     if (input.fairnessMode === 'equal_shifts') {
       if (la.shiftCount !== lb.shiftCount) return la.shiftCount - lb.shiftCount;
       if (la.totalHours !== lb.totalHours) return la.totalHours - lb.totalHours;
@@ -456,14 +464,16 @@ export async function assignStaffToGeneratedRoster(input: {
     if (created.length >= input.maxStaff) break;
     const currentLoad = input.weeklyLoadMap.get(member.id);
     if (!currentLoad) continue;
+    // Max shifts is a hard constraint — staff cannot work more shifts than allowed
     if (maxShifts != null && currentLoad.shiftCount >= maxShifts) {
       currentLoad.warnings.push(`Max shifts reached (${maxShifts})`);
       continue;
     }
+    // Max hours is a soft constraint — deprioritised in sort but never blocks assignment.
+    // Guarantee: shifts are always filled first; hours are optimised after.
     if (maxHours != null && currentLoad.totalHours + shiftHours > maxHours) {
-      currentLoad.warnings.push(`Max hours exceeded (${maxHours})`);
-      input.warnings.push(`Staff ${member.fullName} skipped due to max weekly hours.`);
-      continue;
+      currentLoad.warnings.push(`Staff deprioritised due to hours (limit ${maxHours}h)`);
+      input.warnings.push(`Staff ${member.fullName} deprioritised due to hours.`);
     }
     const assignment = await createShiftAssignment(
       {

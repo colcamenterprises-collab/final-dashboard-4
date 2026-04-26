@@ -63,10 +63,11 @@ const nullablePositiveNumber = z.preprocess(
   (val) => {
     if (val === '' || val === null || val === undefined) return null;
     const num = typeof val === 'number' ? val : Number(val);
-    if (!Number.isFinite(num) || num <= 0) return null;
+    if (!Number.isFinite(num) || num < 0) return null;
+    if (num === 0) return null; // 0 = no limit
     return num;
   },
-  z.number().positive().nullable().optional()
+  z.number().nonnegative().nullable().optional()
 );
 
 const autoGenerateWeekSchema = z.object({
