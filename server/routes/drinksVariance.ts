@@ -48,50 +48,34 @@ router.get('/drinks-variance', async (req, res) => {
 
   const drinkSkus = DRINK_CATALOG.map((d) => d.sku);
 
-  const [endStk, prevStk, sales2End, sales2Prev, purchases, directSold, modifierTotals, reviews] =
+  const [endStk, prevStk, purchases, directSold, modifierTotals, reviews] =
     await Promise.all([
 
-      // 1. End stock — daily_stock_v2 for this date (correct column: "drinksJson")
+      // 1. End stock — CANONICAL: daily_sales_v2.payload.drinkStock for current shift date.
+      // Prefer rows where drinkStock key is present and non-null, then most recent.
       pool
-        .query<{ drinksJson: any }>(
-          `SELECT "drinksJson" FROM daily_stock_v2
-           WHERE "createdAt"::date = $1::date
-           ORDER BY "createdAt" DESC LIMIT 1`,
+        .query<{ drinkstock: any }>(
+          `SELECT payload->'drinkStock' AS drinkstock FROM daily_sales_v2
+           WHERE "shiftDate" = $1
+           ORDER BY (payload->'drinkStock') IS NOT NULL DESC, "createdAt" DESC
+           LIMIT 1`,
           [date],
         )
         .catch(() => ({ rows: [] } as any)),
 
-      // 2. Start stock — daily_stock_v2 for prior date
+      // 2. Start stock — CANONICAL: daily_sales_v2.payload.drinkStock for previous shift date.
+      // Prefer rows where drinkStock key is present and non-null, then most recent.
       pool
-        .query<{ drinksJson: any }>(
-          `SELECT "drinksJson" FROM daily_stock_v2
-           WHERE "createdAt"::date = $1::date
-           ORDER BY "createdAt" DESC LIMIT 1`,
+        .query<{ drinkstock: any }>(
+          `SELECT payload->'drinkStock' AS drinkstock FROM daily_sales_v2
+           WHERE "shiftDate" = $1
+           ORDER BY (payload->'drinkStock') IS NOT NULL DESC, "createdAt" DESC
+           LIMIT 1`,
           [prevDate],
         )
         .catch(() => ({ rows: [] } as any)),
 
-      // 3. End stock fallback — daily_sales_v2
-      pool
-        .query<{ drinkstock: any }>(
-          `SELECT payload->'drinkStock' AS drinkstock FROM daily_sales_v2
-           WHERE "shiftDate" = $1 AND "deletedAt" IS NULL
-           ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`,
-          [date],
-        )
-        .catch(() => ({ rows: [] } as any)),
-
-      // 4. Start stock fallback — daily_sales_v2 prior date
-      pool
-        .query<{ drinkstock: any }>(
-          `SELECT payload->'drinkStock' AS drinkstock FROM daily_sales_v2
-           WHERE "shiftDate" = $1 AND "deletedAt" IS NULL
-           ORDER BY "submittedAtISO" DESC NULLS LAST LIMIT 1`,
-          [prevDate],
-        )
-        .catch(() => ({ rows: [] } as any)),
-
-      // 5. Purchases — purchase_tally_drink for effective date
+      // 3. Purchases — purchase_tally_drink for effective date
       pool
         .query<{ item_name: string; qty: number }>(
           `SELECT d.item_name, SUM(d.qty)::int AS qty
@@ -137,10 +121,9 @@ router.get('/drinks-variance', async (req, res) => {
     ]);
 
   // ── Stock maps ────────────────────────────────────────────────────────
-  const endStockRaw: Record<string, number> =
-    endStk.rows[0]?.drinksJson ?? sales2End.rows[0]?.drinkstock ?? {};
-  const prevStockRaw: Record<string, number> =
-    prevStk.rows[0]?.drinksJson ?? sales2Prev.rows[0]?.drinkstock ?? {};
+  // Canonical source: daily_sales_v2.payload.drinkStock (most complete row per shift date)
+  const endStockRaw: Record<string, number> = endStk.rows[0]?.drinkstock ?? {};
+  const prevStockRaw: Record<string, number> = prevStk.rows[0]?.drinkstock ?? {};
 
   function stockLookup(raw: Record<string, number>, stockKey: string): number | null {
     // Exact key match first
@@ -237,7 +220,7 @@ router.get('/drinks-variance', async (req, res) => {
     date,
     prev_date: prevDate,
     row_count: data.length,
-    stock_source: endStk.rows[0] ? 'daily_stock_v2' : (sales2End.rows[0] ? 'daily_sales_v2' : 'none'),
+    stock_source: endStk.rows[0]?.drinkstock ? 'daily_sales_v2' : 'none',
     data,
   });
 });

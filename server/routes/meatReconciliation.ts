@@ -10,9 +10,9 @@
  *   Expected  = Start + Purchased − Used
  *   Variance  = End − Expected   (negative = missing meat)
  *
- * Stock source priority (per shift date):
- *   1. daily_sales_v2.payload->>'meatEnd'  (v2_canonical  — owner-verified value)
- *   2. daily_stock_v2.meatWeightG          (legacy_fallback — raw form entry)
+ * Stock source (per shift date):
+ *   daily_sales_v2.payload->>'meatEnd'  (v2_canonical  — owner-verified value)
+ *   Row selection: ORDER BY (payload->>'meatEnd') IS NOT NULL DESC, "createdAt" DESC LIMIT 1
  *
  * Chicken burgers (10066, 10068, 10070, 10071) → 0 patties.
  * If SKU has no PATTY_MAP entry → MISSING_PATTY_MAPPING flagged and used=null.
@@ -74,27 +74,23 @@ router.get('/meat-reconciliation', async (req, res) => {
     const prevDateStr = prevDate.toISOString().slice(0, 10);
 
     // ── Helper: resolve canonical meat weight for a shift date ───────────
-    // Priority 1: daily_sales_v2.payload->>'meatEnd'  (owner-verified, v2_canonical)
-    // Priority 2: daily_stock_v2.meatWeightG          (raw form entry, legacy_fallback)
+    // Canonical source: daily_sales_v2.payload->>'meatEnd' (owner-verified, v2_canonical).
+    // Row selection: prefer rows where meatEnd is not null, then most recent createdAt.
     async function resolveMeatWeight(shiftDate: string): Promise<{
       value: number | null;
-      source: 'v2_canonical' | 'legacy_fallback' | 'missing';
+      source: 'v2_canonical' | 'missing';
     }> {
       const r = await pool.query(
-        `SELECT
-           (ds.payload->>'meatEnd')::int  AS v2_canonical,
-           dsv."meatWeightG"              AS legacy_raw
-         FROM daily_sales_v2 ds
-         LEFT JOIN daily_stock_v2 dsv ON dsv."salesId" = ds.id
-         WHERE ds."shiftDate" = $1
+        `SELECT (payload->>'meatEnd')::int AS v2_canonical
+         FROM daily_sales_v2
+         WHERE "shiftDate" = $1
+         ORDER BY (payload->>'meatEnd') IS NOT NULL DESC, "createdAt" DESC
          LIMIT 1`,
         [shiftDate],
       );
       if (!r.rows[0]) return { value: null, source: 'missing' };
       const v2 = r.rows[0].v2_canonical !== null ? Number(r.rows[0].v2_canonical) : null;
-      const legacy = r.rows[0].legacy_raw !== null ? Number(r.rows[0].legacy_raw) : null;
       if (v2 !== null) return { value: v2, source: 'v2_canonical' };
-      if (legacy !== null) return { value: legacy, source: 'legacy_fallback' };
       return { value: null, source: 'missing' };
     }
 

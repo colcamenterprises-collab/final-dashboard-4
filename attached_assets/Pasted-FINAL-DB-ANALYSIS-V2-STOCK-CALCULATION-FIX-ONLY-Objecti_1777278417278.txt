@@ -1,0 +1,95 @@
+FINAL DB — ANALYSIS V2 STOCK CALCULATION FIX ONLY
+
+Objective:
+Fix Analysis V2 stock calculations and source selection only.
+
+CRITICAL RULE:
+Do NOT change the Analysis V2 UI structure.
+Do NOT convert stock tables into cards.
+Do NOT redesign the page.
+Do NOT change table columns or layout.
+
+Scope:
+Backend/source calculation fixes only.
+
+Canonical stock equation for all stock tables:
+
+Start = previous shift End from Daily Sales & Stock V2 form
+Purchased = Stock Ordering / purchase_tally amount
+Sold/Used = POS receipts + modifier logic where applicable
+End = current shift End from Daily Sales & Stock V2 form
+
+Available = Start + Purchased
+Expected = Available - Sold/Used
+Variance = End - Expected
+
+Apply this consistently to:
+- Drinks
+- Buns
+- Meat
+- French Fries
+- Sweet Potato Fries
+
+Rules:
+
+1. Start source
+Start must always come from the previous shift’s staff End count:
+daily_sales_v2.payload
+
+Examples:
+- Drinks: previous shift drinkStock
+- Buns: previous shift rollsEnd
+- Meat: previous shift meatEnd
+- Fries: previous shift friesEnd
+- Sweet Potato: previous shift sweetPotatoEnd
+
+2. End source
+End must always come from the current shift’s staff End count:
+daily_sales_v2.payload
+
+3. Row selection
+When multiple daily_sales_v2 rows exist for the same shift date:
+- prefer rows where the required stock field is not null
+- then latest createdAt DESC
+
+Pattern:
+ORDER BY (payload->>'FIELD') IS NOT NULL DESC, "createdAt" DESC
+LIMIT 1
+
+4. Purchased source
+Purchased must come from purchase_tally using effective date:
+purchase_tally.date
+
+If purchase exists, include it.
+If no purchase exists, Purchased = 0.
+If purchase query fails, surface error/warning; do not silently fake.
+
+5. Sold / Used source
+- Drinks sold = direct POS drink item sales + drink modifier sales
+- Buns used = burgers + burger sets + promo bun impact
+- Meat used = mapped patties × 90g
+- French Fries used = fries-based SKUs + set fries + promo fries
+- Sweet Potato used = SKU 10022 only
+
+6. Do not change:
+- table structure
+- table order
+- visual layout
+- review modal structure
+- Form 1/Form 2 fields
+
+Validation:
+For the shift starting 2026-04-25:
+- End drinks must match the Daily Sales & Stock V2 drinkStock values
+- End buns must be 43 if that is the staff-reported rollsEnd
+- Meat end must match staff-reported meatEnd
+- Fries end must match staff-reported friesEnd
+- Sweet Potato end must match sweetPotatoEnd if present
+- Purchased values must match purchase_tally effective date records
+- Direct + modifier drink totals must match Loyverse synced data
+- Existing tables remain visually unchanged
+
+Return:
+- exact files changed
+- before/after numbers for each affected stock table
+- confirmation no UI structure changed
