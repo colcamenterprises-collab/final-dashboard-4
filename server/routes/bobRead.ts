@@ -1,5 +1,4 @@
 import express, { Request, Response } from "express";
-import fetch from "node-fetch";
 import { bobAuth } from "../middleware/bobAuth";
 import { bobReadAuth } from "../middleware/bobReadAuth";
 import { getDailyAnalysis } from "../services/dataAnalystService";
@@ -8,142 +7,28 @@ import { pool } from "../db";
 
 const router = express.Router();
 
-/**
- * INTERNAL HELPER
- * Calls existing app endpoints
- */
-async function proxyInternal(path: string, req: Request) {
-  const baseUrl = `http://localhost:${process.env.PORT || 8080}`;
-  const [pathname, rawQuery = ""] = path.split("?");
-  const query = new URLSearchParams(rawQuery);
+// ─── Legacy proxy/alias routes (bobAuth, NOT bobReadAuth) ─────────────────────
+// These use the internal session-based bobAuth and remain unchanged.
 
-  for (const [key, raw] of Object.entries(req.query || {})) {
-    if (Array.isArray(raw)) {
-      for (const value of raw) {
-        query.append(key, String(value));
-      }
-    } else if (raw !== undefined && raw !== null) {
-      query.append(key, String(raw));
-    }
-  }
-
-  const queryString = query.toString();
-  const fullPath = queryString ? `${pathname}?${queryString}` : pathname;
-
-  const controller = new AbortController();
-  const timeoutMs = Number(process.env.BOB_READ_PROXY_TIMEOUT_MS || 20000);
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  let response;
-  try {
-    response = await fetch(`${baseUrl}${fullPath}`, {
-      method: "GET",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  if (!response.ok) {
-    throw new Error(`GET ${fullPath} failed with ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data;
-}
-
-/**
- * GENERIC PROXY
- * Example:
- * /api/bob/read/proxy?path=/api/daily-stock-sales
- */
 router.get("/proxy", bobAuth, async (req: Request, res: Response) => {
-  try {
-    const path = req.query.path as string;
-
-    if (!path || !path.startsWith("/api/")) {
-      return res.status(400).json({ error: "Invalid path" });
-    }
-
-    const data = await proxyInternal(path, req);
-    res.json(data);
-  } catch (err) {
-    console.error("BOB PROXY ERROR:", err);
-    res.status(500).json({ error: "Proxy failed" });
-  }
+  return res.status(410).json({
+    error: "PROXY_REMOVED",
+    message: "Direct proxy access is no longer available. Use structured read endpoints.",
+  });
 });
 
-/**
- * SHIFT REPORT (CRITICAL FIRST ENDPOINT)
- */
 router.get("/shift-report/latest", bobAuth, async (req: Request, res: Response) => {
-  try {
-    const data = await proxyInternal("/api/shift-report/latest", req);
-    res.json(data);
-  } catch (err) {
-    console.error("SHIFT REPORT ERROR:", err);
-    res.status(500).json({ error: "Failed to fetch shift report" });
-  }
+  return res.status(410).json({
+    error: "PROXY_REMOVED",
+    message: "Use GET /api/bob/read/verify/latest-shift instead.",
+  });
 });
 
-/**
- * DAILY SALES
- */
-router.get("/daily-sales", bobAuth, async (req: Request, res: Response) => {
-  try {
-    const data = await proxyInternal("/api/daily-stock-sales", req);
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch daily sales" });
-  }
-});
+router.get("/daily-sales",    bobAuth, (_req, res) => res.status(410).json({ error: "PROXY_REMOVED" }));
+router.get("/daily-stock",    bobAuth, (_req, res) => res.status(410).json({ error: "PROXY_REMOVED" }));
+router.get("/purchase-history",bobAuth,(_req, res) => res.status(410).json({ error: "PROXY_REMOVED" }));
+router.get("/stock-usage",    bobAuth, (_req, res) => res.status(410).json({ error: "PROXY_REMOVED" }));
 
-/**
- * DAILY STOCK
- */
-router.get("/daily-stock", bobAuth, async (req: Request, res: Response) => {
-  try {
-    const data = await proxyInternal("/api/daily-stock-sales", req);
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch daily stock" });
-  }
-});
-
-/**
- * PURCHASE HISTORY
- */
-router.get("/purchase-history", bobAuth, async (req: Request, res: Response) => {
-  try {
-    const data = await proxyInternal("/api/analysis/stock-review/purchase-history", req);
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch purchase history" });
-  }
-});
-
-/**
- * STOCK USAGE
- */
-router.get("/stock-usage", bobAuth, async (req: Request, res: Response) => {
-  try {
-    const data = await proxyInternal(
-      `/api/ai-ops/bob/proxy-read?path=analysis/stock-usage&token=${encodeURIComponent(process.env.BOB_READONLY_TOKEN || "")}`,
-      req
-    );
-    res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch stock usage" });
-  }
-});
-
-
-
-/**
- * BOB INTERPRETATION (Analysis V2 aligned)
- */
 router.get("/analysis/interpretation", bobAuth, async (req: Request, res: Response) => {
   try {
     const date = String(req.query.date || "");
@@ -153,20 +38,16 @@ router.get("/analysis/interpretation", bobAuth, async (req: Request, res: Respon
         error: "date query parameter required (YYYY-MM-DD)",
       });
     }
-
     const analyst = await getDailyAnalysis(date);
     const interpretation = buildBobInterpretationFromDailyAnalysis(analyst);
-
     res.json({
       ok: true,
       date,
-      source: {
-        data_analyst: "/api/analysis/v2?date=YYYY-MM-DD (same service: getDailyAnalysis)",
-      },
+      source: "/api/analysis/v2 (getDailyAnalysis)",
       analyst_tables: {
-        drinks: analyst.data.drinks,
-        burgers: analyst.data.burgers,
-        sides: analyst.data.sides,
+        drinks:    analyst.data.drinks,
+        burgers:   analyst.data.burgers,
+        sides:     analyst.data.sides,
         modifiers: analyst.data.modifiers,
       },
       blockers: analyst.blockers,
@@ -178,17 +59,21 @@ router.get("/analysis/interpretation", bobAuth, async (req: Request, res: Respon
   }
 });
 
-// ─── Shift window helpers ─────────────────────────────────────────────────────
+// ─── Shift window helper ───────────────────────────────────────────────────────
 
 /**
- * Compute the latest fully-completed SBB shift.
+ * Compute the latest fully-completed SBB shift using reliable UTC+7 arithmetic.
  *
- * Shift window: 17:00 Asia/Bangkok → 03:00 Asia/Bangkok (next calendar day).
- * shift_date = the date of the 17:00 opening.
+ * Shift window: opens 17:00 BKK, closes 03:00 BKK (next calendar day).
+ * shift_date  = the calendar date of the 17:00 opening (BKK).
  *
- * UTC equivalents (BKK = UTC+7):
- *   start_utc = shift_date 10:00 UTC
- *   end_utc   = shift_date 20:00 UTC  (= shift_date+1 03:00 BKK)
+ * UTC equivalents (Bangkok = UTC+7, no DST):
+ *   start_utc = shift_date T10:00:00Z   (17:00 BKK − 7h)
+ *   end_utc   = shift_date T20:00:00Z   (03:00 BKK next day − 7h = same UTC date)
+ *
+ * "Latest completed" rule:
+ *   - BKK hour  0–02  → tonight's shift is still open → last closed = 2 calendar days ago (BKK)
+ *   - BKK hour 03–23  → yesterday's shift has closed  → last closed = 1 calendar day  ago (BKK)
  */
 function latestCompletedShift(): {
   shiftDate: string;
@@ -197,35 +82,36 @@ function latestCompletedShift(): {
   startUtc: string;
   endUtc: string;
 } {
-  const nowUtc = new Date();
-  // Current Bangkok time
-  const bkkStr = nowUtc.toLocaleString("en-US", { timeZone: "Asia/Bangkok", hour12: false });
-  const bkkNow = new Date(bkkStr + " UTC");
+  // Reliable BKK time via direct arithmetic (UTC+7, no DST).
+  const BKK_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const nowMs   = Date.now();
+  const bkkMs   = nowMs + BKK_OFFSET_MS;
+  const bkkDate = new Date(bkkMs);
 
-  const bkkHour = bkkNow.getUTCHours();
-  // If BKK hour is before 03:00 the current overnight shift hasn't closed yet → go back 2 days
-  const daysBack = bkkHour < 3 ? 2 : 1;
+  const bkkHour = bkkDate.getUTCHours();   // hour in BKK local time
+  const daysBack = bkkHour < 3 ? 2 : 1;   // 0–02 BKK: tonight not closed yet
 
-  const shiftDateObj = new Date(bkkNow);
-  shiftDateObj.setUTCDate(shiftDateObj.getUTCDate() - daysBack);
-  const shiftDate = shiftDateObj.toISOString().slice(0, 10);
+  // Subtract daysBack full days from the BKK timestamp to get shift calendar date.
+  const shiftBkkMs = bkkMs - daysBack * 24 * 60 * 60 * 1000;
+  const shiftDate  = new Date(shiftBkkMs).toISOString().slice(0, 10);  // YYYY-MM-DD in BKK calendar
 
-  // UTC window: shift_date 10:00 UTC → shift_date 20:00 UTC
-  const startUtcObj = new Date(`${shiftDate}T10:00:00.000Z`);
-  const endUtcObj   = new Date(`${shiftDate}T20:00:00.000Z`);
+  // UTC window is always anchored on the shift_date string.
+  const startUtcObj = new Date(`${shiftDate}T10:00:00.000Z`);   // 17:00 BKK
+  const endUtcObj   = new Date(`${shiftDate}T20:00:00.000Z`);   // 03:00 BKK (+1 day) = same UTC date
 
-  const fmt = (d: Date, tz: string) =>
-    d.toLocaleString("sv-SE", { timeZone: tz }).replace(" ", "T") +
-    (tz === "Asia/Bangkok" ? "+07:00" : "Z");
+  const fmtBkk = (d: Date) =>
+    d.toLocaleString("sv-SE", { timeZone: "Asia/Bangkok" }).replace(" ", "T") + "+07:00";
 
   return {
     shiftDate,
-    startBkk: fmt(startUtcObj, "Asia/Bangkok"),
-    endBkk:   fmt(endUtcObj,   "Asia/Bangkok"),
+    startBkk: fmtBkk(startUtcObj),
+    endBkk:   fmtBkk(endUtcObj),
     startUtc: startUtcObj.toISOString(),
     endUtc:   endUtcObj.toISOString(),
   };
 }
+
+// ─── querySafe helper ─────────────────────────────────────────────────────────
 
 async function querySafe<T>(
   label: string,
@@ -235,29 +121,18 @@ async function querySafe<T>(
     const records = await fn();
     return { available: true, records, error: null };
   } catch (err: any) {
-    console.error(`[bob/read/latest-shift] ${label} error:`, err.message);
+    console.error(`[bob/read/verify/latest-shift] ${label} error:`, err.message);
     return { available: false, records: null, error: err.message };
   }
 }
 
-// ─── GET /health ──────────────────────────────────────────────────────────────
+// ─── Core shift-verification handler (shared by /verify/latest-shift and /latest-shift) ──
 
-router.get("/health", bobReadAuth, (_req: Request, res: Response) => {
-  res.json({
-    status: "ok",
-    service: "bob-read",
-    readOnly: true,
-    time: new Date().toISOString(),
-  });
-});
-
-// ─── GET /latest-shift ────────────────────────────────────────────────────────
-
-router.get("/latest-shift", bobReadAuth, async (_req: Request, res: Response) => {
+async function handleLatestShift(_req: Request, res: Response) {
   const shift = latestCompletedShift();
   const { shiftDate, startUtc, endUtc, startBkk, endBkk } = shift;
 
-  // ── 1. Daily Sales Form (daily_sales_v2) ─────────────────────────────────
+  // ── 1. Daily Sales Form ────────────────────────────────────────────────────
   const dailySalesResult = await querySafe("dailySalesForm", async () => {
     const r = await pool.query(
       `SELECT id, "shiftDate", "createdAt",
@@ -280,7 +155,7 @@ router.get("/latest-shift", bobReadAuth, async (_req: Request, res: Response) =>
     return r.rows;
   });
 
-  // ── 2. Daily Stock Form (daily_stock_v2) ──────────────────────────────────
+  // ── 2. Daily Stock Form ────────────────────────────────────────────────────
   const dailyStockResult = await querySafe("dailyStockForm", async () => {
     const r = await pool.query(
       `SELECT dsv.id, dsv."createdAt", ds."shiftDate",
@@ -295,7 +170,7 @@ router.get("/latest-shift", bobReadAuth, async (_req: Request, res: Response) =>
     return r.rows;
   });
 
-  // ── 3. POS Receipts (lv_receipt) ──────────────────────────────────────────
+  // ── 3. POS Receipts ────────────────────────────────────────────────────────
   const posReceiptsResult = await querySafe("posReceipts", async () => {
     const r = await pool.query(
       `SELECT COUNT(*)::int                          AS receipt_count,
@@ -310,7 +185,7 @@ router.get("/latest-shift", bobReadAuth, async (_req: Request, res: Response) =>
     return r.rows[0] ?? null;
   });
 
-  // ── 4. Shift Report (shift_report_v2) ─────────────────────────────────────
+  // ── 4. Shift Report ────────────────────────────────────────────────────────
   const shiftReportResult = await querySafe("shiftReport", async () => {
     const r = await pool.query(
       `SELECT id, "shiftDate", "createdAt",
@@ -324,7 +199,7 @@ router.get("/latest-shift", bobReadAuth, async (_req: Request, res: Response) =>
     return r.rows;
   });
 
-  // ── 5. Purchases (purchase_tally) ─────────────────────────────────────────
+  // ── 5. Purchases ───────────────────────────────────────────────────────────
   const purchasesResult = await querySafe("purchases", async () => {
     const r = await pool.query(
       `SELECT id, date, staff, supplier, notes,
@@ -338,32 +213,28 @@ router.get("/latest-shift", bobReadAuth, async (_req: Request, res: Response) =>
     return r.rows;
   });
 
-  // ── Build sources map ─────────────────────────────────────────────────────
+  // ── Aggregate ──────────────────────────────────────────────────────────────
   const sources = {
-    dailySalesForm:  dailySalesResult,
-    dailyStockForm:  dailyStockResult,
-    posReceipts:     posReceiptsResult,
-    shiftReport:     shiftReportResult,
-    purchases:       purchasesResult,
+    dailySalesForm: dailySalesResult,
+    dailyStockForm: dailyStockResult,
+    posReceipts:    posReceiptsResult,
+    shiftReport:    shiftReportResult,
+    purchases:      purchasesResult,
   };
 
-  // ── Determine status ──────────────────────────────────────────────────────
-  const coreSources = ["dailySalesForm", "posReceipts"] as const;
+  const coreSources   = ["dailySalesForm", "posReceipts"] as const;
   const allCoreFailed = coreSources.every((k) => !sources[k].available);
   const anyFailed     = Object.values(sources).some((s) => !s.available);
-  const status = allCoreFailed ? "blocked" : anyFailed ? "partial" : "ok";
+  const status        = allCoreFailed ? "blocked" : anyFailed ? "partial" : "ok";
 
   const missingSources = Object.entries(sources)
     .filter(([, s]) => !s.available)
     .map(([name, s]) => ({ source: name, error: s.error }));
 
-  // ── Build verificationInputs from the most complete daily_sales_v2 row ───
   const topSalesRow = Array.isArray(dailySalesResult.records) && dailySalesResult.records.length > 0
-    ? dailySalesResult.records[0]
-    : null;
+    ? dailySalesResult.records[0] : null;
   const topStockRow = Array.isArray(dailyStockResult.records) && dailyStockResult.records.length > 0
-    ? dailyStockResult.records[0]
-    : null;
+    ? dailyStockResult.records[0] : null;
 
   const verificationInputs = {
     rolls: {
@@ -386,21 +257,99 @@ router.get("/latest-shift", bobReadAuth, async (_req: Request, res: Response) =>
       totalExpenses: topSalesRow?.total_expenses != null ? Number(topSalesRow.total_expenses) : null,
     },
     receipts: {
-      receiptCount:  (posReceiptsResult.records as any)?.receipt_count ?? null,
-      totalRevenue:  (posReceiptsResult.records as any)?.total_revenue ?? null,
+      receiptCount:    (posReceiptsResult.records as any)?.receipt_count    ?? null,
+      totalRevenue:    (posReceiptsResult.records as any)?.total_revenue    ?? null,
       firstReceiptBkk: (posReceiptsResult.records as any)?.first_receipt_bkk ?? null,
-      lastReceiptBkk:  (posReceiptsResult.records as any)?.last_receipt_bkk ?? null,
+      lastReceiptBkk:  (posReceiptsResult.records as any)?.last_receipt_bkk  ?? null,
     },
   };
 
   return res.json({
     status,
-    shift: { shiftDate, startBkk, endBkk, startUtc, endUtc },
+    shift:               { shiftDate, startBkk, endBkk, startUtc, endUtc },
     sources,
     verificationInputs,
     missingSources,
-    generatedAt: new Date().toISOString(),
+    generatedAt:         new Date().toISOString(),
+  });
+}
+
+// ─── GET /health ───────────────────────────────────────────────────────────────
+
+router.get("/health", bobReadAuth, (_req: Request, res: Response) => {
+  const shift = latestCompletedShift();
+  res.json({
+    status:      "ok",
+    service:     "bob-read",
+    readOnly:    true,
+    shiftDate:   shift.shiftDate,
+    shiftWindow: { startUtc: shift.startUtc, endUtc: shift.endUtc },
+    time:        new Date().toISOString(),
   });
 });
+
+// ─── GET /tools ────────────────────────────────────────────────────────────────
+
+router.get("/tools", bobReadAuth, (_req: Request, res: Response) => {
+  res.json({
+    service: "bob-read",
+    version: "2.1",
+    auth:    "x-bob-token header required for all endpoints",
+    note:    "All endpoints are GET-only. No write access is possible through this layer.",
+    tools: [
+      {
+        name:        "health",
+        method:      "GET",
+        endpoint:    "/api/bob/read/health",
+        description: "Service liveness check. Returns current BKK shift date and window.",
+        params:      [],
+        returns:     { status: "ok", shiftDate: "YYYY-MM-DD", shiftWindow: { startUtc: "ISO8601", endUtc: "ISO8601" } },
+      },
+      {
+        name:        "tools",
+        method:      "GET",
+        endpoint:    "/api/bob/read/tools",
+        description: "This endpoint registry. Lists all callable tools with params and return shapes.",
+        params:      [],
+      },
+      {
+        name:        "verify/latest-shift",
+        method:      "GET",
+        endpoint:    "/api/bob/read/verify/latest-shift",
+        description: "Canonical latest-completed-shift snapshot from 5 canonical sources: " +
+                     "daily_sales_v2 (staff sales form), daily_stock_v2 (staff stock form), " +
+                     "lv_receipt (POS receipts aggregated), shift_report_v2, purchase_tally. " +
+                     "Returns status ok|partial|blocked, shift window details, per-source availability, " +
+                     "verificationInputs (rolls/meat/drinks/salesChannels/receipts), and missingSources.",
+        params:      [],
+        returns: {
+          status:              "ok | partial | blocked",
+          shift:               { shiftDate: "YYYY-MM-DD", startBkk: "ISO8601+07:00", endBkk: "ISO8601+07:00", startUtc: "ISO8601Z", endUtc: "ISO8601Z" },
+          sources:             "{ dailySalesForm, dailyStockForm, posReceipts, shiftReport, purchases }",
+          verificationInputs:  "{ rolls, meat, drinks, salesChannels, receipts }",
+          missingSources:      "Array<{ source, error }> — empty when status=ok",
+        },
+      },
+      {
+        name:        "analysis/interpretation",
+        method:      "GET",
+        endpoint:    "/api/bob/read/analysis/interpretation?date=YYYY-MM-DD",
+        description: "Bob interpretation layer over Analysis V2 daily data. " +
+                     "Returns drinks/burgers/sides/modifiers tables plus AI-readable interpretation.",
+        params: [
+          { name: "date", type: "YYYY-MM-DD", required: true, description: "Shift date to analyse" },
+        ],
+      },
+    ],
+  });
+});
+
+// ─── GET /verify/latest-shift  (canonical) ────────────────────────────────────
+
+router.get("/verify/latest-shift", bobReadAuth, handleLatestShift);
+
+// ─── GET /latest-shift  (backward-compat alias) ───────────────────────────────
+
+router.get("/latest-shift", bobReadAuth, handleLatestShift);
 
 export default router;
