@@ -575,6 +575,12 @@ async function checkSchema() {
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
   app.use('/api/system-health', systemHealthRouter);
 
+  // /api/gateway — Provider-agnostic Agent Tool Gateway.
+  // Architecture: Agent → Gateway → Tool Adapters → External Systems.
+  // SBB App is one adapter; it does not control the agent.
+  const agentGatewayRouter = (await import('./routes/agentGateway')).default;
+  app.use('/api/gateway', agentGatewayRouter);
+
   // /api/bob/read — Bob read-only API layer (token-protected, GET only)
   // MUST be mounted BEFORE /api/bob alias router to prevent prefix-match interception.
   const bobReadRouter = (await import('./routes/bobRead')).default;
