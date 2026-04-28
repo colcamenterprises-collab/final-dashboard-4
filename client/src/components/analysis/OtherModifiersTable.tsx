@@ -15,50 +15,53 @@ interface OtherModifiersResponse {
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
   return (
-    <th className={`px-2 py-1 text-xs font-semibold text-gray-500 border-b border-gray-100 bg-gray-50 ${right ? 'text-right' : 'text-left'}`}>
+    <th className={`px-3 py-2 text-[11px] font-semibold text-slate-500 uppercase tracking-wide bg-slate-50 border-b border-slate-200 whitespace-nowrap ${right ? 'text-right' : 'text-left'}`}>
       {children}
     </th>
   );
 }
 
-function Cell({ children, right, bold }: { children: React.ReactNode; right?: boolean; bold?: boolean }) {
+function Td({ children, right, bold, muted }: { children: React.ReactNode; right?: boolean; bold?: boolean; muted?: boolean }) {
   return (
-    <td className={`px-2 py-1 text-xs border-b border-gray-50 ${right ? 'text-right' : ''} ${bold ? 'font-semibold' : ''}`}>
+    <td className={`px-3 py-2 text-xs border-b border-slate-100 ${right ? 'text-right tabular-nums' : 'text-left'} ${bold ? 'font-semibold text-slate-900' : muted ? 'text-slate-400' : 'text-slate-700'}`}>
       {children}
     </td>
-  );
-}
-
-function EmptyRow({ cols }: { cols: number }) {
-  return (
-    <tr>
-      <td colSpan={cols} className="px-2 py-3 text-xs text-gray-400 text-center">
-        No other modifier data for this date
-      </td>
-    </tr>
   );
 }
 
 export function OtherModifiersTable({ date }: { date: string }) {
   const { data, isLoading, isError } = useQuery<OtherModifiersResponse>({
     queryKey: ['/api/analysis/other-modifiers', date],
-    queryFn: () =>
-      fetch(`/api/analysis/other-modifiers?date=${date}`).then((r) => r.json()),
+    queryFn: () => fetch(`/api/analysis/other-modifiers?date=${date}`).then((r) => r.json()),
     enabled: !!date,
   });
 
   if (isLoading) {
-    return <p className="text-xs text-gray-400 py-2">Loading other modifiers…</p>;
+    return (
+      <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+        {[...Array(3)].map((_, i) => <div key={i} className="h-6 bg-slate-100 rounded animate-pulse" />)}
+      </div>
+    );
   }
+
   if (isError || !data?.ok) {
-    return <p className="text-xs text-red-500 py-2">Failed to load other modifier data.</p>;
+    return (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+        Failed to load other modifier data.
+      </div>
+    );
   }
 
   const rows = data.data ?? [];
   const total = data.total_other_modifiers ?? 0;
 
   return (
-    <div className="space-y-1">
+    <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+        <span className="text-sm font-semibold text-slate-800">Other Modifiers &amp; Add-ons</span>
+        <span className="text-xs text-slate-400">{date}</span>
+      </div>
+
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-xs">
           <thead>
@@ -69,25 +72,34 @@ export function OtherModifiersTable({ date }: { date: string }) {
           </thead>
           <tbody>
             {rows.length === 0 ? (
-              <EmptyRow cols={2} />
+              <tr>
+                <td colSpan={2} className="px-3 py-4 text-center text-xs text-slate-400">
+                  No other modifier data for this date
+                </td>
+              </tr>
             ) : (
-              <>
-                {rows.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <Cell>{row.modifier_name}</Cell>
-                    <Cell right bold>{row.total}</Cell>
-                  </tr>
-                ))}
-                <tr className="bg-gray-50 font-semibold">
-                  <td className="px-2 py-1 text-xs text-gray-600">Total other modifiers</td>
-                  <td className="px-2 py-1 text-xs text-right font-bold">{total}</td>
+              rows.map((row, idx) => (
+                <tr key={idx} className="hover:bg-slate-50/60">
+                  <Td>{row.modifier_name}</Td>
+                  <Td right bold>{row.total}</Td>
                 </tr>
-              </>
+              ))
             )}
           </tbody>
+          {rows.length > 0 && (
+            <tfoot>
+              <tr className="bg-slate-50 border-t border-slate-200">
+                <td className="px-3 py-2 text-xs font-semibold text-slate-700">Total other modifiers</td>
+                <td className="px-3 py-2 text-xs font-semibold text-right tabular-nums text-slate-900">{total}</td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
-      <p className="text-xs text-gray-400">Source: {data.source}</p>
+
+      <div className="px-4 py-2 border-t border-slate-100">
+        <p className="text-[10px] text-slate-400">Source: {data.source}</p>
+      </div>
     </div>
   );
 }
