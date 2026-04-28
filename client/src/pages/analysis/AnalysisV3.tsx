@@ -1,11 +1,12 @@
 /**
- * Analysis V3 — Locked POS Item Sales Mirror
+ * Analysis V3 — Locked POS Mirror (Item Sales + Modifier Sales)
  *
  * THIS PAGE MUST ALWAYS MATCH POS REPORTS 1:1. DO NOT MODIFY THE DATA LAYER.
  *
- * Raw item sales from lv_receipt + lv_line_item only.
- * No stock, no recipes, no variance, no modifiers, no inference.
- * Output mirrors Loyverse item sales report exactly.
+ * Item Sales  source: lv_receipt + lv_line_item only.
+ * Modifier Sales source: lv_receipt + lv_modifier only.
+ * No stock, no recipes, no SKU mapping, no inference.
+ * Output mirrors Loyverse reports exactly.
  */
 
 import { useState, useMemo } from 'react';
@@ -37,6 +38,30 @@ interface ItemSalesResponse {
   checksum: ItemSalesChecksum;
   category_available: boolean;
   data: ItemSalesRow[];
+  error?: string;
+}
+
+interface ModifierRow {
+  modifier_name: string;
+  option_name: string;
+  qty_sold: number;
+}
+
+interface ModifierChecksum {
+  total_receipts: number;
+  refund_receipts: number;
+  sale_receipts: number;
+  total_rows: number;
+  total_qty_sold: number;
+}
+
+interface ModifierResponse {
+  ok: boolean;
+  source_tables: string[];
+  start: string;
+  end: string;
+  checksum: ModifierChecksum;
+  data: ModifierRow[];
   error?: string;
 }
 
@@ -104,6 +129,15 @@ export default function AnalysisV3() {
     staleTime: 60_000,
   });
 
+  const { data: modData, isLoading: modLoading, isError: modIsError, error: modError } = useQuery<ModifierResponse>({
+    queryKey: ['/api/analysis/v3/modifiers', startISO, endISO],
+    queryFn: () =>
+      fetch(`/api/analysis/v3/modifiers?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`)
+        .then((r) => r.json()),
+    enabled: !!shiftDate && !!startTime && !!endTime,
+    staleTime: 60_000,
+  });
+
   const filteredRows = useMemo(() => {
     if (!data?.data) return [];
     if (!filterText.trim()) return data.data;
@@ -134,6 +168,24 @@ export default function AnalysisV3() {
     }
     return out;
   }, [grouped]);
+
+  // Group modifier rows by modifier_name for display
+  const modGrouped = useMemo(() => {
+    const out = new Map<string, ModifierRow[]>();
+    for (const row of (modData?.data ?? [])) {
+      if (!out.has(row.modifier_name)) out.set(row.modifier_name, []);
+      out.get(row.modifier_name)!.push(row);
+    }
+    return out;
+  }, [modData?.data]);
+
+  const modGroupTotals = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const [name, rows] of modGrouped.entries()) {
+      out.set(name, rows.reduce((s, r) => s + r.qty_sold, 0));
+    }
+    return out;
+  }, [modGrouped]);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -330,6 +382,111 @@ export default function AnalysisV3() {
               <p className="text-[10px] text-slate-400">
                 Source: <code>lv_line_item JOIN lv_receipt</code> only · Window: {fmtBkk(data.start)} → {fmtBkk(data.end)} BKK
                 · Refunded receipts excluded · No joins to other tables · POS_TRUTH_LAYER_VIOLATION guard active
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modifier Sales ────────────────────────────────────────────────── */}
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Modifier Sales</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Raw modifier data from Loyverse · source: <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">lv_receipt + lv_modifier</code> only · no mapping, no inference
+          </p>
+        </div>
+
+        {/* Modifier loading */}
+        {modLoading && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+            {[...Array(5)].map((_, i) => <div key={i} className="h-6 bg-slate-100 rounded animate-pulse" />)}
+          </div>
+        )}
+
+        {/* Modifier error */}
+        {modIsError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            Failed to load modifier sales: {(modError as Error)?.message ?? 'Unknown error'}
+          </div>
+        )}
+
+        {/* Modifier truth lock badge */}
+        {modData?.ok && (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 flex items-center gap-3 text-xs text-emerald-800">
+            <span className="inline-flex items-center gap-1.5 font-semibold">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+              POS Truth Layer Locked
+            </span>
+            <span className="text-emerald-600">Source: {modData.source_tables.join(' + ')}</span>
+            <span className="text-emerald-500 ml-auto tabular-nums">
+              Checksum — receipts: {modData.checksum.total_receipts} · rows: {modData.checksum.total_rows} · qty: {modData.checksum.total_qty_sold}
+            </span>
+          </div>
+        )}
+
+        {/* Modifier table */}
+        {modData?.ok && !modLoading && (
+          <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <span className="text-sm font-semibold text-slate-800">Modifier Sales</span>
+                <span className="ml-2 text-xs text-slate-400">
+                  {modData.checksum.total_qty_sold} total qty · {modData.checksum.total_rows} rows · {modData.checksum.sale_receipts} receipts
+                </span>
+              </div>
+            </div>
+
+            {modData.data.length === 0 ? (
+              <div className="px-4 py-8 text-center text-xs text-slate-400">
+                No modifier data found in this time window.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr>
+                      <Th>Modifier Name</Th>
+                      <Th>Option Name</Th>
+                      <Th right>Qty Sold</Th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...modGrouped.entries()].map(([modName, options]) => (
+                      <>
+                        {/* Modifier group header */}
+                        <tr key={`mhdr-${modName}`} className="bg-slate-100/70">
+                          <td colSpan={2} className="px-3 py-1.5 text-[11px] font-semibold text-slate-700 border-b border-slate-200">
+                            {modName}
+                          </td>
+                          <td className="px-3 py-1.5 text-[11px] font-semibold text-slate-700 text-right tabular-nums border-b border-slate-200">
+                            {modGroupTotals.get(modName)}
+                          </td>
+                        </tr>
+                        {/* Option rows */}
+                        {options.map((row, idx) => (
+                          <tr key={`${modName}-${row.option_name}-${idx}`} className="hover:bg-slate-50/60">
+                            <Td muted>—</Td>
+                            <Td>{row.option_name}</Td>
+                            <Td right bold>{row.qty_sold}</Td>
+                          </tr>
+                        ))}
+                      </>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 border-t border-slate-200">
+                      <td colSpan={2} className="px-3 py-2 text-xs font-semibold text-slate-700">Total</td>
+                      <td className="px-3 py-2 text-xs font-semibold text-slate-900 text-right tabular-nums">
+                        {modData.checksum.total_qty_sold}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+
+            <div className="px-4 py-2 border-t border-slate-100">
+              <p className="text-[10px] text-slate-400">
+                Source: <code>lv_modifier JOIN lv_receipt</code> only · Names preserved exactly as stored · No mapping, no renaming, no emoji removal · POS_TRUTH_LAYER_VIOLATION guard active
               </p>
             </div>
           </div>
