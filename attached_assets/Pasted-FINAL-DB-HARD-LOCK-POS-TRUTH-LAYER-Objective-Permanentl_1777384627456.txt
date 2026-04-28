@@ -1,0 +1,149 @@
+FINAL DB — HARD LOCK POS TRUTH LAYER
+
+Objective:
+Permanently lock lv_line_item and lv_modifier as the ONLY POS truth sources.
+
+These must NEVER be transformed, mutated, or reinterpreted.
+
+---
+
+PART 1 — CODE LOCK (BACKEND)
+
+Files:
+- server/services/loyverseImportV2.ts
+- server/routes/analysisV3.ts
+- server/services/* (any analysis layer)
+
+Add global guard:
+
+function assertPosTruthLayer(context: string) {
+  throw new Error(`POS_TRUTH_LAYER_VIOLATION: ${context}`);
+}
+
+---
+
+RULES:
+
+1. lv_line_item:
+- Must only come from Loyverse sync
+- NEVER updated after insert
+- NEVER aggregated into stored tables
+
+2. lv_modifier:
+- Must store ONE ROW per modifier selection per unit
+- qty MUST ALWAYS = 1
+- NEVER updated after insert
+- NEVER grouped or deduplicated at storage level
+
+---
+
+PART 2 — DATABASE PROTECTION
+
+Add DB constraints:
+
+ALTER TABLE lv_modifier
+ADD CONSTRAINT qty_must_be_one CHECK (qty = 1);
+
+---
+
+Prevent accidental updates:
+
+CREATE OR REPLACE FUNCTION prevent_lv_update()
+RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION 'POS_TRUTH_LAYER_VIOLATION: UPDATE not allowed on %', TG_TABLE_NAME;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER no_update_lv_line_item
+BEFORE UPDATE ON lv_line_item
+FOR EACH ROW EXECUTE FUNCTION prevent_lv_update();
+
+CREATE TRIGGER no_update_lv_modifier
+BEFORE UPDATE ON lv_modifier
+FOR EACH ROW EXECUTE FUNCTION prevent_lv_update();
+
+---
+
+PART 3 — ANALYSIS IS READ-ONLY
+
+All analysis routes:
+
+- MUST be SELECT only
+- MUST NOT write to:
+  - lv_line_item
+  - lv_modifier
+
+---
+
+PART 4 — V3 ENDPOINT PROTECTION
+
+In:
+
+/api/analysis/v3/item-sales  
+/api/analysis/v3/modifiers  
+
+Add:
+
+if (any transformation detected) {
+  assertPosTruthLayer('Attempted transformation in V3 endpoint');
+}
+
+---
+
+PART 5 — COMMENT LOCK (MANDATORY)
+
+Add at top of both endpoints:
+
+/*
+POS TRUTH LAYER — DO NOT MODIFY
+
+This endpoint must match Loyverse 1:1.
+No transformations allowed.
+
+If you change this logic, you break:
+- sales accuracy
+- stock calculations
+- fraud detection
+- entire system trust
+
+Read-only. Mirror only.
+*/
+
+---
+
+PART 6 — VALIDATION CHECKSUM
+
+Each endpoint must return:
+
+{
+  total_rows,
+  total_qty,
+  total_receipts,
+  source_tables: ["lv_receipt", "lv_line_item"] OR ["lv_receipt", "lv_modifier"]
+}
+
+---
+
+PART 7 — FAILURE MODE
+
+If:
+
+- lv_modifier count < expected
+- lv_line_item mismatch
+- missing receipts
+
+Return:
+
+status: "POS_DATA_INCOMPLETE"
+
+DO NOT fake numbers.
+
+---
+
+SUCCESS CRITERIA:
+
+- Item Sales = exact Loyverse match
+- Modifier Sales = exact Loyverse match
+- No updates possible to raw tables
+- All analysis derived ONLY from these tables
