@@ -187,7 +187,7 @@ export default function StaffOpsSettings() {
         <WorkAreasPanel workAreas={workAreas} loading={loadingAreas} qc={qc} toast={toast} />
       )}
       {tab === 'templates' && (
-        <TemplatesPanel templates={templates} loading={loadingTemplates} qc={qc} toast={toast} />
+        <TemplatesPanel templates={templates} workAreas={workAreas} loading={loadingTemplates} qc={qc} toast={toast} />
       )}
       {tab === 'daily-cleaning' && (
         <DailyCleaningTemplatesPanel
@@ -551,18 +551,123 @@ function WorkAreasPanel({
   );
 }
 
-function TemplatesPanel({
-  templates,
-  loading,
-  qc,
-  toast,
+type StationRequirement = {
+  id: number; shiftTemplateId: number; workAreaId: number;
+  workAreaName: string | null; requiredCount: number; priority: number;
+};
+
+function StationRequirementsPanel({
+  templateId, templateName, workAreas, qc, toast,
 }: {
-  templates: ShiftTemplate[];
-  loading: boolean;
-  qc: ReturnType<typeof useQueryClient>;
-  toast: ReturnType<typeof useToast>['toast'];
+  templateId: number; templateName: string; workAreas: WorkArea[];
+  qc: ReturnType<typeof useQueryClient>; toast: ReturnType<typeof useToast>['toast'];
+}) {
+  const [addAreaId, setAddAreaId] = useState<number>(workAreas[0]?.id ?? 0);
+  const [addCount, setAddCount] = useState(1);
+  const queryKey = [`/api/operations/staff/templates/${templateId}/station-requirements`];
+
+  const { data: reqs = [], isLoading } = useQuery<StationRequirement[]>({
+    queryKey,
+    queryFn: () => sapi('GET', `/api/operations/staff/templates/${templateId}/station-requirements`),
+  });
+
+  const addMut = useMutation({
+    mutationFn: () => sapi('POST', `/api/operations/staff/templates/${templateId}/station-requirements`, {
+      workAreaId: addAreaId, requiredCount: addCount, priority: reqs.length,
+    }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey }); toast({ title: 'Station slot added' }); },
+    onError: () => toast({ title: 'Failed to add', variant: 'destructive' }),
+  });
+
+  const delMut = useMutation({
+    mutationFn: (id: number) => sapi('DELETE', `/api/operations/staff/templates/${templateId}/station-requirements/${id}`),
+    onSuccess: () => { qc.invalidateQueries({ queryKey }); toast({ title: 'Removed' }); },
+    onError: () => toast({ title: 'Failed to remove', variant: 'destructive' }),
+  });
+
+  const activeAreas = workAreas.filter((a) => a.isActive);
+
+  return (
+    <div className="mt-3 border border-slate-200 rounded-lg bg-slate-50 p-3">
+      <p className="text-xs font-semibold text-slate-700 mb-2">
+        Station Requirements — {templateName}
+      </p>
+      <p className="text-xs text-slate-500 mb-3">
+        Define how many staff are needed per station. Auto-generate uses these to fill each slot. Leave empty to use "Max Staff" instead.
+      </p>
+      {isLoading ? (
+        <div className="text-xs text-slate-400">Loading...</div>
+      ) : reqs.length === 0 ? (
+        <div className="text-xs text-slate-400 italic mb-2">No station slots defined — using Max Staff fallback.</div>
+      ) : (
+        <div className="space-y-1.5 mb-3">
+          {reqs.map((r) => (
+            <div key={r.id} className="flex items-center justify-between bg-white border border-slate-200 rounded px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-slate-800">{r.workAreaName ?? `Area #${r.workAreaId}`}</span>
+                <span className="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-xs">
+                  {r.requiredCount} staff
+                </span>
+              </div>
+              <button
+                onClick={() => { if (confirm('Remove this station slot?')) delMut.mutate(r.id); }}
+                className="p-1 rounded hover:bg-red-50 text-red-400"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          <div className="text-xs text-slate-500 pt-1">
+            Total required: <strong>{reqs.reduce((s, r) => s + r.requiredCount, 0)} staff</strong> per shift
+          </div>
+        </div>
+      )}
+      {activeAreas.length > 0 && (
+        <div className="flex items-end gap-2 flex-wrap">
+          <label className="block">
+            <span className="text-xs font-medium text-slate-600 block mb-0.5">Work Area</span>
+            <select
+              value={addAreaId}
+              onChange={(e) => setAddAreaId(Number(e.target.value))}
+              className={inputCls + ' w-auto'}
+            >
+              {activeAreas.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-slate-600 block mb-0.5">Count</span>
+            <input
+              type="number" min={1} max={20} value={addCount}
+              onChange={(e) => setAddCount(Number(e.target.value))}
+              className={inputCls + ' w-16'}
+            />
+          </label>
+          <button
+            onClick={() => addMut.mutate()}
+            disabled={addMut.isPending || !addAreaId}
+            className="flex items-center gap-1 px-2.5 py-1.5 bg-slate-700 text-white text-xs rounded hover:bg-slate-800 disabled:opacity-50 touch-manipulation"
+          >
+            <Plus className="w-3 h-3" /> Add Slot
+          </button>
+        </div>
+      )}
+      {activeAreas.length === 0 && (
+        <p className="text-xs text-amber-600">No active work areas — add work areas first.</p>
+      )}
+    </div>
+  );
+}
+
+function TemplatesPanel({
+  templates, workAreas, loading, qc, toast,
+}: {
+  templates: ShiftTemplate[]; workAreas: WorkArea[]; loading: boolean;
+  qc: ReturnType<typeof useQueryClient>; toast: ReturnType<typeof useToast>['toast'];
 }) {
   const [modal, setModal] = useState<{ mode: 'add' | 'edit'; item?: ShiftTemplate } | null>(null);
+  const [selectedStationTemplateId, setSelectedStationTemplateId] = useState<number | null>(null);
   const form = useForm({ resolver: zodResolver(templateSchema) });
 
   const saveMut = useMutation({
@@ -582,6 +687,7 @@ function TemplatesPanel({
     mutationFn: (id: number) => sapi('DELETE', `/api/operations/staff/shift-templates/${id}`),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['/api/operations/staff/shift-templates'] });
+      if (selectedStationTemplateId === id) setSelectedStationTemplateId(null);
       toast({ title: 'Deleted' });
     },
     onError: () => toast({ title: 'Delete failed', variant: 'destructive' }),
@@ -597,13 +703,7 @@ function TemplatesPanel({
           </p>
           <button
             onClick={() => {
-              form.reset({
-                templateName: '',
-                startTime: '17:00',
-                endTime: '03:00',
-                maxStaff: 5,
-                isPrepShift: false,
-              });
+              form.reset({ templateName: '', startTime: '17:00', endTime: '03:00', maxStaff: 5, isPrepShift: false });
               setModal({ mode: 'add' });
             }}
             className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600 text-white text-xs rounded hover:bg-emerald-700"
@@ -622,44 +722,38 @@ function TemplatesPanel({
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Name</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Times</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Max Staff</th>
-                <th className="text-left px-4 py-2 font-medium text-slate-600">Type</th>
                 <th className="text-left px-4 py-2 font-medium text-slate-600">Status</th>
                 <th />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {templates.map((t) => (
-                <tr key={t.id}>
-                  <td className="px-4 py-2.5 font-medium text-slate-800">{t.templateName}</td>
-                  <td className="px-4 py-2.5 text-slate-600">
-                    {t.startTime} – {t.endTime}
-                  </td>
-                  <td className="px-4 py-2.5 text-slate-600">{t.maxStaff}</td>
-                  <td className="px-4 py-2.5">
+                <tr key={t.id} className={selectedStationTemplateId === t.id ? 'bg-slate-50' : ''}>
+                  <td className="px-4 py-2.5 font-medium text-slate-800">
+                    {t.templateName}
                     {t.isPrepShift && (
-                      <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
-                        Prep
-                      </span>
+                      <span className="ml-1.5 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">Prep</span>
                     )}
                   </td>
+                  <td className="px-4 py-2.5 text-slate-600">{t.startTime} – {t.endTime}</td>
+                  <td className="px-4 py-2.5 text-slate-600">{t.maxStaff}</td>
                   <td className="px-4 py-2.5">
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-xs font-medium ${t.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}
-                    >
+                    <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${t.isActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                       {t.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right">
                     <div className="flex gap-1 justify-end">
                       <button
+                        onClick={() => setSelectedStationTemplateId(selectedStationTemplateId === t.id ? null : t.id)}
+                        className={`px-2 py-1 text-xs rounded border touch-manipulation ${selectedStationTemplateId === t.id ? 'bg-slate-700 text-white border-slate-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
+                        title="Manage station requirements"
+                      >
+                        Stations
+                      </button>
+                      <button
                         onClick={() => {
-                          form.reset({
-                            templateName: t.templateName,
-                            startTime: t.startTime,
-                            endTime: t.endTime,
-                            maxStaff: t.maxStaff,
-                            isPrepShift: t.isPrepShift,
-                          });
+                          form.reset({ templateName: t.templateName, startTime: t.startTime, endTime: t.endTime, maxStaff: t.maxStaff, isPrepShift: t.isPrepShift });
                           setModal({ mode: 'edit', item: t });
                         }}
                         className="p-1 rounded hover:bg-slate-100 text-slate-500"
@@ -667,9 +761,7 @@ function TemplatesPanel({
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => {
-                          if (confirm('Delete this template?')) delMut.mutate(t.id);
-                        }}
+                        onClick={() => { if (confirm('Delete this template?')) delMut.mutate(t.id); }}
                         className="p-1 rounded hover:bg-red-50 text-red-400"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -682,6 +774,21 @@ function TemplatesPanel({
           </table>
         )}
       </div>
+
+      {selectedStationTemplateId && (() => {
+        const t = templates.find((t) => t.id === selectedStationTemplateId);
+        if (!t) return null;
+        return (
+          <StationRequirementsPanel
+            templateId={t.id}
+            templateName={t.templateName}
+            workAreas={workAreas}
+            qc={qc}
+            toast={toast}
+          />
+        );
+      })()}
+
       {modal && (
         <Modal
           title={modal.mode === 'add' ? 'Add Shift Template' : 'Edit Shift Template'}
@@ -692,11 +799,7 @@ function TemplatesPanel({
             className="space-y-4"
           >
             <Field label="Template Name *">
-              <input
-                {...form.register('templateName')}
-                className={inputCls}
-                placeholder="e.g. Evening Main"
-              />
+              <input {...form.register('templateName')} className={inputCls} placeholder="e.g. Evening Main" />
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Start Time *">
@@ -710,26 +813,14 @@ function TemplatesPanel({
               <input type="number" {...form.register('maxStaff')} className={inputCls} />
             </Field>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                {...form.register('isPrepShift')}
-                className="w-4 h-4 accent-emerald-600"
-              />
+              <input type="checkbox" {...form.register('isPrepShift')} className="w-4 h-4 accent-emerald-600" />
               <span className="text-xs text-slate-600">This is a prep shift</span>
             </div>
             <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={() => setModal(null)}
-                className="px-3 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saveMut.isPending}
-                className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
-              >
+              <button type="button" onClick={() => setModal(null)}
+                className="px-3 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-50">Cancel</button>
+              <button type="submit" disabled={saveMut.isPending}
+                className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50">
                 {saveMut.isPending ? 'Saving...' : 'Save'}
               </button>
             </div>

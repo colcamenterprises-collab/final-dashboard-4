@@ -18,6 +18,8 @@ import {
   Wand2,
   AlertTriangle,
   Download,
+  Coffee,
+  XCircle,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -214,6 +216,81 @@ function Field({
   );
 }
 
+function GuidedSetupBanner({
+  templates, workAreas, members,
+}: {
+  templates: ShiftTemplate[];
+  workAreas: WorkArea[];
+  members: StaffMember[];
+}) {
+  const [dismissed, setDismissed] = useState(false);
+
+  const steps = [
+    {
+      label: 'Shift Templates',
+      done: templates.length > 0,
+      hint: 'Create at least one shift template in Operations Settings → Shift Templates',
+    },
+    {
+      label: 'Work Areas',
+      done: workAreas.length > 0,
+      hint: 'Add work areas (e.g. Grill, Cashier, Sides) in Operations Settings → Work Areas',
+    },
+    {
+      label: 'Station Requirements',
+      done: true, // optimistic — checked when templates have requirements; soft guidance only
+      hint: 'Set how many staff per station in Settings → Shift Templates → Stations button',
+      soft: true,
+    },
+    {
+      label: 'Staff Members',
+      done: members.filter((m) => m.isActive).length > 0,
+      hint: 'Add active staff members in Staff Management',
+    },
+  ];
+
+  const allDone = steps.filter((s) => !s.soft).every((s) => s.done);
+  if (allDone || dismissed) return null;
+
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1">
+          <p className="text-xs font-semibold text-amber-800 mb-1.5">
+            Setup checklist — complete these steps before auto-generating a roster
+          </p>
+          <div className="grid grid-cols-2 gap-1.5">
+            {steps.map((step, i) => (
+              <div key={i} className="flex items-start gap-1.5">
+                {step.done ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 mt-px" />
+                ) : (
+                  <XCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-px" />
+                )}
+                <div>
+                  <span className={`text-xs font-medium ${step.done ? 'text-slate-700' : 'text-amber-800'}`}>
+                    {step.label}
+                  </span>
+                  {!step.done && (
+                    <p className="text-xs text-amber-600 mt-0.5">{step.hint}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-amber-400 hover:text-amber-600 shrink-0"
+          title="Dismiss"
+        >
+          <XCircle className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function WeeklyRosterPlanner() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -260,6 +337,20 @@ export default function WeeklyRosterPlanner() {
         .then((d) => d.assignments ?? []),
     enabled: expandedRosterId !== null,
   });
+
+  const { data: rosterBreaks = [] } = useQuery<ShiftBreak[]>({
+    queryKey: ['/api/operations/staff/rosters', expandedRosterId, 'all-breaks'],
+    queryFn: () =>
+      fetch(`/api/operations/staff/rosters/${expandedRosterId}/all-breaks`).then((r) => r.json()),
+    enabled: expandedRosterId !== null,
+  });
+
+  // Group breaks by assignment id for quick lookup
+  const breaksByAssignment = rosterBreaks.reduce<Record<number, ShiftBreak[]>>((acc, b) => {
+    if (!acc[b.shiftStaffAssignmentId]) acc[b.shiftStaffAssignmentId] = [];
+    acc[b.shiftStaffAssignmentId].push(b);
+    return acc;
+  }, {});
 
   const rosterForm = useForm({
     resolver: zodResolver(rosterSchema),
@@ -576,6 +667,9 @@ export default function WeeklyRosterPlanner() {
         </div>
       </div>
 
+      {/* Guided Setup Banner */}
+      <GuidedSetupBanner templates={templates} workAreas={workAreas} members={members} />
+
       {/* Week Navigation */}
       <div className="bg-white border border-slate-200 rounded-lg p-3">
         <div className="flex items-center justify-between mb-3">
@@ -778,6 +872,9 @@ export default function WeeklyRosterPlanner() {
                       <div className="divide-y divide-slate-100">
                         {rosterAssignments.map((a) => {
                           const member = members.find((m) => m.id === a.staffMemberId);
+                          const assignBreaks = breaksByAssignment[a.id] ?? [];
+                          const mainBreak = assignBreaks.find((b) => b.breakType === 'main');
+                          const shortBreaks = assignBreaks.filter((b) => b.breakType === 'short');
                           return (
                             <div key={a.id} className="flex items-center gap-3 px-4 py-2.5">
                               <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700 shrink-0">
@@ -803,6 +900,17 @@ export default function WeeklyRosterPlanner() {
                                     <span className="ml-1 text-amber-600">· Prep</span>
                                   )}
                                 </p>
+                                {assignBreaks.length > 0 && (
+                                  <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                                    <Coffee className="w-3 h-3" />
+                                    {mainBreak && (
+                                      <span>{mainBreak.plannedStartTime}–{mainBreak.plannedEndTime} main</span>
+                                    )}
+                                    {shortBreaks.map((sb, i) => (
+                                      <span key={i}> · {sb.plannedStartTime}–{sb.plannedEndTime} short</span>
+                                    ))}
+                                  </p>
+                                )}
                                 {a.shiftNotes && (
                                   <p className="text-xs text-slate-400 italic mt-0.5 truncate">
                                     {a.shiftNotes}

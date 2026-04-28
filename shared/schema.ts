@@ -2746,6 +2746,10 @@ export const shiftCleaningTaskStatusEnum = pgEnum('shift_cleaning_task_status', 
   'pending', 'in_progress', 'completed', 'skipped', 'reassigned'
 ]);
 
+export const staffUnavailabilityReasonEnum = pgEnum('staff_unavailability_reason', [
+  'unavailable', 'annual_leave', 'sick', 'preferred_off', 'other',
+]);
+
 export const deepCleaningStatusEnum = pgEnum('deep_cleaning_status', [
   'pending', 'in_progress', 'completed', 'overdue', 'rolled_over'
 ]);
@@ -2833,6 +2837,23 @@ export const insertShiftTemplateSchema = createInsertSchema(shiftTemplates).omit
 export type ShiftTemplate = typeof shiftTemplates.$inferSelect;
 export type InsertShiftTemplate = z.infer<typeof insertShiftTemplateSchema>;
 
+// --- 4b. shift_template_station_requirements ---
+export const shiftTemplateStationRequirements = pgTable("shift_template_station_requirements", {
+  id: serial("id").primaryKey(),
+  shiftTemplateId: integer("shift_template_id").notNull(),
+  workAreaId: integer("work_area_id").notNull(),
+  requiredCount: integer("required_count").notNull().default(1),
+  priority: integer("priority").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("station_req_template_idx").on(t.shiftTemplateId),
+]);
+
+export const insertShiftTemplateStationRequirementSchema = createInsertSchema(shiftTemplateStationRequirements).omit({ id: true, createdAt: true, updatedAt: true });
+export type ShiftTemplateStationRequirement = typeof shiftTemplateStationRequirements.$inferSelect;
+export type InsertShiftTemplateStationRequirement = z.infer<typeof insertShiftTemplateStationRequirementSchema>;
+
 // --- 5. staff_members ---
 export const staffMembers = pgTable("staff_members", {
   id: serial("id").primaryKey(),
@@ -2879,6 +2900,27 @@ export const staffAvailability = pgTable("staff_availability", {
 export const insertStaffAvailabilitySchema = createInsertSchema(staffAvailability).omit({ id: true, createdAt: true, updatedAt: true });
 export type StaffAvailability = typeof staffAvailability.$inferSelect;
 export type InsertStaffAvailability = z.infer<typeof insertStaffAvailabilitySchema>;
+
+// --- 6b. staff_unavailability ---
+export const staffUnavailability = pgTable("staff_unavailability", {
+  id: serial("id").primaryKey(),
+  staffMemberId: integer("staff_member_id").notNull(),
+  businessLocationId: integer("business_location_id").notNull().default(1),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  reasonType: staffUnavailabilityReasonEnum("reason_type").notNull().default("unavailable"),
+  notes: text("notes"),
+  isApproved: boolean("is_approved").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("staff_unavail_member_idx").on(t.staffMemberId),
+  index("staff_unavail_location_idx").on(t.businessLocationId),
+]);
+
+export const insertStaffUnavailabilitySchema = createInsertSchema(staffUnavailability).omit({ id: true, createdAt: true, updatedAt: true });
+export type StaffUnavailability = typeof staffUnavailability.$inferSelect;
+export type InsertStaffUnavailability = z.infer<typeof insertStaffUnavailabilitySchema>;
 
 // --- 7. shift_rosters ---
 export const shiftRosters = pgTable("shift_rosters", {

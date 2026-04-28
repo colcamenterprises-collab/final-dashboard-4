@@ -15,8 +15,10 @@ import {
   operatingHours,
   workAreas,
   shiftTemplates,
+  shiftTemplateStationRequirements,
   staffMembers,
   staffAvailability,
+  staffUnavailability,
   shiftRosters,
   shiftStaffAssignments,
   shiftBreaks,
@@ -29,8 +31,10 @@ import {
   insertOperatingHoursSchema,
   insertWorkAreaSchema,
   insertShiftTemplateSchema,
+  insertShiftTemplateStationRequirementSchema,
   insertStaffMemberSchema,
   insertStaffAvailabilitySchema,
+  insertStaffUnavailabilitySchema,
   insertShiftRosterSchema,
   insertShiftStaffAssignmentSchema,
   insertShiftBreakSchema,
@@ -300,6 +304,139 @@ router.delete('/shift-templates/:id', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     handleError(res, err, 'deleteShiftTemplate');
+  }
+});
+
+// ----------------------------------------------------------------
+// STATION REQUIREMENTS (per shift template)
+// ----------------------------------------------------------------
+
+router.get('/templates/:templateId/station-requirements', async (req, res) => {
+  try {
+    const templateId = Number(req.params.templateId);
+    const rows = await db
+      .select({
+        req: shiftTemplateStationRequirements,
+        area: workAreas,
+      })
+      .from(shiftTemplateStationRequirements)
+      .leftJoin(workAreas, eq(shiftTemplateStationRequirements.workAreaId, workAreas.id))
+      .where(eq(shiftTemplateStationRequirements.shiftTemplateId, templateId))
+      .orderBy(asc(shiftTemplateStationRequirements.priority), asc(shiftTemplateStationRequirements.id));
+
+    res.json(
+      rows.map((r) => ({
+        ...r.req,
+        workAreaName: r.area?.name ?? null,
+      }))
+    );
+  } catch (err) {
+    handleError(res, err, 'getStationRequirements');
+  }
+});
+
+router.post('/templates/:templateId/station-requirements', async (req, res) => {
+  try {
+    const templateId = Number(req.params.templateId);
+    const parsed = insertShiftTemplateStationRequirementSchema.safeParse({
+      ...req.body,
+      shiftTemplateId: templateId,
+    });
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const [row] = await db
+      .insert(shiftTemplateStationRequirements)
+      .values(parsed.data)
+      .returning();
+    res.status(201).json(row);
+  } catch (err) {
+    handleError(res, err, 'createStationRequirement');
+  }
+});
+
+router.patch('/templates/:templateId/station-requirements/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [row] = await db
+      .update(shiftTemplateStationRequirements)
+      .set({ ...req.body, updatedAt: new Date() })
+      .where(eq(shiftTemplateStationRequirements.id, id))
+      .returning();
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json(row);
+  } catch (err) {
+    handleError(res, err, 'updateStationRequirement');
+  }
+});
+
+router.delete('/templates/:templateId/station-requirements/:id', async (req, res) => {
+  try {
+    await db
+      .delete(shiftTemplateStationRequirements)
+      .where(eq(shiftTemplateStationRequirements.id, Number(req.params.id)));
+    res.json({ ok: true });
+  } catch (err) {
+    handleError(res, err, 'deleteStationRequirement');
+  }
+});
+
+// ----------------------------------------------------------------
+// STAFF UNAVAILABILITY
+// ----------------------------------------------------------------
+
+router.get('/unavailability', async (req, res) => {
+  try {
+    const locationId = getLocationId(req);
+    const staffIdParam = req.query.staffMemberId ? Number(req.query.staffMemberId) : null;
+    const conditions = [eq(staffUnavailability.businessLocationId, locationId)];
+    if (staffIdParam) conditions.push(eq(staffUnavailability.staffMemberId, staffIdParam));
+    const rows = await db
+      .select()
+      .from(staffUnavailability)
+      .where(and(...conditions))
+      .orderBy(desc(staffUnavailability.startDate));
+    res.json(rows);
+  } catch (err) {
+    handleError(res, err, 'getUnavailability');
+  }
+});
+
+router.post('/unavailability', async (req, res) => {
+  try {
+    const parsed = insertStaffUnavailabilitySchema.safeParse({
+      ...req.body,
+      businessLocationId: getLocationId(req),
+    });
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const [row] = await db.insert(staffUnavailability).values(parsed.data).returning();
+    res.status(201).json(row);
+  } catch (err) {
+    handleError(res, err, 'createUnavailability');
+  }
+});
+
+router.patch('/unavailability/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const [row] = await db
+      .update(staffUnavailability)
+      .set({ ...req.body, updatedAt: new Date() })
+      .where(eq(staffUnavailability.id, id))
+      .returning();
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    res.json(row);
+  } catch (err) {
+    handleError(res, err, 'updateUnavailability');
+  }
+});
+
+router.delete('/unavailability/:id', async (req, res) => {
+  try {
+    await db
+      .delete(staffUnavailability)
+      .where(eq(staffUnavailability.id, Number(req.params.id)));
+    res.json({ ok: true });
+  } catch (err) {
+    handleError(res, err, 'deleteUnavailability');
   }
 });
 
@@ -752,6 +889,21 @@ router.delete('/assignments/:id', async (req, res) => {
 // ----------------------------------------------------------------
 // BREAKS
 // ----------------------------------------------------------------
+
+router.get('/rosters/:id/all-breaks', async (req, res) => {
+  try {
+    const rosterId = Number(req.params.id);
+    const rows = await db
+      .select({ brk: shiftBreaks })
+      .from(shiftBreaks)
+      .innerJoin(shiftStaffAssignments, eq(shiftBreaks.shiftStaffAssignmentId, shiftStaffAssignments.id))
+      .where(eq(shiftStaffAssignments.shiftRosterId, rosterId))
+      .orderBy(asc(shiftBreaks.plannedStartTime));
+    res.json(rows.map((r) => r.brk));
+  } catch (err) {
+    handleError(res, err, 'getAllRosterBreaks');
+  }
+});
 
 router.post('/rosters/:id/breaks/auto-generate', async (req, res) => {
   try {

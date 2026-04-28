@@ -1,0 +1,192 @@
+PATCH TITLE
+Staff Operations — Guided Roster Builder + Availability + Cleaning Allocation
+
+OBJECTIVE
+Turn the roster system from a manual planner into a guided operational workflow.
+
+The workflow must be:
+
+1. Configure shop/location
+2. Configure shift templates and required station coverage
+3. Configure staff roles/capabilities
+4. Configure staff availability/unavailability
+5. Generate weekly roster
+6. Auto-assign stations, breaks, and cleaning tasks
+7. Export team/individual roster
+
+PART A — Required Station Coverage
+
+Add support for shift templates to define required station slots.
+
+Example:
+Main Shift:
+- Cashier: 1
+- Grill: 1
+- Kitchen/Sides: 1
+
+Data model:
+Use existing shift_templates if possible.
+If needed, add:
+shift_template_station_requirements
+- id
+- shiftTemplateId
+- workAreaId
+- requiredCount
+- priority
+- createdAt
+- updatedAt
+
+Generator must assign staff into these required station slots.
+
+Do not assign everyone to “Main Shift” as station.
+
+PART B — Staff Availability Calendar
+
+Add availability/unavailability layer.
+
+Use existing staff_availability for recurring weekly availability.
+
+Add if missing:
+staff_unavailability
+- id
+- staffMemberId
+- businessLocationId
+- startDate
+- endDate
+- reasonType: unavailable | annual_leave | sick | preferred_off | other
+- notes
+- isApproved
+- createdAt
+- updatedAt
+
+UI:
+In Staff Management, add Availability tab:
+- recurring weekly availability
+- date-specific unavailable periods
+- leave entries
+- preferred days off
+
+Generator must:
+- never assign unavailable staff unless forced fallback is enabled
+- warn if fallback used
+- respect approved leave
+
+PART C — Auto Roster Assignment Logic
+
+Update generator sequence:
+
+1. Read active shift templates
+2. Read required station coverage per template
+3. Create shifts
+4. For each required station slot:
+   - find active available staff
+   - match capability/work area
+   - balance hours/shifts
+   - assign best candidate
+5. If exact match unavailable:
+   - fallback to secondary capability
+   - fallback to available active staff
+   - warn clearly
+6. Never leave shift empty if active staff exist.
+
+Output must show:
+- assigned station, not shift name
+- role coverage summary
+- underfilled station warnings
+
+PART D — Break Allocation
+
+After staff assignments:
+- auto-generate breaks for each roster
+- stagger breaks
+- avoid all staff off station at same time
+- show break summary on roster cards
+- include breaks in individual PDF
+
+PART E — Cleaning Allocation
+
+After staff assignments:
+- generate cleaning tasks for each roster
+- assign tasks based on station/role:
+  - Cashier/front → front counter, tables, napkins, customer area
+  - Grill/kitchen → grill, fryer, prep, food safety
+  - All/general → split evenly
+- balance estimated cleaning minutes
+- leave unassigned only if no suitable staff
+- return warnings
+
+Cleaning allocation must update:
+- Daily Cleaning page
+- Weekly Roster card cleaning counts
+- Team PDF summary
+- Individual PDF assigned tasks
+
+PART F — Guided UI Workflow
+
+Add a simple guided setup flow inside Staff Operations:
+
+Step 1: Shop Setup
+- opening days/hours
+- shift templates
+
+Step 2: Station Coverage
+- required stations per shift template
+
+Step 3: Staff Setup
+- staff roles/capabilities
+
+Step 4: Availability
+- weekly availability
+- leave/unavailability calendar
+
+Step 5: Generate Roster
+- generate week
+- review warnings
+- manual adjustments
+
+Step 6: Export
+- team PDF
+- individual PDFs
+
+Do not over-design.
+Make it simple and operational.
+
+PART G — PDF Follow-Up
+
+Do not redesign PDF again in this patch except to ensure:
+- assigned stations are correct
+- individual tasks appear if assigned
+- breaks appear if available
+
+STYLE NOTE:
+PDF visual design still needs separate improvement later.
+
+VERIFICATION
+
+Test:
+1. Create shift template with station requirements:
+   - Cashier 1
+   - Grill 1
+   - Kitchen/Sides 1
+
+2. Create 4 staff with different capabilities.
+
+3. Mark one staff unavailable for one day.
+
+4. Auto-generate weekly roster.
+
+Confirm:
+- staff not assigned when unavailable
+- stations filled correctly
+- no “Main Shift” as station unless that is the actual station
+- breaks generated
+- cleaning generated
+- cleaning assigned based on station
+- individual PDF shows actual station and assigned tasks
+- warnings appear if coverage impossible
+
+DO NOT TOUCH:
+- Daily Sales / Stock V2
+- Analysis V2
+- Bob
+- POS integrations

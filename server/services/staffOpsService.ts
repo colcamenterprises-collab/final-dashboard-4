@@ -11,8 +11,10 @@ import {
   operatingHours,
   workAreas,
   shiftTemplates,
+  shiftTemplateStationRequirements,
   staffMembers,
   staffAvailability,
+  staffUnavailability,
   shiftRosters,
   shiftStaffAssignments,
   shiftBreaks,
@@ -216,46 +218,57 @@ export async function generateBreaksForRoster(
         eq(shiftStaffAssignments.shiftRosterId, shiftRosterId),
         eq(shiftStaffAssignments.isOffDay, false)
       )
-    );
+    )
+    .orderBy(asc(shiftStaffAssignments.id));
 
   const created: (typeof shiftBreaks.$inferSelect)[] = [];
 
-  for (const assignment of assignments) {
+  // Stagger main breaks by 15 minutes per staff member so no two staff are on break simultaneously.
+  const STAGGER_MINS = 15;
+
+  for (let staffIdx = 0; staffIdx < assignments.length; staffIdx++) {
+    const assignment = assignments[staffIdx];
+    const staggerOffset = staffIdx * STAGGER_MINS;
+
     const [startH, startM] = assignment.scheduledStartTime.split(':').map(Number);
     const [endH, endM] = assignment.scheduledEndTime.split(':').map(Number);
-    const totalMins = endH * 60 + endM - (startH * 60 + startM);
+    let totalMins = endH * 60 + endM - (startH * 60 + startM);
+    if (totalMins <= 0) totalMins += 24 * 60; // overnight shift
 
-    // Main break: at ~midpoint
-    if (totalMins > 0) {
-      const midStart = startH * 60 + startM + Math.floor(totalMins / 2);
+    // Main break: at ~midpoint, staggered by staffIdx
+    if (totalMins > 60) {
+      const midStart = startH * 60 + startM + Math.floor(totalMins / 2) + staggerOffset;
       const midEnd = midStart + settings.breakMainMinutes;
       const [mb] = await db
         .insert(shiftBreaks)
         .values({
           shiftStaffAssignmentId: assignment.id,
           breakType: 'main',
-          plannedStartTime: minsToHHMM(midStart),
-          plannedEndTime: minsToHHMM(midEnd),
+          plannedStartTime: minsToHHMM(midStart % (24 * 60)),
+          plannedEndTime: minsToHHMM(midEnd % (24 * 60)),
         })
         .returning();
       created.push(mb);
     }
 
-    // Short breaks: evenly spaced
-    for (let i = 0; i < settings.breakShortCount; i++) {
-      const offset = Math.floor(totalMins / (settings.breakShortCount + 1)) * (i + 1);
-      const bStart = startH * 60 + startM + offset;
-      const bEnd = bStart + settings.breakShortMinutes;
-      const [sb] = await db
-        .insert(shiftBreaks)
-        .values({
-          shiftStaffAssignmentId: assignment.id,
-          breakType: 'short',
-          plannedStartTime: minsToHHMM(bStart),
-          plannedEndTime: minsToHHMM(bEnd),
-        })
-        .returning();
-      created.push(sb);
+    // Short breaks: evenly spaced, each also staggered per staff member
+    if (settings.breakShortCount > 0 && totalMins > 30) {
+      for (let i = 0; i < settings.breakShortCount; i++) {
+        const offset =
+          Math.floor(totalMins / (settings.breakShortCount + 1)) * (i + 1) + staggerOffset;
+        const bStart = (startH * 60 + startM + offset) % (24 * 60);
+        const bEnd = (bStart + settings.breakShortMinutes) % (24 * 60);
+        const [sb] = await db
+          .insert(shiftBreaks)
+          .values({
+            shiftStaffAssignmentId: assignment.id,
+            breakType: 'short',
+            plannedStartTime: minsToHHMM(bStart),
+            plannedEndTime: minsToHHMM(bEnd),
+          })
+          .returning();
+        created.push(sb);
+      }
     }
   }
 
@@ -406,6 +419,7 @@ export async function calculateStaffWeeklyLoad(
 export function selectEligibleStaffForShift(input: {
   staff: (typeof staffMembers.$inferSelect)[];
   availabilityByKey: Map<string, typeof staffAvailability.$inferSelect>;
+  unavailableSet?: Set<string>;
   shiftDate: string;
   stationName?: string | null;
   currentAssignmentsForDate: Set<number>;
@@ -414,6 +428,8 @@ export function selectEligibleStaffForShift(input: {
   return input.staff.filter((member) => {
     if (!member.isActive) return false;
     if (input.currentAssignmentsForDate.has(member.id)) return false;
+    // Check date-specific unavailability
+    if (input.unavailableSet?.has(`${member.id}:${input.shiftDate}`)) return false;
     const availability = input.availabilityByKey.get(`${member.id}:${day}`);
     if (availability && !availability.isAvailable) return false;
     return stationCapabilityMatch(input.stationName, member);
@@ -671,6 +687,39 @@ export async function autoGenerateWeeklyRoster(input: AutoGenerateWeeklyRosterIn
     throw new Error('No active shift templates found. Create shift templates first.');
   }
 
+  // --- Fetch station requirements for all active templates ---
+  const templateIds = activeTemplates.map((t) => t.id);
+  const stationReqRows =
+    templateIds.length > 0
+      ? await db
+          .select({
+            req: shiftTemplateStationRequirements,
+            area: workAreas,
+          })
+          .from(shiftTemplateStationRequirements)
+          .leftJoin(workAreas, eq(shiftTemplateStationRequirements.workAreaId, workAreas.id))
+          .where(inArray(shiftTemplateStationRequirements.shiftTemplateId, templateIds))
+          .orderBy(
+            asc(shiftTemplateStationRequirements.priority),
+            asc(shiftTemplateStationRequirements.id)
+          )
+      : [];
+
+  const reqsByTemplate = new Map<
+    number,
+    Array<{ workAreaId: number; workAreaName: string; requiredCount: number }>
+  >();
+  for (const row of stationReqRows) {
+    const slot = {
+      workAreaId: row.req.workAreaId,
+      workAreaName: row.area?.name ?? `Area #${row.req.workAreaId}`,
+      requiredCount: row.req.requiredCount,
+    };
+    const arr = reqsByTemplate.get(row.req.shiftTemplateId) ?? [];
+    arr.push(slot);
+    reqsByTemplate.set(row.req.shiftTemplateId, arr);
+  }
+
   const allStaff = await db
     .select()
     .from(staffMembers)
@@ -690,6 +739,28 @@ export async function autoGenerateWeeklyRoster(input: AutoGenerateWeeklyRosterIn
         )
     : [];
   const availabilityByKey = new Map(availRows.map((a) => [`${a.staffMemberId}:${a.dayOfWeek}`, a]));
+
+  // --- Fetch date-specific unavailability for the week ---
+  const unavailRows = await db
+    .select()
+    .from(staffUnavailability)
+    .where(
+      and(
+        eq(staffUnavailability.businessLocationId, input.businessLocationId),
+        lte(staffUnavailability.startDate, input.weekEndDate),
+        gte(staffUnavailability.endDate, input.weekStartDate)
+      )
+    );
+  const unavailableSet = new Set<string>();
+  for (const row of unavailRows) {
+    const dates = getDateRange(row.startDate, row.endDate);
+    for (const d of dates) {
+      if (d >= input.weekStartDate && d <= input.weekEndDate) {
+        unavailableSet.add(`${row.staffMemberId}:${d}`);
+      }
+    }
+  }
+
   const existingInRange = await db
     .select()
     .from(shiftRosters)
@@ -765,30 +836,82 @@ export async function autoGenerateWeeklyRoster(input: AutoGenerateWeeklyRosterIn
       createdRosterIds.push(roster.id);
       rostersCreated += 1;
 
-      const eligible = selectEligibleStaffForShift({
-        staff: activeStaff,
-        availabilityByKey,
-        shiftDate: date,
-        stationName: template.templateName,
-        currentAssignmentsForDate: assignedToday,
-      });
-      if (eligible.length === 0)
-        warnings.push(`No eligible staff for ${template.templateName} on ${date}.`);
-      const createdAssignments = await assignStaffToGeneratedRoster({
-        rosterId: roster.id,
-        shiftStartTime: template.startTime,
-        shiftEndTime: template.endTime,
-        maxStaff: template.maxStaff,
-        stationName: template.templateName,
-        fairnessMode: input.targetFairnessMode,
-        ownerRules: input.ownerRules,
-        eligibleStaff: eligible,
-        weeklyLoadMap,
-        changedBy,
-        warnings,
-      });
-      assignmentsCreated += createdAssignments.length;
-      createdAssignments.forEach((a) => assignedToday.add(a.staffMemberId));
+      const stationSlots = reqsByTemplate.get(template.id) ?? [];
+
+      if (stationSlots.length > 0) {
+        // Station-slot mode: fill each required slot individually by work area
+        for (const slot of stationSlots) {
+          for (let slotIdx = 0; slotIdx < slot.requiredCount; slotIdx++) {
+            const eligible = selectEligibleStaffForShift({
+              staff: activeStaff,
+              availabilityByKey,
+              unavailableSet,
+              shiftDate: date,
+              stationName: slot.workAreaName,
+              currentAssignmentsForDate: assignedToday,
+            });
+            if (eligible.length === 0) {
+              warnings.push(
+                `No eligible staff for station "${slot.workAreaName}" on ${date} (slot ${slotIdx + 1}/${slot.requiredCount}).`
+              );
+              break;
+            }
+            const [created] = await assignStaffToGeneratedRoster({
+              rosterId: roster.id,
+              shiftStartTime: template.startTime,
+              shiftEndTime: template.endTime,
+              maxStaff: 1,
+              stationName: slot.workAreaName,
+              fairnessMode: input.targetFairnessMode,
+              ownerRules: input.ownerRules,
+              eligibleStaff: eligible,
+              weeklyLoadMap,
+              changedBy,
+              warnings,
+            });
+            if (created) {
+              assignmentsCreated += 1;
+              assignedToday.add(created.staffMemberId);
+            }
+          }
+        }
+        const totalRequired = stationSlots.reduce((s, sl) => s + sl.requiredCount, 0);
+        if (assignmentsCreated < totalRequired) {
+          warnings.push(
+            `Template "${template.templateName}" on ${date}: only ${assignmentsCreated} of ${totalRequired} station slots filled.`
+          );
+        }
+      } else {
+        // Legacy mode: assign up to maxStaff using template name as station
+        const eligible = selectEligibleStaffForShift({
+          staff: activeStaff,
+          availabilityByKey,
+          unavailableSet,
+          shiftDate: date,
+          stationName: template.templateName,
+          currentAssignmentsForDate: assignedToday,
+        });
+        if (eligible.length === 0)
+          warnings.push(`No eligible staff for ${template.templateName} on ${date}.`);
+        const createdAssignments = await assignStaffToGeneratedRoster({
+          rosterId: roster.id,
+          shiftStartTime: template.startTime,
+          shiftEndTime: template.endTime,
+          maxStaff: template.maxStaff,
+          stationName: template.templateName,
+          fairnessMode: input.targetFairnessMode,
+          ownerRules: input.ownerRules,
+          eligibleStaff: eligible,
+          weeklyLoadMap,
+          changedBy,
+          warnings,
+        });
+        assignmentsCreated += createdAssignments.length;
+        createdAssignments.forEach((a) => assignedToday.add(a.staffMemberId));
+      }
+
+      // Generate staggered breaks for this roster
+      await generateBreaksForRoster(roster.id, input.businessLocationId);
 
       if (input.includeDailyCleaning) {
         const result = await allocateDailyCleaningForRoster({
