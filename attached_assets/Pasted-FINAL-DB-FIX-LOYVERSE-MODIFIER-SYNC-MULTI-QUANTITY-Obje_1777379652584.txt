@@ -1,0 +1,122 @@
+FINAL DB — FIX LOYVERSE MODIFIER SYNC (MULTI-QUANTITY)
+
+Objective:
+Ensure lv_modifier stores ONE row per modifier selection PER UNIT sold.
+
+Problem:
+For items with qty > 1 (e.g. Double Set x2), only 1 modifier row is saved instead of 2.
+
+Result:
+Modifier counts are underreported.
+
+---
+
+FILES TO EDIT:
+- server/services/loyverseSync.ts  (or wherever receipt import happens)
+- server/services/loyverseImport.ts (if separate)
+- Any function that processes receipt line items + modifiers
+
+---
+
+IMPLEMENTATION:
+
+Locate code that processes line items:
+
+Example pattern (current — WRONG):
+
+for (const item of receipt.line_items) {
+  for (const modifier of item.modifiers) {
+    insertModifier({
+      receiptId,
+      name: modifier.name,
+      qty: 1
+    });
+  }
+}
+
+---
+
+REPLACE WITH:
+
+for (const item of receipt.line_items) {
+  const qty = item.quantity || 1;
+
+  for (let i = 0; i < qty; i++) {
+    for (const modifier of item.modifiers || []) {
+      insertModifier({
+        receiptId: receipt.id,
+        lineItemId: item.id,
+        name: modifier.name,
+        groupName: modifier.group_name || modifier.name,
+        qty: 1,
+        rawJson: modifier
+      });
+    }
+  }
+}
+
+---
+
+IMPORTANT RULES:
+
+1. DO NOT multiply qty in SQL later
+2. DO NOT store qty > 1 for modifiers
+3. ALWAYS store 1 row per selection
+4. This must mirror how a customer selects options
+
+---
+
+DATA CLEANUP (MANDATORY):
+
+Before re-sync:
+
+DELETE FROM lv_modifier
+WHERE receipt_id IN (
+  SELECT id FROM lv_receipt
+  WHERE datetime BETWEEN '2026-04-27T10:00:00Z'
+  AND '2026-04-27T20:00:00Z'
+);
+
+---
+
+RE-SYNC:
+
+Trigger full receipt sync for:
+2026-04-27 shift
+
+---
+
+VALIDATION:
+
+Run:
+
+SELECT option_name, SUM(qty)
+FROM lv_modifier
+JOIN lv_receipt ON lv_receipt.id = lv_modifier.receipt_id
+WHERE datetime BETWEEN shift_start AND shift_end
+GROUP BY option_name;
+
+EXPECTED:
+
+Coke = 12  
+Coke Zero = 10  
+Double Cheese = 7  
+
+---
+
+SUCCESS CRITERIA:
+
+- Modifier totals EXACTLY match Loyverse
+- No missing units on multi-qty items
+- Analysis V3 modifier table = 1:1 match
+
+---
+
+DO NOT TOUCH:
+
+- Analysis V2
+- Stock logic
+- UI
+- Any aggregation queries
+
+Only fix ingestion.

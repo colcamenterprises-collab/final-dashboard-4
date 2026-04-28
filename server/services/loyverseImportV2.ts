@@ -109,16 +109,23 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
           SET sku=EXCLUDED.sku, name=EXCLUDED.name, qty=EXCLUDED.qty, unit_price=EXCLUDED.unit_price,
               raw_json=EXCLUDED.raw_json`;
 
+        // MULTI-QUANTITY FIX: repeat modifiers once per unit sold.
+        // e.g. Double Set x2 with Coke selected → 2 modifier rows, not 1.
+        // Each row has qty=1. mod_no is globally incrementing within the line
+        // so (receipt_id, line_no, mod_no) remains unique.
         let modNo = 0;
-        for (const m of li.line_modifiers ?? []) {
-          modNo++;
-          const modName = m.option ?? m.name ?? "MOD";
-          await db.$executeRaw`
-            INSERT INTO lv_modifier (receipt_id, line_no, mod_no, sku, name, qty, raw_json)
-            VALUES (${rc.receipt_number}, ${lineNo}, ${modNo}, ${m.sku ?? null}, ${modName},
-                    ${Number(m.quantity || 1)}, ${JSON.stringify(m)}::jsonb)
-            ON CONFLICT (receipt_id, line_no, mod_no) DO UPDATE
-            SET sku=EXCLUDED.sku, name=EXCLUDED.name, qty=EXCLUDED.qty, raw_json=EXCLUDED.raw_json`;
+        const lineQty = Math.max(1, Number(li.quantity || 1));
+        for (let unitIdx = 0; unitIdx < lineQty; unitIdx++) {
+          for (const m of li.line_modifiers ?? []) {
+            modNo++;
+            const modName = m.option ?? m.name ?? "MOD";
+            await db.$executeRaw`
+              INSERT INTO lv_modifier (receipt_id, line_no, mod_no, sku, name, qty, raw_json)
+              VALUES (${rc.receipt_number}, ${lineNo}, ${modNo}, ${m.sku ?? null}, ${modName},
+                      1, ${JSON.stringify(m)}::jsonb)
+              ON CONFLICT (receipt_id, line_no, mod_no) DO UPDATE
+              SET sku=EXCLUDED.sku, name=EXCLUDED.name, qty=EXCLUDED.qty, raw_json=EXCLUDED.raw_json`;
+          }
         }
       }
       upserted++;
