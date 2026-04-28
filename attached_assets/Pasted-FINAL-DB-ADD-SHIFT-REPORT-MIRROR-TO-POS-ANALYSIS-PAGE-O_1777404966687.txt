@@ -1,0 +1,156 @@
+FINAL DB — ADD SHIFT REPORT MIRROR TO POS ANALYSIS PAGE
+
+Objective:
+Display Loyverse Shift Report data 1:1 above POS Item Sales Mirror.
+
+NO calculations.
+NO derived values.
+NO recomputation.
+STRICT mirror of POS data only.
+
+---
+
+SECTION NAME:
+"Shift Report (POS Mirror)"
+
+Position:
+TOP of page (above item sales + modifiers)
+
+---
+
+DATA SOURCE:
+Table: pos_shift_report
+
+Do NOT use:
+- lv_receipt aggregation
+- daily forms
+- any fallback logic
+
+Only:
+pos_shift_report
+
+---
+
+API ENDPOINT (NEW):
+
+GET /api/analysis/v3/shift-report?start=ISO&end=ISO
+
+Logic:
+
+1. Convert shift window → match shift by:
+   shift_open <= end
+   AND shift_close >= start
+
+2. Return MOST RELEVANT SHIFT (latest match)
+
+SQL:
+
+SELECT *
+FROM pos_shift_report
+WHERE shift_open <= $end
+AND shift_close >= $start
+ORDER BY shift_open DESC
+LIMIT 1;
+
+---
+
+RESPONSE STRUCTURE:
+
+{
+  shiftNumber,
+  openingTime,
+  closingTime,
+  startingCash,
+  cashPayments,
+  cashRefunds,
+  paidIn,
+  paidOut,
+  expectedCash,
+  actualCash,
+  difference,
+  source: "pos_shift_report"
+}
+
+---
+
+FRONTEND TABLE:
+
+Columns:
+
+Shift #
+Opening Time
+Closing Time
+Starting Cash
+Cash Payments
+Cash Refunds
+Paid In
+Paid Out
+Expected Cash
+Actual Cash
+Difference
+
+---
+
+FORMATTING RULES:
+
+- Currency = ฿
+- No rounding
+- No recalculation
+- Show exactly as stored
+
+---
+
+STATUS HANDLING:
+
+If NO shift found:
+
+Show:
+
+"POS Shift Report Not Available"
+
+DO NOT:
+- fallback to receipts
+- estimate values
+- calculate anything
+
+---
+
+LOCK COMMENT (MANDATORY):
+
+/*
+SHIFT REPORT MIRROR — DO NOT MODIFY
+
+This section mirrors Loyverse shift data exactly.
+
+No calculations allowed.
+No fallback logic allowed.
+
+If this is wrong → POS data is wrong.
+
+Do not attempt to fix via code.
+Fix at data source.
+*/
+
+---
+
+VALIDATION:
+
+- Shift 842 must show:
+  Starting Cash: 1000
+  Cash Payments: 3125
+  Paid Out: 2321
+  Expected: 1804
+  Actual: 1804
+  Difference: 0
+
+Must EXACTLY match your table.
+
+---
+
+DO NOT TOUCH:
+
+- Item Sales Mirror
+- Modifier Sales
+- Any existing endpoints
+
+This is ADDITIVE ONLY.

@@ -1,9 +1,10 @@
 /**
- * Analysis V3 — Locked POS Mirror (Item Sales + Modifier Sales)
+ * Analysis V3 — Locked POS Mirror (Shift Report + Item Sales + Modifier Sales)
  *
  * THIS PAGE MUST ALWAYS MATCH POS REPORTS 1:1. DO NOT MODIFY THE DATA LAYER.
  *
- * Item Sales  source: lv_receipt + lv_line_item only.
+ * Shift Report   source: pos_shift_report only.
+ * Item Sales     source: lv_receipt + lv_line_item only.
  * Modifier Sales source: lv_receipt + lv_modifier only.
  * No stock, no recipes, no SKU mapping, no inference.
  * Output mirrors Loyverse reports exactly.
@@ -14,6 +15,37 @@ import { useQuery } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
+
+interface ShiftReportData {
+  shiftNumber: string;
+  openingTime: string | null;
+  closingTime: string | null;
+  startingCash: number;
+  cashPayments: number;
+  cashRefunds: number | null;
+  paidIn: number | null;
+  paidOut: number;
+  expectedCash: number;
+  actualCash: number;
+  difference: number;
+  grossSales: number;
+  netSales: number;
+  discounts: number;
+  qrTotal: number;
+  grabTotal: number;
+  grandTotal: number;
+  receiptCount: number;
+}
+
+interface ShiftReportResponse {
+  ok: boolean;
+  status: string;
+  source: string;
+  start: string;
+  end: string;
+  data: ShiftReportData | null;
+  error?: string;
+}
 
 interface ItemSalesRow {
   item_name: string;
@@ -119,6 +151,16 @@ export default function AnalysisV3() {
 
   const startISO = useMemo(() => buildShiftISO(shiftDate, startTime, false), [shiftDate, startTime]);
   const endISO = useMemo(() => buildShiftISO(shiftDate, endTime, endIsNextDay), [shiftDate, endTime, endIsNextDay]);
+
+  // ── Shift Report query ──────────────────────────────────────────────────────
+  const { data: shiftData, isLoading: shiftLoading, isError: shiftIsError } = useQuery<ShiftReportResponse>({
+    queryKey: ['/api/analysis/v3/shift-report', startISO, endISO],
+    queryFn: () =>
+      fetch(`/api/analysis/v3/shift-report?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`)
+        .then((r) => r.json()),
+    enabled: !!shiftDate && !!startTime && !!endTime,
+    staleTime: 60_000,
+  });
 
   const { data, isLoading, isError, error } = useQuery<ItemSalesResponse>({
     queryKey: ['/api/analysis/v3/item-sales', startISO, endISO],
@@ -246,6 +288,134 @@ export default function AnalysisV3() {
             </div>
           </div>
         </div>
+
+        {/* ── Shift Report Mirror ────────────────────────────────────────────── */}
+        {/*
+          * SHIFT REPORT MIRROR — DO NOT MODIFY
+          * Source: pos_shift_report only. No fallback. No estimation.
+          * If wrong → fix at data source, not in code.
+          */}
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">Shift Report (POS Mirror)</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Loyverse shift data · source: <code className="text-[11px] bg-slate-100 px-1 py-0.5 rounded">pos_shift_report</code> only · no calculations, no fallback, no estimation
+          </p>
+        </div>
+
+        {/* Shift report loading */}
+        {shiftLoading && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+            {[...Array(4)].map((_, i) => <div key={i} className="h-6 bg-slate-100 rounded animate-pulse" />)}
+          </div>
+        )}
+
+        {/* Shift report error */}
+        {shiftIsError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+            Failed to load shift report. Check server logs.
+          </div>
+        )}
+
+        {/* Shift report — not available */}
+        {shiftData?.ok && shiftData.status === 'POS_SHIFT_REPORT_NOT_AVAILABLE' && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-center">
+            <p className="text-sm font-semibold text-amber-800">POS Shift Report Not Available</p>
+            <p className="text-xs text-amber-600 mt-1">
+              No shift record found in <code className="bg-amber-100 px-1 rounded">pos_shift_report</code> for this window.
+              Do not attempt to fix via code — sync at data source.
+            </p>
+          </div>
+        )}
+
+        {/* Shift report — data */}
+        {shiftData?.ok && shiftData.status === 'ok' && shiftData.data && (() => {
+          const sr = shiftData.data!;
+          const diffColor = sr.difference === 0
+            ? 'text-emerald-700'
+            : sr.difference > 0 ? 'text-blue-600' : 'text-red-600';
+
+          const rows: { label: string; value: string | number | null; highlight?: boolean; diffStyle?: boolean }[] = [
+            { label: 'Shift #',        value: sr.shiftNumber },
+            { label: 'Opening Time',   value: sr.openingTime ? fmtBkk(sr.openingTime) : '—' },
+            { label: 'Closing Time',   value: sr.closingTime ? fmtBkk(sr.closingTime) : '—' },
+            { label: 'Starting Cash',  value: `฿${sr.startingCash.toLocaleString()}` },
+            { label: 'Cash Payments',  value: `฿${sr.cashPayments.toLocaleString()}` },
+            { label: 'Cash Refunds',   value: sr.cashRefunds !== null ? `฿${sr.cashRefunds.toLocaleString()}` : '—' },
+            { label: 'Paid In',        value: sr.paidIn !== null ? `฿${sr.paidIn.toLocaleString()}` : '—' },
+            { label: 'Paid Out',       value: `฿${sr.paidOut.toLocaleString()}` },
+            { label: 'Expected Cash',  value: `฿${sr.expectedCash.toLocaleString()}`, highlight: true },
+            { label: 'Actual Cash',    value: `฿${sr.actualCash.toLocaleString()}`, highlight: true },
+            { label: 'Difference',     value: `฿${sr.difference.toLocaleString()}`, diffStyle: true },
+          ];
+
+          return (
+            <>
+              {/* Mirror lock badge */}
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 flex items-center gap-3 text-xs text-emerald-800">
+                <span className="inline-flex items-center gap-1.5 font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                  Shift Report Mirror Locked
+                </span>
+                <span className="text-emerald-600">Source: pos_shift_report</span>
+                <span className="text-emerald-500 ml-auto tabular-nums">
+                  Receipts: {sr.receiptCount} · Grand Total: ฿{sr.grandTotal.toLocaleString()}
+                </span>
+              </div>
+
+              {/* Summary cards */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Starting Cash',  val: `฿${sr.startingCash.toLocaleString()}` },
+                  { label: 'Cash Payments',  val: `฿${sr.cashPayments.toLocaleString()}` },
+                  { label: 'Paid Out',       val: `฿${sr.paidOut.toLocaleString()}` },
+                  { label: 'Expected Cash',  val: `฿${sr.expectedCash.toLocaleString()}` },
+                  { label: 'Actual Cash',    val: `฿${sr.actualCash.toLocaleString()}` },
+                  { label: 'Difference',     val: `฿${sr.difference.toLocaleString()}`, diff: sr.difference },
+                ].map(({ label, val, diff }) => (
+                  <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                    <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+                    <p className={`text-xl font-bold tabular-nums mt-1 ${diff !== undefined ? (diff === 0 ? 'text-emerald-600' : diff > 0 ? 'text-blue-600' : 'text-red-600') : 'text-slate-900'}`}>
+                      {val}
+                    </p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Full detail table */}
+              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-2">
+                  <span className="text-sm font-semibold text-slate-800">Shift Report Detail</span>
+                  <span className="text-xs text-slate-400">· {sr.shiftNumber}</span>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr>
+                        <Th>Field</Th>
+                        <Th right>Value</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(({ label, value, highlight, diffStyle }) => (
+                        <tr key={label} className={highlight ? 'bg-slate-50/70' : 'hover:bg-slate-50/40'}>
+                          <Td bold={highlight}>{label}</Td>
+                          <td className={`px-3 py-2 text-xs border-b border-slate-100 text-right tabular-nums font-semibold ${diffStyle ? diffColor : highlight ? 'text-slate-900' : 'text-slate-700'}`}>
+                            {value ?? '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="px-4 py-2 border-t border-slate-100">
+                  <p className="text-[10px] text-slate-400">
+                    Source: <code>pos_shift_report</code> only · No fallback to receipt aggregation · No estimation · Shift Report Mirror active
+                  </p>
+                </div>
+              </div>
+            </>
+          );
+        })()}
 
         {/* Stats row + POS Truth Lock badge */}
         {data?.ok && (

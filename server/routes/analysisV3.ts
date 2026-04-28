@@ -136,6 +136,149 @@ function parseWindow(start: string, end: string): { startISO: string; endISO: st
   return { startISO: startDate.toISOString(), endISO: endDate.toISOString() };
 }
 
+// ─── GET /api/analysis/v3/shift-report ───────────────────────────────────────
+/*
+ * SHIFT REPORT MIRROR — DO NOT MODIFY
+ *
+ * This section mirrors Loyverse shift data exactly.
+ * Source: pos_shift_report ONLY.
+ *
+ * No fallback to lv_receipt aggregation.
+ * No fallback to daily forms.
+ * No estimation.
+ *
+ * If this is wrong → POS data is wrong.
+ * Do not attempt to fix via code. Fix at data source.
+ *
+ * Column mapping (pos_shift_report → response):
+ *   openedAt      → openingTime
+ *   closedAt      → closingTime
+ *   startingCash  → startingCash
+ *   cashSales     → cashPayments
+ *   wagesTotal    → paidOut
+ *   cashInDrawer  → actualCash
+ *   expectedCash  = startingCash + cashSales - wagesTotal  (standard POS register formula)
+ *   difference    = actualCash - expectedCash
+ *   cashRefunds / paidIn — not stored in pos_shift_report → returned as null
+ */
+analysisV3Router.get("/shift-report", async (req, res) => {
+  try {
+    const { start, end } = req.query as Record<string, string>;
+    if (!start || !end) {
+      return res.status(400).json({ ok: false, error: "start and end ISO timestamps required" });
+    }
+
+    const parsed = parseWindow(start, end);
+    if ("error" in parsed) {
+      return res.status(400).json({ ok: false, error: parsed.error });
+    }
+    const { startISO, endISO } = parsed;
+
+    // Fetch the most relevant shift that overlaps the requested window.
+    // Match: shift opened before window end AND shift closed after window start.
+    const rows = await prisma.$queryRaw<{
+      id: string;
+      openedAt: Date | null;
+      closedAt: Date | null;
+      startingCash: number | null;
+      cashSales: number | null;
+      cashInDrawer: number | null;
+      wagesTotal: number | null;
+      otherExpense: number | null;
+      grossSales: number | null;
+      netSales: number | null;
+      discounts: number | null;
+      cashTotal: number | null;
+      qrTotal: number | null;
+      grabTotal: number | null;
+      grandTotal: number | null;
+      receiptCount: number | null;
+    }[]>`
+      SELECT
+        id,
+        "openedAt",
+        "closedAt",
+        "startingCash",
+        "cashSales",
+        "cashInDrawer",
+        "wagesTotal",
+        "otherExpense",
+        "grossSales",
+        "netSales",
+        "discounts",
+        "cashTotal",
+        "qrTotal",
+        "grabTotal",
+        "grandTotal",
+        "receiptCount"
+      FROM pos_shift_report
+      WHERE "openedAt" <= ${endISO}::timestamptz
+        AND "closedAt" >= ${startISO}::timestamptz
+      ORDER BY "openedAt" DESC
+      LIMIT 1
+    `;
+
+    if (rows.length === 0) {
+      return res.json({
+        ok: true,
+        status: "POS_SHIFT_REPORT_NOT_AVAILABLE",
+        source: "pos_shift_report",
+        start: startISO,
+        end: endISO,
+        data: null,
+      });
+    }
+
+    const r = rows[0];
+
+    // Direct column mirrors (no transformation)
+    const startingCash    = Number(r.startingCash ?? 0);
+    const cashPayments    = Number(r.cashSales    ?? 0);
+    const paidOut         = Number(r.wagesTotal   ?? 0);
+    const actualCash      = Number(r.cashInDrawer ?? 0);
+
+    // Standard POS register formula (same calculation Loyverse performs internally)
+    const expectedCash    = startingCash + cashPayments - paidOut;
+    const difference      = actualCash - expectedCash;
+
+    return res.json({
+      ok: true,
+      status: "ok",
+      source: "pos_shift_report",
+      start: startISO,
+      end: endISO,
+      data: {
+        shiftNumber:   r.id,
+        openingTime:   r.openedAt   ? new Date(r.openedAt).toISOString()  : null,
+        closingTime:   r.closedAt   ? new Date(r.closedAt).toISOString()  : null,
+        startingCash,
+        cashPayments,
+        cashRefunds:   null, // Not stored in pos_shift_report
+        paidIn:        null, // Not stored in pos_shift_report
+        paidOut,
+        expectedCash,
+        actualCash,
+        difference,
+        // Additional columns mirrored as-is
+        grossSales:    Number(r.grossSales  ?? 0),
+        netSales:      Number(r.netSales    ?? 0),
+        discounts:     Number(r.discounts   ?? 0),
+        qrTotal:       Number(r.qrTotal     ?? 0),
+        grabTotal:     Number(r.grabTotal   ?? 0),
+        grandTotal:    Number(r.grandTotal  ?? 0),
+        receiptCount:  Number(r.receiptCount ?? 0),
+      },
+    });
+  } catch (err: any) {
+    if (err?.message?.startsWith(POS_TRUTH_LAYER_VIOLATION)) {
+      console.error(`[analysisV3] ${err.message}`);
+      return res.status(500).json({ ok: false, error: POS_TRUTH_LAYER_VIOLATION, detail: err.message });
+    }
+    console.error("[analysisV3] shift-report error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message ?? "Internal error" });
+  }
+});
+
 // ─── GET /api/analysis/v3/item-sales ─────────────────────────────────────────
 /*
  * POS TRUTH LAYER — DO NOT MODIFY
