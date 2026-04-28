@@ -39,6 +39,7 @@ import insightsV2Router from "./routes/insightsV2";
 import securityV2Router from "./routes/securityV2";
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
+import { registerWeeklyRosterDistributionCron } from "./cron/weeklyRosterDistributionCron";
 import { tenantContext } from "./middleware/tenantContext";
 import { tenantResolver } from "./middleware/tenantResolver";
 import { TenantScoped } from "./services/tenant/tenantScopedService";
@@ -715,6 +716,8 @@ async function checkSchema() {
           
           // Register Daily Report V2 cron (3AM Bangkok)
           registerDailyReportCron();
+          // Register Weekly Roster Distribution prep cron (Sunday 03:30AM Bangkok)
+          registerWeeklyRosterDistributionCron();
           
           // PATCH 6+7 — AUTO GENERATE SHIFT REPORT AT 03:10AM DAILY (BANGKOK TIME) + EMAIL
           const { buildShiftReport } = await import('./services/shiftReportBuilder');

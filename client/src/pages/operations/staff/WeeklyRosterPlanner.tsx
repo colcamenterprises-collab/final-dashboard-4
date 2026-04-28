@@ -17,6 +17,7 @@ import {
   Zap,
   Wand2,
   AlertTriangle,
+  Download,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -453,6 +454,75 @@ export default function WeeklyRosterPlanner() {
   const dayRosters = rosters.filter((r) => r.shiftDate === selectedDate);
   const today = todayBkk();
 
+  async function downloadPdf(url: string, fileName: string) {
+    const response = await fetch(url, { credentials: 'include' });
+    if (!response.ok) {
+      throw new Error(`${response.status}: Failed to download ${fileName}`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(objectUrl);
+  }
+
+  async function handleTeamRosterExport() {
+    try {
+      const weekStartDate = weekDates[0];
+      await downloadPdf(
+        `/api/operations/staff/rosters/export/team?weekStart=${weekStartDate}`,
+        `team-roster-${weekStartDate}.pdf`
+      );
+      toast({ title: 'Team roster PDF downloaded' });
+    } catch (error) {
+      toast({
+        title: 'Team export failed',
+        description: error instanceof Error ? error.message : 'Download failed',
+        variant: 'destructive',
+      });
+    }
+  }
+
+  async function handleIndividualRosterExport() {
+    try {
+      const weekStartDate = weekDates[0];
+      const rosterIds = rosters.map((r) => r.id);
+      const staffIds = new Set<number>();
+
+      for (const rosterId of rosterIds) {
+        const details = await fetch(`/api/operations/staff/rosters/${rosterId}`, {
+          credentials: 'include',
+        }).then((r) => r.json());
+        const rosterAssignments = (details.assignments ?? []) as ShiftAssignment[];
+        rosterAssignments.forEach((assignment) => staffIds.add(assignment.staffMemberId));
+      }
+
+      if (staffIds.size === 0) {
+        toast({ title: 'No assigned staff found for this week' });
+        return;
+      }
+
+      for (const staffId of staffIds) {
+        await downloadPdf(
+          `/api/operations/staff/rosters/export/staff/${staffId}?weekStart=${weekStartDate}`,
+          `staff-roster-${staffId}-${weekStartDate}.pdf`
+        );
+      }
+
+      toast({ title: `Downloaded ${staffIds.size} individual roster PDFs` });
+    } catch (error) {
+      toast({
+        title: 'Individual export failed',
+        description: error instanceof Error ? error.message : 'Download failed',
+        variant: 'destructive',
+      });
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
@@ -461,6 +531,18 @@ export default function WeeklyRosterPlanner() {
           <p className="text-xs text-slate-500 mt-0.5">Create, assign and publish shift rosters.</p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleTeamRosterExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded hover:bg-slate-50"
+          >
+            <Download className="w-3.5 h-3.5" /> Export Team PDF
+          </button>
+          <button
+            onClick={handleIndividualRosterExport}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 text-slate-700 text-xs font-medium rounded hover:bg-slate-50"
+          >
+            <Download className="w-3.5 h-3.5" /> Export Individual PDFs
+          </button>
           <button
             onClick={() => {
               autoGenerateForm.reset({
