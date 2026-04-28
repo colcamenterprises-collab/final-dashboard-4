@@ -1,9 +1,11 @@
 /**
- * Analysis V3 — POS Item Sales Mirror
+ * Analysis V3 — Locked POS Item Sales Mirror
+ *
+ * THIS PAGE MUST ALWAYS MATCH POS REPORTS 1:1. DO NOT MODIFY THE DATA LAYER.
  *
  * Raw item sales from lv_receipt + lv_line_item only.
  * No stock, no recipes, no variance, no modifiers, no inference.
- * Output mirrors Loyverse item sales report.
+ * Output mirrors Loyverse item sales report exactly.
  */
 
 import { useState, useMemo } from 'react';
@@ -19,14 +21,20 @@ interface ItemSalesRow {
   items_sold: number;
 }
 
+interface ItemSalesChecksum {
+  total_receipts: number;
+  refund_receipts: number;
+  sale_receipts: number;
+  total_rows: number;
+  total_items_sold: number;
+}
+
 interface ItemSalesResponse {
   ok: boolean;
+  source_tables: string[];
   start: string;
   end: string;
-  receipt_count: number;
-  refund_count: number;
-  row_count: number;
-  total_items_sold: number;
+  checksum: ItemSalesChecksum;
   category_available: boolean;
   data: ItemSalesRow[];
   error?: string;
@@ -187,21 +195,34 @@ export default function AnalysisV3() {
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Stats row + POS Truth Lock badge */}
         {data?.ok && (
-          <div className="grid grid-cols-4 gap-3">
-            {[
-              { label: 'Receipts', value: data.receipt_count },
-              { label: 'Refunds excluded', value: data.refund_count },
-              { label: 'Line items (rows)', value: data.row_count },
-              { label: 'Total items sold', value: data.total_items_sold },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
-                <p className="text-2xl font-bold text-slate-900 tabular-nums mt-1">{value}</p>
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label: 'Sale Receipts', value: data.checksum.sale_receipts },
+                { label: 'Refunds Excluded', value: data.checksum.refund_receipts },
+                { label: 'Line Items (rows)', value: data.checksum.total_rows },
+                { label: 'Total Items Sold', value: data.checksum.total_items_sold },
+              ].map(({ label, value }) => (
+                <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
+                  <p className="text-2xl font-bold text-slate-900 tabular-nums mt-1">{value}</p>
+                </div>
+              ))}
+            </div>
+            {/* Checksum + source lock indicator */}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 flex items-center gap-3 text-xs text-emerald-800">
+              <span className="inline-flex items-center gap-1.5 font-semibold">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                POS Truth Layer Locked
+              </span>
+              <span className="text-emerald-600">Source: {data.source_tables.join(' + ')}</span>
+              <span className="text-emerald-500 ml-auto tabular-nums">
+                Checksum — receipts: {data.checksum.total_receipts} · rows: {data.checksum.total_rows} · items: {data.checksum.total_items_sold}
+              </span>
+            </div>
+          </>
         )}
 
         {/* Category notice */}
@@ -231,7 +252,7 @@ export default function AnalysisV3() {
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
               <div>
                 <span className="text-sm font-semibold text-slate-800">Item Sales</span>
-                <span className="ml-2 text-xs text-slate-400">{data.total_items_sold} items · {data.row_count} rows · {data.receipt_count} receipts</span>
+                <span className="ml-2 text-xs text-slate-400">{data.checksum.total_items_sold} items · {data.checksum.total_rows} rows · {data.checksum.sale_receipts} receipts</span>
               </div>
               <input
                 type="text"
@@ -244,7 +265,7 @@ export default function AnalysisV3() {
 
             {filteredRows.length === 0 ? (
               <div className="px-4 py-8 text-center text-xs text-slate-400">
-                {data.row_count === 0 ? 'No item sales found in this time window.' : 'No items match filter.'}
+                {data.checksum.total_rows === 0 ? 'No item sales found in this time window.' : 'No items match filter.'}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -307,8 +328,8 @@ export default function AnalysisV3() {
 
             <div className="px-4 py-2 border-t border-slate-100">
               <p className="text-[10px] text-slate-400">
-                Source: <code>lv_receipt JOIN lv_line_item</code> · Window: {fmtBkk(data.start)} → {fmtBkk(data.end)} BKK
-                · Refunded receipts excluded · Category from <code>item_catalog</code> (LEFT JOIN)
+                Source: <code>lv_line_item JOIN lv_receipt</code> only · Window: {fmtBkk(data.start)} → {fmtBkk(data.end)} BKK
+                · Refunded receipts excluded · No joins to other tables · POS_TRUTH_LAYER_VIOLATION guard active
               </p>
             </div>
           </div>
