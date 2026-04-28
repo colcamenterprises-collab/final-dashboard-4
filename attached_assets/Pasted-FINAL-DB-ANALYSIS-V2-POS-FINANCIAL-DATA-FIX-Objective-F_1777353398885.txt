@@ -1,0 +1,111 @@
+FINAL DB — ANALYSIS V2 POS FINANCIAL DATA FIX
+
+Objective:
+Fix POS shift report data flow into Analysis V2.
+
+Problem:
+The POS / Loyverse shift report is not flowing into Analysis V2, so the financial side of the shift is blind.
+
+Do not change stock tables.
+Do not change existing stock calculation logic.
+This patch is financial data only.
+
+Required investigation first:
+
+1. Find where Dashboard Home currently gets the working POS shift report data.
+2. Find where old Sales / Shift Analysis page attempted to read POS shift data.
+3. Identify the canonical source table/API for:
+   - total sales
+   - gross sales
+   - net sales
+   - cash sales
+   - QR sales
+   - Grab/delivery sales
+   - refunds
+   - pay-ins
+   - pay-outs
+   - receipt count
+   - shift open/close time
+
+Required implementation:
+
+1. Create isolated endpoint:
+GET /api/analysis/v2/financial-summary?date=YYYY-MM-DD
+
+2. This endpoint must return:
+{
+  shiftDate,
+  posAvailable,
+  source,
+  sales: {
+    grossSales,
+    netSales,
+    cashSales,
+    qrSales,
+    grabSales,
+    otherSales,
+    refunds
+  },
+  receipts: {
+    total,
+    cash,
+    qr,
+    grab,
+    other
+  },
+  register: {
+    startingCash,
+    payIns,
+    payOuts,
+    expectedCash,
+    closingCash,
+    cashVariance
+  },
+  banking: {
+    cashBanked,
+    qrBanked,
+    expectedCashBanked,
+    expectedQrBanked,
+    cashBankingVariance,
+    qrBankingVariance
+  },
+  warnings
+}
+
+3. Add a visual card section at the top of Analysis V2:
+Title: Shift Financial Control
+
+Cards only, no tables:
+- POS Sales Summary
+- Receipt Count Check
+- Register Cash Position
+- Banking Position
+- Pay In / Pay Out Control
+
+4. If POS shift report is missing:
+Show a clear red/amber card:
+“POS shift report missing”
+Do not fake zeros.
+
+5. Data rules:
+- Sales figures come from Loyverse/POS only
+- Staff form values are only for:
+  - starting cash
+  - closing cash
+  - receipt counts
+  - cash banked
+  - QR banked
+  - refunds
+  - wages/expenses/payments
+- Do not reintroduce staff-entered sales totals
+
+6. Validation:
+Use latest completed shift.
+
+Return:
+- POS source used
+- financial summary JSON
+- screenshot/confirmation cards render
+- confirmation Dashboard Home POS data and Analysis V2 POS data match
+- if no POS data exists, exact missing source/table/reason
+- no changes to stock sections
