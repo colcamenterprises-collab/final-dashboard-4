@@ -1,0 +1,106 @@
+CRITICAL — ANALYSIS V2 2026-04-27 SHIFT DATA NOT BUILT
+
+Problem:
+The latest completed shift is 2026-04-27:
+17:00 BKK Apr 27 → 03:00 BKK Apr 28.
+
+Analysis V2 is showing almost all sales usage as zero:
+- DAILY_USAGE_NOT_BUILT
+- POS shift report missing
+- POS receipt counts = 0
+- Burgers/Sets = no data
+- Side Orders = no data
+- Drink modifiers = no data
+- Other modifiers = no data
+- Used values = 0
+- Stock variances are therefore meaningless
+
+Do not change UI.
+Do not change table layouts.
+Do not change formulas.
+
+Objective:
+Make Analysis V2 use the actual completed shift data for 2026-04-27.
+
+Step 1 — Verify raw POS data exists
+Check for 2026-04-27 shift window:
+2026-04-27 17:00 Asia/Bangkok
+to
+2026-04-28 03:00 Asia/Bangkok
+
+Return counts from:
+- lv_receipt
+- lv_line_item
+- lv_modifier
+- receipt_truth_daily_usage
+- pos_shift_report / shift report table if present
+
+Step 2 — Identify missing stage
+Classify the failure:
+A. Loyverse data not synced
+B. receipts synced but receipt_truth_daily_usage not built
+C. date/time window wrong
+D. Analysis V2 querying wrong date
+E. shift report not imported
+F. route using calendar date instead of shift date
+
+Step 3 — Rebuild / trigger missing analysis
+If lv_receipt/lv_line_item/lv_modifier exist but receipt_truth_daily_usage is missing:
+- run the existing receipts truth / daily usage build for shift_date 2026-04-27
+- do not create fake rows
+- use existing build service only
+
+If POS shift report missing but receipt aggregates exist:
+- show receipt aggregates clearly
+- do not show POS as zero
+- do not calculate financial variances against zero POS values
+
+Step 4 — Fix date handling if wrong
+All Analysis V2 sections must use:
+shift_date = 2026-04-27
+window = 2026-04-27 17:00 BKK → 2026-04-28 03:00 BKK
+
+Do not use calendar day midnight-to-midnight.
+
+Step 5 — Revalidate Analysis V2
+After rebuild/fix, return:
+
+Financial:
+- POS available true/false
+- receipt counts by Cash / QR / Grab / Other
+- total receipt count
+- gross / net / cash / QR / Grab sales if available
+
+Sales usage:
+- burger/set rows count
+- total buns used
+- meat patties used
+- side order rows count
+- fries servings used
+- sweet potato servings used
+- drink direct totals
+- drink modifier totals
+- other modifier totals
+
+Stock:
+- Start from previous shift end
+- Purchased from purchase_tally effective date
+- Used from POS/receipt truth
+- End from daily_sales_v2 payload
+- Expected
+- Variance
+
+Step 6 — Guard against false variance
+If sales usage is missing:
+- do NOT display normal stock variances as if valid
+- return status: SALES_USAGE_MISSING
+- tables may remain visually unchanged but should not imply valid reconciliation
+
+Validation:
+For 2026-04-27, Analysis V2 must no longer show:
+- receipt count 0 if receipts exist
+- burgers no data if burgers were sold
+- modifiers no data if modifiers exist
+- used = 0 if receipts exist
+
+Return exact root cause and exact files changed.

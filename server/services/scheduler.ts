@@ -296,6 +296,22 @@ export class SchedulerService {
         
         const result = await syncReceiptsWindow(startDate, endDate, 'incremental');
         console.log('✅ Incremental sync completed:', result);
+
+        // After a successful sync with new data: ensure receipt_truth + daily_usage are built.
+        // This prevents Analysis V2 from showing DAILY_USAGE_NOT_BUILT after fresh data arrives.
+        if (result && result.upserted > 0) {
+          const { DateTime } = await import('luxon');
+          const nowBkk = DateTime.now().setZone('Asia/Bangkok');
+          // Shift business date: if before 03:00 BKK, the shift belongs to the previous calendar day
+          const businessDate = nowBkk.hour < 3
+            ? nowBkk.minus({ days: 1 }).toISODate()!
+            : nowBkk.toISODate()!;
+          const { ensureAnalysisForDate } = await import('./analysisBuildOrchestrator.js');
+          const br = await ensureAnalysisForDate(businessDate, 'SCHEDULED');
+          if (br.autoBuilt) {
+            console.log(`✅ [incrementalSync] receipt_truth + daily_usage auto-built for ${businessDate}`);
+          }
+        }
       } catch (error) {
         console.error('❌ Scheduled incremental sync failed:', error);
       }
