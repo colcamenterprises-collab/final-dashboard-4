@@ -2,9 +2,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import BalanceCard from "@/components/BalanceCard";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 import { StockLodgmentModal } from "@/components/operations/StockLodgmentModal";
-import { LogRefundModal } from "@/components/operations/LogRefundModal";
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { VarianceWidget } from "@/components/widgets/VarianceWidget";
 import { TrendingUp, DollarSign, Activity, Plus, ArrowDownLeft, AlertTriangle } from "lucide-react";
 import axios from "axios";
@@ -38,7 +37,6 @@ function ShiftAlertBanner() {
 
 function BalanceHero() {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
 
   const { data: financeSummary } = useQuery({ queryKey: ["/api/finance/summary/today"] });
 
@@ -62,6 +60,10 @@ function BalanceHero() {
               queryClient.invalidateQueries({ queryKey: ["/api/finance/summary/today"] });
               queryClient.invalidateQueries({ queryKey: ["expenseTotals"] });
             }}
+          />
+          <StockLodgmentModal
+            triggerClassName="bg-emerald-500 hover:bg-emerald-600 text-white border-emerald-500 w-full sm:w-auto text-xs font-semibold"
+            triggerText="Lodge Stock Items"
           />
         </div>
       </div>
@@ -126,22 +128,6 @@ function KPIGrid() {
   );
 }
 
-function StockLodgementQuickActions() {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="homepage-stock-lodgement-actions">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">Stock Lodgement</h2>
-        <LogRefundModal />
-      </div>
-      <p className="text-xs text-slate-500 mb-4">Use these lodgement actions to record rolls, meat, and drinks. Purchase history is reviewed in Analysis &gt; Stock Review.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <StockLodgmentModal triggerText="Lodge Rolls" triggerClassName="w-full" initialData={{ type: "rolls" }} />
-        <StockLodgmentModal triggerText="Lodge Meat" triggerClassName="w-full" initialData={{ type: "meat" }} />
-        <StockLodgmentModal triggerText="Lodge Drinks" triggerClassName="w-full" initialData={{ type: "drinks" }} />
-      </div>
-    </div>
-  );
-}
 
 type PCDaily = { sales: number; wages: number; fnb: number; primeCost: number; primePct: number | null };
 type PCMtd = { sales: number; wages: number; fnb: number; primeCost: number; primePct: number | null };
@@ -353,7 +339,6 @@ export default function Home() {
       <ShiftAlertBanner />
       <BalanceHero />
       <KPIGrid />
-      <StockLodgementQuickActions />
       <OpsTaskSummaryModule />
       <PrimeCostCards />
       <VarianceWidget />
