@@ -1,0 +1,163 @@
+PATCH TITLE
+Roster Export PDF — Professional Layout Makeover
+
+OBJECTIVE
+Replace the current plain text/data-dump PDF export with a professional, clean, printable roster document.
+
+SCOPE
+Update PDF/HTML export templates only.
+Do not change roster logic, staff assignment logic, cleaning logic, or database structure.
+
+FILES TO INSPECT
+- server/services/rosterExportService.ts
+- any current PDF/HTML template used for team roster export
+- any current PDF/HTML template used for individual roster export
+- export routes in server/routes/staffOps.ts
+
+DESIGN REQUIREMENTS
+
+1. General PDF Styling
+Use a professional A4 layout:
+- clean header
+- proper spacing
+- readable typography
+- table/card structure
+- no raw JSON
+- no unstyled text dump
+- no oversized default browser text
+- print-friendly black/white with subtle accent colour
+- no icons
+
+2. Team Roster PDF
+
+Header:
+- Business/location name
+- “Weekly Team Roster”
+- Week date range
+- Generated date
+
+Summary section:
+- total shifts
+- total staff scheduled
+- warnings count if any
+
+Main roster layout:
+Group by day.
+
+Each day should show:
+- date
+- shift name
+- shift time
+- staff assigned
+- primary station / role
+- secondary station if available
+- cleaning/task summary only, not a giant comma-separated list
+
+Example format:
+
+MONDAY 27 APRIL
+Shift: Main Shift | 17:50 – 02:10
+
+Staff        Role / Station       Notes
+Ael          Manager / Cashier    -
+Bum          Kitchen / Grill      -
+Mam          Kitchen / Sides      -
+
+Tasks:
+Start: 12 tasks
+During: 8 tasks
+End: 15 tasks
+
+3. Individual Roster PDF
+
+Header:
+- Staff name
+- role
+- “Weekly Individual Roster”
+- week date range
+
+Layout:
+Group by day.
+
+Each shift should show:
+- date
+- shift name
+- time
+- assigned station
+- secondary station
+- assigned cleaning/tasks
+
+Tasks must be displayed as clean bullet lists grouped by:
+- Start of Shift
+- During Shift
+- End of Shift
+
+Do NOT output one huge comma-separated paragraph.
+
+4. Warnings / Validation
+Warnings should be shown in a small boxed section near the top.
+
+Do not let warnings dominate the page.
+
+Example:
+Validation
+- No blockers
+- 2 warnings
+
+Then list warnings in smaller text.
+
+5. Cleaning Tasks
+For team PDF:
+- show summary counts only unless explicitly expanded later
+
+For individual PDF:
+- show only that staff member’s assigned tasks
+- group by timing
+- show pending/completed status cleanly
+
+6. Page Breaks
+Add proper page breaks:
+- avoid splitting one day awkwardly across pages where possible
+- each new day should have enough spacing
+- individual PDF should remain readable on phone and print
+
+7. Security
+Do not include:
+- payroll
+- sales
+- cash
+- staff private notes
+- capability flags
+- attendance logs
+- restricted owner-only analysis
+
+8. Output Quality
+PDF must look like a real document that can be:
+- printed
+- emailed
+- sent in LINE
+- shared with staff
+
+IMPLEMENTATION NOTES
+Prefer HTML/CSS → PDF rendering if already used.
+Create reusable template helpers:
+- renderTeamRosterHtml()
+- renderIndividualRosterHtml()
+- renderRosterPdfStyles()
+
+Use inline CSS if necessary for PDF rendering reliability.
+
+VERIFICATION
+Generate:
+1. Team roster PDF
+2. Individual PDF for Ael
+3. Individual PDF for Bum
+
+Confirm:
+- no raw data dump
+- no giant comma-separated task paragraph
+- days grouped cleanly
+- staff table readable
+- individual tasks grouped by timing
+- no restricted data appears
+- mobile PDF viewer displays cleanly

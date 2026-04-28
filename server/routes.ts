@@ -76,6 +76,7 @@ import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
 import { rebuildIngredientTruth as rebuildIngredientTruthV2, getIngredientUsage } from "./services/receiptIngredientTruthEngine";
 import { analysisDailyReviewRouter } from "./routes/analysisDailyReview";
+import { analysisV3Router } from "./routes/analysisV3";
 import { dailyReviewCommentsRouter } from "./routes/dailyReviewComments";
 import stockReviewManual from "./routes/stockReviewManual";
 import stockReviewRouter from "./api/stockReview";
@@ -1283,6 +1284,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       return res.sendFile(path.join(orderingDist, "index.html"));
     });
   }
+
+  // Analysis V3 — raw POS item sales mirror
+  app.use('/api/analysis/v3', analysisV3Router);
 
   // Register daily review routes BEFORE catch-all :date route
   app.use('/api/analysis', analysisDailyReviewRouter);
