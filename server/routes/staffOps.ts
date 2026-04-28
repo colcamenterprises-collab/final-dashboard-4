@@ -54,6 +54,10 @@ import {
   replaceStaffOnShift,
   writeShiftChangeLog,
 } from '../services/staffOpsService';
+import {
+  generateIndividualRosterPDF,
+  generateTeamRosterPDF,
+} from '../services/rosterExportService';
 
 const router = Router();
 
@@ -522,6 +526,50 @@ router.get('/rosters', async (req, res) => {
     res.json(rows);
   } catch (err) {
     handleError(res, err, 'getRosters');
+  }
+});
+
+router.get('/rosters/export/team', async (req, res) => {
+  try {
+    const locationId = getLocationId(req);
+    const weekStart = String(req.query.weekStart ?? '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+      return res.status(400).json({ error: 'weekStart query param required (YYYY-MM-DD)' });
+    }
+
+    const stream = await generateTeamRosterPDF(weekStart, locationId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=team-roster-location-${locationId}-${weekStart}.pdf`
+    );
+    stream.pipe(res);
+  } catch (err) {
+    handleError(res, err, 'exportTeamRosterPdf');
+  }
+});
+
+router.get('/rosters/export/staff/:id', async (req, res) => {
+  try {
+    const locationId = getLocationId(req);
+    const staffId = Number(req.params.id);
+    const weekStart = String(req.query.weekStart ?? '');
+    if (!Number.isFinite(staffId) || staffId <= 0) {
+      return res.status(400).json({ error: 'Invalid staff id' });
+    }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
+      return res.status(400).json({ error: 'weekStart query param required (YYYY-MM-DD)' });
+    }
+
+    const stream = await generateIndividualRosterPDF(staffId, weekStart, locationId);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=staff-roster-${staffId}-${weekStart}.pdf`
+    );
+    stream.pipe(res);
+  } catch (err) {
+    handleError(res, err, 'exportIndividualRosterPdf');
   }
 });
 
