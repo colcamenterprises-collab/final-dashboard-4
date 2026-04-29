@@ -136,6 +136,214 @@ function parseWindow(start: string, end: string): { startISO: string; endISO: st
   return { startISO: startDate.toISOString(), endISO: endDate.toISOString() };
 }
 
+// ─── GET /api/analysis/v3/integrity-check ────────────────────────────────────
+/*
+ * POS DATA INTEGRITY CHECK — DO NOT MODIFY
+ *
+ * Pure validation layer. No business logic. No stock. No assumptions.
+ * Compares pos_shift_report values against lv_receipt / lv_line_item / lv_modifier.
+ *
+ * All comparisons use the shift window from pos_shift_report (openedAt → closedAt).
+ * No auto-fix. No estimation. No fallback.
+ *
+ * CHECKS:
+ *   1. Receipt Count   — shift.receiptCount vs COUNT(lv_receipt in shift window)
+ *   2. Cash Payments   — shift.cashSales vs SUM(cash from lv_receipt.payment_json)
+ *   3. Total Sales     — shift.grandTotal vs ROUND(SUM(lv_receipt.total_amount))
+ *   4. Item Totals     — COUNT(lv_line_item rows) vs SUM(lv_line_item.qty) in window
+ *   5. Modifier Totals — COUNT(lv_modifier rows) vs SUM(lv_modifier.qty) in window
+ */
+analysisV3Router.get("/integrity-check", async (req, res) => {
+  try {
+    const { start, end } = req.query as Record<string, string>;
+    if (!start || !end) {
+      return res.status(400).json({ ok: false, error: "start and end ISO timestamps required" });
+    }
+
+    const parsed = parseWindow(start, end);
+    if ("error" in parsed) {
+      return res.status(400).json({ ok: false, error: parsed.error });
+    }
+    const { startISO, endISO } = parsed;
+
+    // ── 1. Find the overlapping shift report ─────────────────────────────────
+    const shiftRows = await prisma.$queryRaw<{
+      receiptCount: number;
+      cashSales: number;
+      grandTotal: number;
+      openedUtc: Date;
+      closedUtc: Date;
+    }[]>`
+      SELECT
+        "receiptCount"                  AS "receiptCount",
+        "cashSales"                     AS "cashSales",
+        "grandTotal"                    AS "grandTotal",
+        "openedAt"::timestamptz         AS "openedUtc",
+        "closedAt"::timestamptz         AS "closedUtc"
+      FROM pos_shift_report
+      WHERE "openedAt"::timestamptz <= ${endISO}::timestamptz
+        AND "closedAt"::timestamptz >= ${startISO}::timestamptz
+      ORDER BY "openedAt" DESC
+      LIMIT 1
+    `;
+
+    // If no shift report exists, all checks are N/A — don't guess
+    if (shiftRows.length === 0) {
+      const naCheck = (label: string, note: string) => ({
+        label, status: "N/A" as const, sideA: null, sideB: null, note,
+      });
+      return res.json({
+        ok: true,
+        shiftFound: false,
+        allPass: false,
+        checks: [
+          naCheck("Receipt Count",   "No shift report found for this window"),
+          naCheck("Cash Payments",   "No shift report found for this window"),
+          naCheck("Total Sales",     "No shift report found for this window"),
+          naCheck("Item Totals",     "No shift report found for this window"),
+          naCheck("Modifier Totals", "No shift report found for this window"),
+        ],
+      });
+    }
+
+    const shift = shiftRows[0];
+    const shiftOpenISO  = new Date(shift.openedUtc).toISOString();
+    const shiftCloseISO = new Date(shift.closedUtc).toISOString();
+
+    // ── 2. Compute all comparison values using the shift window ───────────────
+    const stats = await prisma.$queryRaw<{
+      lv_receipt_count: number;
+      lv_cash_total: number;
+      lv_grand_total: number;
+      lv_item_rows: number;
+      lv_item_qty: number;
+      lv_mod_rows: number;
+      lv_mod_qty: number;
+    }[]>`
+      WITH sale_receipts AS (
+        SELECT receipt_id, total_amount, payment_json
+        FROM lv_receipt
+        WHERE datetime_bkk >= ${shiftOpenISO}::timestamptz
+          AND datetime_bkk <  ${shiftCloseISO}::timestamptz
+          AND (raw_json->>'refund_for' IS NULL OR raw_json->>'refund_for' = 'null')
+      )
+      SELECT
+        (SELECT COUNT(*)::int             FROM sale_receipts)                                         AS lv_receipt_count,
+        (SELECT COALESCE(SUM((elem->>'money_amount')::numeric), 0)::int
+           FROM sale_receipts sr,
+                jsonb_array_elements(sr.payment_json::jsonb) AS elem
+          WHERE elem->>'type' = 'CASH')                                                              AS lv_cash_total,
+        (SELECT COALESCE(ROUND(SUM(total_amount)), 0)::int FROM sale_receipts)                        AS lv_grand_total,
+        (SELECT COUNT(li.*)::int   FROM lv_line_item li JOIN sale_receipts sr ON li.receipt_id = sr.receipt_id) AS lv_item_rows,
+        (SELECT COALESCE(SUM(li.qty), 0)::int FROM lv_line_item li JOIN sale_receipts sr ON li.receipt_id = sr.receipt_id) AS lv_item_qty,
+        (SELECT COUNT(m.*)::int    FROM lv_modifier  m  JOIN sale_receipts sr ON m.receipt_id  = sr.receipt_id) AS lv_mod_rows,
+        (SELECT COALESCE(SUM(m.qty), 0)::int FROM lv_modifier  m  JOIN sale_receipts sr ON m.receipt_id  = sr.receipt_id) AS lv_mod_qty
+    `;
+
+    const s = stats[0];
+    const lvReceiptCount = Number(s.lv_receipt_count);
+    const lvCashTotal    = Number(s.lv_cash_total);
+    const lvGrandTotal   = Number(s.lv_grand_total);
+    const lvItemRows     = Number(s.lv_item_rows);
+    const lvItemQty      = Number(s.lv_item_qty);
+    const lvModRows      = Number(s.lv_mod_rows);
+    const lvModQty       = Number(s.lv_mod_qty);
+
+    const shiftReceiptCount = Number(shift.receiptCount);
+    const shiftCash         = Math.round(Number(shift.cashSales));
+    const shiftGrandTotal   = Number(shift.grandTotal);
+
+    // ── 3. Build check results ────────────────────────────────────────────────
+    type CheckStatus = "PASS" | "FAIL" | "N/A";
+    interface CheckResult {
+      label: string;
+      status: CheckStatus;
+      sideA: number | null;
+      sideALabel: string;
+      sideB: number | null;
+      sideBLabel: string;
+      note: string;
+    }
+
+    const pass = (a: number, b: number) => a === b ? "PASS" : "FAIL";
+
+    const checks: CheckResult[] = [
+      {
+        label:      "Receipt Count",
+        status:     pass(shiftReceiptCount, lvReceiptCount),
+        sideA:      shiftReceiptCount,
+        sideALabel: "pos_shift_report.receiptCount",
+        sideB:      lvReceiptCount,
+        sideBLabel: "COUNT(lv_receipt)",
+        note:       shiftReceiptCount === lvReceiptCount
+          ? "Receipt counts match exactly"
+          : `Mismatch: shift says ${shiftReceiptCount}, lv_receipt has ${lvReceiptCount}`,
+      },
+      {
+        label:      "Cash Payments",
+        status:     pass(shiftCash, lvCashTotal),
+        sideA:      shiftCash,
+        sideALabel: "pos_shift_report.cashSales",
+        sideB:      lvCashTotal,
+        sideBLabel: "SUM(payment_json cash) from lv_receipt",
+        note:       shiftCash === lvCashTotal
+          ? "Cash totals match exactly"
+          : `Mismatch: shift ฿${shiftCash.toLocaleString()} vs receipts ฿${lvCashTotal.toLocaleString()}`,
+      },
+      {
+        label:      "Total Sales",
+        status:     pass(shiftGrandTotal, lvGrandTotal),
+        sideA:      shiftGrandTotal,
+        sideALabel: "pos_shift_report.grandTotal",
+        sideB:      lvGrandTotal,
+        sideBLabel: "ROUND(SUM(lv_receipt.total_amount))",
+        note:       shiftGrandTotal === lvGrandTotal
+          ? "Grand totals match exactly"
+          : `Mismatch: shift ฿${shiftGrandTotal.toLocaleString()} vs receipts ฿${lvGrandTotal.toLocaleString()}`,
+      },
+      {
+        label:      "Item Totals",
+        status:     pass(lvItemRows > 0 ? 1 : 0, lvItemRows > 0 ? 1 : 0) === "PASS"
+          ? (lvItemRows <= lvItemQty ? "PASS" : "FAIL")
+          : "FAIL",
+        sideA:      lvItemRows,
+        sideALabel: "COUNT(lv_line_item rows)",
+        sideB:      lvItemQty,
+        sideBLabel: "SUM(lv_line_item.qty)",
+        note:       lvItemRows <= lvItemQty
+          ? `${lvItemRows} rows, ${lvItemQty} total items — internally consistent`
+          : `Row count (${lvItemRows}) exceeds qty sum (${lvItemQty}) — data inconsistency`,
+      },
+      {
+        label:      "Modifier Totals",
+        status:     pass(lvModRows, lvModQty),
+        sideA:      lvModRows,
+        sideALabel: "COUNT(lv_modifier rows)",
+        sideB:      lvModQty,
+        sideBLabel: "SUM(lv_modifier.qty)",
+        note:       lvModRows === lvModQty
+          ? `${lvModRows} rows, ${lvModQty} qty — all modifiers have qty=1 (constraint enforced)`
+          : `Mismatch: ${lvModRows} rows but ${lvModQty} qty — qty constraint may be violated`,
+      },
+    ];
+
+    const allPass = checks.every((c) => c.status === "PASS");
+    const anyFail = checks.some((c) => c.status === "FAIL");
+
+    return res.json({
+      ok: true,
+      shiftFound: true,
+      shiftWindow: { open: shiftOpenISO, close: shiftCloseISO },
+      allPass,
+      anyFail,
+      checks,
+    });
+  } catch (err: any) {
+    console.error("[analysisV3] integrity-check error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message ?? "Internal error" });
+  }
+});
+
 // ─── GET /api/analysis/v3/shift-report ───────────────────────────────────────
 /*
  * SHIFT REPORT MIRROR — DO NOT MODIFY

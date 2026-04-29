@@ -47,6 +47,26 @@ interface ShiftReportResponse {
   error?: string;
 }
 
+interface IntegrityCheck {
+  label: string;
+  status: 'PASS' | 'FAIL' | 'N/A';
+  sideA: number | null;
+  sideALabel?: string;
+  sideB: number | null;
+  sideBLabel?: string;
+  note: string;
+}
+
+interface IntegrityCheckResponse {
+  ok: boolean;
+  shiftFound: boolean;
+  shiftWindow?: { open: string; close: string };
+  allPass: boolean;
+  anyFail?: boolean;
+  checks: IntegrityCheck[];
+  error?: string;
+}
+
 interface ItemSalesRow {
   item_name: string;
   sku: string | null;
@@ -151,6 +171,16 @@ export default function AnalysisV3() {
 
   const startISO = useMemo(() => buildShiftISO(shiftDate, startTime, false), [shiftDate, startTime]);
   const endISO = useMemo(() => buildShiftISO(shiftDate, endTime, endIsNextDay), [shiftDate, endTime, endIsNextDay]);
+
+  // ── Integrity Check query ───────────────────────────────────────────────────
+  const { data: integrityData, isLoading: integrityLoading } = useQuery<IntegrityCheckResponse>({
+    queryKey: ['/api/analysis/v3/integrity-check', startISO, endISO],
+    queryFn: () =>
+      fetch(`/api/analysis/v3/integrity-check?start=${encodeURIComponent(startISO)}&end=${encodeURIComponent(endISO)}`)
+        .then((r) => r.json()),
+    enabled: !!shiftDate && !!startTime && !!endTime,
+    staleTime: 60_000,
+  });
 
   // ── Shift Report query ──────────────────────────────────────────────────────
   const { data: shiftData, isLoading: shiftLoading, isError: shiftIsError } = useQuery<ShiftReportResponse>({
@@ -413,6 +443,110 @@ export default function AnalysisV3() {
                     · <span className="italic">Expected Cash and Difference are calculated from stored POS shift fields (startingCash + cashSales − wagesTotal) because they are not stored as direct columns in pos_shift_report</span>
                   </p>
                 </div>
+              </div>
+            </>
+          );
+        })()}
+
+        {/* ── POS Data Integrity Check ──────────────────────────────────────── */}
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">POS Data Integrity Check</h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Cross-table validation · pos_shift_report vs lv_receipt / lv_line_item / lv_modifier · no auto-fix, no estimation
+          </p>
+        </div>
+
+        {/* Integrity loading */}
+        {integrityLoading && (
+          <div className="rounded-lg border border-slate-200 bg-white p-4 space-y-2">
+            {[...Array(5)].map((_, i) => <div key={i} className="h-7 bg-slate-100 rounded animate-pulse" />)}
+          </div>
+        )}
+
+        {/* Integrity check results */}
+        {integrityData?.ok && !integrityLoading && (() => {
+          const ic = integrityData;
+          return (
+            <>
+              {/* Result banner */}
+              {ic.allPass ? (
+                <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 flex items-center gap-3">
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-emerald-800">POS DATA VERIFIED — SAFE TO PROCEED</p>
+                    <p className="text-xs text-emerald-600 mt-0.5">All {ic.checks.length} checks passed. POS data is internally consistent.</p>
+                  </div>
+                </div>
+              ) : ic.anyFail ? (
+                <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 flex items-center gap-3">
+                  <span className="w-3 h-3 rounded-full bg-red-500 shrink-0 animate-pulse" />
+                  <div>
+                    <p className="text-sm font-bold text-red-800">POS DATA INCONSISTENT — DO NOT TRUST ANALYSIS</p>
+                    <p className="text-xs text-red-600 mt-0.5">One or more checks failed. Investigate at the data source — do not fix in code.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  {ic.shiftFound
+                    ? "Some checks are N/A — shift report data partially available."
+                    : "No shift report found for this window. All checks are N/A."}
+                </div>
+              )}
+
+              {/* Checks table */}
+              <div className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-xs">
+                    <thead>
+                      <tr>
+                        <Th>Check</Th>
+                        <Th>Status</Th>
+                        <Th right>Side A (Shift Report)</Th>
+                        <Th right>Side B (Raw Tables)</Th>
+                        <Th>Notes</Th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ic.checks.map((chk) => {
+                        const statusColor =
+                          chk.status === 'PASS' ? 'text-emerald-700 bg-emerald-50' :
+                          chk.status === 'FAIL' ? 'text-red-700 bg-red-50' :
+                          'text-slate-500 bg-slate-50';
+                        const rowBg =
+                          chk.status === 'FAIL' ? 'bg-red-50/40' : '';
+                        return (
+                          <tr key={chk.label} className={`border-b border-slate-100 ${rowBg}`}>
+                            <td className="px-3 py-2.5 font-semibold text-slate-700 whitespace-nowrap">{chk.label}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${statusColor}`}>
+                                {chk.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                              {chk.sideA !== null ? chk.sideA.toLocaleString() : '—'}
+                              {chk.sideALabel && <div className="text-[10px] text-slate-400">{chk.sideALabel}</div>}
+                            </td>
+                            <td className="px-3 py-2.5 text-right tabular-nums text-slate-700">
+                              {chk.sideB !== null ? chk.sideB.toLocaleString() : '—'}
+                              {chk.sideBLabel && <div className="text-[10px] text-slate-400">{chk.sideBLabel}</div>}
+                            </td>
+                            <td className={`px-3 py-2.5 ${chk.status === 'FAIL' ? 'text-red-700 font-medium' : 'text-slate-500'}`}>
+                              {chk.note}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {ic.shiftWindow && (
+                  <div className="px-4 py-2 border-t border-slate-100">
+                    <p className="text-[10px] text-slate-400">
+                      Shift window used: {fmtBkk(ic.shiftWindow.open)} → {fmtBkk(ic.shiftWindow.close)} BKK
+                      · No auto-fix · No estimation · Fix failures at data source
+                    </p>
+                  </div>
+                )}
               </div>
             </>
           );
