@@ -237,7 +237,9 @@ analysisV3Router.get("/shift-report", async (req, res) => {
     const paidOut         = Number(r.wagesTotal   ?? 0);
     const actualCash      = Number(r.cashInDrawer ?? 0);
 
-    // Standard POS register formula (same calculation Loyverse performs internally)
+    // expectedCash and difference are NOT stored columns in pos_shift_report.
+    // They are calculated from stored fields using the standard POS register formula.
+    // Labelled in the response as calculatedFields so callers know they are derived.
     const expectedCash    = startingCash + cashPayments - paidOut;
     const difference      = actualCash - expectedCash;
 
@@ -245,6 +247,7 @@ analysisV3Router.get("/shift-report", async (req, res) => {
       ok: true,
       status: "ok",
       source: "pos_shift_report",
+      calculatedFields: ["expectedCash", "difference"],
       start: startISO,
       end: endISO,
       data: {

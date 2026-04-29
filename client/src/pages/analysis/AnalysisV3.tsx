@@ -343,9 +343,9 @@ export default function AnalysisV3() {
             { label: 'Cash Refunds',   value: sr.cashRefunds !== null ? `฿${sr.cashRefunds.toLocaleString()}` : '—' },
             { label: 'Paid In',        value: sr.paidIn !== null ? `฿${sr.paidIn.toLocaleString()}` : '—' },
             { label: 'Paid Out',       value: `฿${sr.paidOut.toLocaleString()}` },
-            { label: 'Expected Cash',  value: `฿${sr.expectedCash.toLocaleString()}`, highlight: true },
+            { label: 'Expected Cash *', value: `฿${sr.expectedCash.toLocaleString()}`, highlight: true },
             { label: 'Actual Cash',    value: `฿${sr.actualCash.toLocaleString()}`, highlight: true },
-            { label: 'Difference',     value: `฿${sr.difference.toLocaleString()}`, diffStyle: true },
+            { label: 'Difference *',   value: `฿${sr.difference.toLocaleString()}`, diffStyle: true },
           ];
 
           return (
@@ -368,9 +368,9 @@ export default function AnalysisV3() {
                   { label: 'Starting Cash',  val: `฿${sr.startingCash.toLocaleString()}` },
                   { label: 'Cash Payments',  val: `฿${sr.cashPayments.toLocaleString()}` },
                   { label: 'Paid Out',       val: `฿${sr.paidOut.toLocaleString()}` },
-                  { label: 'Expected Cash',  val: `฿${sr.expectedCash.toLocaleString()}` },
+                  { label: 'Expected Cash *', val: `฿${sr.expectedCash.toLocaleString()}` },
                   { label: 'Actual Cash',    val: `฿${sr.actualCash.toLocaleString()}` },
-                  { label: 'Difference',     val: `฿${sr.difference.toLocaleString()}`, diff: sr.difference },
+                  { label: 'Difference *',   val: `฿${sr.difference.toLocaleString()}`, diff: sr.difference },
                 ].map(({ label, val, diff }) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
                     <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">{label}</p>
@@ -410,6 +410,7 @@ export default function AnalysisV3() {
                 <div className="px-4 py-2 border-t border-slate-100">
                   <p className="text-[10px] text-slate-400">
                     Source: <code>pos_shift_report</code> only · No fallback to receipt aggregation · No estimation · Shift Report Mirror active
+                    · <span className="italic">Expected Cash and Difference are calculated from stored POS shift fields (startingCash + cashSales − wagesTotal) because they are not stored as direct columns in pos_shift_report</span>
                   </p>
                 </div>
               </div>
