@@ -215,6 +215,7 @@ analysisV3Router.get("/integrity-check", async (req, res) => {
       lv_receipt_count: number;
       lv_cash_total: number;
       lv_grand_total: number;
+      lv_grand_total_raw: number;
       lv_item_rows: number;
       lv_item_qty: number;
       lv_mod_rows: number;
@@ -233,7 +234,12 @@ analysisV3Router.get("/integrity-check", async (req, res) => {
            FROM sale_receipts sr,
                 jsonb_array_elements(sr.payment_json::jsonb) AS elem
           WHERE elem->>'type' = 'CASH')                                                              AS lv_cash_total,
-        (SELECT COALESCE(ROUND(SUM(total_amount)), 0)::int FROM sale_receipts)                        AS lv_grand_total,
+        -- lv_receipt.total_amount is stored as baht/100 (e.g. ฿319 receipt → stored as 3.19).
+        -- pos_shift_report.grandTotal is in whole baht (e.g. 23688).
+        -- Multiply by 100 to align units before comparing.
+        (SELECT COALESCE(ROUND(SUM(total_amount) * 100), 0)::int FROM sale_receipts)                  AS lv_grand_total,
+        -- Raw (pre-normalisation) sum kept for diagnostic reporting
+        (SELECT COALESCE(ROUND(SUM(total_amount), 2), 0)::numeric FROM sale_receipts)                 AS lv_grand_total_raw,
         (SELECT COUNT(li.*)::int   FROM lv_line_item li JOIN sale_receipts sr ON li.receipt_id = sr.receipt_id) AS lv_item_rows,
         (SELECT COALESCE(SUM(li.qty), 0)::int FROM lv_line_item li JOIN sale_receipts sr ON li.receipt_id = sr.receipt_id) AS lv_item_qty,
         (SELECT COUNT(m.*)::int    FROM lv_modifier  m  JOIN sale_receipts sr ON m.receipt_id  = sr.receipt_id) AS lv_mod_rows,
@@ -241,13 +247,14 @@ analysisV3Router.get("/integrity-check", async (req, res) => {
     `;
 
     const s = stats[0];
-    const lvReceiptCount = Number(s.lv_receipt_count);
-    const lvCashTotal    = Number(s.lv_cash_total);
-    const lvGrandTotal   = Number(s.lv_grand_total);
-    const lvItemRows     = Number(s.lv_item_rows);
-    const lvItemQty      = Number(s.lv_item_qty);
-    const lvModRows      = Number(s.lv_mod_rows);
-    const lvModQty       = Number(s.lv_mod_qty);
+    const lvReceiptCount    = Number(s.lv_receipt_count);
+    const lvCashTotal       = Number(s.lv_cash_total);
+    const lvGrandTotal      = Number(s.lv_grand_total);      // normalised: raw * 100
+    const lvGrandTotalRaw   = Number(s.lv_grand_total_raw);  // as stored in lv_receipt (baht/100)
+    const lvItemRows        = Number(s.lv_item_rows);
+    const lvItemQty         = Number(s.lv_item_qty);
+    const lvModRows         = Number(s.lv_mod_rows);
+    const lvModQty          = Number(s.lv_mod_qty);
 
     const shiftReceiptCount = Number(shift.receiptCount);
     const shiftCash         = Math.round(Number(shift.cashSales));
@@ -294,12 +301,12 @@ analysisV3Router.get("/integrity-check", async (req, res) => {
         label:      "Total Sales",
         status:     pass(shiftGrandTotal, lvGrandTotal),
         sideA:      shiftGrandTotal,
-        sideALabel: "pos_shift_report.grandTotal",
+        sideALabel: "pos_shift_report.grandTotal (whole baht)",
         sideB:      lvGrandTotal,
-        sideBLabel: "ROUND(SUM(lv_receipt.total_amount))",
+        sideBLabel: `SUM(lv_receipt.total_amount) × 100 — raw stored value: ${lvGrandTotalRaw} (baht÷100 format)`,
         note:       shiftGrandTotal === lvGrandTotal
-          ? "Grand totals match exactly"
-          : `Mismatch: shift ฿${shiftGrandTotal.toLocaleString()} vs receipts ฿${lvGrandTotal.toLocaleString()}`,
+          ? `Grand totals match after unit normalisation (raw stored: ${lvGrandTotalRaw} × 100 = ${lvGrandTotal})`
+          : `Mismatch after normalisation: shift ฿${shiftGrandTotal.toLocaleString()} vs receipts ฿${lvGrandTotal.toLocaleString()} (raw: ${lvGrandTotalRaw})`,
       },
       {
         label:      "Item Totals",
