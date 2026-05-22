@@ -202,7 +202,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 });
 
 
-app.get("/api/system/pos-status", async (_req, res) => {
+app.get("/api/system/pos-status", (req, res, next) => {
+  if (res.locals.isBotRequest) return next();
+  return requireSessionAuth(req, res, next);
+}, async (_req, res) => {
   const hasToken = Boolean(process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_TOKEN || process.env.BOBS_LOYVERSE_TOKEN);
   try {
     const latestReceipt = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(receipt_date) AS v FROM receipts`);
