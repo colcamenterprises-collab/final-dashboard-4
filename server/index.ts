@@ -201,6 +201,57 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
+
+app.get("/api/system/pos-status", async (_req, res) => {
+  const hasToken = Boolean(process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_TOKEN || process.env.BOBS_LOYVERSE_TOKEN);
+  try {
+    const latestReceipt = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(receipt_date) AS v FROM receipts`);
+    const latestShift = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(shift_date) AS v FROM loyverse_shifts`);
+    const latestSync = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(created_at) AS v FROM receipts`);
+
+    const latestReceiptDate = latestReceipt?.[0]?.v ?? null;
+    const latestShiftReportDate = latestShift?.[0]?.v ?? null;
+    const latestSyncAt = latestSync?.[0]?.v ?? null;
+    const connected = hasToken && Boolean(latestReceiptDate);
+
+    let failurePoint = "none";
+    let minimalFixRequired = "none";
+    if (!hasToken) {
+      failurePoint = "no credentials";
+      minimalFixRequired = "Set LOYVERSE_API_TOKEN in server environment.";
+    } else if (!latestReceiptDate) {
+      failurePoint = "missing receipt persistence";
+      minimalFixRequired = "Trigger /api/loyverse/sync and verify writes into receipts table.";
+    } else if (!latestShiftReportDate) {
+      failurePoint = "missing shift creation logic";
+      minimalFixRequired = "Ensure shift ingest route writes loyverse_shifts records for synced receipts.";
+    }
+
+    res.json({
+      connected,
+      latestReceiptDate,
+      latestShiftReportDate,
+      latestSyncAt,
+      activeIngestionRoute: "/api/loyverse/sync",
+      receiptTable: "receipts",
+      shiftReportTable: "loyverse_shifts",
+      failurePoint,
+      minimalFixRequired,
+    });
+  } catch (error: any) {
+    res.status(200).json({
+      connected: false,
+      latestReceiptDate: null,
+      latestShiftReportDate: null,
+      latestSyncAt: null,
+      activeIngestionRoute: "/api/loyverse/sync",
+      receiptTable: "receipts",
+      shiftReportTable: "loyverse_shifts",
+      failurePoint: "API route broken",
+      minimalFixRequired: error?.message || "Validate DB connectivity and table availability.",
+    });
+  }
+});
 // Special tablet reload routes
 app.get('/tablet-reload', (req, res) => {
   res.sendFile(path.resolve(process.cwd(), 'public/tablet-reload.html'));

@@ -69,102 +69,14 @@ type NavGroup = {
  */
 const navigationGroups: NavGroup[] = [
   {
-    title: "Dashboard Home",
-    isStandalone: true,
-    items: []
-  },
-  {
-    title: "Online Ordering Button",
-    isStandalone: true,
+    title: "Core",
+    defaultOpen: true,
     items: [
-      { to: "/order", label: "Online Ordering", icon: ShoppingBag, testId: "button-online-ordering", external: true, isButton: true }
-    ]
-  },
-  {
-    title: "Operations",
-    items: [
-      { 
-        to: "/operations/daily-sales", 
-        label: "Daily Sales & Stock", 
-        icon: Receipt, 
-        testId: "nav-daily-sales",
-        subItems: [
-          { to: "/operations/daily-sales-v2/library", label: "Library", icon: BarChart3, testId: "nav-sales-library", ownerOnly: true }
-        ]
-      },
-      { to: "/operations/health-safety-audit", label: "Operations Audit", icon: Settings, testId: "nav-health-safety" },
-      { to: "/operations/staff", label: "Staff Operations", icon: Users, testId: "nav-staff-ops",
-        subItems: [
-          { to: "/operations/staff/management", label: "Staff Management", icon: Users, testId: "nav-staff-management" },
-          { to: "/operations/staff/roster", label: "Weekly Roster", icon: Home, testId: "nav-staff-roster" },
-          { to: "/operations/staff/cleaning", label: "Daily Cleaning", icon: Settings, testId: "nav-staff-cleaning" },
-          { to: "/operations/staff/deep-cleaning", label: "Deep Cleaning", icon: Package, testId: "nav-staff-deep-cleaning" },
-          { to: "/operations/staff/attendance", label: "Attendance Log", icon: Users, testId: "nav-staff-attendance" },
-          { to: "/operations/staff/settings", label: "Settings", icon: Settings, testId: "nav-staff-settings" },
-        ]
-      }
-    ]
-  },
-  {
-    title: "Purchasing",
-    items: [
-      { to: "/operations/purchasing", label: "Purchasing Items", icon: ShoppingCart, testId: "nav-purchasing-list" },
-      { to: "/operations/shopping-list", label: "Shopping List", icon: ShoppingCart, testId: "nav-shopping-list" },
-      { to: "/operations/purchasing-shift-log", label: "Stock Order History", icon: Package, testId: "nav-purchasing-log" },
-      // INTERNAL/ADMIN ONLY — route still active at /operations/ingredient-purchasing, hidden from normal nav
-    ]
-  },
-  {
-    title: "Analysis",
-    items: [
-      { to: "/analysis/daily-review", label: "Sales & Shift Analysis", icon: BarChart3, testId: "nav-daily-review" },
-      { to: "/analysis/v2", label: "Sales & Shift Analysis V2", icon: BarChart3, testId: "nav-analysis-v2" },
-      { to: "/analysis/v3", label: "POS Item Sales Mirror", icon: BarChart3, testId: "nav-analysis-v3" },
-      { to: "/analysis/grab-loyverse-monthly-reconciliation", label: "Grab vs Loyverse", icon: BarChart3, testId: "nav-grab-loyverse-reconciliation" },
-      { to: "/analysis/receipts", label: "Receipts Analysis", icon: Receipt, testId: "nav-receipt-analysis" },
-    ]
-  },
-  {
-    title: "AI Operations",
-    items: [
-      { to: "/ai-ops/control", label: "AI Ops Control", icon: Bot, testId: "nav-ai-ops-control" },
-      { to: "/ai-ops/issue-register", label: "Issue Register", icon: Settings, testId: "nav-issue-register" },
-      { to: "/ai-ops/variance-monitor", label: "Variance Monitor", icon: BarChart3, testId: "nav-variance-monitor" },
-    ]
-  },
-  {
-    title: "Finance",
-    items: [
-      { to: "/finance/expenses", label: "Expenses", icon: Calculator, testId: "nav-expenses" },
-      { to: "/finance/profit-loss", label: "Profit & Loss", icon: Calculator, testId: "nav-profit-loss" }
-    ]
-  },
-  {
-    title: "Menu Management",
-    items: [
-      { to: "/recipe-management", label: "Recipe Management", icon: ChefHat, testId: "nav-recipe-management" },
-            { to: "/menu-management/ingredients", label: "Ingredients", icon: ChefHat, testId: "nav-ingredients" }
-    ]
-  },
-  {
-    title: "POS & Kitchen",
-    items: [
-      { to: "/pos", label: "POS Terminal", icon: Receipt, testId: "nav-pos" },
-      { to: "/kds", label: "Kitchen Display", icon: ChefHat, testId: "nav-kds" }
-    ]
-  },
-  {
-    title: "Membership",
-    items: [
-      { to: "/membership/dashboard", label: "Member Dashboard", icon: Users, testId: "nav-member-dashboard" },
-      { to: "/membership/register", label: "Registration Form", icon: Users, testId: "nav-member-register" }
-    ]
-  },
-  {
-    title: "Settings",
-    items: [
-      { to: "/settings/profile", label: "My Profile", icon: Users, testId: "nav-settings-profile" },
-      { to: "/settings/staff-access", label: "Staff Access", icon: Settings, testId: "nav-settings-staff" },
+      { to: "/dashboard", label: "Home", icon: Home, testId: "nav-home" },
+      { to: "/operations/daily-sales", label: "Daily Sales V2", icon: Receipt, testId: "nav-daily-sales" },
+      { to: "/operations/daily-stock", label: "Daily Stock V2", icon: Package, testId: "nav-daily-stock" },
+      { to: "/operations/daily-sales-v2/library", label: "Form Library", icon: BarChart3, testId: "nav-library" },
+      { to: "/operations/purchasing", label: "Purchasing", icon: ShoppingCart, testId: "nav-purchasing" },
     ]
   }
 ];
