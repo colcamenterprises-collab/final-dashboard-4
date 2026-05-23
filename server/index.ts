@@ -35,6 +35,7 @@ import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
 
 import systemHealthRoutes from "./routes/systemHealth";
+import coreRoutes from "./core/coreRoutes";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
 import { registerWeeklyRosterDistributionCron } from "./cron/weeklyRosterDistributionCron";
 import { tenantContext } from "./middleware/tenantContext";
@@ -138,6 +139,7 @@ const API_PROTECTED_PREFIXES = [
   "/api/purchasing-analytics",
   "/api/internal",
   "/api/partners",
+  "/api/core",
 ];
 
 const API_PUBLIC_PREFIXES = [
@@ -363,6 +365,7 @@ async function checkSchema() {
   app.use('/api/analysis', promoMixMatchRouter);
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
+  app.use('/api/core', coreRoutes);
   
   const server = await registerRoutes(app);
 
