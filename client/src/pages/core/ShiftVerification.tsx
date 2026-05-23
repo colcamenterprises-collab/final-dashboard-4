@@ -1,0 +1,2 @@
+import { useEffect, useState } from 'react';
+export default function ShiftVerification(){const [d,setD]=useState<any>(null);const date=new Date().toISOString().slice(0,10);useEffect(()=>{fetch('/api/core/shift/'+date,{credentials:'include'}).then(r=>r.json()).then(setD)},[date]);return <div className='space-y-3'><h1 className='text-2xl font-semibold'>Shift Verification</h1><pre className='text-xs bg-slate-50 p-3 rounded'>{JSON.stringify(d,null,2)}</pre></div>}
