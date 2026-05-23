@@ -208,9 +208,9 @@ app.get("/api/system/pos-status", (req, res, next) => {
 }, async (_req, res) => {
   const hasToken = Boolean(process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_TOKEN || process.env.BOBS_LOYVERSE_TOKEN);
   try {
-    const latestReceipt = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(receipt_date) AS v FROM receipts`);
+    const latestReceipt = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX("createdAtUTC") AS v FROM receipts`);
     const latestShift = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(shift_date) AS v FROM loyverse_shifts`);
-    const latestSync = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(created_at) AS v FROM receipts`);
+    const latestSync = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX("createdAt") AS v FROM receipts`);
 
     const latestReceiptDate = latestReceipt?.[0]?.v ?? null;
     const latestShiftReportDate = latestShift?.[0]?.v ?? null;
