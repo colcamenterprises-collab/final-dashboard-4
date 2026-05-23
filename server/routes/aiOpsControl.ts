@@ -6,7 +6,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { runMonitors, startMonitorScheduler } from "../services/monitorEngine";
-import { startShiftRebuildScheduler, runShiftRebuild } from "../services/shiftRebuildScheduler";
+import { runShiftRebuild } from "../services/shiftRebuildScheduler";
 import {
   parseWorkspaceTools,
   executeWorkspaceTools,
@@ -4029,8 +4029,7 @@ router.post("/monitors/run", async (req, res) => {
 // Start daily scheduler (non-blocking, idempotent)
 startMonitorScheduler();
 
-// Start shift rebuild scheduler at 03:05 BKK (non-blocking, idempotent)
-startShiftRebuildScheduler();
+
 
 // ─── Shift Rebuild Log endpoints ─────────────────────────────────────────────
 router.get("/shift-rebuild-log", async (req, res) => {
