@@ -1,0 +1,74 @@
+FINAL DB 5.0 — BACKEND LEGACY CLEANUP PASS 1
+
+Core is verified. Continue cleanup.
+
+Objective:
+Remove remaining legacy backend files/routes/services that are not used by the verified lean core.
+
+Protected workflows:
+- login/auth
+- role access
+- dashboard core homepage
+- Daily Sales V2
+- Daily Stock V2
+- Form Library
+- Purchasing
+- PDF/email required by forms
+- /api/system/pos-status
+- active Loyverse receipt sync only
+
+Hard rules:
+- Do not restore deleted frontend modules.
+- Do not delete database tables.
+- Do not touch schemas unless required to fix a verified core break.
+- Do not rebuild old reports, analysis, Bob, P&L, maintenance, online ordering, or shift reports.
+- Delete unused code; do not hide it.
+- After each deletion group, run the app and verify protected routes still work.
+
+Target remaining legacy areas:
+1. `server/routes/staffOps.ts`
+2. `server/routes/recipes.ts`
+3. `server/services/receiptTruthDailyUsageService.ts`
+4. unused shift report/analysis routes
+5. unused Bob/frontend route handlers
+6. unused finance/expense routes not required by Daily Sales V2
+7. unused old POS upload/report handlers
+8. any route mounted in `server/routes.ts` but no longer used by lean core
+
+Required process:
+1. Read `server/index.ts` and `server/routes.ts`.
+2. List all mounted backend routes.
+3. Mark each:
+   - KEEP CORE
+   - KEEP POS SYNC
+   - DELETE LEGACY
+   - REVIEW
+4. For DELETE LEGACY, remove route mount and file only if no protected workflow imports/calls it.
+5. Keep `/api/system/pos-status`.
+6. Keep active Loyverse sync route if used by POS status/source ingestion.
+7. Keep all Daily Sales V2 / Daily Stock / Form Library / Purchasing APIs.
+8. Remove compatibility files only after their imports are fully removed.
+9. Fix import errors caused by deletion.
+10. Run runtime check after cleanup.
+
+Validation:
+- Server starts.
+- Login works.
+- Dashboard opens.
+- Daily Sales V2 opens and saves/submits.
+- Daily Stock V2 opens and saves/submits.
+- Form Library opens for owner only.
+- Purchasing opens.
+- `/api/system/pos-status` returns authenticated JSON.
+- Legacy shift-report endpoints still return `API_ROUTE_NOT_FOUND`.
+- No server startup module-not-found errors.
+
+Deliverables:
+- Backend route inventory
+- Files deleted
+- Files changed
+- Routes removed
+- Routes kept and why
+- Protected workflow test results
+- POS status JSON
+- Remaining legacy files still present and why

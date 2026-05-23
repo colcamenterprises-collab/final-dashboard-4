@@ -20,8 +20,7 @@ import posItems from "./routes/posItems";
 import posUsage from "./routes/posUsage";
 import dailySalesLibrary from "./routes/dailySalesLibrary";
 import dailyStock from "./routes/dailyStock";
-import chef from "./routes/chef";
-import recipes from "./routes/recipes";
+
 import { uploadsRouter } from "./routes/uploads";
 import { importRouter } from "./routes/imports";
 import formsRouter from "./routes/forms";
@@ -36,7 +35,7 @@ import { publishToMenu } from "./services/menuService";
 import { getItemsWithPurchasing } from "./services/ingredientService";
 
 import expensesImportRouter from "./routes/expenses-import";
-import partnersRouter from "./routes/partners";
+
 import balanceRoutes from "./routes/balance";
 import ingredientsRoutes from "./routes/ingredients";
 import legacyIngredientsRouter from "./routes/ingredients-legacy";
@@ -89,43 +88,23 @@ import loyverseShiftReportRouter from "./routes/loyverseShiftReport";
 import { registerOnlineMenuRoutes } from "./routes/onlineMenu";
 import { registerAdminMenuRoutes } from "./routes/adminMenu";
 import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
-import membershipRouter from "./routes/membership";
-import githubRouter from "./routes/github";
+
 import imageUploadRouter from "./routes/imageUpload";
 import shiftReportRoutes from "./routes/shiftReportRoutes";
-import expensesV2Routes from "./routes/expensesV2Routes";
-import menuOrderingRoutes from "./routes/menuOrderingRoutes";
-import ordersV2Routes from "./routes/ordersV2Routes";
-import onlineOrderingV2Router from "./routes/onlineOrderingV2";
-import onlineCatalogRouter from "./routes/onlineCatalog";
-import loyverseMapRoutes from "./routes/loyverseMapRoutes";
-import qrRoutes from "./routes/qrRoutes";
-import scbRoutes from "./routes/payments/scbRoutes";
-import qrDynamicRoutes from "./routes/payments/qrRoutes";
-import partnerBarRoutes from "./routes/partners/partnerRoutes";
-import partnerAnalyticsRoutes from "./routes/partners/partnerAnalyticsRoutes";
-import deliveryRoutes from "./routes/delivery/deliveryRoutes";
-import kdsRoutes from "./routes/kds/kdsRoutes";
+
 import menuV3Routes from "./routes/menu/menuV3Routes";
 import stockRoutes from "./routes/stock/stockRoutes";
 import varianceRoutes from "./routes/stock/varianceRoutes";
 import ingredientUsageRoutes from "./routes/analytics/ingredientUsageRoutes";
-import loyverseMenuImportRouter from "./routes/loyverseMenuImport";
-import adminBackupRouter from "./routes/adminBackup";
-import adminHistoricalImportRouter from "./routes/adminHistoricalImport";
 import systemHealthRouter from "./routes/systemHealth";
-import bobReadRouter from "./routes/bobRead";
-import bobVerifyRouter from "./routes/bobVerify";
-import executiveMetricsRouter from "./routes/executiveMetrics";
 import { loadCanonicalMenu, generateDriftReport, getCacheStatus } from "./services/menuCanonicalService";
-import dashboard4Routes from "./routes/dashboard4Routes";
+
 import { pool } from "./db";
 import healthSafetyQuestions from "./routes/healthSafety/questions";
 import healthSafetyAudits from "./routes/healthSafety/audits";
 import healthSafetyPdf from "./routes/healthSafety/pdf";
 import receiptBatchRoutes from "./routes/receiptBatchRoutes";
-import pnlReadModelRoutes from "./routes/pnlReadModel";
-import pnlSnapshotRoutes from "./routes/pnlSnapshot.route";
+
 import shiftApprovalRoutes from "./routes/shiftApproval";
 import issueRegisterRoutes from "./routes/issueRegister";
 import { menuManagementRouter } from "./routes/menuManagement";
@@ -135,8 +114,7 @@ import productMenuRouter from "./routes/productMenu";
 import productIngredientsRouter from "./routes/productIngredients";
 import productActivationRouter from "./routes/productActivation";
 import purchasesRouter from "./routes/purchases";
-import lineNotifyRouter from "./routes/lineNotify";
-import varianceHistoryRouter from "./routes/varianceHistory";
+
 import refundsRouter from "./routes/refunds";
 import shiftReviewRouter from "./routes/shiftReview";
 import stockBaselineRouter from "./routes/stockBaseline";
@@ -1252,15 +1230,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Shift Report V2
   app.use("/api/shift-report", shiftReportRoutes);
-  app.use("/api/bob/read", bobReadRouter);
-  app.use("/api/bob/read/verify", bobVerifyRouter);
+
 
   // Purchases import
   app.use("/api/purchases", purchasesRouter);
-
-  // Online Ordering v2 API (product-driven)
-  app.use("/api", onlineOrderingV2Router);
-  app.use("/api", onlineCatalogRouter);
 
   // Serve static uploaded menu item images
   const uploadsDir = path.join(process.cwd(), "uploads");
@@ -1268,22 +1241,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     app.use("/uploads", express.static(uploadsDir));
   }
 
-  // Serve the online ordering SPA (exclude dashboard route /online-ordering/catalog)
-  if (fs.existsSync(orderingDist)) {
-    const orderingStatic = express.static(orderingDist);
-    app.use("/online-ordering", (req, res, next) => {
-      if (req.path === "/catalog" || req.path.startsWith("/catalog/")) {
-        return next();
-      }
-      return orderingStatic(req, res, next);
-    });
-    app.get("/online-ordering/*", (req, res, next) => {
-      if (req.path === "/online-ordering/catalog" || req.path.startsWith("/online-ordering/catalog/")) {
-        return next();
-      }
-      return res.sendFile(path.join(orderingDist, "index.html"));
-    });
-  }
+
 
   // Analysis V3 — raw POS item sales mirror
   app.use('/api/analysis/v3', analysisV3Router);
@@ -4142,30 +4100,15 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/purchasing-shift-log', purchasingShiftLogRouter); // Purchasing shift log visibility
   app.use('/api/purchasing-analytics', purchasingAnalyticsRouter); // Purchasing analytics metrics
   app.use('/api/debug', debugPurchasingRouter); // PATCH A: Purchasing parity check
-  app.use('/api/pnl', pnlReadModelRoutes); // PATCH 1.6.18: P&L Read Model
   app.use('/api', shiftApprovalRoutes); // Shift snapshot approval + shift-reconciled P&L
   app.use('/api/issue-register', issueRegisterRoutes); // Theft-Control Issue Register
-  app.use('/api/pnl/snapshot', pnlSnapshotRoutes); // PATCH 1: P&L Snapshot with checksums
   app.use('/api/menu-management', menuManagementRouter); // PATCH 2.1: Menu Management Foundation
   app.use('/api/modifiers', modifiersRouter); // PATCH 2.2: Modifiers System
   app.use(productsRouter); // PATCH P1: Products API
   app.use('/api/products', productIngredientsRouter);
   app.use('/api/products', productActivationRouter);
   app.use(productMenuRouter);
-  app.use('/api/membership', membershipRouter);
-  app.use('/api/github', githubRouter);
-  app.use('/api/expenses-v2', expensesV2Routes);
-  app.use('/api/menu-ordering', menuOrderingRoutes);
-  app.use('/api/orders-v2', ordersV2Routes);
-  app.use('/api/loyverse-map', loyverseMapRoutes);
-  app.use('/api/payments-qr', qrRoutes);
-  app.use('/api/payments/scb', scbRoutes);
-  app.use('/api/payments/qr', qrDynamicRoutes);
-  app.use('/api/partners', partnerBarRoutes);
-  app.use('/api/partners', partnerAnalyticsRoutes);
-  app.use('/api/partners', partnersRouter);
-  app.use('/api/delivery', deliveryRoutes);
-  app.use('/api/kds', kdsRoutes);
+
   app.use('/api/menu-v3', menuV3Routes);
   app.use('/api/stock', stockRoutes);
   app.use('/api/stock/variance', varianceRoutes);
@@ -4173,14 +4116,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/refunds', refundsRouter);
   app.use('/api/shift-review', shiftReviewRouter);
   app.use('/api/analytics/ingredients', ingredientUsageRoutes);
-  app.use('/api/admin/import', loyverseMenuImportRouter);
-  app.use('/api/admin/backup', adminBackupRouter);
-  app.use('/api/admin/historical', adminHistoricalImportRouter);
+
   
   // 🔒 INGREDIENT AUTHORITY ADMIN ROUTES (ISOLATED FROM RECIPES)
   app.use('/api/admin/ingredient-authority', ingredientAuthorityAdminRoutes);
   app.use('/api/system-health', systemHealthRouter);
-  app.use('/api/line', lineNotifyRouter);
+
   app.get('/api/items', async (req: Request, res: Response) => {
     try {
       const limit = Math.min(Number(req.query.limit ?? 200), 500);
@@ -4192,9 +4133,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       return res.status(500).json({ error: 'Failed to load items' });
     }
   });
-  app.use('/api/items', varianceHistoryRouter);
-  app.use('/api/executive-metrics', executiveMetricsRouter);
-  app.use(dashboard4Routes);
+
 
   // PATCH 5 — Canonical Menu Drift Report (Internal Admin)
   app.get('/api/admin/menu-canonical/status', async (req: Request, res: Response) => {
@@ -4462,72 +4401,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
-  // Recipe Management Routes - handled by /api/recipes router
-  // NOTE: POST /api/recipes is handled by the recipes router (server/routes/recipes.ts)
-  // to ensure database persistence. Do not add duplicate handlers here.
 
-  // app.post("/api/recipes", async (req: Request, res: Response) => {
-  //   // REMOVED: This was creating recipes in memory storage instead of PostgreSQL
-  //   // Use the recipes router mounted at line 3880 instead
-  // });
 
-  app.post("/api/recipes/save-with-photo", async (req: Request, res: Response) => {
-    try {
-      const recipeData = {
-        name: req.body.name || "Untitled Recipe",
-        category: req.body.category || "General",
-        description: req.body.description || "",
-        photoUrl: req.body.photoUrl,
-        ingredients: req.body.components || [],
-        yieldQuantity: req.body.portions || 1,
-        yieldUnit: "portion",
-        totalCost: req.body.totals?.totalCost || 0,
-        laborTime: 0,
-        isActive: true
-      };
-      
-      const recipe = await storage.createRecipe(recipeData);
-      res.json({ ok: true, recipe });
-    } catch (error) {
-      res.status(400).json({ ok: false, error: "Failed to save recipe", details: (error as Error).message });
-    }
-  });
 
-  app.get("/api/recipes/:id", async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        return next(); // Let router handle non-numeric IDs like 'cards'
-      }
-      
-      const recipe = await storage.getRecipeById(id);
-      if (!recipe) {
-        return next();
-      }
-      res.json(recipe);
-    } catch (error) {
-      res.status(500).json({ error: "Failed to fetch recipe", details: (error as Error).message });
-    }
-  });
-
-  app.put("/api/recipes/:id", async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const id = Number(req.params.id);
-      if (!Number.isFinite(id)) {
-        return next(); // Let router handle non-numeric IDs
-      }
-      
-      const recipe = await storage.updateRecipe(id, req.body);
-      if (!recipe) {
-        return res.status(404).json({ error: "Recipe not found" });
-      }
-      res.json(recipe);
-    } catch (error) {
-      res.status(400).json({ error: "Failed to update recipe", details: (error as Error).message });
-    }
-  });
-
-  // DELETE /api/recipes/:id is handled by the recipes router (database-backed)
 
   // Ingredients Management Routes (DISABLED - now using enhanced database route)
   // app.get("/api/ingredients", async (req: Request, res: Response) => {
@@ -5006,9 +4882,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     }
   });
 
-  // Register Chef and Recipe routes
-  app.use('/api/chef', chef);
-  app.use('/api/recipes', recipes);
+
   app.post('/api/menu/publish', async (req: Request, res: Response) => {
     try {
       const recipeId = Number(req.body?.recipeId ?? req.body?.id);
@@ -5833,9 +5707,7 @@ app.use("/api/bank-imports", bankUploadRouter);
     });
   });
 
-  // Phase 1 — Staff Operations Architecture
-  const { default: staffOpsRouter } = await import('./routes/staffOps');
-  app.use('/api/operations/staff', staffOpsRouter);
+
 
   // PATCH A — Health & Safety Audit Routes
   app.use("/api/health-safety/questions", healthSafetyQuestions);

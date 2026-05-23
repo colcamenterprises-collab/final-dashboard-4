@@ -33,10 +33,7 @@ import analysisCsv from "./routes/analysisCsv";
 import ensureShiftRouter from "./routes/ensureShift";
 import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
-import reportsV2Router from "./routes/reportsV2";
-import reportsListV2Router from "./routes/reportsListV2";
-import insightsV2Router from "./routes/insightsV2";
-import securityV2Router from "./routes/securityV2";
+
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
 import { registerWeeklyRosterDistributionCron } from "./cron/weeklyRosterDistributionCron";
@@ -610,10 +607,7 @@ async function checkSchema() {
   // Add admin sync route
   const adminSyncRouter = (await import('./routes/adminSync.js')).default;
   app.use('/api', adminSyncRouter);
-  app.use("/api/reports", reportsV2Router);
-  app.use("/api/reports", reportsListV2Router);
-  app.use("/api/insights", insightsV2Router);
-  app.use("/api/security", securityV2Router);
+
   
   // PATCH O14 — Auth routes
   app.use("/api/auth", authRoutes);
