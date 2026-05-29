@@ -4,7 +4,6 @@ export const ROUTES = {
   HOME: "/dashboard",
   DASHBOARD: "/dashboard",
   HOME_ALIAS: "/home",
-  PUBLIC_MEMBERSHIP: "/membership",
   PUBLIC_ONLINE_ORDERING: "/online-ordering",
 
   // Operations (Core active routes only)
@@ -34,7 +33,6 @@ export const ROUTES = {
   SHIFT_REPORTS: "/operations/shift-reports",
   DAILY_REPORTS: "/operations/daily-reports",
   SYSTEM_HEALTH: "/operations/system-health",
-  AI_OPS_CONTROL: "/operations/ai-ops-control",
   TASK_DETAIL: "/operations/tasks/:id",
   PURCHASE_HISTORY: "/operations/purchase-history",
   HEALTH_SAFETY_AUDIT: "/operations/health-safety-audit",
@@ -69,15 +67,12 @@ export const ROUTES = {
   INGREDIENTS: "/menu/ingredients",
   MENU_MGR: "/menu/manager",
   MENU_IMPORT: "/menu/import",
-  MENU_DESC_TOOL: "/menu/description-tool",
   MENU_MANAGEMENT: "/menu-management",
 
   // Managers
   NIGHTLY_CHECKLIST: "/managers/nightly-checklist",
-  JUSSI_AI: "/ai/jussi-ops",
-  JANE_ACCOUNTS: "/ai/jane-accounts",
 
-  // Marketing
+  // Marketing / Online Ordering
   ONLINE_ORDERING: "/marketing/online-ordering",
   ONLINE_ORDERING_CATALOG: "/online-ordering/catalog",
   MENU_ADMIN: "/marketing/menu-admin",
@@ -94,19 +89,10 @@ export const ROUTES = {
   SHIFT_REPORT_HISTORY: "/reports/shift-report/history",
   SHIFT_REPORT_VIEW: "/reports/shift-report/view/:id",
 
-  // Partners
-  PARTNERS: "/partners",
-  PARTNERS_ANALYTICS: "/partners/analytics",
-
   // Delivery
   DELIVERY_ADMIN: "/delivery/admin",
   DELIVERY_DRIVERS: "/delivery/drivers",
   DELIVERY_HISTORY: "/delivery/history",
-
-  // Membership
-  MEMBERSHIP: "/membership",
-  MEMBERSHIP_DASHBOARD: "/membership/dashboard",
-  MEMBERSHIP_REGISTER: "/membership/register",
 } as const;
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES];

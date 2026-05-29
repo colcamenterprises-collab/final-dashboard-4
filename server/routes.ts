@@ -15,9 +15,6 @@ import analysisShift from "./routes/analysisShift";
 import shiftAnalysis from "./routes/shiftAnalysis";
 // CSV export disabled - daily_shift_summary table does not exist
 // import analysisDailySales from "./routes/analysisDailySales";
-import posLive from "./routes/posLive";
-import posItems from "./routes/posItems";
-import posUsage from "./routes/posUsage";
 import dailySalesLibrary from "./routes/dailySalesLibrary";
 import dailyStock from "./routes/dailyStock";
 
@@ -69,8 +66,6 @@ import { calculateShiftTimeWindow, getShiftTimeWindowForDate } from './utils/shi
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { expenseTypeToPnLCategory, getExpenseMapping, ExpenseType, ShopName } from "../shared/expenseMappings";
 import { generateAndEmailDailyReport } from "../src/server/report";
-import { importPosBundle } from "../src/server/pos/uploadBundle";
-import { analyzeShift } from "../src/server/jussi/analysis";
 import { prisma } from "../lib/prisma";
 import { analysisManualLedgerRouter } from "./routes/analysisManualLedger";
 import { rebuildIngredientTruth as rebuildIngredientTruthV2, getIngredientUsage } from "./services/receiptIngredientTruthEngine";
@@ -82,7 +77,6 @@ import stockReviewRouter from "./api/stockReview";
 import receiptsBurgers from "./routes/receiptsBurgers";
 import receiptsDebug from "./routes/receiptsDebug";
 import receiptCount from "./routes/receiptCount";
-import internalReports from "./routes/internalReports";
 import loyverseSync from "./routes/loyverseSync";
 import loyverseShiftReportRouter from "./routes/loyverseShiftReport";
 import { registerOnlineMenuRoutes } from "./routes/onlineMenu";
@@ -365,55 +359,6 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // });
 
   // POS Bundle Upload (Alternative endpoint)
-  app.post('/api/pos/upload-bundle', async (req: Request, res: Response) => {
-    try {
-      const result = await importPosBundle(req.body);
-      res.json({ ok: true, ...result });
-    } catch (e:any) {
-      res.status(400).json({ ok: false, error: e?.message || "import failed", stack: e?.stack });
-    }
-  });
-
-  // POS Batches List
-  app.get('/api/pos/batches', async (req: Request, res: Response) => {
-    try {
-      const batches = await prisma.posBatch.findMany({
-        orderBy: { createdAt: 'desc' },
-        include: {
-          shift: true,
-          receipts: { select: { id: true } },
-          items: { select: { id: true } }
-        }
-      });
-      res.json(batches);
-    } catch (error) {
-      console.error('Failed to fetch batches:', error);
-      res.status(500).json({ error: 'Failed to fetch batches' });
-    }
-  });
-
-  // Jussi Analysis
-  app.get('/api/pos/:batchId/analyze', async (req: Request, res: Response) => {
-    try {
-      const analysis = await analyzeShift(req.params.batchId);
-      res.json({ ok: true, report: analysis });
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      res.status(500).json({ error: 'Analysis failed' });
-    }
-  });
-
-  // Jussi Analysis (Alternative endpoint)
-  app.get('/api/analysis/shift', async (req: Request, res: Response) => {
-    try {
-      const { batchId } = req.query;
-      const analysis = await analyzeShift(batchId as string);
-      res.json({ ok: true, report: analysis });
-    } catch (error) {
-      console.error('Analysis failed:', error);
-      res.status(500).json({ error: 'Analysis failed' });
-    }
-  });
 
   // Extend Express Request interface for authentication
   interface AuthenticatedRequest extends Request {
@@ -1222,7 +1167,6 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use("/api/receipts", receiptsBurgers);
   app.use("/api/receipts", receiptsDebug);
   app.use("/api/receipts", receiptCount);
-  app.use("/internal/api/reports", internalReports);
 
   // Loyverse sync and cache builder
   app.use("/api/loyverse", loyverseSync);
@@ -4509,15 +4453,9 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.use('/api/costing', costingRouter);
   // ExpensesV2 router is now active
 
-  // Use the bank import routers
-app.use("/api/bank-imports", bankImportRouter);
-app.use("/api/bank-imports", bankUploadRouter);
   
   // Purchase Tally router
   app.use('/api/purchase-tally', purchaseTallyRouter);
-  
-  // Bank Import router (CSV bank statement processing)
-  app.use('/api/bank-imports', bankImportRouter);
   
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);
@@ -4781,10 +4719,6 @@ app.use("/api/bank-imports", bankUploadRouter);
     res.json({ url: `/uploads/mock-image-${Date.now()}.jpg` });
   });
   
-  // Register POS Live routes
-  app.use('/api/pos', posLive);
-  app.use('/api/pos', posItems);
-  app.use('/api/pos', posUsage);
 
   // === PHASE 2: SNAPSHOT SYSTEM ENDPOINTS ===
   

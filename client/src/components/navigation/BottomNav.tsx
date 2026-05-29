@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, BarChart3, ShoppingCart, Receipt, Settings } from "lucide-react";
+import { Home, ShoppingCart, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -8,12 +8,6 @@ const navItems = [
     icon: Home,
     label: "Home",
     testId: "nav-home"
-  },
-  {
-    to: "/finance",
-    icon: BarChart3,
-    label: "Finance",
-    testId: "nav-finance"
   },
   {
     to: "/operations/daily-sales",
@@ -26,12 +20,6 @@ const navItems = [
     icon: ShoppingCart,
     label: "Purchasing",
     testId: "nav-purchasing"
-  },
-  {
-    to: "/recipe-management",
-    icon: Settings,
-    label: "Menu",
-    testId: "nav-menu"
   }
 ];
 

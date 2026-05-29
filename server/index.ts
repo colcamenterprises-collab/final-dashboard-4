@@ -21,7 +21,6 @@ import { timing } from './middleware/timing';
 import { errorGuard } from './middleware/errorGuard';
 import { readonlyGuard } from './middleware/readonly';
 import { installPrismaWriteBlock } from './middleware/prismaWriteBlock';
-import posUploadRouter from "./routes/posUpload";
 import healthRouter from "./routes/health";
 import opsMtdRouter from "./routes/ops_mtd";
 import purchasingRouter from "./routes/purchasing";
@@ -331,8 +330,6 @@ async function checkSchema() {
 }
 
 (async () => {
-  // Mount the POS upload router FIRST to avoid conflicts
-  app.use("/api/pos", posUploadRouter);
 
   // Mount drinks-variance BEFORE registerRoutes to prevent /api/analysis/:date wildcard conflict
   const drinksVarianceRouter = (await import('./routes/drinksVariance.js')).default;
@@ -522,61 +519,6 @@ async function checkSchema() {
     }
   });
 
-  // Multi-agent chat routes
-  app.post('/chat/:agent', async (req: Request, res: Response) => {
-    const startTime = Date.now();
-    const { agent } = req.params;
-    const { message } = req.body;
-
-    if (!message || typeof message !== 'string') {
-      return res.status(400).json({ error: 'Message is required' });
-    }
-
-    let response = '';
-    let agentName = '';
-
-    try {
-      switch (agent.toLowerCase()) {
-        case 'jussi':
-          const { jussiHandler } = await import('./agents/jussi');
-          response = await jussiHandler(message);
-          agentName = 'Jussi';
-          break;
-        case 'jane':
-          const { janeHandler } = await import('./agents/jane');
-          response = await janeHandler(message);
-          agentName = 'Jane';
-          break;
-        case 'ramsay':
-          const { ramsayHandler } = await import('./agents/ramsay');
-          response = await ramsayHandler(message);
-          agentName = 'Ramsay';
-          break;
-        default:
-          return res.status(400).json({ error: 'Invalid agent. Choose jussi, jane, or ramsay.' });
-      }
-
-      const responseTime = Date.now() - startTime;
-
-      // Log the interaction to database
-      try {
-        const { chatLogs } = await import('../shared/schema.js');
-        await db.insert(chatLogs).values({
-          agentName,
-          userMessage: message,
-          agentResponse: response,
-          responseTime
-        });
-      } catch (dbError) {
-        console.error('Error logging chat interaction:', dbError);
-      }
-
-      res.json({ reply: response, responseTime });
-    } catch (error: any) {
-      console.error(`Error with ${agent} agent:`, error);
-      res.status(500).json({ error: 'Agent is currently unavailable. Please try again.' });
-    }
-  });
 
   // Serve static files from public directory
   // Add stock catalog API route
@@ -604,9 +546,6 @@ async function checkSchema() {
   const { adminTestEmailRouter } = await import('./routes/adminTestEmail');
   app.use(adminTestEmailRouter);
   
-  // Add admin sync route
-  const adminSyncRouter = (await import('./routes/adminSync.js')).default;
-  app.use('/api', adminSyncRouter);
 
   
   // PATCH O14 — Auth routes
@@ -623,27 +562,6 @@ async function checkSchema() {
   const systemHealthRouter = (await import('./routes/systemHealth')).default;
   app.use('/api/system-health', systemHealthRouter);
 
-  // /api/gateway — Provider-agnostic Agent Tool Gateway.
-  // Architecture: Agent → Gateway → Tool Adapters → External Systems.
-  // SBB App is one adapter; it does not control the agent.
-  const agentGatewayRouter = (await import('./routes/agentGateway')).default;
-  app.use('/api/gateway', agentGatewayRouter);
-
-  // /api/bob/read — Bob read-only API layer (token-protected, GET only)
-  // MUST be mounted BEFORE /api/bob alias router to prevent prefix-match interception.
-  const bobReadRouter = (await import('./routes/bobRead')).default;
-  app.use('/api/bob/read', bobReadRouter);
-
-  // AI Ops Control Room routes
-  const aiOpsModule = await import('./routes/aiOpsControl');
-  const aiOpsControlRouter = aiOpsModule.default;
-  const { chatAliasRouter, bobAliasRouter } = aiOpsModule;
-  app.use('/api/ops/ai', aiOpsControlRouter);
-  app.use('/api/ai-ops', aiOpsControlRouter);
-  // /api/bob — alias prefix (e.g. /api/bob/health mirrors /api/ai-ops/bob/health)
-  // Mounted AFTER /api/bob/read to avoid prefix-match shadowing.
-  app.use('/api/bob', bobAliasRouter);
-
   // /api/ui-auth — UI password gate (shared password, cookie session)
   const uiAuthRouter = (await import('./routes/uiAuth')).default;
   app.use('/api/ui-auth', uiAuthRouter);
@@ -652,26 +570,13 @@ async function checkSchema() {
   const pinAuthRouter = (await import('./routes/pinAuth')).default;
   app.use('/api/pin-auth', pinAuthRouter);
 
-  // /api/agent/read — Governed canonical read-only surface (6 structured endpoints)
-  const agentReadRouter = (await import('./routes/agentRead')).default;
-  app.use('/api/agent/read', agentReadRouter);
-
-  // /api/ai-ops/bob — Additive canonical Bob read endpoints (shift-window, read/shift-canonical, read/proxy)
-  // Mounted AFTER aiOpsControl so existing /bob/health|manifest|proxy-read are unaffected.
-  const bobCanonicalReadRouter = (await import('./routes/bobCanonicalRead')).default;
-  app.use('/api/ai-ops/bob', bobCanonicalReadRouter);
-
-  // /api/ai/chat — simple chat alias endpoints + idempotent table setup
-  const { ensureAiChatTables, ensureDailySalesAuditTable, ensureWorkRegisterTables, ensureAgentReadFoundation, ensureInternalUsersTable } = await import('./db');
-  await ensureAiChatTables();
+  // DB setup: daily sales audit table + internal users
+  const { ensureDailySalesAuditTable, ensureInternalUsersTable } = await import('./db');
   await ensureDailySalesAuditTable();
-  await ensureWorkRegisterTables();
-  await ensureAgentReadFoundation();
   await ensureInternalUsersTable();
   // Backfill usernames for existing staff (safe no-op if already set)
   const { backfillUsernames } = await import('./routes/pinAuth');
   await backfillUsernames();
-  app.use('/api/ai/chat', chatAliasRouter);
 
   // Ingredient Master route (PACK F)
   const ingredientMasterRouter = (await import('./routes/ingredientMaster')).default;
@@ -741,29 +646,9 @@ async function checkSchema() {
           // Start the scheduler service for daily 4am tasks
           schedulerService.start();
 
-          // Guaranteed daily analysis build before readiness checks (04:30 BKK)
-          const { startScheduledAnalysisBuildJob } = await import("./services/scheduledAnalysisBuild");
-          startScheduledAnalysisBuildJob();
-
           // Start the email cron service for daily 8am management reports
           const { cronEmailService } = await import('./services/cronEmailService');
           cronEmailService.startEmailCron();
-
-          // 🚨 Jussi Daily Cron (3AM BKK)
-          setInterval(async () => {
-            const bkkNow = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
-            const time = bkkNow.slice(11,16);
-            if (time === "03:00") {
-              try {
-                const { generateJussiReport } = await import('./services/summaryGenerator.js');
-                const today = bkkNow.slice(0,10);
-                await generateJussiReport(today);
-                console.log(`🚨 Jussi Daily Report generated for ${today}`);
-              } catch (error) {
-                console.error('🚨 Jussi Daily Cron failed:', error);
-              }
-            }
-          }, 60*1000);
 
           // Start rolls ledger cron jobs (analytics + rolls ledger rebuilds)
           await import('./jobs/cron.js');
@@ -820,24 +705,6 @@ async function checkSchema() {
             }
           }, { timezone: 'Asia/Bangkok' });
           
-          // Auto-daily Bob analysis (09:00 Bangkok — after all data is synced)
-          nodeCron.default.schedule("0 9 * * *", async () => {
-            const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
-              .toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' });
-            try {
-              const res = await fetch(`http://localhost:${process.env.PORT || 5000}/api/ai-ops/bob/run-analysis`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ shift_date: yesterday }),
-              });
-              const json = await res.json();
-              console.log(`[AUTO-ANALYSIS] Bob shift review complete for ${yesterday}: status=${json.status}`);
-            } catch (error) {
-              console.error('[AUTO-ANALYSIS] Bob shift review failed', { yesterday, error });
-            }
-          }, { timezone: 'Asia/Bangkok' });
-          console.log("🤖 Bob auto-daily analysis scheduled for 9:00am Bangkok time");
-
           // PATCH O3 — LOYVERSE QUEUE SCHEDULER
           const { processLoyverseQueue } = await import('./services/loyverseQueue.js');
           setInterval(() => {
@@ -845,14 +712,6 @@ async function checkSchema() {
           }, 30000); // run every 30 seconds
           console.log("📦 Loyverse order queue scheduled every 30 seconds");
 
-          // PATCH O9 — KDS Auto-Complete Cron (every 2 minutes)
-          const { autoCompleteOldOrders } = await import('./services/kdsService');
-          nodeCron.default.schedule("*/2 * * * *", async () => {
-            console.log("[KDS] Auto-cleanup running");
-            await autoCompleteOldOrders().catch((err: any) => console.error("[KDS] Auto-complete error:", err));
-          });
-          console.log("🍳 KDS auto-complete scheduled every 2 minutes");
-          
           // PATCH O14 — Ensure default SaaS tenant exists
           await TenantScoped.ensureRestaurantExists();
           console.log("🏢 SaaS tenant layer initialized");
