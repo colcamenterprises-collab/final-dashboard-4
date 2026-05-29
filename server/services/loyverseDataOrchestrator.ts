@@ -17,7 +17,6 @@ import { DateTime } from 'luxon';
 import cron from 'node-cron';
 import winston from 'winston';
 import { EnhancedLoyverseAPI } from './enhancedLoyverseAPI';
-import { AIAnalysisService } from './aiAnalysisService';
 import { LoyverseDataValidator } from './loyverseDataValidator';
 import { db } from '../db';
 import { loyverseReceipts, loyverseShiftReports, aiInsights, dailyStockSales } from '../../shared/schema';
@@ -56,7 +55,6 @@ interface ProcessingResult {
 export class LoyverseDataOrchestrator {
   private static instance: LoyverseDataOrchestrator;
   private loyverseAPI: EnhancedLoyverseAPI;
-  private aiAnalysisService: AIAnalysisService;
   private validator: LoyverseDataValidator;
   private isProcessing = false;
   private lastProcessingTime: Date | null = null;
@@ -65,12 +63,7 @@ export class LoyverseDataOrchestrator {
   private constructor() {
     const accessToken = process.env.LOYVERSE_ACCESS_TOKEN || 'c1ba07b4dc304101b8dbff63107a3d87';
     this.loyverseAPI = new EnhancedLoyverseAPI(accessToken);
-    this.aiAnalysisService = AIAnalysisService.getInstance();
     this.validator = LoyverseDataValidator.getInstance();
-    
-    if (!this.aiAnalysisService.isConfigured()) {
-      console.warn('⚠️ OpenAI not configured - AI analysis features will be disabled');
-    }
   }
 
   static getInstance(): LoyverseDataOrchestrator {
@@ -171,15 +164,8 @@ export class LoyverseDataOrchestrator {
         }
       }
 
-      // Step 4: Run AI analysis
-      let analysisGenerated = false;
-      try {
-        const analysis = await this.aiAnalysisService.analyzeShiftReceipts(receiptResult.receipts, shiftDate);
-        analysisGenerated = true;
-        logger.info(`AI analysis completed with ${analysis.anomalies.length} anomalies detected`);
-      } catch (error) {
-        errors.push(`AI analysis failed: ${error}`);
-      }
+      // Step 4: AI analysis removed (aiAnalysisService deleted in DB 5.0)
+      const analysisGenerated = false;
 
       // Step 5: Staff form comparison
       const staffForm = await db.select().from(dailyStockSales).where(eq(dailyStockSales.shiftDate, shiftDate));

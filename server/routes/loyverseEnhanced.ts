@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { LoyverseDataOrchestrator } from '../services/loyverseDataOrchestrator';
 import { EnhancedLoyverseAPI } from '../services/enhancedLoyverseAPI';
-import { AIAnalysisService } from '../services/aiAnalysisService';
 import { LoyverseDataValidator } from '../services/loyverseDataValidator';
 
 const router = Router();
@@ -239,15 +238,9 @@ router.get('/enhanced/ingredient-usage/:shiftDate', async (req: Request, res: Re
       updated_at: r.updatedAt.toISOString()
     }));
 
-    // Use AI service to calculate ingredient usage
-    const aiService = AIAnalysisService.getInstance();
-    const analysis = await aiService.analyzeShiftReceipts(validatedReceipts, date);
-
-    res.json({
-      success: true,
-      ingredientUsage: analysis.ingredientUsage,
-      itemAnalysis: analysis.itemAnalysis,
-      totalCost: analysis.ingredientUsage.reduce((sum, ing) => sum + ing.totalCost, 0),
+    res.status(503).json({
+      success: false,
+      message: 'AI ingredient analysis not available (removed in DB 5.0)',
       shiftDate: shiftDate
     });
   } catch (error) {
