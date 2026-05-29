@@ -1,0 +1,131 @@
+FINAL DB 5.0 — RESTORED BASELINE TRUTH AUDIT
+
+Do not edit files.
+Do not delete files.
+Do not create a PR.
+Do not patch anything.
+
+Objective:
+The system has been restored to the pre-cleanup state. Create a full baseline map before we rebuild or delete anything.
+
+Create a report called:
+
+FINAL_DB_5_RESTORED_BASELINE.md
+
+Required report sections:
+
+1. FRONTEND NAVIGATION
+List every visible sidebar/nav/bottom-nav item:
+- label
+- route
+- component file
+- loads yes/no
+- business purpose
+- classification: KEEP / REBUILD / DELETE / UNSURE
+
+2. FRONTEND ROUTES
+List every route registered in App.tsx and any route registry:
+- route path
+- component
+- file exists yes/no
+- page loads yes/no
+- API calls used
+- classification
+
+3. BACKEND API ROUTES
+List every mounted backend route from:
+- server/index.ts
+- server/routes.ts
+- server/routes/*
+- src/server/* if used
+
+For each:
+- route prefix
+- source file
+- purpose
+- frontend consumer if any
+- responding yes/no
+- classification
+
+4. DATABASE TABLE USAGE
+List the key tables used by live features:
+- Daily Sales V2
+- Daily Stock V2
+- Form Library
+- Purchasing
+- Recipes
+- Ingredients
+- Cost Calculator
+- Online Ordering
+- Finance
+- Analysis
+- POS/Loyverse
+
+5. LIVE FEATURE MAP
+Classify every major feature:
+
+KEEP:
+Features live and needed.
+
+REBUILD:
+Features valuable but messy/broken.
+
+DELETE:
+Legacy, duplicate, unused, experimental, or no longer needed.
+
+UNSURE:
+Needs Cameron decision.
+
+Must include:
+- Daily Sales V2
+- Daily Stock V2
+- Form Library
+- Purchasing
+- Recipes
+- Ingredients
+- Cost Calculator
+- Online Ordering
+- Finance
+- Analysis
+- Staff Operations
+- Health & Safety
+- Shopping List
+- Membership
+- Marketing
+- KDS
+- POS Terminal
+- AI Ops
+- Bob
+- Agent Gateway
+- Reports
+- Settings/Admin
+
+6. BACKGROUND JOBS / CRONS
+List all startup jobs, schedulers, and cron tasks:
+- file
+- purpose
+- runs when
+- still needed yes/no
+- classification
+
+7. SAFE DELETE CANDIDATES
+Only list something here if it satisfies all:
+- not visible
+- not routed
+- not imported
+- no API consumer
+- no staff/owner use
+- no future rebuild value
+
+8. PROTECTED LIST
+List files/routes/tables that must not be touched in future cleanup.
+
+9. FINAL RECOMMENDED APP STRUCTURE
+Propose the clean final menu structure only.
+Do not build it.
+
+Important:
+Do not recommend restoring everything just because it exists.
+Classify based on actual business value and usage.
+
+No edits. Audit only.
