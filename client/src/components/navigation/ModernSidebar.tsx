@@ -24,9 +24,14 @@ import {
   BarChart3, 
   Receipt, 
   ShoppingCart, 
+  Calculator,
   Settings,
+  ChefHat,
+  Bot,
   ChevronDown,
   X,
+  ShoppingBag,
+  Users,
   Package
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
@@ -63,21 +68,18 @@ type NavGroup = {
  * - F&B Analysis, Shopping List, Menu Master V3, Menu Admin, Daily Summary Reports
  */
 const navigationGroups: NavGroup[] = [
-  { title: "Core", defaultOpen: true, items: [
-      { to: "/dashboard", label: "Command Center", icon: Home, testId: "nav-home" },
+  {
+    title: "Core",
+    defaultOpen: true,
+    items: [
+      { to: "/dashboard", label: "Home", icon: Home, testId: "nav-home" },
       { to: "/operations/daily-sales", label: "Daily Sales V2", icon: Receipt, testId: "nav-daily-sales" },
       { to: "/operations/daily-stock", label: "Daily Stock V2", icon: Package, testId: "nav-daily-stock" },
       { to: "/operations/daily-sales-v2/library", label: "Form Library", icon: BarChart3, testId: "nav-library" },
       { to: "/operations/purchasing", label: "Purchasing", icon: ShoppingCart, testId: "nav-purchasing" },
-  ]},
-  { title: "Operations", defaultOpen: true, items: [
-      { to: "/operations/pos-status", label: "POS Status", icon: Settings, testId: "nav-pos-status" },
-      { to: "/operations/shift-verification", label: "Shift Verification", icon: Settings, testId: "nav-shift-verification" },
-      { to: "/operations/stock-control", label: "Stock Control", icon: Settings, testId: "nav-stock-control" },
-      { to: "/operations/alerts", label: "Alerts", icon: Settings, testId: "nav-alerts" },
-  ]}
+    ]
+  }
 ];
-
 
 interface ModernSidebarProps {
   isOpen: boolean;

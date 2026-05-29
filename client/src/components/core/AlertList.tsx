@@ -1,1 +1,0 @@
-export default function AlertList({ alerts }: { alerts: any[] }) { return <div className="space-y-2">{alerts.map((a,i)=><div key={i} className="border rounded p-2 text-sm"><b>{a.severity}</b> {a.message}</div>)}</div>; }

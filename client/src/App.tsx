@@ -15,10 +15,6 @@ import DailyStock from "./pages/operations/DailyStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
 import PurchasingPage from "./pages/operations/Purchasing";
 import NotFound from "./pages/NotFound";
-import POSStatus from "./pages/core/POSStatus";
-import ShiftVerification from "./pages/core/ShiftVerification";
-import StockControl from "./pages/core/StockControl";
-import Alerts from "./pages/core/Alerts";
 
 function OwnerRoute({ children }: { children: JSX.Element }) {
   const { currentUser } = usePinAuth();
@@ -47,10 +43,6 @@ export default function App() {
                     <Route path="/operations/daily-sales-v2/library" element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/operations/daily-sales-library" element={<Navigate to="/operations/daily-sales-v2/library" replace />} />
                     <Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} />
-                    <Route path="/operations/pos-status" element={<ProtectedRoute><POSStatus /></ProtectedRoute>} />
-                    <Route path="/operations/shift-verification" element={<ProtectedRoute><ShiftVerification /></ProtectedRoute>} />
-                    <Route path="/operations/stock-control" element={<ProtectedRoute><StockControl /></ProtectedRoute>} />
-                    <Route path="/operations/alerts" element={<ProtectedRoute><Alerts /></ProtectedRoute>} />
                     <Route path="*" element={<NotFound />} />
                   </Route>
                 </Routes>

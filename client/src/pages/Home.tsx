@@ -1,18 +1,24 @@
-import { useEffect, useState } from "react";
-import StatusCard from "@/components/core/StatusCard";
+import { Link } from "react-router-dom";
+
+const items = [
+  { to: "/operations/daily-sales", label: "Daily Sales V2" },
+  { to: "/operations/daily-stock", label: "Daily Stock V2" },
+  { to: "/operations/daily-sales-v2/library", label: "Form Library" },
+  { to: "/operations/purchasing", label: "Purchasing" },
+];
 
 export default function Home() {
-  const [data, setData] = useState<any>(null);
-  useEffect(() => { fetch('/api/core/dashboard', { credentials: 'include' }).then(r=>r.json()).then(setData); }, []);
-  return <div className="max-w-5xl space-y-4"><h1 className="text-2xl font-semibold text-slate-900">Command Center</h1><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-    <StatusCard label="Current Shift Date" value={data?.shiftDate ?? 'Missing'} />
-    <StatusCard label="Shift Window" value={data?.shiftWindow ?? 'Missing'} />
-    <StatusCard label="POS Status" value={data?.pos?.connected ? 'Connected' : 'Disconnected'} />
-    <StatusCard label="Latest Receipt Time" value={data?.pos?.latestReceiptDate ?? 'Missing'} />
-    <StatusCard label="Latest Shift Report Date" value={data?.pos?.latestShiftReportDate ?? 'Missing'} />
-    <StatusCard label="Daily Sales V2" value={data?.shift?.dailySalesFormStatus ?? 'Missing'} />
-    <StatusCard label="Daily Stock V2" value={data?.shift?.dailyStockFormStatus ?? 'Missing'} />
-    <StatusCard label="Purchasing" value={data?.shift?.purchasingStatus ?? 'Missing'} />
-    <StatusCard label="Alert Count" value={data?.alerts?.count ?? 'Missing'} />
-  </div></div>;
+  return (
+    <div className="max-w-3xl space-y-4">
+      <h1 className="text-2xl font-semibold text-slate-900">Operations Core</h1>
+      <p className="text-sm text-slate-600">Lean production navigation only. No analytics or synthetic KPIs shown.</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {items.map((item) => (
+          <Link key={item.to} to={item.to} className="rounded-lg border border-slate-200 bg-white p-4 text-sm font-medium text-slate-900 hover:bg-slate-50">
+            {item.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
 }
