@@ -6,3 +6,9 @@ id = "UAumj1VV0gyz_kIWD64cz"
 uri = "file://FINAL_DB_5_RESTORED_BASELINE.md"
 type = "text"
 title = "FINAL_DB_5_RESTORED_BASELINE.md"
+
+[[outputs]]
+id = "W58pRflQ_OhUHi78tZe9_"
+uri = "file://DB5_CLASSIFICATION_AUDIT.md"
+type = "text"
+title = "DB5_CLASSIFICATION_AUDIT.md — KEEP / REPAIR / REMOVE"
