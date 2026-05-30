@@ -1,0 +1,162 @@
+FINAL DB 5.0 — REPAIR PATCH 2: RESTORE APPROVED BUSINESS SECTIONS
+
+Objective:
+Restore/build frontend access for approved KEEP/REPAIR business sections after Cleanup Patch 1.
+
+Do not restore Bob, AI Ops, Jussi, KDS, POS Terminal, Membership, Marketing Machine, Partner systems, or Delivery.
+
+Protected workflows:
+- Login/auth
+- Daily Sales V2
+- Daily Stock V2
+- Form Library
+- Purchasing
+- POS/Loyverse sync
+- /api/system/pos-status
+
+Approved sections to restore/repair:
+
+1. Menu
+- Recipes
+- Ingredients
+- Cost Calculator
+- Menu Management
+
+2. Online Ordering
+- Online Ordering
+- Catalog
+- Orders
+- Checkout/confirmation if existing pages are usable
+
+3. Finance
+- Finance Hub
+- Profit & Loss
+- Expenses
+- Expenses Import
+- Banking/Reconciliation if backend exists
+
+4. Reports
+- Shift Reports
+- Shift Report History
+- Daily Reports / Export if existing backend works
+
+5. Operations Tools
+- Shopping List
+- Health & Safety
+- Manager Checklist
+- Issue Register
+
+6. Staff Operations
+- Staff Dashboard
+- Staff Management
+- Weekly Roster
+- Cleaning
+- Attendance
+- Staff Settings
+
+Important:
+Staff Ops backend currently appears missing/pre-existing 404. Restore or rebuild only the backend routes needed for existing staff pages if files/services exist. If backend cannot be restored safely, wire the section only after backend repair is complete.
+
+Required work:
+1. Audit existing frontend files for approved sections.
+2. Audit existing backend endpoints for each approved section.
+3. Restore App.tsx routes only for pages with valid files.
+4. Restore sidebar navigation in clean grouped sections.
+5. Do not add broken links.
+6. Do not add placeholder pages.
+7. Do not show fake data.
+8. If a page exists but API is missing, either repair the API or exclude the route and report it.
+9. If an API exists but frontend page is missing, rebuild a simple usable page using real API data.
+10. Keep the UI clean and simple.
+
+Final navigation should be:
+
+Core
+- Dashboard
+- Daily Sales V2
+- Daily Stock V2
+- Form Library
+- Purchasing
+
+Menu
+- Recipes
+- Ingredients
+- Cost Calculator
+- Menu Management
+
+Ordering
+- Online Ordering
+- Catalog
+- Orders
+
+Finance
+- Finance Hub
+- Profit & Loss
+- Expenses
+- Expenses Import
+
+Reports
+- Shift Reports
+- Shift History
+- Export
+
+Operations Tools
+- Shopping List
+- Health & Safety
+- Manager Checklist
+- Issue Register
+
+Staff
+- Staff Dashboard
+- Staff Management
+- Weekly Roster
+- Cleaning
+- Attendance
+- Staff Settings
+
+Hard remove rules:
+Do not restore:
+- Bob
+- AI Ops
+- Agent Gateway
+- Agent Read
+- Jussi
+- Jane
+- Ramsay
+- KDS
+- POS Terminal
+- Membership
+- Marketing Machine
+- Partner/bar systems
+- Delivery module
+
+Validation:
+- Server starts clean.
+- Login works.
+- Dashboard loads.
+- Daily Sales V2 works.
+- Daily Stock V2 works.
+- Form Library owner-only works.
+- Purchasing works.
+- POS sync/status still works.
+- Every restored sidebar link loads.
+- No sidebar link hits NotFound.
+- No restored page throws console/server errors.
+- No removed Tier 5 route is restored.
+- Online Ordering routes load if restored.
+- Recipes routes load.
+- Ingredients routes load.
+- Cost Calculator loads.
+- Finance routes load.
+- Reports routes load.
+- Operations Tools routes load.
+- Staff routes load only if backend is working.
+
+Deliverables:
+- Files created
+- Files changed
+- Routes restored
+- Sidebar sections added
+- APIs repaired/restored
+- Any section not restored and why
+- Validation pass/fail table
