@@ -1,0 +1,192 @@
+FINAL DB 5.0 — FINAL REGRESSION & LOCKDOWN
+
+Objective:
+Confirm Final Dashboard 5.0 is stable, all approved systems function, and no removed systems have been reintroduced.
+
+Rules:
+
+- No feature development.
+- No schema changes.
+- No database changes.
+- No new routes.
+- No refactoring.
+- No code cleanup.
+- No UI redesign.
+- No AI features.
+- No Bob/Jussi/KDS restoration.
+- No changes unless a verified production issue is discovered.
+
+Regression Checklist
+
+CORE SYSTEMS
+Verify:
+
+- Dashboard loads
+- Login works
+- Session persistence works
+- Sidebar loads correctly
+- All sidebar links open successfully
+- No NotFound routes from navigation
+
+DAILY SALES V2
+Verify:
+
+- New submission works
+- Edit submission works
+- Totals calculate correctly
+- Banking section works
+- Expenses save correctly
+- Submission completes successfully
+
+DAILY STOCK V2
+Verify:
+
+- Form loads
+- Rolls save
+- Meat save
+- Drinks save
+- Ingredient requests save
+- Submission completes successfully
+
+FORM LIBRARY
+Verify:
+
+- Library loads
+- View submission works
+- Edit submission works
+- PDF generation works
+- Email actions work
+- Soft delete works
+- Restore works
+
+PURCHASING
+Verify:
+
+- Purchasing page loads
+- Purchasing items load
+- Purchasing analytics load
+- Purchasing shift log loads
+- Purchasing lists load
+
+MENU
+Verify:
+
+- Menu Items page loads
+- Ingredients page loads
+- Recipes page loads
+- Cost Calculator loads
+- Product ingredient mapping functions
+
+ONLINE ORDERING
+Verify:
+
+- Catalog loads
+- Menu loads
+- Add to cart works
+- Remove from cart works
+- Quantity updates work
+- Checkout page works
+- Confirmation page works
+- Order creation works
+
+FINANCE
+Verify:
+
+- Finance Hub loads
+- Profit & Loss loads
+- Expenses loads
+- Expenses Import loads
+- Bank Import loads
+- Balance page/API works
+
+REPORTS
+Verify:
+
+- Shift Reports loads
+- Shift History loads
+- Reports Export loads
+- Report generation works
+- Date filtering works
+
+OPERATIONS
+Verify:
+
+- Shopping List loads
+- Health & Safety loads
+- Manager Checklist loads
+- Issue Register loads
+
+STAFF
+Verify:
+
+- Staff Dashboard loads
+- Staff Members loads
+- Staff Roster loads
+- Staff Cleaning loads
+- Staff Attendance loads
+- Staff Settings loads
+
+POS / LOYVERSE
+Verify:
+
+- /api/system/pos-status returns valid data
+- /api/loyverse/sync route available
+- Receipt sync still functions
+- Shift sync still functions
+
+REMOVED SYSTEM VERIFICATION
+
+Confirm ALL return 404 or are absent:
+
+- /api/bob/*
+- /api/ai-ops/*
+- /api/gateway/*
+- /api/agent/read/*
+- /api/ai/chat
+- /chat/jussi
+- /chat/jane
+- /chat/ramsay
+- Any KDS routes
+- Any POS Terminal routes
+
+CRON VERIFICATION
+
+Confirm active:
+
+- Loyverse sync
+- Daily report generation
+- Shift report generation
+- Weekly roster distribution
+
+Confirm removed:
+
+- Bob analysis cron
+- Jussi cron
+- KDS cron
+- AI Ops rebuild cron
+
+DELIVERABLE
+
+Return:
+
+1. PASS / FAIL table
+2. Broken routes list
+3. Broken APIs list
+4. Console errors
+5. Build errors
+6. Runtime errors
+7. Any fixes applied
+8. Final system status
+
+If all checks pass:
+
+STATUS:
+FINAL DASHBOARD 5.0 STABLE
+READY FOR LIVE OPERATION
+
+If any item fails:
+
+List failures only.
+Do not implement additional features.
+Do not perform unrelated edits.
+Fix only verified production issues.
