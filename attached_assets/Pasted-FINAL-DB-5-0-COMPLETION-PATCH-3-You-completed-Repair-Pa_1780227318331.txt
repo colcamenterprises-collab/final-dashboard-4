@@ -1,0 +1,113 @@
+FINAL DB 5.0 — COMPLETION PATCH 3
+
+You completed Repair Patch 2, but this is not the full combined completion scope.
+
+Do not touch working pages from Patch 2.
+Do not touch Daily Sales V2.
+Do not touch Daily Stock V2.
+Do not touch Form Library.
+Do not touch Purchasing.
+Do not restore Tier 5 systems.
+
+Complete only the missing approved sections:
+
+1. TRUE RECIPES
+Problem:
+No /api/recipes endpoint currently exists, but recipe tables/services exist.
+
+Required:
+- Find existing recipe services/tables.
+- Register or build /api/recipes endpoints:
+  - GET /api/recipes
+  - GET /api/recipes/:id
+  - POST /api/recipes
+  - PUT /api/recipes/:id
+  - DELETE /api/recipes/:id or archive
+- Build /menu/recipes page.
+- Add Recipes to sidebar under Menu.
+- Show recipe list, ingredients, cost, and yield.
+- No fake data.
+
+2. ONLINE ORDERING CUSTOMER FLOW
+Problem:
+Only admin Orders/Catalog pages were built.
+
+Required routes:
+- /online-ordering
+- /online-ordering/cart
+- /online-ordering/checkout
+- /online-ordering/confirmation
+
+Required:
+- Use real catalog/menu data.
+- Build cart in frontend state.
+- Add/remove/update quantities.
+- Capture customer name, phone, pickup/delivery, notes.
+- Submit order to existing online order API if available.
+- If payment is not ready, use manual confirmation/payment on pickup.
+- Add Online Ordering to sidebar under Ordering.
+- No fake payment processing.
+
+3. EXPENSES IMPORT
+Problem:
+Finance Hub links to import but no page exists.
+
+Required:
+- Build /finance/expenses-import.
+- Use existing expense import/bank import API if available.
+- Include upload, preview, validation result, import result.
+- If endpoint is auth-gated, handle auth errors cleanly.
+- Add Expenses Import to sidebar under Finance.
+
+4. REPORTS EXPORT + SHIFT HISTORY
+Problem:
+Only Shift Reports page exists.
+
+Required routes:
+- /reports/shift-history
+- /reports/export
+
+Required:
+- Use existing shift report/export APIs.
+- Include date filters.
+- Export CSV/PDF where supported.
+- Add to Reports sidebar.
+
+5. STAFF OPERATIONS
+Problem:
+staffOpsService exists but routes return 404.
+
+Required:
+- Trace staffOpsService.
+- Build/register missing staff API routes if safe.
+- Add frontend only if API routes work.
+- Required routes if working:
+  - /staff/dashboard
+  - /staff/members
+  - /staff/roster
+  - /staff/cleaning
+  - /staff/attendance
+  - /staff/settings
+- If backend cannot be restored safely, do NOT add Staff sidebar links.
+- Report exact blocker.
+
+Validation:
+- Server starts clean.
+- All Patch 2 pages still pass.
+- /menu/recipes works.
+- /online-ordering flow works.
+- /finance/expenses-import works.
+- /reports/shift-history works.
+- /reports/export works.
+- Staff routes work only if backend fixed.
+- No sidebar link hits NotFound.
+- No Tier 5 systems restored.
+
+Deliver:
+- Files created
+- Files changed
+- APIs added/restored
+- Routes added
+- Sidebar changes
+- Sections skipped and why
+- Full validation table

@@ -24,15 +24,29 @@ import HealthSafety from "./pages/operations/HealthSafety";
 import Ingredients from "./pages/menu/Ingredients";
 import MenuItems from "./pages/menu/MenuItems";
 import CostCalculator from "./pages/menu/CostCalculator";
+import Recipes from "./pages/menu/Recipes";
 
 import FinanceHub from "./pages/finance/FinanceHub";
 import ProfitLoss from "./pages/finance/ProfitLoss";
 import Expenses from "./pages/finance/Expenses";
+import ExpensesImport from "./pages/finance/ExpensesImport";
 
 import ShiftReports from "./pages/reports/ShiftReports";
+import ShiftHistory from "./pages/reports/ShiftHistory";
+import Export from "./pages/reports/Export";
 
 import Orders from "./pages/ordering/Orders";
 import Catalog from "./pages/ordering/Catalog";
+import OnlineOrdering from "./pages/ordering/OnlineOrdering";
+import Checkout from "./pages/ordering/Checkout";
+import Confirmation from "./pages/ordering/Confirmation";
+
+import StaffDashboard from "./pages/staff/Dashboard";
+import StaffMembers from "./pages/staff/Members";
+import StaffRoster from "./pages/staff/Roster";
+import StaffCleaning from "./pages/staff/Cleaning";
+import StaffAttendance from "./pages/staff/Attendance";
+import StaffSettings from "./pages/staff/Settings";
 
 function OwnerRoute({ children }: { children: JSX.Element }) {
   const { currentUser } = usePinAuth();
@@ -73,18 +87,35 @@ export default function App() {
                     <Route path="/menu/ingredients" element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />
                     <Route path="/menu/items" element={<ProtectedRoute><MenuItems /></ProtectedRoute>} />
                     <Route path="/menu/cost-calculator" element={<ProtectedRoute><CostCalculator /></ProtectedRoute>} />
+                    <Route path="/menu/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
 
                     {/* Finance */}
                     <Route path="/finance" element={<ProtectedRoute><FinanceHub /></ProtectedRoute>} />
                     <Route path="/finance/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
                     <Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
+                    <Route path="/finance/expenses-import" element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
 
                     {/* Reports */}
                     <Route path="/reports/shift-reports" element={<ProtectedRoute><ShiftReports /></ProtectedRoute>} />
+                    <Route path="/reports/shift-history" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
+                    <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
 
-                    {/* Online Ordering */}
+                    {/* Online Ordering (customer-facing) */}
+                    <Route path="/online-ordering" element={<OnlineOrdering />} />
+                    <Route path="/online-ordering/checkout" element={<Checkout />} />
+                    <Route path="/online-ordering/confirmation" element={<Confirmation />} />
+
+                    {/* Admin Ordering */}
                     <Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                     <Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
+
+                    {/* Staff Operations */}
+                    <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
+                    <Route path="/staff/members" element={<ProtectedRoute><StaffMembers /></ProtectedRoute>} />
+                    <Route path="/staff/roster" element={<ProtectedRoute><StaffRoster /></ProtectedRoute>} />
+                    <Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} />
+                    <Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} />
+                    <Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} />
 
                     <Route path="*" element={<NotFound />} />
                   </Route>

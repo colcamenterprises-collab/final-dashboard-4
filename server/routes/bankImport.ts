@@ -501,4 +501,15 @@ router.get("/rules", async (req, res) => {
   }
 });
 
+// GET /api/bank-imports — list all import batches (returns [] if table not yet created)
+router.get("/", async (req, res) => {
+  try {
+    const batches = await db.select().from(bankImportBatch).orderBy(desc(bankImportBatch.createdAt));
+    res.json({ batches });
+  } catch (e: any) {
+    // Table may not yet be migrated — return empty list gracefully
+    res.json({ batches: [] });
+  }
+});
+
 export { router as bankImportRouter };

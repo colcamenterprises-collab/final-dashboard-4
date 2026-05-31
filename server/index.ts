@@ -361,6 +361,22 @@ async function checkSchema() {
   const analysisV2Router = (await import('./routes/analysisV2.js')).default;
   app.use('/api/analysis', analysisV2Router);
   
+  // Bank imports — GET must be registered BEFORE registerRoutes mounts bankUploadRouter at same path
+  app.get('/api/bank-imports', async (req: Request, res: Response) => {
+    try {
+      const { db: dbConn } = await import('./db');
+      const { sql: rawSql } = await import('drizzle-orm');
+      const result = await dbConn.execute(rawSql`
+        SELECT id, filename, bank_code AS "bankCode", row_count AS "rowCount",
+               status, created_at AS "createdAt"
+        FROM bank_import_batch ORDER BY created_at DESC LIMIT 50
+      `);
+      res.json({ batches: result.rows });
+    } catch {
+      res.json({ batches: [] }); // table not yet created — return empty gracefully
+    }
+  });
+
   const server = await registerRoutes(app);
 
   // Setup webhooks for real-time Loyverse data
@@ -588,6 +604,18 @@ async function checkSchema() {
   const ingredientSearchRouter = ingredientAuthorityModule.ingredientSearchRouter;
   app.use('/api/ingredient-authority', ingredientAuthorityRouter);
   app.use('/', ingredientSearchRouter);
+
+  // Recipes CRUD
+  const recipesRouterMod = await import('./routes/recipes');
+  app.use('/api/recipes', recipesRouterMod.default);
+
+  // Bank Imports (CSV upload, batch management, transaction review)
+  const { bankImportRouter } = await import('./routes/bankImport');
+  app.use('/api/bank-imports', bankImportRouter);
+
+  // Staff Operations
+  const staffOpsRouterMod = await import('./routes/staffOps');
+  app.use('/api/staff', staffOpsRouterMod.default);
 
   // JSON 404 guard — any /api/* path not matched above returns JSON, never HTML.
   // This MUST sit before errorGuard and before Vite/serveStatic catch-all.

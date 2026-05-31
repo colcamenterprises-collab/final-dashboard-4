@@ -21,6 +21,15 @@ import {
   AlertTriangle,
   BookOpen,
   Wallet,
+  Upload,
+  Download,
+  History,
+  Users,
+  CalendarDays,
+  UserCheck,
+  Settings,
+  MapPin,
+  Globe,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { ModernButton } from "@/components/ui";
@@ -58,30 +67,35 @@ const navigationGroups: NavGroup[] = [
       { to: "/menu/items",           label: "Menu Items",      icon: UtensilsCrossed, testId: "nav-menu-items" },
       { to: "/menu/ingredients",     label: "Ingredients",     icon: List,            testId: "nav-ingredients" },
       { to: "/menu/cost-calculator", label: "Cost Calculator", icon: Calculator,      testId: "nav-cost-calculator" },
+      { to: "/menu/recipes",         label: "Recipes",         icon: BookOpen,        testId: "nav-recipes" },
     ],
   },
   {
     title: "Ordering",
     defaultOpen: false,
     items: [
-      { to: "/ordering/orders",  label: "Orders",  icon: ShoppingBag, testId: "nav-orders" },
-      { to: "/ordering/catalog", label: "Catalog", icon: BookOpen,    testId: "nav-catalog" },
+      { to: "/ordering/orders",    label: "Orders",          icon: ShoppingBag, testId: "nav-orders" },
+      { to: "/ordering/catalog",   label: "Catalog",         icon: BookOpen,    testId: "nav-catalog" },
+      { to: "/online-ordering",    label: "Online Ordering", icon: Globe,       testId: "nav-online-ordering" },
     ],
   },
   {
     title: "Finance",
     defaultOpen: false,
     items: [
-      { to: "/finance",              label: "Finance Hub", icon: Wallet,      testId: "nav-finance-hub" },
-      { to: "/finance/profit-loss",  label: "Profit & Loss", icon: TrendingUp, testId: "nav-profit-loss" },
-      { to: "/finance/expenses",     label: "Expenses",    icon: DollarSign,  testId: "nav-expenses" },
+      { to: "/finance",                  label: "Finance Hub",    icon: Wallet,     testId: "nav-finance-hub" },
+      { to: "/finance/profit-loss",     label: "Profit & Loss",  icon: TrendingUp, testId: "nav-profit-loss" },
+      { to: "/finance/expenses",        label: "Expenses",       icon: DollarSign, testId: "nav-expenses" },
+      { to: "/finance/expenses-import", label: "Import",         icon: Upload,     testId: "nav-expenses-import" },
     ],
   },
   {
     title: "Reports",
     defaultOpen: false,
     items: [
-      { to: "/reports/shift-reports", label: "Shift Reports", icon: FileText, testId: "nav-shift-reports" },
+      { to: "/reports/shift-reports",  label: "Shift Reports",  icon: FileText, testId: "nav-shift-reports" },
+      { to: "/reports/shift-history",  label: "Shift History",  icon: History,  testId: "nav-shift-history" },
+      { to: "/reports/export",         label: "Export",         icon: Download, testId: "nav-export" },
     ],
   },
   {
@@ -92,6 +106,18 @@ const navigationGroups: NavGroup[] = [
       { to: "/operations/health-safety",      label: "Health & Safety",  icon: ShieldCheck,   testId: "nav-health-safety" },
       { to: "/operations/manager-checklist",  label: "Manager Checklist",icon: ClipboardList, testId: "nav-manager-checklist" },
       { to: "/operations/issue-register",     label: "Issue Register",   icon: AlertTriangle, testId: "nav-issue-register" },
+    ],
+  },
+  {
+    title: "Staff",
+    defaultOpen: false,
+    items: [
+      { to: "/staff/dashboard",  label: "Overview",    icon: Users,       testId: "nav-staff-dashboard" },
+      { to: "/staff/members",    label: "Members",     icon: UserCheck,   testId: "nav-staff-members" },
+      { to: "/staff/roster",     label: "Roster",      icon: CalendarDays,testId: "nav-staff-roster" },
+      { to: "/staff/cleaning",   label: "Cleaning",    icon: ClipboardList,testId: "nav-staff-cleaning" },
+      { to: "/staff/attendance", label: "Attendance",  icon: Receipt,     testId: "nav-staff-attendance" },
+      { to: "/staff/settings",   label: "Settings",    icon: Settings,    testId: "nav-staff-settings" },
     ],
   },
 ];

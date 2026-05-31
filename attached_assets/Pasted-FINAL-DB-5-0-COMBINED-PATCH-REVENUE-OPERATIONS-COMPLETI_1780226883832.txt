@@ -1,0 +1,173 @@
+FINAL DB 5.0 — COMBINED PATCH: REVENUE + OPERATIONS COMPLETION
+
+Objective:
+Complete the approved useful business systems while keeping Tier 5 systems removed.
+
+This is one combined repair/build patch.
+
+DO NOT RESTORE:
+- Bob
+- AI Ops
+- Agent Gateway
+- Agent Read
+- Jussi
+- Jane
+- Ramsay
+- KDS
+- POS Terminal
+- Membership
+- Marketing Machine
+- Partner/bar systems
+
+DO NOT TOUCH:
+- Daily Sales V2
+- Daily Stock V2
+- Form Library
+- Purchasing
+- POS/Loyverse sync
+- Auth
+- shared/schema.ts
+- database tables
+
+BUILD / REPAIR ONLY:
+
+1. Recipes
+- Route: /menu/recipes
+- Use real recipe APIs/tables only.
+- Show recipe list, recipe cost, ingredient breakdown.
+- If create/edit APIs are available, include create/edit.
+- If not, read-only first and report missing write endpoint.
+
+2. Cost Calculator
+- Route: /menu/cost-calculator
+- Use recipes + ingredients + costing APIs.
+- Show total cost, serving cost, selling price, margin, food cost percentage.
+- No mock data.
+
+3. Online Ordering
+- Customer routes:
+  - /online-ordering
+  - /online-ordering/cart
+  - /online-ordering/checkout
+  - /online-ordering/confirmation
+- Admin routes:
+  - /ordering/orders
+  - /ordering/catalog
+- Use existing /api/online-menu, /api/online-orders, /api/menu-v3/items, /api/menus where valid.
+- Build actual cart flow in frontend state.
+- Do not process real payments yet.
+- Payment selection can be “Pay at pickup / manual confirmation” unless payment endpoint is confirmed working.
+
+4. Expenses Import
+- Route: /finance/expenses-import
+- Use existing finance/import APIs.
+- Include upload, preview, import result if APIs support it.
+- If upload API requires auth/session, keep it auth-gated and report exact endpoint.
+
+5. Staff Operations
+- Routes:
+  - /staff/dashboard
+  - /staff/members
+  - /staff/roster
+  - /staff/cleaning
+  - /staff/attendance
+  - /staff/settings
+- First restore/register missing staff backend routes if service exists.
+- If backend cannot be safely restored, do not add sidebar links yet.
+- No broken Staff sidebar links allowed.
+
+6. Reports Completion
+- Routes:
+  - /reports/shift-reports
+  - /reports/shift-history
+  - /reports/export
+- Use existing shift report/export APIs.
+- Include date filters where possible.
+- No fake reports.
+
+7. Operations Tools Completion
+- Routes:
+  - /operations/shopping-list
+  - /operations/health-safety
+  - /operations/manager-checklist
+  - /operations/issue-register
+- Use existing APIs only.
+- Fix data shape bugs like rows-vs-array defensively.
+- No placeholder pages.
+
+8. Navigation
+Update sidebar only with routes confirmed to load.
+Final sidebar should include:
+
+Core
+- Dashboard
+- Daily Sales V2
+- Daily Stock V2
+- Form Library
+- Purchasing
+
+Menu
+- Menu Items
+- Recipes
+- Ingredients
+- Cost Calculator
+
+Ordering
+- Online Ordering
+- Catalog
+- Orders
+
+Finance
+- Finance Hub
+- Profit & Loss
+- Expenses
+- Expenses Import
+
+Reports
+- Shift Reports
+- Shift History
+- Export
+
+Operations
+- Shopping List
+- Health & Safety
+- Manager Checklist
+- Issue Register
+
+Staff
+- Staff Dashboard
+- Staff Management
+- Weekly Roster
+- Cleaning
+- Attendance
+- Staff Settings
+
+Only add Staff section if all staff routes load.
+
+VALIDATION:
+- Server starts clean.
+- No Tier 5 route is restored.
+- No database schema changes.
+- No shared/schema.ts changes.
+- All protected workflows still pass.
+- Every sidebar link loads.
+- No NotFound sidebar links.
+- Recipes load.
+- Cost Calculator loads.
+- Online Ordering flow loads.
+- Orders/Catalog load.
+- Expenses Import loads or is excluded with reason.
+- Reports routes load.
+- Operations Tools routes load.
+- Staff routes load only if backend fixed.
+- /api/system/pos-status still works.
+- /api/loyverse/sync still works.
+
+DELIVERABLES:
+- Files created
+- Files changed
+- Routes added
+- APIs repaired/registered
+- Sidebar changes
+- Sections excluded and why
+- Validation pass/fail table

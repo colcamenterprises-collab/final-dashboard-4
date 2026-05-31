@@ -85,6 +85,8 @@ import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
 
 import imageUploadRouter from "./routes/imageUpload";
 import shiftReportRoutes from "./routes/shiftReportRoutes";
+import recipesRouter from "./routes/recipes";
+import staffOpsRouter from "./routes/staffOps";
 
 import menuV3Routes from "./routes/menu/menuV3Routes";
 import stockRoutes from "./routes/stock/stockRoutes";
@@ -4464,7 +4466,13 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   registerOnlineMenuRoutes(app);
   registerAdminMenuRoutes(app);
   registerOnlineOrderRoutes(app);
-  
+
+  // Recipes CRUD
+  app.use('/api/recipes', recipesRouter);
+
+  // Staff Operations
+  app.use('/api/staff', staffOpsRouter);
+
   // Register image upload route
   app.use('/api', imageUploadRouter);
   
