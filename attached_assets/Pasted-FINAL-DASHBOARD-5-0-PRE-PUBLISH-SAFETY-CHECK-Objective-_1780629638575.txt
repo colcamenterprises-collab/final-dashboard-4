@@ -1,0 +1,122 @@
+FINAL DASHBOARD 5.0 — PRE-PUBLISH SAFETY CHECK
+
+Objective:
+Confirm the stable Final Dashboard 5.0 build is safe to republish.
+
+Rules:
+
+- Do not edit code.
+- Do not change database schema.
+- Do not change routes.
+- Do not refactor.
+- Do not add features.
+- Do not remove anything.
+- Only run verification checks.
+- If a critical production issue is found, stop and report before fixing.
+
+Stable baseline:
+
+- Tag: final-dashboard-5.0-stable
+- Branch: production-baseline-5.0
+- Commit: f0dbc18b
+
+Required Checks:
+
+1. Confirm Git baseline
+
+- Confirm current branch.
+- Confirm latest commit.
+- Confirm tag "final-dashboard-5.0-stable" exists.
+- Confirm branch "production-baseline-5.0" exists.
+
+2. Confirm app starts
+
+- Run the app.
+- Confirm no startup crash.
+- Confirm no build/runtime errors.
+
+3. Confirm login
+
+- Open "/login".
+- Confirm Owner login/session works.
+- Confirm protected pages remain accessible.
+
+4. Confirm core workflows
+
+- Open "/dashboard".
+- Open "/operations/daily-sales".
+- Open "/operations/daily-stock".
+- Open "/operations/daily-sales-v2/library".
+- Open "/operations/purchasing".
+
+5. Confirm forms
+
+- Verify Daily Sales V2 page loads.
+- Verify Daily Stock V2 page loads.
+- Verify Form Library shows latest submissions.
+- Do not create test submissions unless explicitly approved.
+
+6. Confirm POS/Loyverse
+
+- Check "/api/system/pos-status".
+- Confirm connected is true.
+- Confirm latest receipt date is current or explain if stale.
+- Confirm "/api/loyverse/sync" route is registered.
+
+7. Confirm Online Ordering
+
+- Open "/online-ordering".
+- Confirm menu loads publicly.
+- Confirm add-to-cart works visually.
+- Do not place a real customer order unless explicitly approved.
+
+8. Confirm reports/email/PDF surface
+
+- Open Reports pages.
+- Confirm Shift Reports loads.
+- Confirm Export page loads.
+- Confirm no PDF/email errors are visible.
+- Do not send test emails unless explicitly approved.
+
+9. Confirm no removed systems returned
+   Verify these are absent or 404:
+
+- "/api/bob/*"
+- "/api/ai-ops/*"
+- "/api/gateway/*"
+- "/api/agent/read/*"
+- "/api/ai/chat"
+- "/chat/jussi"
+- KDS routes
+- POS Terminal routes
+
+10. Confirm known non-blockers only
+    Known pre-existing non-blockers:
+
+- "/api/expensesV2/imports" may return 500 because "expensesV2_imports" is not seeded.
+- "/api/bank-statements" may return 500 because it still points to MemStorage.
+
+These should be reported but should not block publishing unless they affect live operations.
+
+Deliverable:
+Return a concise publish decision:
+
+- Current branch
+- Commit hash
+- App startup: PASS/FAIL
+- Core workflows: PASS/FAIL
+- POS/Loyverse: PASS/FAIL
+- Online Ordering: PASS/FAIL
+- Reports: PASS/FAIL
+- Removed systems absent: PASS/FAIL
+- Known non-blockers confirmed: YES/NO
+
+Final answer must be one of:
+
+PUBLISH APPROVED
+
+or
+
+PUBLISH BLOCKED
+
+If blocked, list only the blocking issues.
