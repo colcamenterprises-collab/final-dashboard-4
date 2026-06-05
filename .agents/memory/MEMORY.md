@@ -1,0 +1,1 @@
+- [Final Dashboard 5.0 Lockdown](lockdown-5.0.md) — All stable systems are read-only; new work must be fully isolated; no route/schema/API changes without explicit approval.
