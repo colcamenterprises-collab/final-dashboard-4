@@ -459,9 +459,8 @@ export class SchedulerService {
   }
 
   async triggerJussiSummary() {
-    // @ts-expect-error - JavaScript module without type declarations
-    const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
-    return await generateDailySummary();
+    console.log('[scheduler] Jussi summary system has been removed.');
+    return null;
   }
 
   private async runFinanceCalculations() {
