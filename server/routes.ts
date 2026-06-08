@@ -171,13 +171,13 @@ async function buildSnapshotDTO(prisma: any, snapshotId: string) {
       payments: {
         select: { channel: true, count: true, totalSatang: true }
       },
-      items: { 
-        select: { itemName: true, qty: true, revenueSatang: true }, 
-        orderBy: { qty: 'desc' }, 
+      items: {
+        select: { itemName: true, qty: true, revenueSatang: true },
+        orderBy: { qty: 'desc' },
         take: 10 // Reduce from 50 to 10 for better performance
       },
-      comparisons: { 
-        orderBy: { createdAt: 'desc' }, 
+      comparisons: {
+        orderBy: { createdAt: 'desc' },
         take: 1,
         select: {
           purchasedBuns: true, purchasedMeatGram: true, purchasedDrinks: true,
@@ -305,18 +305,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const fs = await import('fs');
       const path = await import('path');
-      
+
       // Debug path information
       const cwd = process.cwd();
       const suppliersPath = path.join(cwd, 'data', 'suppliers.json');
       console.log('Current working directory:', cwd);
       console.log('Looking for suppliers file at:', suppliersPath);
       console.log('File exists:', fs.existsSync(suppliersPath));
-      
+
       if (!fs.existsSync(suppliersPath)) {
         return res.status(404).json({ error: 'Suppliers file not found', path: suppliersPath });
       }
-      
+
       const suppliersData = fs.readFileSync(suppliersPath, 'utf8');
       const suppliers = JSON.parse(suppliersData);
       console.log('Loaded suppliers count:', suppliers.length);
@@ -328,7 +328,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   // Stock catalog endpoints (CSV-based) - handler registered in index.ts
-  
+
   app.post('/api/stock-catalog/import', async (req: Request, res: Response) => {
     const { importStockCatalog, uploadMiddleware } = await import('./api/stock-catalog');
     uploadMiddleware(req, res, (err: any) => {
@@ -338,12 +338,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       return importStockCatalog(req, res);
     });
   });
-  
+
   app.get('/api/daily-stock', async (req: Request, res: Response) => {
     const { getDailyStock } = await import('./api/daily-stock');
     return getDailyStock(req, res);
   });
-  
+
   app.post('/api/daily-stock', async (req: Request, res: Response) => {
     const { saveDailyStock } = await import('./api/daily-stock');
     return saveDailyStock(req, res);
@@ -375,11 +375,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     const restaurantId = req.headers['x-restaurant-id'] as string;
     const userId = req.headers['x-user-id'] as string;
     const userRole = req.headers['x-user-role'] as string;
-    
+
     // INTERNAL DASHBOARD ACCESS: Allow if no explicit external API headers
     // External API consumers must provide proper headers; dashboard users get auto-access
     const isInternalDashboard = !restaurantId && !userId;
-    
+
     if (isInternalDashboard) {
       // Internal dashboard access - set defaults for single-tenant mode
       const authReq = req as AuthenticatedRequest;
@@ -388,29 +388,29 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       authReq.userRole = 'admin';
       return next();
     }
-    
+
     // EXTERNAL API: Reject requests without proper authentication for financial data
     if (restaurantId === 'default' || userId === 'anonymous') {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Authentication required: Financial data access requires valid credentials',
-        success: false 
+        success: false
       });
     }
-    
+
     // AUTHORIZATION: Require manager or admin role for P&L access (external API)
     if (userRole !== 'manager' && userRole !== 'admin') {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: 'Insufficient permissions: Financial data access requires manager/admin role',
-        success: false 
+        success: false
       });
     }
-    
+
     // Attach authenticated data to request
     const authReq = req as AuthenticatedRequest;
     authReq.restaurantId = restaurantId;
     authReq.userId = userId;
     authReq.userRole = userRole;
-    
+
     next();
   };
 
@@ -420,16 +420,16 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const authReq = req as AuthenticatedRequest;
       const restaurantId = authReq.restaurantId;
       const year = parseInt(req.query.year as string) || new Date().getFullYear();
-      
+
       // Initialize monthly data structure
       const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
       const monthlyData: Record<string, any> = {};
-      
+
       // Initialize each month
       months.forEach(month => {
         monthlyData[month] = {
           sales: 0,
-          cogs: 0, 
+          cogs: 0,
           expenses: 0,
           grossProfit: 0,
           netProfit: 0
@@ -443,24 +443,24 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         month: sql<number>`EXTRACT(MONTH FROM shift_date)`.as('month'),
         posGross: sql<number>`
           SUM(
-            CASE 
-              WHEN jsonb_array_length(data->'shifts') > 0 
+            CASE
+              WHEN jsonb_array_length(data->'shifts') > 0
               THEN (
-                SELECT SUM(CAST(shift->>'gross_sales' AS DECIMAL)) 
+                SELECT SUM(CAST(shift->>'gross_sales' AS DECIMAL))
                 FROM jsonb_array_elements(data->'shifts') AS shift
               )
-              ELSE 0 
+              ELSE 0
             END
           )`.as('posGross'),
         posNet: sql<number>`
           SUM(
-            CASE 
-              WHEN jsonb_array_length(data->'shifts') > 0 
+            CASE
+              WHEN jsonb_array_length(data->'shifts') > 0
               THEN (
-                SELECT SUM(CAST(shift->>'net_sales' AS DECIMAL)) 
+                SELECT SUM(CAST(shift->>'net_sales' AS DECIMAL))
                 FROM jsonb_array_elements(data->'shifts') AS shift
               )
-              ELSE 0 
+              ELSE 0
             END
           )`.as('posNet')
       })
@@ -468,7 +468,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       .where(sql`EXTRACT(YEAR FROM shift_date) = ${year}`)
       .groupBy(sql`EXTRACT(MONTH FROM shift_date)`);
 
-      // 2. FALLBACK SOURCE: Aggregate sales data from daily_sales_v2 table (staff form data) 
+      // 2. FALLBACK SOURCE: Aggregate sales data from daily_sales_v2 table (staff form data)
       // Used for reconciliation/fallback when POS data is unavailable
       // Single-tenant mode - no restaurantId filtering needed
       // Note: shiftDate is text type, cast to date for EXTRACT
@@ -513,7 +513,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // Process expenses from SINGLE SOURCE (expensesLegacy only)
       expensesResult.forEach(record => {
-        const monthIndex = record.month - 1;  
+        const monthIndex = record.month - 1;
         const monthName = months[monthIndex];
         if (monthName) {
           monthlyData[monthName].expenses = Number(record.totalExpenses || 0);
@@ -524,16 +524,16 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       months.forEach(month => {
         const sales = monthlyData[month].sales;
         const expenses = monthlyData[month].expenses;
-        
+
         // Calculate COGS as 35% of sales (industry standard for fast food)
         const cogs = sales * 0.35;
         monthlyData[month].cogs = Math.round(cogs);
-        
+
         // Calculate gross profit (Sales - COGS)
         const grossProfit = sales - cogs;
         monthlyData[month].grossProfit = Math.round(grossProfit);
-        
-        // Calculate net profit (Gross Profit - Operating Expenses)  
+
+        // Calculate net profit (Gross Profit - Operating Expenses)
         const netProfit = grossProfit - expenses;
         monthlyData[month].netProfit = Math.round(netProfit);
       });
@@ -565,32 +565,32 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
     } catch (error) {
       console.error('P&L aggregation error:', error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to aggregate P&L data',
-        details: (error as Error).message 
+        details: (error as Error).message
       });
     }
   });
-  
-  // Loyverse API Integration Handlers  
+
+  // Loyverse API Integration Handlers
   app.get('/api/loyverse/shifts', async (req: Request, res: Response) => {
     if (!process.env.LOYVERSE_TOKEN) return res.status(400).json({ error: 'Token missing' });
     const shiftDate = req.query.shiftDate as string || new Date().toISOString().split('T')[0];
     const startDate = req.query.startDate as string || shiftDate;
     const endDate = req.query.endDate as string || shiftDate;
-    
+
     try {
       // Fort Knox aggregates with ±50 THB balance tolerance
       const aggregates = { totalGross: 0, totalNet: 0, totalExpenses: 0, anomalies: [], balances: [], shifts: [] };
       const currentDate = new Date(startDate);
       const end = new Date(endDate);
-      
+
       while (currentDate <= end) {
         const dateStr = currentDate.toISOString().split('T')[0];
         const { min, max, exactStart, exactEnd } = getShiftUtcRange(dateStr);
         let shiftsData = await loyverseGet('shifts', { opened_at_min: min, closed_at_max: max });
         shiftsData = { shifts: filterByExactShift(shiftsData.shifts || [], exactStart, exactEnd, 'opened_at') };
-        
+
         // Store in database with proper error handling for unique constraint violations
         try {
           await db.insert(loyverse_shifts).values({ shiftDate: dateStr, data: shiftsData });
@@ -604,7 +604,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             throw insertError;
           }
         }
-        
+
         // Process each shift for aggregates and balance checking
         shiftsData.shifts.forEach((s: any) => {
           aggregates.totalGross += parseFloat(s.gross_sales) || 0;
@@ -615,18 +615,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         // Balance vs form comparison temporarily disabled due to timestamp field compatibility issue
         // The dailySales.date field (timestamp type) requires specific date format handling
         // TODO: Implement proper date handling for timestamp field comparison
-        
+
         // Note: The core loyverse shifts functionality (aggregation, database storage, purging) works correctly
         // Only the balance comparison feature needs further investigation for proper timestamp field handling
-        
+
         aggregates.shifts.push(...shiftsData.shifts);
         currentDate.setDate(currentDate.getDate() + 1);
       }
-      
+
       // Purge old: delete shifts older than first of current month
       const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
       await db.delete(loyverse_shifts).where(lt(loyverse_shifts.shiftDate, firstOfMonth));
-      
+
       res.json(aggregates);
     } catch (error: any) {
       console.error('Loyverse shifts error:', error);
@@ -639,25 +639,25 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     const shiftDate = req.query.shiftDate as string || new Date().toISOString().split('T')[0];
     const startDate = req.query.startDate as string || shiftDate;
     const endDate = req.query.endDate as string || shiftDate;
-    
+
     try {
       // Loop dates if range: for each day, pull/filter, aggregate
       const aggregates = { receipts: [], itemsSold: {} as Record<string, number> };
       const currentDate = new Date(startDate);
       const end = new Date(endDate);
-      
+
       while (currentDate <= end) {
         const dateStr = currentDate.toISOString().split('T')[0];
         const { min, max, exactStart, exactEnd } = getShiftUtcRange(dateStr);
-        let receipts: any[] = []; 
+        let receipts: any[] = [];
         let cursor = null;
-        
+
         do {
           const page = await loyverseGet('receipts', { created_at_min: min, created_at_max: max, cursor });
           receipts = [...receipts, ...page.receipts];
           cursor = page.cursor;
         } while (cursor);
-        
+
         receipts = filterByExactShift(receipts, exactStart, exactEnd);
         const itemsSold = receipts.reduce((acc, r) => {
           r.line_items?.forEach((li: any) => {
@@ -666,25 +666,25 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           });
           return acc;
         }, {} as Record<string, number>);
-        
+
         // Store in database
         await db.insert(loyverse_receipts).values({ shiftDate: dateStr, data: { receipts, itemsSold } })
           .onConflictDoUpdate({ target: [loyverse_receipts.shiftDate], set: { data: { receipts, itemsSold } } });
-        
+
         // Aggregate data
         aggregates.receipts.push(...receipts);
         Object.entries(itemsSold).forEach(([item, qty]) => {
           aggregates.itemsSold[item] = (aggregates.itemsSold[item] || 0) + qty;
         });
-        
+
         currentDate.setDate(currentDate.getDate() + 1);
       }
-      
+
       // Purge old: delete receipts older than first of current month
       const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
       const purgeResult = await db.delete(loyverse_receipts).where(lt(loyverse_receipts.shiftDate, firstOfMonth));
       console.log(`Purged ${purgeResult.rowCount || 0} old receipt records`);
-      
+
       res.json(aggregates);
     } catch (error: any) {
       console.error('Loyverse receipts error:', error);
@@ -697,13 +697,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       // Pull last shift's receipts right out of DB and analyze against staff forms
       const { loyverseReceiptService } = await import("./services/loyverseReceipts");
       const { getExpectedStockFromReceipts, analyzeStockDiscrepancies } = await import("./services/stockAnalysis");
-      
+
       const shift = await loyverseReceiptService.getShiftData("last");
       const receipts = await loyverseReceiptService.getReceiptsByShift(shift.id.toString());
-      
+
       // Calculate expected stock usage from receipts
       const expectedStock = getExpectedStockFromReceipts(receipts);
-      
+
       // Get actual stock from the latest staff form (if available)
       const latestForms = await storage.getAllDailyStockSales();
       const actualStock: Record<string, number> = latestForms.length > 0 ? {
@@ -715,19 +715,19 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         "Fanta": Number((latestForms[0].drinkStock as any)?.["Fanta"]) || 0,
         "Water": Number((latestForms[0].drinkStock as any)?.["Water"]) || 0
       } : {};
-      
+
       // Analyze discrepancies between expected and actual
       const discrepancies = analyzeStockDiscrepancies(expectedStock, actualStock);
-      
-      res.json({ 
+
+      res.json({
         shiftId: shift.id,
         discrepancies: discrepancies.slice(0, 10), // Top 10 discrepancies
         receiptsAnalyzed: receipts.length,
-        expectedItems: expectedStock.length 
+        expectedItems: expectedStock.length
       });
     } catch (err) {
       console.error("Stock discrepancy analysis failed:", err);
-      
+
       // Fallback to simple mock data if analysis fails
       const discrepancies = [
         {
@@ -749,7 +749,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           alert: "Stock level below threshold"
         }
       ];
-      
+
       res.json({ discrepancies });
     }
   });
@@ -769,18 +769,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         'application/vnd.ms-excel', // Excel .xls
         'application/json'
       ];
-      
+
       if (!allowedTypes.includes(file.mimetype)) {
-        return res.status(400).json({ 
-          error: 'Invalid file type. Please upload CSV, Excel, or JSON files only.' 
+        return res.status(400).json({
+          error: 'Invalid file type. Please upload CSV, Excel, or JSON files only.'
         });
       }
 
       // Validate file size (limit to 10MB)
       const maxSizeBytes = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSizeBytes) {
-        return res.status(400).json({ 
-          error: 'File too large. Maximum size is 10MB.' 
+        return res.status(400).json({
+          error: 'File too large. Maximum size is 10MB.'
         });
       }
 
@@ -802,7 +802,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         uploadedAt: new Date().toISOString()
       };
 
-      res.json({ 
+      res.json({
         id: uploadInfo.id,
         message: 'Loyverse report uploaded successfully',
         filename: file.originalname,
@@ -811,7 +811,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       });
     } catch (err) {
       console.error('File upload error:', err);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to upload file',
         details: process.env.NODE_ENV === 'development' ? (err as Error).message : undefined
       });
@@ -822,7 +822,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { reportId } = req.body;
       const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, reportId)).limit(1);
-      
+
       if (!report) {
         return res.status(404).json({ error: 'Report not found' });
       }
@@ -830,7 +830,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       // Parse file content based on type
       let text = '';
       const fileBuffer = Buffer.from(report.fileData, 'base64');
-      
+
       if (report.fileType === 'application/pdf') {
         // For PDF files, use the filename as indicator for now
         text = `PDF file: ${report.filename}. Please analyze based on typical Loyverse report structure.`;
@@ -866,10 +866,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const analysis = JSON.parse(completion.choices[0].message.content || '{}');
 
       // Update report with analysis
-      await db.update(uploadedReports).set({ 
+      await db.update(uploadedReports).set({
         analysisSummary: analysis,
         analyzedAt: new Date(),
-        isAnalyzed: true 
+        isAnalyzed: true
       }).where(eq(uploadedReports.id, reportId));
 
       // Update dashboard data with latest analysis
@@ -912,7 +912,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.json(analysis);
     } catch (err) {
       console.error('Analysis error:', err);
-      
+
       // Fallback to demo mode if OpenAI fails
       const demoAnalysis = {
         totalSales: 14446,
@@ -930,10 +930,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         timeRange: { start: "17:00", end: "03:00" }
       };
 
-      await db.update(uploadedReports).set({ 
+      await db.update(uploadedReports).set({
         analysisSummary: demoAnalysis,
         analyzedAt: new Date(),
-        isAnalyzed: true 
+        isAnalyzed: true
       }).where(eq(uploadedReports.id, req.body.reportId));
 
       res.json(demoAnalysis);
@@ -1081,17 +1081,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
-      
+
       // K-4.4: Filter by month if provided
       const month = req.query.month as string | undefined;
       let whereClause: any = { deletedAt: null };
-      
+
       if (month && /^\d{4}-\d{2}$/.test(month)) {
         // shiftDate is TEXT in ISO format, use startsWith for prefix matching
         whereClause.shiftDate = { startsWith: month };
         console.log(`[K-4.4] Filtering daily-sales by month: ${month}`);
       }
-      
+
       const forms = await prisma.dailySalesV2.findMany({
         where: whereClause,
         orderBy: {
@@ -1102,18 +1102,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       const rows = forms.map((f: any) => {
         const payload = f.payload || {};
-        
+
         // Calculate totals from arrays if direct values not available
         const calculateTotal = (arr: any[], field = 'amount') => {
           if (!Array.isArray(arr)) return 0;
           return arr.reduce((sum, item) => sum + (Number(item[field]) || 0), 0);
         };
-        
+
         const shoppingTotal = payload.shoppingTotal || calculateTotal(payload.expenses, 'cost') || f.shoppingTotal || 0;
         const wagesTotal = payload.wagesTotal || calculateTotal(payload.wages) || f.wagesTotal || 0;
         const othersTotal = payload.othersTotal || f.othersTotal || 0;
         const totalExpenses = payload.totalExpenses || shoppingTotal + wagesTotal + othersTotal || f.totalExpenses || 0;
-        
+
         // Calculate expected banking amounts
         const startingCash = f.startingCash || 0;
         const endingCash = f.endingCash || 0;
@@ -1121,11 +1121,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         const qrSales = payload.qrSales || f.qrSales || 0;
         const cashBanked = f.cashBanked || 0;
         const qrTransfer = f.qrTransfer || 0;
-        
+
         const expected_cash_bank = startingCash + cashSales - endingCash;
         const expected_qr_bank = qrSales;
         const expected_total_bank = expected_cash_bank + expected_qr_bank;
-        
+
         return {
           id: f.id,
           shift_date: f.shiftDate || 'N/A',
@@ -1156,15 +1156,15 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   app.get("/api/analysis/daily-sales/export.csv", (req, res) => {
-    return res.status(503).json({ 
-      error: "CSV export not available - daily_shift_summary table does not exist" 
+    return res.status(503).json({
+      error: "CSV export not available - daily_shift_summary table does not exist"
     });
   });
 
   // Stock Review Manual Ledger - mounted before :date route to avoid conflicts
   app.use("/api/stock-review/manual-ledger", stockReviewManual);
   app.use("/api/stock-review", stockReviewRouter);
-  
+
   // Burger metrics from receipts
   app.use("/api/receipts", receiptsBurgers);
   app.use("/api/receipts", receiptsDebug);
@@ -1195,24 +1195,24 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Register daily review routes BEFORE catch-all :date route
   app.use('/api/analysis', analysisDailyReviewRouter);
   app.use('/api/daily-review-comments', dailyReviewCommentsRouter);
-  
+
   // Register rolls ledger routes BEFORE catch-all :date route
   const rollsLedgerRouter = (await import('./routes/rollsLedger.js')).default;
   app.use('/api/analysis/rolls-ledger', rollsLedgerRouter);
-  
+
   // Register meat ledger routes BEFORE catch-all :date route
   const meatLedgerRouter = (await import('./routes/meatLedger.js')).default;
   app.use('/api/analysis/meat-ledger', meatLedgerRouter);
-  
+
   // Register drinks ledger routes BEFORE catch-all :date route
   const drinksLedgerRouter = (await import('./routes/drinksLedger.js')).default;
   app.use('/api/analysis/drinks-ledger', drinksLedgerRouter);
-  
+
   // PHASE I: Register ingredient reconciliation BEFORE catch-all :date route
-  
+
   // PHASE M: Register receipt batch truth routes BEFORE catch-all :date route
   app.use('/api/analysis', receiptBatchRoutes);
-  
+
   // PHASE M: Canonical receipts-summary endpoint (legacy - reads from DB)
   const { buildReceiptSummary } = await import('./services/receiptSummary');
   app.get('/api/analysis/receipts-summary', async (req, res) => {
@@ -1253,9 +1253,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const result = await getIngredientUsage(date);
       if (!result) {
-        return res.status(404).json({ 
-          error: 'INGREDIENT_USAGE_NOT_BUILT', 
-          message: `No ingredient usage found for ${date}. Use POST /api/analysis/ingredient-usage/rebuild to build.` 
+        return res.status(404).json({
+          error: 'INGREDIENT_USAGE_NOT_BUILT',
+          message: `No ingredient usage found for ${date}. Use POST /api/analysis/ingredient-usage/rebuild to build.`
         });
       }
       res.json(result);
@@ -1325,7 +1325,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       return res.status(502).json({ ok: false, error: error?.message || "Failed to fetch stock usage" });
     }
   });
-  
+
   // Register freshness route BEFORE catch-all :date route
   const freshnessRouter = (await import('./routes/freshness.js')).default;
   app.use(freshnessRouter);
@@ -1364,7 +1364,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { query } = req.query;
       let results;
-      
+
       if (query) {
         results = await db.select({
           id: uploadedReports.id,
@@ -1436,7 +1436,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         return res.status(400).json({ error: 'Invalid report ID' });
       }
       const [report] = await db.select().from(uploadedReports).where(eq(uploadedReports.id, reportId)).limit(1);
-      
+
       if (!report) {
         return res.status(404).json({ error: 'Report not found' });
       }
@@ -1455,7 +1455,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   // ===== Purchasing (Expenses) API =====
-  
+
   // ExpensesV2 routes are defined inline below (lines 1421+) to avoid conflicts
 
   // Legacy Create/Update Expense with lines (fallback for existing functionality)
@@ -1533,13 +1533,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         orderBy: { shiftDate: 'desc' },
         take: 100,
       });
-      
+
       // Get lines separately and merge
       const expenseIds = expenses.map(e => e.id);
       const lines = await prisma.expenseLine.findMany({
         where: { expenseId: { in: expenseIds } }
       });
-      
+
       const result = expenses.map(expense => ({
         id: expense.id,
         expenseDate: expense.shiftDate,
@@ -1555,7 +1555,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           lineTotalTHB: l.lineTotalTHB ? Number(l.lineTotalTHB) : null
         }))
       }));
-      
+
       return safeJson(res, result);
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
@@ -1571,16 +1571,16 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     const q = String(req.query.q ?? '').trim();
     try {
       if (!q) return safeJson(res, []);
-      
+
       // Search in existing recipe items as a proxy for ingredients
       const rows = await prisma.recipeItem.findMany({
-        where: { 
+        where: {
           name: { contains: q, mode: 'insensitive' }
         },
         take: 20,
         select: { id: true, name: true, category: true },
       });
-      
+
       // Map to expected format
       const mapped = rows.map(r => ({
         id: r.id,
@@ -1588,7 +1588,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         uom: 'unit',
         category: r.category || 'Recipe Item'
       }));
-      
+
       return safeJson(res, mapped);
     } catch (e: any) {
       return res.status(500).json({ error: e.message });
@@ -1601,7 +1601,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.get('/api/reports/sales-summary', async (req: Request, res: Response) => {
     try {
       const { period = '7', startDate, endDate } = req.query;
-      
+
       // Get sales data from daily stock sales forms
       let salesData = await db.select({
         id: dailyStockSales.id,
@@ -1620,7 +1620,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       // Calculate totals and averages
       const totalSales = salesData.reduce((sum, sale) => sum + (parseFloat(sale.totalSales || '0')), 0);
       const averageDailySales = salesData.length > 0 ? totalSales / salesData.length : 0;
-      
+
       res.json({
         period: `${salesData.length} days`,
         totalSales,
@@ -1646,7 +1646,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.get('/api/reports/financial-overview', async (req: Request, res: Response) => {
     try {
       const { period = '30' } = req.query;
-      
+
       // Get recent forms
       const recentForms = await db.select({
         id: dailyStockSales.id,
@@ -1705,7 +1705,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // Staff performance analysis
       const staffPerformance: Record<string, { shifts: number; totalSales: number; avgSales: number }> = {};
-      
+
       recentForms.forEach(form => {
         const staff = form.completedBy || 'Unknown';
         if (!staffPerformance[staff]) {
@@ -1726,7 +1726,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         operationalMetrics: {
           totalShiftsCompleted: recentForms.length,
           uniqueStaffMembers: Object.keys(staffPerformance).length,
-          averageShiftSales: recentForms.length > 0 ? 
+          averageShiftSales: recentForms.length > 0 ?
             recentForms.reduce((sum, form) => sum + parseFloat(form.totalSales || '0'), 0) / recentForms.length : 0,
           completionRate: '100%' // All forms in DB are completed
         }
@@ -1742,9 +1742,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { syncSupplierCSV } = await import('./syncSupplierCSV');
       console.log('🔄 Starting supplier CSV sync...');
-      
+
       const result = await syncSupplierCSV();
-      
+
       if (result.success) {
         res.json({
           success: true,
@@ -1763,8 +1763,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
     } catch (err) {
       console.error('CSV sync error:', err);
-      res.status(500).json({ 
-        success: false, 
+      res.status(500).json({
+        success: false,
         error: 'Failed to sync CSV',
         details: err instanceof Error ? err.message : 'Unknown error'
       });
@@ -1775,7 +1775,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.get('/api/ingredients/by-category', async (req: Request, res: Response) => {
     try {
       console.log('🔍 Fetching ingredients by category...');
-      
+
       const allIngredients = await db.select().from(ingredients)
         .orderBy(ingredients.category, ingredients.name);
 
@@ -1783,7 +1783,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // Group by category
       const ingredientsByCategory: Record<string, any[]> = {};
-      
+
       allIngredients.forEach(ingredient => {
         if (!ingredientsByCategory[ingredient.category]) {
           ingredientsByCategory[ingredient.category] = [];
@@ -1802,7 +1802,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       });
     } catch (err) {
       console.error('❌ Error fetching ingredients by category:', err);
-      res.status(500).json({ 
+      res.status(500).json({
         error: 'Failed to fetch ingredients',
         details: err instanceof Error ? err.message : 'Unknown error'
       });
@@ -1814,13 +1814,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const data = req.body; // Now validated and sanitized by middleware
       console.log("✅ Validated comprehensive form submission:", data);
-      
+
       // Use validated data from middleware
       const formData = {
         completedBy: data.completed_by || data.completedBy || 'Unknown User',
         shiftType: data.shift_type || data.shiftType || 'Standard',
         shiftDate: data.shift_date || data.shiftDate || new Date(),
-        
+
         // Sales data (validated by middleware)
         startingCash: data.starting_cash || data.startingCash || 0,
         grabSales: data.grab_sales || data.grabSales || 0,
@@ -1828,30 +1828,30 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         qrScanSales: data.qr_scan_sales || data.qrScanSales || 0,
         cashSales: data.cash_sales || data.cashSales || 0,
         totalSales: data.total_sales || data.totalSales || 0,
-        
+
         // Cash management
         endingCash: data.ending_cash || data.endingCash || 0,
         bankedAmount: data.banked_amount || data.bankedAmount || 0,
-        
+
         // Expenses (validated by middleware)
         wages: JSON.stringify(data.wages || []),
         shopping: JSON.stringify(data.shopping || []),
         totalExpenses: data.total_expenses || data.totalExpenses || 0,
-        
+
         // Inventory data
         numberNeeded: JSON.stringify(data.inventory || {}),
-        
+
         // Status
         isDraft: false,
         status: data.status || 'completed',
         validatedAt: data.validated_at
       };
-      
+
       console.log("✅ Processed validated form data:", formData);
-      
+
       // Use Drizzle ORM with proper schema field mapping
       const [result] = await db.insert(dailyStockSales).values([formData]).returning();
-      
+
       console.log("✅ Validated comprehensive form saved with ID:", result.id);
       res.json(result);
     } catch (err: any) {
@@ -1868,14 +1868,14 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.post("/api/daily-stock-sales/draft", async (req: Request, res: Response) => {
     try {
       const data = req.body;
-      
+
       // Basic validation for draft forms
       if (!data.completedBy) {
         return res.status(400).json({ error: 'Missing required field: completedBy' });
       }
-      
+
       console.log("Draft save request:", data);
-      
+
       const [result] = await db.insert(dailyStockSales).values({
         completedBy: data.completedBy || '',
         shiftType: data.shiftType || '',
@@ -1884,7 +1884,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         isDraft: true,
         status: 'draft'
       }).returning();
-      
+
       res.json(result);
     } catch (err: any) {
       console.error("Draft save error:", err);
@@ -1897,7 +1897,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const data = req.body;
       console.log("Daily shift form submission:", data);
-      
+
       // Store form data with proper structure
       const formData = {
         completedBy: 'Shift Staff',
@@ -1907,10 +1907,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         isDraft: false,
         status: 'completed'
       };
-      
+
       const [result] = await db.insert(dailyStockSales).values(formData).returning();
       console.log("✅ Daily shift form saved with ID:", result.id);
-      
+
       res.json(result);
     } catch (err: any) {
       console.error("Daily shift form error:", err);
@@ -1939,11 +1939,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       }
 
       const success = await storage.softDeleteDailyStockSales(formId);
-      
+
       if (success) {
-        res.json({ 
-          success: true, 
-          message: `Form ${formId} has been archived and removed from view` 
+        res.json({
+          success: true,
+          message: `Form ${formId} has been archived and removed from view`
         });
       } else {
         res.status(404).json({ error: "Form not found" });
@@ -1971,7 +1971,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { id } = req.params;
       const success = await storage.updateDailyStockSales(parseInt(id), { deletedAt: null });
-      
+
       if (success) {
         res.json({ message: 'Form restored successfully' });
       } else {
@@ -1988,13 +1988,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const data = req.body; // Now validated and sanitized by middleware
       console.log("✅ Validated Fort Knox Daily Stock Sales form submission:", data);
-      
+
       // Use the validated and sanitized data from middleware
       const formData = {
         completedBy: data.completed_by || data.completedBy || 'Unknown Staff',
         shiftType: data.shift_type || 'daily-stock-sales',
         shiftDate: data.shift_date || new Date(),
-        
+
         // Sales data (validated by middleware)
         startingCash: data.starting_cash,
         endingCash: data.ending_cash,
@@ -2004,26 +2004,26 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         qrScanSales: data.qr_scan_sales,
         cashSales: data.cash_sales,
         totalSales: data.total_sales,
-        
+
         // Expenses (validated by middleware)
         salaryWages: data.salary_wages,
         gasExpense: data.gas_expense,
         totalExpenses: data.total_expenses,
-        
+
         // Stock data (validated by middleware)
         burgerBunsStock: data.burger_buns_stock,
         meatWeight: data.meat_weight,
-        
+
         // Additional data
         formData: JSON.stringify(data),
         isDraft: false,
         status: data.status || 'completed',
         validatedAt: data.validated_at
       };
-      
+
       const [result] = await db.insert(dailyStockSales).values(formData).returning();
       console.log("✅ Validated Fort Knox form saved with ID:", result.id);
-      
+
       // after creating stock + shopping list
       if (result.id) {
         try {
@@ -2032,22 +2032,22 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           console.error("Daily email/PDF failed:", e);
         }
       }
-      
+
       // Email notification will be added when email service is configured
       console.log("✅ Form validation passed - data integrity confirmed");
-      
-      res.json({ 
-        success: true, 
+
+      res.json({
+        success: true,
         data: result,
         message: 'Form submitted successfully with validation',
         validation_status: 'passed'
       });
     } catch (err: any) {
       console.error("Fort Knox form submission error:", err);
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to save form', 
-        details: err.message 
+      res.status(500).json({
+        success: false,
+        error: 'Failed to save form',
+        details: err.message
       });
     }
   });
@@ -2063,9 +2063,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         lodgeDate: new Date().toISOString(),
         lodgedBy: req.body.lodgedBy || 'Unknown',
       };
-      
+
       console.log('Stock lodged:', lodgeData);
-      
+
       res.json({ success: true, data: lodgeData, message: 'Stock lodged successfully' });
     } catch (error) {
       console.error('Error lodging stock:', error);
@@ -2077,13 +2077,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { query } = req.query;
       let results;
-      
+
       if (query && typeof query === 'string') {
         results = await storage.searchDailyStockSales(query);
       } else {
         results = await storage.getAllDailyStockSales();
       }
-      
+
       res.json(results);
     } catch (err) {
       console.error("Error searching daily stock sales:", err);
@@ -2107,7 +2107,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
-  // Get all shopping lists endpoint  
+  // Get all shopping lists endpoint
   app.get('/api/shopping-lists', async (req: Request, res: Response) => {
     try {
       const lists = await storage.getShoppingList();
@@ -2124,9 +2124,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const { loadFoodCostingItems } = await import('./utils/loadFoodCostings');
       const items = await loadFoodCostingItems();
       res.json(items);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading food costings:', error);
-      res.status(500).json({ error: 'Failed to load food costing data' });
+      res.status(200).json({ rows: [], source: 'recipes + purchasing_items', blockers: [{ code: 'FOOD_COSTINGS_UNAVAILABLE', message: error?.message || 'Failed to load food costing data', where: '/api/food-costings', canonical_source: 'recipes + purchasing_items', auto_build_attempted: false }] });
     }
   });
 
@@ -2135,13 +2135,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const formData = req.body; // Now validated and sanitized by middleware
       console.log("✅ Validated /submit-form submission:", formData);
-      
+
       // Use validated data for database storage
       const dailySalesData = {
         completedBy: formData.completed_by || formData.staff_name || 'Unknown Staff',
         shiftType: formData.shift_type || formData.shift_time || 'Day',
         shiftDate: formData.shift_date || new Date(formData.date || new Date()),
-        
+
         // Sales data (validated by middleware)
         startingCash: formData.starting_cash || 0,
         endingCash: formData.ending_cash || 0,
@@ -2150,7 +2150,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         qrScanSales: formData.qr_scan_sales || formData.qr_sales || 0,
         cashSales: formData.cash_sales || 0,
         totalSales: formData.total_sales || 0,
-        
+
         // Additional data
         formData: JSON.stringify(formData),
         isDraft: false,
@@ -2160,7 +2160,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // Save to database using existing storage
       const result = await storage.createDailyStockSales(dailySalesData);
-      
+
       // Send success response with validation confirmation
       res.json({
         success: true,
@@ -2182,29 +2182,29 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   // ===== EXPENSE MANAGEMENT API ROUTES =====
-  
+
   // EXPENSES API WITH SOURCE FILTERING - Supports ?source=DIRECT/SHIFT_FORM/STOCK_LODGMENT&month=10&year=2025
   app.get("/api/expensesV2", async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       // Extract query parameters
       const source = req.query.source as string | undefined;
       const month = req.query.month ? parseInt(req.query.month as string) : undefined;
       const year = req.query.year ? parseInt(req.query.year as string) : undefined;
-      
+
       // Build WHERE clause conditions
       const conditions: string[] = [];
       const params: any[] = [];
       let paramIndex = 1;
-      
+
       if (source) {
         conditions.push(`source = $${paramIndex}`);
         params.push(source);
         paramIndex++;
       }
-      
+
       if (month && year) {
         conditions.push(`EXTRACT(MONTH FROM "shiftDate") = $${paramIndex}`);
         params.push(month);
@@ -2213,9 +2213,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         params.push(year);
         paramIndex++;
       }
-      
+
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-      
+
       // Query with dynamic filtering
       const expenses = await prisma.$queryRawUnsafe<Array<{
         id: string,
@@ -2229,7 +2229,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         meta: any
       }>>(`
         SELECT id, item, "costCents", supplier, "shiftDate", "expenseType", "createdAt", source, meta
-        FROM expenses 
+        FROM expenses
         ${whereClause}
         ORDER BY "shiftDate" DESC
         LIMIT 200
@@ -2266,20 +2266,20 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
-      
+
       // Get current database user
       const userResult = await prisma.$queryRaw<Array<{current_user: string}>>`SELECT current_user`;
       const currentUser = userResult[0]?.current_user || 'unknown';
-      
+
       // Check for unsafe scripts in package.json
       const fs = await import('fs');
       const packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
       const unsafeScripts = [];
-      
+
       if (packageJson.scripts?.['db:push']?.includes('drizzle-kit push')) {
         unsafeScripts.push('db:push contains drizzle-kit push');
       }
-      
+
       const status = {
         readonlyMode: process.env.AGENT_READONLY === "1",
         databaseUser: currentUser,
@@ -2287,7 +2287,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         unsafeScripts,
         lastChecked: new Date().toISOString()
       };
-      
+
       res.json(status);
       await prisma.$disconnect();
     } catch (error) {
@@ -2300,22 +2300,22 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.post("/api/expensesV2", async (req: Request, res: Response) => {
     try {
       const { date, supplier, category, description, amount } = req.body;
-      
+
       // PATCH 12: Enforce required fields
       if (!date || !supplier || !category || !amount) {
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: "Missing required expense fields",
           required: ["date", "supplier", "category", "amount"],
           received: { date: !!date, supplier: !!supplier, category: !!category, amount: !!amount }
         });
       }
-      
+
       // PATCH 12: Normalize amount (critical)
       const normalizedAmount = Number(amount);
       if (Number.isNaN(normalizedAmount) || normalizedAmount <= 0) {
         return res.status(400).json({ error: "Invalid amount - must be a positive number" });
       }
-      
+
       // PATCH 12: Write expense (NO side effects)
       const expenseData = {
         date,
@@ -2324,14 +2324,14 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         description: description ?? null,
         amount: normalizedAmount,
       };
-      
+
       const expense = await storage.createExpense(expenseData);
-      
+
       // PATCH 12: Return created record
       return res.json({ success: true, expense });
     } catch (error: any) {
       console.error("[EXPENSE ERROR]", error?.message || error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to create expense",
         detail: error?.message || String(error)
       });
@@ -2353,7 +2353,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         // Parse CSV file
         const csvText = file.buffer.toString('utf8');
         const lines = csvText.split('\n').filter(line => line.trim());
-        
+
         for (let i = 1; i < lines.length; i++) { // Skip header
           const cols = lines[i].split(',');
           if (cols.length >= 4) {
@@ -2392,8 +2392,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         });
       }
 
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         parsed,
         message: `Successfully parsed ${parsed.length} items from ${file.originalname}`
       });
@@ -2463,7 +2463,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       if (req.body.type === "rolls") {
         const { quantity, cost, paid, submittedBy, submittedAt } = req.body;
-        
+
         // Insert into purchase_tally for rolls count (always - this tracks inventory)
         const tallyResult = await db.execute(sql`
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, rolls_pcs)
@@ -2503,18 +2503,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           `);
           return res.json({ ok: true, expense: expenseResult.rows[0], tally: tallyResult.rows[0], paid: true });
         }
-        
+
         // Unpaid: only tally recorded, NO expense entry
         return res.json({ ok: true, message: "Rolls pickup recorded (unpaid - no expense created)", tally: tallyResult.rows[0], paid: false });
       }
 
       if (req.body.type === "meat") {
         const { meatType, weightKg, submittedBy, submittedAt } = req.body;
-        
+
         // Meat → insert into purchase_tally with proper weight handling
         const weightGrams = Math.round(Number(weightKg) * 1000);
         console.log(`Inserting meat: ${meatType}, ${weightKg}kg (${weightGrams}g)`);
-        
+
         const result = await db.execute(sql`
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes, meat_grams)
           VALUES (
@@ -2535,7 +2535,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       if (req.body.type === "drinks") {
         const { items, submittedBy, submittedAt } = req.body;
-        
+
         const tallyResult = await db.execute(sql`
           INSERT INTO purchase_tally (id, created_at, date, staff, supplier, amount_thb, notes)
           VALUES (
@@ -2549,9 +2549,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           )
           RETURNING id, created_at, date, staff, notes as item
         `);
-        
+
         const tallyId = tallyResult.rows[0]?.id;
-        
+
         const drinkResults = [];
         for (const item of items) {
           const drinkResult = await db.execute(sql`
@@ -2761,11 +2761,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       if (req.body.type === "rolls") {
         const { quantity, cost, submittedBy } = req.body;
-        
+
         // Update purchase_tally for rolls
         const result = await db.execute(sql`
           UPDATE purchase_tally
-          SET 
+          SET
             date = COALESCE(${purchaseDate}::date, date),
             rolls_pcs = ${Number(quantity)},
             amount_thb = ${Number(cost)},
@@ -2786,11 +2786,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       if (req.body.type === "meat") {
         const { meatType, weightKg, submittedBy } = req.body;
         const weightGrams = Math.round(Number(weightKg) * 1000);
-        
+
         // Update purchase_tally for meat
         const result = await db.execute(sql`
           UPDATE purchase_tally
-          SET 
+          SET
             date = COALESCE(${purchaseDate}::date, date),
             meat_grams = ${weightGrams},
             staff = ${submittedBy || null},
@@ -2809,10 +2809,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       if (req.body.type === "drinks") {
         const { items, submittedBy } = req.body;
-        
+
         const result = await db.execute(sql`
           UPDATE purchase_tally
-          SET 
+          SET
             date = COALESCE(${purchaseDate}::date, date),
             staff = ${submittedBy || null},
             supplier = ${'Drinks Supplier'},
@@ -2826,7 +2826,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         }
 
         await db.execute(sql`DELETE FROM purchase_tally_drink WHERE tally_id = ${id}`);
-        
+
         if (items && items.length > 0) {
           for (const item of items) {
             await db.execute(sql`
@@ -2851,10 +2851,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const id = req.params.id;
       const { date, supplier, category, description, amount } = req.body;
-      
+
       const updatedExpense = await db.execute(sql`
-        UPDATE expenses 
-        SET 
+        UPDATE expenses
+        SET
           "shiftDate" = ${date},
           supplier = ${supplier},
           "expenseType" = ${category},
@@ -2926,8 +2926,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       // costCents stores whole THB, not cents - no division needed
       // MTD Business
       const mtdBusinessResult = await db.execute(sql`
-        SELECT COALESCE(SUM("costCents"), 0) as total 
-        FROM expenses 
+        SELECT COALESCE(SUM("costCents"), 0) as total
+        FROM expenses
         WHERE EXTRACT(month FROM "shiftDate") = ${currentMonth}
         AND EXTRACT(year FROM "shiftDate") = ${currentYear}
         AND source = 'DIRECT'
@@ -2936,8 +2936,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // YTD Business
       const ytdBusinessResult = await db.execute(sql`
-        SELECT COALESCE(SUM("costCents"), 0) as total 
-        FROM expenses 
+        SELECT COALESCE(SUM("costCents"), 0) as total
+        FROM expenses
         WHERE EXTRACT(year FROM "shiftDate") = ${currentYear}
         AND source = 'DIRECT'
       `);
@@ -2945,8 +2945,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // Prev Month Business
       const prevMonthBusinessResult = await db.execute(sql`
-        SELECT COALESCE(SUM("costCents"), 0) as total 
-        FROM expenses 
+        SELECT COALESCE(SUM("costCents"), 0) as total
+        FROM expenses
         WHERE EXTRACT(month FROM "shiftDate") = ${prevMonth}
         AND EXTRACT(year FROM "shiftDate") = ${prevYear}
         AND source = 'DIRECT'
@@ -2955,7 +2955,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // SHIFT EXPENSES (from daily_sales_v2 payload - matching expenses page display)
       // Parse payload for accurate line-item totals (same method as shift expenses table)
-      
+
       // MTD Shift
       const mtdShiftResult = await db.execute(sql`
         SELECT payload
@@ -3020,7 +3020,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // Get top 5 expense categories (only from business expenses table)
       const top5Result = await db.execute(sql`
-        SELECT 
+        SELECT
           "expenseType" as type,
           COALESCE(SUM("costCents"), 0) as total
         FROM expenses
@@ -3030,7 +3030,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         ORDER BY total DESC
         LIMIT 5
       `);
-      
+
       // costCents stores whole THB, not cents - no division needed
       const top5 = top5Result.rows.map((row: any) => ({
         type: row.type || 'Unknown',
@@ -3098,9 +3098,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const statements = await storage.getBankStatements();
       res.json(statements);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching bank statements:", error);
-      res.status(500).json({ error: "Failed to fetch bank statements" });
+      res.status(200).json({ rows: [], source: 'bank_statements', blockers: [{ code: 'BANK_STATEMENTS_UNAVAILABLE', message: error?.message || 'Failed to fetch bank statements', where: '/api/bank-statements', canonical_source: 'bank_statements', auto_build_attempted: false }] });
     }
   });
 
@@ -3116,12 +3116,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   });
 
   // ===== INGREDIENT MANAGEMENT API ROUTES =====
-  
+
   // Get ingredients by category (for Daily Stock form)
   app.get("/api/ingredients/by-category", async (req: Request, res: Response) => {
     try {
       const ingredients = await storage.getIngredients();
-      
+
       // Group by category and sort
       const grouped = ingredients.reduce((acc: Record<string, any[]>, ingredient) => {
         const category = ingredient.category || 'Uncategorized';
@@ -3149,7 +3149,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   //   try {
   //     const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
   //     const catalogItems = loadCatalogFromCSV();
-  //     
+  //
   //     const ingredients = catalogItems.map(item => {
   //       const raw = item.raw || {};
   //       return {
@@ -3170,7 +3170,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   //         notes: null
   //       };
   //     });
-  //     
+  //
   //     res.json(ingredients);
   //   } catch (error) {
   //     console.error("Error fetching ingredients:", error);
@@ -3183,7 +3183,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
       const catalogItems = loadCatalogFromCSV();
-      
+
       const printableData = catalogItems.map(item => {
         const raw = item.raw || {};
         return {
@@ -3262,7 +3262,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const { loadCatalogFromCSV } = await import('./lib/stockCatalog');
       const catalogItems = loadCatalogFromCSV();
-      
+
       const printableData = catalogItems.map(item => {
         const raw = item.raw || {};
         return {
@@ -3327,7 +3327,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         </body>
         </html>
       `;
-      
+
       res.setHeader('Content-Type', 'text/html');
       res.send(html);
     } catch (error) {
@@ -3341,11 +3341,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const id = parseInt(req.params.id);
       const updates = req.body;
-      
+
       // Build dynamic update object for only provided fields
       const setClauses: string[] = [];
       const values: any[] = [];
-      
+
       if (updates.name !== undefined) {
         setClauses.push(`name = $${values.length + 1}`);
         values.push(updates.name);
@@ -3378,24 +3378,24 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         setClauses.push(`packaging_qty = $${values.length + 1}`);
         values.push(updates.packagingQty);
       }
-      
+
       if (setClauses.length === 0) {
         return res.status(400).json({ error: "No valid fields to update" });
       }
-      
+
       setClauses.push("updated_at = NOW()");
       values.push(id);
-      
+
       const { pool } = await import('./db');
       const query = `UPDATE ingredients SET ${setClauses.join(", ")} WHERE id = $${values.length}`;
       await pool.query(query, values);
-      
+
       const result = await pool.query("SELECT * FROM ingredients WHERE id = $1", [id]);
-      
+
       if (result.rows.length === 0) {
         return res.status(404).json({ error: "Ingredient not found" });
       }
-      
+
       res.json({ success: true, ingredient: result.rows[0] });
     } catch (error) {
       console.error("Error updating ingredient:", error);
@@ -3411,7 +3411,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.json(result);
     } catch (error) {
       console.error("Error syncing ingredients from CSV:", error);
-      res.status(500).json({ 
+      res.status(500).json({
         error: "Failed to sync ingredients from CSV",
         details: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -3423,17 +3423,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     const { PrismaClient } = await import('@prisma/client');
     const { sendDailySalesEmail } = await import('./services/salesEmail');
     const prisma = new PrismaClient();
-    
+
     try {
       const payload = req.body;
-      
+
       // Mandatory validation as specified in the plan (fixed field naming)
       const requiredFields = ['completedBy', 'startingCash', 'cashSales', 'qrSales', 'grabSales', 'otherSales', 'totalSales']; // Fixed cashStart to startingCash
       const missing = requiredFields.filter(field => !payload[field] && payload[field] !== 0);
       if (missing.length) {
         return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
       }
-      
+
       const data = {
         completedBy: payload.completedBy || 'Unknown',
         shiftDate: payload.shiftDate ? new Date(payload.shiftDate).toLocaleDateString('en-GB') : new Date().toLocaleDateString('en-GB'),
@@ -3452,7 +3452,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       };
 
       const result = await prisma.dailySales.create({ data });
-      
+
       // Send email with shopping list included
       try {
         await sendDailySalesEmail(payload);
@@ -3461,7 +3461,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         console.error('Failed to send sales email:', emailError);
         // Don't fail the entire request for email issues
       }
-      
+
       console.log('Daily Sales Form submitted with ID:', result.id);
       res.status(200).json({ ok: true, shiftId: result.id });
     } catch (err) {
@@ -3475,13 +3475,13 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Email function for direct use
   async function sendEmailDirectly(prisma: any, salesId: string) {
     const nodemailer = (await import('nodemailer')).default;
-    
+
     const sales = await prisma.dailySales.findUnique({ where: { id: salesId } });
     if (!sales) throw new Error('Sales not found');
     const stock = await prisma.dailyStock.findFirst({ where: { salesFormId: salesId } });
 
-    const totalSales = sales.totalSales ?? 
-      (Number(sales.cashSales || 0) + Number(sales.qrSales || 0) + 
+    const totalSales = sales.totalSales ??
+      (Number(sales.cashSales || 0) + Number(sales.qrSales || 0) +
        Number(sales.grabSales || 0) + Number(sales.otherSales || sales.aroiDeeSales || 0)); // Updated to use otherSales
 
     const lines: string[] = [
@@ -3527,9 +3527,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
     const transporter = nodemailer.createTransport({
       service: 'gmail',
-      auth: { 
-        user: process.env.GMAIL_USER, 
-        pass: process.env.GMAIL_APP_PASSWORD 
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD
       },
     });
 
@@ -3546,22 +3546,22 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.post('/api/daily-stock', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const payload = req.body;
-      
+
       // Mandatory validation for daily stock as specified in plan
       const requiredFields = ['meatGrams', 'burgerBuns'];
       const missing = requiredFields.filter(field => payload[field] === undefined || payload[field] === null);
       if (missing.length) {
         return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
       }
-      
+
       // Validate requisition items >0 (not >1 as mentioned in plan - assumed typo)
       if (!payload.stockRequests || Object.keys(payload.stockRequests).length === 0) {
         return res.status(400).json({ error: 'Requisition items required' });
       }
-      
+
       const {
         salesFormId = null,
         meatGrams,
@@ -3604,16 +3604,34 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.get('/api/daily-stock', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
-      const rows = await prisma.dailyStock.findMany({ 
-        orderBy: { createdAt: 'desc' }, 
-        take: 20 
+      const rows = await prisma.dailyStockV2.findMany({
+        where: { deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        include: { purchasingShiftItems: true }
       });
-      res.status(200).json(rows);
-    } catch (error) {
+      res.status(200).json({
+        ok: true,
+        source: 'daily_stock_v2',
+        requestedSource: 'daily_stock_v2',
+        rows,
+        count: rows.length,
+        blockers: [],
+      });
+    } catch (error: any) {
       console.error('Error fetching stock forms:', error);
-      res.status(500).json({ error: 'Failed to fetch stock forms' });
+      if (error?.code === 'P2021' || /does not exist|not exist|no such table/i.test(error?.message || '')) {
+        return res.status(200).json({
+          ok: false,
+          source: 'daily_stock_v2',
+          rows: [],
+          count: 0,
+          blockers: [{ code: 'MISSING_DAILY_STOCK_SOURCE', message: error?.message || 'daily_stock_v2 unavailable', where: '/api/daily-stock', canonical_source: 'daily_stock_v2', auto_build_attempted: false }],
+        });
+      }
+      res.status(200).json({ ok: false, source: 'daily_stock_v2', rows: [], count: 0, blockers: [{ code: 'DAILY_STOCK_READ_FAILED', message: error?.message || 'Failed to fetch stock forms', where: '/api/daily-stock', canonical_source: 'daily_stock_v2', auto_build_attempted: false }] });
     } finally {
       await prisma.$disconnect();
     }
@@ -3631,11 +3649,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Golden Patch - Expenses Import & Approval Routes
   app.use('/api/expenses', expensesImportRouter);
-  
+
   // Partners Router - Partner bar routes (no auth) must come BEFORE analytics routes (auth-protected)
   // to prevent the auth middleware from intercepting public partner bar endpoints
 
-  // Balance Reconciliation Router - Cash balance comparisons 
+  // Balance Reconciliation Router - Cash balance comparisons
   app.use('/api/balance', balanceRoutes);
 
   // Ingredients API routes
@@ -3665,7 +3683,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.use('/api/shift-review', shiftReviewRouter);
   app.use('/api/analytics/ingredients', ingredientUsageRoutes);
 
-  
+
   // 🔒 INGREDIENT AUTHORITY ADMIN ROUTES (ISOLATED FROM RECIPES)
   app.use('/api/admin/ingredient-authority', ingredientAuthorityAdminRoutes);
   app.use('/api/system-health', systemHealthRouter);
@@ -3697,10 +3715,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.post('/api/admin/menu-canonical/load', async (req: Request, res: Response) => {
     try {
       const items = loadCanonicalMenu();
-      res.json({ 
-        success: true, 
+      res.json({
+        success: true,
         itemCount: items.length,
-        message: `Loaded ${items.length} items from Loyverse CSV` 
+        message: `Loaded ${items.length} items from Loyverse CSV`
       });
     } catch (err) {
       console.error('[CANONICAL] Load error:', err);
@@ -3722,21 +3740,21 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   import('./api/expenseImports').then(async expenseModule => {
     app.use('/api/expensesV2/imports', expenseModule.default);
   }).catch(err => console.warn('Legacy expense imports unavailable:', err));
-  
+
   app.use("/api/bank-imports", bankUploadRouter);
-    
+
   // Import and register finance router
   import('./api/finance').then(async financeModule => {
     app.use('/api/finance', financeModule.financeRouter);
   }).catch(err => console.error('Failed to load finance API:', err));
 
   // === NEW POS INGESTION & ANALYTICS ENDPOINTS ===
-  
+
   // POS Sync Status
   app.get('/api/pos/sync-status', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const restaurant = await prisma.restaurant.findFirst({
         where: { slug: 'smash-brothers-burgers' },
@@ -3745,11 +3763,11 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           syncLogs: { orderBy: { startedAt: 'desc' }, take: 5 }
         }
       });
-      
+
       if (!restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
       }
-      
+
       res.json({
         restaurant: { name: restaurant.name, slug: restaurant.slug },
         connections: restaurant.posConnections,
@@ -3767,27 +3785,27 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.post('/api/pos/sync', async (req: Request, res: Response) => {
     try {
       const { mode = 'incremental' } = req.body;
-      
+
       if (mode === 'backfill') {
         // Trigger backfill sync (last 90 days)
         const ingesterModule = await import('./services/pos-ingestion/ingester.js');
         const syncReceiptsWindow = (ingesterModule as any).syncReceiptsWindow;
-        
+
         const endDate = new Date();
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - 90);
-        
+
         const result = await syncReceiptsWindow(startDate, endDate, 'backfill');
         res.json({ mode: 'backfill', result });
       } else {
         // Trigger incremental sync (last 15 minutes)
         const ingesterModule = await import('./services/pos-ingestion/ingester.js');
         const syncReceiptsWindow = (ingesterModule as any).syncReceiptsWindow;
-        
+
         const endDate = new Date();
         const startDate = new Date();
         startDate.setMinutes(startDate.getMinutes() - 15);
-        
+
         const result = await syncReceiptsWindow(startDate, endDate, 'incremental');
         res.json({ mode: 'incremental', result });
       }
@@ -3801,21 +3819,21 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.get('/api/analytics/latest', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const restaurant = await prisma.restaurant.findFirst({
         where: { slug: 'smash-brothers-burgers' }
       });
-      
+
       if (!restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
       }
-      
+
       const analytics = await prisma.analyticsDaily.findFirst({
         where: { restaurantId: restaurant.id },
         orderBy: { shiftDate: 'desc' }
       });
-      
+
       res.json(analytics || { message: 'No analytics data available' });
     } catch (error) {
       console.error('Analytics fetch error:', error);
@@ -3832,17 +3850,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const processAnalytics = (analyticsModule as any).processAnalytics;
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
-      
+
       const restaurant = await prisma.restaurant.findFirst({
         where: { slug: 'smash-brothers-burgers' }
       });
-      
+
       if (!restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
       }
-      
+
       const analytics = await processAnalytics(restaurant.id);
-      
+
       if (analytics) {
         res.json({ success: true, analytics });
       } else {
@@ -3858,16 +3876,16 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.get('/api/jussi/status', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const restaurant = await prisma.restaurant.findFirst({
         where: { slug: 'smash-brothers-burgers' }
       });
-      
+
       if (!restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
       }
-      
+
       const recentJobs = await prisma.job.findMany({
         where: {
           restaurantId: restaurant.id,
@@ -3876,7 +3894,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         orderBy: { createdAt: 'desc' },
         take: 5
       });
-      
+
       res.json({
         restaurant: { name: restaurant.name },
         recentSummaries: recentJobs
@@ -3906,7 +3924,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const { db } = await import('./db.js');
       const { dailyReceiptSummaries } = await import('../shared/schema.js');
       const { desc } = await import('drizzle-orm');
-      
+
       const latest = await db.select().from(dailyReceiptSummaries).orderBy(desc(dailyReceiptSummaries.shiftDate)).limit(1);
       res.json({ ok: true, data: latest[0]?.data || null });
     } catch (e: any) {
@@ -3918,18 +3936,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.get('/api/receipts/recent', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const restaurant = await prisma.restaurant.findFirst({
         where: { slug: 'smash-brothers-burgers' }
       });
-      
+
       if (!restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
       }
-      
+
       const limit = parseInt(req.query.limit as string) || 20;
-      
+
       const receipts = await prisma.receipt.findMany({
         where: { restaurantId: restaurant.id },
         include: {
@@ -3939,7 +3957,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         orderBy: { createdAtUTC: 'desc' },
         take: limit
       });
-      
+
       res.json(receipts);
     } catch (error) {
       console.error('Receipts fetch error:', error);
@@ -4033,26 +4051,26 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Register Loyverse enhanced routes
   app.use('/api/loyverse', loyverseEnhancedRoutes);
-  
-  // Register analytics routes  
+
+  // Register analytics routes
   app.use('/api/analytics', analyticsRoutes);
   app.use('/api/receipts', analyticsRoutes);
-  
+
   // Register analysis shift summary routes
   app.use('/api/analysis/shift-summary', analysisShift);
-  
+
   // Register shift analysis routes (Mekong Mamba 1.0)
   app.use('/api', shiftAnalysis);
-  
+
   // Register Daily Sales Library routes
   app.use('/api/daily-sales', dailySalesLibrary);
-  
+
   // Register Library API endpoints
   app.get('/api/library/daily-sales', async (req: Request, res: Response) => {
     const { getDailySalesLibrary } = await import('./api/library/daily-sales');
     return getDailySalesLibrary(req, res);
   });
-  
+
   // Register CSV Import endpoints
   app.post('/api/ingredients/upload', async (req: Request, res: Response) => {
     try {
@@ -4061,20 +4079,20 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.status(500).json({ ok: false, error: 'Import failed' });
     }
   });
-  
+
   // Shopping List API endpoints
   app.post('/api/shopping-list/regenerate', async (req: Request, res: Response) => {
     try {
       // Get the most recent daily sales form with requisition data directly from database
       const { pool } = await import('./db');
       const formsQuery = await pool.query(`
-        SELECT id, "createdAt", payload 
-        FROM daily_sales_v2 
-        WHERE payload IS NOT NULL 
-        ORDER BY "createdAt" DESC 
+        SELECT id, "createdAt", payload
+        FROM daily_sales_v2
+        WHERE payload IS NOT NULL
+        ORDER BY "createdAt" DESC
         LIMIT 10
       `);
-      
+
       if (formsQuery.rows.length === 0) {
         return res.json({ ok: true, message: "No forms found", itemsGenerated: 0 });
       }
@@ -4098,7 +4116,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       // Get ingredient cost data for pricing
       const ingredientsQuery = await pool.query('SELECT name, "unitCost", unit, supplier, brand FROM ingredient_v2');
       const ingredients = ingredientsQuery.rows;
-      
+
       const ingredientCosts = ingredients.reduce((acc: any, item) => {
         acc[item.name.toLowerCase()] = {
           cost: parseFloat(item.unitCost) || 0,
@@ -4132,10 +4150,10 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
       // Save to database - clear existing current shopping list and insert new one
       await pool.query('DELETE FROM shopping_list WHERE is_completed = false OR is_completed IS NULL');
-      
+
       const insertResult = await pool.query(`
         INSERT INTO shopping_list (
-          sales_form_id, items, total_items, list_name, 
+          sales_form_id, items, total_items, list_name,
           is_completed, ai_generated, created_at, updated_at
         ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
         RETURNING id
@@ -4148,150 +4166,117 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         true
       ]);
 
-      res.json({ 
-        ok: true, 
-        message: "Shopping list regenerated successfully", 
+      res.json({
+        ok: true,
+        message: "Shopping list regenerated successfully",
         itemsGenerated: shoppingItems.length,
         sourceDate: lastForm.createdAt,
         shoppingListId: insertResult.rows[0].id
       });
     } catch (error) {
       console.error('Error regenerating shopping list:', error);
-      res.status(500).json({ 
-        ok: false, 
-        error: "Failed to regenerate shopping list" 
+      res.status(500).json({
+        ok: false,
+        error: "Failed to regenerate shopping list"
       });
     }
   });
 
   app.get('/api/shopping-list/:date?', async (req: Request, res: Response) => {
     try {
-      console.log('Shopping list source:', 'ingredients DB');
       const { pool } = await import('./db');
-      
-      // Fix history/date as specified
-      const date = req.query.date || new Date().toISOString().slice(0,10);
-      const isHistory = req.query.history === 'true';
-      
-      if (isHistory) {
-        const lists = await pool.query(`
-          SELECT * FROM shopping_list 
-          WHERE DATE(created_at) = $1
-          ORDER BY created_at DESC
-        `, [date]);
-        return res.json({ history: lists.rows });
-      }
-      
-      // Get the most recent shopping list from the shopping_list table
-      const latestShoppingList = await pool.query(`
-        SELECT items FROM shopping_list 
-        WHERE items IS NOT NULL 
-        AND jsonb_array_length(items) > 0
-        ORDER BY created_at DESC 
+      const requestedDate = typeof req.query.date === 'string' ? req.query.date : (typeof req.params.date === 'string' ? req.params.date : null);
+      const params: any[] = [];
+      const dateFilter = requestedDate ? 'AND dsv."shiftDate"::date = $1::date' : '';
+      if (requestedDate) params.push(requestedDate);
+
+      const latest = await pool.query(`
+        SELECT ds.id AS stock_id, ds."salesId" AS sales_id, dsv."shiftDate" AS shift_date
+        FROM daily_stock_v2 ds
+        JOIN daily_sales_v2 dsv ON dsv.id = ds."salesId"
+        JOIN purchasing_shift_items psi ON psi."dailyStockId" = ds.id
+        WHERE ds."deletedAt" IS NULL
+          AND dsv."deletedAt" IS NULL
+          AND psi.quantity > 0
+          ${dateFilter}
+        GROUP BY ds.id, ds."salesId", dsv."shiftDate"
+        ORDER BY dsv."shiftDate"::date DESC, ds."createdAt" DESC
         LIMIT 1
-      `);
-      
-      if (latestShoppingList.rows.length === 0) {
-        console.log('No shopping list data found');
-        return res.json({ groupedList: {}, source: 'ingredients DB', totalItems: 0 });
-      }
-      
-      const items = latestShoppingList.rows[0].items || [];
-      console.log('Shopping list items found:', items.length);
-      
-      // Group by category with costs (enhanced as specified in plan)
-      const groupedList: any = {};
-      let totalItems = 0;
-      let totalEstimatedCost = 0;
-      
-      for (const item of items) {
-        const category = item.category || 'Other';
-        const estimatedCost = item.estimatedCost || 0; // Include cost calculations as specified
-        
-        if (!groupedList[category]) {
-          groupedList[category] = [];
-        }
-        
-        groupedList[category].push({
-          name: item.itemName,
-          qty: item.quantity,
-          estCost: estimatedCost // Enhanced with cost as specified in plan
+      `, params);
+
+      if (latest.rows.length === 0) {
+        return res.json({
+          ok: true,
+          source: 'purchasing_shift_items',
+          canonicalCatalogue: 'purchasing_items',
+          requestedQuantities: 'purchasing_shift_items.quantity',
+          purchasedQuantities: 'purchase_tally',
+          salesId: null,
+          stockId: null,
+          shiftDate: requestedDate,
+          lines: [],
+          groupedList: {},
+          totalItems: 0,
+          grandTotal: 0,
+          blockers: [{ code: 'NO_PURCHASING_REQUESTS', message: requestedDate ? `No purchasing requests found for ${requestedDate}` : 'No purchasing requests found', where: '/api/shopping-list', canonical_source: 'purchasing_shift_items', auto_build_attempted: false }],
         });
-        totalItems++;
-        totalEstimatedCost += estimatedCost;
       }
 
-      // FORT KNOX FIX: Add Drinks category from latest daily sales form
-      try {
-        const latestFormQuery = await pool.query(`
-          SELECT payload FROM daily_sales_v2 
-          WHERE payload IS NOT NULL 
-          ORDER BY "createdAt" DESC 
-          LIMIT 1
-        `);
-        
-        if (latestFormQuery.rows.length > 0) {
-          const payload = latestFormQuery.rows[0].payload;
-          console.log('Payload keys:', Object.keys(payload || {}));
-          
-          // Try multiple possible drink data sources
-          let drinkStock = payload?.drinkStock || payload?.drinksEnd || payload?.drinks || [];
-          
-          if (drinkStock.length > 0) {
-            groupedList['Drinks'] = drinkStock.map((drink: any) => ({
-              name: drink.name || drink.drink || 'Unknown Drink',
-              qty: drink.quantity || drink.qty || 0,
-              estCost: Number(((drink.quantity || drink.qty || 0) * 25).toFixed(2)) // Estimated 25 THB per drink unit
-            }));
-            
-            const drinksCount = drinkStock.length;
-            totalItems += drinksCount;
-            totalEstimatedCost += drinkStock.reduce((sum: number, drink: any) => 
-              sum + Number(((drink.quantity || drink.qty || 0) * 25)), 0);
-            
-            console.log('Added Drinks category with', drinksCount, 'items from form data');
-          } else {
-            // Add demo drinks when no stock data exists
-            const defaultDrinks = [
-              {name: 'Coca-Cola', qty: 24, estCost: '600.00'},
-              {name: 'Sprite', qty: 12, estCost: '300.00'},
-              {name: 'Water Bottles', qty: 48, estCost: '240.00'}
-            ];
-            groupedList['Drinks'] = defaultDrinks;
-            totalItems += defaultDrinks.length;
-            totalEstimatedCost += defaultDrinks.reduce((sum, drink) => sum + Number(drink.estCost), 0);
-            console.log('Added default Drinks category - no stock data found');
-          }
-        }
-      } catch (drinkError) {
-        console.log('Note: Could not fetch drinks data:', drinkError);
-        // Ensure Drinks category exists even if empty
-        if (!groupedList['Drinks']) {
-          groupedList['Drinks'] = [];
-        }
-      }
-      
-      console.log('Grouped categories:', Object.keys(groupedList));
-      console.log('Total items processed:', totalItems);
-      
-      // ENHANCEMENT: Add auto-order gen (manual Line text v1)
-      const orderText = `Order: ${Object.entries(groupedList).map(([cat, items]: [string, any]) => `${cat}: ${Array.isArray(items) ? items.map((i: any) => `${i.name} x${i.qty}`).join(', ') : 'No items'}`).join('\n')}`;
-      
-      if (groupedList.Rolls && Array.isArray(groupedList.Rolls) && groupedList.Rolls.some((item: any) => item.qty < 80)) {
-        // Send to bakery Line (manual: console.log(orderText); v2: direct Line API with token)
-        console.log('🥖 BAKERY ORDER NEEDED:', orderText);
-      }
-      
-      res.json({ 
-        groupedList, 
-        source: 'ingredients DB',
-        totalItems,
-        totalEstimatedCost, // Enhanced with total cost calculations as specified in plan
-        orderText // Return with orderText for dashboard
+      const stockId = latest.rows[0].stock_id;
+      const linesResult = await pool.query(`
+        SELECT pi.category, pi.item, pi.brand, pi."supplierName", pi."supplierSku", pi."unitDescription", pi."orderUnit", pi."unitCost", psi.quantity
+        FROM purchasing_shift_items psi
+        JOIN purchasing_items pi ON pi.id = psi."purchasingItemId"
+        WHERE psi."dailyStockId" = $1
+          AND psi.quantity > 0
+        ORDER BY pi.category, pi.item
+      `, [stockId]);
+
+      const lines = linesResult.rows.map((row: any) => {
+        const quantity = Number(row.quantity || 0);
+        const unitCost = Number(row.unitCost || 0);
+        return {
+          category: row.category || 'Uncategorised',
+          item: row.item,
+          name: row.item,
+          quantity,
+          qty: quantity,
+          brand: row.brand || null,
+          supplier: row.supplierName || null,
+          sku: row.supplierSku || null,
+          unitDescription: row.unitDescription || row.orderUnit || null,
+          unitCost,
+          lineTotal: quantity * unitCost,
+        };
       });
-    } catch (error) {
+
+      const groupedList = lines.reduce((acc: any, line: any) => {
+        const category = line.category || 'Uncategorised';
+        if (!acc[category]) acc[category] = [];
+        acc[category].push({ name: line.item, qty: line.quantity, estCost: line.lineTotal });
+        return acc;
+      }, {});
+      const grandTotal = lines.reduce((sum: number, line: any) => sum + line.lineTotal, 0);
+
+      return res.json({
+        ok: true,
+        source: 'purchasing_shift_items',
+        canonicalCatalogue: 'purchasing_items',
+        requestedQuantities: 'purchasing_shift_items.quantity',
+        purchasedQuantities: 'purchase_tally',
+        salesId: latest.rows[0].sales_id,
+        stockId,
+        shiftDate: latest.rows[0].shift_date,
+        lines,
+        groupedList,
+        totalItems: lines.length,
+        grandTotal,
+        totalEstimatedCost: grandTotal,
+        blockers: [],
+      });
+    } catch (error: any) {
       console.error('Shopping list error:', error);
-      res.status(500).json({ ok: false, error: 'Failed to retrieve shopping list' });
+      res.status(200).json({ ok: false, source: 'purchasing_shift_items', lines: [], groupedList: {}, totalItems: 0, blockers: [{ code: 'SHOPPING_LIST_READ_FAILED', message: error?.message || 'Failed to retrieve shopping list', where: '/api/shopping-list', canonical_source: 'purchasing_shift_items', auto_build_attempted: false }] });
     }
   });
 
@@ -4308,7 +4293,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       return res.status(500).json({ error: 'Server error' });
     }
   });
-  
+
   app.get('/api/shopping-list/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
@@ -4318,64 +4303,64 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       res.status(500).json({ ok: false, error: 'Failed to get shopping list' });
     }
   });
-  
+
   // Roadmap hooks (stubs for future implementation)
   app.post('/api/ops/jussi/compare-shift', async (req: Request, res: Response) => {
     res.json({ ok: true, message: 'Jussi comparison endpoint - implementation pending' });
   });
-  
+
   app.post('/api/acc/jane/reconcile-day', async (req: Request, res: Response) => {
     res.json({ ok: true, message: 'Jane reconciliation endpoint - implementation pending' });
   });
-  
-  // Register Daily Stock routes  
+
+  // Register Daily Stock routes
   app.use('/api/daily-stock', dailyStock);
-  
+
   // ENHANCEMENT: Add GET /api/operations/variance (new handler, but in existing routes)
   app.get('/api/operations/variance', async (req: Request, res: Response) => {
     try {
       const shiftDate = req.query.shiftDate as string;
-      
+
       // Direct Loyverse API (env LOYVERSE_TOKEN)
       const loyverseToken = process.env.LOYVERSE_TOKEN;
       if (!loyverseToken) {
         return res.status(401).json({ error: 'LOYVERSE_TOKEN not configured' });
       }
-      
+
       // Mock Loyverse API response for now (replace with actual API call)
       const receipts = []; // Would be: await loyverse.getReceipts({ date: shiftDate });
-      
+
       const soldItems = receipts.reduce((acc: any, r: any) => {
         r.items?.forEach((i: any) => acc[i.category] = (acc[i.category] || 0) + i.quantity);
         return acc;
       }, {});
-      
+
       // Match recipes/ingredients
       const expectedUsage = Object.entries(soldItems).reduce((acc: any, [cat, qty]: [string, any]) => {
         // E.g., for burgers: qty * portion from recipes
         acc['beef'] = qty * 95 / 1000 * 319; // Est THB, adjust per cat
         return acc;
       }, {});
-      
+
       // Get actual lodgment from staff
       const actualLodgment: any[] = []; // Would query: await db.select().from(stock_lodgment).where(eq(date, shiftDate));
-      
+
       // Return mock discrepancies when token is present but no real data
       const mockDiscrepancies = [
         { item: 'beef', expected: 95.5, actual: 90.0, variance: 5.5 },
         { item: 'cheese', expected: 50.0, actual: 48.0, variance: 2.0 },
         { item: 'buns', expected: 100.0, actual: 95.0, variance: 5.0 }
       ];
-      
-      const discrepancies = Object.keys(expectedUsage).length > 0 ? 
+
+      const discrepancies = Object.keys(expectedUsage).length > 0 ?
         Object.keys(expectedUsage).map(k => ({
-          item: k, 
-          expected: expectedUsage[k], 
+          item: k,
+          expected: expectedUsage[k],
           actual: actualLodgment.find(l => l.type === k)?.quantity || 0,
           variance: expectedUsage[k] - (actualLodgment.find(l => l.type === k)?.quantity || 0)
-        })).filter(d => Math.abs(d.variance) > 5) : 
+        })).filter(d => Math.abs(d.variance) > 5) :
         mockDiscrepancies;
-      
+
       res.json({ discrepancies });
     } catch (error) {
       console.error('Error calculating variance:', error);
@@ -4387,15 +4372,15 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   app.post('/api/ai/recipe-description', async (req: Request, res: Response) => {
     try {
       const { recipeName, ingredients } = req.body;
-      
+
       if (!recipeName || !ingredients) {
         return res.status(400).json({ error: 'recipeName and ingredients are required' });
       }
-      
+
       if (!openai) {
         return res.status(500).json({ error: 'OpenAI not configured' });
       }
-      
+
       const prompt = `Create a professional restaurant menu description for:
 Recipe: ${recipeName}
 Ingredients: ${ingredients}
@@ -4411,11 +4396,11 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
         max_tokens: 200,
         temperature: 0.7
       });
-      
+
       const description = response.choices[0].message.content;
       console.log(`[AI] Generated description for: ${recipeName}`);
-      
-      res.json({ 
+
+      res.json({
         ok: true,
         description,
         recipeName,
@@ -4423,8 +4408,8 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
       });
     } catch (error) {
       console.error('AI recipe description error:', error);
-      res.status(500).json({ 
-        ok: false, 
+      res.status(500).json({
+        ok: false,
         error: 'Failed to generate recipe description: ' + (error instanceof Error ? error.message : 'Unknown error')
       });
     }
@@ -4448,20 +4433,20 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
       return res.status(500).json({ error: error?.message || 'Failed to publish menu' });
     }
   });
-  
+
   // Register Upload and Import routes
   app.use('/api/upload', uploadsRouter);
   app.use('/api/import', importRouter);
   app.use('/api/costing', costingRouter);
   // ExpensesV2 router is now active
 
-  
+
   // Purchase Tally router
   app.use('/api/purchase-tally', purchaseTallyRouter);
-  
+
   // Register Menu Management routes
   app.use('/api/menus', menuRouter);
-  
+
   // Register Online Ordering routes
   registerOnlineMenuRoutes(app);
   registerAdminMenuRoutes(app);
@@ -4475,21 +4460,21 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
 
   // Register image upload route
   app.use('/api', imageUploadRouter);
-  
+
   // MEGA V3 PATCH: GET /api/forms/library - properly return payload for library display
   app.get('/api/forms/library', async (req: Request, res: Response) => {
     try {
       const { pool } = await import('./db');
-      
+
       // Get recent form submissions - include all records even without payload
       const formsQuery = await pool.query(`
         SELECT id, "shiftDate", "completedBy", "createdAt", "totalSales", payload
-        FROM daily_sales_v2 
+        FROM daily_sales_v2
         WHERE "deletedAt" IS NULL
-        ORDER BY "createdAt" DESC 
+        ORDER BY "createdAt" DESC
         LIMIT 20
       `);
-      
+
       const forms = formsQuery.rows.map((form: any) => {
         const payload = form.payload || {};
         return {
@@ -4507,7 +4492,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
           payload // Include full payload for debugging
         };
       });
-      
+
       console.log(`[MEGA V3 LIBRARY] Returning ${forms.length} forms, first has payload:`, !!forms[0]?.payload);
       res.json(forms);
     } catch (error) {
@@ -4527,7 +4512,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
       res.status(500).json({ error: "Failed to process v3 request" });
     }
   });
-  
+
   // V3.1 TIDY: Block legacy WRITE endpoints with 410 Gone (allow GET for library compatibility)
   const legacyRoutes = [
     "/api/forms/daily-sales-v2",      // dash version
@@ -4535,7 +4520,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     "/api/daily-sales",
     "/api/forms/daily-sales"
   ];
-  
+
   // Block POST/PUT/PATCH/DELETE but allow GET for backwards compatibility
   app.post(legacyRoutes, (_req, res) => {
     res.status(410).json({ error: "Gone: use /api/forms/daily-sales/v3" });
@@ -4595,7 +4580,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
       res.status(500).json({ ok: false, error: 'Failed to repair merge' });
     }
   });
-  
+
   // Owner-only protection for Form Library read endpoints
   // All GET requests to /api/forms/daily-sales/v2* are library-read only (owners)
   // Staff submit via POST/PATCH — those are not blocked here
@@ -4619,25 +4604,25 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     return getDailySalesV2LatestProof(req, res);
   });
   app.use('/api/forms', formsRouter);
-  
+
   // Register Ingredients routes
   app.post("/api/ingredients/upload-csv", upload.single("file"), uploadIngredientsCSV);
   app.get("/api/ingredients/shopping-list/:date", getShoppingListByDate);
-  
+
   // Register Manager Checklist routes
   // Enhanced Manager Checklist endpoints
-  
+
   // Admin: manage questions
   app.get("/api/manager-checklist/questions", async (req,res)=>{
     const rows = await managerChecklistStore.listQuestions();
     res.json({ rows });
   });
-  
+
   app.post("/api/manager-checklist/questions", async (req,res)=>{
     const q = await managerChecklistStore.upsertQuestion(req.body);
     res.json(q);
   });
-  
+
   app.delete("/api/manager-checklist/questions/:id", async (req,res)=>{
     await managerChecklistStore.deleteQuestion(req.params.id);
     res.json({ ok:true });
@@ -4676,7 +4661,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     if (!managerName || !Array.isArray(answers)) {
       return res.status(400).json({ error:"managerName & answers required" });
     }
-    
+
     const submission = {
       id: `sub-${dateISO}`,
       dateISO,
@@ -4686,7 +4671,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
       answers,
       shiftNotes,
     };
-    
+
     await managerChecklistStore.saveSubmission(submission);
     res.json({ ok:true, submission });
   });
@@ -4726,18 +4711,18 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     // Simple mock upload - in production, use proper file upload middleware
     res.json({ url: `/uploads/mock-image-${Date.now()}.jpg` });
   });
-  
+
 
   // === PHASE 2: SNAPSHOT SYSTEM ENDPOINTS ===
-  
+
   // Get shift snapshots
   app.get('/api/snapshots', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const limit = parseInt(req.query.limit as string) || 10;
-      
+
       const snapshots = await prisma.shiftSnapshot.findMany({
         include: {
           payments: true,
@@ -4747,7 +4732,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
         orderBy: { windowStartUTC: 'desc' },
         take: limit
       });
-      
+
       // Convert BigInt to string for JSON serialization
       const serializedSnapshots = snapshots.map(snapshot => ({
         ...snapshot,
@@ -4761,7 +4746,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
           revenueSatang: i.revenueSatang.toString()
         }))
       }));
-      
+
       res.json(serializedSnapshots);
     } catch (error) {
       console.error('Snapshots fetch error:', error);
@@ -4775,7 +4760,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.get('/api/snapshots/:id', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const snapshot = await prisma.shiftSnapshot.findUnique({
         where: { id: req.params.id },
@@ -4786,11 +4771,11 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
           comparisons: { include: { salesForm: true } }
         }
       });
-      
+
       if (!snapshot) {
         return res.status(404).json({ error: 'Snapshot not found' });
       }
-      
+
       res.json(snapshot);
     } catch (error) {
       console.error('Snapshot fetch error:', error);
@@ -4804,7 +4789,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.get('/api/jussi/latest-comparison', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const comparison = await prisma.jussiComparison.findFirst({
         include: {
@@ -4825,11 +4810,11 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
         },
         orderBy: { createdAt: 'desc' }
       });
-      
+
       if (!comparison) {
         return res.status(404).json({ error: 'No comparison data available' });
       }
-      
+
       res.json(comparison);
     } catch (error) {
       console.error('Comparison fetch error:', error);
@@ -4843,28 +4828,28 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.get('/api/snapshots/:id/items', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const snapshotId = req.params.id;
-      
+
       const items = await prisma.snapshotItem.findMany({
         where: { snapshotId },
         orderBy: { qty: 'desc' },
         take: 50,
-        select: { 
-          itemName: true, 
-          qty: true, 
-          revenueSatang: true 
+        select: {
+          itemName: true,
+          qty: true,
+          revenueSatang: true
         }
       });
-      
+
       // Convert BigInt to string for JSON serialization
       const serializedItems = items.map(item => ({
         itemName: item.itemName,
         qty: item.qty,
         revenueSatang: item.revenueSatang.toString()
       }));
-      
+
       res.json(serializedItems);
     } catch (error) {
       console.error('Items fetch error:', error);
@@ -4900,45 +4885,45 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.post('/api/snapshots/create', async (req: Request, res: Response) => {
     try {
       const { date, salesFormId } = req.body;
-      
+
       if (!date) {
         return res.status(400).json({ error: 'Date is required (YYYY-MM-DD format)' });
       }
-      
+
       // Execute the snapshot worker
       const { spawn } = require('child_process');
       const args = ['workers/snapshotWorker.mjs', date];
       if (salesFormId) args.push(salesFormId);
-      
+
       const worker = spawn('node', args, { cwd: process.cwd() });
-      
+
       let output = '';
       let error = '';
-      
+
       worker.stdout.on('data', (data: Buffer) => {
         output += data.toString();
       });
-      
+
       worker.stderr.on('data', (data: Buffer) => {
         error += data.toString();
       });
-      
+
       worker.on('close', (code: number) => {
         if (code === 0) {
-          res.json({ 
-            success: true, 
+          res.json({
+            success: true,
             message: 'Snapshot created successfully',
             output: output.trim()
           });
         } else {
-          res.status(500).json({ 
-            success: false, 
+          res.status(500).json({
+            success: false,
             error: 'Snapshot creation failed',
             details: error || output
           });
         }
       });
-      
+
     } catch (error) {
       console.error('Snapshot creation error:', error);
       res.status(500).json({ error: 'Failed to create snapshot', details: (error as Error).message });
@@ -4949,10 +4934,10 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.get('/api/snapshots/:id/comparison', async (req: Request, res: Response) => {
     const { PrismaClient } = await import('@prisma/client');
     const prisma = new PrismaClient();
-    
+
     try {
       const snapshotId = req.params.id;
-      
+
       const comparison = await prisma.jussiComparison.findFirst({
         where: { snapshotId },
         select: {
@@ -4977,41 +4962,41 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
           state: true
         }
       });
-      
+
       if (!comparison) {
         return res.status(404).json({ error: 'No comparison data available for this snapshot' });
       }
-      
+
       res.json({
-        opening: { 
-          buns: comparison.openingBuns ?? 0, 
-          meatGram: comparison.openingMeatGram ?? 0, 
-          drinks: comparison.openingDrinks ?? 0 
+        opening: {
+          buns: comparison.openingBuns ?? 0,
+          meatGram: comparison.openingMeatGram ?? 0,
+          drinks: comparison.openingDrinks ?? 0
         },
-        purchases: { 
-          buns: comparison.purchasedBuns ?? 0, 
-          meatGram: comparison.purchasedMeatGram ?? 0, 
-          drinks: comparison.purchasedDrinks ?? 0 
+        purchases: {
+          buns: comparison.purchasedBuns ?? 0,
+          meatGram: comparison.purchasedMeatGram ?? 0,
+          drinks: comparison.purchasedDrinks ?? 0
         },
-        usagePOS: { 
-          buns: comparison.expectedBuns ?? 0, 
-          meatGram: comparison.expectedMeatGram ?? 0, 
-          drinks: comparison.expectedDrinks ?? 0 
+        usagePOS: {
+          buns: comparison.expectedBuns ?? 0,
+          meatGram: comparison.expectedMeatGram ?? 0,
+          drinks: comparison.expectedDrinks ?? 0
         },
-        expectedClose: { 
-          buns: comparison.expectedCloseBuns ?? 0, 
-          meatGram: comparison.expectedCloseMeatGram ?? 0, 
-          drinks: comparison.expectedCloseDrinks ?? 0 
+        expectedClose: {
+          buns: comparison.expectedCloseBuns ?? 0,
+          meatGram: comparison.expectedCloseMeatGram ?? 0,
+          drinks: comparison.expectedCloseDrinks ?? 0
         },
-        staffClose: { 
-          buns: comparison.staffBuns ?? 0, 
-          meatGram: comparison.staffMeatGram ?? 0, 
-          drinks: comparison.staffDrinks ?? 0 
+        staffClose: {
+          buns: comparison.staffBuns ?? 0,
+          meatGram: comparison.staffMeatGram ?? 0,
+          drinks: comparison.staffDrinks ?? 0
         },
-        variance: { 
-          buns: comparison.varBuns ?? 0, 
-          meatGram: comparison.varMeatGram ?? 0, 
-          drinks: comparison.varDrinks ?? 0 
+        variance: {
+          buns: comparison.varBuns ?? 0,
+          meatGram: comparison.varMeatGram ?? 0,
+          drinks: comparison.varDrinks ?? 0
         },
         state: comparison.state
       });
@@ -5027,56 +5012,56 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.post('/api/snapshots/:id/recompute', async (req: Request, res: Response) => {
     try {
       const snapshotId = req.params.id;
-      
+
       // Find the snapshot date
       const { PrismaClient } = await import('@prisma/client');
       const prisma = new PrismaClient();
-      
+
       const snapshot = await prisma.shiftSnapshot.findUnique({
         where: { id: snapshotId },
         select: { windowStartUTC: true }
       });
-      
+
       if (!snapshot) {
         return res.status(404).json({ error: 'Snapshot not found' });
       }
-      
+
       // Format date for worker
       const date = snapshot.windowStartUTC.toISOString().split('T')[0];
-      
+
       // Execute the snapshot worker
       const { spawn } = require('child_process');
       const worker = spawn('node', ['workers/snapshotWorker.mjs', date], { cwd: process.cwd() });
-      
+
       let output = '';
       let error = '';
-      
+
       worker.stdout.on('data', (data: Buffer) => {
         output += data.toString();
       });
-      
+
       worker.stderr.on('data', (data: Buffer) => {
         error += data.toString();
       });
-      
+
       worker.on('close', (code: number) => {
         if (code === 0) {
-          res.json({ 
-            success: true, 
+          res.json({
+            success: true,
             message: 'Purchases-aware comparison recomputed successfully',
             output: output.trim()
           });
         } else {
-          res.status(500).json({ 
-            success: false, 
+          res.status(500).json({
+            success: false,
             error: 'Recomputation failed',
             details: error || output
           });
         }
       });
-      
+
       await prisma.$disconnect();
-      
+
     } catch (error) {
       console.error('Recompute error:', error);
       res.status(500).json({ error: 'Failed to recompute comparison', details: (error as Error).message });
@@ -5123,11 +5108,11 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     try {
       const id = parseInt(req.params.id);
       const { status } = req.body;
-      
+
       if (!['DRAFT', 'SUBMITTED', 'LOCKED'].includes(status)) {
         return res.status(400).json({ error: "Invalid status" });
       }
-      
+
       const result = await storage.updateShiftSalesStatus(id, status);
       res.json(result);
     } catch (error) {
@@ -5140,42 +5125,42 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.get('/api/operations/stats', async (req: Request, res: Response) => {
     try {
       const { pool } = await import('./db');
-      
+
       // Aggregate Loyverse for MTD as specified
       const firstMonth = new Date().toISOString().slice(0,7) + '-01';
-      
+
       // Get MTD shifts from Loyverse data
       const mtdShiftsQuery = await pool.query(`
-        SELECT data FROM loyverse_shifts 
-        WHERE shift_date >= $1 
+        SELECT data FROM loyverse_shifts
+        WHERE shift_date >= $1
         ORDER BY shift_date DESC
       `, [firstMonth]);
-      
+
       const mtdShifts = mtdShiftsQuery.rows || [];
       const netMtd = mtdShifts.reduce((sum: number, row: any) => {
         const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
         return sum + parseFloat(data.net_sales || 0);
       }, 0);
-      
+
       // Get last shift data
       const lastShiftQuery = await pool.query(`
-        SELECT data FROM loyverse_shifts 
-        ORDER BY shift_date DESC 
+        SELECT data FROM loyverse_shifts
+        ORDER BY shift_date DESC
         LIMIT 1
       `);
-      
+
       const lastShift = lastShiftQuery.rows?.[0];
-      const lastShiftData = lastShift ? 
-        (typeof lastShift.data === 'string' ? JSON.parse(lastShift.data) : lastShift.data) : 
+      const lastShiftData = lastShift ?
+        (typeof lastShift.data === 'string' ? JSON.parse(lastShift.data) : lastShift.data) :
         {};
-      
+
       // Get recent balances for anomaly detection (last 5 shifts)
       const recentShiftsQuery = await pool.query(`
-        SELECT shift_date, data FROM loyverse_shifts 
-        ORDER BY shift_date DESC 
+        SELECT shift_date, data FROM loyverse_shifts
+        ORDER BY shift_date DESC
         LIMIT 5
       `);
-      
+
       const balances = (recentShiftsQuery.rows || []).map((row: any) => {
         const data = typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
         // Simple balance check - in production would compare against form.totalSales
@@ -5186,7 +5171,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
           status: Math.abs(balance) <= 50 ? 'Balanced' : 'Unbalanced'
         };
       });
-      
+
       res.json({
         netMtd: netMtd,
         grossLast: parseFloat(lastShiftData.gross_sales || 0),
@@ -5194,7 +5179,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
         anomalies: balances.filter((b: any) => b.status === 'Unbalanced').length,
         balances: balances
       });
-      
+
     } catch (error) {
       console.error('Operations stats error:', error);
       res.status(500).json({ error: 'Failed to fetch operations stats' });
@@ -5267,24 +5252,24 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     try {
       const { loyverseShiftReports } = await import("../shared/schema");
       const { format } = await import("date-fns");
-      
+
       // Get last 5 authentic shift reports from Loyverse data
       const recentShifts = await db
         .select()
         .from(loyverseShiftReports)
         .orderBy(desc(loyverseShiftReports.shiftDate))
         .limit(5);
-      
+
       const balanceReports = recentShifts.map(shift => {
         // Extract authentic cash difference from report_data JSON
         const reportData = shift.reportData as any;
         const cashDifference = parseFloat(reportData?.cash_difference?.toString() || '0');
         const isWithinRange = Math.abs(cashDifference) <= 50;
-        
+
         // Format date to show actual shift date
         const shiftDate = shift.shiftDate ? new Date(shift.shiftDate) : new Date();
         const formattedDate = format(shiftDate, 'dd/MM/yyyy');
-        
+
         return {
           date: formattedDate,
           balance: cashDifference,
@@ -5292,7 +5277,7 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
           isWithinRange
         };
       });
-      
+
       res.json(balanceReports);
     } catch (err) {
       console.error("Error fetching shift balance review:", err);

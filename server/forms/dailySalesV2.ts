@@ -132,9 +132,19 @@ export function mapLibraryRow(row: any) {
     id: row.id,
     date: row.shiftDate || row.createdAt,
     staff: row.completedBy,
-    cashStart: row.payload?.startingCash || 0,
-    cashEnd: row.payload?.closingCash || 0,
-    totalSales: row.payload?.totalSales || 0,
+    cashStart: row.payload?.startingCash ?? 0,
+    cashEnd: row.payload?.closingCash ?? 0,
+    cashSales: row.payload?.cashSales ?? row.cashSales ?? 0,
+    qrSales: row.payload?.qrSales ?? row.qrSales ?? 0,
+    grabSales: row.payload?.grabSales ?? row.grabSales ?? 0,
+    otherSales: row.payload?.otherSales ?? row.aroiSales ?? 0,
+    totalSales: row.payload?.totalSales ?? row.totalSales ?? 0,
+    refunds: row.payload?.refunds ?? null,
+    expenses: row.payload?.expenses ?? [],
+    wages: row.payload?.wages ?? [],
+    totalExpenses: row.payload?.totalExpenses ?? row.totalExpenses ?? 0,
+    expectedClosingCash: row.payload?.expectedClosingCash ?? null,
+    balanced: row.payload?.balanced ?? null,
     buns: rollsEnd ?? "-",   // 0 shows as 0, not "-"
     meat: meatEnd ?? "-",    // 0 shows as 0, not "-"
     drinks,                  // normalized array
@@ -305,11 +315,18 @@ export async function createDailySalesV2(req: Request, res: Response) {
     
     await pool.query(
       `INSERT INTO daily_sales_v2 (
-        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO", payload
+        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO",
+        "startingCash", "endingCash", "cashBanked", "cashSales", "qrSales", "grabSales", "aroiSales",
+        "totalSales", "shoppingTotal", "wagesTotal", "othersTotal", "totalExpenses", "qrTransfer",
+        "grab_receipt_count", "cash_receipt_count", "qr_receipt_count", payload
       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)`,
       [
-        id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt, payload
+        id, shiftDate, shiftDateAsDate, completedBy, createdAt, createdAt,
+        toTHB(startingCash), closingCashTHB, cashBanked < 0 ? 0 : cashBanked,
+        toTHB(cashSales), toTHB(qrSales), toTHB(grabSales), toTHB(otherSales),
+        totalSales, shoppingTotal, wagesTotal, othersTotal, totalExpenses, qrTransfer,
+        grabReceiptCount, cashReceiptCount, qrReceiptCount, payload
       ]
     );
 
@@ -506,9 +523,9 @@ export async function getDailySalesV2(_req: Request, res: Response) {
     const records = result.rows.map(mapLibraryRow);
 
     res.json({ ok: true, records });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Get Daily Sales V2 error", err);
-    res.status(500).json({ ok: false, error: "Failed to fetch records" });
+    res.status(200).json({ ok: false, records: [], rows: [], source: 'daily_sales_v2', blockers: [{ code: 'DAILY_SALES_V2_UNAVAILABLE', message: err?.message || 'Failed to fetch records', where: '/api/forms/daily-sales/v2', canonical_source: 'daily_sales_v2', auto_build_attempted: false }] });
   }
 }
 

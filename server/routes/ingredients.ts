@@ -174,7 +174,7 @@ router.get('/', async (req, res) => {
     res.json(enriched);
   } catch (e: any) {
     console.error('ingredients.list error', e);
-    res.status(500).json({ error: 'Server error' });
+    res.status(200).json({ ingredients: [], rows: [], source: 'purchasing_items where is_ingredient=true', blockers: [{ code: 'INGREDIENTS_UNAVAILABLE', message: e?.message || 'Failed to fetch ingredients', where: '/api/ingredients', canonical_source: 'purchasing_items', auto_build_attempted: false }] });
   }
 });
 
