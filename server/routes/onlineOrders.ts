@@ -29,9 +29,9 @@ export function registerOnlineOrderRoutes(app: Express) {
       });
       
       res.json({ totalOrders: count, lastChecked: new Date() });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching order count:', error);
-      res.status(500).json({ error: 'Failed to fetch order count' });
+      res.status(200).json({ totalOrders: 0, lastChecked: new Date(), blockers: [{ code: 'ONLINE_ORDERS_UNAVAILABLE', message: error?.message || 'Failed to fetch order count', where: '/api/orders/today', canonical_source: 'orders_online', auto_build_attempted: false }] });
     }
   });
 
@@ -90,10 +90,24 @@ export function registerOnlineOrderRoutes(app: Express) {
         },
       });
 
-      res.json({ orders });
-    } catch (error) {
+      res.json({ orders, source: 'orders_online' });
+    } catch (error: any) {
       console.error("Error fetching orders:", error);
-      res.status(500).json({ error: "Failed to fetch orders" });
+      res.status(200).json({ orders: [], source: 'orders_online', blockers: [{ code: 'ONLINE_ORDERS_UNAVAILABLE', message: error?.message || 'Failed to fetch orders', where: '/api/orders', canonical_source: 'orders_online', auto_build_attempted: false }] });
+    }
+  });
+
+  // GET /api/online-orders - compatibility read alias for admin/API checks.
+  app.get("/api/online-orders", async (_req, res) => {
+    try {
+      const orders = await prisma.orderOnline.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { lines: true },
+      });
+      res.json({ orders, source: 'orders_online' });
+    } catch (error: any) {
+      console.error("Error fetching online orders:", error);
+      res.status(200).json({ orders: [], source: 'orders_online', blockers: [{ code: 'ONLINE_ORDERS_UNAVAILABLE', message: error?.message || 'Failed to fetch orders', where: '/api/online-orders', canonical_source: 'orders_online', auto_build_attempted: false }] });
     }
   });
 

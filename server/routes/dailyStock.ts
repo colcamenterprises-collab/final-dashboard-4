@@ -5,32 +5,32 @@ const r = Router();
 
 r.get("/", async (req, res) => {
   const { salesId } = req.query;
-  
+
   if (!salesId) {
-    return res.status(400).json({ error: "salesId query parameter is required" });
+    return res.json({ ok: true, source: "daily_stock_v2", rows: [], blockers: [{ code: "MISSING_SALES_ID", message: "salesId query parameter is required for record lookup", where: "/api/daily-stock", canonical_source: "daily_stock_v2", auto_build_attempted: false }] });
   }
 
   try {
-    // Check if we have a DailyStock table and look for records related to this sales ID
     const stockRow = await pool.query(`
-      SELECT * FROM "DailyStock" 
-      WHERE "salesId" = $1 
-      ORDER BY "createdAt" DESC 
+      SELECT * FROM daily_stock_v2
+      WHERE "salesId" = $1
+        AND "deletedAt" IS NULL
+      ORDER BY "createdAt" DESC
       LIMIT 1
     `, [salesId]);
 
     if (stockRow.rows.length === 0) {
-      return res.status(404).json({ error: "Stock data not found for this sales record" });
+      return res.json({ ok: true, source: "daily_stock_v2", rows: [], blockers: [{ code: "STOCK_DATA_NOT_FOUND", message: "Stock data not found for this sales record", where: "/api/daily-stock", canonical_source: "daily_stock_v2", auto_build_attempted: false }] });
     }
 
-    res.json(stockRow.rows[0]);
+    res.json({ ok: true, source: "daily_stock_v2", data: stockRow.rows[0], rows: stockRow.rows });
   } catch (error: any) {
     console.error("Error fetching stock data:", error);
     // If DailyStock table doesn't exist, return 404
     if (error.code === '42P01') { // relation does not exist
-      return res.status(404).json({ error: "Stock data not available" });
+      return res.json({ ok: false, source: "daily_stock_v2", rows: [], blockers: [{ code: "MISSING_DAILY_STOCK_SOURCE", message: "daily_stock_v2 table not available", where: "/api/daily-stock", canonical_source: "daily_stock_v2", auto_build_attempted: false }] });
     }
-    res.status(500).json({ error: "Failed to fetch stock data" });
+    res.status(200).json({ ok: false, source: "daily_stock_v2", rows: [], blockers: [{ code: "DAILY_STOCK_READ_FAILED", message: error?.message || "Failed to fetch stock data", where: "/api/daily-stock", canonical_source: "daily_stock_v2", auto_build_attempted: false }] });
   }
 });
 

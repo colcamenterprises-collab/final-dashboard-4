@@ -380,12 +380,12 @@ router.get('/', async (req, res) => {
       .limit(50);
 
     res.json(batches);
-  } catch (error) {
+  } catch (error: any) {
     console.error('[EXPENSE_SAFE_FAIL] imports/list:', error);
-    res.status(500).json({
-      success: false,
-      error: "EXPENSE_IMPORT_LIST_FAILED",
-      message: error instanceof Error ? error.message : "Failed to load import batches.",
+    res.status(200).json({
+      rows: [],
+      source: 'expense_import_batch',
+      blockers: [{ code: 'EXPENSE_IMPORT_SOURCE_UNAVAILABLE', message: error?.message || 'Failed to load import batches.', where: '/api/expensesV2/imports', canonical_source: 'expense_import_batch', auto_build_attempted: false }],
     });
   }
 });

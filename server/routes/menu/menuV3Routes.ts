@@ -15,8 +15,13 @@ import {
 const router = express.Router();
 
 // Categories
-router.get("/categories", async (req, res) => {
-  return res.json(await getAllCategories());
+router.get("/categories", async (_req, res) => {
+  try {
+    return res.json(await getAllCategories());
+  } catch (error: any) {
+    console.error('[menu-v3] categories unavailable:', error);
+    return res.status(200).json({ ok: false, categories: [], source: 'menu_categories_v3', blockers: [{ code: 'MENU_CATEGORIES_UNAVAILABLE', message: error?.message || 'Failed to load categories', where: '/api/menu-v3/categories', canonical_source: 'menu_categories_v3', auto_build_attempted: false }] });
+  }
 });
 
 router.post("/categories/create", async (req, res) => {
@@ -33,8 +38,14 @@ router.post("/categories/reorder", async (req, res) => {
 });
 
 // Items
-router.get("/items", async (req, res) => {
-  return res.json(await getAllItems());
+router.get("/items", async (_req, res) => {
+  try {
+    const items = await getAllItems();
+    return res.json({ ok: true, items, source: 'menu_items_v3' });
+  } catch (error: any) {
+    console.error('[menu-v3] items unavailable:', error);
+    return res.status(200).json({ ok: false, items: [], source: 'menu_items_v3', blockers: [{ code: 'MENU_ITEMS_UNAVAILABLE', message: error?.message || 'Failed to load menu items', where: '/api/menu-v3/items', canonical_source: 'menu_items_v3', auto_build_attempted: false }] });
+  }
 });
 
 router.post("/items/create", async (req, res) => {
@@ -50,8 +61,13 @@ router.post("/items/toggle", async (req, res) => {
 });
 
 // Modifiers
-router.get("/modifiers/groups", async (req, res) => {
-  return res.json(await getModifierGroups());
+router.get("/modifiers/groups", async (_req, res) => {
+  try {
+    return res.json(await getModifierGroups());
+  } catch (error: any) {
+    console.error('[menu-v3] modifiers unavailable:', error);
+    return res.status(200).json({ ok: false, groups: [], source: 'modifier_groups_v3', blockers: [{ code: 'MODIFIERS_UNAVAILABLE', message: error?.message || 'Failed to load modifier groups', where: '/api/menu-v3/modifiers/groups', canonical_source: 'modifier_groups_v3', auto_build_attempted: false }] });
+  }
 });
 
 router.post("/modifiers/groups/create", async (req, res) => {
@@ -68,7 +84,12 @@ router.post("/modifiers/apply", async (req, res) => {
 
 // Recipes
 router.get("/recipes/:itemId", async (req, res) => {
-  return res.json(await getRecipe(req.params.itemId));
+  try {
+    return res.json(await getRecipe(req.params.itemId));
+  } catch (error: any) {
+    console.error('[menu-v3] recipe unavailable:', error);
+    return res.status(200).json({ ok: false, recipe: null, source: 'recipes_v3', blockers: [{ code: 'MENU_RECIPE_UNAVAILABLE', message: error?.message || 'Failed to load recipe', where: '/api/menu-v3/recipes/:itemId', canonical_source: 'recipes_v3', auto_build_attempted: false }] });
+  }
 });
 
 router.post("/recipes/set", async (req, res) => {

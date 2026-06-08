@@ -204,23 +204,38 @@ app.get("/api/system/pos-status", (req, res, next) => {
 }, async (_req, res) => {
   const hasToken = Boolean(process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_TOKEN || process.env.BOBS_LOYVERSE_TOKEN);
   try {
-    const latestReceipt = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX("createdAtUTC") AS v FROM receipts`);
-    const latestShift = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX(shift_date) AS v FROM loyverse_shifts`);
-    const latestSync = await prisma.$queryRawUnsafe<any[]>(`SELECT MAX("createdAt") AS v FROM receipts`);
+    const receiptMeta = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT COUNT(*)::int AS count, MAX("createdAtUTC") AS latest_receipt_at, MAX("createdAt") AS latest_sync_at
+      FROM receipts
+    `).catch((error: any) => ({ error }));
+    const shiftMeta = await prisma.$queryRawUnsafe<any[]>(`
+      SELECT COUNT(*)::int AS count, MAX(shift_date) AS latest_shift_date
+      FROM loyverse_shifts
+    `).catch((error: any) => ({ error }));
 
-    const latestReceiptDate = latestReceipt?.[0]?.v ?? null;
-    const latestShiftReportDate = latestShift?.[0]?.v ?? null;
-    const latestSyncAt = latestSync?.[0]?.v ?? null;
-    const connected = hasToken && Boolean(latestReceiptDate);
+    const receiptError = !Array.isArray(receiptMeta) ? receiptMeta.error : null;
+    const shiftError = !Array.isArray(shiftMeta) ? shiftMeta.error : null;
+    const receiptRow = Array.isArray(receiptMeta) ? receiptMeta[0] : null;
+    const shiftRow = Array.isArray(shiftMeta) ? shiftMeta[0] : null;
+    const latestReceiptDate = receiptRow?.latest_receipt_at ?? null;
+    const latestShiftReportDate = shiftRow?.latest_shift_date ?? null;
+    const latestSyncAt = receiptRow?.latest_sync_at ?? null;
+    const connected = hasToken && Boolean(latestReceiptDate) && !receiptError;
 
     let failurePoint = "none";
     let minimalFixRequired = "none";
     if (!hasToken) {
       failurePoint = "no credentials";
       minimalFixRequired = "Set LOYVERSE_API_TOKEN in server environment.";
+    } else if (receiptError) {
+      failurePoint = "missing canonical receipt source";
+      minimalFixRequired = receiptError?.message || "Verify receipts table exists and sync has run.";
     } else if (!latestReceiptDate) {
       failurePoint = "missing receipt persistence";
       minimalFixRequired = "Trigger /api/loyverse/sync and verify writes into receipts table.";
+    } else if (shiftError) {
+      failurePoint = "missing canonical shift source";
+      minimalFixRequired = shiftError?.message || "Verify loyverse_shifts table exists.";
     } else if (!latestShiftReportDate) {
       failurePoint = "missing shift creation logic";
       minimalFixRequired = "Ensure shift ingest route writes loyverse_shifts records for synced receipts.";
@@ -233,7 +248,19 @@ app.get("/api/system/pos-status", (req, res, next) => {
       latestSyncAt,
       activeIngestionRoute: "/api/loyverse/sync",
       receiptTable: "receipts",
+      receiptItemsTable: "receipt_items",
+      receiptPaymentsTable: "receipt_payments",
       shiftReportTable: "loyverse_shifts",
+      timezone: "Asia/Bangkok",
+      shiftWindow: "17:00-03:00 Asia/Bangkok",
+      counts: {
+        receipts: Number(receiptRow?.count || 0),
+        shiftReports: Number(shiftRow?.count || 0),
+      },
+      blockers: [
+        ...(receiptError ? [{ code: "MISSING_RECEIPT_SOURCE", message: receiptError.message || String(receiptError), where: "receipts", canonical_source: "receipts", auto_build_attempted: false }] : []),
+        ...(shiftError ? [{ code: "MISSING_SHIFT_SOURCE", message: shiftError.message || String(shiftError), where: "loyverse_shifts", canonical_source: "loyverse_shifts", auto_build_attempted: false }] : []),
+      ],
       failurePoint,
       minimalFixRequired,
     });

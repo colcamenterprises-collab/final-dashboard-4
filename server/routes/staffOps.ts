@@ -205,7 +205,7 @@ router.get('/dashboard', async (req, res) => {
       lastRosterDate: rosterResult[0]?.shiftDate ?? null,
     });
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(200).json({ activeStaff: 0, recentRosters: 0, cleaningTemplates: 0, lastRosterDate: null, source: 'staff_ops_tables', blockers: [{ code: 'STAFF_DASHBOARD_UNAVAILABLE', message: e.message, where: '/api/staff/dashboard', canonical_source: 'staff_members + shift_rosters + cleaning_task_templates', auto_build_attempted: false }] });
   }
 });
 

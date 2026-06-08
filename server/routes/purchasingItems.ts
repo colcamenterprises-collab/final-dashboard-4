@@ -90,9 +90,9 @@ router.get('/', async (req, res) => {
       ],
     });
     res.json({ ok: true, items });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching purchasing items:', error);
-    res.status(500).json({ ok: false, error: 'Failed to fetch items' });
+    res.status(200).json({ ok: false, items: [], source: 'purchasing_items', blockers: [{ code: 'PURCHASING_ITEMS_UNAVAILABLE', message: error?.message || 'Failed to fetch items', where: '/api/purchasing-items', canonical_source: 'purchasing_items', auto_build_attempted: false }] });
   }
 });
 

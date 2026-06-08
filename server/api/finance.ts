@@ -176,6 +176,82 @@ router.get('/summary/today', async (req: Request, res: Response) => {
   }
 });
 
+
+// GET /api/finance/profit-loss - read-only P&L aligned to stored POS/Daily Sales values.
+router.get('/profit-loss', async (req: Request, res: Response) => {
+  try {
+    const start = typeof req.query.start === 'string' ? req.query.start : null;
+    const end = typeof req.query.end === 'string' ? req.query.end : null;
+    const validRange = Boolean(start && end && /^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end));
+    const dateFilter = validRange ? `AND dsv."shiftDate"::date >= '${start}'::date AND dsv."shiftDate"::date <= '${end}'::date` : '';
+
+    const salesResult = await db.execute(sql.raw(`
+      SELECT
+        COALESCE(SUM(dsv."cashSales"), 0) AS cash_sales,
+        COALESCE(SUM(dsv."qrSales"), 0) AS qr_sales,
+        COALESCE(SUM(dsv."grabSales"), 0) AS grab_sales,
+        COALESCE(SUM(dsv."aroiSales"), 0) AS other_sales,
+        COALESCE(SUM(dsv."totalSales"), 0) AS total_sales,
+        COALESCE(SUM(dsv."shoppingTotal"), 0) AS shopping_total,
+        COALESCE(SUM(dsv."wagesTotal"), 0) AS wages_total,
+        COALESCE(SUM(dsv."othersTotal"), 0) AS others_total,
+        COALESCE(SUM(dsv."totalExpenses"), 0) AS total_shift_expenses,
+        COUNT(*)::int AS shift_count,
+        MAX(dsv."shiftDate") AS latest_shift_date
+      FROM daily_sales_v2 dsv
+      WHERE dsv."deletedAt" IS NULL
+      ${dateFilter}
+    `));
+
+    const businessExpenseResult = await db.execute(sql.raw(`
+      SELECT COALESCE(SUM("costCents"), 0) AS business_expenses
+      FROM expenses
+      WHERE 1=1
+      ${validRange ? `AND "shiftDate"::date >= '${start}'::date AND "shiftDate"::date <= '${end}'::date` : ''}
+    `)).catch((_error: any) => ({ rows: [{ business_expenses: 0 }], warning: _error } as any));
+
+    const row = salesResult.rows[0] as any || {};
+    const businessRow = (businessExpenseResult as any).rows?.[0] || {};
+    const sales = Number(row.total_sales || 0);
+    const shiftExpenses = Number(row.total_shift_expenses || 0);
+    const businessExpenses = Number(businessRow.business_expenses || 0);
+    const expensesTotal = shiftExpenses + businessExpenses;
+
+    return res.json({
+      ok: true,
+      source: 'daily_sales_v2',
+      salesSource: 'daily_sales_v2 stored columns',
+      expensesSource: 'daily_sales_v2 stored expense columns + expenses',
+      scope: { start, end, timezone: 'Asia/Bangkok', shiftWindow: '17:00-03:00' },
+      data: {
+        sales,
+        salesBreakdown: {
+          cash: Number(row.cash_sales || 0),
+          qr: Number(row.qr_sales || 0),
+          grab: Number(row.grab_sales || 0),
+          other: Number(row.other_sales || 0),
+        },
+        expenses: expensesTotal,
+        expenseBreakdown: {
+          shopping: Number(row.shopping_total || 0),
+          wages: Number(row.wages_total || 0),
+          otherShift: Number(row.others_total || 0),
+          business: businessExpenses,
+          shiftTotal: shiftExpenses,
+        },
+        netProfit: sales - expensesTotal,
+        shiftCount: Number(row.shift_count || 0),
+        latestShiftDate: row.latest_shift_date || null,
+      },
+      rows: [],
+      blockers: (businessExpenseResult as any).warning ? [{ code: 'EXPENSE_SOURCE_UNAVAILABLE', message: (businessExpenseResult as any).warning?.message || 'expenses unavailable', where: 'expenses', canonical_source: 'expenses', auto_build_attempted: false }] : [],
+    });
+  } catch (error: any) {
+    console.error('[EXPENSE_SAFE_FAIL] finance/profit-loss:', error);
+    return res.status(200).json({ ok: false, source: 'daily_sales_v2', data: { sales: 0, expenses: 0, netProfit: 0 }, rows: [], blockers: [{ code: 'PROFIT_LOSS_UNAVAILABLE', message: error?.message || 'Failed to load P&L', where: '/api/finance/profit-loss', canonical_source: 'daily_sales_v2', auto_build_attempted: false }] });
+  }
+});
+
 // GET /api/finance/pnl-expenses - PATCH 4: Read from canonical pnl_expense table
 // Public endpoint for P&L display (no auth required)
 router.get('/pnl-expenses', async (req: Request, res: Response) => {

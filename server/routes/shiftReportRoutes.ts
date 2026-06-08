@@ -51,9 +51,9 @@ router.get("/history", async (req, res) => {
     });
 
     res.json({ reports: list });
-  } catch (err) {
+  } catch (err: any) {
     console.error("Fetch shift report history error:", err);
-    res.status(500).json({ error: "Failed to fetch report history" });
+    res.status(200).json({ reports: [], source: 'shift_report_v2', blockers: [{ code: 'SHIFT_REPORT_HISTORY_UNAVAILABLE', message: err?.message || 'Failed to fetch report history', where: '/api/shift-report/history', canonical_source: 'shift_report_v2', auto_build_attempted: false }] });
   }
 });
 

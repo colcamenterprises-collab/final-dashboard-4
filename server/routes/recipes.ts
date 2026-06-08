@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
     `);
     res.json(result.rows);
   } catch (e: any) {
-    res.status(500).json({ error: e.message });
+    res.status(200).json({ rows: [], source: 'recipes', blockers: [{ code: 'RECIPES_UNAVAILABLE', message: e.message, where: '/api/recipes', canonical_source: 'recipes', auto_build_attempted: false }] });
   }
 });
 
