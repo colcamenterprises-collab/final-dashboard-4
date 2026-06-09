@@ -37,17 +37,56 @@ export async function submitDailyStock(req: express.Request, res: express.Respon
 
 // Export individual functions for routes.ts compatibility
 export async function getDailyStock(req: express.Request, res: express.Response) {
+  const salesId = typeof req.query.salesId === 'string' && req.query.salesId.trim() !== ''
+    ? req.query.salesId.trim()
+    : null;
+
   try {
-    // Return empty array for now - can be expanded later
-    res.json({
-      ok: true,
-      data: []
+    const rows = await db().dailyStockV2.findMany({
+      where: salesId ? { salesId, deletedAt: null } : { deletedAt: null },
+      orderBy: { createdAt: 'desc' },
+      take: salesId ? 1 : 20,
+      include: { purchasingShiftItems: true },
     });
-  } catch (error) {
+
+    if (salesId && rows.length === 0) {
+      return res.status(200).json({
+        ok: true,
+        source: 'daily_stock_v2',
+        rows: [],
+        count: 0,
+        blockers: [{
+          code: 'STOCK_DATA_NOT_FOUND',
+          message: 'Stock data not found for this sales record',
+          where: '/api/daily-stock',
+          canonical_source: 'daily_stock_v2',
+          auto_build_attempted: false,
+        }],
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      source: 'daily_stock_v2',
+      rows,
+      count: rows.length,
+      blockers: [],
+    });
+  } catch (error: any) {
     console.error('[daily-stock] Get error:', error);
-    res.status(500).json({
+    const missingSource = error?.code === 'P2021' || /does not exist|not exist|no such table/i.test(error?.message || '');
+    return res.status(200).json({
       ok: false,
-      error: 'Failed to get daily stock data'
+      source: 'daily_stock_v2',
+      rows: [],
+      count: 0,
+      blockers: [{
+        code: missingSource ? 'MISSING_DAILY_STOCK_SOURCE' : 'DAILY_STOCK_READ_FAILED',
+        message: error?.message || 'Failed to get daily stock data',
+        where: '/api/daily-stock',
+        canonical_source: 'daily_stock_v2',
+        auto_build_attempted: false,
+      }],
     });
   }
 }
