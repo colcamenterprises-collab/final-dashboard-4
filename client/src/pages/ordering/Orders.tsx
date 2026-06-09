@@ -14,9 +14,15 @@ interface Order {
   type?: string;
 }
 
+interface Blocker {
+  code: string;
+  message: string;
+}
+
 interface OrdersResponse {
   orders: Order[];
   total?: number;
+  blockers?: Blocker[];
 }
 
 function statusColor(s?: string) {
@@ -43,6 +49,7 @@ export default function Orders() {
   });
 
   const orders = data?.orders ?? [];
+  const blockers = data?.blockers ?? [];
 
   return (
     <div className="p-4 space-y-4 max-w-4xl mx-auto">
@@ -61,7 +68,16 @@ export default function Orders() {
         <div className="text-center py-12 text-red-500 text-xs">Failed to load orders.</div>
       )}
 
-      {!isLoading && !isError && orders.length === 0 && (
+      {!isLoading && !isError && blockers.length > 0 && (
+        <div className="border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 rounded-lg">
+          <p className="font-semibold">Data unavailable</p>
+          {blockers.map((blocker) => (
+            <p key={blocker.code}>{blocker.code}: {blocker.message}</p>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !isError && blockers.length === 0 && orders.length === 0 && (
         <div className="flex flex-col items-center py-16 gap-3 text-slate-400">
           <ShoppingBag className="h-10 w-10 opacity-30" />
           <p className="text-xs">No orders yet.</p>

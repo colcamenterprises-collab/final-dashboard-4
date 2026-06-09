@@ -17,8 +17,14 @@ interface ShiftReport {
   [key: string]: unknown;
 }
 
+interface Blocker {
+  code: string;
+  message: string;
+}
+
 interface HistoryResponse {
   reports?: ShiftReport[];
+  blockers?: Blocker[];
 }
 
 function fmt(n: number | undefined) {
@@ -48,6 +54,7 @@ export default function ShiftHistory() {
   });
 
   const reports = data?.reports ?? [];
+  const blockers = data?.blockers ?? [];
 
   const sorted = [...reports].sort((a, b) => {
     const da = a.shiftDate ?? a.createdAt ?? "";
@@ -101,7 +108,16 @@ export default function ShiftHistory() {
       {isLoading && <div className="text-center py-16 text-slate-400 text-xs">Loading shift history...</div>}
       {isError && <div className="text-center py-16 text-red-500 text-xs">Failed to load shift history.</div>}
 
-      {!isLoading && !isError && sorted.length === 0 && (
+      {!isLoading && !isError && blockers.length > 0 && (
+        <div className="border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 rounded-lg">
+          <p className="font-semibold">Data unavailable</p>
+          {blockers.map((blocker) => (
+            <p key={blocker.code}>{blocker.code}: {blocker.message}</p>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !isError && blockers.length === 0 && sorted.length === 0 && (
         <div className="text-center py-16 space-y-2">
           <FileText className="h-8 w-8 text-slate-300 mx-auto" />
           <p className="text-xs text-slate-400">No shift reports yet.</p>

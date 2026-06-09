@@ -2,12 +2,18 @@ import { useQuery } from "@tanstack/react-query";
 import { Users, CalendarDays, ClipboardList, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 
+interface Blocker {
+  code: string;
+  message: string;
+}
+
 interface DashboardData {
   activeStaff?: number;
   recentRosters?: number;
   cleaningTemplates?: number;
   lastRosterDate?: string | null;
   error?: string;
+  blockers?: Blocker[];
 }
 
 function StatCard({ icon: Icon, label, value, to, colour }: {
@@ -38,6 +44,8 @@ export default function StaffDashboard() {
   const { data, isLoading, isError } = useQuery<DashboardData>({
     queryKey: ["/api/staff/dashboard"],
   });
+
+  const blockers = data?.blockers ?? [];
 
   const navItems = [
     { label: "Staff Members", description: "Manage your team", to: "/staff/members" },
@@ -71,7 +79,16 @@ export default function StaffDashboard() {
 
       {isLoading && <div className="text-center py-8 text-slate-400 text-xs">Loading...</div>}
 
-      {!isLoading && !isError && (
+      {!isLoading && !isError && blockers.length > 0 && (
+        <div className="border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 rounded-lg">
+          <p className="font-semibold">Data unavailable</p>
+          {blockers.map((blocker) => (
+            <p key={blocker.code}>{blocker.code}: {blocker.message}</p>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !isError && blockers.length === 0 && (
         <div className="grid grid-cols-3 gap-3">
           <StatCard icon={Users} label="Active Staff" value={data?.activeStaff} to="/staff/members" colour="bg-blue-500" />
           <StatCard icon={CalendarDays} label="Rosters (7d)" value={data?.recentRosters} to="/staff/roster" colour="bg-purple-500" />

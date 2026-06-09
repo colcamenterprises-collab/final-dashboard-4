@@ -4218,6 +4218,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           groupedList: {},
           totalItems: 0,
           grandTotal: 0,
+          orderText: '',
           blockers: [{ code: 'NO_PURCHASING_REQUESTS', message: requestedDate ? `No purchasing requests found for ${requestedDate}` : 'No purchasing requests found', where: '/api/shopping-list', canonical_source: 'purchasing_shift_items', auto_build_attempted: false }],
         });
       }
@@ -4235,6 +4236,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const lines = linesResult.rows.map((row: any) => {
         const quantity = Number(row.quantity || 0);
         const unitCost = Number(row.unitCost || 0);
+        const unit = row.unitDescription || row.orderUnit || null;
+        const lineTotal = quantity * unitCost;
+        const orderText = `${quantity} ${unit || ''} ${row.item || ''}`.trim();
         return {
           category: row.category || 'Uncategorised',
           item: row.item,
@@ -4244,19 +4248,33 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           brand: row.brand || null,
           supplier: row.supplierName || null,
           sku: row.supplierSku || null,
-          unitDescription: row.unitDescription || row.orderUnit || null,
+          unit,
+          unitDescription: unit,
           unitCost,
-          lineTotal: quantity * unitCost,
+          lineTotal,
+          estimatedCost: lineTotal,
+          estCost: lineTotal,
+          orderText,
         };
       });
 
       const groupedList = lines.reduce((acc: any, line: any) => {
         const category = line.category || 'Uncategorised';
         if (!acc[category]) acc[category] = [];
-        acc[category].push({ name: line.item, qty: line.quantity, estCost: line.lineTotal });
+        acc[category].push({
+          name: line.name,
+          item: line.item,
+          quantity: line.quantity,
+          qty: line.qty,
+          unit: line.unit,
+          unitDescription: line.unitDescription,
+          estimatedCost: line.estimatedCost,
+          estCost: line.estCost,
+        });
         return acc;
       }, {});
       const grandTotal = lines.reduce((sum: number, line: any) => sum + line.lineTotal, 0);
+      const orderText = lines.map((line: any) => line.orderText).filter(Boolean).join('\n');
 
       return res.json({
         ok: true,
@@ -4272,11 +4290,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         totalItems: lines.length,
         grandTotal,
         totalEstimatedCost: grandTotal,
+        orderText,
         blockers: [],
       });
     } catch (error: any) {
       console.error('Shopping list error:', error);
-      res.status(200).json({ ok: false, source: 'purchasing_shift_items', lines: [], groupedList: {}, totalItems: 0, blockers: [{ code: 'SHOPPING_LIST_READ_FAILED', message: error?.message || 'Failed to retrieve shopping list', where: '/api/shopping-list', canonical_source: 'purchasing_shift_items', auto_build_attempted: false }] });
+      res.status(200).json({ ok: false, source: 'purchasing_shift_items', lines: [], groupedList: {}, totalItems: 0, orderText: '', blockers: [{ code: 'SHOPPING_LIST_READ_FAILED', message: error?.message || 'Failed to retrieve shopping list', where: '/api/shopping-list', canonical_source: 'purchasing_shift_items', auto_build_attempted: false }] });
     }
   });
 

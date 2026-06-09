@@ -10,10 +10,16 @@ interface ShoppingItem {
   estimatedCost?: number;
 }
 
+interface Blocker {
+  code: string;
+  message: string;
+}
+
 interface ShoppingListResponse {
   groupedList: Record<string, ShoppingItem[]>;
   source: string;
   totalItems: number;
+  blockers?: Blocker[];
 }
 
 export default function ShoppingList() {
@@ -23,6 +29,7 @@ export default function ShoppingList() {
 
   const groups = data?.groupedList ?? {};
   const categories = Object.keys(groups);
+  const blockers = data?.blockers ?? [];
 
   return (
     <div className="p-4 space-y-4 max-w-3xl mx-auto">
@@ -43,7 +50,16 @@ export default function ShoppingList() {
         <div className="text-center py-12 text-red-500 text-xs">Failed to load shopping list.</div>
       )}
 
-      {!isLoading && !isError && categories.length === 0 && (
+      {!isLoading && !isError && blockers.length > 0 && (
+        <div className="border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 rounded-lg">
+          <p className="font-semibold">Data unavailable</p>
+          {blockers.map((blocker) => (
+            <p key={blocker.code}>{blocker.code}: {blocker.message}</p>
+          ))}
+        </div>
+      )}
+
+      {!isLoading && !isError && blockers.length === 0 && categories.length === 0 && (
         <div className="flex flex-col items-center py-16 gap-3 text-slate-400">
           <ShoppingCart className="h-10 w-10 opacity-30" />
           <p className="text-xs">Shopping list is empty.</p>

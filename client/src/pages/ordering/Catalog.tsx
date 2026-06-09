@@ -23,13 +23,29 @@ interface MenuCategory {
   isActive: boolean;
 }
 
+interface MenuResponse {
+  ok?: boolean;
+  items?: MenuItem[];
+  products?: MenuItem[];
+  source?: string;
+  blockers?: Array<{ code: string; message: string }>;
+}
+
+function toItems(data: MenuItem[] | MenuResponse | undefined): MenuItem[] {
+  if (!data) return [];
+  if (Array.isArray(data)) return data;
+  return data.items ?? data.products ?? [];
+}
+
 export default function Catalog() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "online" | "pos">("all");
 
-  const { data: items = [], isLoading } = useQuery<MenuItem[]>({
+  const { data: rawItems, isLoading } = useQuery<MenuItem[] | MenuResponse>({
     queryKey: ["/api/menu-v3/items"],
   });
+
+  const items = toItems(rawItems);
 
   const { data: categories = [] } = useQuery<MenuCategory[]>({
     queryKey: ["/api/menu-v3/categories"],
