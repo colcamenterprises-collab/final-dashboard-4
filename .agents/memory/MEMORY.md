@@ -1,1 +1,2 @@
 - [Final Dashboard 5.0 Lockdown](lockdown-5.0.md) — All stable systems are read-only; new work must be fully isolated; no route/schema/API changes without explicit approval.
+- [Loyverse total_amount fix](loyverse-total-amount-fix.md) — use payment_json[].money_amount for all Baht calculations; total_amount had unit bug (÷100) from ~Jun 2026; fixed in import + all query paths

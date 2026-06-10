@@ -105,9 +105,14 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
       // Shift-window queries filter using Asia/Bangkok timezone.
       const receiptDateISO = rc.receipt_date;
 
-      const totalAmount = typeof rc.total_money === 'number'
-        ? rc.total_money / 100.0
-        : (rc.total_money?.amount ?? 0) / 100.0;
+      // Derive total_amount from payments array — this is always correct in Baht
+      // regardless of how Loyverse represents total_money (API has returned both
+      // satang and baht across different versions, causing a unit ambiguity).
+      // payment_json[].money_amount is confirmed correct (Baht) in every receipt.
+      const payments = rc.payments ?? [];
+      const totalAmount = payments.reduce(
+        (sum: number, p: any) => sum + (Number(p.money_amount) || 0), 0
+      );
 
       // lv_receipt: DO UPDATE allowed — receipt metadata (staff, total) can be corrected.
       await db.$executeRaw`

@@ -36,11 +36,12 @@ router.get("/analysis/shift/items", async (req, res) => {
     }
 
     const receiptsData = await db.$queryRaw<any[]>`
-      SELECT COUNT(*)::int as receipt_count, 
-             SUM(total_amount)::numeric as total_sales
-      FROM lv_receipt
-      WHERE datetime_bkk >= ${fromISO}::timestamptz 
-        AND datetime_bkk < ${toISO}::timestamptz`;
+      SELECT COUNT(DISTINCT r.receipt_id)::int as receipt_count,
+             COALESCE(SUM((p->>'money_amount')::numeric), 0)::numeric as total_sales
+      FROM lv_receipt r
+      CROSS JOIN LATERAL jsonb_array_elements(r.payment_json) AS p
+      WHERE r.datetime_bkk >= ${fromISO}::timestamptz
+        AND r.datetime_bkk < ${toISO}::timestamptz`;
 
     const paymentsData = await db.$queryRaw<any[]>`
       SELECT 
