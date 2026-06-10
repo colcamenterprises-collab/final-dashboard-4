@@ -440,7 +440,7 @@ export class SchedulerService {
 
   // Manual trigger for testing
   async triggerManualSync() {
-    await this.syncReceiptsAndReports();
+    await this.syncReceiptsOnly();
   }
 
   // Manual trigger for new services
