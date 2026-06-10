@@ -32,6 +32,7 @@ import analysisCsv from "./routes/analysisCsv";
 import ensureShiftRouter from "./routes/ensureShift";
 import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
+import operationsReadRouter from "./routes/operationsRead";
 
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
@@ -405,6 +406,9 @@ async function checkSchema() {
   });
 
   const server = await registerRoutes(app);
+
+  // Read-only operational UI summaries for owner review pages.
+  app.use("/api/operations-read", operationsReadRouter);
 
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);

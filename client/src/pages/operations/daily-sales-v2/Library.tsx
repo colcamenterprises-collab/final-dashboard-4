@@ -337,7 +337,7 @@ export default function DailySalesV2Library() {
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900 font-[Poppins]">Daily Sales Library (V2)</h1>
-            <p className="mt-1 text-sm text-slate-600">Full-width operations archive with cleaner spacing for tablet and desktop review.</p>
+            <p className="mt-1 text-sm text-slate-600">Full-width operations archive with scan-friendly rows showing date, sales total, balance status, submitted by, and actions.</p>
           </div>
           <button
             className="h-11 rounded-lg border border-slate-300 bg-slate-100 px-4 text-sm font-medium text-slate-700 hover:bg-slate-200"
@@ -353,6 +353,13 @@ export default function DailySalesV2Library() {
       
       {/* Stacked 2-row library layout (tablet + desktop friendly) */}
       <div className="space-y-3">
+        <div className="hidden rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 lg:grid lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-center lg:gap-4">
+          <span>Date</span>
+          <span>Sales total</span>
+          <span>Balance status</span>
+          <span>Submitted by</span>
+          <span className="text-right">Actions</span>
+        </div>
         {filteredRecords.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-lg p-6 text-center text-gray-500">
             No records found
@@ -367,7 +374,7 @@ export default function DailySalesV2Library() {
                     <p className="font-semibold text-slate-900 whitespace-nowrap leading-snug">{new Date(rec.date).toLocaleDateString()}</p>
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400 leading-tight">Staff</p>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 leading-tight">Submitted by</p>
                     <p className="font-medium text-slate-800 truncate leading-snug">{rec.staff}</p>
                   </div>
                   <div className="space-y-0.5">
