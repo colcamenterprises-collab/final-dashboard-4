@@ -184,7 +184,7 @@ router.get("/loyverse/mirror-diagnostic", async (req, res) => {
     const latestShiftComparison = latestShiftRow ? { ...latestShiftRow, itemCount, modifierCount } : null;
 
     // ── 5. Integrity summary ────────────────────────────────────────────────
-    const mismatches = sevenDayComparison.filter(r => r.status === "MISMATCH");
+    const mismatches  = sevenDayComparison.filter(r => r.status === "MISMATCH");
     const noShiftData = sevenDayComparison.filter(r => r.status === "NO_SHIFT_DATA");
     const blockers: string[] = [];
 
@@ -197,18 +197,52 @@ router.get("/loyverse/mirror-diagnostic", async (req, res) => {
       blockers.push(`${noShiftData.length} day(s) in lv_receipt have no loyverse_shifts entry: ${noShiftData.map(r => fmtDate(r.shiftDate)).join(", ")}`);
     }
 
-    const allMatch = blockers.length === 0;
     // Only flag stale receipts outside Bangkok shift window (17:00–03:00).
     // During daytime (03:00–17:00 Bangkok) no new receipts are expected.
     const latestReceiptAge = lvReceipt[0].latest_receipt
       ? Math.round((Date.now() - new Date(lvReceipt[0].latest_receipt).getTime()) / 1000 / 60)
       : null;
-    const bkkHour = new Date().toLocaleString("en-US", { timeZone: TZ, hour: "numeric", hour12: false });
-    const hourNum = parseInt(bkkHour, 10);
+    const bkkHour    = new Date().toLocaleString("en-US", { timeZone: TZ, hour: "numeric", hour12: false });
+    const hourNum    = parseInt(bkkHour, 10);
     const inShiftWindow = hourNum >= 17 || hourNum < 3;
     if (latestReceiptAge !== null && latestReceiptAge > 120 && inShiftWindow) {
       blockers.push(`Latest receipt is ${latestReceiptAge} minutes old during active shift window — sync may be behind`);
     }
+
+    // ── 6. Duplicate & orphan data integrity ────────────────────────────────
+    const [dupRows, orphanItemRows, orphanModRows] = await Promise.all([
+      prisma.$queryRaw<any[]>`
+        SELECT COUNT(*)::int AS total, COUNT(DISTINCT receipt_id)::int AS distinct_count
+        FROM lv_receipt`,
+      prisma.$queryRaw<any[]>`
+        SELECT COUNT(*)::int AS orphan_count
+        FROM lv_line_item li
+        WHERE NOT EXISTS (SELECT 1 FROM lv_receipt r WHERE r.receipt_id = li.receipt_id)`,
+      prisma.$queryRaw<any[]>`
+        SELECT COUNT(*)::int AS orphan_count
+        FROM lv_modifier m
+        WHERE NOT EXISTS (SELECT 1 FROM lv_receipt r WHERE r.receipt_id = m.receipt_id)`,
+    ]);
+
+    const duplicateReceiptCount = dupRows[0].total - dupRows[0].distinct_count;
+    const orphanLineItemCount   = Number(orphanItemRows[0].orphan_count);
+    const orphanModifierCount   = Number(orphanModRows[0].orphan_count);
+
+    if (duplicateReceiptCount > 0)
+      blockers.push(`${duplicateReceiptCount} duplicate receipt_id(s) detected in lv_receipt`);
+    if (orphanLineItemCount > 0)
+      blockers.push(`${orphanLineItemCount} orphan line item(s) in lv_line_item (receipt not in lv_receipt)`);
+    if (orphanModifierCount > 0)
+      blockers.push(`${orphanModifierCount} orphan modifier(s) in lv_modifier (receipt not in lv_receipt)`);
+
+    // Unmapped payments: payment type IDs not covered by the 3 known payment types.
+    // All unknown IDs currently resolve to "Other" (acceptable per spec). Listed here
+    // explicitly so any future new Loyverse payment type is immediately visible.
+    const unmappedPayments = paymentMapping.filter(
+      p => ![CASH_PT, GRAB_PT, QR_PT].includes(p.paymentTypeId)
+    );
+
+    const allMatch = blockers.length === 0;
 
     const integrity = {
       totalDaysChecked:    sevenDayComparison.length,
@@ -216,6 +250,17 @@ router.get("/loyverse/mirror-diagnostic", async (req, res) => {
       mismatchDays:        mismatches.length,
       noShiftDataDays:     noShiftData.length,
       latestReceiptAgeMin: latestReceiptAge,
+      duplicateReceipts:   duplicateReceiptCount,
+      orphanLineItems:     orphanLineItemCount,
+      orphanModifiers:     orphanModifierCount,
+    };
+
+    const dataIntegrity = {
+      duplicateReceipts:   duplicateReceiptCount,
+      orphanLineItems:     orphanLineItemCount,
+      orphanModifiers:     orphanModifierCount,
+      unmappedPayments,
+      idempotencyNote:     "lv_line_item and lv_modifier use ON CONFLICT DO NOTHING. lv_receipt uses ON CONFLICT DO UPDATE (non-financial fields only). Re-running the same sync range cannot create duplicates.",
     };
 
     const status = allMatch ? "MIRROR_VERIFIED" : "MIRROR_ISSUES_FOUND";
@@ -229,6 +274,7 @@ router.get("/loyverse/mirror-diagnostic", async (req, res) => {
       canonicalTables,
       paymentMapping,
       integrity,
+      dataIntegrity,
       latestShiftComparison,
       sevenDayComparison,
       blockers,
@@ -237,6 +283,84 @@ router.get("/loyverse/mirror-diagnostic", async (req, res) => {
     });
   } catch (err: any) {
     console.error("[mirror-diagnostic] error:", err.message);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ─── POST /api/loyverse/sync-missing-shifts ───────────────────────────────────
+// Manual trigger for the missing shift recovery. Checks the last N BKK business
+// days (default 3) for dates that have receipts but no loyverse_shifts row, then
+// fetches and upserts them from the Loyverse API.
+// ─────────────────────────────────────────────────────────────────────────────
+router.post("/loyverse/sync-missing-shifts", async (req, res) => {
+  try {
+    const lookbackDays = Math.min(Number(req.query.days ?? 3), 14);
+
+    const [missingRows] = await Promise.all([
+      prisma.$queryRaw<{ biz_date: string }[]>`
+        WITH bkk_dates AS (
+          SELECT DISTINCT
+            CASE
+              WHEN EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3
+              THEN (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date - INTERVAL '1 day'
+              ELSE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date
+            END AS biz_date
+          FROM lv_receipt
+          WHERE datetime_bkk >= NOW() - (${lookbackDays + 1} || ' days')::interval
+        )
+        SELECT biz_date::text
+        FROM bkk_dates
+        WHERE biz_date < (NOW() AT TIME ZONE 'Asia/Bangkok')::date
+          AND biz_date NOT IN (SELECT shift_date FROM loyverse_shifts)
+        ORDER BY biz_date DESC
+      `,
+    ]);
+
+    if (missingRows.length === 0) {
+      return res.json({ ok: true, recovered: [], message: `No missing shift dates in last ${lookbackDays} days` });
+    }
+
+    const { loyverseAPI } = await import("../loyverseAPI");
+    const { db }              = await import("../db");
+    const { loyverse_shifts } = await import("../../shared/schema");
+
+    const results: { biz_date: string; status: string; shifts?: number; error?: string }[] = [];
+
+    if (!db) throw new Error("DB not available");
+
+    for (const { biz_date } of missingRows) {
+      const dateStr = String(biz_date).slice(0, 10); // "2026-06-09 00:00:00" → "2026-06-09"
+      try {
+        const midnight   = new Date(`${dateStr}T00:00:00Z`);
+        const retryStart = new Date(midnight.getTime() - (14 * 3_600_000));
+        const retryEnd   = new Date(midnight.getTime() + ( 4 * 3_600_000));
+
+        const retryResp    = await loyverseAPI.getShifts({
+          start_time: retryStart.toISOString(),
+          end_time:   retryEnd.toISOString(),
+          limit: 10,
+        });
+        const closedShifts = (retryResp.shifts as any[]).filter((s: any) => !!s.closed_at);
+
+        if (closedShifts.length > 0) {
+          await db.insert(loyverse_shifts)
+            .values({ shiftDate: dateStr, data: { shifts: closedShifts } })
+            .onConflictDoUpdate({
+              target: loyverse_shifts.shiftDate,
+              set: { data: { shifts: closedShifts } },
+            });
+          results.push({ biz_date: dateStr, status: "recovered", shifts: closedShifts.length });
+        } else {
+          results.push({ biz_date: dateStr, status: "not_finalised_yet" });
+        }
+      } catch (e: any) {
+        results.push({ biz_date: dateStr, status: "error", error: e.message });
+      }
+    }
+
+    return res.json({ ok: true, recovered: results });
+  } catch (err: any) {
+    console.error("[sync-missing-shifts] error:", err.message);
     return res.status(500).json({ ok: false, error: err.message });
   }
 });

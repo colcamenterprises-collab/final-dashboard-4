@@ -127,66 +127,126 @@ export class SchedulerService {
 
   private async syncNewShifts() {
     try {
-      console.log('🔄 Syncing new shifts to prevent missing data...');
-      
-      const endTime = new Date();
+      console.log('🔄 [3:30 AM] Syncing shifts (last 3 days + missing shift recovery)...');
+
+      const endTime   = new Date();
       const startTime = new Date(endTime.getTime() - (3 * 24 * 60 * 60 * 1000));
-      
+
       const shiftsResponse = await loyverseAPI.getShifts({
         start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        limit: 50
+        end_time:   endTime.toISOString(),
+        limit: 50,
       });
-      
+
       console.log(`📊 Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
-      
-      const { db } = await import('../db');
+
+      const { db }              = await import('../db');
       const { loyverse_shifts } = await import('../../shared/schema');
-      const { eq, sql } = await import('drizzle-orm');
-      
+
+      // Group closed shifts by Bangkok business date
       const shiftsByDate = new Map<string, any[]>();
       for (const shift of shiftsResponse.shifts as any[]) {
-        // Skip open/unclosed shifts — they have incomplete payment totals.
-        // The shift report is only reliable once closed_at is set by Loyverse.
+        // Skip open/unclosed shifts — incomplete payment totals until closed_at is set.
         if (!shift.closed_at) {
           console.log(`⏭️  Skipping open shift (no closed_at): id=${shift.id ?? 'unknown'}`);
           continue;
         }
         const openedAt = shift.opened_at || shift.opening_time;
         if (!openedAt) continue;
-        const openingTime = new Date(openedAt);
-        const bangkokOpen = new Date(openingTime.getTime() + (7 * 60 * 60 * 1000));
-        const dateStr = bangkokOpen.toISOString().split('T')[0];
-        
-        if (!shiftsByDate.has(dateStr)) {
-          shiftsByDate.set(dateStr, []);
-        }
+        const bangkokOpen = new Date(new Date(openedAt).getTime() + (7 * 60 * 60 * 1000));
+        const dateStr     = bangkokOpen.toISOString().split('T')[0];
+        if (!shiftsByDate.has(dateStr)) shiftsByDate.set(dateStr, []);
         shiftsByDate.get(dateStr)!.push(shift);
       }
-      
-      let newShiftsImported = 0;
-      
+
+      if (!db) throw new Error('[syncNewShifts] DB not available');
+
+      let imported = 0;
       for (const [dateStr, shifts] of shiftsByDate) {
         try {
-          await db.insert(loyverse_shifts).values({
-            shiftDate: dateStr,
-            data: { shifts },
-          }).onConflictDoUpdate({
-            target: loyverse_shifts.shiftDate,
-            set: { data: { shifts } }
-          });
-          newShiftsImported++;
-        } catch (insertError: any) {
-          console.error(`Failed to upsert shift for ${dateStr}:`, insertError.message);
+          await db.insert(loyverse_shifts)
+            .values({ shiftDate: dateStr, data: { shifts } })
+            .onConflictDoUpdate({ target: loyverse_shifts.shiftDate, set: { data: { shifts } } });
+          imported++;
+        } catch (e: any) {
+          console.error(`Failed to upsert shift for ${dateStr}:`, e.message);
         }
       }
-      
-      if (newShiftsImported > 0) {
-        console.log(`✅ Imported/updated ${newShiftsImported} shift dates during daily sync`);
-      } else {
-        console.log('✅ No new shifts to import - all shifts are up to date');
+
+      console.log(imported > 0
+        ? `✅ Imported/updated ${imported} shift date(s)`
+        : '✅ No new shifts to import — all up to date');
+
+      // ── Missing shift recovery ──────────────────────────────────────────
+      // Loyverse sometimes finalises shift reports hours after the register
+      // closes. Find any fully-closed BKK business date in the last 3 days
+      // that has receipts in lv_receipt but no row in loyverse_shifts, then
+      // query Loyverse again with a targeted window for that date.
+      const { PrismaClient } = await import('@prisma/client');
+      const recoveryPrisma   = new PrismaClient();
+      try {
+        const missingRows = await recoveryPrisma.$queryRaw<{ biz_date: string }[]>`
+          WITH bkk_dates AS (
+            SELECT DISTINCT
+              CASE
+                WHEN EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3
+                THEN (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date - INTERVAL '1 day'
+                ELSE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date
+              END AS biz_date
+            FROM lv_receipt
+            WHERE datetime_bkk >= NOW() - INTERVAL '4 days'
+          )
+          SELECT biz_date::text
+          FROM bkk_dates
+          WHERE biz_date < (NOW() AT TIME ZONE 'Asia/Bangkok')::date
+            AND biz_date NOT IN (SELECT shift_date FROM loyverse_shifts)
+          ORDER BY biz_date DESC
+        `;
+
+        if (missingRows.length === 0) {
+          console.log('✅ [shift-recovery] No missing shift dates in last 3 days');
+        } else {
+          console.log(`⚠️  [shift-recovery] Missing shift data for: ${missingRows.map(r => r.biz_date).join(', ')}`);
+
+          for (const { biz_date: rawDate } of missingRows) {
+            const biz_date = String(rawDate).slice(0, 10); // normalise "2026-06-09 00:00:00" → "2026-06-09"
+            try {
+              // BKK business date: shift opens biz_date-1 at ~17:00 BKK = 10:00 UTC
+              //                    shift closes biz_date  at ~03:00 BKK = biz_date-1 20:00 UTC
+              // Query window padded ±2h to catch edge cases.
+              const midnight   = new Date(`${biz_date}T00:00:00Z`);
+              const retryStart = new Date(midnight.getTime() - (14 * 3_600_000)); // biz_date-1 10:00 UTC
+              const retryEnd   = new Date(midnight.getTime() + ( 4 * 3_600_000)); // biz_date 04:00 UTC
+
+              const retryResp    = await loyverseAPI.getShifts({
+                start_time: retryStart.toISOString(),
+                end_time:   retryEnd.toISOString(),
+                limit: 10,
+              });
+              const closedShifts = (retryResp.shifts as any[]).filter(s => !!s.closed_at);
+
+              if (closedShifts.length > 0 && db) {
+                await db.insert(loyverse_shifts)
+                  .values({ shiftDate: biz_date, data: { shifts: closedShifts } })
+                  .onConflictDoUpdate({
+                    target: loyverse_shifts.shiftDate,
+                    set: { data: { shifts: closedShifts } },
+                  });
+                console.log(`✅ [shift-recovery] Recovered shift for ${biz_date} (${closedShifts.length} record(s))`);
+              } else if (!db) {
+                console.error('[shift-recovery] DB not available for recovery insert');
+              } else {
+                console.log(`⏳ [shift-recovery] No closed shift yet for ${biz_date} — Loyverse may not have finalised`);
+              }
+            } catch (retryErr: any) {
+              console.error(`❌ [shift-recovery] Failed for ${biz_date}:`, retryErr.message);
+            }
+          }
+        }
+      } finally {
+        await recoveryPrisma.$disconnect();
       }
-      
+
     } catch (error) {
       console.error('❌ Failed to sync new shifts:', error);
     }
