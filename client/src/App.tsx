@@ -15,6 +15,9 @@ import NotFound from "./pages/NotFound";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
+import LoyverseMirror from "./pages/operations/LoyverseMirror";
+import DailySalesAnalysis from "./pages/operations/DailySalesAnalysis";
+import DailyStockAnalysis from "./pages/operations/DailyStockAnalysis";
 import PurchasingPage from "./pages/operations/Purchasing";
 import ShoppingList from "./pages/operations/ShoppingList";
 import IssueRegister from "./pages/operations/IssueRegister";
@@ -74,6 +77,9 @@ export default function App() {
                     <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-stock" element={<ProtectedRoute><DailyStock /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales-v2/library" element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><LoyverseMirror /></ProtectedRoute>} />
+                    <Route path="/operations/daily-sales-analysis" element={<ProtectedRoute><DailySalesAnalysis /></ProtectedRoute>} />
+                    <Route path="/operations/daily-stock-analysis" element={<ProtectedRoute><DailyStockAnalysis /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales-library" element={<Navigate to="/operations/daily-sales-v2/library" replace />} />
                     <Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} />
 
