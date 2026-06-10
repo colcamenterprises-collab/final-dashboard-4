@@ -10,9 +10,10 @@ export class SchedulerService {
     // Initialize restaurant data first
     this.initializeRestaurant();
 
-    // Schedule daily receipt sync at 3am Bangkok time (end of 5pm-3am shift)
+    // Schedule daily receipt sync at 3:00 AM Bangkok time (end of 5pm-3am shift)
+    // Receipts only — shift report sync is intentionally separated (see 3:30 AM below)
     this.scheduleDailyTask(() => {
-      this.syncReceiptsAndReports();
+      this.syncReceiptsOnly();
     }, 3, 0); // 3:00 AM Bangkok time
 
     // Schedule daily summary job at 3:05 AM Bangkok time  
@@ -22,12 +23,20 @@ export class SchedulerService {
 
     // === NEW SERVICES ===
 
-    // Schedule incremental POS sync every 15 minutes
-    this.scheduleIncrementalSync();
+    // Incremental POS sync (scheduleIncrementalSync) is DISABLED.
+    // It imported a non-existent ./pos-ingestion/ingester.js and silently failed every 15 min.
+    // Receipts are synced via the 3:00 AM job above. Remove this comment once replaced.
 
     // Schedule analytics processing at 3:30 AM Bangkok time
     this.scheduleDailyTask(() => {
       this.processAnalytics();
+    }, 3, 30); // 3:30 AM Bangkok time
+
+    // Schedule loyverse_shifts sync at 3:30 AM Bangkok time
+    // Runs 30 minutes after shift close so the register is fully closed and
+    // Loyverse has finalised the shift report before we query the API.
+    this.scheduleDailyTask(() => {
+      this.syncNewShifts();
     }, 3, 30); // 3:30 AM Bangkok time
 
     // Schedule Jussi email summary at 8:00 AM Bangkok time
@@ -60,7 +69,9 @@ export class SchedulerService {
       this.rebuildShiftAnalytics();
     }, 3, 20); // 3:20 AM Bangkok time
 
-    console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
+    console.log('Scheduler service started');
+    console.log('📥 Receipt sync scheduled for 3:00am Bangkok time');
+    console.log('📊 Shift report sync (loyverse_shifts) scheduled for 3:30am Bangkok time');
     console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
     console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
     console.log('🍔 Burger metrics cache scheduled for 3:10am Bangkok time');
@@ -118,18 +129,16 @@ export class SchedulerService {
     scheduleNext();
   }
 
-  private async syncReceiptsAndReports() {
+  // Receipts-only sync — runs at 3:00 AM Bangkok.
+  // Shift report sync (syncNewShifts) runs separately at 3:30 AM to avoid
+  // racing against the register close, which happens at or after 3:00 AM.
+  private async syncReceiptsOnly() {
     try {
-      console.log('🔄 Starting daily receipt and shift report sync...');
-      
-      // 1. First sync all new shifts to prevent missing shift data
-      await this.syncNewShifts();
-      
-      // 2. Sync receipts from Loyverse using Bangkok timezone-aware API
+      console.log('🔄 [3:00 AM] Starting daily receipt sync...');
+
       const receiptCount = await loyverseAPI.syncTodaysReceipts();
       console.log(`✅ Synced ${receiptCount} receipts from completed shift`);
-      
-      // 3. Process shift analytics for the completed shift
+
       if (receiptCount > 0) {
         console.log('🔄 Processing shift analytics for previous shift...');
         const { processPreviousShift } = await import('./shiftAnalytics');
@@ -137,17 +146,9 @@ export class SchedulerService {
         console.log(`📊 Shift analytics: ${analyticsResult.message}`);
       }
 
-      // 3. Sync additional data (items, customers, etc.)
-      // Note: syncAllItems() and syncCustomers() are not implemented yet
-      // const itemCount = await loyverseAPI.syncAllItems();
-      // console.log(`✅ Synced ${itemCount} menu items`);
-
-      // const customerCount = await loyverseAPI.syncCustomers();
-      // console.log(`✅ Synced ${customerCount} customers`);
-
-      console.log('🎉 Daily sync completed successfully');
+      console.log('🎉 Receipt sync completed successfully');
     } catch (error) {
-      console.error('❌ Daily sync failed:', error);
+      console.error('❌ Receipt sync failed:', error);
     }
   }
 
@@ -172,6 +173,12 @@ export class SchedulerService {
       
       const shiftsByDate = new Map<string, any[]>();
       for (const shift of shiftsResponse.shifts as any[]) {
+        // Skip open/unclosed shifts — they have incomplete payment totals.
+        // The shift report is only reliable once closed_at is set by Loyverse.
+        if (!shift.closed_at) {
+          console.log(`⏭️  Skipping open shift (no closed_at): id=${shift.id ?? 'unknown'}`);
+          continue;
+        }
         const openedAt = shift.opened_at || shift.opening_time;
         if (!openedAt) continue;
         const openingTime = new Date(openedAt);

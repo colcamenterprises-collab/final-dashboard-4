@@ -53,7 +53,7 @@ import { db } from "./db"; // For transactions
 import { dailyStockSales, shoppingList, insertDailyStockSalesSchema, inventory, shiftItemSales, dailyShiftSummary, uploadedReports, shiftReports, insertShiftReportSchema, dailyReceiptSummaries, ingredients, loyverse_shifts, loyverse_receipts, dailySalesV2, dailyShiftAnalysis, expenses, analysisReports } from "../shared/schema"; // Adjust path
 import { generateShiftAnalysis } from "./services/shiftAnalysisService";
 import { z } from "zod";
-import { eq, desc, sql, inArray, isNull, lt } from "drizzle-orm";
+import { eq, desc, sql, inArray, isNull } from "drizzle-orm";
 import multer from 'multer';
 import OpenAI from 'openai';
 import xlsx from 'xlsx';
@@ -622,10 +622,6 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         aggregates.shifts.push(...shiftsData.shifts);
         currentDate.setDate(currentDate.getDate() + 1);
       }
-
-      // Purge old: delete shifts older than first of current month
-      const firstOfMonth = new Date().toISOString().slice(0,7) + '-01';
-      await db.delete(loyverse_shifts).where(lt(loyverse_shifts.shiftDate, firstOfMonth));
 
       res.json(aggregates);
     } catch (error: any) {
