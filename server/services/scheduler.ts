@@ -21,38 +21,12 @@ export class SchedulerService {
       this.buildDailySummary();
     }, 3, 5); // 3:05 AM Bangkok time
 
-    // === NEW SERVICES ===
-
-    // Incremental POS sync (scheduleIncrementalSync) is DISABLED.
-    // It imported a non-existent ./pos-ingestion/ingester.js and silently failed every 15 min.
-    // Receipts are synced via the 3:00 AM job above. Remove this comment once replaced.
-
-    // Schedule analytics processing at 3:30 AM Bangkok time
-    this.scheduleDailyTask(() => {
-      this.processAnalytics();
-    }, 3, 30); // 3:30 AM Bangkok time
-
     // Schedule loyverse_shifts sync at 3:30 AM Bangkok time
     // Runs 30 minutes after shift close so the register is fully closed and
     // Loyverse has finalised the shift report before we query the API.
     this.scheduleDailyTask(() => {
       this.syncNewShifts();
     }, 3, 30); // 3:30 AM Bangkok time
-
-    // Schedule Jussi email summary at 8:00 AM Bangkok time
-    this.scheduleDailyTask(() => {
-      this.generateJussiSummary();
-    }, 8, 0); // 8:00 AM Bangkok time
-
-    // Schedule daily sales summary at 9:00 AM Bangkok time
-    this.scheduleDailyTask(() => {
-      this.sendDailySalesSummary();
-    }, 9, 0); // 9:00 AM Bangkok time
-
-    // Schedule finance calculations at 3:35 AM Bangkok time
-    this.scheduleDailyTask(() => {
-      this.runFinanceCalculations();
-    }, 3, 35); // 3:35 AM Bangkok time
 
     // Schedule burger metrics cache at 3:10 AM Bangkok time
     this.scheduleDailyTask(() => {
@@ -69,14 +43,13 @@ export class SchedulerService {
       this.rebuildShiftAnalytics();
     }, 3, 20); // 3:20 AM Bangkok time
 
-    console.log('Scheduler service started');
-    console.log('📥 Receipt sync scheduled for 3:00am Bangkok time');
-    console.log('📊 Shift report sync (loyverse_shifts) scheduled for 3:30am Bangkok time');
-    console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
-    console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
-    console.log('🍔 Burger metrics cache scheduled for 3:10am Bangkok time');
-    console.log('📊 Daily Review POS ingestion scheduled for 3:15am Bangkok time');
-    console.log('📊 Shift Analytics MM cache rebuild scheduled for 3:20am Bangkok time');
+    console.log('[Scheduler] Daily task pipeline registered');
+    console.log('  03:00  receipt sync → lv_receipt');
+    console.log('  03:05  daily summary build');
+    console.log('  03:10  burger metrics cache');
+    console.log('  03:15  Daily Review POS ingest');
+    console.log('  03:20  shift analytics MM cache');
+    console.log('  03:30  loyverse_shifts sync (post-close)');
   }
 
   stop() {
@@ -313,130 +286,6 @@ export class SchedulerService {
     console.log('📅 Incremental POS sync scheduled every 15 minutes');
   }
 
-  /**
-   * Process analytics for the latest shift
-   */
-  private async processAnalytics() {
-    try {
-      console.log('📊 Starting scheduled analytics processing...');
-      
-      // @ts-expect-error - JavaScript module without type declarations
-      const { processAnalytics } = await import('./analytics/processor.js');
-      
-      const restaurant = await this.prisma.restaurant.findFirst({
-        where: { slug: 'smash-brothers-burgers' }
-      });
-      
-      if (restaurant) {
-        const analytics = await processAnalytics(restaurant.id);
-        console.log('✅ Analytics processing completed:', {
-          shiftDate: analytics?.shiftDate,
-          flags: analytics?.flags?.length || 0
-        });
-      }
-    } catch (error) {
-      console.error('❌ Scheduled analytics processing failed:', error);
-    }
-  }
-
-  /**
-   * Generate and send Jussi email summary
-   */
-  private async generateJussiSummary() {
-    try {
-      console.log('📧 Starting scheduled Jussi summary generation...');
-      
-      // @ts-expect-error - JavaScript module without type declarations
-      const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
-      const result = await generateDailySummary();
-      
-      console.log('✅ Jussi summary completed:', {
-        jobId: result.jobId,
-        emailSent: !!result.emailResult,
-        recipient: result.emailResult?.recipient
-      });
-    } catch (error) {
-      console.error('❌ Scheduled Jussi summary failed:', error);
-    }
-  }
-
-  /**
-   * Send daily sales summary to management
-   */
-  private async sendDailySalesSummary() {
-    try {
-      console.log('📧 Starting daily sales summary generation...');
-      
-      const { pool } = await import('../db');
-      const { workingEmailService } = await import('./workingEmailService');
-      
-      // Get yesterday's sales data (for previous shift)
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
-      
-      const result = await pool.query(
-        `SELECT * FROM daily_sales_v2 WHERE "shiftDate" = $1 ORDER BY "createdAt" DESC LIMIT 1`,
-        [yesterdayStr]
-      );
-      
-      if (result.rows.length === 0) {
-        console.log('📧 No sales data found for yesterday, skipping summary');
-        return;
-      }
-      
-      const salesData = result.rows[0];
-      const payload = salesData.payload || {};
-      
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px;">
-            🍔 Daily Sales Summary - ${salesData.shiftDate}
-          </h2>
-          
-          <div style="background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="color: #34495e; margin-top: 0;">Shift Details</h3>
-            <p><strong>Completed by:</strong> ${salesData.completedBy}</p>
-            <p><strong>Date:</strong> ${salesData.shiftDate}</p>
-            <p><strong>Submitted:</strong> ${new Date(salesData.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })}</p>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-            <div style="background-color: ${payload.balanced ? '#d5f4e6' : '#ffebee'}; padding: 15px; border-radius: 5px;">
-              <h4 style="color: ${payload.balanced ? '#27ae60' : '#e74c3c'}; margin-top: 0;">
-                💰 Cash Balance ${payload.balanced ? '✅' : '❌'}
-              </h4>
-              <p style="font-size: 18px; font-weight: bold; margin: 0;">
-                ${payload.balanced ? 'BALANCED' : 'UNBALANCED'}
-              </p>
-            </div>
-            
-            <div style="background-color: #d5f4e6; padding: 15px; border-radius: 5px;">
-              <h4 style="color: #27ae60; margin-top: 0;">💰 Total Sales</h4>
-              <p style="font-size: 24px; font-weight: bold; color: #27ae60; margin: 0;">
-                ฿${(payload.totalSales / 100).toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          <p style="color: #7f8c8d; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #bdc3c7; padding-top: 20px;">
-            Generated automatically by Smash Brothers Burgers Management System<br>
-            ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })} (Bangkok Time)
-          </p>
-        </div>
-      `;
-      
-      await workingEmailService.sendEmail(
-        'smashbrothersburgersth@gmail.com',
-        `Daily Sales Summary - ${salesData.shiftDate}`,
-        html
-      );
-      
-      console.log('✅ Daily sales summary sent successfully');
-    } catch (error) {
-      console.error('❌ Daily sales summary failed:', error);
-    }
-  }
 
   // Manual trigger for testing
   async triggerManualSync() {
@@ -454,34 +303,13 @@ export class SchedulerService {
   }
 
   async triggerAnalytics() {
-    // @ts-expect-error - JavaScript module without type declarations
-    const { processAnalytics } = await import('./analytics/processor.js');
-    const restaurant = await this.prisma.restaurant.findFirst({
-      where: { slug: 'smash-brothers-burgers' }
-    });
-    if (restaurant) {
-      return await processAnalytics(restaurant.id);
-    }
+    console.log('[scheduler] analytics/processor.js has been removed. No-op.');
     return null;
   }
 
   async triggerJussiSummary() {
     console.log('[scheduler] Jussi summary system has been removed.');
     return null;
-  }
-
-  private async runFinanceCalculations() {
-    try {
-      console.log('💰 Running finance calculations...');
-      
-      // Note: dailyFinanceJob is not implemented yet
-      // const { runDailyFinanceJob } = await import('../jobs/dailyFinanceJob');
-      // await runDailyFinanceJob();
-      
-      console.log('✅ Finance calculations completed (placeholder)');
-    } catch (error) {
-      console.error('❌ Failed to run finance calculations:', error);
-    }
   }
 
   private async cacheBurgerMetrics() {
