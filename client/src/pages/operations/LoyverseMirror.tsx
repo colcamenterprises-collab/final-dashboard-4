@@ -20,6 +20,7 @@ function formatValue(value: unknown) {
   if (value == null) return "—";
   if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
   if (typeof value === "string") return value;
+  if (Array.isArray(value)) return value.join(", ");
   return JSON.stringify(value);
 }
 
@@ -38,8 +39,33 @@ function StatusBadge({ status }: { status: string }) {
   return <span className={`inline-flex rounded border px-2 py-1 text-xs font-semibold ${classes}`}>{status}</span>;
 }
 
-function JsonBlock({ value }: { value: unknown }) {
-  return <pre className="max-h-96 overflow-auto rounded bg-slate-50 p-3 text-xs">{JSON.stringify(value, null, 2)}</pre>;
+function KeyValueTable({ data, labelKey = "Field", valueKey = "Value" }: { data?: Record<string, any>; labelKey?: string; valueKey?: string }) {
+  const entries = Object.entries(data || {});
+  if (entries.length === 0) return <p className="text-sm text-slate-600">No data returned.</p>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-left text-sm">
+        <thead><tr className="border-b"><th className="py-2 pr-4">{labelKey}</th><th className="py-2 pr-4">{valueKey}</th></tr></thead>
+        <tbody>{entries.map(([key, value]) => <tr className="border-b" key={key}><td className="py-2 pr-4 font-mono">{key}</td><td className="py-2 pr-4">{formatValue(value)}</td></tr>)}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function FindingsTable({ rows, emptyText }: { rows?: any[]; emptyText: string }) {
+  if (!rows || rows.length === 0) return <p className="text-sm text-slate-600">{emptyText}</p>;
+  const columns = Array.from(rows.reduce((set, row) => {
+    Object.keys(row || {}).forEach((key) => set.add(key));
+    return set;
+  }, new Set<string>()));
+  return (
+    <div className="overflow-x-auto">
+      <table className="min-w-full text-left text-xs">
+        <thead><tr className="border-b">{columns.map((column) => <th className="py-2 pr-3" key={column}>{column}</th>)}</tr></thead>
+        <tbody>{rows.map((row, index) => <tr className="border-b" key={index}>{columns.map((column) => <td className="py-2 pr-3" key={column}>{formatValue(row?.[column])}</td>)}</tr>)}</tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function LoyverseMirror() {
@@ -103,17 +129,12 @@ export default function LoyverseMirror() {
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Canonical table map</h2>
-        <JsonBlock value={data.canonicalTables || {}} />
+        <KeyValueTable data={data.canonicalTables} />
       </section>
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Receipt table counts</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead><tr className="border-b"><th className="py-2 pr-4">Table</th><th className="py-2 pr-4">Rows</th></tr></thead>
-            <tbody>{Object.entries(data.receiptCounts || {}).map(([table, count]) => <tr className="border-b" key={table}><td className="py-2 pr-4 font-mono">{table}</td><td className="py-2 pr-4">{formatValue(count)}</td></tr>)}</tbody>
-          </table>
-        </div>
+        <KeyValueTable data={data.receiptCounts} labelKey="Table" valueKey="Rows" />
       </section>
 
       <section className="rounded border bg-white p-4">
@@ -132,37 +153,37 @@ export default function LoyverseMirror() {
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Latest shift comparison</h2>
-        <JsonBlock value={data.latestShiftComparison} />
+        <KeyValueTable data={data.latestShiftComparison || {}} />
       </section>
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Duplicate and missing data</h2>
-        <JsonBlock value={data.integrity || {}} />
+        <div className="space-y-4">{Object.entries(data.integrity || {}).map(([name, rows]) => <div key={name}><h3 className="mb-2 font-medium">{name}</h3><FindingsTable rows={rows} emptyText="No findings returned." /></div>)}</div>
       </section>
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Unmapped payment names</h2>
-        <JsonBlock value={data.paymentMapping?.unmappedPayments || []} />
+        <FindingsTable rows={data.paymentMapping?.unmappedPayments || []} emptyText="No unmapped payment names returned." />
       </section>
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Payment mapping rules</h2>
-        <JsonBlock value={data.paymentMapping || {}} />
+        <KeyValueTable data={data.paymentMapping?.rules || {}} />
       </section>
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Blockers</h2>
-        {data.blockers.length === 0 ? <p>No blockers returned.</p> : <JsonBlock value={data.blockers} />}
+        <FindingsTable rows={data.blockers} emptyText="No blockers returned." />
       </section>
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Mismatches</h2>
-        {data.mismatches.length === 0 ? <p>No mismatches returned.</p> : <JsonBlock value={data.mismatches} />}
+        <FindingsTable rows={data.mismatches} emptyText="No mismatches returned." />
       </section>
 
       <section className="rounded border bg-white p-4">
         <h2 className="mb-3 text-lg font-semibold">Source map</h2>
-        <JsonBlock value={data.sourceMap || {}} />
+        <KeyValueTable data={data.sourceMap || {}} />
       </section>
     </main>
   );

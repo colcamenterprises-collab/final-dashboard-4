@@ -24,7 +24,7 @@
 
 import axios from "axios";
 import { PrismaClient } from "@prisma/client";
-import { normalizeLoyversePayments, parseLoyverseMoney } from "./loyverseMirrorCommon.js";
+import { getBangkokBusinessWindow, normalizeLoyversePayments, parseLoyverseMoney } from "./loyverseMirrorCommon.js";
 
 const db = new PrismaClient();
 const LOYVERSE_TOKEN = process.env.LOYVERSE_TOKEN || process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_ACCESS_TOKEN;
@@ -243,4 +243,23 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
   } finally {
     await db.$disconnect();
   }
+}
+
+export async function importShift(shiftDate: string) {
+  const window = getBangkokBusinessWindow(shiftDate);
+  const result = await importReceiptsV2(window.startISO, window.endISO);
+  return {
+    ...result,
+    shiftDate,
+    shiftWindow: window,
+    receipts: result.importedReceipts + result.updatedReceipts,
+    imported: result.importedReceipts,
+  };
+}
+
+export async function syncRange(from: string, to: string) {
+  const fromWindow = getBangkokBusinessWindow(from);
+  const toWindow = getBangkokBusinessWindow(to);
+  const result = await importReceiptsV2(fromWindow.startISO, toWindow.endISO);
+  return { ...result, from, to, shiftWindow: { from: fromWindow, to: toWindow } };
 }

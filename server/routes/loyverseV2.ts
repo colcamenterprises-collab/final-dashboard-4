@@ -1,5 +1,7 @@
 import { Router } from "express";
+import { DateTime } from "luxon";
 import { importReceiptsV2 } from "../services/loyverseImportV2.js";
+import { db } from "../lib/prisma.js";
 import { getBangkokBusinessWindow } from "../services/loyverseMirrorCommon.js";
 import { buildLoyverseMirrorDiagnostic } from "../services/loyverseMirrorDiagnostic.js";
 
@@ -32,6 +34,63 @@ router.get("/loyverse/mirror-diagnostic", async (_req, res) => {
       }],
       sourceMap: {},
     });
+  }
+});
+
+
+function dateRange(from: string, to: string) {
+  const start = DateTime.fromISO(from, { zone: "Asia/Bangkok" }).startOf("day");
+  const end = DateTime.fromISO(to, { zone: "Asia/Bangkok" }).startOf("day");
+  if (!start.isValid || !end.isValid || end < start) return [];
+  const days: string[] = [];
+  let current = start;
+  while (current <= end && days.length < 31) {
+    days.push(current.toISODate()!);
+    current = current.plus({ days: 1 });
+  }
+  return days;
+}
+
+async function canonicalReceiptCount(fromISO: string, toISO: string) {
+  const rows = await db().$queryRawUnsafe<{ count: number }[]>(
+    `SELECT COUNT(*)::int AS count FROM lv_receipt WHERE datetime_bkk >= $1::timestamptz AND datetime_bkk < $2::timestamptz`,
+    fromISO,
+    toISO,
+  );
+  return Number(rows[0]?.count ?? 0);
+}
+
+router.post("/loyverse/sync-missing-shifts", async (req, res) => {
+  try {
+    const bodyDates = Array.isArray(req.body?.dates) ? req.body.dates : [];
+    const queryDates = typeof req.query.dates === "string" ? req.query.dates.split(",") : [];
+    const from = String(req.query.from || req.body?.from || "");
+    const to = String(req.query.to || req.body?.to || from || "");
+    const dates = [...bodyDates, ...queryDates].map((value) => String(value).trim()).filter(Boolean);
+    const requestedDates = dates.length > 0 ? dates : (from && to ? dateRange(from, to) : []);
+
+    if (requestedDates.length === 0) {
+      return res.status(400).json({ ok: false, error: "dates or from/to required (YYYY-MM-DD)" });
+    }
+
+    const results = [];
+    for (const date of requestedDates) {
+      const window = getBangkokBusinessWindow(date);
+      const beforeCount = await canonicalReceiptCount(window.startISO, window.endISO);
+      if (beforeCount > 0) {
+        results.push({ date, status: "skipped_existing", beforeCount, afterCount: beforeCount, shiftWindow: window });
+        continue;
+      }
+
+      const syncResult = await importReceiptsV2(window.startISO, window.endISO);
+      const afterCount = await canonicalReceiptCount(window.startISO, window.endISO);
+      results.push({ date, status: afterCount > 0 ? "synced" : "missing_after_sync", beforeCount, afterCount, shiftWindow: window, syncResult });
+    }
+
+    res.json({ ok: true, mode: "sync-missing-shifts", dates: requestedDates, results });
+  } catch (error: any) {
+    console.error("[loyverseV2] sync missing shifts failed:", error);
+    res.status(500).json({ ok: false, error: error?.message || "sync-missing-shifts failed" });
   }
 });
 
