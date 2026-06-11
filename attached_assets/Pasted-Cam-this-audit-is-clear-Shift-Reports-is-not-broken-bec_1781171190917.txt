@@ -1,0 +1,89 @@
+Cam, this audit is clear: Shift Reports is not broken because the data is missing — it’s broken because the report system is wired to the wrong/empty pipeline.
+The best next patch is Option B/C hybrid:
+Do not use the broken Prisma DailySalesV2 model.
+Do not rely on empty shift_report_v2.
+Repair /api/shift-report/history and /api/shift-report/generate to use the verified sources:
+loyverse_shifts
+lv_receipt
+daily_sales_v2
+Keep the UI pages, but make them show real data now.
+Send this:
+:::writing{variant="document" id="81264"} FINAL DB 5.1 — SHIFT REPORTS SOURCE ALIGNMENT PATCH
+Objective: Repair Shift Reports and Shift History so they display real operational shift data from verified sources.
+Do not add new features. Do not change schemas. Do not change POS sync. Do not change Daily Sales V2 submission. Do not change Daily Stock V2 submission. Do not touch Purchasing, Finance, Staff, Online Ordering, or POS mirror logic.
+Problem: Shift Reports and Shift History currently show zero reports because they read shift_report_v2, which has 0 rows. The generate flow silently fails because shiftReportBuilder.ts uses Prisma model dailySalesV2, which maps to non-existent table "DailySalesV2". The real table is daily_sales_v2.
+Verified usable sources:
+POS truth: loyverse_shifts
+Receipt truth: lv_receipt, lv_line_item, lv_modifier
+Staff form truth: daily_sales_v2
+Broken/empty report output: shift_report_v2
+Required Repair:
+Repair /api/shift-report/history
+Stop returning empty shift_report_v2 as the primary source.
+Return shift history rows built from loyverse_shifts.
+Join/compare to daily_sales_v2 when a staff form exists for the same Bangkok business date.
+Include receipt-derived totals from lv_receipt where useful.
+Response must include:
+id
+shiftDate
+businessDate
+grossSales
+netSales
+cashSales
+qrSales
+grabSales
+otherSales
+receiptCount
+staffFormStatus: submitted / missing
+posStatus: matched / mismatch / missing
+varianceSummary
+source: loyverse_shifts + lv_receipt + daily_sales_v2
+blockers
+Repair /api/shift-report/latest
+Return latest completed shift from loyverse_shifts.
+Include latest matching staff form from daily_sales_v2 if present.
+Do not depend on shift_report_v2.
+Repair /api/shift-report/generate
+Do not call the broken Prisma builder.
+For now, make this endpoint generate a read-only report object from the same verified sources.
+It may persist to shift_report_v2 only if safe and current schema supports it.
+If persistence is unsafe, return the generated object without writing and explain: persistenceSkipped: true
+Never return { success: true, report: null }.
+If generation fails, return success: false with blocker reason.
+Fix UI Behavior
+/reports/shift-reports must display real rows from repaired /api/shift-report/history.
+/reports/shift-history must display real rows from repaired /api/shift-report/history.
+Generate button must:
+show success only when a report object is returned
+show the actual blocker/error if generation fails
+Do not show “0 reports generated” when loyverse_shifts has data.
+Keep or simplify duplicate report pages
+Do not remove pages in this patch.
+It is acceptable for both pages to read the same repaired endpoint for now.
+Add clear labels:
+Shift Reports = latest generated/available shift summaries
+Shift History = date-based report lookup/generation
+No silent failures
+Remove or bypass any flow that catches buildShiftReport() failure and returns success: true, report: null.
+Missing data must show as Missing.
+Broken source must show as blocker.
+Validation Required
+npm run build
+/reports/shift-reports loads and shows rows from loyverse_shifts
+/reports/shift-history loads and shows rows from loyverse_shifts
+/api/shift-report/history returns non-empty rows
+/api/shift-report/latest returns latest shift
+/api/shift-report/generate returns either a report object or success:false with blockers
+No schema changes
+No POS sync changes
+No Daily Sales V2 write-path changes
+No Daily Stock V2 changes
+No Tier 5 systems restored
+Deliver:
+Files changed
+Data source map
+Before/after API results
+Screenshot/page verification
+PASS/FAIL table
+Known remaining issues :::
+This gets the reports usable now without pretending the old shift_report_v2 pipeline is alive.
