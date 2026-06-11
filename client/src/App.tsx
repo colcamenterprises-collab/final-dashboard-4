@@ -20,6 +20,7 @@ import ShoppingList from "./pages/operations/ShoppingList";
 import IssueRegister from "./pages/operations/IssueRegister";
 import ManagerChecklist from "./pages/operations/ManagerChecklist";
 import HealthSafety from "./pages/operations/HealthSafety";
+import LoyverseMirror from "./pages/operations/LoyverseMirror";
 
 import Ingredients from "./pages/menu/Ingredients";
 import MenuItems from "./pages/menu/MenuItems";
@@ -82,6 +83,7 @@ export default function App() {
                     <Route path="/operations/issue-register" element={<ProtectedRoute><IssueRegister /></ProtectedRoute>} />
                     <Route path="/operations/manager-checklist" element={<ProtectedRoute><ManagerChecklist /></ProtectedRoute>} />
                     <Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
+                    <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
 
                     {/* Menu */}
                     <Route path="/menu/ingredients" element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />
