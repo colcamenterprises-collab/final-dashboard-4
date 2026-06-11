@@ -13,7 +13,8 @@
     "test:burger-metrics": "tsx server/scripts/run_burger_metrics_test.ts",
     "postinstall": "prisma generate",
     "test:stock-ledger-smoke": "tsx server/scripts/stock_ledger_smoke.ts",
-    "seed:ai-ops-agents": "tsx server/scripts/seed_ai_ops_agents.ts"
+    "seed:ai-ops-agents": "tsx server/scripts/seed_ai_ops_agents.ts",
+    "seed:ordering-test-menu": "tsx server/scripts/seed_ordering_test_menu.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.37.0",

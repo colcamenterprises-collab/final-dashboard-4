@@ -43,6 +43,13 @@ import Catalog from "./pages/ordering/Catalog";
 import OnlineOrdering from "./pages/ordering/OnlineOrdering";
 import Checkout from "./pages/ordering/Checkout";
 import Confirmation from "./pages/ordering/Confirmation";
+import OrderPage from "./pages/ordering/OrderPage";
+import OrderStatus from "./pages/ordering/OrderStatus";
+import KitchenDisplay from "./pages/kitchen/KitchenDisplay";
+import AdminMenu from "./pages/admin/ordering/AdminMenu";
+import AdminOrders from "./pages/admin/ordering/AdminOrders";
+import AdminSettings from "./pages/admin/ordering/AdminSettings";
+import AdminQrCodes from "./pages/admin/ordering/AdminQrCodes";
 
 import StaffDashboard from "./pages/staff/Dashboard";
 import StaffMembers from "./pages/staff/Members";
@@ -70,6 +77,12 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/order" element={<OrderPage />} />
+                  <Route path="/order/:venueCode" element={<OrderPage />} />
+                  <Route path="/order/table/:tableCode" element={<OrderPage />} />
+                  <Route path="/order/status/:orderId" element={<OrderStatus />} />
+                  <Route path="/ordering/tablet" element={<OrderPage tablet />} />
+                  <Route path="/kitchen/display" element={<KitchenDisplay />} />
                   <Route element={<PageShell />}>
                     {/* Core */}
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
@@ -114,6 +127,11 @@ export default function App() {
                     {/* Admin Ordering */}
                     <Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                     <Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
+                    <Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/menu" element={<ProtectedRoute><AdminMenu /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
 
                     {/* Staff Operations */}
                     <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />

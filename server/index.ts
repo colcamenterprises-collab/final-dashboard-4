@@ -32,6 +32,7 @@ import ensureShiftRouter from "./routes/ensureShift";
 import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
 import operationsReadRouter from "./routes/operationsRead";
+import orderingRouter from "./routes/ordering";
 
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
@@ -151,6 +152,7 @@ const API_PUBLIC_PREFIXES = [
   "/api/bob/read",
   "/api/agent/read",
   "/api/ui-auth",
+  "/api/ordering",
 ];
 
 app.use((req, res, next) => {
@@ -408,6 +410,7 @@ async function checkSchema() {
 
   // Read-only operational UI summaries for owner review pages.
   app.use("/api/operations-read", operationsReadRouter);
+  app.use("/api/ordering", orderingRouter);
 
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);
