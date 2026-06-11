@@ -30,6 +30,8 @@ import {
   Settings,
   MapPin,
   Globe,
+  QrCode,
+  Monitor,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { ModernButton } from "@/components/ui";
@@ -74,9 +76,12 @@ const navigationGroups: NavGroup[] = [
     title: "Ordering",
     defaultOpen: false,
     items: [
-      { to: "/ordering/orders",    label: "Orders",          icon: ShoppingBag, testId: "nav-orders" },
-      { to: "/ordering/catalog",   label: "Catalog",         icon: BookOpen,    testId: "nav-catalog" },
-      { to: "/online-ordering",    label: "Online Ordering", icon: Globe,       testId: "nav-online-ordering" },
+      { to: "/admin/ordering/menu",      label: "Menu Manager", icon: UtensilsCrossed, testId: "nav-ordering-menu" },
+      { to: "/admin/ordering/orders",    label: "Orders",       icon: ShoppingBag,     testId: "nav-ordering-orders" },
+      { to: "/admin/ordering/qr-codes",  label: "QR Codes",     icon: QrCode,          testId: "nav-ordering-qr" },
+      { to: "/admin/ordering/settings",  label: "Settings",     icon: Settings,        testId: "nav-ordering-settings" },
+      { to: "/kitchen/display",          label: "Kitchen Display", icon: Monitor,       testId: "nav-kitchen-display" },
+      { to: "/order/table/T1",           label: "Table T1 (Test)", icon: Globe,         testId: "nav-ordering-t1" },
     ],
   },
   {
