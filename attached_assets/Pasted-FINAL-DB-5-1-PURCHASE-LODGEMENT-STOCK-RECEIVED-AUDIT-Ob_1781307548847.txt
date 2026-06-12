@@ -1,0 +1,103 @@
+FINAL DB 5.1 — PURCHASE LODGEMENT / STOCK RECEIVED AUDIT
+
+Objective:
+Find and restore the purchase lodgement flow for stock bought outside the shift.
+
+This is NOT the Daily Stock V2 end-of-shift count form.
+
+We need the page/modal/table where owner/manager records purchases such as:
+
+- rolls bought
+- meat bought in kg or grams
+- drinks bought by brand and quantity
+- french fries bought
+- sweet potato fries bought
+- other stock purchases
+
+This data must be stored by date/month and later used to compare:
+opening stock + purchases - POS usage = expected closing stock
+
+Audit only first. Do not change code.
+
+Find:
+
+1. Which page currently opens the purchase lodgement modal/table.
+2. Whether the modal still exists in the frontend.
+3. Whether it is linked from:
+   - /operations/purchasing
+   - /operations/shopping-list
+   - /operations/daily-stock
+   - /operations/purchasing-list
+   - any purchasing analytics page
+4. Whether the component exists:
+   - PurchaseTallyModal
+   - purchase tally modal
+   - stock received modal
+   - lodge stock modal
+   - rolls/meat/drinks purchase modal
+
+Trace frontend files for:
+
+- PurchaseTallyModal
+- purchase_tally
+- purchase_tally_drink
+- stock_received_log
+- stock_purchase_rolls
+- stock_purchase_meat
+- stock_purchase_drinks
+- lodge/rolls
+- lodge/meat
+- lodge/drinks
+
+Trace backend routes:
+
+- /api/purchase-tally
+- /api/purchasing
+- /api/purchasing/drinks
+- /api/stock/lodge/rolls
+- /api/stock/lodge/meat
+- /api/stock/lodge/drinks
+- /api/stock/rolls
+- /api/stock/meat
+- /api/stock/drinks
+
+Answer:
+
+1. Where is the purchase lodgement UI currently?
+2. Is it visible in navigation?
+3. Is it hidden inside another page?
+4. Is the modal disconnected?
+5. What tables does it save to?
+6. Does it support:
+   - rolls
+   - meat
+   - drinks
+   - fries
+   - sweet potato fries
+7. Does it save purchase date/month?
+8. Does it save supplier/cost?
+9. Does it feed reconciliation/ledger calculations?
+10. What is missing or broken?
+
+Return a field map:
+
+Item | UI present? | Modal field | API endpoint | DB table | Unit | Monthly usable? | Feeds variance? | Status
+
+Recommended repair path:
+
+- Prefer restoring the existing modal if present.
+- Do not build a new system if the old one still exists.
+- If the modal exists but is disconnected, reconnect it.
+- If fries/sweet potato are missing, add them to the existing purchase tally flow only.
+- No schema change unless absolutely required and explained.
+- Do not touch POS sync.
+- Do not touch Daily Sales V2 sales fields.
+- Do not touch Daily Stock V2 end count form.
+
+Required output:
+
+- current location
+- broken/disconnected pieces
+- exact files involved
+- recommended smallest repair patch
+- no code changes yet
