@@ -1,13 +1,26 @@
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { DateTime } from "luxon";
 import { importReceiptsV2 } from "../services/loyverseImportV2.js";
 import { db } from "../lib/prisma.js";
 import { getBangkokBusinessWindow } from "../services/loyverseMirrorCommon.js";
 import { buildLoyverseMirrorDiagnostic } from "../services/loyverseMirrorDiagnostic.js";
+import { attachSessionUser } from "../middleware/sessionAuth.js";
+import { getPinSessionUser } from "./pinAuth.js";
 
 const router = Router();
 
-router.get("/loyverse/mirror-diagnostic", async (_req, res) => {
+function requireMirrorDiagnosticAuth(req: Request, res: Response, next: NextFunction) {
+  if (res.locals.isBotRequest) return next();
+  if (attachSessionUser(req)) return next();
+
+  const pinUser = getPinSessionUser(req);
+  if (pinUser?.role === "owner") return next();
+
+  return res.status(401).json({ ok: false, error: "Unauthorized" });
+}
+
+
+router.get("/loyverse/mirror-diagnostic", requireMirrorDiagnosticAuth, async (_req, res) => {
   try {
     const diagnostic = await buildLoyverseMirrorDiagnostic();
     res.json(diagnostic);

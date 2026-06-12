@@ -35,7 +35,7 @@ export function roundMoney(value: number) {
 
 export function parseLoyverseMoney(raw: any): number {
   if (raw == null) return 0;
-  if (typeof raw === "number") return raw / 100;
+  if (typeof raw === "number") return raw;
   if (typeof raw === "string") return Number(raw) || 0;
   if (typeof raw === "object") {
     if (raw.amount != null) return Number(raw.amount) / 100;
