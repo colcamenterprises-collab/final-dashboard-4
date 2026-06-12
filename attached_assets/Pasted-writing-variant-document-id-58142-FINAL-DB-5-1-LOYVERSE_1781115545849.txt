@@ -1,0 +1,66 @@
+writing{variant="document" id="58142"} FINAL DB 5.1 — LOYVERSE MIRROR RELIABILITY PATCH
+Objective: The Loyverse mirror has now been verified against production data. Six of six completed business days match exactly with zero variance. The app is now considered trustworthy for completed synced shifts.
+Do NOT add new features. Do NOT add AI systems. Do NOT add analytics. Do NOT modify Daily Sales V2, Daily Stock V2, Purchasing, Finance, Staff, Reports, or Online Ordering workflows.
+Scope is Loyverse mirror reliability only.
+Required Repairs:
+Missing Shift Recovery
+Detect any business date where receipts exist in lv_receipt but no corresponding row exists in loyverse_shifts.
+Automatically queue a retry sync for those dates.
+Check at least the previous 3 Bangkok business days on every shift sync run.
+Shift Finalisation Catch-Up
+Loyverse sometimes finalises shift reports after the scheduled sync.
+Add a catch-up process that re-checks recently completed shifts.
+A shift must not remain permanently missing because Loyverse finalised late.
+Mirror Diagnostic Production Verification
+Run /api/loyverse/mirror-diagnostic against the production database.
+Confirm:
+lv_receipt populated
+lv_line_item populated
+lv_modifier populated
+loyverse_shifts populated
+sevenDayComparison all MATCH
+latestShiftComparison MATCH
+no duplicate receipts
+no orphan items
+no orphan payments
+Payment Mapping Verification
+Verify every payment type currently returned by Loyverse.
+Eliminate all UNMAPPED_PAYMENT_NAMES findings.
+Every payment must resolve to:
+Cash
+QR
+Grab
+Other
+Idempotency Verification
+Run the same small sync range twice.
+Confirm:
+receipts not duplicated
+line items not duplicated
+modifiers not duplicated
+second run reports updated/skipped activity only
+Production Report Return a final report containing:
+receipt counts
+line item counts
+modifier counts
+shift counts
+latest receipt timestamp
+latest shift timestamp
+sevenDayComparison table
+latestShiftComparison
+integrity findings
+payment mappings
+final trust verdict
+Success Criteria:
+The app can only be declared trusted when:
+sevenDayComparison = MATCH for every completed day
+latestShiftComparison = MATCH
+no duplicate data exists
+no orphan data exists
+no unmapped payment names exist
+missing shift reports automatically recover after late Loyverse finalisation
+Deliver:
+Code changes
+Validation report
+Exact files changed
+Final trust verdict
+No other modules may be modified. 

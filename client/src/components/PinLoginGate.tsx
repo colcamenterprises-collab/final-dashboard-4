@@ -42,6 +42,8 @@ const PUBLIC_PATH_PREFIXES = [
   "/website",
   "/order",
   "/online-ordering",
+  "/ordering/tablet",
+  "/kitchen/display",
   "/login",
   "/pos-login",
 ];

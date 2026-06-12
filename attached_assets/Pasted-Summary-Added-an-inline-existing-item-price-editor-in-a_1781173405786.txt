@@ -1,0 +1,138 @@
+Summary
+
+Added an inline existing-item price editor in /admin/ordering/menu so the seeded Phase 1 records can receive real prices before being enabled for live testing. 
+
+Hardened updateMenuItem so partial patches only update fields explicitly present in the request body; this prevents a price/toggle update from accidentally clearing Thai names or descriptions. 
+
+Live DB Verification Evidence
+
+Migration applied: no — blocked because DATABASE_URL is not present in this environment.
+
+Seed completed: no — npm run seed:ordering-test-menu ran, but returned DATABASE_URL is not configured.
+
+Menu item IDs enabled: none — blocked by missing live DB access.
+
+Test order ID: none — no fake order was created.
+
+Order number: none — no fake order was created.
+
+Final order status: not available — live DB flow blocked.
+
+Kitchen display result: frontend route loads; live DB active-order verification blocked by missing DATABASE_URL.
+
+Customer status page result: frontend route loads; live DB order status verification blocked by missing DATABASE_URL.
+
+Admin orders result: frontend route loads; live DB admin order verification blocked by missing DATABASE_URL.
+
+Blockers: DATABASE_URL is missing, so I could not apply the migration, confirm ordering tables, seed real DB records, enable records, or submit/progress a real order.
+
+Readiness
+
+Ordering OS Phase 1 is not truthfully verifiable as ready for in-store tablet/QR testing from this environment because live DB access is unavailable.
+
+The code blocker found during review was fixed: seeded records can now have real prices set in the admin menu before being enabled. 
+
+Testing
+
+✅ npm run build
+
+✅ git diff --check
+
+✅ NODE_ENV=development npx tsx server/index.ts > /tmp/sbb-ordering-route-final2.log 2>&1 & server_pid=$! for i in $(seq 1 60); do if curl -s http://localhost:8080/order >/tmp/order.html; then break; fi; sleep 1; done for path in /order /order/table/T1 /order/status/00000000-0000-0000-0000-000000000000 /ordering/tablet /kitchen/display /admin/ordering/menu /admin/ordering/orders /admin/ordering/settings /admin/ordering/qr-codes; do code=$(curl -s -o /tmp/curl.out -w '%{http_code}' "http://localhost:8080$path"); echo "$path $code"; done curl -s -w '\n%{http_code}\n' http://localhost:8080/api/ordering/menu | head -c 500; echo kill $server_pid || true wait $server_pid || true
+
+⚠️ npm run seed:ordering-test-menu — failed due environment blocker: DATABASE_URL is not configured.
+
+⚠️ npm run check — repo-wide TypeScript still reports pre-existing non-ordering errors; targeted filtering showed no errors in Ordering OS files.
+
+Committed changes with 1779c86 and created a PR for this verification blocker fix.
+
+
+Files (21)
+
+App.tsx
+client/src/App.tsx
++18
+-0
+
+PinLoginGate.tsx
+client/src/components/PinLoginGate.tsx
++2
+-0
+
+KitchenOrderCard.tsx
+client/src/components/kitchen/KitchenOrderCard.tsx
+New
+
+OrderingCart.tsx
+client/src/components/ordering/OrderingCart.tsx
+New
+
+OrderingMenu.tsx
+client/src/components/ordering/OrderingMenu.tsx
+New
+
+orderingApi.ts
+client/src/components/ordering/orderingApi.ts
+New
+
+AdminMenu.tsx
+client/src/pages/admin/ordering/AdminMenu.tsx
+New
+
+AdminOrders.tsx
+client/src/pages/admin/ordering/AdminOrders.tsx
+New
+
+AdminQrCodes.tsx
+client/src/pages/admin/ordering/AdminQrCodes.tsx
+New
+
+AdminSettings.tsx
+client/src/pages/admin/ordering/AdminSettings.tsx
+New
+
+KitchenDisplay.tsx
+client/src/pages/kitchen/KitchenDisplay.tsx
+New
+
+OrderPage.tsx
+client/src/pages/ordering/OrderPage.tsx
+New
+
+OrderStatus.tsx
+client/src/pages/ordering/OrderStatus.tsx
+New
+
+202606110001_ordering_phase1.sql
+migrations/202606110001_ordering_phase1.sql
+New
+
+package.json
+package.json
++2
+-1
+
+index.ts
+server/index.ts
++3
+-0
+
+202606110001_ordering_phase1.sql
+server/migrations/202606110001_ordering_phase1.sql
+New
+
+ordering.ts
+server/routes/ordering.ts
+New
+
+seed_ordering_test_menu.ts
+server/scripts/seed_ordering_test_menu.ts
+New
+
+orderingService.ts
+server/services/ordering/orderingService.ts
+New
+
+ordering.ts
+shared/schema/ordering.ts
+New

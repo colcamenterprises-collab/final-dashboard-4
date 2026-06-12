@@ -10,9 +10,10 @@ export class SchedulerService {
     // Initialize restaurant data first
     this.initializeRestaurant();
 
-    // Schedule daily receipt sync at 3am Bangkok time (end of 5pm-3am shift)
+    // Schedule daily receipt sync at 3:00 AM Bangkok time (end of 5pm-3am shift)
+    // Receipts only — shift report sync is intentionally separated (see 3:30 AM below)
     this.scheduleDailyTask(() => {
-      this.syncReceiptsAndReports();
+      this.syncReceiptsOnly();
     }, 3, 0); // 3:00 AM Bangkok time
 
     // Schedule daily summary job at 3:05 AM Bangkok time  
@@ -20,30 +21,12 @@ export class SchedulerService {
       this.buildDailySummary();
     }, 3, 5); // 3:05 AM Bangkok time
 
-    // === NEW SERVICES ===
-
-    // Schedule incremental POS sync every 15 minutes
-    this.scheduleIncrementalSync();
-
-    // Schedule analytics processing at 3:30 AM Bangkok time
+    // Schedule loyverse_shifts sync at 3:30 AM Bangkok time
+    // Runs 30 minutes after shift close so the register is fully closed and
+    // Loyverse has finalised the shift report before we query the API.
     this.scheduleDailyTask(() => {
-      this.processAnalytics();
+      this.syncNewShifts();
     }, 3, 30); // 3:30 AM Bangkok time
-
-    // Schedule Jussi email summary at 8:00 AM Bangkok time
-    this.scheduleDailyTask(() => {
-      this.generateJussiSummary();
-    }, 8, 0); // 8:00 AM Bangkok time
-
-    // Schedule daily sales summary at 9:00 AM Bangkok time
-    this.scheduleDailyTask(() => {
-      this.sendDailySalesSummary();
-    }, 9, 0); // 9:00 AM Bangkok time
-
-    // Schedule finance calculations at 3:35 AM Bangkok time
-    this.scheduleDailyTask(() => {
-      this.runFinanceCalculations();
-    }, 3, 35); // 3:35 AM Bangkok time
 
     // Schedule burger metrics cache at 3:10 AM Bangkok time
     this.scheduleDailyTask(() => {
@@ -60,12 +43,13 @@ export class SchedulerService {
       this.rebuildShiftAnalytics();
     }, 3, 20); // 3:20 AM Bangkok time
 
-    console.log('Scheduler service started - daily sync at 3am Bangkok time for 5pm-3am shifts');
-    console.log('📧 Email cron scheduled for 8am Bangkok time (1am UTC)');
-    console.log('📧 Daily sales summary scheduled for 9am Bangkok time (2am UTC)');
-    console.log('🍔 Burger metrics cache scheduled for 3:10am Bangkok time');
-    console.log('📊 Daily Review POS ingestion scheduled for 3:15am Bangkok time');
-    console.log('📊 Shift Analytics MM cache rebuild scheduled for 3:20am Bangkok time');
+    console.log('[Scheduler] Daily task pipeline registered');
+    console.log('  03:00  receipt sync → lv_receipt');
+    console.log('  03:05  daily summary build');
+    console.log('  03:10  burger metrics cache');
+    console.log('  03:15  Daily Review POS ingest');
+    console.log('  03:20  shift analytics MM cache');
+    console.log('  03:30  loyverse_shifts sync (post-close)');
   }
 
   stop() {
@@ -118,18 +102,16 @@ export class SchedulerService {
     scheduleNext();
   }
 
-  private async syncReceiptsAndReports() {
+  // Receipts-only sync — runs at 3:00 AM Bangkok.
+  // Shift report sync (syncNewShifts) runs separately at 3:30 AM to avoid
+  // racing against the register close, which happens at or after 3:00 AM.
+  private async syncReceiptsOnly() {
     try {
-      console.log('🔄 Starting daily receipt and shift report sync...');
-      
-      // 1. First sync all new shifts to prevent missing shift data
-      await this.syncNewShifts();
-      
-      // 2. Sync receipts from Loyverse using Bangkok timezone-aware API
+      console.log('🔄 [3:00 AM] Starting daily receipt sync...');
+
       const receiptCount = await loyverseAPI.syncTodaysReceipts();
       console.log(`✅ Synced ${receiptCount} receipts from completed shift`);
-      
-      // 3. Process shift analytics for the completed shift
+
       if (receiptCount > 0) {
         console.log('🔄 Processing shift analytics for previous shift...');
         const { processPreviousShift } = await import('./shiftAnalytics');
@@ -137,76 +119,134 @@ export class SchedulerService {
         console.log(`📊 Shift analytics: ${analyticsResult.message}`);
       }
 
-      // 3. Sync additional data (items, customers, etc.)
-      // Note: syncAllItems() and syncCustomers() are not implemented yet
-      // const itemCount = await loyverseAPI.syncAllItems();
-      // console.log(`✅ Synced ${itemCount} menu items`);
-
-      // const customerCount = await loyverseAPI.syncCustomers();
-      // console.log(`✅ Synced ${customerCount} customers`);
-
-      console.log('🎉 Daily sync completed successfully');
+      console.log('🎉 Receipt sync completed successfully');
     } catch (error) {
-      console.error('❌ Daily sync failed:', error);
+      console.error('❌ Receipt sync failed:', error);
     }
   }
 
   private async syncNewShifts() {
     try {
-      console.log('🔄 Syncing new shifts to prevent missing data...');
-      
-      const endTime = new Date();
+      console.log('🔄 [3:30 AM] Syncing shifts (last 3 days + missing shift recovery)...');
+
+      const endTime   = new Date();
       const startTime = new Date(endTime.getTime() - (3 * 24 * 60 * 60 * 1000));
-      
+
       const shiftsResponse = await loyverseAPI.getShifts({
         start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        limit: 50
+        end_time:   endTime.toISOString(),
+        limit: 50,
       });
-      
+
       console.log(`📊 Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
-      
-      const { db } = await import('../db');
+
+      const { db }              = await import('../db');
       const { loyverse_shifts } = await import('../../shared/schema');
-      const { eq, sql } = await import('drizzle-orm');
-      
+
+      // Group closed shifts by Bangkok business date
       const shiftsByDate = new Map<string, any[]>();
       for (const shift of shiftsResponse.shifts as any[]) {
+        // Skip open/unclosed shifts — incomplete payment totals until closed_at is set.
+        if (!shift.closed_at) {
+          console.log(`⏭️  Skipping open shift (no closed_at): id=${shift.id ?? 'unknown'}`);
+          continue;
+        }
         const openedAt = shift.opened_at || shift.opening_time;
         if (!openedAt) continue;
-        const openingTime = new Date(openedAt);
-        const bangkokOpen = new Date(openingTime.getTime() + (7 * 60 * 60 * 1000));
-        const dateStr = bangkokOpen.toISOString().split('T')[0];
-        
-        if (!shiftsByDate.has(dateStr)) {
-          shiftsByDate.set(dateStr, []);
-        }
+        const bangkokOpen = new Date(new Date(openedAt).getTime() + (7 * 60 * 60 * 1000));
+        const dateStr     = bangkokOpen.toISOString().split('T')[0];
+        if (!shiftsByDate.has(dateStr)) shiftsByDate.set(dateStr, []);
         shiftsByDate.get(dateStr)!.push(shift);
       }
-      
-      let newShiftsImported = 0;
-      
+
+      if (!db) throw new Error('[syncNewShifts] DB not available');
+
+      let imported = 0;
       for (const [dateStr, shifts] of shiftsByDate) {
         try {
-          await db.insert(loyverse_shifts).values({
-            shiftDate: dateStr,
-            data: { shifts },
-          }).onConflictDoUpdate({
-            target: loyverse_shifts.shiftDate,
-            set: { data: { shifts } }
-          });
-          newShiftsImported++;
-        } catch (insertError: any) {
-          console.error(`Failed to upsert shift for ${dateStr}:`, insertError.message);
+          await db.insert(loyverse_shifts)
+            .values({ shiftDate: dateStr, data: { shifts } })
+            .onConflictDoUpdate({ target: loyverse_shifts.shiftDate, set: { data: { shifts } } });
+          imported++;
+        } catch (e: any) {
+          console.error(`Failed to upsert shift for ${dateStr}:`, e.message);
         }
       }
-      
-      if (newShiftsImported > 0) {
-        console.log(`✅ Imported/updated ${newShiftsImported} shift dates during daily sync`);
-      } else {
-        console.log('✅ No new shifts to import - all shifts are up to date');
+
+      console.log(imported > 0
+        ? `✅ Imported/updated ${imported} shift date(s)`
+        : '✅ No new shifts to import — all up to date');
+
+      // ── Missing shift recovery ──────────────────────────────────────────
+      // Loyverse sometimes finalises shift reports hours after the register
+      // closes. Find any fully-closed BKK business date in the last 3 days
+      // that has receipts in lv_receipt but no row in loyverse_shifts, then
+      // query Loyverse again with a targeted window for that date.
+      const { PrismaClient } = await import('@prisma/client');
+      const recoveryPrisma   = new PrismaClient();
+      try {
+        const missingRows = await recoveryPrisma.$queryRaw<{ biz_date: string }[]>`
+          WITH bkk_dates AS (
+            SELECT DISTINCT
+              CASE
+                WHEN EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3
+                THEN (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date - INTERVAL '1 day'
+                ELSE (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date
+              END AS biz_date
+            FROM lv_receipt
+            WHERE datetime_bkk >= NOW() - INTERVAL '4 days'
+          )
+          SELECT biz_date::text
+          FROM bkk_dates
+          WHERE biz_date < (NOW() AT TIME ZONE 'Asia/Bangkok')::date
+            AND biz_date NOT IN (SELECT shift_date FROM loyverse_shifts)
+          ORDER BY biz_date DESC
+        `;
+
+        if (missingRows.length === 0) {
+          console.log('✅ [shift-recovery] No missing shift dates in last 3 days');
+        } else {
+          console.log(`⚠️  [shift-recovery] Missing shift data for: ${missingRows.map(r => r.biz_date).join(', ')}`);
+
+          for (const { biz_date: rawDate } of missingRows) {
+            const biz_date = String(rawDate).slice(0, 10); // normalise "2026-06-09 00:00:00" → "2026-06-09"
+            try {
+              // BKK business date: shift opens biz_date-1 at ~17:00 BKK = 10:00 UTC
+              //                    shift closes biz_date  at ~03:00 BKK = biz_date-1 20:00 UTC
+              // Query window padded ±2h to catch edge cases.
+              const midnight   = new Date(`${biz_date}T00:00:00Z`);
+              const retryStart = new Date(midnight.getTime() - (14 * 3_600_000)); // biz_date-1 10:00 UTC
+              const retryEnd   = new Date(midnight.getTime() + ( 4 * 3_600_000)); // biz_date 04:00 UTC
+
+              const retryResp    = await loyverseAPI.getShifts({
+                start_time: retryStart.toISOString(),
+                end_time:   retryEnd.toISOString(),
+                limit: 10,
+              });
+              const closedShifts = (retryResp.shifts as any[]).filter(s => !!s.closed_at);
+
+              if (closedShifts.length > 0 && db) {
+                await db.insert(loyverse_shifts)
+                  .values({ shiftDate: biz_date, data: { shifts: closedShifts } })
+                  .onConflictDoUpdate({
+                    target: loyverse_shifts.shiftDate,
+                    set: { data: { shifts: closedShifts } },
+                  });
+                console.log(`✅ [shift-recovery] Recovered shift for ${biz_date} (${closedShifts.length} record(s))`);
+              } else if (!db) {
+                console.error('[shift-recovery] DB not available for recovery insert');
+              } else {
+                console.log(`⏳ [shift-recovery] No closed shift yet for ${biz_date} — Loyverse may not have finalised`);
+              }
+            } catch (retryErr: any) {
+              console.error(`❌ [shift-recovery] Failed for ${biz_date}:`, retryErr.message);
+            }
+          }
+        }
+      } finally {
+        await recoveryPrisma.$disconnect();
       }
-      
+
     } catch (error) {
       console.error('❌ Failed to sync new shifts:', error);
     }
@@ -306,134 +346,10 @@ export class SchedulerService {
     console.log('📅 Incremental POS sync scheduled every 15 minutes');
   }
 
-  /**
-   * Process analytics for the latest shift
-   */
-  private async processAnalytics() {
-    try {
-      console.log('📊 Starting scheduled analytics processing...');
-      
-      // @ts-expect-error - JavaScript module without type declarations
-      const { processAnalytics } = await import('./analytics/processor.js');
-      
-      const restaurant = await this.prisma.restaurant.findFirst({
-        where: { slug: 'smash-brothers-burgers' }
-      });
-      
-      if (restaurant) {
-        const analytics = await processAnalytics(restaurant.id);
-        console.log('✅ Analytics processing completed:', {
-          shiftDate: analytics?.shiftDate,
-          flags: analytics?.flags?.length || 0
-        });
-      }
-    } catch (error) {
-      console.error('❌ Scheduled analytics processing failed:', error);
-    }
-  }
-
-  /**
-   * Generate and send Jussi email summary
-   */
-  private async generateJussiSummary() {
-    try {
-      console.log('📧 Starting scheduled Jussi summary generation...');
-      
-      // @ts-expect-error - JavaScript module without type declarations
-      const { generateDailySummary } = await import('./jussi/summaryGenerator.js');
-      const result = await generateDailySummary();
-      
-      console.log('✅ Jussi summary completed:', {
-        jobId: result.jobId,
-        emailSent: !!result.emailResult,
-        recipient: result.emailResult?.recipient
-      });
-    } catch (error) {
-      console.error('❌ Scheduled Jussi summary failed:', error);
-    }
-  }
-
-  /**
-   * Send daily sales summary to management
-   */
-  private async sendDailySalesSummary() {
-    try {
-      console.log('📧 Starting daily sales summary generation...');
-      
-      const { pool } = await import('../db');
-      const { workingEmailService } = await import('./workingEmailService');
-      
-      // Get yesterday's sales data (for previous shift)
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
-      
-      const result = await pool.query(
-        `SELECT * FROM daily_sales_v2 WHERE "shiftDate" = $1 ORDER BY "createdAt" DESC LIMIT 1`,
-        [yesterdayStr]
-      );
-      
-      if (result.rows.length === 0) {
-        console.log('📧 No sales data found for yesterday, skipping summary');
-        return;
-      }
-      
-      const salesData = result.rows[0];
-      const payload = salesData.payload || {};
-      
-      const html = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 10px;">
-            🍔 Daily Sales Summary - ${salesData.shiftDate}
-          </h2>
-          
-          <div style="background-color: #ecf0f1; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <h3 style="color: #34495e; margin-top: 0;">Shift Details</h3>
-            <p><strong>Completed by:</strong> ${salesData.completedBy}</p>
-            <p><strong>Date:</strong> ${salesData.shiftDate}</p>
-            <p><strong>Submitted:</strong> ${new Date(salesData.createdAt).toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })}</p>
-          </div>
-
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 20px 0;">
-            <div style="background-color: ${payload.balanced ? '#d5f4e6' : '#ffebee'}; padding: 15px; border-radius: 5px;">
-              <h4 style="color: ${payload.balanced ? '#27ae60' : '#e74c3c'}; margin-top: 0;">
-                💰 Cash Balance ${payload.balanced ? '✅' : '❌'}
-              </h4>
-              <p style="font-size: 18px; font-weight: bold; margin: 0;">
-                ${payload.balanced ? 'BALANCED' : 'UNBALANCED'}
-              </p>
-            </div>
-            
-            <div style="background-color: #d5f4e6; padding: 15px; border-radius: 5px;">
-              <h4 style="color: #27ae60; margin-top: 0;">💰 Total Sales</h4>
-              <p style="font-size: 24px; font-weight: bold; color: #27ae60; margin: 0;">
-                ฿${(payload.totalSales / 100).toLocaleString()}
-              </p>
-            </div>
-          </div>
-
-          <p style="color: #7f8c8d; font-size: 14px; text-align: center; margin-top: 30px; border-top: 1px solid #bdc3c7; padding-top: 20px;">
-            Generated automatically by Smash Brothers Burgers Management System<br>
-            ${new Date().toLocaleString('en-US', { timeZone: 'Asia/Bangkok' })} (Bangkok Time)
-          </p>
-        </div>
-      `;
-      
-      await workingEmailService.sendEmail(
-        'smashbrothersburgersth@gmail.com',
-        `Daily Sales Summary - ${salesData.shiftDate}`,
-        html
-      );
-      
-      console.log('✅ Daily sales summary sent successfully');
-    } catch (error) {
-      console.error('❌ Daily sales summary failed:', error);
-    }
-  }
 
   // Manual trigger for testing
   async triggerManualSync() {
-    await this.syncReceiptsAndReports();
+    await this.syncReceiptsOnly();
   }
 
   // Manual trigger for new services
@@ -447,34 +363,13 @@ export class SchedulerService {
   }
 
   async triggerAnalytics() {
-    // @ts-expect-error - JavaScript module without type declarations
-    const { processAnalytics } = await import('./analytics/processor.js');
-    const restaurant = await this.prisma.restaurant.findFirst({
-      where: { slug: 'smash-brothers-burgers' }
-    });
-    if (restaurant) {
-      return await processAnalytics(restaurant.id);
-    }
+    console.log('[scheduler] analytics/processor.js has been removed. No-op.');
     return null;
   }
 
   async triggerJussiSummary() {
     console.log('[scheduler] Jussi summary system has been removed.');
     return null;
-  }
-
-  private async runFinanceCalculations() {
-    try {
-      console.log('💰 Running finance calculations...');
-      
-      // Note: dailyFinanceJob is not implemented yet
-      // const { runDailyFinanceJob } = await import('../jobs/dailyFinanceJob');
-      // await runDailyFinanceJob();
-      
-      console.log('✅ Finance calculations completed (placeholder)');
-    } catch (error) {
-      console.error('❌ Failed to run finance calculations:', error);
-    }
   }
 
   private async cacheBurgerMetrics() {

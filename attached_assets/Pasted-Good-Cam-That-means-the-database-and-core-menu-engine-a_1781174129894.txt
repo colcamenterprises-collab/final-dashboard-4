@@ -1,0 +1,91 @@
+Good, Cam. That means the database and core menu engine are live.
+But one important gap remains:
+They did not complete a real customer order yet.
+They verified:
+Migration ✅
+Seed ✅
+Admin menu ✅
+Customer menu visibility ✅
+Kitchen empty state ✅
+API routes ✅
+Still not verified:
+Submit order
+Order appears in kitchen
+Kitchen status updates
+Customer status updates
+Admin order record appears
+Send this next:
+:::writing{variant="document" id="26841"}
+SBB Ordering OS — Final Phase 1 E2E Order Test
+Objective
+Complete the missing real order test against the live DB.
+Do not add new features.
+Current Verified Status
+The following are complete:
+Migration applied
+12 ordering tables created
+Test menu seeded
+Admin menu loads
+Single Burger enabled at ฿129
+Customer /order page shows Single Burger
+Kitchen display loads
+Admin orders page loads
+Core API routes work
+Missing Verification
+A real order has not yet been submitted and progressed through kitchen/admin/customer status.
+Required Test
+Using the live environment:
+Open:
+Plain text
+/order/table/T1
+Add:
+Plain text
+Single Burger
+Submit using:
+Plain text
+pay_at_counter
+Capture:
+Plain text
+Order ID
+Order number
+Order status page URL
+Open:
+Plain text
+/kitchen/display
+Confirm order appears.
+Progress the order:
+Plain text
+submitted → accepted → in_kitchen → ready
+Confirm:
+Plain text
+/order/status/:orderId
+shows ready.
+Open:
+Plain text
+/admin/ordering/orders
+Confirm order appears.
+Mark order:
+Plain text
+completed
+Confirm completed order leaves active kitchen display.
+Required Output
+Return:
+Plain text
+Test order submitted: yes/no
+Order ID:
+Order number:
+Kitchen display saw order: yes/no
+Customer status updated to ready: yes/no
+Admin orders saw order: yes/no
+Final order status:
+Completed order removed from active kitchen: yes/no
+Blockers:
+Ready for shop-floor QR/tablet pilot: yes/no
+Hard Rules
+Do not create fake orders.
+Do not add features.
+Do not touch Daily Sales.
+Do not touch Daily Stock.
+Do not touch POS/Loyverse.
+Only fix bugs that directly block this final E2E order test. :::
+After that passes, we can call Phase 1 pilot-ready.

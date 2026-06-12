@@ -15,6 +15,9 @@ import NotFound from "./pages/NotFound";
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyStock from "./pages/operations/DailyStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
+import LoyverseMirror from "./pages/operations/LoyverseMirror";
+import DailySalesAnalysis from "./pages/operations/DailySalesAnalysis";
+import DailyStockAnalysis from "./pages/operations/DailyStockAnalysis";
 import PurchasingPage from "./pages/operations/Purchasing";
 import ShoppingList from "./pages/operations/ShoppingList";
 import IssueRegister from "./pages/operations/IssueRegister";
@@ -41,6 +44,13 @@ import Catalog from "./pages/ordering/Catalog";
 import OnlineOrdering from "./pages/ordering/OnlineOrdering";
 import Checkout from "./pages/ordering/Checkout";
 import Confirmation from "./pages/ordering/Confirmation";
+import OrderPage from "./pages/ordering/OrderPage";
+import OrderStatus from "./pages/ordering/OrderStatus";
+import KitchenDisplay from "./pages/kitchen/KitchenDisplay";
+import AdminMenu from "./pages/admin/ordering/AdminMenu";
+import AdminOrders from "./pages/admin/ordering/AdminOrders";
+import AdminSettings from "./pages/admin/ordering/AdminSettings";
+import AdminQrCodes from "./pages/admin/ordering/AdminQrCodes";
 
 import StaffDashboard from "./pages/staff/Dashboard";
 import StaffMembers from "./pages/staff/Members";
@@ -68,6 +78,12 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/order" element={<OrderPage />} />
+                  <Route path="/order/:venueCode" element={<OrderPage />} />
+                  <Route path="/order/table/:tableCode" element={<OrderPage />} />
+                  <Route path="/order/status/:orderId" element={<OrderStatus />} />
+                  <Route path="/ordering/tablet" element={<OrderPage tablet />} />
+                  <Route path="/kitchen/display" element={<KitchenDisplay />} />
                   <Route element={<PageShell />}>
                     {/* Core */}
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
@@ -75,6 +91,9 @@ export default function App() {
                     <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-stock" element={<ProtectedRoute><DailyStock /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales-v2/library" element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><LoyverseMirror /></ProtectedRoute>} />
+                    <Route path="/operations/daily-sales-analysis" element={<ProtectedRoute><DailySalesAnalysis /></ProtectedRoute>} />
+                    <Route path="/operations/daily-stock-analysis" element={<ProtectedRoute><DailyStockAnalysis /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales-library" element={<Navigate to="/operations/daily-sales-v2/library" replace />} />
                     <Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} />
 
@@ -110,6 +129,11 @@ export default function App() {
                     {/* Admin Ordering */}
                     <Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                     <Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
+                    <Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/menu" element={<ProtectedRoute><AdminMenu /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
+                    <Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
 
                     {/* Staff Operations */}
                     <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />

@@ -340,7 +340,7 @@ export async function rebuildReceiptTruth(businessDate: string): Promise<Receipt
           ${receipt.receipt_date}::timestamptz,
           NULL,
           ${receipt.customer_id ?? null},
-          ${Number(receipt.total_money || 0)},
+          ${(receipt.payments ?? []).reduce((s: number, p: any) => s + (Number(p.money_amount) || 0), 0)},
           ${paymentJson}::jsonb,
           ${rawJson}::jsonb
         )

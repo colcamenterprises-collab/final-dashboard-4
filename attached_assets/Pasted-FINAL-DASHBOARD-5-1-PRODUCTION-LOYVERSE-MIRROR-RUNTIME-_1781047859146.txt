@@ -1,0 +1,161 @@
+FINAL DASHBOARD 5.1 — PRODUCTION LOYVERSE MIRROR RUNTIME VERIFICATION
+
+Objective:
+Run the Loyverse mirror diagnostic against the live Replit production database and prove whether the app mirrors Loyverse correctly.
+
+Do not edit code.
+Do not create new files.
+Do not change schema.
+Do not change routes.
+Do not modify Daily Sales V2.
+Do not modify Daily Stock V2.
+Do not modify Purchasing.
+Do not modify Finance.
+Do not modify Reports.
+Do not modify Staff.
+Do not add features.
+Do not run destructive commands.
+
+This is runtime verification only.
+
+Step 1 — Confirm Live Environment
+Verify:
+
+- DATABASE_URL is configured.
+- Loyverse API token/env vars are configured.
+- Server is running.
+- /api/system/pos-status returns 200.
+- /api/loyverse/mirror-diagnostic returns 200.
+
+Step 2 — Run Mirror Diagnostic
+Call:
+
+GET /api/loyverse/mirror-diagnostic
+
+Capture the full JSON response.
+
+Do not summarise only.
+Return the important fields exactly:
+
+- status
+- latestSyncAt
+- latestReceiptDate
+- latestShiftDate
+- canonicalTables
+- receiptCounts
+- integrity
+- paymentMapping
+- latestShiftComparison
+- sevenDayComparison
+- blockers
+- mismatches
+
+Step 3 — Check Canonical Tables
+Confirm these are non-empty and current:
+
+- lv_receipt
+- lv_line_item
+- lv_modifier
+- loyverse_shifts
+
+Also confirm whether these legacy/app tables exist and whether they match:
+
+- receipts
+- receipt_items
+- receipt_payments
+- loyverse_receipts
+
+Step 4 — Latest Shift Verification
+For the latest completed Bangkok business shift:
+Compare:
+
+- receipt count
+- gross sales
+- net sales
+- discounts
+- refunds
+- cash
+- QR
+- Grab
+- other payments
+- item count
+- modifier count
+
+Return exact values from:
+
+- canonical receipt tables
+- loyverse_shifts
+- diagnostic comparison
+
+Step 5 — Seven-Day Verification
+For the last 7 Bangkok business days:
+Return a table:
+
+date
+receiptCountApp
+receiptCountShift
+grossApp
+grossShift
+cashApp
+cashShift
+qrApp
+qrShift
+grabApp
+grabShift
+otherApp
+otherShift
+itemCount
+modifierCount
+status
+difference
+
+Every row must be match with zero difference to pass.
+
+Step 6 — Manual Sync Idempotency Test
+Only if safe and existing sync supports date range.
+
+Use the smallest safe date range:
+
+- yesterday’s Bangkok business day only
+
+Run:
+
+POST /api/loyverse/sync
+
+with from/to covering only that business day.
+
+Then run the exact same sync again.
+
+Compare the two responses.
+
+Confirm:
+
+- second run does not duplicate receipts
+- second run does not duplicate line items
+- second run does not duplicate modifiers
+- second run does not duplicate payments
+- duplicate/skipped/updated counters behave correctly
+
+If unsafe, do not run it. Report why.
+
+Step 7 — Final Decision
+Return one of:
+
+LOYVERSE MIRROR VERIFIED — APP CAN BE TRUSTED
+
+or
+
+LOYVERSE MIRROR FAILED — APP CANNOT BE TRUSTED YET
+
+If failed:
+List blockers in priority order.
+
+Required Output:
+
+- Full diagnostic summary
+- Seven-day comparison table
+- Latest shift comparison
+- Integrity findings
+- Payment mapping findings
+- Manual sync idempotency result
+- Final trust decision

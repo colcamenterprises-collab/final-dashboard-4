@@ -5,7 +5,6 @@ process.on('uncaughtException', (err) => {
   console.error('🔴 UNCAUGHT EXCEPTION:', err);
 });
 
-import { registerEnsureShiftCron } from './jobs/cronEnsureShift.js';
 import express, { type Request, Response, NextFunction } from "express";
 import path from "path";
 import { registerRoutes } from "./routes";
@@ -32,6 +31,8 @@ import analysisCsv from "./routes/analysisCsv";
 import ensureShiftRouter from "./routes/ensureShift";
 import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
+import operationsReadRouter from "./routes/operationsRead";
+import orderingRouter from "./routes/ordering";
 
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
@@ -151,6 +152,7 @@ const API_PUBLIC_PREFIXES = [
   "/api/bob/read",
   "/api/agent/read",
   "/api/ui-auth",
+  "/api/ordering",
 ];
 
 app.use((req, res, next) => {
@@ -405,6 +407,10 @@ async function checkSchema() {
   });
 
   const server = await registerRoutes(app);
+
+  // Read-only operational UI summaries for owner review pages.
+  app.use("/api/operations-read", operationsReadRouter);
+  app.use("/api/ordering", orderingRouter);
 
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);

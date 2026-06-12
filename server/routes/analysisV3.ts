@@ -234,12 +234,15 @@ analysisV3Router.get("/integrity-check", async (req, res) => {
            FROM sale_receipts sr,
                 jsonb_array_elements(sr.payment_json::jsonb) AS elem
           WHERE elem->>'type' = 'CASH')                                                              AS lv_cash_total,
-        -- lv_receipt.total_amount is stored as baht/100 (e.g. ฿319 receipt → stored as 3.19).
-        -- pos_shift_report.grandTotal is in whole baht (e.g. 23688).
-        -- Multiply by 100 to align units before comparing.
-        (SELECT COALESCE(ROUND(SUM(total_amount) * 100), 0)::int FROM sale_receipts)                  AS lv_grand_total,
-        -- Raw (pre-normalisation) sum kept for diagnostic reporting
-        (SELECT COALESCE(ROUND(SUM(total_amount), 2), 0)::numeric FROM sale_receipts)                 AS lv_grand_total_raw,
+        -- Use payment_json[].money_amount (always correct Baht) for grand total.
+        -- total_amount was historically affected by a unit-scaling bug (stored ÷100).
+        -- payment_json is the authoritative source per POS Truth Layer.
+        (SELECT COALESCE(ROUND(SUM((elem->>'money_amount')::numeric)), 0)::int
+           FROM sale_receipts sr,
+                jsonb_array_elements(sr.payment_json::jsonb) AS elem)                                AS lv_grand_total,
+        (SELECT COALESCE(ROUND(SUM((elem->>'money_amount')::numeric), 2), 0)::numeric
+           FROM sale_receipts sr,
+                jsonb_array_elements(sr.payment_json::jsonb) AS elem)                                AS lv_grand_total_raw,
         (SELECT COUNT(li.*)::int   FROM lv_line_item li JOIN sale_receipts sr ON li.receipt_id = sr.receipt_id) AS lv_item_rows,
         (SELECT COALESCE(SUM(li.qty), 0)::int FROM lv_line_item li JOIN sale_receipts sr ON li.receipt_id = sr.receipt_id) AS lv_item_qty,
         (SELECT COUNT(m.*)::int    FROM lv_modifier  m  JOIN sale_receipts sr ON m.receipt_id  = sr.receipt_id) AS lv_mod_rows,
@@ -303,10 +306,10 @@ analysisV3Router.get("/integrity-check", async (req, res) => {
         sideA:      shiftGrandTotal,
         sideALabel: "pos_shift_report.grandTotal (whole baht)",
         sideB:      lvGrandTotal,
-        sideBLabel: `SUM(lv_receipt.total_amount) × 100 — raw stored value: ${lvGrandTotalRaw} (baht÷100 format)`,
+        sideBLabel: `SUM(payment_json[].money_amount) from lv_receipt — authoritative Baht value: ${lvGrandTotalRaw}`,
         note:       shiftGrandTotal === lvGrandTotal
-          ? `Grand totals match after unit normalisation (raw stored: ${lvGrandTotalRaw} × 100 = ${lvGrandTotal})`
-          : `Mismatch after normalisation: shift ฿${shiftGrandTotal.toLocaleString()} vs receipts ฿${lvGrandTotal.toLocaleString()} (raw: ${lvGrandTotalRaw})`,
+          ? `Grand totals match exactly (payment_json sum: ฿${lvGrandTotal.toLocaleString()})`
+          : `Mismatch: shift ฿${shiftGrandTotal.toLocaleString()} vs payment_json sum ฿${lvGrandTotal.toLocaleString()}`,
       },
       {
         label:      "Item Totals",

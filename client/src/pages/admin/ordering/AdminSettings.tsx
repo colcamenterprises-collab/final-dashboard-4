@@ -1,0 +1,7 @@
+import { useEffect, useState } from "react";
+export default function AdminSettings() {
+  const [settings,setSettings]=useState<any[]>([]); const [keyName,setKeyName]=useState(""); const [value,setValue]=useState("");
+  async function load(){const r=await fetch('/api/ordering/settings',{credentials:'include'}); const d=await r.json(); setSettings(d.data??[]);} useEffect(()=>{load()},[]);
+  async function save(){await fetch('/api/ordering/settings',{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({[keyName]: value})}); setKeyName(""); setValue(""); load();}
+  return <main className="p-4"><h1 className="text-3xl font-bold">Ordering Settings</h1><section className="mt-4 rounded border bg-white p-4"><table className="w-full border-collapse border"><tbody>{settings.map(s=><tr key={s.key}><td className="border p-2">{s.key}</td><td className="border p-2">{JSON.stringify(s.value)}</td></tr>)}</tbody></table></section><section className="mt-4 rounded border bg-white p-4"><h2 className="text-xl font-semibold">Update setting</h2><input className="mt-2 w-full rounded border p-2" placeholder="key" value={keyName} onChange={e=>setKeyName(e.target.value)}/><input className="mt-2 w-full rounded border p-2" placeholder="value" value={value} onChange={e=>setValue(e.target.value)}/><button className="mt-2 rounded bg-black px-4 py-2 text-white" disabled={!keyName} onClick={save}>Save</button></section></main>
+}
