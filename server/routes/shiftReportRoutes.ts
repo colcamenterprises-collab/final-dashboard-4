@@ -58,6 +58,7 @@ async function buildShiftRows(limitOrDate: number | string) {
         "cashSales"         AS staff_cash,
         "qrSales"           AS staff_qr,
         "grabSales"         AS staff_grab,
+        "aroiSales"         AS staff_other,
         "totalSales"        AS staff_total,
         "totalExpenses"     AS staff_expenses
       FROM daily_sales_v2
@@ -79,6 +80,7 @@ async function buildShiftRows(limitOrDate: number | string) {
       f.staff_cash,
       f.staff_qr,
       f.staff_grab,
+      f.staff_other,
       f.staff_total,
       f.staff_expenses
     FROM shifts s
@@ -92,26 +94,26 @@ async function buildShiftRows(limitOrDate: number | string) {
     const staffTotal     = row.staff_total    != null ? Number(row.staff_total)    : null;
     const receiptGross   = row.receipt_gross  != null ? Number(row.receipt_gross)  : null;
 
+    const staffValues = [row.staff_cash, row.staff_qr, row.staff_grab, row.staff_other, row.staff_total]
+      .filter((v) => v != null)
+      .map((v) => Number(v));
+    const staffSalesEntered = staffValues.some((v) => Number.isFinite(v) && v !== 0);
+
     const staffFormStatus: "submitted" | "missing" = row.form_id ? "submitted" : "missing";
 
-    let posStatus: "matched" | "mismatch" | "missing" | "no_staff_sales" = "missing";
+    let posStatus: "matched" | "mismatch" | "missing" = "missing";
     let varianceSummary: object | null = null;
 
-    if (grossSales != null && staffFormStatus === "submitted" && staffTotal != null) {
-      if (staffTotal === 0) {
-        // Form submitted but staff did not enter any sales figures
-        posStatus = "no_staff_sales";
-      } else {
-        const diff = Math.abs(staffTotal - grossSales);
-        posStatus = diff <= 100 ? "matched" : "mismatch";
-        varianceSummary = {
-          posGross:       grossSales,
-          staffTotal,
-          variance:       staffTotal - grossSales,
-          absVariance:    diff,
-          level:          diff <= 50 ? "GREEN" : diff <= 200 ? "YELLOW" : "RED",
-        };
-      }
+    if (grossSales != null && staffFormStatus === "submitted" && staffSalesEntered && staffTotal != null) {
+      const diff = Math.abs(staffTotal - grossSales);
+      posStatus = diff <= 100 ? "matched" : "mismatch";
+      varianceSummary = {
+        posGross:       grossSales,
+        staffTotal,
+        variance:       staffTotal - grossSales,
+        absVariance:    diff,
+        level:          diff <= 50 ? "GREEN" : diff <= 200 ? "YELLOW" : "RED",
+      };
     } else if (grossSales != null) {
       posStatus = "matched";
     }
@@ -127,10 +129,12 @@ async function buildShiftRows(limitOrDate: number | string) {
       receiptCount:   row.receipt_count != null ? Number(row.receipt_count) : null,
       receiptGross,
       staffFormStatus,
+      staffSalesStatus: staffSalesEntered ? "entered" : "not_entered",
+      staffSalesMessage: staffSalesEntered ? null : "Staff sales not entered",
       posStatus,
       varianceSummary,
       completedBy:    row.completed_by ?? null,
-      staffTotal,
+      staffTotal:     staffSalesEntered ? staffTotal : null,
       staffExpenses:  row.staff_expenses != null ? Number(row.staff_expenses) : null,
       source:         "loyverse_shifts + lv_receipt + daily_sales_v2",
     };

@@ -288,10 +288,10 @@ export default function DailySales() {
   const [directReceiptCount, setDirectReceiptCount] = useState(0);
 
   // Staff-reported sales — for POS comparison only
-  const [staffCashSales, setStaffCashSales] = useState(0);
-  const [staffQrSales, setStaffQrSales] = useState(0);
-  const [staffGrabSales, setStaffGrabSales] = useState(0);
-  const [staffAroiSales, setStaffAroiSales] = useState(0);
+  const [cashSales, setCashSales] = useState(0);
+  const [qrSales, setQrSales] = useState(0);
+  const [grabSales, setGrabSales] = useState(0);
+  const [otherSales, setOtherSales] = useState(0);
 
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -357,10 +357,10 @@ export default function DailySales() {
           const p = data.record.payload || {};
           setCompletedBy(data.record.staff || "");
           setCashStart(p.startingCash || 0);
-          setStaffCashSales(p.cashSales || 0);
-          setStaffQrSales(p.qrSales || 0);
-          setStaffGrabSales(p.grabSales || 0);
-          setStaffAroiSales(p.otherSales || p.aroiSales || 0);
+          setCashSales(p.cashSales || 0);
+          setQrSales(p.qrSales || 0);
+          setGrabSales(p.grabSales || 0);
+          setOtherSales(p.otherSales ?? p.aroiSales ?? p.aroiDeeSales ?? 0);
           setClosingCash(p.closingCash || 0);
           setCashBanked(p.cashBanked || 0);
           setQrBanked(p.qrTransfer || 0);
@@ -484,6 +484,10 @@ export default function DailySales() {
         const draft = JSON.parse(raw);
         setCompletedBy(draft.completedBy || "");
         setCashStart(draft.cashStart || 0);
+        setCashSales(draft.cashSales || 0);
+        setQrSales(draft.qrSales || 0);
+        setGrabSales(draft.grabSales || 0);
+        setOtherSales(draft.otherSales || 0);
         setClosingCash(draft.closingCash || 0);
         setCashBanked(draft.cashBanked || 0);
         setQrBanked(draft.qrBanked || 0);
@@ -503,6 +507,10 @@ export default function DailySales() {
   const resetForm = () => {
     setCompletedBy("");
     setCashStart(0);
+    setCashSales(0);
+    setQrSales(0);
+    setGrabSales(0);
+    setOtherSales(0);
     setShiftExpenses([{ id: uid(), item: "", cost: 0, shop: "" }]);
     setStaffWages([{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
     setOtherPayments([{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
@@ -601,11 +609,11 @@ export default function DailySales() {
       const submitData = {
         completedBy,
         startingCash: cashStart,
-        cashSales: staffCashSales,
-        qrSales: staffQrSales,
-        grabSales: staffGrabSales,
-        otherSales: staffAroiSales,
-        totalSales: staffCashSales + staffQrSales + staffGrabSales + staffAroiSales,
+        cashSales,
+        qrSales,
+        grabSales,
+        otherSales,
+        totalSales: cashSales + qrSales + grabSales + otherSales,
         refunds: {
           status: refundStatus,
           rows: refundStatus === 'YES' ? refundRows : [],
@@ -710,6 +718,10 @@ export default function DailySales() {
   const collectDailySalesValues = () => ({
     completedBy,
     cashStart,
+    cashSales,
+    qrSales,
+    grabSales,
+    otherSales,
     shiftExpenses,
     staffWages,
     otherPayments,
@@ -853,8 +865,8 @@ export default function DailySales() {
                   min="0"
                   step="1"
                   placeholder="0"
-                  value={staffCashSales || ''}
-                  onChange={e => setStaffCashSales(Math.max(0, Number(e.target.value) || 0))}
+                  value={cashSales || ''}
+                  onChange={e => setCashSales(Math.max(0, Number(e.target.value) || 0))}
                   className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
                 />
               </div>
@@ -865,8 +877,8 @@ export default function DailySales() {
                   min="0"
                   step="1"
                   placeholder="0"
-                  value={staffQrSales || ''}
-                  onChange={e => setStaffQrSales(Math.max(0, Number(e.target.value) || 0))}
+                  value={qrSales || ''}
+                  onChange={e => setQrSales(Math.max(0, Number(e.target.value) || 0))}
                   className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
                 />
               </div>
@@ -877,8 +889,8 @@ export default function DailySales() {
                   min="0"
                   step="1"
                   placeholder="0"
-                  value={staffGrabSales || ''}
-                  onChange={e => setStaffGrabSales(Math.max(0, Number(e.target.value) || 0))}
+                  value={grabSales || ''}
+                  onChange={e => setGrabSales(Math.max(0, Number(e.target.value) || 0))}
                   className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
                 />
               </div>
@@ -889,8 +901,8 @@ export default function DailySales() {
                   min="0"
                   step="1"
                   placeholder="0"
-                  value={staffAroiSales || ''}
-                  onChange={e => setStaffAroiSales(Math.max(0, Number(e.target.value) || 0))}
+                  value={otherSales || ''}
+                  onChange={e => setOtherSales(Math.max(0, Number(e.target.value) || 0))}
                   className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
                 />
               </div>
@@ -898,7 +910,7 @@ export default function DailySales() {
             <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-3">
               <span className="text-xs text-amber-700 font-medium">Staff Total (auto-calculated):</span>
               <span className="text-sm font-bold text-amber-900">
-                ฿{(staffCashSales + staffQrSales + staffGrabSales + staffAroiSales).toLocaleString()}
+                ฿{(cashSales + qrSales + grabSales + otherSales).toLocaleString()}
               </span>
             </div>
           </section>
