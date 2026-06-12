@@ -1,0 +1,97 @@
+FINAL DB 5.1 — DAILY SALES V2 STAFF SALES FIELDS PATCH
+
+Objective:
+Daily Sales V2 Form 1 currently has no fields for staff to enter sales figures, so "cashSales", "qrSales", "grabSales", and "totalSales" are saving as zero. Add the staff-entered sales section back into Form 1 and ensure values save correctly.
+
+Do not change POS sync.
+Do not change Loyverse mirror.
+Do not change Shift Reports source alignment.
+Do not change Daily Stock V2.
+Do not change Purchasing.
+Do not change Finance.
+Do not change Reports except display labels if needed.
+Do not change schema unless absolutely required and reported first.
+Do not backfill historical rows.
+Do not make staff sales the source of truth.
+
+Rules:
+
+- POS remains source of truth.
+- Staff sales values are comparison inputs only.
+- Staff-entered sales must be clearly labelled as staff-reported.
+- Missing/blank staff sales should show as missing or zero staff entry, not overwrite POS data.
+
+Required UI Change:
+In Daily Sales V2 Form 1, add a section:
+
+"Staff Sales Entry — for POS comparison only"
+
+Fields:
+
+- Cash sales
+- QR / Scan sales
+- Grab sales
+- Other sales
+
+Behaviour:
+
+- Numeric THB inputs.
+- Default blank or 0 is acceptable, but UI should make it clear staff should fill them in.
+- Total sales auto-calculates:
+  cash + QR + Grab + Other
+- Total should be display-only.
+- Keep existing sales/payment/expense/banking workflow intact.
+
+Required Backend Mapping:
+On submit/save:
+
+- Store values in payload using existing names where possible:
+  - cashSales
+  - qrSales
+  - grabSales
+  - aroiSales or otherSales, whichever current backend expects
+  - totalSales
+- Store values into DB summary columns:
+  - cash_sales
+  - qr_sales
+  - grab_sales
+  - aroi_sales / other_sales if present
+  - total_sales
+- Preserve existing payload fields.
+- Do not overwrite POS data.
+
+Required Display Updates:
+
+- Form Library should show staff sales totals if present.
+- Shift Reports should compare POS vs staff sales only when staff values are entered.
+- If staff sales are all zero/missing, show:
+  "Staff sales not entered"
+  not "failed" or misleading mismatch.
+
+Validation:
+
+1. "npm run build"
+2. Daily Sales V2 form loads.
+3. Staff Sales Entry section appears on Form 1.
+4. Enter test values:
+   - Cash 1000
+   - QR 500
+   - Grab 1500
+   - Other 100
+   - Total = 3100
+5. Submit/save dry-run or safe test only if test environment allows.
+6. Confirm payload contains correct values.
+7. Confirm DB stored columns contain correct values for new submission.
+8. Confirm Form Library displays the values.
+9. Confirm Shift Reports no longer marks missing staff sales as a hard mismatch when staff sales were not entered.
+10. No POS sync changes.
+11. No Daily Stock V2 changes.
+12. No schema changes unless justified.
+13. No Tier 5 systems restored.
+
+Deliver:
+
+- files changed
+- field mapping table
+- validation result
+- whether historical backfill is needed later

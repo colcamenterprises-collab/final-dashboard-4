@@ -37,6 +37,10 @@ type RecordType = {
   date: string;
   staff: string;
   totalSales: number;
+  cashSales?: number;
+  qrSales?: number;
+  grabSales?: number;
+  otherSales?: number;
   buns: number | string;
   meat: number | string;
   drinks?: { name: string; quantity: number }[];
@@ -378,8 +382,18 @@ export default function DailySalesV2Library() {
                     <p className="font-medium text-slate-800 truncate leading-snug">{rec.staff}</p>
                   </div>
                   <div className="space-y-0.5">
-                    <p className="text-[10px] uppercase tracking-wide text-slate-400 leading-tight">Total Sales</p>
-                    <p className="font-semibold text-slate-900 whitespace-nowrap leading-snug">{thb(rec.totalSales)}</p>
+                    <p className="text-[10px] uppercase tracking-wide text-slate-400 leading-tight">Staff Sales (reported)</p>
+                    {rec.totalSales > 0 ? (
+                      <>
+                        <p className="font-semibold text-slate-900 whitespace-nowrap leading-snug">{thb(rec.totalSales)}</p>
+                        <p className="text-[10px] text-slate-500 leading-tight">
+                          Cash {thb(rec.cashSales ?? 0)} · QR {thb(rec.qrSales ?? 0)} · Grab {thb(rec.grabSales ?? 0)}
+                          {(rec.otherSales ?? 0) > 0 ? ` · Other ${thb(rec.otherSales ?? 0)}` : ''}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-[11px] text-slate-400 italic leading-snug">Not entered</p>
+                    )}
                   </div>
                 </div>
 

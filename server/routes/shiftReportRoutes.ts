@@ -94,19 +94,24 @@ async function buildShiftRows(limitOrDate: number | string) {
 
     const staffFormStatus: "submitted" | "missing" = row.form_id ? "submitted" : "missing";
 
-    let posStatus: "matched" | "mismatch" | "missing" = "missing";
+    let posStatus: "matched" | "mismatch" | "missing" | "no_staff_sales" = "missing";
     let varianceSummary: object | null = null;
 
     if (grossSales != null && staffFormStatus === "submitted" && staffTotal != null) {
-      const diff = Math.abs(staffTotal - grossSales);
-      posStatus = diff <= 100 ? "matched" : "mismatch";
-      varianceSummary = {
-        posGross:       grossSales,
-        staffTotal,
-        variance:       staffTotal - grossSales,
-        absVariance:    diff,
-        level:          diff <= 50 ? "GREEN" : diff <= 200 ? "YELLOW" : "RED",
-      };
+      if (staffTotal === 0) {
+        // Form submitted but staff did not enter any sales figures
+        posStatus = "no_staff_sales";
+      } else {
+        const diff = Math.abs(staffTotal - grossSales);
+        posStatus = diff <= 100 ? "matched" : "mismatch";
+        varianceSummary = {
+          posGross:       grossSales,
+          staffTotal,
+          variance:       staffTotal - grossSales,
+          absVariance:    diff,
+          level:          diff <= 50 ? "GREEN" : diff <= 200 ? "YELLOW" : "RED",
+        };
+      }
     } else if (grossSales != null) {
       posStatus = "matched";
     }

@@ -21,7 +21,7 @@ interface ShiftReport {
   receiptCount: number | null;
   receiptGross: number | null;
   staffFormStatus: "submitted" | "missing";
-  posStatus: "matched" | "mismatch" | "missing";
+  posStatus: "matched" | "mismatch" | "missing" | "no_staff_sales";
   varianceSummary: VarianceSummary | null;
   completedBy: string | null;
   staffTotal: number | null;
@@ -46,8 +46,9 @@ function fmt(n: number | null | undefined) {
 }
 
 function PosStatusBadge({ status }: { status: ShiftReport["posStatus"] }) {
-  if (status === "matched")  return <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border border-green-200">Matched</Badge>;
-  if (status === "mismatch") return <Badge className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700 border border-red-200">Mismatch</Badge>;
+  if (status === "matched")        return <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border border-green-200">Matched</Badge>;
+  if (status === "mismatch")       return <Badge className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700 border border-red-200">Mismatch</Badge>;
+  if (status === "no_staff_sales") return <Badge className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-500 border border-slate-200">Staff not entered</Badge>;
   return <Badge className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-500 border border-slate-200">POS Missing</Badge>;
 }
 

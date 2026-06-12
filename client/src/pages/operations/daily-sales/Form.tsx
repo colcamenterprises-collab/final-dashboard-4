@@ -286,7 +286,13 @@ export default function DailySales() {
   const [cashReceiptCount, setCashReceiptCount] = useState(0);
   const [qrReceiptCount, setQrReceiptCount] = useState(0);
   const [directReceiptCount, setDirectReceiptCount] = useState(0);
-  
+
+  // Staff-reported sales — for POS comparison only
+  const [staffCashSales, setStaffCashSales] = useState(0);
+  const [staffQrSales, setStaffQrSales] = useState(0);
+  const [staffGrabSales, setStaffGrabSales] = useState(0);
+  const [staffAroiSales, setStaffAroiSales] = useState(0);
+
   const [submitting, setSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [shiftId, setShiftId] = useState<string | null>(null);
@@ -351,6 +357,10 @@ export default function DailySales() {
           const p = data.record.payload || {};
           setCompletedBy(data.record.staff || "");
           setCashStart(p.startingCash || 0);
+          setStaffCashSales(p.cashSales || 0);
+          setStaffQrSales(p.qrSales || 0);
+          setStaffGrabSales(p.grabSales || 0);
+          setStaffAroiSales(p.otherSales || p.aroiSales || 0);
           setClosingCash(p.closingCash || 0);
           setCashBanked(p.cashBanked || 0);
           setQrBanked(p.qrTransfer || 0);
@@ -591,11 +601,11 @@ export default function DailySales() {
       const submitData = {
         completedBy,
         startingCash: cashStart,
-        cashSales: 0,
-        qrSales: 0,
-        grabSales: 0,
-        otherSales: 0,
-        totalSales: 0,
+        cashSales: staffCashSales,
+        qrSales: staffQrSales,
+        grabSales: staffGrabSales,
+        otherSales: staffAroiSales,
+        totalSales: staffCashSales + staffQrSales + staffGrabSales + staffAroiSales,
         refunds: {
           status: refundStatus,
           rows: refundStatus === 'YES' ? refundRows : [],
@@ -827,6 +837,70 @@ export default function DailySales() {
               </div>
             </div>
             <p className="mt-2 text-xs text-gray-500">{L.autoTimestamp}: {new Date().toISOString()}</p>
+          </section>
+
+          {/* Staff Sales Entry — for POS comparison only */}
+          <section className="rounded-[4px] border border-amber-200 bg-amber-50 p-5">
+            <div className="mb-3">
+              <h3 className="text-sm font-semibold text-amber-800">Staff Sales Entry — for POS comparison only</h3>
+              <p className="text-xs text-amber-600 mt-0.5">Enter the sales figures from the shift. POS is the source of truth — these values are used for cross-checking only.</p>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Cash Sales (฿)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  value={staffCashSales || ''}
+                  onChange={e => setStaffCashSales(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">QR / Scan Sales (฿)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  value={staffQrSales || ''}
+                  onChange={e => setStaffQrSales(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Grab Sales (฿)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  value={staffGrabSales || ''}
+                  onChange={e => setStaffGrabSales(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">Other Sales (฿)</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  placeholder="0"
+                  value={staffAroiSales || ''}
+                  onChange={e => setStaffAroiSales(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                />
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-3">
+              <span className="text-xs text-amber-700 font-medium">Staff Total (auto-calculated):</span>
+              <span className="text-sm font-bold text-amber-900">
+                ฿{(staffCashSales + staffQrSales + staffGrabSales + staffAroiSales).toLocaleString()}
+              </span>
+            </div>
           </section>
 
           {/* Expenses Section */}
