@@ -23,21 +23,24 @@
  */
 
 import axios from "axios";
-import { DateTime } from "luxon";
 import { PrismaClient } from "@prisma/client";
+import { getBangkokBusinessWindow, normalizeLoyversePayments, parseLoyverseMoney } from "./loyverseMirrorCommon.js";
 
 const db = new PrismaClient();
-const LOYVERSE_TOKEN = process.env.LOYVERSE_TOKEN!;
-const LOYVERSE_API = "https://api.loyverse.com/v1.0";
+const LOYVERSE_TOKEN = process.env.LOYVERSE_TOKEN || process.env.LOYVERSE_API_TOKEN || process.env.LOYVERSE_ACCESS_TOKEN;
+const LOYVERSE_API = process.env.LOYVERSE_BASE_URL || "https://api.loyverse.com/v1.0";
 
 type LvReceipt = {
+  id?: string;
   receipt_number: string;
   receipt_date: string;
-  total_money?: { amount: number };
+  total_money?: number | { amount?: number; value?: number };
   line_items?: Array<{
-    item_name: string;
+    item_name?: string;
+    name?: string;
     quantity: number;
-    price?: number;
+    price?: number | { amount?: number; value?: number };
+    total_money?: number | { amount?: number; value?: number };
     sku?: string;
     line_modifiers?: Array<{ name?: string; option?: string; quantity?: number; sku?: string }>;
   }>;
@@ -47,6 +50,9 @@ type LvReceipt = {
 };
 
 async function* fetchReceipts(fromISO: string, toISO: string): AsyncGenerator<LvReceipt> {
+  if (!LOYVERSE_TOKEN) {
+    throw new Error("LOYVERSE_TOKEN, LOYVERSE_API_TOKEN, or LOYVERSE_ACCESS_TOKEN is required for Loyverse sync");
+  }
   let cursor: string | undefined;
   let pageCount = 0;
 
@@ -54,7 +60,10 @@ async function* fetchReceipts(fromISO: string, toISO: string): AsyncGenerator<Lv
     const params = new URLSearchParams();
     params.append('created_at_min', fromISO);
     params.append('created_at_max', toISO);
-    if (cursor) params.append('cursor', cursor);
+    if (cursor) {
+      params.append('cursor', cursor);
+      params.append('page_token', cursor);
+    }
 
     const url = `${LOYVERSE_API}/receipts?${params.toString()}`;
 
@@ -71,7 +80,7 @@ async function* fetchReceipts(fromISO: string, toISO: string): AsyncGenerator<Lv
       }
     }
 
-    cursor = data?.cursor;
+    cursor = data?.cursor ?? data?.next_page_token ?? data?.nextCursor;
     pageCount++;
 
     if (pageCount > 500) {
@@ -88,7 +97,16 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
   const started = new Date();
   const runId = crypto.randomUUID();
   let fetched = 0;
-  let upserted = 0;
+  let importedReceipts = 0;
+  let updatedReceipts = 0;
+  let skippedDuplicateReceipts = 0;
+  let failedReceipts = 0;
+  let lineItemsImported = 0;
+  let lineItemsSkippedDuplicates = 0;
+  let modifiersImported = 0;
+  let modifiersSkippedDuplicates = 0;
+  let paymentsImported = 0;
+  const errors: Array<{ receipt_id: string | null; message: string }> = [];
 
   try {
     await db.$executeRaw`
@@ -105,39 +123,56 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
       // Shift-window queries filter using Asia/Bangkok timezone.
       const receiptDateISO = rc.receipt_date;
 
-      // Derive total_amount from payments array — this is always correct in Baht
-      // regardless of how Loyverse represents total_money (API has returned both
-      // satang and baht across different versions, causing a unit ambiguity).
-      // payment_json[].money_amount is confirmed correct (Baht) in every receipt.
-      const payments = rc.payments ?? [];
-      const totalAmount = payments.reduce(
-        (sum: number, p: any) => sum + (Number(p.money_amount) || 0), 0
-      );
+      const receiptId = rc.receipt_number || rc.id;
+      if (!receiptId) {
+        failedReceipts++;
+        errors.push({ receipt_id: null, message: "Receipt missing receipt_number/id" });
+        continue;
+      }
 
-      // lv_receipt: DO UPDATE allowed — receipt metadata (staff, total) can be corrected.
-      await db.$executeRaw`
-        INSERT INTO lv_receipt (receipt_id, datetime_bkk, staff_name, customer_id, total_amount, payment_json, raw_json)
-        VALUES (${rc.receipt_number}, ${receiptDateISO}::timestamptz, ${rc.employee?.name ?? null}, ${rc.customer_id ?? null},
-                ${totalAmount}, ${JSON.stringify(rc.payments ?? [])}::jsonb, ${JSON.stringify(rc)}::jsonb)
-        ON CONFLICT (receipt_id) DO UPDATE
-        SET datetime_bkk=EXCLUDED.datetime_bkk,
-            staff_name=EXCLUDED.staff_name,
-            customer_id=EXCLUDED.customer_id,
-            total_amount=EXCLUDED.total_amount,
-            payment_json=EXCLUDED.payment_json,
-            raw_json=EXCLUDED.raw_json`;
+      try {
+        const totalAmount = parseLoyverseMoney(rc.total_money);
+        const normalizedPayments = normalizeLoyversePayments(rc.payments);
+        paymentsImported += normalizedPayments.length;
 
-      let lineNo = 0;
-      for (const li of rc.line_items ?? []) {
+        const existingRows = await db.$queryRaw<{ exists: boolean }[]>`
+          SELECT EXISTS(SELECT 1 FROM lv_receipt WHERE receipt_id = ${receiptId}) AS exists`;
+        const receiptExisted = Boolean(existingRows[0]?.exists);
+
+        // lv_receipt: DO UPDATE allowed — receipt metadata/payment/raw payload can be corrected by Loyverse.
+        await db.$executeRaw`
+          INSERT INTO lv_receipt (receipt_id, datetime_bkk, staff_name, customer_id, total_amount, payment_json, raw_json)
+          VALUES (${receiptId}, ${receiptDateISO}::timestamptz, ${rc.employee?.name ?? null}, ${rc.customer_id ?? null},
+                  ${totalAmount}, ${JSON.stringify(normalizedPayments)}::jsonb, ${JSON.stringify(rc)}::jsonb)
+          ON CONFLICT (receipt_id) DO UPDATE
+          SET datetime_bkk=EXCLUDED.datetime_bkk,
+              staff_name=EXCLUDED.staff_name,
+              customer_id=EXCLUDED.customer_id,
+              total_amount=EXCLUDED.total_amount,
+              payment_json=EXCLUDED.payment_json,
+              raw_json=EXCLUDED.raw_json`;
+
+        if (receiptExisted) {
+          updatedReceipts++;
+          skippedDuplicateReceipts++;
+        } else {
+          importedReceipts++;
+        }
+
+        let lineNo = 0;
+        for (const li of rc.line_items ?? []) {
         lineNo++;
 
         // lv_line_item: DO NOTHING — immutable after first insert.
         // DB trigger no_update_lv_line_item blocks all UPDATEs.
-        await db.$executeRaw`
+        const insertedLineRows = await db.$queryRaw<{ inserted: number }[]>`
           INSERT INTO lv_line_item (receipt_id, line_no, sku, name, qty, unit_price, raw_json)
-          VALUES (${rc.receipt_number}, ${lineNo}, ${li.sku ?? null}, ${li.item_name ?? "UNKNOWN"},
-                  ${Number(li.quantity || 0)}, ${Number(li.price || 0)}, ${JSON.stringify(li)}::jsonb)
-          ON CONFLICT (receipt_id, line_no) DO NOTHING`;
+          VALUES (${receiptId}, ${lineNo}, ${li.sku ?? null}, ${li.item_name ?? li.name ?? "UNKNOWN"},
+                  ${Number(li.quantity || 0)}, ${parseLoyverseMoney(li.price)}, ${JSON.stringify(li)}::jsonb)
+          ON CONFLICT (receipt_id, line_no) DO NOTHING
+          RETURNING 1 AS inserted`;
+        if (insertedLineRows.length > 0) lineItemsImported++;
+        else lineItemsSkippedDuplicates++;
 
         // lv_modifier: DO NOTHING — immutable after first insert.
         // DB trigger no_update_lv_modifier blocks all UPDATEs.
@@ -154,24 +189,50 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
           for (const m of li.line_modifiers ?? []) {
             modNo++;
             const modName = m.option ?? m.name ?? "MOD";
-            await db.$executeRaw`
+            const insertedModifierRows = await db.$queryRaw<{ inserted: number }[]>`
               INSERT INTO lv_modifier (receipt_id, line_no, mod_no, sku, name, qty, raw_json)
-              VALUES (${rc.receipt_number}, ${lineNo}, ${modNo}, ${m.sku ?? null}, ${modName},
+              VALUES (${receiptId}, ${lineNo}, ${modNo}, ${m.sku ?? null}, ${modName},
                       1, ${JSON.stringify(m)}::jsonb)
-              ON CONFLICT (receipt_id, line_no, mod_no) DO NOTHING`;
+              ON CONFLICT (receipt_id, line_no, mod_no) DO NOTHING
+              RETURNING 1 AS inserted`;
+            if (insertedModifierRows.length > 0) modifiersImported++;
+            else modifiersSkippedDuplicates++;
           }
         }
+        }
+      } catch (receiptError: any) {
+        failedReceipts++;
+        errors.push({ receipt_id: receiptId, message: receiptError?.message || String(receiptError) });
+        console.error(`[ImportV2] Failed receipt ${receiptId}:`, receiptError?.message || receiptError);
       }
-      upserted++;
     }
 
+    const status = failedReceipts > 0 ? 'warning' : 'ok';
     await db.$executeRaw`
       UPDATE import_log
-      SET receipts_fetched=${fetched}, receipts_upserted=${upserted}, status='ok', finished_at=now()
+      SET receipts_fetched=${fetched}, receipts_upserted=${importedReceipts + updatedReceipts}, status=${status}, message=${errors.length ? JSON.stringify(errors.slice(0, 25)) : null}, finished_at=now()
       WHERE run_id=${runId}::uuid`;
 
-    console.log(`[ImportV2] Complete: fetched=${fetched}, upserted=${upserted}`);
-    return { ok: true, fetched, upserted };
+    const result = {
+      ok: failedReceipts === 0,
+      status,
+      runId,
+      dateRange: { fromISO, toISO },
+      importedReceipts,
+      updatedReceipts,
+      skippedDuplicates: skippedDuplicateReceipts + lineItemsSkippedDuplicates + modifiersSkippedDuplicates,
+      skippedDuplicateReceipts,
+      failedReceipts,
+      lineItemsImported,
+      lineItemsSkippedDuplicates,
+      modifiersImported,
+      modifiersSkippedDuplicates,
+      paymentsImported,
+      errors,
+      legacy: { fetched, upserted: importedReceipts + updatedReceipts },
+    };
+    console.log(`[ImportV2] Complete: ${JSON.stringify(result)}`);
+    return result;
   } catch (error: any) {
     console.error('[ImportV2] Error:', error.message);
     await db.$executeRaw`
@@ -182,4 +243,23 @@ export async function importReceiptsV2(fromISO: string, toISO: string) {
   } finally {
     await db.$disconnect();
   }
+}
+
+export async function importShift(shiftDate: string) {
+  const window = getBangkokBusinessWindow(shiftDate);
+  const result = await importReceiptsV2(window.startISO, window.endISO);
+  return {
+    ...result,
+    shiftDate,
+    shiftWindow: window,
+    receipts: result.importedReceipts + result.updatedReceipts,
+    imported: result.importedReceipts,
+  };
+}
+
+export async function syncRange(from: string, to: string) {
+  const fromWindow = getBangkokBusinessWindow(from);
+  const toWindow = getBangkokBusinessWindow(to);
+  const result = await importReceiptsV2(fromWindow.startISO, toWindow.endISO);
+  return { ...result, from, to, shiftWindow: { from: fromWindow, to: toWindow } };
 }
