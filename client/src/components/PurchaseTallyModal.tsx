@@ -142,7 +142,7 @@ export function PurchaseTallyModal({ open, onClose, entry }: PurchaseTallyModalP
   const updateMutation = useMutation({
     mutationFn: async (data: any) => {
       return apiRequest(`/api/purchase-tally/${entry.id}`, {
-        method: "PUT",
+        method: "PATCH",
         body: JSON.stringify(data),
       });
     },

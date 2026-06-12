@@ -19,6 +19,7 @@ import LoyverseMirror from "./pages/operations/LoyverseMirror";
 import DailySalesAnalysis from "./pages/operations/DailySalesAnalysis";
 import DailyStockAnalysis from "./pages/operations/DailyStockAnalysis";
 import PurchasingPage from "./pages/operations/Purchasing";
+import PurchaseLodgement from "./pages/operations/PurchaseLodgement";
 import ShoppingList from "./pages/operations/ShoppingList";
 import IssueRegister from "./pages/operations/IssueRegister";
 import ManagerChecklist from "./pages/operations/ManagerChecklist";
@@ -94,6 +95,7 @@ export default function App() {
                     <Route path="/operations/daily-stock-analysis" element={<ProtectedRoute><DailyStockAnalysis /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales-library" element={<Navigate to="/operations/daily-sales-v2/library" replace />} />
                     <Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} />
+                    <Route path="/operations/purchase-lodgement" element={<ProtectedRoute><PurchaseLodgement /></ProtectedRoute>} />
 
                     {/* Operations Tools */}
                     <Route path="/operations/shopping-list" element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />

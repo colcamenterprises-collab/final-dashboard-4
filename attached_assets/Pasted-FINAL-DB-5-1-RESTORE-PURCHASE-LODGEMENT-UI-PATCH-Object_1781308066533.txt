@@ -1,0 +1,149 @@
+FINAL DB 5.1 — RESTORE PURCHASE LODGEMENT UI PATCH
+
+Objective:
+Restore the purchase lodgement flow for stock bought outside the shift.
+
+This is NOT the Daily Stock V2 end-of-shift count form.
+
+Use the existing correct system:
+
+- "PurchaseTallyList"
+- "PurchaseTallyModal"
+- "/api/purchase-tally"
+- "purchase_tally"
+- "purchase_tally_drink"
+
+Do not build a new system.
+Do not connect "StockLodgementPanels".
+Do not use "stock_received_log" for this patch.
+Do not change schema.
+Do not touch POS sync.
+Do not touch Daily Sales V2.
+Do not touch Daily Stock V2 end-count form.
+Do not touch Shift Reports.
+Do not restore Tier 5 systems.
+
+Reason:
+The existing reconciliation engines already read from "purchase_tally":
+
+- rolls → "purchase_tally.rolls_pcs"
+- meat → "purchase_tally.meat_grams"
+- fries → "purchase_tally.fries_grams"
+- sweet potato → "purchase_tally.sweet_potato_grams"
+- drinks → "purchase_tally_drink"
+
+Required fixes:
+
+1. Mount the existing UI
+
+Create or restore a route:
+"/operations/purchase-lodgement"
+
+Render:
+"PurchaseTallyList"
+
+Add sidebar/nav entry:
+Label:
+"Purchase Lodgement"
+
+Place under Purchasing or Operations.
+
+2. Fix edit method
+
+File:
+"client/src/components/PurchaseTallyModal.tsx"
+
+Change edit request method from:
+"PUT"
+
+to:
+"PATCH"
+
+because backend route is:
+"PATCH /api/purchase-tally/:id"
+
+3. Add missing summary cards
+
+File:
+"client/src/components/PurchaseTallyList.tsx"
+
+Add summary cards for:
+
+- French Fries
+- Sweet Potato Fries
+
+Use existing summary API values if already returned:
+
+- "totalFries"
+- "totalSweetPotato"
+
+Do not alter backend unless those values are missing.
+
+4. Verify supported fields
+
+The modal must allow entry of:
+
+- Date
+- Staff
+- Supplier
+- Amount THB
+- Rolls pcs
+- Meat grams
+- Fries grams
+- Sweet potato grams
+- Drinks by brand and quantity
+
+5. Monthly usability
+
+Confirm the page can filter or display by month using existing:
+"GET /api/purchase-tally?month=YYYY-MM"
+
+6. Reconciliation compatibility
+
+Confirm no reconciliation changes are required because existing files already read "purchase_tally":
+
+- "bunsReconciliation.ts"
+- "meatReconciliation.ts"
+- "friesReconciliation.ts"
+- "sweetPotatoReconciliation.ts"
+- "drinksVariance.ts"
+
+7. Do not connect legacy system
+
+Do not mount:
+
+- "StockPurchaseTables"
+- "StockLodgmentModal"
+- "StockLodgementPanels"
+
+Reason:
+They write to "stock_received_log", while reconciliation reads "purchase_tally".
+
+Validation:
+
+- "npm run build"
+- "/operations/purchase-lodgement" loads
+- Sidebar link appears
+- Purchase modal opens
+- Can create a purchase tally row with:
+  - rolls
+  - meat
+  - fries
+  - sweet potato
+  - drinks
+- Edit existing row works using PATCH
+- "/api/purchase-tally" returns the row
+- "/api/purchase-tally/summary?month=YYYY-MM" returns totals
+- Fries and sweet potato summary cards display
+- No schema changes
+- No POS sync changes
+- No Daily Sales V2 changes
+- No Daily Stock V2 end-count changes
+- No Shift Report changes
+
+Return:
+
+- files changed
+- route added
+- validation table
+- remaining dormant legacy stock lodgement files

@@ -97,7 +97,7 @@ export function PurchaseTallyList() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Total Amount</CardTitle>
@@ -134,6 +134,24 @@ export function PurchaseTallyList() {
           </CardHeader>
           <CardContent>
             <div className="text-lg font-bold num">{summary.totalDrinks || 0} pcs</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Fries</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold num">{Number(summary.totalFries || 0).toLocaleString()} g</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Sweet Potato</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-lg font-bold num">{Number(summary.totalSweetPotato || 0).toLocaleString()} g</div>
           </CardContent>
         </Card>
       </div>

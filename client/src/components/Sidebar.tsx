@@ -40,6 +40,7 @@ const groups: Group[] = [
     title: "Purchasing",
     items: [
       { to: "/operations/purchasing", label: "Purchasing Items" },
+      { to: "/operations/purchase-lodgement", label: "Purchase Lodgement" },
       { to: "/operations/purchasing-shift-log", label: "Stock Order History" },
       // INTERNAL/ADMIN ONLY — route still active at /operations/ingredient-purchasing, hidden from normal nav
 
