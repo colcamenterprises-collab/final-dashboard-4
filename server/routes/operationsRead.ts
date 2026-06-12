@@ -56,7 +56,11 @@ function normalizeSales(row: any) {
   const cash = money(p.cashSales ?? row.cashSales);
   const qr = money(p.qrSales ?? row.qrSales);
   const grab = money(p.grabSales ?? row.grabSales);
-  const total = money(p.totalSales ?? row.totalSales) ?? [cash, qr, grab].reduce((sum, val) => sum + (val ?? 0), 0);
+  const other = money(p.otherSales ?? p.aroiSales ?? row.aroiSales);
+  const rawTotal = money(p.totalSales ?? row.totalSales);
+  const staffSalesValues = [cash, qr, grab, other, rawTotal].filter((value): value is number => value !== null);
+  const staffSalesEntered = staffSalesValues.some((value) => value !== 0);
+  const total = staffSalesEntered ? rawTotal ?? [cash, qr, grab, other].reduce((sum, val) => sum + (val ?? 0), 0) : null;
   const expectedClosingCash = money(p.expectedClosingCash ?? p.expectedCash);
   const actualCash = money(p.closingCash ?? row.endingCash);
   const variance = expectedClosingCash !== null && actualCash !== null ? Math.round((actualCash - expectedClosingCash) * 100) / 100 : null;
@@ -67,9 +71,12 @@ function normalizeSales(row: any) {
     submittedBy: row.completedBy || row.staff || p.completedBy || null,
     status: "submitted",
     totalSales: total,
-    cash,
-    qr,
-    grab,
+    cash: staffSalesEntered ? cash : null,
+    qr: staffSalesEntered ? qr : null,
+    grab: staffSalesEntered ? grab : null,
+    other: staffSalesEntered ? other : null,
+    staffSalesEntered,
+    staffSalesStatus: staffSalesEntered ? "entered" : "not_entered",
     expenses: totalExpenses,
     wagesTotal: money(p.wagesTotal ?? row.wagesTotal) ?? wages.reduce((sum: number, item: any) => sum + (money(item?.amount ?? item?.value) ?? 0), 0),
     expectedCash: expectedClosingCash,
@@ -120,7 +127,7 @@ function normalizeStock(row: any) {
 
 async function getLatestSales() {
   return safeQuery(
-    `SELECT id, "shiftDate", shift_date, "completedBy", staff, "createdAt", "submittedAtISO", "totalSales", "cashSales", "qrSales", "grabSales", "totalExpenses", "endingCash", payload
+    `SELECT id, "shiftDate", shift_date, "completedBy", staff, "createdAt", "submittedAtISO", "totalSales", "cashSales", "qrSales", "grabSales", "aroiSales", "totalExpenses", "endingCash", payload
      FROM daily_sales_v2
      WHERE "deletedAt" IS NULL
      ORDER BY COALESCE("shiftDate"::timestamp, shift_date::timestamp, "createdAt") DESC
@@ -286,12 +293,13 @@ router.get("/daily-sales-analysis", async (req, res) => {
     receipts: Number(receipts.receipt_count || 0),
   };
   blockers.push(blocker("POS_GROSS_NET_UNAVAILABLE", "POS gross/net split unavailable from canonical receipt source", "/api/operations-read/daily-sales-analysis", "lv_receipt"));
+  const staffSalesNotEntered = latestSales?.staffSalesStatus === "not_entered";
   const lines = [
-    { label: "Gross sales", staff: latestSales?.totalSales ?? null, pos: pos.gross },
-    { label: "Net sales", staff: latestSales?.totalSales ?? null, pos: pos.net },
-    { label: "Cash", staff: latestSales?.cash ?? null, pos: null },
-    { label: "QR", staff: latestSales?.qr ?? null, pos: null },
-    { label: "Grab", staff: latestSales?.grab ?? null, pos: null },
+    { label: "Gross sales", staff: staffSalesNotEntered ? null : latestSales?.totalSales ?? null, pos: pos.gross, staffDisplay: staffSalesNotEntered ? "Staff sales not entered" : undefined },
+    { label: "Net sales", staff: staffSalesNotEntered ? null : latestSales?.totalSales ?? null, pos: pos.net, staffDisplay: staffSalesNotEntered ? "Staff sales not entered" : undefined },
+    { label: "Cash", staff: staffSalesNotEntered ? null : latestSales?.cash ?? null, pos: null, staffDisplay: staffSalesNotEntered ? "Staff sales not entered" : undefined },
+    { label: "QR", staff: staffSalesNotEntered ? null : latestSales?.qr ?? null, pos: null, staffDisplay: staffSalesNotEntered ? "Staff sales not entered" : undefined },
+    { label: "Grab", staff: staffSalesNotEntered ? null : latestSales?.grab ?? null, pos: null, staffDisplay: staffSalesNotEntered ? "Staff sales not entered" : undefined },
     { label: "Receipts", staff: latestSales?.receiptCounts ? Object.values(latestSales.receiptCounts).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0) : null, pos: pos.receipts },
     { label: "Expenses", staff: latestSales?.expenses ?? null, pos: null },
     { label: "Expected cash", staff: latestSales?.expectedCash ?? null, pos: null },
@@ -299,7 +307,8 @@ router.get("/daily-sales-analysis", async (req, res) => {
     { label: "Variance", staff: latestSales?.variance ?? null, pos: 0 },
   ].map((line) => {
     const variance = line.staff !== null && line.pos !== null ? Math.round((Number(line.staff) - Number(line.pos)) * 100) / 100 : null;
-    return { ...line, variance, status: variance === null ? "WARNING" : Math.abs(variance) <= 1 ? "PASS" : Math.abs(variance) <= 50 ? "WARNING" : "FAIL" };
+    const status = line.staffDisplay === "Staff sales not entered" ? "STAFF_NOT_ENTERED" : variance === null ? "WARNING" : Math.abs(variance) <= 1 ? "PASS" : Math.abs(variance) <= 50 ? "WARNING" : "FAIL";
+    return { ...line, variance, status };
   });
   res.json({ ok: blockers.length === 0, source: "daily_sales_v2,lv_receipt", date, latestSales: latestSales || { status: "missing" }, pos, lines, warnings: [], blockers, last_updated: new Date().toISOString() });
 });

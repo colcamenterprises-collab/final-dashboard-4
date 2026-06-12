@@ -58,6 +58,7 @@ async function buildShiftRows(limitOrDate: number | string) {
         "cashSales"         AS staff_cash,
         "qrSales"           AS staff_qr,
         "grabSales"         AS staff_grab,
+        "aroiSales"         AS staff_other,
         "totalSales"        AS staff_total,
         "totalExpenses"     AS staff_expenses
       FROM daily_sales_v2
@@ -79,6 +80,7 @@ async function buildShiftRows(limitOrDate: number | string) {
       f.staff_cash,
       f.staff_qr,
       f.staff_grab,
+      f.staff_other,
       f.staff_total,
       f.staff_expenses
     FROM shifts s
@@ -91,13 +93,17 @@ async function buildShiftRows(limitOrDate: number | string) {
     const grossSales     = row.gross_sales    != null ? Number(row.gross_sales)    : null;
     const staffTotal     = row.staff_total    != null ? Number(row.staff_total)    : null;
     const receiptGross   = row.receipt_gross  != null ? Number(row.receipt_gross)  : null;
+    const staffValues = [row.staff_cash, row.staff_qr, row.staff_grab, row.staff_other, row.staff_total]
+      .filter((value) => value != null)
+      .map((value) => Number(value));
+    const staffSalesEntered = staffValues.some((value) => Number.isFinite(value) && value !== 0);
 
     const staffFormStatus: "submitted" | "missing" = row.form_id ? "submitted" : "missing";
 
     let posStatus: "matched" | "mismatch" | "missing" = "missing";
     let varianceSummary: object | null = null;
 
-    if (grossSales != null && staffFormStatus === "submitted" && staffTotal != null) {
+    if (grossSales != null && staffFormStatus === "submitted" && staffSalesEntered && staffTotal != null) {
       const diff = Math.abs(staffTotal - grossSales);
       posStatus = diff <= 100 ? "matched" : "mismatch";
       varianceSummary = {
@@ -122,10 +128,12 @@ async function buildShiftRows(limitOrDate: number | string) {
       receiptCount:   row.receipt_count != null ? Number(row.receipt_count) : null,
       receiptGross,
       staffFormStatus,
+      staffSalesStatus: staffSalesEntered ? "entered" : "not_entered",
+      staffSalesMessage: staffSalesEntered ? null : "Staff sales not entered",
       posStatus,
       varianceSummary,
       completedBy:    row.completed_by ?? null,
-      staffTotal,
+      staffTotal:     staffSalesEntered ? staffTotal : null,
       staffExpenses:  row.staff_expenses != null ? Number(row.staff_expenses) : null,
       source:         "loyverse_shifts + lv_receipt + daily_sales_v2",
     };
