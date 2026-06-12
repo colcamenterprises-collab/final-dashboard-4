@@ -1,0 +1,174 @@
+FINAL DB 5.1 — POST MERGE VERIFICATION
+
+Objective:
+Verify PR #156 is live, Loyverse mirror is functioning, shift reporting is functional, and no core systems regressed.
+
+Do not modify code.
+Do not create commits.
+Verification only.
+
+1. Build Verification
+   Run:
+
+npm run build
+
+Report:
+
+- PASS / FAIL
+- Any new TypeScript errors
+- Any new build warnings
+
+2. Route Verification
+
+Verify HTTP 200:
+
+GET /api/system/pos-status
+GET /api/loyverse/mirror-diagnostic
+GET /api/shift-report/history
+GET /api/shift-report/latest
+
+Report exact responses (trim large payloads).
+
+3. Authentication Verification
+
+Test:
+
+GET /api/loyverse/mirror-diagnostic
+
+without authentication.
+
+Expected:
+401 Unauthorized
+
+Then test using a valid owner session.
+
+Expected:
+200 OK
+
+Report both results.
+
+4. Loyverse Mirror Verification
+
+Capture:
+
+- latest sync timestamp
+- latest receipt timestamp
+- latest shift date
+- receipt row count
+- line item row count
+- modifier row count
+- payment mappings
+- blockers
+- mismatches
+
+State:
+
+LOYVERSE MIRROR VERIFIED
+or
+LOYVERSE MIRROR FAILED
+
+5. Shift Reporting Verification
+
+Check:
+
+GET /api/shift-report/history
+
+Report:
+
+- total rows returned
+- latest shift date
+- latest gross sales
+- latest receipt count
+
+Verify:
+
+GET /api/shift-report/latest
+
+returns a populated shift.
+
+Expected:
+not null
+
+6. Generate Report Verification
+
+Run:
+
+POST /api/shift-report/generate
+
+for:
+
+2026-06-08
+2026-06-09
+
+Report:
+
+- success value
+- report object returned
+- blockers returned
+- whether row was written
+
+Confirm:
+
+No "success:true, report:null" path exists.
+
+7. Daily Sales V2 Integrity
+
+Verify latest Daily Sales V2 records.
+
+Report:
+
+- latest submission date
+- totalSales
+- cashSales
+- qrSales
+- grabSales
+
+If totals are zero:
+
+state whether this is:
+A) expected form design
+or
+B) broken field mapping
+
+Do not fix.
+
+8. Daily Stock V2 Integrity
+
+Verify:
+
+- latest stock record exists
+- dashboard summary reads daily_stock_v2 only
+- no fallback to daily_sales_v2
+
+Report PASS / FAIL.
+
+9. Dashboard Verification
+
+Verify pages load:
+
+/dashboard
+/operations/loyverse-mirror
+/reports/shift-reports
+/reports/shift-history
+
+Report:
+
+- loads successfully
+- displays data
+- displays empty state
+- displays blockers
+
+10. Final Summary
+
+Provide:
+
+PASS / FAIL table
+
+and one final verdict:
+
+SYSTEM READY FOR ANALYSIS
+
+or
+
+BLOCKERS REMAIN
+(with exact blockers)
