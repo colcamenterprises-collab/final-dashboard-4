@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 const thb = (value: unknown) => typeof value === "number" ? `฿${value.toLocaleString("en-TH")}` : "Missing";
 const val = (value: unknown) => value === null || value === undefined || value === "" ? "Missing" : String(value);
-const badge = (status?: string) => status === "PASS" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : status === "FAIL" ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800";
+const badge = (status?: string) => status === "PASS" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : status === "FAIL" ? "border-red-200 bg-red-50 text-red-800" : status === "STAFF_NOT_ENTERED" ? "border-slate-200 bg-slate-50 text-slate-700" : "border-amber-200 bg-amber-50 text-amber-800";
 
 export default function DailySalesAnalysis() {
   const { data, isLoading, isError } = useQuery<any>({ queryKey: ["/api/operations-read/daily-sales-analysis"] });
@@ -32,7 +32,7 @@ export default function DailySalesAnalysis() {
         <div className="mt-3 overflow-x-auto">
           <table className="w-full min-w-[680px] text-sm">
             <thead className="bg-slate-50 text-xs uppercase text-slate-500"><tr><th className="px-3 py-2 text-left">Line</th><th className="px-3 py-2 text-right">Staff form</th><th className="px-3 py-2 text-right">POS mirror</th><th className="px-3 py-2 text-right">Variance</th><th className="px-3 py-2 text-left">Status</th></tr></thead>
-            <tbody>{lines.map((line: any) => <tr key={line.label} className="border-t border-slate-100"><td className="px-3 py-3 font-medium">{line.label}</td><td className="px-3 py-3 text-right">{typeof line.staff === "number" && line.label !== "Receipts" ? thb(line.staff) : val(line.staff)}</td><td className="px-3 py-3 text-right">{typeof line.pos === "number" && line.label !== "Receipts" ? thb(line.pos) : val(line.pos)}</td><td className="px-3 py-3 text-right">{line.variance === null ? "Missing" : line.label === "Receipts" ? line.variance : thb(line.variance)}</td><td className="px-3 py-3"><span className={`rounded-full border px-2 py-1 text-xs font-semibold ${badge(line.status)}`}>{line.status}</span></td></tr>)}</tbody>
+            <tbody>{lines.map((line: any) => <tr key={line.label} className="border-t border-slate-100"><td className="px-3 py-3 font-medium">{line.label}</td><td className="px-3 py-3 text-right">{line.staffDisplay ?? (typeof line.staff === "number" && line.label !== "Receipts" ? thb(line.staff) : val(line.staff))}</td><td className="px-3 py-3 text-right">{typeof line.pos === "number" && line.label !== "Receipts" ? thb(line.pos) : val(line.pos)}</td><td className="px-3 py-3 text-right">{line.variance === null ? "Missing" : line.label === "Receipts" ? line.variance : thb(line.variance)}</td><td className="px-3 py-3"><span className={`rounded-full border px-2 py-1 text-xs font-semibold ${badge(line.status)}`}>{line.status}</span></td></tr>)}</tbody>
           </table>
         </div>
       </section>

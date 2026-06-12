@@ -272,6 +272,10 @@ export default function DailySales() {
   
   const [completedBy, setCompletedBy] = useState("");
   const [cashStart, setCashStart] = useState(0);
+  const [cashSales, setCashSales] = useState(0);
+  const [qrSales, setQrSales] = useState(0);
+  const [grabSales, setGrabSales] = useState(0);
+  const [otherSales, setOtherSales] = useState(0);
 
   // Expenses state
   const [shiftExpenses, setShiftExpenses] = useState<ShiftExpenseRow[]>([{ id: uid(), item: "", cost: 0, shop: "" }]);
@@ -351,6 +355,10 @@ export default function DailySales() {
           const p = data.record.payload || {};
           setCompletedBy(data.record.staff || "");
           setCashStart(p.startingCash || 0);
+          setCashSales(p.cashSales || 0);
+          setQrSales(p.qrSales || 0);
+          setGrabSales(p.grabSales || 0);
+          setOtherSales(p.otherSales ?? p.aroiSales ?? p.aroiDeeSales ?? 0);
           setClosingCash(p.closingCash || 0);
           setCashBanked(p.cashBanked || 0);
           setQrBanked(p.qrTransfer || 0);
@@ -474,6 +482,10 @@ export default function DailySales() {
         const draft = JSON.parse(raw);
         setCompletedBy(draft.completedBy || "");
         setCashStart(draft.cashStart || 0);
+        setCashSales(draft.cashSales || 0);
+        setQrSales(draft.qrSales || 0);
+        setGrabSales(draft.grabSales || 0);
+        setOtherSales(draft.otherSales || 0);
         setClosingCash(draft.closingCash || 0);
         setCashBanked(draft.cashBanked || 0);
         setQrBanked(draft.qrBanked || 0);
@@ -493,6 +505,10 @@ export default function DailySales() {
   const resetForm = () => {
     setCompletedBy("");
     setCashStart(0);
+    setCashSales(0);
+    setQrSales(0);
+    setGrabSales(0);
+    setOtherSales(0);
     setShiftExpenses([{ id: uid(), item: "", cost: 0, shop: "" }]);
     setStaffWages([{ id: uid(), staff: "", amount: 0, type: "WAGES" }]);
     setOtherPayments([{ id: uid(), staff: "", amount: 0, type: "BONUS" }]);
@@ -502,6 +518,7 @@ export default function DailySales() {
     setGrabReceiptCount(0);
     setCashReceiptCount(0);
     setQrReceiptCount(0);
+    setDirectReceiptCount(0);
     setRefundStatus('');
     setRefundRows([]);
     setErrors([]);
@@ -588,14 +605,15 @@ export default function DailySales() {
         ? new Date(shiftDate + 'T00:00:00').toISOString()
         : new Date().toISOString();
       
+      const staffTotalSales = cashSales + qrSales + grabSales + otherSales;
       const submitData = {
         completedBy,
         startingCash: cashStart,
-        cashSales: 0,
-        qrSales: 0,
-        grabSales: 0,
-        otherSales: 0,
-        totalSales: 0,
+        cashSales,
+        qrSales,
+        grabSales,
+        otherSales,
+        totalSales: staffTotalSales,
         refunds: {
           status: refundStatus,
           rows: refundStatus === 'YES' ? refundRows : [],
@@ -700,6 +718,10 @@ export default function DailySales() {
   const collectDailySalesValues = () => ({
     completedBy,
     cashStart,
+    cashSales,
+    qrSales,
+    grabSales,
+    otherSales,
     shiftExpenses,
     staffWages,
     otherPayments,
@@ -827,6 +849,36 @@ export default function DailySales() {
               </div>
             </div>
             <p className="mt-2 text-xs text-gray-500">{L.autoTimestamp}: {new Date().toISOString()}</p>
+          </section>
+
+
+
+          {/* Staff Sales Section */}
+          <section className="rounded-[4px] border bg-white p-6 mt-6">
+            <h3 className="mb-1 text-sm font-semibold">{L.salesInfo}</h3>
+            <p className="mb-4 text-xs text-slate-500">Staff-entered sales for POS comparison only. POS remains source of truth.</p>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.cashSales} (฿)</label>
+                <input type="number" min="0" value={cashSales} onChange={e=>setCashSales(Math.max(0, +e.target.value||0))} className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.qrSales} (฿)</label>
+                <input type="number" min="0" value={qrSales} onChange={e=>setQrSales(Math.max(0, +e.target.value||0))} className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.grabSales} (฿)</label>
+                <input type="number" min="0" value={grabSales} onChange={e=>setGrabSales(Math.max(0, +e.target.value||0))} className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.otherSales} (฿)</label>
+                <input type="number" min="0" value={otherSales} onChange={e=>setOtherSales(Math.max(0, +e.target.value||0))} className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm" />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 block mb-1">{L.totalSales} (฿)</label>
+                <input type="number" value={cashSales + qrSales + grabSales + otherSales} readOnly className="w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-slate-50" />
+              </div>
+            </div>
           </section>
 
           {/* Expenses Section */}

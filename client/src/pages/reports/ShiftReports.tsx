@@ -21,6 +21,8 @@ interface ShiftReport {
   receiptCount: number | null;
   receiptGross: number | null;
   staffFormStatus: "submitted" | "missing";
+  staffSalesStatus?: "entered" | "not_entered";
+  staffSalesMessage?: string | null;
   posStatus: "matched" | "mismatch" | "missing";
   varianceSummary: VarianceSummary | null;
   completedBy: string | null;
@@ -45,9 +47,10 @@ function fmt(n: number | null | undefined) {
   return `฿${Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-function PosStatusBadge({ status }: { status: ShiftReport["posStatus"] }) {
-  if (status === "matched")  return <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border border-green-200">Matched</Badge>;
-  if (status === "mismatch") return <Badge className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700 border border-red-200">Mismatch</Badge>;
+function PosStatusBadge({ report }: { report: ShiftReport }) {
+  if (report.staffSalesStatus === "not_entered") return <Badge className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-600 border border-slate-200">Staff sales not entered</Badge>;
+  if (report.posStatus === "matched")  return <Badge className="text-[10px] px-1.5 py-0 bg-green-100 text-green-700 border border-green-200">Matched</Badge>;
+  if (report.posStatus === "mismatch") return <Badge className="text-[10px] px-1.5 py-0 bg-red-100 text-red-700 border border-red-200">Mismatch</Badge>;
   return <Badge className="text-[10px] px-1.5 py-0 bg-slate-100 text-slate-500 border border-slate-200">POS Missing</Badge>;
 }
 
@@ -148,7 +151,7 @@ export default function ShiftReports() {
                       <FormStatusBadge status={r.staffFormStatus} />
                     </td>
                     <td className="px-3 py-2 text-center">
-                      <PosStatusBadge status={r.posStatus} />
+                      <PosStatusBadge report={r} />
                     </td>
                     <td className="px-3 py-2 text-slate-500 dark:text-slate-400">
                       {r.completedBy ?? "—"}

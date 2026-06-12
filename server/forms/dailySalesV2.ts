@@ -616,8 +616,8 @@ export async function updateDailySalesV2Form1(req: Request, res: Response) {
       ...(typeof body.refunds !== 'undefined' ? { refunds: body.refunds } : {}),
     } as Record<string, any>;
 
-    // ANTI-MANIPULATION PATCH: totalSales is now sourced from POS, not recalculated from staff-entered fields
-    // Preserve existing totalSales from payload; do not overwrite with zeroes
+    // Staff sales are comparison-only fields. Preserve the existing comparison total
+    // unless this edit payload explicitly includes sales components.
     nextPayload.totalSales = nextPayload.totalSales ?? 0;
 
     // Also update top-level columns that the library reads directly
@@ -635,6 +635,35 @@ export async function updateDailySalesV2Form1(req: Request, res: Response) {
     if (typeof body.completedBy !== 'undefined') {
       columnUpdates.push(`"completedBy" = $${paramIdx}`);
       columnValues.push(body.completedBy);
+      paramIdx++;
+    }
+    if (typeof body.cashSales !== 'undefined') {
+      columnUpdates.push(`"cashSales" = $${paramIdx}`);
+      columnValues.push(toTHB(body.cashSales));
+      paramIdx++;
+    }
+    if (typeof body.qrSales !== 'undefined') {
+      columnUpdates.push(`"qrSales" = $${paramIdx}`);
+      columnValues.push(toTHB(body.qrSales));
+      paramIdx++;
+    }
+    if (typeof body.grabSales !== 'undefined') {
+      columnUpdates.push(`"grabSales" = $${paramIdx}`);
+      columnValues.push(toTHB(body.grabSales));
+      paramIdx++;
+    }
+    if (typeof body.otherSales !== 'undefined') {
+      columnUpdates.push(`"aroiSales" = $${paramIdx}`);
+      columnValues.push(toTHB(body.otherSales));
+      paramIdx++;
+    }
+    if (typeof body.cashSales !== 'undefined' || typeof body.qrSales !== 'undefined' || typeof body.grabSales !== 'undefined' || typeof body.otherSales !== 'undefined') {
+      const nextTotalSales = toTHB(nextPayload.cashSales) + toTHB(nextPayload.qrSales) + toTHB(nextPayload.grabSales) + toTHB(nextPayload.otherSales);
+      nextPayload.totalSales = nextTotalSales;
+      columnUpdates[0] = 'payload = $1';
+      columnValues[0] = JSON.stringify(nextPayload);
+      columnUpdates.push(`"totalSales" = $${paramIdx}`);
+      columnValues.push(nextTotalSales);
       paramIdx++;
     }
 

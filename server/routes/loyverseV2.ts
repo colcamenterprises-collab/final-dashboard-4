@@ -1,4 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
+import { PrismaClient } from "@prisma/client";
 import { DateTime } from "luxon";
 import { importReceiptsV2 } from "../services/loyverseImportV2.js";
 import { db } from "../lib/prisma.js";

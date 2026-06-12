@@ -23,6 +23,8 @@ interface ShiftReport {
   receiptCount: number | null;
   receiptGross: number | null;
   staffFormStatus: "submitted" | "missing";
+  staffSalesStatus?: "entered" | "not_entered";
+  staffSalesMessage?: string | null;
   posStatus: "matched" | "mismatch" | "missing";
   varianceSummary: VarianceSummary | null;
   completedBy: string | null;
@@ -251,11 +253,12 @@ export default function ShiftHistory() {
                       {report.staffFormStatus === "submitted" ? "Form ✓" : "No Form"}
                     </Badge>
                     <Badge className={`text-[10px] px-1.5 py-0 border ${
+                      report.staffSalesStatus === "not_entered" ? "bg-slate-100 text-slate-600 border-slate-200" :
                       report.posStatus === "matched"  ? "bg-green-100 text-green-700 border-green-200"  :
                       report.posStatus === "mismatch" ? "bg-red-100 text-red-700 border-red-200" :
                                                         "bg-slate-100 text-slate-500 border-slate-200"
                     }`}>
-                      {report.posStatus === "matched" ? "Matched" : report.posStatus === "mismatch" ? "Mismatch" : "No POS"}
+                      {report.staffSalesStatus === "not_entered" ? "Staff sales not entered" : report.posStatus === "matched" ? "Matched" : report.posStatus === "mismatch" ? "Mismatch" : "No POS"}
                     </Badge>
                   </div>
                 </button>
@@ -281,7 +284,7 @@ export default function ShiftHistory() {
                     {report.staffFormStatus === "submitted" && (
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { label: "Staff Sales",    value: fmt(report.staffTotal) },
+                          { label: "Staff Sales",    value: report.staffSalesStatus === "not_entered" ? "Staff sales not entered" : fmt(report.staffTotal) },
                           { label: "Staff Expenses", value: fmt(report.staffExpenses) },
                           { label: "Completed By",   value: report.completedBy ?? "—" },
                         ].map((row) => (
