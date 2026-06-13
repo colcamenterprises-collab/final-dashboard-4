@@ -146,23 +146,50 @@ export default function LoyverseMirror() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-3">
-        <h1 className="text-xl font-semibold">Loyverse Mirror</h1>
-        <p className="text-sm text-slate-500">Loading...</p>
+      <div className="space-y-4 max-w-4xl mx-auto">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">Loyverse Mirror</h1>
+          <p className="text-xs text-slate-500 mt-1">Loading POS sync status…</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">Loading…</div>
       </div>
     );
   }
 
+  const isAuthError = error && (error.includes("401") || error.includes("403") || error.toLowerCase().includes("unauthorized"));
+
   if (error || !data) {
     return (
-      <div className="p-6 space-y-4">
-        <h1 className="text-xl font-semibold">Loyverse Mirror</h1>
-        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error || "No data returned from the diagnostic endpoint."}
+      <div className="space-y-5 max-w-4xl mx-auto">
+        <div>
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">Loyverse Mirror</h1>
+          <p className="text-xs text-slate-500 mt-1">POS sync status and 7-day shift comparison</p>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchData}>
-          <RefreshCw className="h-4 w-4 mr-1.5" />Retry
-        </Button>
+        {isAuthError ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 space-y-3">
+            <p className="text-sm font-semibold text-amber-900">Owner authentication required</p>
+            <p className="text-xs text-amber-800">
+              This page is restricted to the owner account. Sign in with the owner PIN to view the Loyverse sync status, 7-day shift comparison, and data integrity checks.
+            </p>
+            <button
+              onClick={fetchData}
+              className="flex items-center gap-1.5 rounded-lg bg-[#111111] text-white px-3 py-2 text-xs font-semibold hover:bg-neutral-800 transition-colors"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Retry
+            </button>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-red-200 bg-red-50 p-5 space-y-3">
+            <p className="text-sm font-semibold text-red-800">Could not load mirror data</p>
+            <p className="text-xs text-red-700">{error || "No data returned. Check server connection."}</p>
+            <button
+              onClick={fetchData}
+              className="flex items-center gap-1.5 rounded-lg border border-red-200 bg-white text-red-700 px-3 py-1.5 text-xs font-semibold hover:bg-red-50 transition-colors"
+            >
+              <RefreshCw className="h-3.5 w-3.5" /> Retry
+            </button>
+          </div>
+        )}
       </div>
     );
   }
