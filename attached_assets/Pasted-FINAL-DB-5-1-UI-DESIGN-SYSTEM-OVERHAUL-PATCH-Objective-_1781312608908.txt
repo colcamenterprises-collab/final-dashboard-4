@@ -1,0 +1,116 @@
+FINAL DB 5.1 — UI DESIGN SYSTEM OVERHAUL PATCH
+
+Objective:
+Rebuild the app UI style to match the attached reference screenshot as closely as possible.
+
+This is a UI-only design patch.
+Do not change backend logic.
+Do not change APIs.
+Do not change schema.
+Do not change POS sync.
+Do not change calculations.
+Do not change data sources.
+
+Design target:
+Premium tablet dashboard style like the screenshot:
+- black left icon sidebar
+- large rounded white app canvas
+- bold black headings
+- yellow/black brand accents
+- soft pastel cards
+- large readable cards
+- clean spacing
+- no raw technical tables unless inside admin/debug views
+- no developer JSON/object dumps on normal pages
+
+Primary colours:
+- Black: #111111 / #000000
+- Yellow: #FFD400 or close Smash yellow
+- White/off-white background
+- Soft card backgrounds:
+  - pale yellow
+  - pale blue
+  - pale green
+  - pale grey
+
+Global UI requirements:
+1. Create a reusable layout shell matching the screenshot:
+   - black vertical sidebar
+   - rounded icon buttons
+   - main white content area
+   - top bar with search/settings/profile
+   - large page title area
+
+2. Create reusable components:
+   - DashboardCard
+   - StatCard
+   - StatusBadge
+   - DataTable
+   - ActionButton
+   - SectionHeader
+
+3. Apply first to these pages only:
+   - /dashboard
+   - /operations/loyverse-mirror
+   - /reports/shift-reports
+   - /reports/shift-history
+   - /operations/purchase-lodgement
+   - /operations/daily-sales
+   - /operations/daily-stock
+
+4. Do not redesign every page at once.
+Start with the core operational pages above.
+
+5. Loyverse Mirror page:
+Remove developer-style layout from main view.
+No visible:
+- JSON
+- [object Object]
+- DB table names
+- API route names
+- raw IDs
+- file paths
+- source map table
+
+Show:
+- big status card
+- latest completed shift card
+- last 7 shifts table
+- issues cards
+- action buttons
+
+6. Dashboard page:
+Make it look like the screenshot:
+- big overview title
+- large primary card for latest shift sales
+- smaller cards for POS mirror, Daily Sales, Daily Stock
+- table/list section for recent shifts
+- action panel on right
+
+7. Tables:
+Make tables readable:
+- big row height
+- clear labels
+- no dense developer text
+- status pills
+- formatted Thai Baht
+- formatted dates
+
+8. Mobile/tablet:
+Must look good on tablet width first.
+
+9. Validation:
+- npm run build
+- screenshot /dashboard
+- screenshot /operations/loyverse-mirror
+- screenshot /reports/shift-reports
+- screenshot /operations/purchase-lodgement
+- confirm no [object Object] appears
+- confirm no raw JSON visible on normal pages
+- confirm existing data still loads
+
+Return:
+- files changed
+- screenshots
+- before/after notes
+- any pages not yet restyled

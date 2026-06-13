@@ -8,12 +8,12 @@ import { usePinAuth } from "@/components/PinLoginGate";
 export default function PageShell() {
   usePinAuth();
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
 
   useEffect(() => {
     const savedState = window.localStorage.getItem("sidebarCollapsed");
-    if (savedState === "true") {
-      setIsSidebarCollapsed(true);
+    if (savedState !== null) {
+      setIsSidebarCollapsed(savedState === "true");
     }
   }, []);
 
@@ -26,8 +26,8 @@ export default function PageShell() {
   };
 
   return (
-    <div className="h-dvh bg-slate-50 dark:bg-slate-900">
-      {/* Single Modern Sidebar - handles both desktop and mobile */}
+    <div className="h-dvh bg-neutral-100">
+      {/* Sidebar */}
       <ModernSidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -35,16 +35,15 @@ export default function PageShell() {
         onCollapseToggle={handleSidebarCollapseToggle}
       />
 
-      {/* Modern layout shell */}
+      {/* Main layout — offset by sidebar width */}
       <div
         className={cn(
           "flex h-dvh transition-[margin] duration-300",
           isSidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-64"
         )}
       >
-        {/* Main content area */}
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* Modern Header */}
+          {/* Header */}
           <ModernHeader
             onMenuToggle={() => setSidebarOpen(true)}
             title="Restaurant Dashboard"
@@ -54,16 +53,16 @@ export default function PageShell() {
           {/* Data Confidence Banner */}
           <DataConfidenceBanner />
 
-          {/* Content with proper scrolling */}
-          <main className="flex-1 overflow-y-scroll bg-slate-50 dark:bg-slate-900">
-            <div className="px-4 sm:px-6 lg:px-8 py-6 pb-20 lg:pb-6">
+          {/* Content */}
+          <main className="flex-1 overflow-y-scroll bg-neutral-100">
+            <div className="px-4 sm:px-5 lg:px-6 py-5 pb-20 lg:pb-6">
               <Outlet />
             </div>
           </main>
         </div>
       </div>
 
-      {/* Bottom Navigation - Mobile Only */}
+      {/* Bottom Navigation — Mobile Only */}
       <BottomNav />
     </div>
   );
