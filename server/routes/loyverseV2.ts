@@ -5,7 +5,7 @@ import { importReceiptsV2 } from "../services/loyverseImportV2.js";
 import { db } from "../lib/prisma.js";
 import { getBangkokBusinessWindow } from "../services/loyverseMirrorCommon.js";
 import { buildLoyverseMirrorDiagnostic } from "../services/loyverseMirrorDiagnostic.js";
-import { attachSessionUser } from "../middleware/sessionAuth.js";
+import { attachSessionUser, requireSessionAuth } from "../middleware/sessionAuth.js";
 import { getPinSessionUser } from "./pinAuth.js";
 
 const router = Router();
@@ -47,7 +47,7 @@ router.get("/loyverse/mirror-diagnostic", requireMirrorDiagnosticAuth, async (_r
       blockers: [{
         code: "MIRROR_DIAGNOSTIC_ERROR",
         message: error?.message || "Loyverse mirror diagnostic failed.",
-        where: "GET /api/loyverse/mirror-diagnostic",
+        where: "GET /api/loyverse/mirror-diagnostic (protected)",
         canonical_source: "lv_receipt/lv_line_item/lv_modifier",
         auto_build_attempted: false,
       }],
@@ -56,6 +56,38 @@ router.get("/loyverse/mirror-diagnostic", requireMirrorDiagnosticAuth, async (_r
   }
 });
 
+// ── UI data endpoint: same diagnostic, session-gated (owner UI) ────────────
+// In-memory cache — 2-minute TTL so the React page loads instantly on repeat visits.
+let _mirrorUiCache: { data: any; expiresAt: number } | null = null;
+
+router.get("/loyverse/mirror-ui-data", requireSessionAuth, async (_req, res) => {
+  const now = Date.now();
+  if (_mirrorUiCache && _mirrorUiCache.expiresAt > now) {
+    return res.json(_mirrorUiCache.data);
+  }
+  try {
+    const diagnostic = await buildLoyverseMirrorDiagnostic();
+    _mirrorUiCache = { data: diagnostic, expiresAt: now + 120_000 };
+    res.json(diagnostic);
+  } catch (error: any) {
+    console.error("[loyverseV2] mirror-ui-data failed:", error);
+    res.status(200).json({
+      status: "fail",
+      latestSyncAt: null,
+      latestReceiptDate: null,
+      latestShiftDate: null,
+      canonicalTables: {},
+      receiptCounts: {},
+      integrity: {},
+      paymentMapping: { mappedPayments: [], unmappedPayments: [], rules: {} },
+      latestShiftComparison: null,
+      sevenDayComparison: [],
+      mismatches: [],
+      blockers: [{ code: "MIRROR_DIAGNOSTIC_ERROR", message: error?.message || "Failed." }],
+      sourceMap: {},
+    });
+  }
+});
 
 function dateRange(from: string, to: string) {
   const start = DateTime.fromISO(from, { zone: "Asia/Bangkok" }).startOf("day");
