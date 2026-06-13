@@ -1,0 +1,142 @@
+FINAL DB 5.1 — LOYVERSE MIRROR OWNER UI CLEANUP PATCH
+
+Objective:
+Replace the current developer-style Loyverse Mirror page with a plain-English owner dashboard.
+
+Do not change backend diagnostic calculations unless needed to shape display data.
+Do not change POS sync.
+Do not change schema.
+Do not touch Daily Sales V2, Daily Stock V2, Purchasing, Finance, Staff, Online Ordering, or Shift Reports.
+Do not remove the diagnostic endpoint.
+Do not show raw developer data in the main UI.
+
+File focus:
+client/src/pages/operations/LoyverseMirror.tsx
+
+Current problem:
+The page shows raw codes, JSON, [object Object], DB table names, API routes, file paths, receipt IDs, and developer diagnostics. This is not usable for a restaurant owner.
+
+Required UI:
+
+1. Top status card
+Show one plain-English verdict:
+- “Loyverse mirror is healthy”
+- “Loyverse mirror needs attention”
+- “Loyverse mirror failed”
+
+Also show:
+- Last sync time
+- Latest receipt time
+- Latest completed shift date
+- Sync age
+
+2. Latest completed shift card
+Show:
+- Shift date/window
+- Sales total
+- Receipt count
+- Cash total
+- QR total
+- Grab total
+- Status: Match / Warning / Missing / Mismatch
+
+Do not show total lifetime receipts like 5,963 as the primary number.
+Show receipt count by latest completed shift.
+
+3. Last 7 completed shifts
+Show simple table:
+Date | Sales | Receipts | Cash | QR | Grab | Status
+
+Only completed shifts.
+Use plain labels.
+No raw JSON.
+
+4. Issues section
+Group issues into human-readable cards:
+
+Missing shift reports:
+- date
+- simple explanation
+- suggested action
+
+Payment mapping issues:
+- payment name
+- mapped as
+- count
+- impact
+
+Data integrity issues:
+- issue name
+- count
+- plain-English explanation
+
+Do not show:
+- UNMAPPED_PAYMENT_NAMES
+- MISMATCHED_DAILY_TOTALS
+- latestShiftComparison
+- lv_receipt.payment_json
+- [object Object]
+- raw IDs
+- file paths
+- API endpoints
+- source map table
+
+5. Actions
+Add visible buttons:
+- Refresh
+- Run sync
+- Sync missing shifts
+
+If action endpoints already exist, wire them:
+- POST /api/loyverse/sync
+- POST /api/loyverse/sync-missing-shifts
+
+If sync requires date range and cannot run safely without it:
+- disable button
+- show “Manual sync requires date range”
+
+6. Developer details
+Move raw diagnostic JSON/source map into a collapsed section at the very bottom:
+Title:
+“Developer details”
+
+Default collapsed.
+Not visible unless opened.
+
+7. Date correctness
+The page must clearly identify:
+- latest receipt date
+- latest completed shift date
+- whether latest completed shift is stale
+
+If latest receipt is newer than latest shift by more than 1 business day, show:
+“Shift report may be behind receipts.”
+
+8. Styling level
+Keep current design system.
+Do not do full redesign.
+Use:
+- cards
+- badges
+- simple status colours
+- tables with readable headers
+- no dense developer dumps
+
+Validation:
+- npm run build
+- /operations/loyverse-mirror loads
+- No [object Object] appears anywhere
+- No raw JSON appears outside collapsed Developer details
+- No source map table visible by default
+- Latest shift card shows shift-level receipt count, not lifetime receipt count
+- Last 7 shifts table is readable
+- Issues are plain English
+- /api/loyverse/mirror-diagnostic remains auth-protected
+- No POS sync changes
+- No schema changes
+
+Return:
+- files changed
+- before/after summary
+- screenshot verification notes
+- remaining backend data issues separately from UI issues
