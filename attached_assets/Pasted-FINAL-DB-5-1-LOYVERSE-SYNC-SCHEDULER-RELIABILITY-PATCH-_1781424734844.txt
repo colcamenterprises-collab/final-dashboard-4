@@ -1,0 +1,132 @@
+FINAL DB 5.1 — LOYVERSE SYNC SCHEDULER RELIABILITY PATCH
+
+Objective:
+Manual sync works, but the scheduled Loyverse sync stopped after 10/06/2026 20:00. Find and repair why scheduled receipt/shift sync is not reliably keeping the app current.
+
+No UI work.
+No dashboard redesign.
+No schema changes unless absolutely required and reported first.
+Do not touch Daily Sales V2.
+Do not touch Daily Stock V2.
+Do not touch Purchasing.
+Do not touch Finance.
+Do not touch Staff.
+Do not restore Bob/Jussi/AI/KDS/POS Terminal.
+
+Known facts:
+- DB had receipts only up to Jun 10.
+- Manual `/api/loyverse/sync` for Jun 10–13 pulled 80 receipts.
+- That proves the API token and import code can work.
+- The failure is likely scheduler/cron/retry/source alignment.
+- `loyverse_shifts` also lagged after Jun 10.
+
+Required investigation:
+
+1. Identify all scheduled POS jobs:
+   - receipt sync cron
+   - shift report sync cron
+   - missing-shift catchup cron
+   - any queue worker
+   - any startup sync
+   - any production-only cron registration
+
+2. For each job, document:
+   - file
+   - function
+   - schedule time
+   - timezone
+   - date range synced
+   - table written
+   - errors logged
+   - whether it runs in production
+
+3. Add sync health logging:
+   - job started
+   - job completed
+   - date range
+   - imported count
+   - updated count
+   - skipped count
+   - failed count
+   - errors
+   - duration
+   - timestamp
+
+Use existing logs if present; do not create noisy logs.
+
+4. Add/read sync-health endpoint:
+   GET /api/loyverse/sync-health
+
+Must be owner/internal protected.
+
+Return:
+- current Bangkok time
+- latest receipt timestamp
+- latest receipt sync timestamp
+- latest shift date
+- minutes since latest receipt
+- missing receipt business dates for last 7 shifts
+- missing shift business dates for last 7 shifts
+- sync jobs registered yes/no
+- last manual sync result if available
+- last scheduled sync result if available
+- blockers
+
+5. Repair scheduled receipt sync:
+   - must run daily after closing window
+   - business window: Asia/Bangkok 18:00 → 03:00
+   - must include late receipts through 03:00
+   - must catch up missed recent business dates automatically
+   - must be idempotent
+
+6. Repair scheduled shift sync:
+   - must run after receipt sync
+   - must retry recent missing shift reports because Loyverse may finalize late
+   - must not silently succeed if no shift rows imported
+   - must mark missing shift report as pending, not success
+
+7. Add startup catch-up:
+   On server start, run a safe catch-up check for the last 3–5 business dates:
+   - detect missing receipt dates
+   - detect missing shift dates
+   - sync only missing dates
+   - idempotent
+   - log result
+
+8. Secure manual sync:
+   Confirm whether `/api/loyverse/sync` is public.
+   If public, protect it with owner/session/internal token.
+   Do not leave unauthenticated sync endpoints exposed.
+
+9. Verify after repair:
+   - run scheduled sync function manually in code or safe endpoint
+   - run same sync twice
+   - confirm no duplicate receipts/items/modifiers/payments
+   - confirm recent receipts exist through latest known shift
+   - confirm latest shift report either exists or is explicitly pending from Loyverse
+   - confirm `/api/system/pos-status` reports current data
+   - confirm `/api/loyverse/sync-health` reports no stale receipt blocker
+
+Validation:
+- npm run build
+- server starts
+- /api/system/pos-status returns 200
+- /api/loyverse/sync-health returns 200 when authenticated
+- unauthenticated manual sync returns 401 if endpoint is protected
+- manual sync with auth still works
+- scheduled catch-up function imports missing dates
+- second run creates no duplicates
+- no UI changes
+
+Return:
+- root cause
+- files changed
+- schedule map
+- sync-health result
+- before/after DB counts
+- idempotency test
+- remaining blockers
+- final verdict:
+  LOYVERSE SYNC VERIFIED — APP CAN BE TRUSTED
+  or
+  LOYVERSE SYNC FAILED — APP CANNOT BE TRUSTED YET

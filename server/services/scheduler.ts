@@ -1,133 +1,231 @@
+import cron from 'node-cron';
+import { DateTime } from 'luxon';
 import { loyverseAPI } from "../loyverseAPI";
 import { buildShiftSummary } from "./receiptSummary";
 import { PrismaClient } from '@prisma/client';
 
+const TZ = 'Asia/Bangkok';
+
 export class SchedulerService {
-  private intervals: NodeJS.Timeout[] = [];
   private prisma = new PrismaClient();
+  private jobsRegistered = false;
+  private lastStartupCatchupAt: string | null = null;
+  private lastScheduledSyncResult: Record<string, any> | null = null;
 
   start() {
-    // Initialize restaurant data first
+    if (this.jobsRegistered) {
+      console.log('[Scheduler] Already registered — skipping duplicate start');
+      return;
+    }
+    this.jobsRegistered = true;
+
+    // Initialize restaurant data on start
     this.initializeRestaurant();
 
-    // Schedule daily receipt sync at 3:00 AM Bangkok time (end of 5pm-3am shift)
-    // Receipts only — shift report sync is intentionally separated (see 3:30 AM below)
-    this.scheduleDailyTask(() => {
+    // ── Daily cron pipeline (node-cron, Asia/Bangkok timezone) ──────────────
+    // Previously used custom setTimeout chains which were lost on server restart.
+    // node-cron with explicit timezone fires reliably after any restart.
+
+    // 03:00 BKK — receipt sync into lv_receipt (end of 18:00–03:00 shift)
+    cron.schedule('0 3 * * *', () => {
+      console.log('[Scheduler][CRON] 03:00 BKK — receipt sync fired');
       this.syncReceiptsOnly();
-    }, 3, 0); // 3:00 AM Bangkok time
+    }, { timezone: TZ });
 
-    // Schedule daily summary job at 3:05 AM Bangkok time  
-    this.scheduleDailyTask(() => {
+    // 03:05 BKK — daily summary build
+    cron.schedule('5 3 * * *', () => {
+      console.log('[Scheduler][CRON] 03:05 BKK — daily summary fired');
       this.buildDailySummary();
-    }, 3, 5); // 3:05 AM Bangkok time
+    }, { timezone: TZ });
 
-    // Schedule loyverse_shifts sync at 3:30 AM Bangkok time
-    // Runs 30 minutes after shift close so the register is fully closed and
-    // Loyverse has finalised the shift report before we query the API.
-    this.scheduleDailyTask(() => {
-      this.syncNewShifts();
-    }, 3, 30); // 3:30 AM Bangkok time
-
-    // Schedule burger metrics cache at 3:10 AM Bangkok time
-    this.scheduleDailyTask(() => {
+    // 03:10 BKK — burger metrics cache
+    cron.schedule('10 3 * * *', () => {
+      console.log('[Scheduler][CRON] 03:10 BKK — burger metrics cache fired');
       this.cacheBurgerMetrics();
-    }, 3, 10); // 3:10 AM Bangkok time
+    }, { timezone: TZ });
 
-    // Schedule Daily Review POS data ingestion at 3:15 AM Bangkok time
-    this.scheduleDailyTask(() => {
+    // 03:15 BKK — Daily Review POS ingest
+    cron.schedule('15 3 * * *', () => {
+      console.log('[Scheduler][CRON] 03:15 BKK — daily review POS ingest fired');
       this.ingestDailyPOSData();
-    }, 3, 15); // 3:15 AM Bangkok time
+    }, { timezone: TZ });
 
-    // Schedule Shift Analytics MM cache rebuild at 3:20 AM Bangkok time
-    this.scheduleDailyTask(() => {
+    // 03:20 BKK — Shift Analytics MM cache
+    cron.schedule('20 3 * * *', () => {
+      console.log('[Scheduler][CRON] 03:20 BKK — shift analytics rebuild fired');
       this.rebuildShiftAnalytics();
-    }, 3, 20); // 3:20 AM Bangkok time
+    }, { timezone: TZ });
 
-    console.log('[Scheduler] Daily task pipeline registered');
+    // 03:30 BKK — loyverse_shifts sync (30 min after register close)
+    cron.schedule('30 3 * * *', () => {
+      console.log('[Scheduler][CRON] 03:30 BKK — loyverse_shifts sync fired');
+      this.syncNewShifts();
+    }, { timezone: TZ });
+
+    console.log('[Scheduler] Cron pipeline registered (Asia/Bangkok)');
     console.log('  03:00  receipt sync → lv_receipt');
     console.log('  03:05  daily summary build');
     console.log('  03:10  burger metrics cache');
     console.log('  03:15  Daily Review POS ingest');
     console.log('  03:20  shift analytics MM cache');
     console.log('  03:30  loyverse_shifts sync (post-close)');
+
+    // Run startup catch-up (async, non-blocking)
+    this.startupCatchup().catch(err =>
+      console.error('[Scheduler] Startup catch-up error:', err?.message ?? err)
+    );
   }
 
   stop() {
-    this.intervals.forEach(interval => clearInterval(interval));
-    this.intervals = [];
-    console.log('Scheduler service stopped');
+    console.log('[Scheduler] Stop called — node-cron tasks will cease at process exit');
   }
 
-  private scheduleDailyTask(task: () => void, hour: number, minute: number) {
-    const scheduleNext = () => {
-      const now = new Date();
-      
-      // Get current time in Bangkok timezone using UTC offset method
-      const bangkokNow = new Date(now.getTime() + (7 * 60 * 60 * 1000));
-      
-      // Create next scheduled time in Bangkok timezone
-      const bangkokScheduledTime = new Date(bangkokNow);
-      bangkokScheduledTime.setUTCHours(hour, minute, 0, 0);
+  /**
+   * On server start: detect and sync any missing receipt/shift dates
+   * for the last 5 completed BKK business dates. Idempotent.
+   *
+   * A "business date" for day D covers receipts from
+   *   D-1 17:00 BKK  →  D 03:00 BKK
+   *
+   * Dates that already have receipts are skipped.
+   * Dates with receipts but no loyverse_shifts row are re-queried.
+   */
+  async startupCatchup(): Promise<void> {
+    const started = Date.now();
+    console.log('[Scheduler] ── Startup catch-up starting (last 5 BKK business dates) ──');
 
-      // If the scheduled time has passed today in Bangkok, schedule for tomorrow
-      if (bangkokScheduledTime <= bangkokNow) {
-        bangkokScheduledTime.setUTCDate(bangkokScheduledTime.getUTCDate() + 1);
+    const bkk = DateTime.now().setZone(TZ);
+    // Only catch up fully-closed dates (i.e. exclude today — shift may still be open)
+    const datesToCheck: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      datesToCheck.push(bkk.minus({ days: i }).toISODate()!);
+    }
+
+    const missingReceiptDates: string[] = [];
+    const missingShiftDates: string[] = [];
+    const catchupResults: Record<string, any> = {};
+
+    try {
+      const { importShift } = await import('./loyverseImportV2.js');
+      const { db }          = await import('../db');
+      const { loyverse_shifts } = await import('../../shared/schema');
+
+      if (!db) {
+        console.warn('[Scheduler] DB not available — startup catch-up aborted');
+        return;
       }
 
-      // Convert back to UTC for setTimeout
-      const utcScheduledTime = new Date(bangkokScheduledTime.getTime() - (7 * 60 * 60 * 1000));
-      const timeUntilNext = utcScheduledTime.getTime() - now.getTime();
+      for (const date of datesToCheck) {
+        // Check receipt count for this business date
+        // Business window: (date-1) 17:00 BKK → date 03:00 BKK, expressed as UTC
+        const windowStart = DateTime.fromISO(date, { zone: TZ }).set({ hour: 0, minute: 0, second: 0, millisecond: 0 }).minus({ hours: 7 }).toUTC().toISO()!;
+        const windowEnd   = DateTime.fromISO(date, { zone: TZ }).set({ hour: 3, minute: 0, second: 0, millisecond: 0 }).toUTC().toISO()!;
 
-      const timeout = setTimeout(() => {
-        console.log(`🕐 Executing daily sync at ${new Date().toLocaleString('en-US', { 
-          timeZone: 'Asia/Bangkok',
-          dateStyle: 'full',
-          timeStyle: 'medium'
-        })} Bangkok time`);
-        task();
-        // Schedule the next occurrence
-        scheduleNext();
-      }, timeUntilNext);
+        const rcRows = await this.prisma.$queryRaw<{ n: number }[]>`
+          SELECT COUNT(*)::int AS n
+          FROM lv_receipt
+          WHERE datetime_bkk >= ${windowStart}::timestamptz
+            AND datetime_bkk <  ${windowEnd}::timestamptz`;
+        const receiptCount = Number(rcRows[0]?.n ?? 0);
 
-      // Display the actual Bangkok time correctly (bangkokScheduledTime is already in Bangkok timezone)
-      console.log(`Next receipt sync scheduled for: ${bangkokScheduledTime.toLocaleDateString('en-US', { 
-        weekday: 'long',
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric'
-      })} at ${bangkokScheduledTime.getUTCHours().toString().padStart(2, '0')}:${bangkokScheduledTime.getUTCMinutes().toString().padStart(2, '0')} Bangkok time`);
-      return timeout;
-    };
+        const shiftRows = await this.prisma.$queryRaw<{ n: number }[]>`
+          SELECT COUNT(*)::int AS n FROM loyverse_shifts WHERE shift_date = ${date}::date`;
+        const shiftCount = Number(shiftRows[0]?.n ?? 0);
 
-    scheduleNext();
+        if (receiptCount === 0) {
+          missingReceiptDates.push(date);
+          console.log(`[Scheduler] Catch-up: missing receipts for ${date} — syncing now`);
+          try {
+            const syncResult = await importShift(date);
+            catchupResults[date] = {
+              receipts: syncResult.importedReceipts ?? 0,
+              updated: syncResult.updatedReceipts ?? 0,
+              skipped: syncResult.skippedDuplicateReceipts ?? 0,
+              status: 'synced',
+            };
+            console.log(`[Scheduler] Catch-up: ${date} synced — ${catchupResults[date].receipts} new, ${catchupResults[date].updated} updated`);
+          } catch (syncErr: any) {
+            catchupResults[date] = { status: 'error', error: syncErr?.message ?? String(syncErr) };
+            console.error(`[Scheduler] Catch-up: sync failed for ${date}:`, syncErr?.message ?? syncErr);
+          }
+        } else {
+          catchupResults[date] = { receipts: receiptCount, status: 'already_present' };
+        }
+
+        if (shiftCount === 0 && receiptCount > 0) {
+          missingShiftDates.push(date);
+        }
+      }
+
+      // Recover missing loyverse_shifts for dates that have receipts
+      if (missingShiftDates.length > 0) {
+        console.log(`[Scheduler] Catch-up: recovering loyverse_shifts for: ${missingShiftDates.join(', ')}`);
+        for (const date of missingShiftDates) {
+          try {
+            const midnight   = new Date(`${date}T00:00:00Z`);
+            const retryStart = new Date(midnight.getTime() - (14 * 3_600_000));
+            const retryEnd   = new Date(midnight.getTime() + ( 4 * 3_600_000));
+
+            const shiftsResp = await loyverseAPI.getShifts({
+              start_time: retryStart.toISOString(),
+              end_time:   retryEnd.toISOString(),
+              limit: 10,
+            });
+            const closedShifts = (shiftsResp.shifts as any[]).filter(s => !!s.closed_at);
+            if (closedShifts.length > 0) {
+              await db.insert(loyverse_shifts)
+                .values({ shiftDate: date, data: { shifts: closedShifts } })
+                .onConflictDoUpdate({
+                  target: loyverse_shifts.shiftDate,
+                  set:    { data: { shifts: closedShifts } },
+                });
+              console.log(`[Scheduler] Catch-up: recovered loyverse_shifts for ${date} (${closedShifts.length} shift record(s))`);
+            } else {
+              console.log(`[Scheduler] Catch-up: no closed shift found yet for ${date} — may still be pending in Loyverse`);
+            }
+          } catch (shiftErr: any) {
+            console.error(`[Scheduler] Catch-up: shift recovery failed for ${date}:`, shiftErr?.message ?? shiftErr);
+          }
+        }
+      }
+
+      const durationMs = Date.now() - started;
+      this.lastStartupCatchupAt = new Date().toISOString();
+      console.log(`[Scheduler] ── Startup catch-up complete in ${durationMs}ms ──`);
+      console.log(`[Scheduler]   missing receipts: ${missingReceiptDates.length ? missingReceiptDates.join(', ') : 'none'}`);
+      console.log(`[Scheduler]   missing shifts:   ${missingShiftDates.length ? missingShiftDates.join(', ') : 'none'}`);
+
+    } catch (err: any) {
+      console.error('[Scheduler] Startup catch-up failed:', err?.message ?? err);
+    }
   }
 
-  // Receipts-only sync — runs at 3:00 AM Bangkok.
-  // Shift report sync (syncNewShifts) runs separately at 3:30 AM to avoid
-  // racing against the register close, which happens at or after 3:00 AM.
+  // ── Receipt sync ────────────────────────────────────────────────────────────
+  // Runs at 03:00 BKK. Syncs the just-closed shift into lv_receipt.
   private async syncReceiptsOnly() {
+    const started = Date.now();
+    console.log('[Scheduler][3:00] Starting scheduled receipt sync...');
     try {
-      console.log('🔄 [3:00 AM] Starting daily receipt sync...');
-
       const receiptCount = await loyverseAPI.syncTodaysReceipts();
-      console.log(`✅ Synced ${receiptCount} receipts from completed shift`);
+      const durationMs = Date.now() - started;
+      console.log(`[Scheduler][3:00] Receipt sync complete: ${receiptCount} receipts imported/updated in ${durationMs}ms`);
+      this.lastScheduledSyncResult = { type: 'receipt', at: new Date().toISOString(), count: receiptCount, durationMs, status: 'ok' };
 
       if (receiptCount > 0) {
-        console.log('🔄 Processing shift analytics for previous shift...');
         const { processPreviousShift } = await import('./shiftAnalytics');
         const analyticsResult = await processPreviousShift();
-        console.log(`📊 Shift analytics: ${analyticsResult.message}`);
+        console.log(`[Scheduler][3:00] Shift analytics: ${analyticsResult.message}`);
       }
-
-      console.log('🎉 Receipt sync completed successfully');
-    } catch (error) {
-      console.error('❌ Receipt sync failed:', error);
+    } catch (error: any) {
+      console.error('[Scheduler][3:00] Receipt sync failed:', error?.message ?? error);
+      this.lastScheduledSyncResult = { type: 'receipt', at: new Date().toISOString(), status: 'error', error: error?.message ?? String(error) };
     }
   }
 
   private async syncNewShifts() {
+    const started = Date.now();
     try {
-      console.log('🔄 [3:30 AM] Syncing shifts (last 3 days + missing shift recovery)...');
+      console.log('[Scheduler][3:30] Syncing shifts (last 3 days + missing shift recovery)...');
 
       const endTime   = new Date();
       const startTime = new Date(endTime.getTime() - (3 * 24 * 60 * 60 * 1000));
@@ -138,17 +236,15 @@ export class SchedulerService {
         limit: 50,
       });
 
-      console.log(`📊 Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
+      console.log(`[Scheduler][3:30] Found ${shiftsResponse.shifts.length} shifts from Loyverse API`);
 
       const { db }              = await import('../db');
       const { loyverse_shifts } = await import('../../shared/schema');
 
-      // Group closed shifts by Bangkok business date
       const shiftsByDate = new Map<string, any[]>();
       for (const shift of shiftsResponse.shifts as any[]) {
-        // Skip open/unclosed shifts — incomplete payment totals until closed_at is set.
         if (!shift.closed_at) {
-          console.log(`⏭️  Skipping open shift (no closed_at): id=${shift.id ?? 'unknown'}`);
+          console.log(`[Scheduler][3:30] Skipping open shift (no closed_at): id=${shift.id ?? 'unknown'}`);
           continue;
         }
         const openedAt = shift.opened_at || shift.opening_time;
@@ -169,21 +265,19 @@ export class SchedulerService {
             .onConflictDoUpdate({ target: loyverse_shifts.shiftDate, set: { data: { shifts } } });
           imported++;
         } catch (e: any) {
-          console.error(`Failed to upsert shift for ${dateStr}:`, e.message);
+          console.error(`[Scheduler][3:30] Failed to upsert shift for ${dateStr}:`, e.message);
         }
       }
 
-      console.log(imported > 0
-        ? `✅ Imported/updated ${imported} shift date(s)`
-        : '✅ No new shifts to import — all up to date');
+      const durationMs = Date.now() - started;
+      if (imported > 0) {
+        console.log(`[Scheduler][3:30] Shift sync complete: ${imported} date(s) upserted in ${durationMs}ms`);
+      } else {
+        console.log(`[Scheduler][3:30] Shift sync complete: no new shifts to import (${durationMs}ms)`);
+      }
 
-      // ── Missing shift recovery ──────────────────────────────────────────
-      // Loyverse sometimes finalises shift reports hours after the register
-      // closes. Find any fully-closed BKK business date in the last 3 days
-      // that has receipts in lv_receipt but no row in loyverse_shifts, then
-      // query Loyverse again with a targeted window for that date.
-      const { PrismaClient } = await import('@prisma/client');
-      const recoveryPrisma   = new PrismaClient();
+      // ── Missing shift recovery ─────────────────────────────────────────────
+      const recoveryPrisma = new PrismaClient();
       try {
         const missingRows = await recoveryPrisma.$queryRaw<{ biz_date: string }[]>`
           WITH bkk_dates AS (
@@ -200,46 +294,33 @@ export class SchedulerService {
           FROM bkk_dates
           WHERE biz_date < (NOW() AT TIME ZONE 'Asia/Bangkok')::date
             AND biz_date NOT IN (SELECT shift_date FROM loyverse_shifts)
-          ORDER BY biz_date DESC
-        `;
+          ORDER BY biz_date DESC`;
 
         if (missingRows.length === 0) {
-          console.log('✅ [shift-recovery] No missing shift dates in last 3 days');
+          console.log('[Scheduler][3:30] [shift-recovery] No missing shift dates in last 3 days');
         } else {
-          console.log(`⚠️  [shift-recovery] Missing shift data for: ${missingRows.map(r => r.biz_date).join(', ')}`);
+          console.log(`[Scheduler][3:30] [shift-recovery] Missing: ${missingRows.map(r => r.biz_date).join(', ')}`);
 
           for (const { biz_date: rawDate } of missingRows) {
-            const biz_date = String(rawDate).slice(0, 10); // normalise "2026-06-09 00:00:00" → "2026-06-09"
+            const biz_date = String(rawDate).slice(0, 10);
             try {
-              // BKK business date: shift opens biz_date-1 at ~17:00 BKK = 10:00 UTC
-              //                    shift closes biz_date  at ~03:00 BKK = biz_date-1 20:00 UTC
-              // Query window padded ±2h to catch edge cases.
               const midnight   = new Date(`${biz_date}T00:00:00Z`);
-              const retryStart = new Date(midnight.getTime() - (14 * 3_600_000)); // biz_date-1 10:00 UTC
-              const retryEnd   = new Date(midnight.getTime() + ( 4 * 3_600_000)); // biz_date 04:00 UTC
+              const retryStart = new Date(midnight.getTime() - (14 * 3_600_000));
+              const retryEnd   = new Date(midnight.getTime() + ( 4 * 3_600_000));
 
-              const retryResp    = await loyverseAPI.getShifts({
-                start_time: retryStart.toISOString(),
-                end_time:   retryEnd.toISOString(),
-                limit: 10,
-              });
+              const retryResp    = await loyverseAPI.getShifts({ start_time: retryStart.toISOString(), end_time: retryEnd.toISOString(), limit: 10 });
               const closedShifts = (retryResp.shifts as any[]).filter(s => !!s.closed_at);
 
               if (closedShifts.length > 0 && db) {
                 await db.insert(loyverse_shifts)
                   .values({ shiftDate: biz_date, data: { shifts: closedShifts } })
-                  .onConflictDoUpdate({
-                    target: loyverse_shifts.shiftDate,
-                    set: { data: { shifts: closedShifts } },
-                  });
-                console.log(`✅ [shift-recovery] Recovered shift for ${biz_date} (${closedShifts.length} record(s))`);
-              } else if (!db) {
-                console.error('[shift-recovery] DB not available for recovery insert');
+                  .onConflictDoUpdate({ target: loyverse_shifts.shiftDate, set: { data: { shifts: closedShifts } } });
+                console.log(`[Scheduler][3:30] [shift-recovery] Recovered ${biz_date} (${closedShifts.length} record(s))`);
               } else {
-                console.log(`⏳ [shift-recovery] No closed shift yet for ${biz_date} — Loyverse may not have finalised`);
+                console.log(`[Scheduler][3:30] [shift-recovery] No closed shift yet for ${biz_date} — Loyverse may not have finalised`);
               }
             } catch (retryErr: any) {
-              console.error(`❌ [shift-recovery] Failed for ${biz_date}:`, retryErr.message);
+              console.error(`[Scheduler][3:30] [shift-recovery] Failed for ${biz_date}:`, retryErr.message);
             }
           }
         }
@@ -247,185 +328,117 @@ export class SchedulerService {
         await recoveryPrisma.$disconnect();
       }
 
-    } catch (error) {
-      console.error('❌ Failed to sync new shifts:', error);
+    } catch (error: any) {
+      console.error('[Scheduler][3:30] Shift sync failed:', error?.message ?? error);
     }
   }
 
   private async buildDailySummary() {
     try {
-      console.log('📊 Building daily shift summary...');
-      
-      // Get yesterday's date for the summary (shift that just ended)
+      console.log('[Scheduler][3:05] Building daily shift summary...');
       const bangkokNow = new Date(new Date().getTime() + 7 * 3600_000);
-      const dateStr = bangkokNow.toISOString().slice(0, 10); // yyyy-mm-dd
-      
-      console.log('📊 Building shift summary for', dateStr);
-      const summary = await buildShiftSummary(dateStr);
-      
-      console.log(`✅ Shift summary built successfully`);
-    } catch (error) {
-      console.error('❌ Failed to build daily summary:', error);
+      const dateStr = bangkokNow.toISOString().slice(0, 10);
+      console.log('[Scheduler][3:05] Building shift summary for', dateStr);
+      await buildShiftSummary(dateStr);
+      console.log('[Scheduler][3:05] Shift summary built');
+    } catch (error: any) {
+      console.error('[Scheduler][3:05] Daily summary failed:', error?.message ?? error);
     }
-  }
-
-  // === NEW SERVICE METHODS ===
-
-  /**
-   * Initialize restaurant and POS connection
-   */
-  private async initializeRestaurant() {
-    try {
-      // Ensure Smash Brothers Burgers restaurant exists
-      let restaurant = await this.prisma.restaurant.findFirst({
-        where: { slug: 'smash-brothers-burgers' }
-      });
-
-      if (!restaurant) {
-        restaurant = await this.prisma.restaurant.create({
-          data: {
-            name: 'Smash Brothers Burgers',
-            slug: 'smash-brothers-burgers',
-            email: 'smashbrothersburgersth@gmail.com',
-            timezone: 'Asia/Bangkok',
-            locale: 'en-TH'
-          }
-        });
-        console.log('✅ Restaurant created:', restaurant.name);
-      }
-
-      // Ensure POS connection exists
-      let posConnection = await this.prisma.posConnection.findFirst({
-        where: {
-          restaurantId: restaurant.id,
-          provider: 'LOYVERSE',
-          isActive: true
-        }
-      });
-
-      if (!posConnection) {
-        posConnection = await this.prisma.posConnection.create({
-          data: {
-            restaurantId: restaurant.id,
-            provider: 'LOYVERSE',
-            apiKey: process.env.LOYVERSE_API_TOKEN?.substring(0, 8) + '...',
-            isActive: true
-          }
-        });
-        console.log('✅ POS connection created for Loyverse');
-      }
-    } catch (error) {
-      console.error('❌ Restaurant initialization failed:', error);
-    }
-  }
-
-  /**
-   * Schedule incremental POS sync every 15 minutes
-   */
-  private scheduleIncrementalSync() {
-    const interval = setInterval(async () => {
-      try {
-        console.log('🔄 Starting scheduled incremental POS sync...');
-        
-        // @ts-expect-error - JavaScript module without type declarations
-        const { syncReceiptsWindow } = await import('./pos-ingestion/ingester.js');
-        
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setMinutes(startDate.getMinutes() - 15);
-        
-        const result = await syncReceiptsWindow(startDate, endDate, 'incremental');
-        console.log('✅ Incremental sync completed:', result);
-
-      } catch (error) {
-        console.error('❌ Scheduled incremental sync failed:', error);
-      }
-    }, 15 * 60 * 1000); // 15 minutes
-
-    this.intervals.push(interval);
-    console.log('📅 Incremental POS sync scheduled every 15 minutes');
-  }
-
-
-  // Manual trigger for testing
-  async triggerManualSync() {
-    await this.syncReceiptsOnly();
-  }
-
-  // Manual trigger for new services
-  async triggerPOSSync() {
-    // @ts-expect-error - JavaScript module without type declarations
-    const { syncReceiptsWindow } = await import('./pos-ingestion/ingester.js');
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setMinutes(startDate.getMinutes() - 60); // Last hour
-    return await syncReceiptsWindow(startDate, endDate, 'manual');
-  }
-
-  async triggerAnalytics() {
-    console.log('[scheduler] analytics/processor.js has been removed. No-op.');
-    return null;
-  }
-
-  async triggerJussiSummary() {
-    console.log('[scheduler] Jussi summary system has been removed.');
-    return null;
   }
 
   private async cacheBurgerMetrics() {
     try {
-      console.log('🍔 Caching burger metrics for previous shift...');
-      
-      const { DateTime } = await import('luxon');
+      console.log('[Scheduler][3:10] Caching burger metrics for previous shift...');
       const { buildAndSaveBurgerShiftCache } = await import('./shiftBurgerCache');
-      
-      const now = DateTime.now().setZone('Asia/Bangkok');
-      const d = now.minus({ days: 1 }).startOf('day');
-      const shiftDateLabel = d.toISODate()!;
-      const fromISO = d.plus({ hours: 18 }).toISO()!;
-      const toISO = d.plus({ days: 1, hours: 3 }).toISO()!;
-      
-      await buildAndSaveBurgerShiftCache({ fromISO, toISO, shiftDateLabel, restaurantId: null });
-      console.log(`✅ Burger metrics cached for shift ${shiftDateLabel}`);
-    } catch (error) {
-      console.error('❌ Failed to cache burger metrics:', error);
+      const now  = DateTime.now().setZone(TZ);
+      const d    = now.minus({ days: 1 }).startOf('day');
+      await buildAndSaveBurgerShiftCache({
+        fromISO:       d.plus({ hours: 18 }).toISO()!,
+        toISO:         d.plus({ days: 1, hours: 3 }).toISO()!,
+        shiftDateLabel: d.toISODate()!,
+        restaurantId:  null,
+      });
+      console.log(`[Scheduler][3:10] Burger metrics cached for ${d.toISODate()}`);
+    } catch (error: any) {
+      console.error('[Scheduler][3:10] Burger metrics cache failed:', error?.message ?? error);
     }
   }
 
   private async ingestDailyPOSData() {
     try {
-      console.log('📊 Starting Daily Review POS data ingestion...');
-      
+      console.log('[Scheduler][3:15] Starting Daily Review POS data ingestion...');
       const { ingestShiftForDate } = await import('./loyverseIngest');
-      
-      // Get yesterday's date (the shift that just completed)
-      const now = new Date();
+      const now       = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const yesterdayStr = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD
-      
-      await ingestShiftForDate(yesterdayStr);
-      console.log(`✅ Daily Review POS data ingested for ${yesterdayStr}`);
-    } catch (error) {
-      console.error('❌ Failed to ingest Daily Review POS data:', error);
+      const dateStr   = yesterday.toISOString().split('T')[0];
+      await ingestShiftForDate(dateStr);
+      console.log(`[Scheduler][3:15] Daily Review POS ingested for ${dateStr}`);
+    } catch (error: any) {
+      console.error('[Scheduler][3:15] Daily Review POS ingest failed:', error?.message ?? error);
     }
   }
 
   private async rebuildShiftAnalytics() {
     try {
-      console.log('📊 Rebuilding Shift Analytics MM cache for previous shift...');
-      
+      console.log('[Scheduler][3:20] Rebuilding Shift Analytics MM cache...');
       const { computeShiftAll } = await import('./shiftItems');
-      
-      // Get yesterday's date (the shift that just completed at 3 AM)
-      const now = new Date();
+      const now       = new Date();
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const yesterdayStr = yesterday.toISOString().split('T')[0]; // YYYY-MM-DD
-      
-      const result = await computeShiftAll(yesterdayStr);
-      console.log(`✅ Shift Analytics MM cache rebuilt for ${result.shiftDate}: ${result.items.length} items`);
-    } catch (error) {
-      console.error('❌ Failed to rebuild Shift Analytics MM cache:', error);
+      const dateStr   = yesterday.toISOString().split('T')[0];
+      const result    = await computeShiftAll(dateStr);
+      console.log(`[Scheduler][3:20] Shift Analytics rebuilt for ${result.shiftDate}: ${result.items.length} items`);
+    } catch (error: any) {
+      console.error('[Scheduler][3:20] Shift Analytics rebuild failed:', error?.message ?? error);
     }
+  }
+
+  private async initializeRestaurant() {
+    try {
+      let restaurant = await this.prisma.restaurant.findFirst({ where: { slug: 'smash-brothers-burgers' } });
+      if (!restaurant) {
+        restaurant = await this.prisma.restaurant.create({
+          data: { name: 'Smash Brothers Burgers', slug: 'smash-brothers-burgers', email: 'smashbrothersburgersth@gmail.com', timezone: 'Asia/Bangkok', locale: 'en-TH' },
+        });
+        console.log('[Scheduler] Restaurant created:', restaurant.name);
+      }
+
+      const posConnection = await this.prisma.posConnection.findFirst({ where: { restaurantId: restaurant.id, provider: 'LOYVERSE', isActive: true } });
+      if (!posConnection) {
+        await this.prisma.posConnection.create({
+          data: { restaurantId: restaurant.id, provider: 'LOYVERSE', apiKey: (process.env.LOYVERSE_API_TOKEN ?? '').substring(0, 8) + '...', isActive: true },
+        });
+        console.log('[Scheduler] POS connection created for Loyverse');
+      }
+    } catch (error: any) {
+      console.error('[Scheduler] Restaurant initialization failed:', error?.message ?? error);
+    }
+  }
+
+  // ── Public helpers ──────────────────────────────────────────────────────────
+
+  isJobsRegistered(): boolean { return this.jobsRegistered; }
+  getLastStartupCatchupAt(): string | null { return this.lastStartupCatchupAt; }
+  getLastScheduledSyncResult(): Record<string, any> | null { return this.lastScheduledSyncResult; }
+
+  async triggerManualSync() { await this.syncReceiptsOnly(); }
+
+  async triggerPOSSync() {
+    // @ts-expect-error — JS module without type declarations
+    const { syncReceiptsWindow } = await import('./pos-ingestion/ingester.js');
+    const endDate   = new Date();
+    const startDate = new Date();
+    startDate.setMinutes(startDate.getMinutes() - 60);
+    return await syncReceiptsWindow(startDate, endDate, 'manual');
+  }
+
+  async triggerAnalytics() {
+    console.log('[Scheduler] analytics/processor.js has been removed. No-op.');
+    return null;
+  }
+
+  async triggerJussiSummary() {
+    console.log('[Scheduler] Jussi summary system has been removed.');
+    return null;
   }
 }
 
