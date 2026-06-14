@@ -58,7 +58,6 @@ const navigationGroups: NavGroup[] = [
       { to: "/operations/daily-stock",             label: "Daily Stock V2",    icon: Package,       testId: "nav-daily-stock" },
       { to: "/operations/daily-sales-v2/library",  label: "Form Library",      icon: BarChart3,     testId: "nav-library", ownerOnly: true },
       { to: "/operations/purchasing",              label: "Purchasing",         icon: ShoppingCart,  testId: "nav-purchasing" },
-      { to: "/operations/purchase-lodgement",      label: "Purchase Lodgement", icon: ShoppingBag,  testId: "nav-purchase-lodgement" },
     ],
   },
   {

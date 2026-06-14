@@ -310,7 +310,8 @@ export default function DailySalesV2Library() {
           meat: p.meatEnd ?? 0,
           fries: p.friesEnd ?? null,
           drinks: drinksArray,
-          zeroConfirmation: p.zeroConfirmation || null
+          zeroConfirmation: p.zeroConfirmation || null,
+          shiftPurchases: p.shiftPurchases || null,
         },
         shoppingList: p.requisition || [],
         audit: Array.isArray(record.audit) ? record.audit : []
@@ -694,6 +695,41 @@ export default function DailySalesV2Library() {
                     </div>
                   )}
                 </div>
+
+                {/* Purchases This Shift */}
+                {selected.stock.shiftPurchases && selected.stock.shiftPurchases.confirmed ? (
+                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded text-xs">
+                    <h4 className="text-xs font-semibold mb-2 text-emerald-800">Purchases This Shift</h4>
+                    <div className="grid grid-cols-2 gap-1 mb-2">
+                      {[
+                        { l: 'Rolls', v: selected.stock.shiftPurchases.rollsPcs, u: 'pcs' },
+                        { l: 'Meat', v: selected.stock.shiftPurchases.meatGrams, u: 'g' },
+                        { l: 'Fries', v: selected.stock.shiftPurchases.friesGrams, u: 'g' },
+                        { l: 'Sweet potato', v: selected.stock.shiftPurchases.sweetPotatoGrams, u: 'g' },
+                        { l: 'Nuggets', v: selected.stock.shiftPurchases.nuggetsQty, u: 'qty' },
+                        { l: 'Bacon long', v: selected.stock.shiftPurchases.baconLongQty, u: 'qty' },
+                        { l: 'Bacon short', v: selected.stock.shiftPurchases.baconShortQty, u: 'qty' },
+                      ].map(item => (
+                        <p key={item.l}><strong>{item.l}:</strong> {item.v ?? 0} {item.u}</p>
+                      ))}
+                    </div>
+                    {Array.isArray(selected.stock.shiftPurchases.drinks) && selected.stock.shiftPurchases.drinks.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-emerald-700 mb-1">Drinks purchased:</p>
+                        <div className="grid grid-cols-2 gap-1">
+                          {selected.stock.shiftPurchases.drinks.map((d: any, i: number) => (
+                            <p key={i}><strong>{d.itemName}:</strong> {d.qty} {d.unit}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 p-3 rounded text-xs text-amber-700">
+                    <h4 className="text-xs font-semibold mb-1">Purchases This Shift</h4>
+                    <p>No shift purchase data recorded.</p>
+                  </div>
+                )}
 
                 {/* Drinks Requisition Section */}
                 <DrinksRequisitionSection requisition={selected.shoppingList} />

@@ -661,7 +661,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
   try {
     const { id } = req.params;
     const salesId = id;
-    const { rollsEnd, meatEnd, friesEnd, sweetPotatoEnd, requisition, drinkStock } = req.body;
+    const { rollsEnd, meatEnd, friesEnd, sweetPotatoEnd, requisition, drinkStock, shiftPurchases } = req.body;
 
     console.log("[DAILY_STOCK_PATCH] start", { salesId, time: new Date().toISOString() });
 
@@ -755,6 +755,7 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       ...(typeof requisition !== 'undefined' ? { requisition } : {}),
       ...(hadForm2Data ? {} : { recoveredAt: new Date().toISOString() }),
       purchasingJson,
+      ...(shiftPurchases && shiftPurchases.confirmed ? { shiftPurchases } : {}),
     };
 
     console.log(`[daily-sales-v2/form2] existing_payload_keys=${Object.keys(existingPayload).join(',')}`);
@@ -793,7 +794,78 @@ export async function updateDailySalesV2WithStock(req: Request, res: Response) {
       [id, burgerBuns, meatWeightG, JSON.stringify(mergedPayload.drinkStock || {}), JSON.stringify(purchasingJson)]
     );
     console.log(`[FIELD BRIDGE] Synced daily_stock_v2: salesId=${id}, burgerBuns=${burgerBuns}, meatWeightG=${meatWeightG}`);
-    
+
+    // ── SHIFT PURCHASE CAPTURE — upsert purchase_tally ────────────────────────
+    if (shiftPurchases && shiftPurchases.confirmed === true) {
+      try {
+        const sourceRef = `source:daily_stock_v2:${id}`;
+        const shiftDateStr: string = existingResult.rows[0].shiftDate ?? new Date().toISOString().slice(0, 10);
+        const staffStr: string = existingResult.rows[0].completedBy ?? 'Staff';
+
+        const existingTally = await pool.query<{ id: string }>(
+          `SELECT id FROM purchase_tally WHERE notes = $1 LIMIT 1`,
+          [sourceRef],
+        );
+
+        let tallyId: string;
+        if (existingTally.rows.length > 0) {
+          tallyId = existingTally.rows[0].id;
+          await pool.query(
+            `UPDATE purchase_tally SET
+               date = $1, staff = $2,
+               rolls_pcs         = $3,
+               meat_grams        = $4,
+               fries_grams       = $5,
+               sweet_potato_grams= $6
+             WHERE id = $7`,
+            [
+              shiftDateStr, staffStr,
+              shiftPurchases.rollsPcs        ?? null,
+              shiftPurchases.meatGrams       ?? null,
+              shiftPurchases.friesGrams      ?? null,
+              shiftPurchases.sweetPotatoGrams ?? null,
+              tallyId,
+            ],
+          );
+        } else {
+          const newRow = await pool.query<{ id: string }>(
+            `INSERT INTO purchase_tally
+               (id, date, staff, supplier, notes, rolls_pcs, meat_grams, fries_grams, sweet_potato_grams)
+             VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8)
+             RETURNING id`,
+            [
+              shiftDateStr, staffStr, 'Daily Stock V2 Shift Purchase', sourceRef,
+              shiftPurchases.rollsPcs        ?? null,
+              shiftPurchases.meatGrams       ?? null,
+              shiftPurchases.friesGrams      ?? null,
+              shiftPurchases.sweetPotatoGrams ?? null,
+            ],
+          );
+          tallyId = newRow.rows[0].id;
+        }
+
+        // Sync drink rows: delete existing, re-insert fresh
+        await pool.query(`DELETE FROM purchase_tally_drink WHERE tally_id = $1`, [tallyId]);
+        if (Array.isArray(shiftPurchases.drinks)) {
+          for (const d of shiftPurchases.drinks as { itemName: string; qty: number; unit?: string }[]) {
+            if (d.itemName != null && d.qty != null) {
+              await pool.query(
+                `INSERT INTO purchase_tally_drink (id, tally_id, item_name, qty, unit)
+                 VALUES (gen_random_uuid(), $1, $2, $3, $4)`,
+                [tallyId, d.itemName, d.qty, d.unit ?? 'pcs'],
+              );
+            }
+          }
+        }
+
+        console.log(`[SHIFT_PURCHASE_CAPTURE] Upserted purchase_tally tallyId=${tallyId} salesId=${id}`);
+      } catch (spErr) {
+        // Non-blocking — log and continue; shift stock save is already done
+        console.error('[SHIFT_PURCHASE_CAPTURE] purchase_tally upsert failed (non-blocking):', spErr);
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // PATCH C: Sync ALL active purchasing items to purchasing_shift_items (including zero qty)
     // Get the daily_stock_v2 id for this salesId
     const stockResult = await pool.query(

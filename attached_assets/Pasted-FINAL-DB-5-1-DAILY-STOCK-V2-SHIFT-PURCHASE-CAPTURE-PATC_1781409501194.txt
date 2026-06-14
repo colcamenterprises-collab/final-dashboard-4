@@ -1,0 +1,147 @@
+FINAL DB 5.1 — DAILY STOCK V2 SHIFT PURCHASE CAPTURE PATCH
+
+Objective:
+Move shift purchase capture into Daily Stock V2 and make it the active source for stock purchased during the shift.
+
+This replaces the need for staff/manager to use the standalone Purchase Lodgement modal for normal shift purchases.
+
+Do not delete database tables.
+Do not change POS sync.
+Do not change Daily Sales V2 sales fields.
+Do not change Shift Reports.
+Do not change schema unless absolutely required and reported first.
+Do not restore Bob/Jussi/AI/KDS/POS Terminal.
+
+Business rule:
+Purchases made during a shift must be entered once, inside Daily Stock V2, before end-of-shift stock counts and requisition.
+
+Do not require separate Purchase Lodgement entry for normal shift purchases.
+
+Required UI Flow:
+Route:
+`/operations/daily-stock`
+
+When Daily Stock V2 opens, show a required first-step modal/panel:
+
+Title:
+`Purchases This Shift`
+
+Subtitle:
+`Enter all stock purchased during this shift before completing end-of-shift counts. Enter 0 if none.`
+
+Required fields:
+- Meat purchased (grams)
+- Drinks purchased by brand/quantity
+- French fries purchased (grams)
+- Sweet potato fries purchased (grams)
+- Nuggets purchased (qty or grams — use current purchasing item unit if available)
+- Bacon long purchased (qty or grams — use current purchasing item unit if available)
+- Bacon short purchased (qty or grams — use current purchasing item unit if available)
+- Rolls purchased (pcs)
+
+Rules:
+- Every required purchase field must be completed before staff can continue.
+- 0 is allowed.
+- Blank/null is not allowed.
+- Staff must actively confirm purchases before stock counts become editable.
+- Show confirmation checkbox:
+  `I confirm all purchases during this shift have been entered.`
+- Continue button remains disabled until all fields are filled and confirmation checked.
+
+Data storage:
+Use the existing working stock form save path.
+Save purchase values into `daily_sales_v2.payload` for the same Daily Stock V2 submission.
+
+Payload fields to add/preserve:
+- shiftPurchases: {
+    rollsPcs,
+    meatGrams,
+    friesGrams,
+    sweetPotatoGrams,
+    nuggetsQty,
+    baconLongQty,
+    baconShortQty,
+    drinks: [
+      { itemName, qty, unit }
+    ],
+    confirmed: true,
+    confirmedAt,
+    source: "daily_stock_v2_shift_purchase_capture"
+  }
+
+Also preserve existing fields:
+- rollsEnd
+- meatEnd
+- drinkStock
+- friesEnd
+- sweetPotatoEnd
+- requisition
+
+Purchase table update:
+The reporting/reconciliation table must still update from the Daily Stock V2 submission.
+
+On Daily Stock V2 stock save:
+- upsert or write a corresponding row into `purchase_tally`
+- use the shift date
+- use source/reference to prevent duplicates
+- do not create duplicate purchase_tally rows if the stock form is edited/re-saved
+- use one row per stock form/shift
+
+Mapping:
+- shiftPurchases.rollsPcs -> purchase_tally.rolls_pcs
+- shiftPurchases.meatGrams -> purchase_tally.meat_grams
+- shiftPurchases.friesGrams -> purchase_tally.fries_grams
+- shiftPurchases.sweetPotatoGrams -> purchase_tally.sweet_potato_grams
+- shiftPurchases.drinks -> purchase_tally_drink rows
+- shiftPurchases.nuggetsQty, baconLongQty, baconShortQty:
+  - if columns already exist, map them
+  - if columns do not exist, store in payload only and report as not yet included in reconciliation
+  - do not add schema without approval
+
+Payment/expense rule:
+Do not auto-create expenses in this patch unless existing code already supports it safely.
+For now, capture quantity first.
+Payment/cost linkage can be a separate patch.
+
+Standalone Purchase Lodgement:
+- Do not delete it.
+- Remove it from primary navigation if it is active.
+- Label it as legacy/manual adjustment only if still visible.
+- Normal shift purchases must use Daily Stock V2.
+
+Daily Stock Analysis:
+Update to show:
+- Purchases This Shift
+- End-of-shift counts
+- Requisition for next shift
+
+Form Library:
+Update stock detail modal to show:
+- Purchases This Shift
+- End Counts
+- Requisition
+
+Validation:
+- npm run build
+- /operations/daily-stock loads
+- purchases modal/panel appears first
+- stock count inputs are not editable until purchases step is completed
+- blank purchase fields are blocked
+- 0 values are accepted
+- payload includes shiftPurchases
+- save updates daily_sales_v2.payload
+- save creates/updates one purchase_tally row for the shift
+- save creates/updates purchase_tally_drink rows
+- editing/re-saving does not duplicate purchase_tally rows
+- /operations/daily-stock-analysis shows purchases this shift
+- Form Library shows purchases this shift
+- no POS sync changes
+- no schema changes unless explicitly reported
+- no duplicate standalone purchase entry required
+
+Return:
+- files changed
+- payload shape
+- purchase_tally mapping
+- validation table
+- any fields stored in payload only because purchase_tally lacks columns

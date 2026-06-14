@@ -183,6 +183,20 @@ const DailyStock: React.FC = () => {
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
 
+  // ── Shift Purchases (required first step) ──────────────────────────────────
+  const [purchasesStep, setPurchasesStep] = useState<'pending' | 'confirmed'>('pending');
+  const [spRolls, setSpRolls] = useState<number | null>(null);
+  const [spMeat, setSpMeat] = useState<number | null>(null);
+  const [spFries, setSpFries] = useState<number | null>(null);
+  const [spSweetPotato, setSpSweetPotato] = useState<number | null>(null);
+  const [spNuggets, setSpNuggets] = useState<number | null>(null);
+  const [spBaconLong, setSpBaconLong] = useState<number | null>(null);
+  const [spBaconShort, setSpBaconShort] = useState<number | null>(null);
+  const [spDrinks, setSpDrinks] = useState<Record<string, number | null>>({});
+  const [spConfirmChecked, setSpConfirmChecked] = useState(false);
+  const [spConfirmedAt, setSpConfirmedAt] = useState<string | null>(null);
+  const [spErrors, setSpErrors] = useState<Record<string, string>>({});
+
   const normalizeCategory = (rawCategory: string | null | undefined): string => {
     const trimmed = (rawCategory || '').trim();
     if (!trimmed) return 'Uncategorized';
@@ -445,8 +459,34 @@ const DailyStock: React.FC = () => {
     }
   };
 
+  const handleConfirmPurchases = () => {
+    const errs: Record<string, string> = {};
+    const req = 'Required — enter 0 if none';
+    if (spRolls === null || spRolls < 0) errs.spRolls = req;
+    if (spMeat === null || spMeat < 0) errs.spMeat = req;
+    if (spFries === null || spFries < 0) errs.spFries = req;
+    if (spSweetPotato === null || spSweetPotato < 0) errs.spSweetPotato = req;
+    if (spNuggets === null || spNuggets < 0) errs.spNuggets = req;
+    if (spBaconLong === null || spBaconLong < 0) errs.spBaconLong = req;
+    if (spBaconShort === null || spBaconShort < 0) errs.spBaconShort = req;
+    for (const d of drinkItems) {
+      const qty = spDrinks[d.name];
+      if (qty === null || qty === undefined || qty < 0) errs[`drink_${d.name}`] = req;
+    }
+    if (Object.keys(errs).length > 0) { setSpErrors(errs); return; }
+    setSpErrors({});
+    const confirmedAt = new Date().toISOString();
+    setSpConfirmedAt(confirmedAt);
+    setPurchasesStep('confirmed');
+  };
+
   const handleSubmit = async () => {
     if (submitting) return;
+    if (purchasesStep !== 'confirmed') {
+      setMessage({ type: 'error', text: 'Complete the "Purchases This Shift" step before submitting stock counts.' });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
     if (!shiftId) {
       setMessage({ type: "error", text: "Cannot submit stock: missing shift ID. Please submit Form 1 first." });
       return;
@@ -539,7 +579,24 @@ const DailyStock: React.FC = () => {
       sweetPotatoEnd: sweetPotatoEnd,
       drinkStock: drinkStockObj,
       requisition: requisitionItems,
-      notes: notes.trim()
+      notes: notes.trim(),
+      shiftPurchases: {
+        rollsPcs: spRolls ?? 0,
+        meatGrams: spMeat ?? 0,
+        friesGrams: spFries ?? 0,
+        sweetPotatoGrams: spSweetPotato ?? 0,
+        nuggetsQty: spNuggets ?? 0,
+        baconLongQty: spBaconLong ?? 0,
+        baconShortQty: spBaconShort ?? 0,
+        drinks: drinkItems.map(d => ({
+          itemName: d.name,
+          qty: spDrinks[d.name] ?? 0,
+          unit: d.unit,
+        })),
+        confirmed: true,
+        confirmedAt: spConfirmedAt,
+        source: "daily_stock_v2_shift_purchase_capture",
+      },
     };
 
     if (zeroConfirmation) {
@@ -722,6 +779,123 @@ const DailyStock: React.FC = () => {
         </div>
       </div>
 
+      {/* ── PURCHASES THIS SHIFT — Required first step ──────────────────── */}
+      {purchasesStep === 'pending' && (
+        <section className="rounded-[4px] border-2 border-amber-400 bg-amber-50 p-4 space-y-4">
+          <div>
+            <h2 className="text-sm font-bold text-amber-900">Purchases This Shift</h2>
+            <p className="text-xs text-amber-800 mt-1">
+              Enter all stock purchased during this shift before completing end-of-shift counts. Enter 0 if none.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {([
+              { key: 'spRolls',      label: 'Rolls purchased (pcs)',           val: spRolls,      set: setSpRolls },
+              { key: 'spMeat',       label: 'Meat purchased (g)',              val: spMeat,       set: setSpMeat },
+              { key: 'spFries',      label: 'French fries purchased (g)',      val: spFries,      set: setSpFries },
+              { key: 'spSweetPotato',label: 'Sweet potato fries purchased (g)',val: spSweetPotato,set: setSpSweetPotato },
+              { key: 'spNuggets',    label: 'Nuggets purchased (qty)',         val: spNuggets,    set: setSpNuggets },
+              { key: 'spBaconLong',  label: 'Bacon long purchased (qty)',      val: spBaconLong,  set: setSpBaconLong },
+              { key: 'spBaconShort', label: 'Bacon short purchased (qty)',     val: spBaconShort, set: setSpBaconShort },
+            ] as { key: string; label: string; val: number | null; set: (v: number | null) => void }[]).map(f => (
+              <div key={f.key}>
+                <label className="block text-xs font-medium mb-1 text-amber-900">{f.label}</label>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min="0"
+                  className={`w-full border rounded-[4px] px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${spErrors[f.key] ? 'border-red-400' : 'border-slate-200'}`}
+                  value={f.val === null ? '' : f.val}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^\d]/g, '');
+                    f.set(v === '' ? null : parseInt(v, 10));
+                  }}
+                  placeholder="0"
+                />
+                {spErrors[f.key] && <p className="text-[10px] text-red-600 mt-0.5">{spErrors[f.key]}</p>}
+              </div>
+            ))}
+          </div>
+
+          {drinkItems.length > 0 && (
+            <div>
+              <h3 className="text-xs font-semibold text-amber-900 mb-2">Drinks purchased (by brand)</h3>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                {drinkItems.map(drink => (
+                  <div key={drink.name}>
+                    <label className="block text-xs font-medium mb-1 text-amber-900">{drink.name}</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      className={`w-full border rounded-[4px] px-3 py-2 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 ${spErrors[`drink_${drink.name}`] ? 'border-red-400' : 'border-slate-200'}`}
+                      value={spDrinks[drink.name] === null || spDrinks[drink.name] === undefined ? '' : spDrinks[drink.name]!}
+                      onChange={e => {
+                        const v = e.target.value.replace(/[^\d]/g, '');
+                        setSpDrinks(prev => ({ ...prev, [drink.name]: v === '' ? null : parseInt(v, 10) }));
+                      }}
+                      placeholder="0"
+                    />
+                    {spErrors[`drink_${drink.name}`] && <p className="text-[10px] text-red-600 mt-0.5">{spErrors[`drink_${drink.name}`]}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={spConfirmChecked}
+              onChange={e => setSpConfirmChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-amber-500"
+            />
+            <span className="text-xs text-amber-900 font-medium">
+              I confirm all purchases during this shift have been entered.
+            </span>
+          </label>
+
+          <button
+            type="button"
+            onClick={handleConfirmPurchases}
+            disabled={!spConfirmChecked}
+            className="w-full rounded-[4px] bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold py-2.5 transition-colors"
+          >
+            Continue to Stock Counts →
+          </button>
+        </section>
+      )}
+
+      {purchasesStep === 'confirmed' && (
+        <div className="rounded-[4px] border border-emerald-300 bg-emerald-50 px-4 py-3 flex items-center justify-between">
+          <div className="text-xs text-emerald-800">
+            <span className="font-semibold">✓ Purchases This Shift confirmed</span>
+            {spConfirmedAt && (
+              <span className="ml-2 text-emerald-600 font-normal">
+                at {new Date(spConfirmedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+            <span className="ml-2 text-emerald-600">
+              · Rolls {spRolls ?? 0} pcs · Meat {spMeat ?? 0}g · Fries {spFries ?? 0}g · Drinks {Object.values(spDrinks).reduce<number>((s, v) => s + (v ?? 0), 0)} total
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setPurchasesStep('pending'); setSpConfirmChecked(false); }}
+            className="text-xs text-emerald-700 underline hover:text-emerald-900 ml-3 whitespace-nowrap"
+          >
+            Edit
+          </button>
+        </div>
+      )}
+
+      {purchasesStep === 'pending' && (
+        <div className="rounded-[4px] border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          ⬆ Complete <strong>Purchases This Shift</strong> above to unlock stock count entry.
+        </div>
+      )}
+
       {/* Sync button for updating items from purchasing list */}
       <div className="flex items-center gap-3 flex-wrap">
         <button
@@ -760,6 +934,9 @@ const DailyStock: React.FC = () => {
       
       {/* EXACT error display from consolidated patch */}
       {errors.length > 0 && <p className="text-red-500 text-xs">{L.validationError}</p>}
+
+      {/* ── Stock form locked until purchases confirmed ──────────────── */}
+      <div className={purchasesStep !== 'confirmed' ? 'opacity-40 pointer-events-none select-none' : ''}>
 
       {/* End-of-Shift Counts */}
       <section className="space-y-4">
@@ -964,6 +1141,8 @@ const DailyStock: React.FC = () => {
           </div>
         </div>
       </section>
+
+      </div>{/* end stock-form lock wrapper */}
 
       {/* Submit Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">

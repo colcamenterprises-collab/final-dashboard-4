@@ -307,12 +307,29 @@ router.get("/daily-sales-analysis", async (req, res) => {
 router.get("/daily-stock-analysis", async (_req, res) => {
   const stockResult = await getLatestStock();
   const latestStock = normalizeStock(stockResult.rows[0]);
+  const stockRow: any = stockResult.rows[0] ?? {};
   const blockers = [...stockResult.blockers];
   if (latestStock.status === "missing") blockers.push(blocker("DAILY_STOCK_V2_MISSING", "Daily Stock V2 record missing", "/api/operations-read/daily-stock-analysis", "daily_stock_v2"));
+
+  // Fetch shiftPurchases from daily_sales_v2.payload using the linked salesId
+  let shiftPurchases: any = null;
+  const linkedSalesId: string | null = stockRow.salesId ?? stockRow["salesId"] ?? null;
+  if (linkedSalesId) {
+    try {
+      const spResult = await pool.query<{ payload: any }>(
+        `SELECT payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
+        [linkedSalesId],
+      );
+      shiftPurchases = spResult.rows[0]?.payload?.shiftPurchases ?? null;
+    } catch {
+      // Non-blocking — shiftPurchases stays null
+    }
+  }
+
   res.json({
     ok: blockers.length === 0,
     source: "daily_stock_v2",
-    latestStock,
+    latestStock: { ...latestStock, shiftPurchases },
     posUsageComparison: [],
     comparisonNote: "POS usage comparison is only shown when explicit item mappings exist. No usage is invented.",
     warnings: [],

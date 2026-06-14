@@ -27,6 +27,56 @@ export default function DailyStockAnalysis() {
         <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Drinks counted</p><p className="font-semibold">{drinks.length || "Missing"}</p></div>
       </section>
 
+      {/* Purchases This Shift */}
+      {(() => {
+        const sp = stock.shiftPurchases;
+        if (!sp || !sp.confirmed) return (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <h2 className="font-semibold text-amber-900">Purchases This Shift</h2>
+            <p className="mt-1 text-xs">No shift purchase data recorded for this submission.</p>
+          </section>
+        );
+        const drinkRows: { itemName: string; qty: number; unit: string }[] = Array.isArray(sp.drinks) ? sp.drinks : [];
+        return (
+          <section className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold text-slate-900">Purchases This Shift</h2>
+              <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800">Confirmed</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
+              {[
+                { label: 'Rolls', val: sp.rollsPcs, unit: 'pcs' },
+                { label: 'Meat', val: sp.meatGrams, unit: 'g' },
+                { label: 'French fries', val: sp.friesGrams, unit: 'g' },
+                { label: 'Sweet potato fries', val: sp.sweetPotatoGrams, unit: 'g' },
+                { label: 'Nuggets', val: sp.nuggetsQty, unit: 'qty' },
+                { label: 'Bacon long', val: sp.baconLongQty, unit: 'qty' },
+                { label: 'Bacon short', val: sp.baconShortQty, unit: 'qty' },
+              ].map(item => (
+                <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-500">{item.label}</p>
+                  <p className="font-semibold">{val(item.val)} <span className="text-xs font-normal text-slate-400">{item.unit}</span></p>
+                </div>
+              ))}
+            </div>
+            {drinkRows.length > 0 && (
+              <>
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">Drinks purchased</h3>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {drinkRows.map(d => (
+                    <div key={d.itemName} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                      <p className="text-xs text-slate-500">{d.itemName}</p>
+                      <p className="font-semibold">{val(d.qty)} <span className="text-xs font-normal text-slate-400">{d.unit}</span></p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+            {sp.confirmedAt && <p className="mt-3 text-[11px] text-slate-400">Confirmed at {new Date(sp.confirmedAt).toLocaleString('en-GB')}</p>}
+          </section>
+        );
+      })()}
+
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">Drinks summary</h2>
