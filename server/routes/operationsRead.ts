@@ -349,4 +349,203 @@ router.get("/daily-stock-analysis", async (_req, res) => {
   });
 });
 
+const OWNER_DASHBOARD_SEVEN_DAY_SQL = `
+  WITH shift_dates AS (
+    SELECT TO_CHAR(shift_date, 'YYYY-MM-DD') AS shift_date
+    FROM (SELECT DISTINCT shift_date FROM loyverse_shifts ORDER BY shift_date DESC LIMIT 7) sub
+  )
+  SELECT
+    sd.shift_date,
+    COUNT(DISTINCT r.receipt_id)::int AS receipt_count,
+    ROUND(COALESCE(SUM(pay.amount), 0), 0)::int AS gross_sales,
+    ROUND(COALESCE(SUM(CASE WHEN pay.category = 'Cash' THEN pay.amount ELSE 0 END), 0), 0)::int AS cash,
+    ROUND(COALESCE(SUM(CASE WHEN pay.category = 'QR'   THEN pay.amount ELSE 0 END), 0), 0)::int AS qr,
+    ROUND(COALESCE(SUM(CASE WHEN pay.category = 'Grab' THEN pay.amount ELSE 0 END), 0), 0)::int AS grab,
+    ROUND(COALESCE(SUM(CASE WHEN pay.category NOT IN ('Cash','QR','Grab') THEN pay.amount ELSE 0 END), 0), 0)::int AS other
+  FROM shift_dates sd
+  LEFT JOIN lv_receipt r
+    ON r.datetime_bkk >= (sd.shift_date || 'T11:00:00.000Z')::timestamptz
+   AND r.datetime_bkk <  (sd.shift_date || 'T20:00:00.000Z')::timestamptz
+  LEFT JOIN LATERAL (
+    SELECT
+      COALESCE(
+        (p->>'amount')::numeric,
+        (p->>'money_amount')::numeric,
+        0
+      ) AS amount,
+      COALESCE(
+        p->>'normalizedCategory',
+        CASE
+          WHEN UPPER(COALESCE(p->>'name','')) = 'CASH' THEN 'Cash'
+          WHEN UPPER(COALESCE(p->>'name','')) LIKE '%GRAB%' THEN 'Grab'
+          WHEN UPPER(COALESCE(p->>'name','')) LIKE '%QR%'
+            OR LOWER(COALESCE(p->>'name','')) LIKE '%scan%'
+            OR LOWER(COALESCE(p->>'name','')) LIKE '%prompt%' THEN 'QR'
+          ELSE 'Other'
+        END
+      ) AS category
+    FROM jsonb_array_elements(COALESCE(r.payment_json, '[]'::jsonb)) AS p
+    WHERE COALESCE((p->>'amount')::numeric, (p->>'money_amount')::numeric) IS NOT NULL
+  ) pay ON true
+  GROUP BY sd.shift_date
+  ORDER BY sd.shift_date DESC
+`;
+
+router.get("/owner-dashboard", async (_req, res) => {
+  const blockers: Blocker[] = [];
+
+  const [sevenDayResult, salesResult, syncHealthResult] = await Promise.all([
+    safeQuery<any>(OWNER_DASHBOARD_SEVEN_DAY_SQL, [], "lv_receipt,loyverse_shifts", "ownerDashboard.sevenDay"),
+    getLatestSales(),
+    safeQuery<any>(
+      `SELECT MAX(datetime_bkk) AS latest_receipt_at, MAX(created_at) AS last_sync_at FROM lv_receipt`,
+      [],
+      "lv_receipt",
+      "ownerDashboard.syncHealth",
+    ),
+  ]);
+
+  blockers.push(...sevenDayResult.blockers, ...salesResult.blockers, ...syncHealthResult.blockers);
+
+  const sevenDayRows = sevenDayResult.rows;
+  const latestShiftRow: any = sevenDayRows[0] ?? null;
+  const latestShiftDate: string | null = latestShiftRow?.shift_date ?? null;
+
+  const latestSales = normalizeSales(salesResult.rows[0]);
+  const stockResult = await getLatestStock(latestSales?.id ?? null);
+  const latestStock = normalizeStock(stockResult.rows[0]);
+  blockers.push(...stockResult.blockers);
+
+  const syncHealthRow: any = syncHealthResult.rows[0] ?? {};
+  const latestReceiptAt: string | null = syncHealthRow.latest_receipt_at ?? null;
+  const lastSyncAt: string | null = syncHealthRow.last_sync_at ?? null;
+
+  const minutesSinceLastReceipt = latestReceiptAt
+    ? (Date.now() - new Date(latestReceiptAt).getTime()) / 60000
+    : null;
+
+  // Only flag sync as stale during active shift window (18:00–03:00 BKK)
+  // During 03:00–18:00 BKK the restaurant is closed — no receipts expected
+  const bkkHourStr = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ, hour: "numeric", hour12: false,
+  }).format(new Date());
+  const bkkHour = parseInt(bkkHourStr, 10);
+  const isInShiftWindow = bkkHour >= 18 || bkkHour < 3;
+  const syncIsStale = isInShiftWindow && minutesSinceLastReceipt !== null && minutesSinceLastReceipt > 60;
+
+  const latestShift = latestShiftRow
+    ? {
+        date: latestShiftRow.shift_date,
+        window: "18:00–03:00 Asia/Bangkok",
+        grossSales: Number(latestShiftRow.gross_sales),
+        netSales: Number(latestShiftRow.gross_sales),
+        receiptCount: Number(latestShiftRow.receipt_count),
+        cash: Number(latestShiftRow.cash),
+        qr: Number(latestShiftRow.qr),
+        grab: Number(latestShiftRow.grab),
+        other: Number(latestShiftRow.other),
+        status: "ok",
+      }
+    : null;
+
+  const staffReceiptTotal = latestSales
+    ? (Number(latestSales.receiptCounts?.cash ?? 0) +
+       Number(latestSales.receiptCounts?.qr ?? 0) +
+       Number(latestSales.receiptCounts?.grab ?? 0))
+    : null;
+
+  const staffComparison = {
+    staffSalesEntered: latestSales !== null,
+    staffGrossSales: latestSales?.totalSales ?? null,
+    staffReceiptCount: staffReceiptTotal,
+    salesDifference:
+      latestShift !== null && latestSales?.totalSales !== null && latestSales?.totalSales !== undefined
+        ? Math.round((latestShift.grossSales - (latestSales.totalSales ?? 0)) * 100) / 100
+        : null,
+    receiptDifference:
+      latestShift !== null && staffReceiptTotal !== null
+        ? latestShift.receiptCount - staffReceiptTotal
+        : null,
+    cashVariance: latestSales?.variance ?? null,
+  };
+
+  const stockStatus = {
+    dailyStockSubmitted: latestStock.status === "submitted",
+    purchasesConfirmed: null as boolean | null,
+    rollsStatus: latestStock.rolls !== null ? "submitted" : "missing",
+    meatStatus: latestStock.meat !== null ? "submitted" : "missing",
+    drinksStatus: Object.keys(latestStock.drinks ?? {}).length > 0 ? "submitted" : "missing",
+    friesStatus: null as string | null,
+  };
+
+  const lastSevenShifts = sevenDayRows.map((row: any) => ({
+    date: row.shift_date as string,
+    grossSales: Number(row.gross_sales),
+    receipts: Number(row.receipt_count),
+    cash: Number(row.cash),
+    qr: Number(row.qr),
+    grab: Number(row.grab),
+    other: Number(row.other),
+    status: "ok",
+  }));
+
+  const salesMix = latestShift
+    ? { cash: latestShift.cash, qr: latestShift.qr, grab: latestShift.grab, other: latestShift.other }
+    : { cash: null, qr: null, grab: null, other: null };
+
+  const actionRequired: { severity: string; title: string; message: string }[] = [];
+
+  const salesMatchesLatestShift = latestSales !== null && latestSales.date === latestShiftDate;
+  if (!latestSales || !salesMatchesLatestShift) {
+    actionRequired.push({
+      severity: "high",
+      title: "Daily Sales not submitted",
+      message: latestShiftDate ? `No sales form found for ${latestShiftDate}` : "No recent sales form found",
+    });
+  }
+
+  if (latestSales?.variance !== null && latestSales?.variance !== undefined && Math.abs(latestSales.variance) > 50) {
+    actionRequired.push({
+      severity: "high",
+      title: "Cash variance detected",
+      message: `Closing cash difference of ฿${Math.abs(latestSales.variance).toLocaleString()}`,
+    });
+  }
+
+  if (!stockStatus.dailyStockSubmitted) {
+    actionRequired.push({
+      severity: "medium",
+      title: "Daily Stock not submitted",
+      message: "Stock count not completed for latest shift",
+    });
+  }
+
+  if (syncIsStale) {
+    actionRequired.push({
+      severity: "high",
+      title: "POS sync overdue",
+      message: "No POS receipts received in over 8 hours",
+    });
+  }
+
+  res.json({
+    ok: blockers.length === 0 && actionRequired.filter(a => a.severity === "high").length === 0,
+    latestShift,
+    staffComparison,
+    stockStatus,
+    lastSevenShifts,
+    salesMix,
+    actionRequired,
+    syncHealth: {
+      status: syncIsStale ? "warning" : "ok",
+      latestReceiptAt,
+      latestShiftDate,
+      lastSyncAt,
+    },
+    blockers,
+    last_updated: new Date().toISOString(),
+  });
+});
+
 export default router;
+

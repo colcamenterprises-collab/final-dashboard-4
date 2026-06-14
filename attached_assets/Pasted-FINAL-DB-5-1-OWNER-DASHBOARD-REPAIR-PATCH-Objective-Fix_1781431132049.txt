@@ -1,0 +1,203 @@
+FINAL DB 5.1 — OWNER DASHBOARD REPAIR PATCH
+
+Objective:
+Fix `/dashboard` and `/operations/loyverse-mirror` so they are useful owner dashboards, not developer diagnostic pages.
+
+This is a UI/data-source repair only.
+
+Do not change:
+- POS sync logic
+- scheduler
+- schemas
+- Daily Sales V2 submit logic
+- Daily Stock V2 submit logic
+- purchase capture logic
+- auth/session
+- finance/staff/ordering
+
+Core rule:
+Remove all lifetime/database/developer metrics from normal visible dashboards.
+
+Forbidden visible metrics/text:
+- lifetime receipt count
+- total database receipts
+- table row counts
+- latest imported row as primary KPI
+- source map
+- raw JSON
+- API route names
+- DB table names
+- internal IDs
+- `[object Object]`
+- sync table totals
+- technical diagnostic wording
+
+Allowed visible metrics:
+- latest completed shift
+- latest shift gross sales
+- latest shift receipt count
+- latest shift Cash / QR / Grab / Other
+- POS vs staff sales comparison
+- POS vs staff receipt comparison
+- stock verification status
+- purchase capture status
+- cash variance
+- last 7 completed shifts
+- action required alerts
+
+Business shift window:
+Asia/Bangkok
+18:00 → 03:00
+
+Page 1:
+`/dashboard`
+
+Redesign into main owner operations dashboard.
+
+Layout:
+1. Header:
+   `Operations Overview`
+   Subtitle:
+   `Latest completed shift: {date} · 18:00–03:00 Asia/Bangkok`
+
+2. Top KPI row — four equal cards:
+   - Gross Sales
+   - Receipts
+   - Cash Variance
+   - Verification Status
+
+3. Main chart row — 70/30:
+   Left:
+   `Last 7 Shifts Gross Sales` bar chart.
+   This must be largest visual element.
+
+   Right:
+   `Action Required` panel:
+   - Daily Sales missing
+   - Staff sales not entered
+   - Daily Stock missing
+   - Purchases not confirmed
+   - POS sync overdue
+   - Shift report missing
+   - Variance detected
+
+4. Verification row:
+   - Receipt Verification
+   - Sales Verification
+   - Payment Breakdown
+   - Stock Verification
+
+5. Secondary charts:
+   - Sales Mix donut chart: Cash / QR / Grab / Other
+   - 7 Day Trend: Sales + Receipts
+
+6. Quick Actions:
+   Bottom only, smaller cards.
+
+Page 2:
+`/operations/loyverse-mirror`
+
+Change from diagnostic report to POS Verification dashboard.
+
+Do not show source map / table names / raw diagnostic rows.
+
+Show:
+- latest completed POS shift
+- receipts
+- gross sales
+- Cash / QR / Grab / Other
+- last 7 completed shifts chart
+- POS sync health
+- missing shift warning if applicable
+- payment mapping issue as owner-friendly wording only:
+  `Payment type needs review`
+- integrity issue as owner-friendly wording only:
+  `Receipt data needs review`
+
+Data source:
+Use existing synced canonical POS tables only.
+If current endpoints are not shaped correctly, add read-only endpoint:
+
+`GET /api/operations-read/owner-dashboard`
+
+Must return:
+{
+  latestShift: {
+    date,
+    window,
+    grossSales,
+    netSales,
+    receiptCount,
+    cash,
+    qr,
+    grab,
+    other,
+    status
+  },
+  staffComparison: {
+    staffSalesEntered,
+    staffGrossSales,
+    staffReceiptCount,
+    salesDifference,
+    receiptDifference
+  },
+  stockStatus: {
+    dailyStockSubmitted,
+    purchasesConfirmed,
+    rollsStatus,
+    meatStatus,
+    drinksStatus,
+    friesStatus
+  },
+  lastSevenShifts: [
+    { date, grossSales, receipts, cash, qr, grab, other, status }
+  ],
+  salesMix: {
+    cash,
+    qr,
+    grab,
+    other
+  },
+  actionRequired: [
+    { severity, title, message }
+  ],
+  syncHealth: {
+    status,
+    latestReceiptAt,
+    latestShiftDate,
+    lastSyncAt
+  },
+  blockers: []
+}
+
+Rules:
+- GET only.
+- Read-only only.
+- No mutations.
+- No fake values.
+- If data is unavailable, return null and UI must show `Not available`.
+- Do not use lifetime totals.
+- Do not aggregate by calendar date if business shift window is required.
+- Do not display 14/06 as a completed shift if the current shift has not closed.
+
+Validation:
+- npm run build
+- /dashboard loads
+- /operations/loyverse-mirror loads
+- latest shift card uses shift-level receipts, not lifetime receipts
+- no visible lifetime receipt count
+- no visible DB table names
+- no visible raw JSON
+- no visible `[object Object]`
+- chart is largest element
+- KPI cards are uniform
+- quick actions at bottom
+- screenshots for both pages if available
+
+Return:
+- files changed
+- data source summary
+- PASS/FAIL table
+- screenshot notes
+- remaining unavailable fields
+- merge recommendation
