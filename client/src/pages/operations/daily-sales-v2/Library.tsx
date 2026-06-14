@@ -698,8 +698,8 @@ export default function DailySalesV2Library() {
 
                 {/* Purchases This Shift */}
                 {selected.stock.shiftPurchases && selected.stock.shiftPurchases.confirmed ? (
-                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded text-xs">
-                    <h4 className="text-xs font-semibold mb-2 text-emerald-800">Purchases This Shift</h4>
+                  <div className="bg-emerald-50 border border-emerald-200 p-3 rounded">
+                    <h4 className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 mb-2">Purchases This Shift</h4>
                     <div className="grid grid-cols-2 gap-1 mb-2">
                       {[
                         { l: 'Rolls', v: selected.stock.shiftPurchases.rollsPcs, u: 'pcs' },
@@ -710,24 +710,24 @@ export default function DailySalesV2Library() {
                         { l: 'Bacon long', v: selected.stock.shiftPurchases.baconLongQty, u: 'qty' },
                         { l: 'Bacon short', v: selected.stock.shiftPurchases.baconShortQty, u: 'qty' },
                       ].map(item => (
-                        <p key={item.l}><strong>{item.l}:</strong> {item.v ?? 0} {item.u}</p>
+                        <p key={item.l} className="text-xs"><strong className="font-semibold">{item.l}:</strong> {item.v ?? 0} <span className="text-[10px] text-slate-500">{item.u}</span></p>
                       ))}
                     </div>
                     {Array.isArray(selected.stock.shiftPurchases.drinks) && selected.stock.shiftPurchases.drinks.length > 0 && (
                       <div>
-                        <p className="font-semibold text-emerald-700 mb-1">Drinks purchased:</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-widest text-emerald-700 mb-1">Drinks purchased</p>
                         <div className="grid grid-cols-2 gap-1">
                           {selected.stock.shiftPurchases.drinks.map((d: any, i: number) => (
-                            <p key={i}><strong>{d.itemName}:</strong> {d.qty} {d.unit}</p>
+                            <p key={i} className="text-xs"><strong className="font-semibold">{d.itemName}:</strong> {d.qty} <span className="text-[10px] text-slate-500">{d.unit}</span></p>
                           ))}
                         </div>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="bg-amber-50 border border-amber-200 p-3 rounded text-xs text-amber-700">
-                    <h4 className="text-xs font-semibold mb-1">Purchases This Shift</h4>
-                    <p>No shift purchase data recorded.</p>
+                  <div className="bg-amber-50 border border-amber-200 p-3 rounded">
+                    <h4 className="text-[10px] font-semibold uppercase tracking-widest text-amber-700 mb-1">Purchases This Shift</h4>
+                    <p className="text-xs text-amber-700">No shift purchase data recorded.</p>
                   </div>
                 )}
 

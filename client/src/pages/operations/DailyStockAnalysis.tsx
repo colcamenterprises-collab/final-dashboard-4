@@ -42,10 +42,10 @@ export default function DailyStockAnalysis() {
         return (
           <section className="rounded-2xl border border-emerald-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold text-slate-900">Purchases This Shift</h2>
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Purchases This Shift</h2>
               <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800">Confirmed</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 mb-4">
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 mb-4">
               {[
                 { label: 'Rolls', val: sp.rollsPcs, unit: 'pcs' },
                 { label: 'Meat', val: sp.meatGrams, unit: 'g' },
@@ -55,26 +55,26 @@ export default function DailyStockAnalysis() {
                 { label: 'Bacon long', val: sp.baconLongQty, unit: 'qty' },
                 { label: 'Bacon short', val: sp.baconShortQty, unit: 'qty' },
               ].map(item => (
-                <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                  <p className="text-xs text-slate-500">{item.label}</p>
-                  <p className="font-semibold">{val(item.val)} <span className="text-xs font-normal text-slate-400">{item.unit}</span></p>
+                <div key={item.label} className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                  <p className="text-[10px] text-slate-500 leading-tight">{item.label}</p>
+                  <p className="text-sm font-bold text-slate-800 mt-0.5">{val(item.val)} <span className="text-[10px] font-normal text-slate-400">{item.unit}</span></p>
                 </div>
               ))}
             </div>
             {drinkRows.length > 0 && (
               <>
-                <h3 className="text-sm font-semibold text-slate-700 mb-2">Drinks purchased</h3>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-2">Drinks purchased</h3>
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                   {drinkRows.map(d => (
-                    <div key={d.itemName} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
-                      <p className="text-xs text-slate-500">{d.itemName}</p>
-                      <p className="font-semibold">{val(d.qty)} <span className="text-xs font-normal text-slate-400">{d.unit}</span></p>
+                    <div key={d.itemName} className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
+                      <p className="text-[10px] text-slate-500 leading-tight">{d.itemName}</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">{val(d.qty)} <span className="text-[10px] font-normal text-slate-400">{d.unit}</span></p>
                     </div>
                   ))}
                 </div>
               </>
             )}
-            {sp.confirmedAt && <p className="mt-3 text-[11px] text-slate-400">Confirmed at {new Date(sp.confirmedAt).toLocaleString('en-GB')}</p>}
+            {sp.confirmedAt && <p className="mt-3 text-[10px] text-slate-400">Confirmed at {new Date(sp.confirmedAt).toLocaleString('en-GB')}</p>}
           </section>
         );
       })()}
