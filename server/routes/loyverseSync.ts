@@ -16,11 +16,14 @@ const prisma = new PrismaClient();
 // Without this any external caller could trigger expensive Loyverse API calls.
 function requireInternalAuth(req: Request, res: Response, next: NextFunction) {
   const pwd = process.env.INTERNAL_APP_PASSWORD;
+
+  // If the secret is not configured we reject all requests — never silently open the endpoint.
+  // (In local dev you can set INTERNAL_APP_PASSWORD to any value to enable the endpoint.)
   if (!pwd) {
-    // Token not configured — allow through in dev; warn in production
-    console.warn("[loyverseSync] INTERNAL_APP_PASSWORD not set — sync endpoint unprotected");
-    return next();
+    console.error("[loyverseSync] INTERNAL_APP_PASSWORD env var not set — rejecting sync request");
+    return res.status(401).json({ ok: false, error: "Sync endpoint disabled — INTERNAL_APP_PASSWORD not configured on server" });
   }
+
   const provided =
     (req.headers["x-internal-token"] as string | undefined) ||
     (req.headers["x-bob-token"] as string | undefined) ||
