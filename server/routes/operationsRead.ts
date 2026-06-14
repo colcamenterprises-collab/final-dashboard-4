@@ -220,6 +220,144 @@ router.get("/summary", async (_req, res) => {
   });
 });
 
+
+async function getShiftPaymentSplit(date: string) {
+  const win = shiftWindowFor(date);
+  return safeQuery(
+    `SELECT payment_json, total_amount
+     FROM lv_receipt
+     WHERE datetime_bkk >= $1::timestamptz AT TIME ZONE 'UTC'
+       AND datetime_bkk < $2::timestamptz AT TIME ZONE 'UTC'`,
+    [win.startUtc, win.endUtc],
+    "lv_receipt",
+    "operationsRead.getShiftPaymentSplit",
+  );
+}
+
+function paymentBucket(raw: unknown): "Cash" | "QR" | "Grab" | "Other" {
+  const label = String(raw || "").toLowerCase();
+  if (label.includes("cash")) return "Cash";
+  if (label.includes("grab")) return "Grab";
+  if (label.includes("qr") || label.includes("prompt") || label.includes("transfer") || label.includes("scan")) return "QR";
+  return "Other";
+}
+
+function extractPaymentName(paymentJson: any): string | null {
+  const first = Array.isArray(paymentJson) ? paymentJson[0] : paymentJson;
+  if (!first || typeof first !== "object") return null;
+  return first.name ?? first.type ?? first.payment_name ?? first.paymentName ?? first.payment_type ?? first.paymentType ?? null;
+}
+
+function compareValues(a: number | null, b: number | null): { status: string; difference: number | null } {
+  if (a === null || b === null) return { status: "Not available", difference: null };
+  const difference = Math.round((a - b) * 100) / 100;
+  return { status: Math.abs(difference) <= 1 ? "Match" : "Difference", difference };
+}
+
+router.get("/dashboard-home", async (_req, res) => {
+  const today = todayBkk();
+  const dates = Array.from({ length: 7 }, (_, idx) => {
+    const d = new Date(`${today}T00:00:00.000Z`);
+    d.setUTCDate(d.getUTCDate() - idx);
+    return d.toISOString().slice(0, 10);
+  });
+
+  const [salesResult, posMeta] = await Promise.all([getLatestSales(), getPosMeta()]);
+  const latestSales = normalizeSales(salesResult.rows[0]);
+  const latestDate = String(latestSales?.date || dates[0]).slice(0, 10);
+  const stockResult = await getLatestStock(latestSales?.id);
+  const latestStock = normalizeStock(stockResult.rows[0]);
+  const blockers = [...salesResult.blockers, ...stockResult.blockers, ...posMeta.blockers];
+
+  const rows = [] as any[];
+  for (const date of dates) {
+    const receiptResult = await getReceiptTotals(date);
+    const shiftResult = await safeQuery(`SELECT data FROM loyverse_shifts WHERE shift_date = $1::date LIMIT 1`, [date], "loyverse_shifts", "operationsRead.dashboardHome.shift");
+    blockers.push(...receiptResult.blockers, ...shiftResult.blockers);
+    const receipts: any = receiptResult.rows[0] || {};
+    const shiftData = (shiftResult.rows[0] as any)?.data ?? null;
+    const receiptTotal = money(receipts.receipt_total);
+    const shiftTotal = extractShiftTotal(shiftData);
+    rows.push({
+      date,
+      receipts: Number(receipts.receipt_count || 0),
+      grossSales: shiftTotal ?? receiptTotal,
+      posGrossSales: receiptTotal,
+      shiftGrossSales: shiftTotal,
+      status: shiftTotal === null ? "Not available" : Math.abs((receiptTotal ?? 0) - shiftTotal) <= 1 ? "Match" : "Difference",
+    });
+  }
+
+  const latestRow = rows.find((row) => row.date === latestDate) || rows[0] || null;
+  const paymentRows = await getShiftPaymentSplit(latestRow?.date || latestDate);
+  blockers.push(...paymentRows.blockers);
+  const paymentMap = new Map(["Cash", "QR", "Grab", "Other"].map((label) => [label, { label, amount: 0, count: 0 }]));
+  for (const row of paymentRows.rows as any[]) {
+    const bucket = paymentBucket(extractPaymentName(row.payment_json));
+    const item = paymentMap.get(bucket)!;
+    item.amount = Math.round((item.amount + (money(row.total_amount) ?? 0)) * 100) / 100;
+    item.count += 1;
+  }
+  const paymentSplit = Array.from(paymentMap.values());
+
+  if (!latestSales) blockers.push(blocker("DAILY_SALES_V2_MISSING", "Daily Sales V2 is missing for the latest completed shift.", "/api/operations-read/dashboard-home", "daily_sales_v2"));
+  if (latestStock.status === "missing") blockers.push(blocker("DAILY_STOCK_V2_MISSING", "Daily Stock V2 is missing for the latest completed shift.", "/api/operations-read/dashboard-home", "daily_stock_v2"));
+  if (!posMeta.data.latestShiftReportDate) blockers.push(blocker("POS_SHIFT_REPORT_BEHIND", "POS shift report is not available for verification.", "/api/operations-read/dashboard-home", "loyverse_shifts"));
+
+  const staffReceipts = latestSales?.receiptCounts ? Object.values(latestSales.receiptCounts).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0) : null;
+  const receiptCheck = compareValues(latestRow?.receipts ?? null, staffReceipts);
+  const salesCheck = compareValues(latestRow?.posGrossSales ?? null, latestSales?.totalSales ?? null);
+  const cashPayment = paymentSplit.find((p) => p.label === "Cash")?.amount ?? null;
+  const cashVariance = latestSales?.cash !== null && cashPayment !== null ? Math.round((Number(latestSales?.cash) - cashPayment) * 100) / 100 : null;
+
+  const actionItems = [
+    { label: "Daily Sales", status: latestSales ? "POS Verified" : "Action Required", message: latestSales ? "Daily Sales V2 is entered." : "Daily Sales missing." },
+    { label: "Staff Sales", status: latestSales?.totalSales != null ? "POS Verified" : "Action Required", message: latestSales?.totalSales != null ? "Staff sales are available." : "Staff sales not entered." },
+    { label: "Stock Count", status: latestStock.status === "submitted" ? "POS Verified" : "Action Required", message: latestStock.status === "submitted" ? "Stock count is entered." : "Stock count missing." },
+    { label: "Purchases", status: latestStock.requestedShopping?.length ? "Needs Review" : "POS Verified", message: latestStock.requestedShopping?.length ? "Purchases not confirmed." : "No purchase blocker found." },
+    { label: "POS Shift Report", status: latestRow?.shiftGrossSales === null ? "Needs Review" : "POS Verified", message: latestRow?.shiftGrossSales === null ? "POS shift report behind." : "POS sync healthy." },
+    { label: "Payment Mapping", status: paymentSplit.find((p) => p.label === "Other" && p.count > 0) ? "Needs Review" : "POS Verified", message: paymentSplit.find((p) => p.label === "Other" && p.count > 0) ? "Payment mapping needs review." : "POS sync healthy." },
+  ];
+
+  const overall = blockers.length > 0 || actionItems.some((a) => a.status === "Action Required") ? "Action Required" : actionItems.some((a) => a.status === "Needs Review") || receiptCheck.status === "Difference" || salesCheck.status === "Difference" ? "Needs Review" : "POS Verified";
+
+  res.json({
+    ok: overall === "POS Verified",
+    source: "daily_sales_v2,daily_stock_v2,lv_receipt,loyverse_shifts",
+    scope: "dashboard-home/latest-completed-shift",
+    status: overall,
+    data: {
+      latestShift: { date: latestRow?.date ?? latestDate, grossSales: latestRow?.grossSales ?? null, netSales: null, receipts: latestRow?.receipts ?? null },
+      last7Shifts: rows,
+      paymentSplit,
+      verification: {
+        overall,
+        posReceipts: latestRow?.receipts ?? null,
+        staffReceipts,
+        receiptStatus: receiptCheck.status,
+        receiptDifference: receiptCheck.difference,
+        posGrossSales: latestRow?.posGrossSales ?? null,
+        staffGrossSales: latestSales?.totalSales ?? null,
+        salesStatus: salesCheck.status,
+        salesDifference: salesCheck.difference,
+        cashVariance,
+      },
+      stock: {
+        rolls: latestStock.rolls,
+        meat: latestStock.meat,
+        drinks: latestStock.drinks && typeof latestStock.drinks === "object" ? Object.values(latestStock.drinks).reduce((sum: number, val: any) => sum + (Number(val) || 0), 0) : null,
+        fries: latestSales?.payload?.friesEnd ?? null,
+        purchasesThisShift: Array.isArray(latestSales?.payload?.shiftPurchases) ? latestSales?.payload?.shiftPurchases.length : null,
+        status: latestStock.status === "submitted" ? "Submitted" : "Missing",
+      },
+      actions: actionItems,
+    },
+    warnings: [],
+    blockers,
+    last_updated: new Date().toISOString(),
+  });
+});
+
 router.get("/loyverse-mirror", async (_req, res) => {
   const today = todayBkk();
   const dates = Array.from({ length: 7 }, (_, idx) => {
