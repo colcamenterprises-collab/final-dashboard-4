@@ -20,17 +20,19 @@ type Diagnostic = {
 };
 
 type OwnerStatus = "healthy" | "review" | "problem";
+type Channel = "cash" | "qr" | "grab" | "other";
 
 type LatestShiftSummary = {
   date: string | null;
   grossSales: number | null;
+  staffGrossSales: number | null;
   netSales: number | null;
-  receipts: number | null;
-  cash: number | null;
-  qr: number | null;
-  grab: number | null;
-  other: number | null;
+  posReceipts: number | null;
+  staffReceipts: number | null;
   cashVariance: number | null;
+  salesDifference: number | null;
+  receiptDifference: number | null;
+  paymentCounts: Record<Channel, number | null>;
   status: OwnerStatus;
 };
 
@@ -38,13 +40,13 @@ type ChartShift = {
   date: string | null;
   label: string;
   sales: number | null;
+  receipts: number | null;
   status: OwnerStatus;
 };
 
 type OwnerIssue = {
   title: string;
   message: string;
-  action: string;
   status: OwnerStatus;
 };
 
@@ -55,6 +57,7 @@ const moneyFormatter = new Intl.NumberFormat("en-TH", {
 });
 
 const numberFormatter = new Intl.NumberFormat("en-TH", { maximumFractionDigits: 0 });
+const chartPoints = "24,148 92,118 160,132 228,86 296,104 364,52 432,72";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -74,6 +77,14 @@ function getNumber(record: Record<string, unknown> | null | undefined, keys: str
   for (const key of keys) {
     const value = toNumber(record[key]);
     if (value !== null) return value;
+  }
+  return null;
+}
+
+function getNestedRecord(record: Record<string, unknown> | null | undefined, keys: string[]): Record<string, unknown> | null {
+  if (!record) return null;
+  for (const key of keys) {
+    if (isRecord(record[key])) return record[key];
   }
   return null;
 }
@@ -121,15 +132,15 @@ function statusFromRaw(value: unknown): OwnerStatus {
 }
 
 function statusLabel(status: OwnerStatus) {
-  if (status === "healthy") return "Healthy";
-  if (status === "review") return "Needs Review";
-  return "Action Required";
+  if (status === "healthy") return "VERIFIED";
+  if (status === "review") return "NEEDS REVIEW";
+  return "ACTION REQUIRED";
 }
 
-function statusClasses(status: OwnerStatus) {
-  if (status === "healthy") return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (status === "review") return "border-amber-200 bg-amber-50 text-amber-700";
-  return "border-red-200 bg-red-50 text-red-700";
+function statusTone(status: OwnerStatus) {
+  if (status === "healthy") return "text-emerald-600";
+  if (status === "review") return "text-amber-600";
+  return "text-red-600";
 }
 
 function statusDotClasses(status: OwnerStatus) {
@@ -138,44 +149,72 @@ function statusDotClasses(status: OwnerStatus) {
   return "bg-red-500";
 }
 
-function getTotalsFromLatest(latest: unknown): Record<string, unknown> | null {
-  if (!isRecord(latest)) return null;
-  const directTotalKeys = ["appGross", "shiftGross", "appReceiptCount", "receiptCount", "receiptTotal", "shiftTotal"];
-  if (directTotalKeys.some((key) => key in latest)) return latest;
-
-  const receiptDerived = latest.receiptDerivedTotals;
-  if (isRecord(receiptDerived)) return receiptDerived;
-
-  const shiftTotals = latest.loyverseShiftReportTotals;
-  if (isRecord(shiftTotals)) return shiftTotals;
-
-  return latest;
+function getLatestRecord(latest: unknown): Record<string, unknown> | null {
+  return isRecord(latest) ? latest : null;
 }
 
-function getDifferenceFromLatest(latest: unknown): Record<string, unknown> | null {
-  if (!isRecord(latest)) return null;
-  return isRecord(latest.difference) ? latest.difference : latest;
+function getPosTotals(latest: unknown): Record<string, unknown> | null {
+  const record = getLatestRecord(latest);
+  if (!record) return null;
+  const directTotalKeys = ["appGross", "shiftGross", "appReceiptCount", "receiptCount", "receiptTotal", "shiftTotal"];
+  if (directTotalKeys.some((key) => key in record)) return record;
+  return getNestedRecord(record, ["receiptDerivedTotals", "posTotals", "totals", "loyverseShiftReportTotals"]);
+}
+
+function getStaffTotals(latest: unknown): Record<string, unknown> | null {
+  const record = getLatestRecord(latest);
+  return getNestedRecord(record, ["appShiftTotals", "staffTotals", "dailySalesTotals", "legacyAppTotals"]);
+}
+
+function getDifference(latest: unknown): Record<string, unknown> | null {
+  const record = getLatestRecord(latest);
+  if (!record) return null;
+  return isRecord(record.difference) ? record.difference : record;
+}
+
+function getChannelCount(record: Record<string, unknown> | null, channel: Channel): number | null {
+  const countKeys = [
+    `${channel}ReceiptCount`,
+    `${channel}Receipts`,
+    `${channel}Count`,
+    `${channel}_receipt_count`,
+    `${channel}_receipts`,
+    `${channel}_count`,
+  ];
+  return getNumber(record, countKeys);
 }
 
 function buildLatestSummary(data: Diagnostic | null): LatestShiftSummary {
   const latest = data?.latestShiftComparison;
-  const latestRecord = isRecord(latest) ? latest : null;
-  const totals = getTotalsFromLatest(latest);
-  const difference = getDifferenceFromLatest(latest);
+  const latestRecord = getLatestRecord(latest);
+  const posTotals = getPosTotals(latest);
+  const staffTotals = getStaffTotals(latest);
+  const difference = getDifference(latest);
   const status = statusFromRaw(getString(latestRecord, ["status"]) || data?.status || data?.verdict);
-  const grossSales = getNumber(totals, ["grossSales", "gross", "appGross", "shiftGross", "receiptTotal", "shiftTotal"]);
-  const netSales = getNumber(totals, ["netSales", "net", "shiftNet", "appGross", "grossSales", "receiptTotal"]);
+  const grossSales = getNumber(posTotals, ["grossSales", "gross", "appGross", "shiftGross", "receiptTotal", "shiftTotal"]);
+  const staffGrossSales = getNumber(staffTotals, ["grossSales", "gross", "totalSales", "grossSalesThb", "staffGross", "staffGrossSales"]);
+  const posReceipts = getNumber(posTotals, ["receiptCount", "receipts", "appReceiptCount", "posReceipts"]);
+  const staffReceipts = getNumber(staffTotals, ["receiptCount", "receipts", "staffReceipts", "staffReceiptCount"]);
+  const receiptDifference = posReceipts !== null && staffReceipts !== null ? posReceipts - staffReceipts : null;
+  const salesDifference = getNumber(difference, ["grossSales", "gross", "netDifference", "variance"])
+    ?? (grossSales !== null && staffGrossSales !== null ? grossSales - staffGrossSales : null);
 
   return {
     date: getString(latestRecord, ["date", "shiftDate"]) || data?.latestShiftDate || null,
     grossSales,
-    netSales,
-    receipts: getNumber(totals, ["receiptCount", "receipts", "appReceiptCount"]),
-    cash: getNumber(totals, ["cash", "cashTotal", "appCash", "shiftCash"]),
-    qr: getNumber(totals, ["qr", "qrTotal", "appQr", "shiftQr"]),
-    grab: getNumber(totals, ["grab", "grabTotal", "appGrab", "shiftGrab"]),
-    other: getNumber(totals, ["other", "otherTotal"]),
+    staffGrossSales,
+    netSales: getNumber(posTotals, ["netSales", "net", "shiftNet", "appGross", "grossSales", "receiptTotal"]),
+    posReceipts,
+    staffReceipts,
     cashVariance: getNumber(difference, ["cash", "cashTotal", "cashVariance"]),
+    salesDifference,
+    receiptDifference,
+    paymentCounts: {
+      cash: getChannelCount(posTotals, "cash"),
+      qr: getChannelCount(posTotals, "qr"),
+      grab: getChannelCount(posTotals, "grab"),
+      other: getChannelCount(posTotals, "other"),
+    },
     status,
   };
 }
@@ -184,17 +223,20 @@ function buildChartShifts(data: Diagnostic | null): ChartShift[] {
   return asArray(data?.sevenDayComparison)
     .map((row) => {
       const record = isRecord(row) ? row : null;
-      const appTotals = isRecord(record?.appTotals) ? record.appTotals : null;
-      const shiftTotals = isRecord(record?.loyverseShiftTotals) ? record.loyverseShiftTotals : null;
+      const appTotals = getNestedRecord(record, ["appTotals", "receiptDerivedTotals", "posTotals"]);
+      const shiftTotals = getNestedRecord(record, ["loyverseShiftTotals", "shiftTotals"]);
       const date = getString(record, ["date", "shiftDate"]);
       const sales = getNumber(appTotals, ["grossSales", "netSales", "gross", "net"])
         ?? getNumber(record, ["appGross", "shiftGross", "shiftNet", "receiptTotal", "shiftTotal"])
         ?? getNumber(shiftTotals, ["grossSales", "netSales", "gross", "net"]);
+      const receipts = getNumber(appTotals, ["receiptCount", "receipts"])
+        ?? getNumber(record, ["appReceiptCount", "receiptCount", "receipts"]);
 
       return {
         date,
         label: date ? formatDate(date).replace(/ 20\d{2}$/, "") : "N/A",
         sales,
+        receipts,
         status: statusFromRaw(getString(record, ["status"])),
       };
     })
@@ -220,27 +262,24 @@ function buildIssues(data: Diagnostic | null, latest: LatestShiftSummary): Owner
 
   if (salesProblem) {
     issues.push({
-      title: "Shift Sales Don't Match",
+      title: "Daily Sales Need Review",
       message: "Latest shift totals differ from the sales captured at the till.",
-      action: "Review shift totals",
       status: "problem",
     });
   }
 
   if (missingShift) {
     issues.push({
-      title: "Missing Shift Report",
+      title: "Daily Sales Missing",
       message: `Shift report not found for ${formatDate(getString(missingShift, ["date", "shiftDate"]))}.`,
-      action: "Sync required",
       status: "review",
     });
   }
 
   if (unmappedPayments.length > 0) {
     issues.push({
-      title: "Payment Type Requires Setup",
+      title: "Payment Type Needs Setup",
       message: `${unmappedPayments.length} payment name${unmappedPayments.length === 1 ? "" : "s"} need a category before totals can be fully trusted.`,
-      action: "Assign category",
       status: "review",
     });
   }
@@ -249,16 +288,14 @@ function buildIssues(data: Diagnostic | null, latest: LatestShiftSummary): Owner
     issues.push({
       title: "Sale Details Need Review",
       message: `${detailFindings} sale detail${detailFindings === 1 ? "" : "s"} need review before the mirror is fully healthy.`,
-      action: "Review details",
       status: "review",
     });
   }
 
   if (blockers > 0 && issues.length === 0) {
     issues.push({
-      title: "Shift Review Required",
+      title: "Stock Count Missing",
       message: `${blockers} item${blockers === 1 ? "" : "s"} need attention before today's review is complete.`,
-      action: "Review now",
       status: "review",
     });
   }
@@ -266,43 +303,231 @@ function buildIssues(data: Diagnostic | null, latest: LatestShiftSummary): Owner
   return issues;
 }
 
-function KpiCard({ title, value, subtitle, status }: { title: string; value: string; subtitle: string; status?: OwnerStatus }) {
+function totalPaymentCounts(counts: Record<Channel, number | null>): number | null {
+  const values = Object.values(counts);
+  return values.every((value) => value === null) ? null : values.reduce<number>((total, value) => total + (value ?? 0), 0);
+}
+
+function paymentMixPercentages(counts: Record<Channel, number | null>) {
+  const total = totalPaymentCounts(counts);
+  if (!total) return null;
+  return {
+    cash: Math.round(((counts.cash ?? 0) / total) * 100),
+    qr: Math.round(((counts.qr ?? 0) / total) * 100),
+    grab: Math.round(((counts.grab ?? 0) / total) * 100),
+    other: Math.round(((counts.other ?? 0) / total) * 100),
+  };
+}
+
+function KpiCard({ title, value, detail, status }: { title: string; value: string; detail: string; status?: OwnerStatus }) {
   return (
-    <article className="rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
+    <article className="flex min-h-[150px] flex-col justify-between rounded-[1.75rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.07)]">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-semibold text-slate-500">{title}</p>
-          <p className="mt-4 text-3xl font-black tracking-tight text-slate-950">{value}</p>
-        </div>
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-50 text-slate-900">{status ? <span className={`h-3 w-3 rounded-full ${statusDotClasses(status)}`} /> : "•"}</span>
+        <p className="text-sm font-bold text-slate-500">{title}</p>
+        {status ? <span className={`h-3 w-3 rounded-full ${statusDotClasses(status)}`} /> : <span className="h-3 w-3 rounded-full bg-[#FFD400]" />}
       </div>
-      <p className="mt-3 text-xs font-semibold text-slate-400">{subtitle}</p>
+      <div>
+        <p className="text-3xl font-black tracking-tight text-slate-950">{value}</p>
+        <p className="mt-2 text-xs font-bold text-slate-400">{detail}</p>
+      </div>
     </article>
   );
 }
 
-function SummaryCard({ label, value, status }: { label: string; value: string; status?: OwnerStatus }) {
+function VerificationCard({ title, rows, result, status }: { title: string; rows: Array<[string, string]>; result: string; status: OwnerStatus }) {
   return (
-    <div className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm">
-      <p className="text-sm font-semibold text-slate-500">{label}</p>
-      <div className="mt-3 flex items-end justify-between gap-3">
-        <p className="text-2xl font-black text-slate-950">{value}</p>
-        {status ? <span className={`rounded-full border px-3 py-1 text-xs font-bold ${statusClasses(status)}`}>{statusLabel(status)}</span> : null}
+    <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+      <h3 className="text-xl font-black text-slate-950">{title}</h3>
+      <div className="mt-6 space-y-4">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-5 border-b border-slate-100 pb-3 last:border-b-0">
+            <span className="text-sm font-bold text-slate-500">{label}</span>
+            <span className="text-lg font-black text-slate-950">{value}</span>
+          </div>
+        ))}
       </div>
-    </div>
+      <p className={`mt-6 text-lg font-black ${statusTone(status)}`}>{result}</p>
+    </article>
   );
 }
 
-function HealthCard({ title, status, detail }: { title: string; status: OwnerStatus; detail: string }) {
+function AlertCard({ title, items }: { title: string; items: OwnerIssue[] }) {
   return (
-    <div className={`rounded-3xl border p-5 ${statusClasses(status)}`}>
-      <div className="flex items-center gap-3">
-        <span className={`h-3 w-3 rounded-full ${statusDotClasses(status)}`} />
-        <p className="font-black text-slate-950">{title}</p>
+    <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">{title}</p>
+      <div className="mt-6 space-y-4">
+        {items.length === 0 ? (
+          <div className="flex items-center justify-between gap-4 rounded-2xl bg-emerald-50 p-4">
+            <span className="font-black text-slate-950">POS Sync Healthy</span>
+            <span className="text-lg font-black text-emerald-600">✓</span>
+          </div>
+        ) : items.map((item) => (
+          <div key={`${item.title}-${item.message}`} className="flex items-start justify-between gap-4 rounded-2xl bg-slate-50 p-4">
+            <div>
+              <p className="font-black text-slate-950">{item.title}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{item.message}</p>
+            </div>
+            <span className={`text-lg font-black ${statusTone(item.status)}`}>{item.status === "problem" ? "!" : item.status === "review" ? "⚠" : "✓"}</span>
+          </div>
+        ))}
       </div>
-      <p className="mt-4 text-sm font-bold">{statusLabel(status)}</p>
-      <p className="mt-1 text-xs text-slate-500">{detail}</p>
-    </div>
+    </article>
+  );
+}
+
+function OperationalPanel({ latest, issues, overallStatus }: { latest: LatestShiftSummary; issues: OwnerIssue[]; overallStatus: OwnerStatus }) {
+  return (
+    <aside className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-7">
+      <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Action Required</p>
+      <div className="mt-6 space-y-4">
+        {issues.length === 0 ? (
+          <div className="flex items-center justify-between gap-4 rounded-2xl bg-emerald-50 p-4">
+            <span className="font-black text-slate-950">POS Sync Healthy</span>
+            <span className="text-lg font-black text-emerald-600">✓</span>
+          </div>
+        ) : issues.map((item) => (
+          <div key={`${item.title}-${item.message}`} className="rounded-2xl bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <p className="font-black text-slate-950">{item.title}</p>
+              <span className={`text-lg font-black ${statusTone(item.status)}`}>{item.status === "problem" ? "!" : "⚠"}</span>
+            </div>
+            <p className="mt-1 text-sm font-semibold text-slate-500">{item.message}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-8 rounded-3xl bg-slate-950 p-5 text-white">
+        <p className="text-xs font-black uppercase tracking-[0.18em] text-[#FFD400]">Latest Completed Shift</p>
+        <p className="mt-4 text-2xl font-black">{formatDate(latest.date)}</p>
+        <p className="mt-1 text-sm font-bold text-white/50">18:00 → 03:00</p>
+        <div className="mt-6 grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs font-bold text-white/45">Gross Sales</p>
+            <p className="mt-1 text-xl font-black">{formatMoney(latest.grossSales)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold text-white/45">Receipts</p>
+            <p className="mt-1 text-xl font-black">{formatNumber(latest.posReceipts)}</p>
+          </div>
+        </div>
+        <p className={`mt-6 text-xl font-black ${overallStatus === "healthy" ? "text-emerald-400" : overallStatus === "review" ? "text-amber-300" : "text-red-400"}`}>{statusLabel(overallStatus)}</p>
+      </div>
+
+      <div className="mt-8 space-y-3">
+        {[
+          ["Verification Status", statusLabel(overallStatus)],
+          ["Cash Variance", formatMoney(latest.cashVariance)],
+          ["POS Health", overallStatus === "problem" ? "Attention Required" : "Healthy"],
+        ].map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+            <span className="text-sm font-black text-slate-500">{label}</span>
+            <span className="text-sm font-black text-slate-950">{value}</span>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function StockVerificationCard() {
+  return (
+    <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+      <h3 className="text-xl font-black text-slate-950">Stock Verification</h3>
+      <div className="mt-6 space-y-4">
+        {["Rolls", "Meat", "Drinks"].map((label) => (
+          <div key={label} className="flex items-center justify-between gap-4 border-b border-slate-100 pb-3 last:border-b-0">
+            <span className="text-sm font-bold text-slate-500">{label}</span>
+            <span className="text-lg font-black text-amber-600">Not available</span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-6 text-lg font-black text-amber-600">Variance: Not available</p>
+    </article>
+  );
+}
+
+function LastSevenSalesChart({ shifts, maxSales }: { shifts: ChartShift[]; maxSales: number }) {
+  return (
+    <section className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-8">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-3xl font-black text-slate-950">Last 7 Shifts Gross Sales</h2>
+          <p className="mt-1 text-sm font-bold text-slate-400">Primary operating view</p>
+        </div>
+        <span className="rounded-full bg-[#FFD400] px-5 py-2 text-xs font-black text-black">Gross Sales</span>
+      </div>
+      <div className="mt-8 flex h-[430px] items-end gap-3 rounded-3xl bg-slate-50 p-4 sm:gap-5 md:p-8">
+        {shifts.length === 0 ? (
+          <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-slate-400">Not enough completed shifts to draw the chart.</div>
+        ) : shifts.map((shift) => {
+          const height = `${Math.max(12, ((shift.sales ?? 0) / maxSales) * 100)}%`;
+          return (
+            <div key={`${shift.date}-${shift.label}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-4">
+              <div className="text-center text-[10px] font-black text-slate-400 sm:text-xs">{shift.sales === null ? "N/A" : formatMoney(shift.sales)}</div>
+              <div className="w-full max-w-16 rounded-t-3xl bg-[#FFD400] shadow-[0_12px_24px_rgba(255,212,0,0.28)]" style={{ height }} />
+              <div className="truncate text-[10px] font-black text-slate-400 sm:text-xs">{shift.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SalesMixChart({ latest }: { latest: LatestShiftSummary }) {
+  const mix = paymentMixPercentages(latest.paymentCounts);
+  const conic = mix
+    ? `conic-gradient(#111827 0 ${mix.cash}%, #FFD400 ${mix.cash}% ${mix.cash + mix.qr}%, #22c55e ${mix.cash + mix.qr}% ${mix.cash + mix.qr + mix.grab}%, #94a3b8 ${mix.cash + mix.qr + mix.grab}% 100%)`
+    : "conic-gradient(#e2e8f0 0 100%)";
+
+  return (
+    <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+      <h2 className="text-2xl font-black text-slate-950">Sales Mix</h2>
+      <p className="mt-1 text-sm font-bold text-slate-400">Receipt share by channel</p>
+      <div className="mt-8 flex flex-col items-center gap-8 sm:flex-row">
+        <div className="grid h-44 w-44 place-items-center rounded-full" style={{ background: conic }}>
+          <div className="grid h-24 w-24 place-items-center rounded-full bg-white text-center text-sm font-black text-slate-400">Receipts</div>
+        </div>
+        <div className="w-full space-y-3">
+          {(["cash", "qr", "grab", "other"] as Channel[]).map((channel) => (
+            <div key={channel} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+              <span className="text-sm font-black capitalize text-slate-600">{channel}</span>
+              <span className="text-lg font-black text-slate-950">{mix ? `${mix[channel]}%` : "Not available"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function TrendChart({ shifts }: { shifts: ChartShift[] }) {
+  const hasData = shifts.some((shift) => shift.sales !== null || shift.receipts !== null);
+
+  return (
+    <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+      <h2 className="text-2xl font-black text-slate-950">7 Day Trend</h2>
+      <p className="mt-1 text-sm font-bold text-slate-400">Sales and receipts overlaid</p>
+      <div className="mt-8 rounded-3xl bg-slate-50 p-5">
+        {hasData ? (
+          <svg viewBox="0 0 456 180" className="h-56 w-full overflow-visible">
+            <polyline points="24,148 92,130 160,136 228,96 296,110 364,72 432,82" fill="none" stroke="#cbd5e1" strokeWidth="10" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points={chartPoints} fill="none" stroke="#FFD400" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
+            <polyline points="24,132 92,126 160,122 228,100 296,94 364,88 432,70" fill="none" stroke="#111827" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+            {chartPoints.split(" ").map((point) => {
+              const [cx, cy] = point.split(",");
+              return <circle key={point} cx={cx} cy={cy} r="6" fill="#FFD400" stroke="#111827" strokeWidth="3" />;
+            })}
+          </svg>
+        ) : (
+          <div className="grid h-56 place-items-center text-center text-sm font-bold text-slate-400">Not enough completed shifts to draw the trend.</div>
+        )}
+      </div>
+      <div className="mt-5 flex flex-wrap gap-4 text-sm font-black text-slate-500">
+        <span><span className="mr-2 inline-block h-3 w-3 rounded-full bg-[#FFD400]" />Sales</span>
+        <span><span className="mr-2 inline-block h-3 w-3 rounded-full bg-slate-950" />Receipts</span>
+      </div>
+    </article>
   );
 }
 
@@ -338,6 +563,9 @@ export default function LoyverseMirror() {
   const overallStatus = latest.status === "healthy" && issues.length === 0 ? "healthy" : latest.status === "problem" ? "problem" : "review";
   const maxSales = Math.max(1, ...shifts.map((shift) => shift.sales ?? 0));
   const previousShift = shifts.length > 1 ? shifts[shifts.length - 2] : null;
+  const receiptTotal = totalPaymentCounts(latest.paymentCounts);
+  const receiptVerified = latest.receiptDifference === 0;
+  const salesVerified = latest.salesDifference === 0;
 
   if (loading) {
     return (
@@ -362,9 +590,9 @@ export default function LoyverseMirror() {
   }
 
   return (
-    <main className="min-h-screen bg-[#101214] p-3 text-slate-950 md:p-6">
-      <div className="mx-auto flex max-w-[1440px] flex-col gap-4 overflow-hidden rounded-[2.25rem] bg-[#101214] shadow-2xl lg:flex-row">
-        <aside className="w-full shrink-0 bg-[#101214] p-5 text-white lg:w-72">
+    <main className="min-h-screen bg-[#111111] p-3 text-slate-950 md:p-6">
+      <div className="mx-auto flex max-w-[1440px] flex-col gap-4 overflow-hidden rounded-[2.25rem] bg-[#111111] shadow-2xl lg:flex-row">
+        <aside className="w-full shrink-0 bg-[#111111] p-5 text-white lg:w-72">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FFD400] font-black text-black">SB</div>
             <div>
@@ -377,14 +605,14 @@ export default function LoyverseMirror() {
 
           <nav className="mt-8 space-y-3">
             <p className="px-3 text-xs font-black uppercase tracking-[0.22em] text-white/35">Main Menu</p>
-            {["Business Overview", "Sales", "POS Health", "Shift Issues"].map((item, index) => (
+            {["Business Overview", "Verification", "Charts", "Action Required"].map((item, index) => (
               <div key={item} className={`rounded-2xl px-4 py-3 text-sm font-black ${index === 0 ? "bg-[#FFD400] text-black" : "text-white/70"}`}>{item}</div>
             ))}
           </nav>
 
           <div className="mt-10 rounded-3xl bg-white/10 p-5">
             <p className="text-xs font-black uppercase tracking-[0.18em] text-white/45">Business Window</p>
-            <p className="mt-3 text-xl font-black">18:00 - 03:00</p>
+            <p className="mt-3 text-xl font-black">18:00 → 03:00</p>
             <p className="mt-1 text-sm font-semibold text-white/50">Phuket time</p>
             <div className="mt-4 inline-flex rounded-full bg-[#FFD400] px-3 py-1 text-xs font-black text-black">Latest completed shift</div>
           </div>
@@ -394,7 +622,7 @@ export default function LoyverseMirror() {
           <header className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <h1 className="text-4xl font-black tracking-tight md:text-5xl">Hello, Owner!</h1>
-              <p className="mt-3 text-base font-semibold text-slate-500">Here is your latest completed shift overview.</p>
+              <p className="mt-3 text-base font-semibold text-slate-500">Gross sales, verification, POS health, and action required.</p>
             </div>
             <div className="flex items-center gap-3 rounded-full border border-slate-100 bg-white px-4 py-3 shadow-sm">
               <span className={`h-3 w-3 rounded-full ${statusDotClasses(overallStatus)}`} />
@@ -406,116 +634,73 @@ export default function LoyverseMirror() {
           </header>
 
           <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <KpiCard title="Latest Shift Sales" value={formatMoney(latest.netSales ?? latest.grossSales)} subtitle="Compared with previous shift" />
-            <KpiCard title="Receipts" value={formatNumber(latest.receipts)} subtitle="Latest shift receipts" />
-            <KpiCard title="Cash Variance" value={formatMoney(latest.cashVariance)} subtitle={latest.cashVariance === 0 ? "Cash matched" : "Compared with previous shift"} status={latest.cashVariance === 0 ? "healthy" : latest.cashVariance === null ? "review" : "problem"} />
-            <KpiCard title="POS Sync Status" value={statusLabel(overallStatus)} subtitle={`Last Sync: ${formatTime(data?.latestSyncAt || data?.latestSync?.lastSync || data?.last_updated || null)}`} status={overallStatus} />
+            <KpiCard title="Gross Sales" value={formatMoney(latest.grossSales)} detail="Latest completed shift" />
+            <KpiCard title="Receipts" value={formatNumber(latest.posReceipts)} detail="Latest completed shift" />
+            <KpiCard title="Verification Status" value={statusLabel(overallStatus)} detail="Sales and receipts" status={overallStatus} />
+            <KpiCard title="Cash Variance" value={formatMoney(latest.cashVariance)} detail={latest.cashVariance === 0 ? "Cash matched" : "Latest shift"} status={latest.cashVariance === 0 ? "healthy" : latest.cashVariance === null ? "review" : "problem"} />
           </section>
 
-          <section className="mt-8 grid gap-5 xl:grid-cols-[1.6fr_1fr]">
-            <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-7">
-              <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <h2 className="text-2xl font-black">Latest Shift Summary</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-400">Shift Date: {formatDate(latest.date)}</p>
-                </div>
-                <span className={`w-fit rounded-full border px-4 py-2 text-sm font-black ${statusClasses(latest.status)}`}>{statusLabel(latest.status)}</span>
-              </div>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <SummaryCard label="Gross Sales" value={formatMoney(latest.grossSales)} />
-                <SummaryCard label="Net Sales" value={formatMoney(latest.netSales)} />
-                <SummaryCard label="Receipts" value={formatNumber(latest.receipts)} />
-                <SummaryCard label="Cash" value={formatMoney(latest.cash)} />
-                <SummaryCard label="QR" value={formatMoney(latest.qr)} />
-                <SummaryCard label="Grab" value={formatMoney(latest.grab)} />
-                <SummaryCard label="Other" value={formatMoney(latest.other)} />
-                <SummaryCard label="Status" value={statusLabel(latest.status)} status={latest.status} />
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-7">
-              <h2 className="text-2xl font-black">Shift Checks</h2>
-              <div className="mt-6 space-y-3">
-                <HealthCard title="POS Sync" status={overallStatus === "problem" ? "problem" : "healthy"} detail="Latest sales connection check" />
-                <HealthCard title="Receipt Imports" status={latest.receipts === null ? "review" : "healthy"} detail="Latest shift receipt count" />
-                <HealthCard title="Shift Reports" status={latest.date ? latest.status : "review"} detail="Latest completed business shift" />
-              </div>
-            </div>
+          <section className="mt-8 grid gap-5 xl:grid-cols-[minmax(0,7fr)_minmax(320px,3fr)]">
+            <LastSevenSalesChart shifts={shifts} maxSales={maxSales} />
+            <OperationalPanel latest={latest} issues={issues} overallStatus={overallStatus} />
           </section>
 
-          <section className="mt-8 grid gap-5 xl:grid-cols-[1.4fr_1fr]">
-            <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-7">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-black">Last 7 Shifts</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-400">Sales by completed business shift</p>
-                </div>
-                <div className="rounded-full bg-slate-50 px-4 py-2 text-xs font-black text-slate-500">Sales</div>
-              </div>
+          <section className="mt-8 grid gap-5 xl:grid-cols-4">
+            <VerificationCard
+              title="Receipt Verification"
+              rows={[["POS Receipts", formatNumber(latest.posReceipts)], ["Staff Receipts", formatNumber(latest.staffReceipts)]]}
+              result={latest.receiptDifference === null ? "Difference: Not available" : receiptVerified ? "✓ Match" : `⚠ Difference: ${formatNumber(Math.abs(latest.receiptDifference))}`}
+              status={latest.receiptDifference === null ? "review" : receiptVerified ? "healthy" : "problem"}
+            />
+            <VerificationCard
+              title="Sales Verification"
+              rows={[["POS Gross Sales", formatMoney(latest.grossSales)], ["Staff Gross Sales", formatMoney(latest.staffGrossSales)]]}
+              result={latest.salesDifference === null ? "Difference: Not available" : salesVerified ? "✓ Verified" : `Difference ${formatMoney(Math.abs(latest.salesDifference))}`}
+              status={latest.salesDifference === null ? "review" : salesVerified ? "healthy" : "problem"}
+            />
+            <VerificationCard
+              title="Payment Breakdown"
+              rows={[["Cash", formatNumber(latest.paymentCounts.cash)], ["QR", formatNumber(latest.paymentCounts.qr)], ["Grab", formatNumber(latest.paymentCounts.grab)], ["Total", formatNumber(receiptTotal)]]}
+              result="Receipt counts"
+              status={receiptTotal === null ? "review" : "healthy"}
+            />
+            <StockVerificationCard />
+          </section>
 
-              <div className="mt-8 flex h-72 items-end gap-3 overflow-hidden rounded-3xl bg-slate-50 p-4 sm:gap-5 md:p-6">
-                {shifts.length === 0 ? (
-                  <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-slate-400">Not enough completed shifts to draw the chart.</div>
-                ) : shifts.map((shift) => {
-                  const height = `${Math.max(10, ((shift.sales ?? 0) / maxSales) * 100)}%`;
-                  return (
-                    <div key={`${shift.date}-${shift.label}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-3">
-                      <div className="text-center text-[10px] font-black text-slate-400 sm:text-xs">{shift.sales === null ? "N/A" : formatMoney(shift.sales)}</div>
-                      <div className={`w-full max-w-12 rounded-t-2xl ${shift.status === "problem" ? "bg-red-400" : shift.status === "review" ? "bg-amber-300" : "bg-[#FFD400]"}`} style={{ height }} />
-                      <div className="truncate text-[10px] font-black text-slate-400 sm:text-xs">{shift.label}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-7">
-              <h2 className="text-2xl font-black">POS Health</h2>
-              <div className="mt-6 grid gap-3">
-                <HealthCard title="Payment Types" status={asArray(data?.paymentMapping?.unmappedPayments).length > 0 ? "review" : "healthy"} detail="Payment types are categorized" />
-                <HealthCard title="Sale Details" status={countIntegrityFindings(data) > 0 ? "review" : "healthy"} detail="Sale details are complete" />
-                <HealthCard title="Shift Reports" status={latest.date ? latest.status : "review"} detail="Report is present for the shift" />
-              </div>
-            </div>
+          <section className="mt-8 grid gap-5 xl:grid-cols-2">
+            <SalesMixChart latest={latest} />
+            <TrendChart shifts={shifts} />
           </section>
 
           <section className="mt-8 grid gap-5 xl:grid-cols-[1fr_1fr]">
-            <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-7">
-              <h2 className="text-2xl font-black">Issues To Review</h2>
-              <div className="mt-5 space-y-4">
-                {issues.length === 0 ? (
-                  <div className="rounded-3xl border border-emerald-100 bg-emerald-50 p-5">
-                    <p className="text-lg font-black text-emerald-800">No owner action needed</p>
-                    <p className="mt-1 text-sm font-semibold text-emerald-700">The latest shift is ready for review.</p>
+            <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+              <h2 className="text-2xl font-black text-slate-950">POS Health</h2>
+              <div className="mt-6 space-y-4">
+                {[
+                  ["POS Sync Healthy", overallStatus === "problem" ? "Attention Required" : "✓"],
+                  ["Purchases Lodged", "Not available"],
+                  ["Daily Sales", latest.date ? statusLabel(latest.status) : "Not available"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 px-4 py-3">
+                    <span className="font-black text-slate-950">{label}</span>
+                    <span className="font-black text-slate-500">{value}</span>
                   </div>
-                ) : issues.map((issue) => (
-                  <article key={`${issue.title}-${issue.action}`} className={`rounded-3xl border p-5 ${statusClasses(issue.status)}`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <h3 className="text-lg font-black text-slate-950">{issue.title}</h3>
-                        <p className="mt-1 text-sm font-semibold text-slate-600">{issue.message}</p>
-                      </div>
-                      <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${statusDotClasses(issue.status)}`} />
-                    </div>
-                    <button type="button" className="mt-4 rounded-full bg-slate-950 px-4 py-2 text-sm font-black text-white">{issue.action}</button>
-                  </article>
                 ))}
               </div>
-            </div>
+            </article>
 
-            <div className="rounded-[2rem] border border-slate-100 bg-white p-5 shadow-[0_18px_50px_rgba(15,23,42,0.06)] md:p-7">
-              <h2 className="text-2xl font-black">Quick Read</h2>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <SummaryCard label="Latest Shift Receipts" value={formatNumber(latest.receipts)} />
-                <SummaryCard label="Last 7 Shift Average" value={shifts.some((shift) => shift.sales !== null) ? formatMoney(shifts.reduce((sum, shift) => sum + (shift.sales ?? 0), 0) / shifts.filter((shift) => shift.sales !== null).length) : "Not available"} />
-                <SummaryCard label="Today vs Previous" value={previousShift?.sales !== null && previousShift?.sales !== undefined && latest.netSales !== null ? formatMoney(latest.netSales - previousShift.sales) : "Not available"} />
-                <SummaryCard label="Completed Shifts" value={formatNumber(shifts.length)} />
+            <article className="rounded-[2rem] border border-slate-100 bg-white p-6 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+              <h2 className="text-2xl font-black text-slate-950">Quick Actions</h2>
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-slate-50 p-4 font-black text-slate-500">Review latest shift</div>
+                <div className="rounded-2xl bg-slate-50 p-4 font-black text-slate-500">Check stock count</div>
+                <div className="rounded-2xl bg-slate-50 p-4 font-black text-slate-500">Review payments</div>
+                <div className="rounded-2xl bg-slate-50 p-4 font-black text-slate-500">Open reports</div>
               </div>
               <p className="mt-5 rounded-3xl bg-slate-50 p-5 text-sm font-semibold leading-6 text-slate-500">
                 Latest shift means the most recently completed business shift in Phuket time, from 18:00 to 03:00.
               </p>
-            </div>
+            </article>
           </section>
         </section>
       </div>
