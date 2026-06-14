@@ -194,6 +194,7 @@ export default function Home() {
     );
   }
 
+function KpiCard({ label, value, sub }: { label: string; value: React.ReactNode; sub?: React.ReactNode }) {
   return (
     <div className="mx-auto max-w-5xl space-y-5">
 
@@ -496,6 +497,9 @@ export default function Home() {
           ))}
         </div>
       </div>
+    </Card>
+  );
+}
 
     </div>
   );
