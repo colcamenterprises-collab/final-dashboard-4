@@ -20,10 +20,12 @@ export default function DailyStockAnalysis() {
       {isLoading && <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm">Loading latest stock analysis...</div>}
       {isError && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">Failed to load stock analysis.</div>}
 
-      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Status</p><p className="font-semibold capitalize">{val(stock.status)}</p></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Rolls</p><p className="font-semibold">{val(stock.rolls)}</p></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Meat</p><p className="font-semibold">{val(stock.meat)}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Meat (end)</p><p className="font-semibold">{val(stock.meat)}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">French Fries (closing bags)</p><p className="font-semibold">{stock.friesEnd != null ? String(stock.friesEnd) : "Missing"}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Sweet Potato Fries (closing g)</p><p className="font-semibold">{stock.sweetPotatoEnd != null ? String(stock.sweetPotatoEnd) : "Missing"}</p></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4"><p className="text-xs text-slate-500">Drinks counted</p><p className="font-semibold">{drinks.length || "Missing"}</p></div>
       </section>
 

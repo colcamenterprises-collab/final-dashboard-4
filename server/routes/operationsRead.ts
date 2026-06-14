@@ -311,25 +311,36 @@ router.get("/daily-stock-analysis", async (_req, res) => {
   const blockers = [...stockResult.blockers];
   if (latestStock.status === "missing") blockers.push(blocker("DAILY_STOCK_V2_MISSING", "Daily Stock V2 record missing", "/api/operations-read/daily-stock-analysis", "daily_stock_v2"));
 
-  // Fetch shiftPurchases from daily_sales_v2.payload using the linked salesId
+  // Fetch shiftPurchases, friesEnd, sweetPotatoEnd from daily_sales_v2.payload
   let shiftPurchases: any = null;
-  const linkedSalesId: string | null = stockRow.salesId ?? stockRow["salesId"] ?? null;
-  if (linkedSalesId) {
-    try {
-      const spResult = await pool.query<{ payload: any }>(
-        `SELECT payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
-        [linkedSalesId],
-      );
-      shiftPurchases = spResult.rows[0]?.payload?.shiftPurchases ?? null;
-    } catch {
-      // Non-blocking — shiftPurchases stays null
-    }
+  let friesEnd: number | null = null;
+  let sweetPotatoEnd: number | null = null;
+  // normalizeStock() already maps both salesId and sales_id onto latestStock.salesId;
+  // also check the raw row's snake_case column as a belt-and-braces fallback.
+  const linkedSalesId: string | null =
+    latestStock.salesId ?? stockRow.salesId ?? stockRow["salesId"] ?? stockRow.sales_id ?? null;
+  try {
+    const spResult = linkedSalesId
+      ? await pool.query<{ payload: any }>(
+          `SELECT payload FROM daily_sales_v2 WHERE id = $1 LIMIT 1`,
+          [linkedSalesId],
+        )
+      : await pool.query<{ payload: any }>(
+          `SELECT payload FROM daily_sales_v2 WHERE "deletedAt" IS NULL ORDER BY COALESCE("shiftDate"::timestamp, "createdAt") DESC LIMIT 1`,
+          [],
+        );
+    const payload = spResult.rows[0]?.payload ?? null;
+    shiftPurchases = payload?.shiftPurchases ?? null;
+    friesEnd = n(payload?.friesEnd);
+    sweetPotatoEnd = n(payload?.sweetPotatoEnd);
+  } catch {
+    // Non-blocking — fields stay null
   }
 
   res.json({
     ok: blockers.length === 0,
     source: "daily_stock_v2",
-    latestStock: { ...latestStock, shiftPurchases },
+    latestStock: { ...latestStock, shiftPurchases, friesEnd, sweetPotatoEnd },
     posUsageComparison: [],
     comparisonNote: "POS usage comparison is only shown when explicit item mappings exist. No usage is invented.",
     warnings: [],
