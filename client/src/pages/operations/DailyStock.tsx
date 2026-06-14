@@ -82,7 +82,23 @@ const labels = {
     expandAll: 'Expand All',
     collapseAll: 'Collapse All',
     kg: 'kg',
-    g: 'g'
+    g: 'g',
+    purchasesTitle: 'Purchases This Shift',
+    purchasesDesc: 'Enter all stock purchased during this shift before completing end-of-shift counts. Enter 0 if none.',
+    spRolls: 'Rolls purchased (pcs)',
+    spMeat: 'Meat purchased (g)',
+    spFries: 'French fries purchased (g)',
+    spSweetPotato: 'Sweet potato fries purchased (g)',
+    spNuggets: 'Nuggets purchased (qty)',
+    spBaconLong: 'Bacon long purchased (qty)',
+    spBaconShort: 'Bacon short purchased (qty)',
+    spDrinksTitle: 'Drinks purchased (by brand)',
+    spConfirmCheck: 'I confirm all purchases during this shift have been entered.',
+    spContinueBtn: 'Continue to Stock Counts →',
+    spConfirmedLabel: '✓ Purchases This Shift confirmed',
+    spEditBtn: 'Edit',
+    spLockedMsg: '⬆ Complete Purchases This Shift above to unlock stock count entry.',
+    spRequiredError: 'Required — enter 0 if none',
   },
   th: {
     pageTitle: 'สต๊อกประจำวัน',
@@ -122,7 +138,23 @@ const labels = {
     expandAll: 'ขยายทั้งหมด',
     collapseAll: 'ยุบทั้งหมด',
     kg: 'กก.',
-    g: 'ก.'
+    g: 'ก.',
+    purchasesTitle: 'การซื้อในกะนี้',
+    purchasesDesc: 'ใส่สต๊อกทั้งหมดที่ซื้อในกะนี้ก่อนกรอกจำนวนปิดกะ ใส่ 0 ถ้าไม่มี',
+    spRolls: 'โรลที่ซื้อ (ชิ้น)',
+    spMeat: 'เนื้อที่ซื้อ (กรัม)',
+    spFries: 'เฟรนช์ฟรายส์ที่ซื้อ (กรัม)',
+    spSweetPotato: 'มันฝรั่งหวานที่ซื้อ (กรัม)',
+    spNuggets: 'นักเก็ตที่ซื้อ (ชิ้น)',
+    spBaconLong: 'เบคอนยาวที่ซื้อ (ชิ้น)',
+    spBaconShort: 'เบคอนสั้นที่ซื้อ (ชิ้น)',
+    spDrinksTitle: 'เครื่องดื่มที่ซื้อ (แยกตามยี่ห้อ)',
+    spConfirmCheck: 'ฉันยืนยันว่าได้กรอกการซื้อทั้งหมดในกะนี้แล้ว',
+    spContinueBtn: 'ดำเนินการต่อไปยังการนับสต๊อก →',
+    spConfirmedLabel: '✓ ยืนยันการซื้อในกะแล้ว',
+    spEditBtn: 'แก้ไข',
+    spLockedMsg: '⬆ กรอก "การซื้อในกะนี้" ด้านบนเพื่อปลดล็อกการกรอกจำนวนสต๊อก',
+    spRequiredError: 'จำเป็น — ใส่ 0 ถ้าไม่มี',
   }
 };
 
@@ -461,7 +493,7 @@ const DailyStock: React.FC = () => {
 
   const handleConfirmPurchases = () => {
     const errs: Record<string, string> = {};
-    const req = 'Required — enter 0 if none';
+    const req = L.spRequiredError;
     if (spRolls === null || spRolls < 0) errs.spRolls = req;
     if (spMeat === null || spMeat < 0) errs.spMeat = req;
     if (spFries === null || spFries < 0) errs.spFries = req;
@@ -765,17 +797,20 @@ const DailyStock: React.FC = () => {
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-baseline justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-3xl font-semibold">{L.pageTitle}</h1>
           <p className="text-xs text-slate-400 mt-1">Source: purchasing_items</p>
         </div>
-        <div className="text-xs text-slate-600">
-          {shiftId ? (
-            <span className="inline-flex items-center gap-2 rounded-[4px] border border-slate-200 px-3 py-1">{L.linkedToShift}: {shiftId}</span>
-          ) : (
-            <span className="inline-flex items-center gap-2 rounded-[4px] border border-amber-200 px-3 py-1 bg-amber-50">{L.noShiftId}</span>
-          )}
+        <div className="flex items-center gap-3 flex-wrap justify-end">
+          <LanguageToggle onChange={(nextLang) => setLang((nextLang === "th" ? "th" : "en"))} />
+          <div className="text-xs text-slate-600">
+            {shiftId ? (
+              <span className="inline-flex items-center gap-2 rounded-[4px] border border-slate-200 px-3 py-1">{L.linkedToShift}: {shiftId}</span>
+            ) : (
+              <span className="inline-flex items-center gap-2 rounded-[4px] border border-amber-200 px-3 py-1 bg-amber-50">{L.noShiftId}</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -783,21 +818,19 @@ const DailyStock: React.FC = () => {
       {purchasesStep === 'pending' && (
         <section className="rounded-[4px] border-2 border-amber-400 bg-amber-50 p-4 space-y-4">
           <div>
-            <h2 className="text-sm font-bold text-amber-900">Purchases This Shift</h2>
-            <p className="text-xs text-amber-800 mt-1">
-              Enter all stock purchased during this shift before completing end-of-shift counts. Enter 0 if none.
-            </p>
+            <h2 className="text-sm font-bold text-amber-900">{L.purchasesTitle}</h2>
+            <p className="text-xs text-amber-800 mt-1">{L.purchasesDesc}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {([
-              { key: 'spRolls',      label: 'Rolls purchased (pcs)',           val: spRolls,      set: setSpRolls },
-              { key: 'spMeat',       label: 'Meat purchased (g)',              val: spMeat,       set: setSpMeat },
-              { key: 'spFries',      label: 'French fries purchased (g)',      val: spFries,      set: setSpFries },
-              { key: 'spSweetPotato',label: 'Sweet potato fries purchased (g)',val: spSweetPotato,set: setSpSweetPotato },
-              { key: 'spNuggets',    label: 'Nuggets purchased (qty)',         val: spNuggets,    set: setSpNuggets },
-              { key: 'spBaconLong',  label: 'Bacon long purchased (qty)',      val: spBaconLong,  set: setSpBaconLong },
-              { key: 'spBaconShort', label: 'Bacon short purchased (qty)',     val: spBaconShort, set: setSpBaconShort },
+              { key: 'spRolls',      label: L.spRolls,       val: spRolls,      set: setSpRolls },
+              { key: 'spMeat',       label: L.spMeat,        val: spMeat,       set: setSpMeat },
+              { key: 'spFries',      label: L.spFries,       val: spFries,      set: setSpFries },
+              { key: 'spSweetPotato',label: L.spSweetPotato, val: spSweetPotato,set: setSpSweetPotato },
+              { key: 'spNuggets',    label: L.spNuggets,     val: spNuggets,    set: setSpNuggets },
+              { key: 'spBaconLong',  label: L.spBaconLong,   val: spBaconLong,  set: setSpBaconLong },
+              { key: 'spBaconShort', label: L.spBaconShort,  val: spBaconShort, set: setSpBaconShort },
             ] as { key: string; label: string; val: number | null; set: (v: number | null) => void }[]).map(f => (
               <div key={f.key}>
                 <label className="block text-xs font-medium mb-1 text-amber-900">{f.label}</label>
@@ -820,7 +853,7 @@ const DailyStock: React.FC = () => {
 
           {drinkItems.length > 0 && (
             <div>
-              <h3 className="text-xs font-semibold text-amber-900 mb-2">Drinks purchased (by brand)</h3>
+              <h3 className="text-xs font-semibold text-amber-900 mb-2">{L.spDrinksTitle}</h3>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
                 {drinkItems.map(drink => (
                   <div key={drink.name}>
@@ -851,9 +884,7 @@ const DailyStock: React.FC = () => {
               onChange={e => setSpConfirmChecked(e.target.checked)}
               className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-amber-500"
             />
-            <span className="text-xs text-amber-900 font-medium">
-              I confirm all purchases during this shift have been entered.
-            </span>
+            <span className="text-xs text-amber-900 font-medium">{L.spConfirmCheck}</span>
           </label>
 
           <button
@@ -862,7 +893,7 @@ const DailyStock: React.FC = () => {
             disabled={!spConfirmChecked}
             className="w-full rounded-[4px] bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-semibold py-2.5 transition-colors"
           >
-            Continue to Stock Counts →
+            {L.spContinueBtn}
           </button>
         </section>
       )}
@@ -870,7 +901,7 @@ const DailyStock: React.FC = () => {
       {purchasesStep === 'confirmed' && (
         <div className="rounded-[4px] border border-emerald-300 bg-emerald-50 px-4 py-3 flex items-center justify-between">
           <div className="text-xs text-emerald-800">
-            <span className="font-semibold">✓ Purchases This Shift confirmed</span>
+            <span className="font-semibold">{L.spConfirmedLabel}</span>
             {spConfirmedAt && (
               <span className="ml-2 text-emerald-600 font-normal">
                 at {new Date(spConfirmedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
@@ -885,14 +916,14 @@ const DailyStock: React.FC = () => {
             onClick={() => { setPurchasesStep('pending'); setSpConfirmChecked(false); }}
             className="text-xs text-emerald-700 underline hover:text-emerald-900 ml-3 whitespace-nowrap"
           >
-            Edit
+            {L.spEditBtn}
           </button>
         </div>
       )}
 
       {purchasesStep === 'pending' && (
         <div className="rounded-[4px] border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-800">
-          ⬆ Complete <strong>Purchases This Shift</strong> above to unlock stock count entry.
+          {L.spLockedMsg}
         </div>
       )}
 
@@ -928,9 +959,6 @@ const DailyStock: React.FC = () => {
           </div>
         </div>
       )}
-      
-      {/* EXACT LanguageToggle from consolidated patch */}
-      <LanguageToggle onChange={(nextLang) => setLang((nextLang === "th" ? "th" : "en"))} />
       
       {/* EXACT error display from consolidated patch */}
       {errors.length > 0 && <p className="text-red-500 text-xs">{L.validationError}</p>}
