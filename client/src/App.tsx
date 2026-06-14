@@ -78,6 +78,7 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
                   <Route path="/order" element={<OrderPage />} />
                   <Route path="/order/:venueCode" element={<OrderPage />} />
                   <Route path="/order/table/:tableCode" element={<OrderPage />} />
@@ -102,7 +103,6 @@ export default function App() {
                     <Route path="/operations/issue-register" element={<ProtectedRoute><IssueRegister /></ProtectedRoute>} />
                     <Route path="/operations/manager-checklist" element={<ProtectedRoute><ManagerChecklist /></ProtectedRoute>} />
                     <Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
-                    <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
 
                     {/* Menu */}
                     <Route path="/menu/ingredients" element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />
