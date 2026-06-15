@@ -102,7 +102,7 @@ const quickActions = [
   { to: "/operations/daily-sales",        label: "Daily Sales",        icon: Receipt,     colour: "bg-blue-50 text-blue-800 border-blue-100" },
   { to: "/operations/daily-stock",        label: "Daily Stock",        icon: Package,     colour: "bg-emerald-50 text-emerald-800 border-emerald-100" },
   { to: "/operations/purchase-lodgement", label: "Purchases",          icon: ShoppingBag, colour: "bg-amber-50 text-amber-800 border-amber-100" },
-  { to: "/reports/shift-reports",         label: "Shift Reports",      icon: FileText,    colour: "bg-purple-50 text-purple-800 border-purple-100" },
+  { to: "/reports/shift-reports",         label: "Shift Verification",      icon: FileText,    colour: "bg-purple-50 text-purple-800 border-purple-100" },
   { to: "/operations/loyverse-mirror",    label: "POS Verification",   icon: Activity,    colour: "bg-slate-50 text-slate-800 border-slate-200" },
   { to: "/finance/expenses-import",       label: "Expenses",           icon: TrendingUp,  colour: "bg-rose-50 text-rose-800 border-rose-100" },
 ];
@@ -496,7 +496,6 @@ export default function Home() {
           ))}
         </div>
       </div>
-
     </div>
   );
 }
