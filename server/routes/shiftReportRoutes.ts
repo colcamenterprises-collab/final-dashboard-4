@@ -20,9 +20,9 @@ async function buildShiftRows(limitOrDate: number | string) {
     WITH
     shifts AS (
       SELECT
-        shift_date,
-        (data->'shifts'->0->>'gross_sales')::numeric  AS gross_sales,
-        (data->'shifts'->0->>'net_sales')::numeric    AS net_sales,
+        shift_date::date AS shift_date,
+        (data->'shifts'->0->>'gross_sales')::numeric   AS gross_sales,
+        (data->'shifts'->0->>'net_sales')::numeric     AS net_sales,
         (data->'shifts'->0->>'cash_payments')::numeric AS pos_cash
       FROM loyverse_shifts
       ${isDate ? sql`WHERE shift_date = ${limitOrDate}::date` : sql`ORDER BY shift_date DESC LIMIT ${sql.raw(String(limitOrDate))}`}
@@ -53,90 +53,104 @@ async function buildShiftRows(limitOrDate: number | string) {
     forms AS (
       SELECT DISTINCT ON (COALESCE(shift_date, "shiftDate"::date))
         COALESCE(shift_date, "shiftDate"::date) AS form_date,
-        id                  AS form_id,
-        "completedBy"       AS completed_by,
-        "cashSales"         AS staff_cash,
-        "qrSales"           AS staff_qr,
-        "grabSales"         AS staff_grab,
-        "aroiSales"         AS staff_other,
-        "totalSales"        AS staff_total,
-        "totalExpenses"     AS staff_expenses
+        id AS form_id,
+        "cashSales" AS staff_cash,
+        "qrSales" AS staff_qr,
+        "grabSales" AS staff_grab,
+        "aroiSales" AS staff_other,
+        "totalSales" AS staff_total,
+        (COALESCE("cash_receipt_count", 0) + COALESCE("qr_receipt_count", 0) + COALESCE("grab_receipt_count", 0)) AS staff_receipts
       FROM daily_sales_v2
       WHERE "deletedAt" IS NULL
       ORDER BY COALESCE(shift_date, "shiftDate"::date), "createdAt" DESC
+    ),
+    stocks AS (
+      SELECT DISTINCT ON (COALESCE(d."shiftDate"::date, d.shift_date))
+        COALESCE(d."shiftDate"::date, d.shift_date) AS stock_date,
+        s.id AS stock_id
+      FROM daily_stock_v2 s
+      LEFT JOIN daily_sales_v2 d ON d.id = s."salesId"
+      ORDER BY COALESCE(d."shiftDate"::date, d.shift_date), s."createdAt" DESC
     )
     SELECT
       s.shift_date,
       s.gross_sales,
       s.net_sales,
-      s.pos_cash,
+      COALESCE(s.pos_cash, r.cash_total) AS pos_cash,
       r.receipt_count,
       r.receipt_gross,
-      r.cash_total,
       r.grab_total,
       r.qr_total,
       f.form_id,
-      f.completed_by,
       f.staff_cash,
       f.staff_qr,
       f.staff_grab,
-      f.staff_other,
       f.staff_total,
-      f.staff_expenses
+      f.staff_receipts,
+      st.stock_id
     FROM shifts s
     LEFT JOIN receipts r ON r.biz_date = s.shift_date
     LEFT JOIN forms f    ON f.form_date = s.shift_date
+    LEFT JOIN stocks st  ON st.stock_date = s.shift_date
     ${isDate ? sql`` : sql`ORDER BY s.shift_date DESC`}
   `);
 
+  const toNumber = (value: unknown): number | null => value == null ? null : Number(value);
+  const diff = (staff: number | null, pos: number | null): number | null => staff == null || pos == null ? null : staff - pos;
+  const matchMessage = (label: string, value: number | null, unit: "money" | "count") => {
+    if (value == null) return "Not Available";
+    if (value === 0) return `${label} Match`;
+    const amount = unit === "money" ? `฿${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 0 })}` : String(Math.abs(value));
+    return `${label} Difference ${amount}`;
+  };
+
   return (rows as any[]).map((row) => {
-    const grossSales     = row.gross_sales    != null ? Number(row.gross_sales)    : null;
-    const staffTotal     = row.staff_total    != null ? Number(row.staff_total)    : null;
-    const receiptGross   = row.receipt_gross  != null ? Number(row.receipt_gross)  : null;
+    const posGross = toNumber(row.gross_sales ?? row.receipt_gross);
+    const staffGross = toNumber(row.staff_total);
+    const posCash = toNumber(row.pos_cash);
+    const staffCash = toNumber(row.staff_cash);
+    const posReceipts = toNumber(row.receipt_count);
+    const staffReceipts = toNumber(row.staff_receipts);
+    const grossDiff = diff(staffGross, posGross);
+    const receiptDiff = diff(staffReceipts, posReceipts);
+    const cashDiff = diff(staffCash, posCash);
+    const hasDailySalesV2 = Boolean(row.form_id);
+    const hasDailyStockV2 = Boolean(row.stock_id);
 
-    const staffValues = [row.staff_cash, row.staff_qr, row.staff_grab, row.staff_other, row.staff_total]
-      .filter((v) => v != null)
-      .map((v) => Number(v));
-    const staffSalesEntered = staffValues.some((v) => Number.isFinite(v) && v !== 0);
+    const issues: string[] = [];
+    if (!hasDailySalesV2) issues.push("Daily Sales V2 form is missing.");
+    if (!hasDailyStockV2) issues.push("Daily Stock V2 form is missing.");
+    if (grossDiff != null && grossDiff !== 0) issues.push(`Gross sales differ by ฿${Math.abs(grossDiff).toLocaleString("en-US", { maximumFractionDigits: 0 })}.`);
+    if (receiptDiff != null && receiptDiff !== 0) issues.push(`Staff reported ${staffReceipts} receipts but POS recorded ${posReceipts}.`);
+    if (cashDiff != null && cashDiff !== 0) issues.push(`Cash ${cashDiff < 0 ? "under" : "over"}-reported by ฿${Math.abs(cashDiff).toLocaleString("en-US", { maximumFractionDigits: 0 })}.`);
 
-    const staffFormStatus: "submitted" | "missing" = row.form_id ? "submitted" : "missing";
+    let status: "VERIFIED" | "ISSUE" | "MISSING_FORM" | "MISSING_STOCK" = "VERIFIED";
+    if (!hasDailySalesV2) status = "MISSING_FORM";
+    else if (!hasDailyStockV2) status = "MISSING_STOCK";
+    else if (issues.length > 0) status = "ISSUE";
 
-    let posStatus: "matched" | "mismatch" | "missing" = "missing";
-    let varianceSummary: object | null = null;
-
-    if (grossSales != null && staffFormStatus === "submitted" && staffSalesEntered && staffTotal != null) {
-      const diff = Math.abs(staffTotal - grossSales);
-      posStatus = diff <= 100 ? "matched" : "mismatch";
-      varianceSummary = {
-        posGross:       grossSales,
-        staffTotal,
-        variance:       staffTotal - grossSales,
-        absVariance:    diff,
-        level:          diff <= 50 ? "GREEN" : diff <= 200 ? "YELLOW" : "RED",
-      };
-    } else if (grossSales != null) {
-      posStatus = "matched";
-    }
+    const issueSummary = !hasDailySalesV2 ? "Missing Daily Sales V2 form" : !hasDailyStockV2 ? "Missing Daily Stock V2 form" : issues[0]?.replace(/\.$/, "") ?? null;
+    const maxAbs = Math.max(Math.abs(grossDiff ?? 0), Math.abs(cashDiff ?? 0), Math.abs(receiptDiff ?? 0));
+    const severity = status === "VERIFIED" ? null : maxAbs >= 500 ? "High" : maxAbs >= 100 ? "Medium" : "Low";
 
     return {
-      id:             `sr-${String(row.shift_date).slice(0, 10)}`,
-      shiftDate:      String(row.shift_date).slice(0, 10),
-      grossSales,
-      netSales:       row.net_sales    != null ? Number(row.net_sales)    : null,
-      cashSales:      row.pos_cash     != null ? Number(row.pos_cash)     : null,
-      grabSales:      row.grab_total   != null ? Number(row.grab_total)   : null,
-      qrSales:        row.qr_total     != null ? Number(row.qr_total)     : null,
-      receiptCount:   row.receipt_count != null ? Number(row.receipt_count) : null,
-      receiptGross,
-      staffFormStatus,
-      staffSalesStatus: staffSalesEntered ? "entered" : "not_entered",
-      staffSalesMessage: staffSalesEntered ? null : "Staff sales not entered",
-      posStatus,
-      varianceSummary,
-      completedBy:    row.completed_by ?? null,
-      staffTotal:     staffSalesEntered ? staffTotal : null,
-      staffExpenses:  row.staff_expenses != null ? Number(row.staff_expenses) : null,
-      source:         "loyverse_shifts + lv_receipt + daily_sales_v2",
+      id: `sr-${String(row.shift_date).slice(0, 10)}`,
+      shiftDate: String(row.shift_date).slice(0, 10),
+      pos: { grossSales: posGross, cash: posCash, qr: toNumber(row.qr_total), grab: toNumber(row.grab_total), receipts: posReceipts },
+      staff: { grossSales: hasDailySalesV2 ? staffGross : null, cash: hasDailySalesV2 ? staffCash : null, qr: hasDailySalesV2 ? toNumber(row.staff_qr) : null, grab: hasDailySalesV2 ? toNumber(row.staff_grab) : null, receipts: hasDailySalesV2 ? staffReceipts : null },
+      differences: { grossSales: grossDiff, receipts: receiptDiff, cash: cashDiff },
+      status,
+      issueExplanation: issues.length > 0 ? issues.join(" ") : "All checked values match.",
+      issueSummary,
+      severity,
+      hasDailySalesV2,
+      hasDailyStockV2,
+      verification: [
+        { label: "Gross Sales", status: grossDiff == null ? "NOT_AVAILABLE" : grossDiff === 0 ? "MATCH" : "DIFFERENCE", message: matchMessage("Gross sales", grossDiff, "money") },
+        { label: "Receipts", status: receiptDiff == null ? "NOT_AVAILABLE" : receiptDiff === 0 ? "MATCH" : "DIFFERENCE", message: matchMessage("Receipts", receiptDiff, "count") },
+        { label: "Cash", status: cashDiff == null ? "NOT_AVAILABLE" : cashDiff === 0 ? "MATCH" : "DIFFERENCE", message: matchMessage("Cash", cashDiff, "money") },
+      ],
+      source: "loyverse_shifts + lv_receipt + daily_sales_v2 + daily_stock_v2",
     };
   });
 }
@@ -147,12 +161,12 @@ async function buildShiftRows(limitOrDate: number | string) {
 router.get("/history", async (req, res) => {
   try {
     const reports = await buildShiftRows(30);
-    return res.json({ reports, source: "loyverse_shifts", blockers: [] });
+    return res.json({ reports, source: "loyverse_shifts + lv_receipt + daily_sales_v2 + daily_stock_v2", blockers: [] });
   } catch (err: any) {
     console.error("[shift-report/history]", err?.message);
     return res.json({
       reports: [],
-      source: "loyverse_shifts",
+      source: "loyverse_shifts + lv_receipt + daily_sales_v2 + daily_stock_v2",
       blockers: [{ code: "HISTORY_QUERY_FAILED", message: err?.message ?? "Query failed" }],
     });
   }
@@ -167,7 +181,7 @@ router.get("/latest", async (req, res) => {
     return res.json(rows[0] ?? null);
   } catch (err: any) {
     console.error("[shift-report/latest]", err?.message);
-    return res.status(500).json({ error: "Failed to fetch latest shift", message: err?.message });
+    return res.status(500).json({ error: "Unable to fetch latest shift", message: err?.message });
   }
 });
 
@@ -212,23 +226,23 @@ router.post("/generate", async (req, res) => {
           id:         report.id,
           shiftDate:  shiftDateObj,
           posData:    {
-            grossSales:   report.grossSales,
-            netSales:     report.netSales,
-            cashSales:    report.cashSales,
-            grabSales:    report.grabSales,
-            qrSales:      report.qrSales,
-            receiptCount: report.receiptCount,
-            receiptGross: report.receiptGross,
-            posStatus:    report.posStatus,
+            grossSales:   report.pos.grossSales,
+            cashSales:    report.pos.cash,
+            grabSales:    report.pos.grab,
+            qrSales:      report.pos.qr,
+            receiptCount: report.pos.receipts,
+            status:       report.status,
           } as object,
           salesData:  {
-            staffTotal:     report.staffTotal,
-            staffExpenses:  report.staffExpenses,
-            completedBy:    report.completedBy,
-            staffFormStatus: report.staffFormStatus,
+            staffTotal:      report.staff.grossSales,
+            staffCash:       report.staff.cash,
+            staffGrab:       report.staff.grab,
+            staffQr:         report.staff.qr,
+            staffReceipts:   report.staff.receipts,
+            dailySalesV2:    report.hasDailySalesV2 ? "submitted" : "missing",
           } as object,
-          stockData:  {} as object,
-          variances:  report.varianceSummary as object ?? {} as object,
+          stockData:  { dailyStockV2: report.hasDailyStockV2 ? "submitted" : "missing" } as object,
+          variances:  report.differences as object,
           aiInsights: null,
         },
       });
@@ -260,7 +274,7 @@ router.get("/view/:id", async (req, res) => {
     const rows = await buildShiftRows(dateStr);
     return res.json(rows[0] ?? null);
   } catch (err: any) {
-    return res.status(500).json({ error: "Failed to fetch report", message: err?.message });
+    return res.status(500).json({ error: "Unable to fetch report", message: err?.message });
   }
 });
 
