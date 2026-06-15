@@ -1,6 +1,6 @@
 import { money, patchOrderingStatus } from "@/components/ordering/orderingApi";
 
-const nextStatuses = ["accepted", "in_kitchen", "ready", "completed", "cancelled"];
+const nextStatuses = ["ACCEPTED", "PREPARING", "READY", "COMPLETED", "CANCELLED"];
 
 export default function KitchenOrderCard({ order, onChanged }: { order: any; onChanged: () => void }) {
   const elapsed = Math.max(0, Math.floor((Date.now() - new Date(order.created_at).getTime()) / 60000));
@@ -15,7 +15,7 @@ export default function KitchenOrderCard({ order, onChanged }: { order: any; onC
           <h3 className="text-2xl font-bold">#{order.order_number}</h3>
           <p className="text-sm uppercase tracking-wide text-gray-600">{order.channel}{order.table_code ? ` · Table ${order.table_code}` : ""}</p>
         </div>
-        <div className="text-right"><div className="font-semibold">{order.status}</div><div className="text-sm text-gray-600">{elapsed} min</div></div>
+        <div className="text-right"><div className="font-semibold">{order.status_code ?? order.status}</div><div className="text-sm text-gray-600">{elapsed} min</div></div>
       </div>
       <div className="mt-4 space-y-3">
         {(order.items ?? []).map((item: any) => (
