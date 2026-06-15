@@ -10,14 +10,37 @@ import {
 const SOURCE = "sbb_ordering_os_phase1";
 
 
-const ORDERING_PHASE1_TEST_MENU_ITEMS = [
-  "Single Burger",
-  "Double Burger",
-  "Fries",
-  "Coke",
-  "Coke Zero",
-  "Water",
+const ORDERING_GO_LIVE_MENU = [
+  { category: "Burgers", name: "Single Burger", description: "Classic Smash Brothers single burger.", price: "150.00", sort: 10 },
+  { category: "Burgers", name: "Double Burger", description: "Two smashed beef patties with cheese.", price: "220.00", sort: 20 },
+  { category: "Burgers", name: "Triple Burger", description: "Three smashed beef patties with cheese.", price: "290.00", sort: 30 },
+  { category: "Burgers", name: "Super Double Bacon", description: "Double burger with bacon.", price: "270.00", sort: 40 },
+  { category: "Sides", name: "Fries", description: "Crispy fries.", price: "80.00", sort: 10 },
+  { category: "Sides", name: "Onion Rings", description: "Crispy onion rings.", price: "90.00", sort: 20 },
+  { category: "Sides", name: "Nuggets", description: "Chicken nuggets.", price: "95.00", sort: 30 },
+  { category: "Drinks", name: "Coke", description: "Coca-Cola.", price: "40.00", sort: 10 },
+  { category: "Drinks", name: "Coke Zero", description: "Coca-Cola Zero Sugar.", price: "40.00", sort: 20 },
+  { category: "Drinks", name: "Sprite", description: "Sprite.", price: "40.00", sort: 30 },
+  { category: "Drinks", name: "Water", description: "Bottled water.", price: "25.00", sort: 40 },
 ] as const;
+
+const STATUS_TO_DB: Record<string, string> = {
+  SUBMITTED: "submitted",
+  ACCEPTED: "accepted",
+  PREPARING: "in_kitchen",
+  READY: "ready",
+  COMPLETED: "completed",
+  CANCELLED: "cancelled",
+};
+
+const STATUS_FROM_DB: Record<string, string> = {
+  submitted: "SUBMITTED",
+  accepted: "ACCEPTED",
+  in_kitchen: "PREPARING",
+  ready: "READY",
+  completed: "COMPLETED",
+  cancelled: "CANCELLED",
+};
 
 
 function requireDb() {
@@ -51,8 +74,47 @@ function hasOwn(input: any, key: string) {
   return Object.prototype.hasOwnProperty.call(input ?? {}, key);
 }
 
+async function ensureGoLiveMenuIfEmpty() {
+  const db = requireDb();
+  const countResult = await db.query(`SELECT COUNT(*)::int AS count FROM ordering_menu_items`);
+  if (Number(countResult.rows[0]?.count ?? 0) > 0) return;
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const categoryIds = new Map<string, string>();
+    for (const [index, category] of ["Burgers", "Sides", "Drinks"].entries()) {
+      const result = await client.query(
+        `INSERT INTO ordering_menu_categories (name_en, description_en, sort_order, is_active)
+         VALUES ($1, $2, $3, TRUE) RETURNING id`,
+        [category, `Go-live ${category.toLowerCase()} category`, (index + 1) * 10],
+      );
+      categoryIds.set(category, result.rows[0].id);
+    }
+    for (const item of ORDERING_GO_LIVE_MENU) {
+      await client.query(
+        `INSERT INTO ordering_menu_items (category_id, name_en, description_en, price, is_active, is_sold_out, sort_order)
+         VALUES ($1, $2, $3, $4, TRUE, FALSE, $5)`,
+        [categoryIds.get(item.category), item.name, item.description, item.price, item.sort],
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function decorateOrder(order: any) {
+  if (!order) return order;
+  return { ...order, status_code: STATUS_FROM_DB[order.status] ?? order.status.toUpperCase(), last_update_time: order.updated_at };
+}
+
 export async function getMenu(includeInactive = false) {
   const db = requireDb();
+  await ensureGoLiveMenuIfEmpty();
   const [categoryResult, itemResult, groupResult, modifierResult] = await Promise.all([
     db.query(`SELECT * FROM ordering_menu_categories ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
     db.query(`SELECT * FROM ordering_menu_items ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
@@ -207,56 +269,13 @@ export async function updateItemModifier(id: string, input: any) {
 
 
 export async function seedPhase1TestMenu(_actor = "admin") {
-  const db = requireDb();
-  const client = await db.connect();
-  try {
-    await client.query("BEGIN");
-    const categoryResult = await client.query(
-      `SELECT * FROM ordering_menu_categories WHERE name_en = 'Phase 1 Test Menu' ORDER BY created_at ASC LIMIT 1`,
-    );
-    let category = categoryResult.rows[0];
-    if (!category) {
-      const createdCategory = await client.query(
-        `INSERT INTO ordering_menu_categories (name_en, name_th, description_en, description_th, sort_order, is_active)
-         VALUES ('Phase 1 Test Menu', NULL, 'Disabled seed records for Phase 1 verification. Set real prices and enable items before customer use.', NULL, 999, TRUE)
-         RETURNING *`,
-      );
-      category = createdCategory.rows[0];
-    }
-
-    const seededItems = [];
-    for (let index = 0; index < ORDERING_PHASE1_TEST_MENU_ITEMS.length; index += 1) {
-      const name = ORDERING_PHASE1_TEST_MENU_ITEMS[index];
-      const existing = await client.query(
-        `SELECT * FROM ordering_menu_items WHERE category_id = $1 AND name_en = $2 ORDER BY created_at ASC LIMIT 1`,
-        [category.id, name],
-      );
-      if (existing.rows[0]) {
-        seededItems.push(existing.rows[0]);
-        continue;
-      }
-      const created = await client.query(
-        `INSERT INTO ordering_menu_items
-          (category_id, name_en, name_th, description_en, description_th, price, is_active, is_sold_out, sort_order)
-         VALUES ($1, $2, NULL, 'Seeded disabled item. Set a real price and enable before ordering.', NULL, 0, FALSE, TRUE, $3)
-         RETURNING *`,
-        [category.id, name, index],
-      );
-      seededItems.push(created.rows[0]);
-    }
-
-    await client.query("COMMIT");
-    return {
-      category,
-      items: seededItems,
-      warning: "Seeded menu items are disabled, sold out, and priced at 0.00 until an admin sets real prices and enables them.",
-    };
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  await ensureGoLiveMenuIfEmpty();
+  const menu = await getMenu(true);
+  return {
+    category: menu.categories[0] ?? null,
+    items: menu.categories.flatMap((category: any) => category.items ?? []),
+    warning: "Go-live menu exists with enabled, visible items priced above zero.",
+  };
 }
 
 export async function createVenueTable(input: any) {
@@ -378,7 +397,7 @@ export async function getOrder(id: string) {
     list.push(modifier);
     modifiersByItem.set(modifier.order_item_id, list);
   }
-  return { ...order, items: itemsResult.rows.map((item) => ({ ...item, modifiers: modifiersByItem.get(item.id) ?? [] })), events: eventsResult.rows, payments: paymentsResult.rows };
+  return decorateOrder({ ...order, items: itemsResult.rows.map((item) => ({ ...item, modifiers: modifiersByItem.get(item.id) ?? [] })), events: eventsResult.rows, payments: paymentsResult.rows });
 }
 
 export async function listOrders(options: { kitchen?: boolean; status?: string; limit?: number } = {}) {
@@ -387,7 +406,7 @@ export async function listOrders(options: { kitchen?: boolean; status?: string; 
   const clauses: string[] = [];
   if (options.kitchen) clauses.push(`status IN ('submitted','accepted','in_kitchen','ready')`);
   if (options.status) {
-    values.push(options.status);
+    values.push(STATUS_TO_DB[options.status.toUpperCase()] ?? options.status.toLowerCase());
     clauses.push(`status = $${values.length}`);
   }
   values.push(options.limit ?? 100);
@@ -402,17 +421,18 @@ export async function listOrders(options: { kitchen?: boolean; status?: string; 
 
 export async function updateOrderStatus(id: string, status: OrderingOrderStatus, actor = "staff", notes?: string | null) {
   const db = requireDb();
-  if (!ORDERING_ORDER_STATUSES.includes(status)) throw new Error("Unsupported order status");
+  const dbStatus = STATUS_TO_DB[String(status).toUpperCase()] ?? String(status).toLowerCase();
+  if (!ORDERING_ORDER_STATUSES.includes(dbStatus as OrderingOrderStatus) || !(STATUS_FROM_DB[dbStatus])) throw new Error("Unsupported order status");
   const client = await db.connect();
   try {
     await client.query("BEGIN");
     const currentResult = await client.query(`SELECT status FROM ordering_orders WHERE id = $1 FOR UPDATE`, [id]);
     const current = currentResult.rows[0];
     if (!current) throw new Error("Order not found");
-    const result = await client.query(`UPDATE ordering_orders SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *`, [id, status]);
-    await client.query(`INSERT INTO ordering_status_events (order_id, from_status, to_status, actor, notes) VALUES ($1,$2,$3,$4,$5)`, [id, current.status, status, actor, notes || null]);
+    const result = await client.query(`UPDATE ordering_orders SET status = $2, updated_at = NOW() WHERE id = $1 RETURNING *`, [id, dbStatus]);
+    await client.query(`INSERT INTO ordering_status_events (order_id, from_status, to_status, actor, notes) VALUES ($1,$2,$3,$4,$5)`, [id, current.status, dbStatus, actor, notes || null]);
     await client.query("COMMIT");
-    return result.rows[0];
+    return decorateOrder(result.rows[0]);
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

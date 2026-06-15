@@ -42,7 +42,7 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
       localStorage.removeItem(tablet ? "sbb_tablet_cart" : "sbb_order_cart");
       navigate(`/order/status/${orderId}`);
     } catch (err: any) {
-      setError(err.message);
+      setError("Unable to submit order. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -66,7 +66,7 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
             <h2 className="text-xl font-semibold">Order details</h2>
             {!tablet && <><input className="mt-3 w-full rounded border p-2" placeholder="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><input className="mt-3 w-full rounded border p-2" placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></>}
             <textarea className="mt-3 w-full rounded border p-2" placeholder="Order notes" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} />
-            <select className="mt-3 w-full rounded border p-2" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}><option value="pay_at_counter">Pay at counter</option><option value="cash">Cash</option><option value="manual_qr_transfer">Manual QR transfer</option></select>
+            <select className="mt-3 w-full rounded border p-2" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}><option value="pay_at_counter">Pay at counter</option><option value="cash">Cash</option><option value="manual_qr_transfer">QR</option></select>
             <button disabled={!cart.length || loading} className="mt-4 w-full rounded bg-black px-4 py-3 font-semibold text-white disabled:bg-gray-400" onClick={submit}>{loading ? "Submitting..." : "Submit order"}</button>
           </section>
         </div>
