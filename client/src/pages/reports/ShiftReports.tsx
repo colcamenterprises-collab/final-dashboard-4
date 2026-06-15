@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Calendar, ChevronDown, ChevronRight, XCircle } from "lucide-react";
 import { PageTitle } from "@/components/ui/sbb-cards";
@@ -15,65 +15,217 @@ type Issue = { shiftDate: string; issueType: "POS Issue" | "Staff Issue" | "Miss
 interface ShiftReport { id: string; shiftDate: string; receipts: MoneyBlock; shiftReport: Required<MoneyBlock>; dailySalesV2: Omit<MoneyBlock, "netSales">; posIntegrityStatus: PosStatus; staffVerificationStatus: StaffStatus; overallStatus: OverallStatus; comparisons: { posIntegrity: Record<string, Comparison>; staffVerification: Record<string, Comparison> }; issueExplanation: string; issues: Issue[]; }
 interface HistoryResponse { reports: ShiftReport[]; blockers?: { code: string; message: string }[]; }
 
-const fields = ["grossSales", "netSales", "cash", "qr", "grab", "other", "receiptCount"] as const;
-const staffFields = ["grossSales", "cash", "qr", "grab", "other", "receiptCount"] as const;
-const labels: Record<string, string> = { grossSales: "Gross Sales", netSales: "Net Sales", cash: "Cash", qr: "QR", grab: "Grab", other: "Other", receiptCount: "Receipt Count" };
+const ALL_FIELDS = ["grossSales", "netSales", "cash", "qr", "grab", "other", "receiptCount"] as const;
+const LABELS: Record<string, string> = { grossSales: "Gross Sales", netSales: "Net Sales", cash: "Cash", qr: "QR", grab: "Grab", other: "Other", receiptCount: "Receipt Count" };
 
-function formatDate(d?: string) { if (!d) return "Not Available"; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
-function formatIssueDate(d?: string) { if (!d) return "Not Available"; const dt = new Date(`${d}T00:00:00Z`); return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }); }
-function money(n: number | null | undefined) { if (n == null) return "Not Available"; return `฿${Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`; }
-function count(n: number | null | undefined) { return n == null ? "Not Available" : Number(n).toLocaleString("en-US"); }
-function value(field: string, n: number | null | undefined) { return field === "receiptCount" ? count(n) : money(n); }
-function diffText(field: string, n: number | null | undefined) { if (n == null) return "Not Available"; if (n === 0) return field === "receiptCount" ? "0 receipts" : "฿0"; const prefix = n > 0 ? "+" : "-"; return field === "receiptCount" ? `${prefix}${Math.abs(n)} receipts` : `${prefix}฿${Math.abs(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`; }
-function statusMark(status: CompareStatus) { if (status === "MATCH") return "✓"; if (status === "DIFFERENCE") return "✕"; return "Not Available"; }
-
-function StatusBadge({ status }: { status: OverallStatus }) {
-  const styles = status === "VERIFIED" ? "bg-emerald-100 text-emerald-800 border-emerald-200" : status === "MISSING FORM" ? "bg-amber-100 text-amber-800 border-amber-200" : status === "STAFF ISSUE" ? "bg-orange-100 text-orange-800 border-orange-200" : "bg-red-100 text-red-800 border-red-200";
-  return <span className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold ${styles}`}>{status}</span>;
+function fmtDate(d?: string) { if (!d) return "—"; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
+function fmtIssueDate(d?: string) { if (!d) return "—"; return new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }); }
+function fmtMoney(n: number | null | undefined) { if (n == null) return "—"; return `฿${Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`; }
+function fmtCount(n: number | null | undefined) { return n == null ? "—" : Number(n).toLocaleString("en-US"); }
+function fmtVal(field: string, n: number | null | undefined) { return field === "receiptCount" ? fmtCount(n) : fmtMoney(n); }
+function fmtDiff(field: string, n: number | null | undefined, compact = false): { text: string; sign: "pos" | "neg" | "zero" | "na" } {
+  if (n == null) return { text: "—", sign: "na" };
+  if (Math.abs(n) < 0.005) return { text: field === "receiptCount" ? "0" : "฿0", sign: "zero" };
+  const abs = Math.abs(n);
+  const prefix = n > 0 ? "+" : "−";
+  const text = field === "receiptCount"
+    ? `${prefix}${abs}`
+    : compact ? `${prefix}฿${abs.toLocaleString("en-US", { maximumFractionDigits: 0 })}` : `${prefix}฿${abs.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  return { text, sign: n > 0 ? "pos" : "neg" };
 }
 
-function SourceBlock({ title, data, includeNet = false }: { title: string; data: MoneyBlock | Omit<MoneyBlock, "netSales">; includeNet?: boolean }) {
-  return <div className="rounded-lg border border-slate-200 bg-white p-3 min-w-[180px]"><h3 className="text-[11px] font-bold uppercase tracking-wide text-slate-700">{title}</h3><dl className="mt-2 space-y-1 text-xs">
-    <Line label="Gross Sales" value={money(data.grossSales)} />
-    {includeNet && <Line label="Net Sales" value={money((data as MoneyBlock).netSales)} />}
-    <Line label="Cash" value={money(data.cash)} /><Line label="QR" value={money(data.qr)} /><Line label="Grab" value={money(data.grab)} /><Line label="Other" value={money(data.other)} /><Line label="Receipt Count" value={count(data.receiptCount)} />
-  </dl></div>;
+function PosBadge({ status }: { status: PosStatus }) {
+  if (status === "VERIFIED") return <span className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">POS ✓</span>;
+  if (status === "MISSING_RECEIPTS") return <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Missing Receipts</span>;
+  if (status === "MISSING_SHIFT_REPORT") return <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Missing Shift Report</span>;
+  return <span className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-700">POS ✕</span>;
 }
-function Line({ label, value }: { label: string; value: string }) { return <div className="flex justify-between gap-3"><dt className="text-slate-500">{label}</dt><dd className="font-semibold text-slate-800">{value}</dd></div>; }
-function Relation({ title, comparison, missing }: { title: string; comparison: Comparison; missing?: boolean }) {
-  if (missing) return <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">{title}<br />Warning: Missing Form</div>;
-  const isMatch = comparison.status === "MATCH";
-  return <div className={`rounded-lg border p-3 text-xs font-semibold ${isMatch ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{title}<br />{isMatch ? "✓ Match" : `✕ Difference ${diffText("grossSales", comparison.difference)}`}</div>;
+
+function StaffBadge({ status }: { status: StaffStatus }) {
+  if (status === "VERIFIED") return <span className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Staff ✓</span>;
+  if (status === "MISSING_FORM") return <span className="inline-flex items-center rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Missing Form</span>;
+  return <span className="inline-flex items-center gap-1 rounded border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-semibold text-orange-700">Staff ✕</span>;
+}
+
+function CheckCell({ cmp, field }: { cmp: Comparison | undefined; field: string }) {
+  if (!cmp || cmp.status === "NOT_AVAILABLE") return <td className="px-3 py-2 text-slate-300 text-center">—</td>;
+  if (cmp.status === "MATCH") return <td className="px-3 py-2 text-center font-semibold text-emerald-600">✓</td>;
+  const { text, sign } = fmtDiff(field, cmp.difference);
+  return <td className={`px-3 py-2 text-center font-semibold ${sign === "neg" ? "text-red-600" : "text-orange-600"}`}>✕ {text}</td>;
+}
+
+function DiffPill({ cmp, field }: { cmp: Comparison | undefined; field: string }) {
+  if (!cmp || cmp.status === "NOT_AVAILABLE") return <span className="text-slate-300">—</span>;
+  if (cmp.status === "MATCH") return <span className="text-emerald-600 font-semibold">✓</span>;
+  const { text, sign } = fmtDiff(field, cmp.difference, true);
+  return <span className={`font-semibold ${sign === "neg" ? "text-red-600" : "text-orange-600"}`}>{text}</span>;
 }
 
 export default function ShiftReports() {
   const [filter, setFilter] = useState<FilterValue>("ALL");
-  const [openRows, setOpenRows] = useState<Record<string, boolean>>({});
+  const [openId, setOpenId] = useState<string | null>(null);
   const { data, isLoading, isError } = useQuery<HistoryResponse>({ queryKey: ["/api/shift-report/history"] });
   const reports = data?.reports ?? [];
   const blockers = data?.blockers ?? [];
+
+  useEffect(() => {
+    if (reports.length > 0 && openId === null) setOpenId(reports[0].id);
+  }, [reports.length]);
+
   const filtered = useMemo(() => reports.filter((r) => filter === "ALL" || r.overallStatus === filter), [reports, filter]);
-  const openIssues = reports.flatMap((r) => r.issues ?? []);
-  const kpis = [["POS Verified", reports.filter((r) => r.posIntegrityStatus === "VERIFIED").length], ["POS Issues", reports.filter((r) => r.posIntegrityStatus !== "VERIFIED").length], ["Staff Issues", reports.filter((r) => r.staffVerificationStatus === "ISSUE").length], ["Missing Forms", reports.filter((r) => r.staffVerificationStatus === "MISSING_FORM").length]];
+  const openIssues = useMemo(() => reports.flatMap((r) => r.issues ?? []), [reports]);
 
-  return <div className="space-y-5 max-w-7xl mx-auto">
-    <PageTitle title="Shift Verification" meta="Receipts → Shift Report → Daily Sales V2" />
-    <div className="flex flex-wrap gap-2">{[["ALL","All"],["VERIFIED","Verified"],["POS ISSUE","POS Issues"],["STAFF ISSUE","Staff Issues"],["MISSING FORM","Missing Forms"]].map(([v, label]) => <button key={v} onClick={() => setFilter(v as FilterValue)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold ${filter === v ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700"}`}>{label}</button>)}</div>
-    {isLoading && <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">Loading shift verification.</div>}
-    {isError && <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><XCircle className="h-4 w-4" />Shift verification data unavailable. Check server connection.</div>}
-    {!isLoading && !isError && blockers.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-1"><div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Data unavailable</div>{blockers.map((b) => <p key={b.code}>{b.message}</p>)}</div>}
-    {!isLoading && !isError && reports.length === 0 && blockers.length === 0 && <div className="flex flex-col items-center py-16 gap-3 text-slate-400"><Calendar className="h-10 w-10 opacity-30" /><p className="text-sm">No shift data found yet.</p></div>}
-    {reports.length > 0 && <>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{kpis.map(([label, v]) => <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 text-xl font-bold text-slate-900">{v}</p></div>)}</div>
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-xs min-w-[1220px]"><thead><tr className="border-b border-slate-100 bg-slate-50">{["Date","Receipts","Shift Report","Daily Sales V2","Status","Action"].map(h => <th key={h} className="text-left px-4 py-3 font-semibold text-slate-600 uppercase tracking-wide text-[10px]">{h}</th>)}</tr></thead><tbody>{filtered.map((r, idx) => <Fragment key={r.id}>
-        <tr onClick={() => setOpenRows(o => ({ ...o, [r.id]: !o[r.id] }))} className={`border-b border-slate-100 align-top hover:bg-blue-50/30 cursor-pointer ${idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"}`}><td className="px-4 py-3 font-semibold text-slate-800 whitespace-nowrap">{formatDate(r.shiftDate)}</td><td className="px-4 py-3"><SourceBlock title="Receipts" data={r.receipts} /></td><td className="px-4 py-3"><div className="space-y-2"><Relation title="Receipts → Shift Report" comparison={r.comparisons.posIntegrity.grossSales} /><SourceBlock title="Shift Report" data={r.shiftReport} includeNet /></div></td><td className="px-4 py-3"><div className="space-y-2"><Relation title="Shift Report → Daily Sales V2" comparison={r.comparisons.staffVerification.grossSales} missing={r.staffVerificationStatus === "MISSING_FORM"} /><SourceBlock title="Daily Sales V2" data={r.dailySalesV2} /></div></td><td className="px-4 py-3"><div className="space-y-1"><StatusBadge status={r.overallStatus} /><p className="text-[11px] text-slate-500">POS: {r.posIntegrityStatus}</p><p className="text-[11px] text-slate-500">Staff: {r.staffVerificationStatus}</p></div></td><td className="px-4 py-3 text-slate-600 whitespace-nowrap"><span className="inline-flex items-center gap-1">{openRows[r.id] ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}View Details</span></td></tr>
-        {openRows[r.id] && <tr className="border-b border-slate-100 bg-slate-50"><td colSpan={6} className="px-4 py-4"><div className="grid gap-4 lg:grid-cols-3"><ComparisonTable title="POS Integrity" subtitle="Receipts vs Shift Report" fields={fields} leftTitle="Receipts" rightTitle="Shift Report" comparisons={r.comparisons.posIntegrity} /><ComparisonTable title="Staff Verification" subtitle="Shift Report vs Daily Sales V2" fields={staffFields} leftTitle="Shift Report" rightTitle="Daily Sales V2" comparisons={r.comparisons.staffVerification} /><div className="rounded-xl border border-slate-200 bg-white p-4"><h3 className="font-bold text-slate-800">Issue Explanation</h3><p className="mt-2 text-sm text-slate-700 leading-6">{r.issueExplanation}</p></div></div></td></tr>}
-      </Fragment>)}</tbody></table></div></div>
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><h2 className="text-sm font-bold uppercase tracking-wide text-slate-700">Open Issues</h2>{openIssues.length === 0 ? <p className="mt-3 text-sm text-slate-500">No open issues.</p> : <div className="mt-3 divide-y divide-slate-100">{openIssues.map((i, idx) => <div key={`${i.shiftDate}-${idx}`} className="py-3 grid gap-1 md:grid-cols-5 text-sm"><p className="font-semibold text-slate-800">{formatIssueDate(i.shiftDate)}</p><p>{i.issueType}</p><p><span className="text-slate-500">Severity:</span> {i.severity}</p><p>{i.explanation}</p><p><span className="text-slate-500">Status:</span> {i.status}</p></div>)}</div>}</section>
-    </>}
-  </div>;
-}
+  const kpis: [string, number][] = [
+    ["POS Verified", reports.filter((r) => r.posIntegrityStatus === "VERIFIED").length],
+    ["POS Issues", reports.filter((r) => r.posIntegrityStatus !== "VERIFIED").length],
+    ["Staff Issues", reports.filter((r) => r.staffVerificationStatus === "ISSUE").length],
+    ["Missing Forms", reports.filter((r) => r.staffVerificationStatus === "MISSING_FORM").length],
+  ];
 
-function ComparisonTable({ title, subtitle, fields, leftTitle, rightTitle, comparisons }: { title: string; subtitle: string; fields: readonly string[]; leftTitle: string; rightTitle: string; comparisons: Record<string, Comparison> }) {
-  return <div className="rounded-xl border border-slate-200 bg-white p-4 overflow-x-auto"><h3 className="font-bold text-slate-800">{title}</h3><p className="text-xs text-slate-500 mb-3">{subtitle}</p><table className="w-full text-xs"><thead><tr className="text-left text-slate-500"><th className="py-2">Field</th><th>{leftTitle}</th><th>{rightTitle}</th><th>Difference</th><th>Status</th></tr></thead><tbody>{fields.map((f) => { const c = comparisons[f]; return <tr key={f} className="border-t border-slate-100"><td className="py-2 font-semibold text-slate-700">{labels[f]}</td><td>{value(f, c?.receiptsValue ?? c?.shiftReportValue)}</td><td>{value(f, c?.dailySalesV2Value ?? c?.shiftReportValue)}</td><td>{diffText(f, c?.difference)}</td><td>{statusMark(c?.status ?? "NOT_AVAILABLE")}</td></tr>; })}</tbody></table></div>;
+  function toggle(id: string) { setOpenId(prev => prev === id ? null : id); }
+
+  return (
+    <div className="space-y-5 max-w-7xl mx-auto">
+      <PageTitle title="Shift Verification" meta="Receipts → Shift Report → Daily Sales V2" />
+
+      <div className="flex flex-wrap gap-2">
+        {([["ALL","All"],["VERIFIED","Verified"],["POS ISSUE","POS Issues"],["STAFF ISSUE","Staff Issues"],["MISSING FORM","Missing Forms"]] as [FilterValue,string][]).map(([v, label]) =>
+          <button key={v} onClick={() => setFilter(v)} className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${filter === v ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>{label}</button>
+        )}
+      </div>
+
+      {isLoading && <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-400">Loading shift verification…</div>}
+      {isError && <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><XCircle className="h-4 w-4" />Shift verification data unavailable.</div>}
+      {!isLoading && !isError && blockers.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-1">
+          <div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />Data unavailable</div>
+          {blockers.map((b) => <p key={b.code}>{b.message}</p>)}
+        </div>
+      )}
+      {!isLoading && !isError && reports.length === 0 && blockers.length === 0 && (
+        <div className="flex flex-col items-center py-16 gap-3 text-slate-400"><Calendar className="h-10 w-10 opacity-30" /><p className="text-sm">No shift data found yet.</p></div>
+      )}
+
+      {reports.length > 0 && (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {kpis.map(([label, v]) => (
+              <div key={label} className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+                <p className="mt-1 text-xl font-bold text-slate-900">{v}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            {filtered.map((r, idx) => {
+              const isOpen = openId === r.id;
+              const posGross = r.comparisons.posIntegrity?.grossSales;
+              const posReceipts = r.comparisons.posIntegrity?.receiptCount;
+              const posCash = r.comparisons.posIntegrity?.cash;
+              const missingReceipts = r.posIntegrityStatus === "MISSING_RECEIPTS";
+              const missingShift = r.posIntegrityStatus === "MISSING_SHIFT_REPORT";
+              const missingForm = r.staffVerificationStatus === "MISSING_FORM";
+
+              return (
+                <div key={r.id} className={`${idx > 0 ? "border-t border-slate-100" : ""}`}>
+                  {/* Collapsed row */}
+                  <button
+                    onClick={() => toggle(r.id)}
+                    className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-slate-50/60 transition-colors ${isOpen ? "bg-slate-50" : ""}`}
+                  >
+                    <span className="w-24 shrink-0 text-xs font-bold text-slate-800">{fmtDate(r.shiftDate)}</span>
+                    <span className="shrink-0"><PosBadge status={r.posIntegrityStatus} /></span>
+                    <span className="shrink-0"><StaffBadge status={r.staffVerificationStatus} /></span>
+                    <span className="hidden md:flex items-center gap-4 flex-1 text-xs text-slate-600">
+                      <span>Gross <DiffPill cmp={posGross} field="grossSales" /></span>
+                      <span>Receipts <DiffPill cmp={posReceipts} field="receiptCount" /></span>
+                      <span>Cash <DiffPill cmp={posCash} field="cash" /></span>
+                    </span>
+                    <span className="ml-auto shrink-0 text-slate-400">
+                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </span>
+                  </button>
+
+                  {/* Expanded panel */}
+                  {isOpen && (
+                    <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-4 space-y-4">
+                      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                        <table className="w-full text-xs min-w-[600px]">
+                          <thead>
+                            <tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                              <th className="px-3 py-2">Field</th>
+                              <th className="px-3 py-2">
+                                Receipts
+                                {missingReceipts && <span className="ml-1 font-normal normal-case text-amber-600">(Missing)</span>}
+                              </th>
+                              <th className="px-3 py-2">
+                                Shift Report
+                                {missingShift && <span className="ml-1 font-normal normal-case text-amber-600">(Missing)</span>}
+                              </th>
+                              <th className="px-3 py-2">
+                                Daily Sales V2
+                                {missingForm && <span className="ml-1 font-normal normal-case text-amber-600">(Missing Form)</span>}
+                              </th>
+                              <th className="px-3 py-2 text-center">POS Check</th>
+                              <th className="px-3 py-2 text-center">Staff Check</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {ALL_FIELDS.map((field) => {
+                              const posCmp = r.comparisons.posIntegrity?.[field];
+                              const staffCmp = r.comparisons.staffVerification?.[field];
+                              const receiptsVal = r.receipts[field as keyof MoneyBlock];
+                              const shiftVal = r.shiftReport[field as keyof Required<MoneyBlock>];
+                              const dsv2Val = field === "netSales" ? null : r.dailySalesV2[field as keyof Omit<MoneyBlock, "netSales">];
+
+                              return (
+                                <tr key={field} className="border-t border-slate-100 hover:bg-slate-50/50">
+                                  <td className="px-3 py-2 font-semibold text-slate-700">{LABELS[field]}</td>
+                                  <td className="px-3 py-2 text-slate-600">{fmtVal(field, receiptsVal)}</td>
+                                  <td className="px-3 py-2 text-slate-600">{fmtVal(field, shiftVal)}</td>
+                                  <td className="px-3 py-2 text-slate-600">{missingForm ? "—" : fmtVal(field, dsv2Val)}</td>
+                                  <CheckCell cmp={posCmp} field={field} />
+                                  {field === "netSales"
+                                    ? <td className="px-3 py-2 text-center text-slate-300">—</td>
+                                    : <CheckCell cmp={staffCmp} field={field} />
+                                  }
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Issue Explanation</p>
+                        <p className="text-sm text-slate-700 leading-6">{r.issueExplanation}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {openIssues.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <h2 className="text-sm font-bold uppercase tracking-wide text-slate-700 mb-3">Open Issues</h2>
+              <div className="divide-y divide-slate-100">
+                {openIssues.map((i, idx) => (
+                  <div key={`${i.shiftDate}-${idx}`} className="py-2.5 grid grid-cols-3 md:grid-cols-5 gap-2 text-xs">
+                    <span className="font-semibold text-slate-800">{fmtIssueDate(i.shiftDate)}</span>
+                    <span className={i.issueType === "POS Issue" ? "text-red-600 font-medium" : i.issueType === "Staff Issue" ? "text-orange-600 font-medium" : "text-amber-600 font-medium"}>{i.issueType}</span>
+                    <span className="text-slate-500">{i.severity}</span>
+                    <span className="col-span-3 md:col-span-1 text-slate-600">{i.explanation}</span>
+                    <span className="text-slate-400">{i.status}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
