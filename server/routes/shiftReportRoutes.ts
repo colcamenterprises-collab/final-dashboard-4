@@ -167,7 +167,7 @@ async function buildShiftRows(limitOrDate: number | string) {
       posIntegrityStatus, staffVerificationStatus, overallStatus,
       comparisons: { posIntegrity: posFields, staffVerification: staffFields },
       issueExplanation: explanations.length ? explanations.join(" ") : "Receipts match the Loyverse shift report and Daily Sales V2 matches the Loyverse shift report.",
-      issues: explanations.map((explanation) => ({ shiftDate: String(row.shift_date).slice(0, 10), issueType: explanation.includes("Daily Sales V2 form is missing") ? "Missing Form" : explanation.startsWith("POS") || explanation.includes("Receipts are not available") || explanation.includes("Loyverse shift report") ? "POS Issue" : "Staff Issue", severity: maxAbs >= 500 ? "High" : maxAbs >= 100 ? "Medium" : "Low", explanation, status: "Open" })),
+      issues: explanations.map((explanation) => ({ shiftDate: String(row.shift_date).slice(0, 10), issueType: explanation.includes("Daily Sales V2 form is missing") ? "Missing Form" : explanation.startsWith("Staff") ? "Staff Issue" : "POS Issue", severity: maxAbs >= 500 ? "High" : maxAbs >= 100 ? "Medium" : "Low", explanation, status: "Open" })),
       sourceMapping: SOURCE_MAPPING,
     };
   });
