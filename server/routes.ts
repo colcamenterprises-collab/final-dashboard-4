@@ -85,6 +85,7 @@ import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
 
 import imageUploadRouter from "./routes/imageUpload";
 import shiftReportRoutes from "./routes/shiftReportRoutes";
+import receiptAnalyticsRouter from "./routes/receiptAnalytics";
 import recipesRouter from "./routes/recipes";
 import staffOpsRouter from "./routes/staffOps";
 
@@ -1172,6 +1173,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Shift Report V2
   app.use("/api/shift-report", shiftReportRoutes);
+
+  // Receipt Analytics — read-only POS item/modifier analysis
+  app.use("/api/reports/receipt-analytics", receiptAnalyticsRouter);
 
 
   // Purchases import

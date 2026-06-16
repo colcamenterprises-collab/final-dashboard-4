@@ -38,6 +38,7 @@ import ExpensesImport from "./pages/finance/ExpensesImport";
 import ShiftReports from "./pages/reports/ShiftReports";
 import ShiftHistory from "./pages/reports/ShiftHistory";
 import Export from "./pages/reports/Export";
+import ReceiptAnalytics from "./pages/reports/ReceiptAnalytics";
 
 import Orders from "./pages/ordering/Orders";
 import Catalog from "./pages/ordering/Catalog";
@@ -120,6 +121,7 @@ export default function App() {
                     <Route path="/reports/shift-reports" element={<ProtectedRoute><ShiftReports /></ProtectedRoute>} />
                     <Route path="/reports/shift-history" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
                     <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
+                    <Route path="/reports/receipts-analysis" element={<ProtectedRoute><ReceiptAnalytics /></ProtectedRoute>} />
 
                     {/* Online Ordering (customer-facing) */}
                     <Route path="/online-ordering" element={<OnlineOrdering />} />

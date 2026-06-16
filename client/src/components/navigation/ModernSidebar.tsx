@@ -96,6 +96,7 @@ const navigationGroups: NavGroup[] = [
     title: "Reports",
     defaultOpen: false,
     items: [
+      { to: "/reports/receipts-analysis", label: "Receipt Analytics", icon: BarChart3, testId: "nav-receipt-analytics" },
       { to: "/reports/shift-reports",  label: "Shift Verification", icon: FileText, testId: "nav-shift-reports" },
       { to: "/reports/shift-history",  label: "Shift History", icon: History,  testId: "nav-shift-history" },
       { to: "/reports/export",         label: "Export",        icon: Download, testId: "nav-export" },
