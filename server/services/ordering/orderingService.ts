@@ -24,6 +24,16 @@ const ORDERING_GO_LIVE_MENU = [
   { category: "Drinks", name: "Water", description: "Bottled water.", price: "25.00", sort: 40 },
 ] as const;
 
+type GoLiveMenuBootstrapResult = {
+  usableBefore: number;
+  usableAfter: number;
+  categoriesCreated: number;
+  categoriesUpdated: number;
+  itemsCreated: number;
+  itemsUpdated: number;
+  bootstrapped: boolean;
+};
+
 const STATUS_TO_DB: Record<string, string> = {
   SUBMITTED: "submitted",
   ACCEPTED: "accepted",
@@ -76,29 +86,109 @@ function hasOwn(input: any, key: string) {
 
 async function ensureGoLiveMenuIfEmpty() {
   const db = requireDb();
-  const countResult = await db.query(`SELECT COUNT(*)::int AS count FROM ordering_menu_items`);
-  if (Number(countResult.rows[0]?.count ?? 0) > 0) return;
+  const usableBeforeResult = await db.query(`
+    SELECT COUNT(*)::int AS count
+    FROM ordering_menu_items item
+    JOIN ordering_menu_categories category ON category.id = item.category_id
+    WHERE item.is_active = TRUE
+      AND item.is_sold_out = FALSE
+      AND item.price > 0
+      AND category.is_active = TRUE
+  `);
+  const usableBefore = Number(usableBeforeResult.rows[0]?.count ?? 0);
+  if (usableBefore > 0) {
+    return {
+      usableBefore,
+      usableAfter: usableBefore,
+      categoriesCreated: 0,
+      categoriesUpdated: 0,
+      itemsCreated: 0,
+      itemsUpdated: 0,
+      bootstrapped: false,
+    };
+  }
 
   const client = await db.connect();
+  const result: GoLiveMenuBootstrapResult = {
+    usableBefore,
+    usableAfter: 0,
+    categoriesCreated: 0,
+    categoriesUpdated: 0,
+    itemsCreated: 0,
+    itemsUpdated: 0,
+    bootstrapped: true,
+  };
   try {
     await client.query("BEGIN");
     const categoryIds = new Map<string, string>();
     for (const [index, category] of ["Burgers", "Sides", "Drinks"].entries()) {
-      const result = await client.query(
-        `INSERT INTO ordering_menu_categories (name_en, description_en, sort_order, is_active)
-         VALUES ($1, $2, $3, TRUE) RETURNING id`,
-        [category, `Go-live ${category.toLowerCase()} category`, (index + 1) * 10],
+      const existingCategory = await client.query(
+        `SELECT * FROM ordering_menu_categories WHERE lower(name_en) = lower($1) ORDER BY created_at ASC, id ASC LIMIT 1`,
+        [category],
       );
-      categoryIds.set(category, result.rows[0].id);
+      if (existingCategory.rows[0]) {
+        const updatedCategory = await client.query(
+          `UPDATE ordering_menu_categories
+           SET description_en = COALESCE(description_en, $2),
+               sort_order = $3,
+               is_active = TRUE,
+               updated_at = NOW()
+           WHERE id = $1
+           RETURNING id`,
+          [existingCategory.rows[0].id, `Go-live ${category.toLowerCase()} category`, (index + 1) * 10],
+        );
+        categoryIds.set(category, updatedCategory.rows[0].id);
+        result.categoriesUpdated += 1;
+      } else {
+        const createdCategory = await client.query(
+          `INSERT INTO ordering_menu_categories (name_en, description_en, sort_order, is_active)
+           VALUES ($1, $2, $3, TRUE) RETURNING id`,
+          [category, `Go-live ${category.toLowerCase()} category`, (index + 1) * 10],
+        );
+        categoryIds.set(category, createdCategory.rows[0].id);
+        result.categoriesCreated += 1;
+      }
     }
     for (const item of ORDERING_GO_LIVE_MENU) {
-      await client.query(
-        `INSERT INTO ordering_menu_items (category_id, name_en, description_en, price, is_active, is_sold_out, sort_order)
-         VALUES ($1, $2, $3, $4, TRUE, FALSE, $5)`,
-        [categoryIds.get(item.category), item.name, item.description, item.price, item.sort],
+      const existingItem = await client.query(
+        `SELECT * FROM ordering_menu_items WHERE lower(name_en) = lower($1) ORDER BY created_at ASC, id ASC LIMIT 1`,
+        [item.name],
       );
+      if (existingItem.rows[0]) {
+        await client.query(
+          `UPDATE ordering_menu_items
+           SET category_id = $2,
+               description_en = COALESCE(description_en, $3),
+               price = $4,
+               is_active = TRUE,
+               is_sold_out = FALSE,
+               sort_order = $5,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [existingItem.rows[0].id, categoryIds.get(item.category), item.description, item.price, item.sort],
+        );
+        result.itemsUpdated += 1;
+      } else {
+        await client.query(
+          `INSERT INTO ordering_menu_items (category_id, name_en, description_en, price, is_active, is_sold_out, sort_order)
+           VALUES ($1, $2, $3, $4, TRUE, FALSE, $5)`,
+          [categoryIds.get(item.category), item.name, item.description, item.price, item.sort],
+        );
+        result.itemsCreated += 1;
+      }
     }
+    const usableAfterResult = await client.query(`
+      SELECT COUNT(*)::int AS count
+      FROM ordering_menu_items item
+      JOIN ordering_menu_categories category ON category.id = item.category_id
+      WHERE item.is_active = TRUE
+        AND item.is_sold_out = FALSE
+        AND item.price > 0
+        AND category.is_active = TRUE
+    `);
+    result.usableAfter = Number(usableAfterResult.rows[0]?.count ?? 0);
     await client.query("COMMIT");
+    return result;
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;
@@ -117,7 +207,7 @@ export async function getMenu(includeInactive = false) {
   await ensureGoLiveMenuIfEmpty();
   const [categoryResult, itemResult, groupResult, modifierResult] = await Promise.all([
     db.query(`SELECT * FROM ordering_menu_categories ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
-    db.query(`SELECT * FROM ordering_menu_items ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
+    db.query(`SELECT * FROM ordering_menu_items ${includeInactive ? "" : "WHERE is_active = TRUE AND is_sold_out = FALSE AND price > 0"} ORDER BY sort_order ASC, name_en ASC`),
     db.query(`SELECT * FROM ordering_modifier_groups ORDER BY sort_order ASC, name_en ASC`),
     db.query(`SELECT * FROM ordering_item_modifiers ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
   ]);
@@ -138,9 +228,6 @@ export async function getMenu(includeInactive = false) {
 
   const itemsByCategory = new Map<string, any[]>();
   for (const item of itemResult.rows) {
-    if (!includeInactive && item.is_sold_out) {
-      // Sold-out items remain visible so customers can see they are unavailable.
-    }
     const list = itemsByCategory.get(item.category_id) ?? [];
     list.push({ ...item, modifier_groups: groupsByItem.get(item.id) ?? [] });
     itemsByCategory.set(item.category_id, list);
@@ -269,12 +356,16 @@ export async function updateItemModifier(id: string, input: any) {
 
 
 export async function seedPhase1TestMenu(_actor = "admin") {
-  await ensureGoLiveMenuIfEmpty();
+  const bootstrap = await ensureGoLiveMenuIfEmpty();
   const menu = await getMenu(true);
+  const warning = bootstrap?.bootstrapped
+    ? `Go-live menu bootstrap created or repaired usable live items because usable item count was ${bootstrap.usableBefore}.`
+    : "Go-live menu already has enabled, visible items priced above zero.";
   return {
     category: menu.categories[0] ?? null,
     items: menu.categories.flatMap((category: any) => category.items ?? []),
-    warning: "Go-live menu exists with enabled, visible items priced above zero.",
+    bootstrap,
+    warning,
   };
 }
 
