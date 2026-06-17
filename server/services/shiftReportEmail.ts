@@ -5,6 +5,15 @@ import { DateTime } from "luxon";
 import { getDailySalesFormNormalized, getShiftSnapshot, upsertFormSnapshot } from "./shiftApprovalService";
 import { storeShiftSnapshot } from "./loyverseService";
 
+function getAppBaseUrl(context: string): string | null {
+  const appBaseUrl = process.env.APP_BASE_URL?.replace(/\/$/, '');
+  if (!appBaseUrl) {
+    console.error(`❌ APP_BASE_URL not configured - cannot build ${context} links`);
+    return null;
+  }
+  return appBaseUrl;
+}
+
 export async function sendShiftReportEmail(reportId: string) {
   const prisma = db();
   const report = await prisma.shift_report_v2.findUnique({
@@ -19,6 +28,8 @@ export async function sendShiftReportEmail(reportId: string) {
   });
 
   const subject = `Shift Report — ${date} — Severity: ${v.level || "UNKNOWN"}`;
+  const appBaseUrl = getAppBaseUrl("shift report email");
+  if (!appBaseUrl) return false;
 
   const body = `
 Shift Report Summary
@@ -41,10 +52,10 @@ AI Insights:
 ${report.aiInsights || "No insights available."}
 
 View Detailed Report:
-https://smash-brothers-dashboard.replit.app/reports/shift-report/view/${report.id}
+${appBaseUrl}/reports/shift-report/view/${report.id}
 
 Download PDF:
-https://smash-brothers-dashboard.replit.app/api/shift-report/pdf/${report.id}
+${appBaseUrl}/api/shift-report/pdf/${report.id}
 `;
 
   await transporter.sendMail({
@@ -104,7 +115,10 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
     </tr>`)
     .join('');
 
-  const shiftUrl = `${process.env.APP_BASE_URL || 'https://smash-brothers-dashboard.replit.app'}/operations/analysis/daily-shift-analysis?date=${dateISO}`;
+  const appBaseUrl = getAppBaseUrl('shift anomaly summary');
+  if (!appBaseUrl) return { sent: false, date: dateISO, reason: 'missing_APP_BASE_URL' };
+
+  const shiftUrl = `${appBaseUrl}/operations/analysis/daily-shift-analysis?date=${dateISO}`;
 
   await transporter.sendMail({
     from: "Shift Reports <colcamenterprises@gmail.com>",
