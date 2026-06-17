@@ -18,6 +18,15 @@ import { db } from "./db";
 import { loyverseReceipts, loyverseShiftReports } from "@shared/schema";
 import crypto from "crypto";
 
+function getAppBaseUrl(context: string): string | null {
+  const appBaseUrl = process.env.APP_BASE_URL?.replace(/\/$/, '');
+  if (!appBaseUrl) {
+    console.error(`❌ APP_BASE_URL not configured - cannot build ${context} URL`);
+    return null;
+  }
+  return appBaseUrl;
+}
+
 // Loyverse webhook event types
 interface WebhookEvent {
   id: string;
@@ -195,9 +204,10 @@ export async function registerWebhooks() {
       return;
     }
 
-    const webhookUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}/api/webhooks/loyverse`
-      : 'https://your-domain.replit.app/api/webhooks/loyverse';
+    const appBaseUrl = getAppBaseUrl('Loyverse webhook registration');
+    if (!appBaseUrl) return;
+
+    const webhookUrl = `${appBaseUrl}/api/webhooks/loyverse`;
 
     const webhooksToRegister = [
       {
