@@ -1,4 +1,4 @@
-import { NavLink, useLocation, Link } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
 import {
@@ -9,7 +9,6 @@ import {
   ChevronDown,
   X,
   ShoppingBag,
-  Package,
   UtensilsCrossed,
   Calculator,
   TrendingUp,
@@ -17,18 +16,13 @@ import {
   FileText,
   List,
   ShieldCheck,
-  ClipboardList,
   AlertTriangle,
   BookOpen,
   Wallet,
-  Upload,
-  Download,
-  History,
   Users,
   CalendarDays,
   UserCheck,
   Settings,
-  Globe,
   QrCode,
   Monitor,
 } from "lucide-react";
@@ -48,16 +42,32 @@ type NavGroup = {
   defaultOpen?: boolean;
 };
 
+const homeNavItem: NavItem = {
+  to: "/dashboard",
+  label: "Home",
+  icon: Home,
+  testId: "nav-home",
+};
+
 const navigationGroups: NavGroup[] = [
   {
-    title: "Core",
+    title: "Operations",
     defaultOpen: true,
     items: [
-      { to: "/dashboard",                          label: "Home",              icon: Home,          testId: "nav-home" },
-      { to: "/operations/daily-sales",             label: "Daily Sales V2",    icon: Receipt,       testId: "nav-daily-sales" },
-      { to: "/operations/daily-stock",             label: "Daily Stock V2",    icon: Package,       testId: "nav-daily-stock" },
-      { to: "/operations/daily-sales-v2/library",  label: "Form Library",      icon: BarChart3,     testId: "nav-library", ownerOnly: true },
-      { to: "/operations/purchasing",              label: "Purchasing",         icon: ShoppingCart,  testId: "nav-purchasing" },
+      { to: "/operations/daily-sales",             label: "Daily Sales & Stock Form", icon: Receipt,       testId: "nav-daily-sales" },
+      { to: "/operations/daily-sales-v2/library",  label: "Daily Form Library",       icon: BarChart3,     testId: "nav-library", ownerOnly: true },
+      { to: "/operations/purchasing",              label: "Purchasing",               icon: ShoppingCart,  testId: "nav-purchasing" },
+      { to: "/operations/shopping-list",           label: "Shopping List",            icon: ShoppingCart,  testId: "nav-shopping-list" },
+      { to: "/operations/health-safety",           label: "Health & Safety",          icon: ShieldCheck,   testId: "nav-health-safety" },
+      { to: "/operations/issue-register",          label: "Issue Register",           icon: AlertTriangle, testId: "nav-issue-register" },
+    ],
+  },
+  {
+    title: "Reporting",
+    defaultOpen: false,
+    items: [
+      { to: "/reports/receipts-analysis", label: "Receipt Analytics",             icon: BarChart3, testId: "nav-receipt-analytics" },
+      { to: "/reports/shift-reports",     label: "Shift Verification & History", icon: FileText,  testId: "nav-shift-reports" },
     ],
   },
   {
@@ -71,57 +81,33 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
-    title: "Ordering",
+    title: "Sales & Ordering",
     defaultOpen: false,
     items: [
-      { to: "/admin/ordering/menu",      label: "Menu Manager",    icon: UtensilsCrossed, testId: "nav-ordering-menu" },
-      { to: "/admin/ordering/orders",    label: "Orders",          icon: ShoppingBag,     testId: "nav-ordering-orders" },
-      { to: "/admin/ordering/qr-codes",  label: "QR Codes",        icon: QrCode,          testId: "nav-ordering-qr" },
-      { to: "/admin/ordering/settings",  label: "Settings",        icon: Settings,        testId: "nav-ordering-settings" },
-      { to: "/kitchen/display",          label: "Kitchen Display", icon: Monitor,         testId: "nav-kitchen-display" },
-      { to: "/order/table/T1",           label: "Table T1 (Test)", icon: Globe,           testId: "nav-ordering-t1" },
+      { to: "/admin/ordering/menu",      label: "Menu Manager",       icon: UtensilsCrossed, testId: "nav-ordering-menu" },
+      { to: "/admin/ordering/orders",    label: "Orders",             icon: ShoppingBag,     testId: "nav-ordering-orders" },
+      { to: "/admin/ordering/qr-codes",  label: "QR Codes & Settings", icon: QrCode,          testId: "nav-ordering-qr" },
+      { to: "/kitchen/display",          label: "Kitchen Display",    icon: Monitor,         testId: "nav-kitchen-display" },
     ],
   },
   {
     title: "Finance",
     defaultOpen: false,
     items: [
-      { to: "/finance",                  label: "Finance Hub",   icon: Wallet,     testId: "nav-finance-hub" },
-      { to: "/finance/profit-loss",      label: "Profit & Loss", icon: TrendingUp, testId: "nav-profit-loss" },
-      { to: "/finance/expenses",         label: "Expenses",      icon: DollarSign, testId: "nav-expenses" },
-      { to: "/finance/expenses-import",  label: "Import",        icon: Upload,     testId: "nav-expenses-import" },
+      { to: "/finance",             label: "Finance Hub",     icon: Wallet,     testId: "nav-finance-hub" },
+      { to: "/finance/profit-loss", label: "Profit and Loss", icon: TrendingUp, testId: "nav-profit-loss" },
+      { to: "/finance/expenses",    label: "Expenses",        icon: DollarSign, testId: "nav-expenses" },
     ],
   },
   {
-    title: "Reports",
+    title: "Human Resources",
     defaultOpen: false,
     items: [
-      { to: "/reports/receipts-analysis", label: "Receipt Analytics", icon: BarChart3, testId: "nav-receipt-analytics" },
-      { to: "/reports/shift-reports",  label: "Shift Verification", icon: FileText, testId: "nav-shift-reports" },
-      { to: "/reports/shift-history",  label: "Shift History", icon: History,  testId: "nav-shift-history" },
-      { to: "/reports/export",         label: "Export",        icon: Download, testId: "nav-export" },
-    ],
-  },
-  {
-    title: "Operations",
-    defaultOpen: false,
-    items: [
-      { to: "/operations/shopping-list",      label: "Shopping List",     icon: ShoppingCart,  testId: "nav-shopping-list" },
-      { to: "/operations/health-safety",      label: "Health & Safety",   icon: ShieldCheck,   testId: "nav-health-safety" },
-      { to: "/operations/manager-checklist",  label: "Manager Checklist", icon: ClipboardList, testId: "nav-manager-checklist" },
-      { to: "/operations/issue-register",     label: "Issue Register",    icon: AlertTriangle, testId: "nav-issue-register" },
-    ],
-  },
-  {
-    title: "Staff",
-    defaultOpen: false,
-    items: [
-      { to: "/staff/dashboard",  label: "Overview",   icon: Users,        testId: "nav-staff-dashboard" },
-      { to: "/staff/members",    label: "Members",    icon: UserCheck,    testId: "nav-staff-members" },
-      { to: "/staff/roster",     label: "Roster",     icon: CalendarDays, testId: "nav-staff-roster" },
-      { to: "/staff/cleaning",   label: "Cleaning",   icon: ClipboardList,testId: "nav-staff-cleaning" },
-      { to: "/staff/attendance", label: "Attendance", icon: Receipt,      testId: "nav-staff-attendance" },
-      { to: "/staff/settings",   label: "Settings",   icon: Settings,     testId: "nav-staff-settings" },
+      { to: "/staff/dashboard",  label: "Overview",     icon: Users,        testId: "nav-staff-dashboard" },
+      { to: "/staff/members",    label: "Staff List",   icon: UserCheck,    testId: "nav-staff-members" },
+      { to: "/staff/roster",     label: "Staff Roster", icon: CalendarDays, testId: "nav-staff-roster" },
+      { to: "/staff/attendance", label: "Attendance",   icon: Receipt,      testId: "nav-staff-attendance" },
+      { to: "/staff/settings",   label: "HR Settings",  icon: Settings,     testId: "nav-staff-settings" },
     ],
   },
 ];
@@ -252,6 +238,31 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
           className="overflow-y-auto p-2 space-y-0.5"
           style={{ maxHeight: "calc(100vh - 120px)" }}
         >
+          {(() => {
+            const active = isActive(homeNavItem.to);
+            const HomeIcon = homeNavItem.icon;
+            return (
+              <NavLink
+                to={homeNavItem.to}
+                onClick={onClose}
+                className={cn(
+                  "flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg transition-all duration-150",
+                  isCollapsed && "lg:justify-center lg:px-2",
+                  active
+                    ? "bg-[#FFD400] text-[#111111]"
+                    : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"
+                )}
+                data-testid={homeNavItem.testId}
+              >
+                <HomeIcon className={cn(
+                  "h-4 w-4 flex-shrink-0",
+                  active ? "text-[#111111]" : "text-neutral-500 group-hover:text-neutral-300"
+                )} />
+                {!isCollapsed && <span className="truncate">{homeNavItem.label}</span>}
+              </NavLink>
+            );
+          })()}
+
           {visibleGroups.map((group) => {
             const isGroupOpen = openGroups.has(group.title);
 
