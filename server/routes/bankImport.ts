@@ -20,6 +20,11 @@ interface ParsedTransaction {
   raw: any;
 }
 
+interface EnhancedTransaction extends ParsedTransaction {
+  category?: string | null;
+  supplier?: string | null;
+}
+
 // Bank format detection and parsing
 type BankFormat = 'kbank' | 'scb' | 'bangkok_bank' | 'krungsri' | 'generic';
 
@@ -185,8 +190,53 @@ function generateDedupeKey(source: string, postedAt: Date, amountTHB: number, de
   return `${source}|${dateStr}|${absAmount}|${descPrefix}`;
 }
 
-async function applyVendorRules(txns: ParsedTransaction[]) {
-  const rules = await db.select().from(vendorRule);
+function isMissingVendorRuleTableError(error: any): boolean {
+  const messages = [
+    error?.message,
+    error?.detail,
+    error?.cause?.message,
+    error?.cause?.detail,
+  ].filter(Boolean).map(String);
+
+  return (
+    error?.code === '42P01' ||
+    error?.cause?.code === '42P01' ||
+    messages.some((message) => /relation ["']?vendor_rule["']? does not exist/i.test(message))
+  );
+}
+
+function logMissingVendorRuleWarning(where: string, error: any) {
+  console.warn('bank_import_vendor_rule_unavailable', {
+    code: 'VENDOR_RULE_TABLE_MISSING',
+    message: 'vendor_rule table is unavailable; continuing without vendor/category suggestions.',
+    where,
+    canonical_source: 'vendor_rule',
+    auto_build_attempted: false,
+    db_code: error?.code || error?.cause?.code,
+  });
+}
+
+function missingVendorRuleWarning(where: string) {
+  return {
+    code: 'VENDOR_RULE_TABLE_MISSING',
+    message: 'vendor_rule table is unavailable; vendor/category suggestions are disabled.',
+    where,
+    canonical_source: 'vendor_rule',
+    auto_build_attempted: false,
+  };
+}
+
+async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTransaction[]> {
+  let rules: any[];
+  try {
+    rules = await db.select().from(vendorRule);
+  } catch (error: any) {
+    if (isMissingVendorRuleTableError(error)) {
+      logMissingVendorRuleWarning('applyVendorRules', error);
+      return txns;
+    }
+    throw error;
+  }
   
   return txns.map(txn => {
     // Find matching rule
@@ -652,7 +702,16 @@ router.get("/rules", async (req, res) => {
       rules,
     });
 
-  } catch (error) {
+  } catch (error: any) {
+    if (isMissingVendorRuleTableError(error)) {
+      logMissingVendorRuleWarning('GET /api/bank-imports/rules', error);
+      return res.json({
+        ok: true,
+        rules: [],
+        warnings: [missingVendorRuleWarning('GET /api/bank-imports/rules')],
+      });
+    }
+
     console.error('List rules error:', error);
     res.status(500).json({ error: "Failed to fetch vendor rules" });
   }
