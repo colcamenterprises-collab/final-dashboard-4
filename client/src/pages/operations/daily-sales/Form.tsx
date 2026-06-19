@@ -656,12 +656,16 @@ export default function DailySales() {
       const shiftId = 
         data?.shiftId ?? 
         data?.salesId ?? // some endpoints return salesId
+        data?.record?.id ??
+        data?.data?.id ??
         data?.id ?? null;
       
       if (!shiftId) {
         console.error("[Form1] Missing shiftId in response:", data);
         throw new Error("Server error: missing shift ID. Please try again.");
       }
+
+      setShiftId(String(shiftId));
       
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });

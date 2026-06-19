@@ -65,7 +65,7 @@ const labels = {
     notesPlaceholder: 'Additional notes for the shift...',
     submitStock: 'Submit Stock Form',
     submitting: 'Submitting...',
-    stockSaved: 'Stock data saved successfully! Redirecting to library...',
+    stockSaved: 'Daily Sales & Stock workflow completed successfully.',
     submitFailed: 'Submit failed.',
     loading: 'Loading stock…',
     incompleteData: 'Incomplete Stock Data',
@@ -99,6 +99,12 @@ const labels = {
     spEditBtn: 'Edit',
     spLockedMsg: '⬆ Complete Purchases This Shift above to unlock stock count entry.',
     spRequiredError: 'Required — enter 0 if none',
+    recoveryTitle: 'Daily Stock requires a linked Daily Sales record',
+    recoveryMessage: 'Open Daily Stock from a completed Daily Sales form or from the Daily Form Library recovery action so stock attaches to the correct sales record.',
+    startSales: 'Start Daily Sales & Stock Form',
+    openLibrary: 'Open Daily Form Library',
+    completionTitle: 'Shift-close workflow complete',
+    completionMessage: 'Daily Sales and Daily Stock have both been saved for this shift.',
   },
   th: {
     pageTitle: 'สต๊อกประจำวัน',
@@ -121,7 +127,7 @@ const labels = {
     notesPlaceholder: 'หมายเหตุเพิ่มเติมสำหรับกะ...',
     submitStock: 'ส่งแบบฟอร์มสต๊อก',
     submitting: 'กำลังส่ง...',
-    stockSaved: 'บันทึกข้อมูลสต๊อกแล้ว! กำลังไปยังรายการ...',
+    stockSaved: 'บันทึกยอดขายและสต๊อกประจำวันเรียบร้อยแล้ว',
     submitFailed: 'ส่งไม่สำเร็จ',
     loading: 'กำลังโหลดสต๊อก…',
     incompleteData: 'ข้อมูลสต๊อกไม่ครบ',
@@ -155,6 +161,12 @@ const labels = {
     spEditBtn: 'แก้ไข',
     spLockedMsg: '⬆ กรอก "การซื้อในกะนี้" ด้านบนเพื่อปลดล็อกการกรอกจำนวนสต๊อก',
     spRequiredError: 'จำเป็น — ใส่ 0 ถ้าไม่มี',
+    recoveryTitle: 'แบบฟอร์มสต๊อกต้องเชื่อมกับยอดขายประจำวัน',
+    recoveryMessage: 'เปิดสต๊อกจากแบบฟอร์มยอดขายที่บันทึกแล้ว หรือจาก Daily Form Library เพื่อให้สต๊อกผูกกับรายการยอดขายที่ถูกต้อง',
+    startSales: 'เริ่ม Daily Sales & Stock Form',
+    openLibrary: 'เปิด Daily Form Library',
+    completionTitle: 'ขั้นตอนปิดกะเสร็จสมบูรณ์',
+    completionMessage: 'บันทึกยอดขายและสต๊อกประจำวันสำหรับกะนี้แล้ว',
   }
 };
 
@@ -192,6 +204,7 @@ const DailyStock: React.FC = () => {
   const [validationErrors, setValidationErrors] = useState<any>({});
   const [lang, setLang] = useState<'en' | 'th'>('en');
   const [showValidationDialog, setShowValidationDialog] = useState(false);
+  const [stockCompleted, setStockCompleted] = useState(false);
   const [validationDetails, setValidationDetails] = useState<{
     rolls?: string;
     meat?: string;
@@ -666,20 +679,13 @@ const DailyStock: React.FC = () => {
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
       
-      // ✅ Dashboard-style success message
-      setMessage({ type: "success", text: "Stock data saved successfully! Redirecting to library..." });
-
-      // ✅ Redirect to Daily Sales V2 Library 
-      setTimeout(() => {
-        window.location.assign("/operations/daily-sales-v2/library");
-      }, 2000);
+      setStockCompleted(true);
+      setMessage({ type: "success", text: L.stockSaved });
 
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Submit failed." });
     } finally {
       setSubmitting(false);
-      // auto-clear message after 4s
-      setTimeout(() => setMessage(null), 4000);
     }
   };
 
@@ -687,6 +693,41 @@ const DailyStock: React.FC = () => {
   const L = labels[lang];
 
   if (loading) return <div className="p-4 text-xs">{L.loading}</div>;
+
+  if (!shiftId) {
+    return (
+      <div className="p-4 space-y-4 text-xs">
+        <LanguageToggle onChange={(nextLang) => setLang((nextLang === "th" ? "th" : "en"))} />
+        <div className="rounded-[4px] border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <h1 className="text-lg font-semibold">{L.recoveryTitle}</h1>
+          <p className="mt-2 text-sm">{L.recoveryMessage}</p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <a className="rounded-[4px] bg-emerald-600 px-4 py-2 text-center text-xs font-medium text-white hover:bg-emerald-700" href="/operations/daily-sales">
+              {L.startSales}
+            </a>
+            <a className="rounded-[4px] border border-slate-300 bg-white px-4 py-2 text-center text-xs font-medium text-slate-700 hover:bg-slate-50" href="/operations/daily-sales-v2/library">
+              {L.openLibrary}
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (stockCompleted) {
+    return (
+      <div className="p-4 space-y-4 text-xs">
+        <div className="rounded-[4px] border border-green-200 bg-green-50 p-4 text-green-900">
+          <h1 className="text-lg font-semibold">{L.completionTitle}</h1>
+          <p className="mt-2 text-sm">{L.completionMessage}</p>
+          <p className="mt-2 text-xs">{L.linkedToShift}: <span className="font-semibold">{shiftId}</span></p>
+          <a className="mt-4 inline-flex rounded-[4px] bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700" href="/operations/daily-sales-v2/library">
+            {L.openLibrary}
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 space-y-4 text-xs">
