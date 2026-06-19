@@ -360,37 +360,126 @@ router.post("/:batchId/approve", async (req, res) => {
       return res.status(400).json({ error: "No transaction IDs provided" });
     }
 
-    // Get transactions to approve
+    // Get requested transactions. Already-approved rows with an expense link are returned
+    // idempotently so duplicate approval attempts do not create duplicate expenses.
     const txnsToApprove = await db.select()
       .from(bankTxn)
       .where(
         and(
           eq(bankTxn.batchId, batchId),
-          inArray(bankTxn.id, ids),
-          eq(bankTxn.status, 'pending')
+          inArray(bankTxn.id, ids)
         )
       );
 
     if (txnsToApprove.length === 0) {
-      return res.status(400).json({ error: "No pending transactions found to approve" });
+      return res.status(400).json({ error: "No transactions found to approve" });
     }
 
-    // TODO: Create expense entries in expensesV2 system
-    // For now, just mark as approved
-    const approvedTxns = await db.update(bankTxn)
-      .set({
-        status: 'approved',
-        category: defaults?.category,
-        supplier: defaults?.supplier, 
-        notes: defaults?.notes,
-      })
-      .where(inArray(bankTxn.id, ids))
-      .returning();
+    const approvedTxns: any[] = [];
+    const blockers: any[] = [];
+
+    for (const txn of txnsToApprove) {
+      if (txn.status === 'approved' && txn.expenseId) {
+        approvedTxns.push(txn);
+        continue;
+      }
+
+      if (txn.status !== 'pending') {
+        blockers.push({
+          code: 'BANK_TXN_NOT_PENDING',
+          message: 'Only pending transactions can be approved into expenses.',
+          where: `bank_txn:${txn.id}`,
+          canonical_source: 'bank_txn',
+          auto_build_attempted: false,
+        });
+        continue;
+      }
+
+      const amountTHB = Number(txn.amountTHB);
+
+      if (!Number.isFinite(amountTHB) || amountTHB <= 0) {
+        blockers.push({
+          code: 'BANK_TXN_NOT_EXPENSE_OUTFLOW',
+          message: 'Only positive outflow bank transactions can create expense records.',
+          where: `bank_txn:${txn.id}`,
+          canonical_source: 'bank_txn',
+          auto_build_attempted: false,
+        });
+        continue;
+      }
+
+      const supplier = defaults?.supplier || txn.supplier;
+      const category = defaults?.category || txn.category;
+
+      if (!supplier || !category) {
+        blockers.push({
+          code: 'BANK_TXN_EXPENSE_MAPPING_INCOMPLETE',
+          message: 'Supplier and category are required before approval can create an expense.',
+          where: `bank_txn:${txn.id}`,
+          canonical_source: 'bank_txn',
+          auto_build_attempted: false,
+        });
+        continue;
+      }
+
+
+      const expenseId = `bank_txn:${txn.id}`;
+      // expenses."costCents" is a legacy/misnamed column in this app. Existing
+      // expensesV2 reads and totals it as whole Thai Baht, not satang/cents, so
+      // bank_txn.amountTHB is written through unchanged with no ×100 conversion.
+      const expenseAmountTHB = amountTHB;
+      await db.execute(sql`
+        INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
+        VALUES (
+          ${expenseId},
+          ${req.headers['x-restaurant-id'] || 'sbb'},
+          ${txn.postedAt},
+          ${supplier},
+          ${expenseAmountTHB},
+          ${txn.description},
+          ${category},
+          ${JSON.stringify({
+            source: 'bank_import',
+            bankTxnId: txn.id,
+            bankImportBatchId: batchId,
+            bankRef: txn.ref || null,
+            notes: defaults?.notes || txn.notes || null,
+            dedupeKey: txn.dedupeKey,
+            amountTHB,
+          })}::jsonb,
+          'BANK_UPLOAD',
+          now()
+        )
+        ON CONFLICT (id) DO NOTHING
+      `);
+
+      const [updatedTxn] = await db.update(bankTxn)
+        .set({
+          status: 'approved',
+          category,
+          supplier,
+          notes: defaults?.notes || txn.notes,
+          expenseId,
+        })
+        .where(and(eq(bankTxn.id, txn.id), eq(bankTxn.status, 'pending')))
+        .returning();
+
+      if (updatedTxn) approvedTxns.push(updatedTxn);
+    }
+
+    const batchTxns = await db.select().from(bankTxn).where(eq(bankTxn.batchId, batchId));
+    const approvedCount = batchTxns.filter((txn) => txn.status === 'approved').length;
+    await db.update(bankImportBatch)
+      .set({ status: approvedCount === batchTxns.length ? 'approved' : approvedCount > 0 ? 'partially_approved' : 'pending' })
+      .where(eq(bankImportBatch.id, batchId));
 
     res.json({
-      ok: true,
+      ok: blockers.length === 0,
       approved: approvedTxns.length,
       txns: approvedTxns,
+      blockers,
+      holdSupported: false,
+      holdSchemaGap: 'bank_txn_status enum does not include hold; no schema migration was performed.',
     });
 
   } catch (error) {

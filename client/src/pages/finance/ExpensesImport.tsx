@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Upload, FileText, CheckCircle, AlertCircle, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
-import { queryClient } from "@/lib/queryClient";
+import { BankTransactionReview } from "@/components/BankTransactionReview";
 
 const AUTH_HEADERS = {
   "x-restaurant-id": "sbb",
@@ -11,21 +11,9 @@ const AUTH_HEADERS = {
   "x-user-role": "manager",
 };
 
-interface ImportedRow {
-  id?: number;
-  date?: string;
-  description?: string;
-  amount?: number;
-  amountTHB?: number;
-  category?: string;
-  status?: string;
-  [key: string]: unknown;
-}
-
 interface BatchResponse {
+  batchId?: string;
   batch?: { id: string; status: string; importedAt?: string };
-  transactions?: ImportedRow[];
-  rows?: ImportedRow[];
   message?: string;
   error?: string;
 }
@@ -70,15 +58,6 @@ export default function ExpensesImport() {
     retry: 1,
   });
 
-  const batchDetailQuery = useQuery({
-    queryKey: ["bank-import-batch", selectedBatch],
-    queryFn: async () => {
-      const res = await fetch(`/api/bank-imports/${selectedBatch}/txns`, { headers: AUTH_HEADERS });
-      if (!res.ok) throw new Error("Failed to load");
-      return res.json();
-    },
-    enabled: !!selectedBatch,
-  });
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => uploadCSV(file),
@@ -155,7 +134,7 @@ export default function ExpensesImport() {
           <div>
             <p className="text-xs font-semibold text-green-700 dark:text-green-400">Upload Successful</p>
             <p className="text-[10px] text-green-600 dark:text-green-500 mt-0.5">
-              {uploadResult.message || `Batch ${uploadResult.batch?.id ?? ""} created — review transactions below`}
+              {uploadResult.message || `Batch ${uploadResult.batchId ?? uploadResult.batch?.id ?? ""} created — review transactions below`}
             </p>
           </div>
         </div>
@@ -181,8 +160,6 @@ export default function ExpensesImport() {
         <div className="divide-y divide-slate-100 dark:divide-slate-800">
           {batches.map((batch) => {
             const isOpen = selectedBatch === batch.id;
-            const detail = isOpen ? batchDetailQuery.data : null;
-            const txns: ImportedRow[] = detail?.transactions ?? detail?.rows ?? [];
             return (
               <div key={batch.id} className="bg-white dark:bg-slate-900">
                 <button
@@ -206,41 +183,7 @@ export default function ExpensesImport() {
 
                 {isOpen && (
                   <div className="px-3 pb-3">
-                    {batchDetailQuery.isLoading && <p className="text-xs text-slate-400 py-2">Loading transactions...</p>}
-                    {txns.length > 0 && (
-                      <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                        <table className="w-full text-[10px]">
-                          <thead>
-                            <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                              <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Date</th>
-                              <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Description</th>
-                              <th className="text-right px-2 py-1.5 text-slate-500 font-semibold">Amount</th>
-                              <th className="text-left px-2 py-1.5 text-slate-500 font-semibold">Category</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {txns.slice(0, 20).map((t, i) => (
-                              <tr key={i} className="bg-white dark:bg-slate-900">
-                                <td className="px-2 py-1.5 text-slate-500">{FmtDate(t.date as string)}</td>
-                                <td className="px-2 py-1.5 text-slate-700 dark:text-slate-300 max-w-[180px] truncate">{String(t.description ?? t.descriptionRaw ?? "—")}</td>
-                                <td className="px-2 py-1.5 text-right font-semibold text-slate-800 dark:text-white">
-                                  {t.amountTHB !== undefined ? `฿${Number(t.amountTHB).toFixed(2)}` : t.amount !== undefined ? `฿${Number(t.amount).toFixed(2)}` : "—"}
-                                </td>
-                                <td className="px-2 py-1.5 text-slate-500">{String(t.category ?? "—")}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {txns.length > 20 && (
-                          <div className="px-3 py-2 bg-slate-50 dark:bg-slate-800 text-[10px] text-slate-400 border-t border-slate-200 dark:border-slate-700">
-                            Showing first 20 of {txns.length} transactions
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {!batchDetailQuery.isLoading && txns.length === 0 && (
-                      <p className="text-xs text-slate-400 py-2">No transactions found in this batch.</p>
-                    )}
+                    <BankTransactionReview batchId={batch.id} onClose={() => setSelectedBatch(null)} />
                   </div>
                 )}
               </div>
