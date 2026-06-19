@@ -4,6 +4,7 @@ import { db } from "../db";
 import { bankImportBatch, bankTxn, vendorRule } from "../../shared/schema";
 import { eq, desc, sql, and, gte, lte, like, inArray } from "drizzle-orm";
 import { z } from "zod";
+import { parse as parseCsv } from "csv-parse/sync";
 
 const router = Router();
 
@@ -20,125 +21,161 @@ interface ParsedTransaction {
 }
 
 // Bank format detection and parsing
-function detectBankFormat(headers: string[]): 'kbank' | 'scb' | 'generic' {
-  const headerStr = headers.join(',').toLowerCase();
-  
-  if (headerStr.includes('posting date') || headerStr.includes('date') && headerStr.includes('description')) {
-    if (headerStr.includes('amount (thb)') || headerStr.includes('amount')) {
-      return 'kbank';
-    }
+type BankFormat = 'kbank' | 'scb' | 'bangkok_bank' | 'krungsri' | 'generic';
+
+class CsvValidationError extends Error {
+  status = 400;
+  details?: Record<string, unknown>;
+
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message);
+    this.name = 'CsvValidationError';
+    this.details = details;
   }
-  
-  if (headerStr.includes('withdrawal') || headerStr.includes('deposit')) {
+}
+
+const normalizeHeader = (value: string) => value.trim().replace(/^\uFEFF/, '').toLowerCase();
+const compactHeader = (value: string) => normalizeHeader(value).replace(/[^a-z0-9ก-๙]/gi, '');
+
+function detectBankFormat(headers: string[]): BankFormat {
+  const normalized = headers.map(normalizeHeader);
+  const compact = headers.map(compactHeader);
+  const headerStr = normalized.join(',');
+
+  if (compact.some(h => h.includes('withdrawal') || h.includes('ถอน')) && compact.some(h => h.includes('deposit') || h.includes('ฝาก'))) {
     return 'scb';
   }
-  
+
+  if (compact.some(h => h.includes('amountthb') || h === 'amount' || h.includes('จำนวนเงิน')) && compact.some(h => h.includes('description') || h.includes('details') || h.includes('รายการ'))) {
+    return 'kbank';
+  }
+
+  if (headerStr.includes('debit') || headerStr.includes('credit')) {
+    return 'bangkok_bank';
+  }
+
+  if (headerStr.includes('paid out') || headerStr.includes('paid in')) {
+    return 'krungsri';
+  }
+
   return 'generic';
 }
 
-function parseDate(dateStr: string): Date {
-  // Try different date formats
-  const formats = [
-    /(\d{1,2})\/(\d{1,2})\/(\d{4})/, // DD/MM/YYYY or MM/DD/YYYY
-    /(\d{4})-(\d{1,2})-(\d{1,2})/, // YYYY-MM-DD
-    /(\d{1,2})-(\w{3})-(\d{2,4})/, // DD-MMM-YY/YYYY
-  ];
-  
-  for (const format of formats) {
-    const match = dateStr.match(format);
-    if (match) {
-      if (format.source.includes('\\w{3}')) {
-        // Handle MMM format (Jan, Feb, etc.)
-        const months: Record<string, number> = {
-          'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
-          'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
-        };
-        const day = parseInt(match[1]);
-        const month = months[match[2].toLowerCase()];
-        let year = parseInt(match[3]);
-        if (year < 100) year += 2000; // Convert 2-digit to 4-digit year
-        
-        return new Date(year, month, day);
-      } else if (format.source.includes('\\d{4}')) {
-        // YYYY-MM-DD format
-        return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
-      } else {
-        // DD/MM/YYYY format (assume Thai format)
-        const day = parseInt(match[1]);
-        const month = parseInt(match[2]) - 1;
-        const year = parseInt(match[3]);
-        return new Date(year, month, day);
-      }
-    }
+function findColumn(headers: string[], candidates: string[]): number {
+  const compact = headers.map(compactHeader);
+  const normalized = headers.map(normalizeHeader);
+  for (const candidate of candidates.map(compactHeader)) {
+    const idx = compact.findIndex(h => h === candidate || h.includes(candidate));
+    if (idx >= 0) return idx;
   }
-  
-  // Fallback to native parsing
-  return new Date(dateStr);
+  for (const candidate of candidates.map(c => c.toLowerCase())) {
+    const idx = normalized.findIndex(h => h.includes(candidate));
+    if (idx >= 0) return idx;
+  }
+  return -1;
+}
+
+function valueAt(row: string[], index: number): string {
+  return index >= 0 ? String(row[index] ?? '').trim() : '';
+}
+
+function parseDate(dateStr: string): Date {
+  const raw = String(dateStr || '').trim();
+  if (!raw) throw new CsvValidationError('Transaction date is missing.');
+  const dateOnly = raw.split(/\s+/)[0];
+  const monthNames: Record<string, number> = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11,
+  };
+
+  let match = dateOnly.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/);
+  if (match) {
+    const day = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    let year = Number(match[3]);
+    if (year < 100) year += 2000;
+    if (year > 2400) year -= 543;
+    const parsed = new Date(Date.UTC(year, month, day));
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  match = dateOnly.match(/^(\d{4})[\/.-](\d{1,2})[\/.-](\d{1,2})$/);
+  if (match) {
+    let year = Number(match[1]);
+    if (year > 2400) year -= 543;
+    const parsed = new Date(Date.UTC(year, Number(match[2]) - 1, Number(match[3])));
+    if (!Number.isNaN(parsed.getTime())) return parsed;
+  }
+
+  match = dateOnly.match(/^(\d{1,2})-(\w{3})-(\d{2,4})$/);
+  if (match) {
+    const month = monthNames[match[2].toLowerCase()];
+    let year = Number(match[3]);
+    if (year < 100) year += 2000;
+    if (year > 2400) year -= 543;
+    if (month !== undefined) return new Date(Date.UTC(year, month, Number(match[1])));
+  }
+
+  const fallback = new Date(raw);
+  if (!Number.isNaN(fallback.getTime())) return fallback;
+  throw new CsvValidationError(`Unsupported transaction date "${raw}". Use DD/MM/YYYY, YYYY-MM-DD, or DD-MMM-YYYY.`);
 }
 
 function parseAmount(amountStr: string): number {
-  // Remove commas, currency symbols, spaces
-  const cleaned = amountStr.replace(/[,฿\s]/g, '');
-  const amount = parseFloat(cleaned);
-  return isNaN(amount) ? 0 : amount;
+  const raw = String(amountStr || '').trim();
+  if (!raw || raw === '-') return 0;
+  const negativeByParens = /^\(.*\)$/.test(raw);
+  const cleaned = raw.replace(/[฿,\s]/g, '').replace(/[()]/g, '');
+  const amount = Number(cleaned);
+  if (!Number.isFinite(amount)) throw new CsvValidationError(`Unsupported amount "${raw}".`);
+  return negativeByParens ? -amount : amount;
 }
 
-function parseCSVRow(row: any, format: string, headers: string[]): ParsedTransaction | null {
-  try {
-    let postedAt: Date;
-    let description: string;
-    let amountTHB: number;
-    let ref: string | undefined;
+function parseCSVRow(row: string[], format: BankFormat, headers: string[], rowNumber: number): ParsedTransaction | null {
+  const dateCol = findColumn(headers, ['date', 'posting date', 'transaction date', 'effective date', 'วันที่']);
+  const descCol = findColumn(headers, ['description', 'details', 'transaction details', 'particulars', 'รายการ', 'คำอธิบาย']);
+  const refCol = findColumn(headers, ['reference', 'ref', 'cheque no', 'เลขที่อ้างอิง']);
+  let postedAt: Date;
+  let description: string;
+  let amountTHB: number;
+  let ref: string | undefined;
 
-    if (format === 'kbank') {
-      // KBank format: Date, Description, Amount (THB), Reference
-      const dateCol = headers.findIndex(h => h.toLowerCase().includes('date'));
-      const descCol = headers.findIndex(h => h.toLowerCase().includes('description') || h.toLowerCase().includes('details'));
-      const amountCol = headers.findIndex(h => h.toLowerCase().includes('amount'));
-      const refCol = headers.findIndex(h => h.toLowerCase().includes('reference') || h.toLowerCase().includes('ref'));
-      
-      postedAt = parseDate(row[dateCol] || row[0]);
-      description = String(row[descCol] || row[1] || '').trim();
-      amountTHB = parseAmount(String(row[amountCol] || row[2] || '0'));
-      ref = refCol >= 0 ? String(row[refCol] || '').trim() : undefined;
-      
-    } else if (format === 'scb') {
-      // SCB format: Date, Description, Withdrawal, Deposit
-      const dateCol = headers.findIndex(h => h.toLowerCase().includes('date'));
-      const descCol = headers.findIndex(h => h.toLowerCase().includes('description'));
-      const withdrawalCol = headers.findIndex(h => h.toLowerCase().includes('withdrawal'));
-      const depositCol = headers.findIndex(h => h.toLowerCase().includes('deposit'));
-      
-      postedAt = parseDate(row[dateCol] || row[0]);
-      description = String(row[descCol] || row[1] || '').trim();
-      
-      const withdrawal = parseAmount(String(row[withdrawalCol] || '0'));
-      const deposit = parseAmount(String(row[depositCol] || '0'));
-      amountTHB = withdrawal > 0 ? withdrawal : -deposit; // Positive = expense, negative = income
-      
-    } else {
-      // Generic format: assume first 3 columns are date, description, amount
-      postedAt = parseDate(row[0] || '');
-      description = String(row[1] || '').trim();
-      amountTHB = parseAmount(String(row[2] || '0'));
-      ref = row[3] ? String(row[3]).trim() : undefined;
-    }
-
-    // Skip empty or zero transactions
-    if (!description || amountTHB === 0) return null;
-
-    return {
-      postedAt,
-      description,
-      amountTHB,
-      ref,
-      raw: Object.fromEntries(headers.map((h, i) => [h, row[i]]))
-    };
-    
-  } catch (error) {
-    console.error('Error parsing CSV row:', error, row);
-    return null;
+  if (format === 'scb') {
+    const withdrawalCol = findColumn(headers, ['withdrawal', 'debit', 'paid out', 'ถอน']);
+    const depositCol = findColumn(headers, ['deposit', 'credit', 'paid in', 'ฝาก']);
+    postedAt = parseDate(valueAt(row, dateCol >= 0 ? dateCol : 0));
+    description = valueAt(row, descCol >= 0 ? descCol : 1);
+    const withdrawal = parseAmount(valueAt(row, withdrawalCol));
+    const deposit = parseAmount(valueAt(row, depositCol));
+    amountTHB = withdrawal > 0 ? withdrawal : -deposit;
+  } else if (format === 'bangkok_bank' || format === 'krungsri') {
+    const debitCol = findColumn(headers, ['debit', 'withdrawal', 'paid out', 'ถอน']);
+    const creditCol = findColumn(headers, ['credit', 'deposit', 'paid in', 'ฝาก']);
+    postedAt = parseDate(valueAt(row, dateCol >= 0 ? dateCol : 0));
+    description = valueAt(row, descCol >= 0 ? descCol : 1);
+    const debit = parseAmount(valueAt(row, debitCol));
+    const credit = parseAmount(valueAt(row, creditCol));
+    amountTHB = debit > 0 ? debit : -credit;
+  } else {
+    const amountCol = findColumn(headers, ['amount (thb)', 'amount thb', 'amount', 'จำนวนเงิน']);
+    postedAt = parseDate(valueAt(row, dateCol >= 0 ? dateCol : 0));
+    description = valueAt(row, descCol >= 0 ? descCol : 1);
+    amountTHB = parseAmount(valueAt(row, amountCol >= 0 ? amountCol : 2));
   }
+
+  ref = valueAt(row, refCol) || undefined;
+  if (!description && amountTHB === 0) return null;
+  if (!description) throw new CsvValidationError(`Row ${rowNumber}: transaction description is missing.`, { rowNumber });
+  if (amountTHB === 0) return null;
+  if (Number.isNaN(postedAt.getTime())) throw new CsvValidationError(`Row ${rowNumber}: transaction date is invalid.`, { rowNumber });
+
+  return {
+    postedAt,
+    description,
+    amountTHB,
+    ref,
+    raw: Object.fromEntries(headers.map((h, i) => [h, row[i] ?? '']))
+  };
 }
 
 function generateDedupeKey(source: string, postedAt: Date, amountTHB: number, description: string): string {
@@ -173,29 +210,55 @@ router.post("/", upload.single('csv'), async (req, res) => {
     }
 
     const csvContent = req.file.buffer.toString('utf-8');
-    const lines = csvContent.split('\n').filter(line => line.trim());
-    
-    if (lines.length < 2) {
-      return res.status(400).json({ error: "CSV file must have at least a header and one data row" });
+    let records: string[][];
+    try {
+      records = parseCsv(csvContent, {
+        bom: true,
+        relaxColumnCount: true,
+        skipEmptyLines: true,
+        trim: true,
+      });
+    } catch (error: any) {
+      throw new CsvValidationError(`CSV parser error: ${error.message || 'invalid CSV file'}`);
     }
 
-    // Parse CSV manually (simple approach)
-    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    if (records.length < 2) {
+      throw new CsvValidationError("CSV file must have at least a header and one data row");
+    }
+
+    const headers = records[0].map(h => String(h || '').trim());
+    if (headers.every(h => !h)) {
+      throw new CsvValidationError("CSV header row is empty");
+    }
+
     const format = detectBankFormat(headers);
     const source = req.body.source || format.toUpperCase();
-    
-    // Parse all data rows
+    const rowErrors: string[] = [];
     const rawTxns: ParsedTransaction[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cells = lines[i].split(',').map(c => c.trim().replace(/"/g, ''));
-      const parsed = parseCSVRow(cells, format, headers);
-      if (parsed) {
-        rawTxns.push(parsed);
+
+    for (let i = 1; i < records.length; i++) {
+      try {
+        const parsed = parseCSVRow(records[i], format, headers, i + 1);
+        if (parsed) rawTxns.push(parsed);
+      } catch (error: any) {
+        rowErrors.push(error.message || `Row ${i + 1}: could not parse transaction.`);
+        if (rowErrors.length >= 5) break;
       }
     }
 
     if (rawTxns.length === 0) {
-      return res.status(400).json({ error: "No valid transactions found in CSV" });
+      throw new CsvValidationError(
+        rowErrors.length > 0 ? rowErrors[0] : "No valid transactions found in CSV. Check date, description, and amount columns.",
+        { format, headers, rowErrors }
+      );
+    }
+
+    if (!db) {
+      return res.status(503).json({
+        error: "Database unavailable for bank import",
+        reason: "DATABASE_URL is not configured, so parsed transactions cannot be saved for review.",
+        details: { format, parsedRows: rawTxns.length },
+      });
     }
 
     // Apply vendor rules for smart suggestions
@@ -246,9 +309,14 @@ router.post("/", upload.single('csv'), async (req, res) => {
       format,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('CSV upload error:', error);
-    res.status(500).json({ error: "Failed to process CSV upload" });
+    const status = error instanceof CsvValidationError ? error.status : 500;
+    res.status(status).json({
+      error: status === 500 ? "Failed to process CSV upload" : error.message,
+      reason: error.message,
+      details: error.details,
+    });
   }
 });
 
