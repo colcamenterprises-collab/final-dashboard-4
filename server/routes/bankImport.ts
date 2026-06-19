@@ -424,6 +424,10 @@ router.post("/:batchId/approve", async (req, res) => {
 
 
       const expenseId = `bank_txn:${txn.id}`;
+      // expenses."costCents" is a legacy/misnamed column in this app. Existing
+      // expensesV2 reads and totals it as whole Thai Baht, not satang/cents, so
+      // bank_txn.amountTHB is written through unchanged with no ×100 conversion.
+      const expenseAmountTHB = amountTHB;
       await db.execute(sql`
         INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
         VALUES (
@@ -431,7 +435,7 @@ router.post("/:batchId/approve", async (req, res) => {
           ${req.headers['x-restaurant-id'] || 'sbb'},
           ${txn.postedAt},
           ${supplier},
-          ${Math.round(amountTHB)},
+          ${expenseAmountTHB},
           ${txn.description},
           ${category},
           ${JSON.stringify({
