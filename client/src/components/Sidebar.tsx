@@ -20,7 +20,7 @@ const groups: Group[] = [
   {
     title: "Daily Sales",
     items: [
-      { to: "/operations/daily-sales", label: "Daily Sales Form" },
+      { to: "/operations/daily-sales", label: "Daily Sales & Stock Form" },
       { to: "/operations/daily-sales-library", label: "Library" },
       { to: "/operations/daily-sales-analysis", label: "Daily Sales Analysis" },
     ],
@@ -31,7 +31,6 @@ const groups: Group[] = [
       { to: "/operations/health-safety-audit", label: "Operations Audit" },
       { to: "/operations/variance-monitor", label: "Variance Monitor" },
       { to: "/operations/issue-register", label: "Issue Register" },
-      { to: "/operations/daily-stock", label: "Daily Stock V2" },
       { to: "/operations/daily-stock-analysis", label: "Daily Stock Analysis" },
       { to: "/operations/loyverse-mirror", label: "Loyverse Mirror" },
     ],
