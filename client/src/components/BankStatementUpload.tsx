@@ -25,6 +25,7 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
   const [isUploading, setIsUploading] = useState(false);
   const [source, setSource] = useState("CSV");
   const [result, setResult] = useState<UploadResult | null>(null);
+  const [uploadError, setUploadError] = useState("");
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
@@ -42,6 +43,7 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
     }
 
     setIsUploading(true);
+    setUploadError("");
     setProgress(10);
 
     try {
@@ -59,8 +61,9 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
       setProgress(80);
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
+        const error = await response.json().catch(() => ({}));
+        const detailLines = error.details?.rowErrors?.length ? ` Details: ${error.details.rowErrors.join(' ')}` : '';
+        throw new Error(`${error.reason || error.error || 'Upload failed'}${detailLines}`);
       }
 
       const uploadResult: UploadResult = await response.json();
@@ -76,6 +79,7 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
 
     } catch (error: any) {
       console.error('Upload error:', error);
+      setUploadError(error.message || "Failed to process CSV file");
       toast({
         title: "Upload failed",
         description: error.message || "Failed to process CSV file",
@@ -200,6 +204,13 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
               )}
             </div>
           </div>
+
+          {uploadError && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+              <div className="font-semibold">Upload failed</div>
+              <div className="mt-1 whitespace-pre-wrap">{uploadError}</div>
+            </div>
+          )}
 
           {/* Upload Progress */}
           {isUploading && (

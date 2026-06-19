@@ -27,7 +27,10 @@ async function uploadCSV(file: File): Promise<BatchResponse> {
     body,
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  if (!res.ok) {
+    const detailLines = data.details?.rowErrors?.length ? ` Details: ${data.details.rowErrors.join(" ")}` : "";
+    throw new Error(`${data.reason || data.error || `HTTP ${res.status}`}${detailLines}`);
+  }
   return data;
 }
 

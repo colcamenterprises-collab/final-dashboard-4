@@ -30,9 +30,10 @@ interface BankTransaction {
 interface ReviewPanelProps {
   batchId: string;
   onClose: () => void;
+  onApproved?: () => void;
 }
 
-export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
+export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPanelProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filters, setFilters] = useState({
     status: '',
@@ -80,6 +81,8 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
         variant: data.blockers?.length ? "destructive" : undefined,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
+      onApproved?.();
       setSelectedIds([]);
     },
     onError: (error: any) => {
