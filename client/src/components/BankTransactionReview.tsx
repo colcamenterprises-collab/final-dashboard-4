@@ -242,8 +242,10 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                   <SelectItem value="deleted">Deleted</SelectItem>
+                  <SelectItem value="hold_unavailable" disabled>Hold — unavailable</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="mt-1 text-[10px] text-slate-500">Hold unavailable: bank_txn_status schema does not support hold.</p>
             </div>
 
             <div>
@@ -421,7 +423,7 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
                                 variant="ghost"
                                 disabled
                                 className="h-7 w-7 p-0"
-                                title="Hold requires bank_txn_status schema support; no migration performed"
+                                title="Hold unavailable: bank_txn_status schema does not support hold; no migration performed"
                               >
                                 <PauseCircle className="h-3 w-3 text-blue-600" />
                               </Button>
