@@ -2,14 +2,31 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { TrendingUp, Receipt, Upload, ArrowRight } from "lucide-react";
 
-interface FinancialOverview {
-  period: string;
-  totalRevenue: number;
-  totalExpenses: number;
+interface MonthData {
+  sales: number;
+  cogs: number;
+  expenses: number;
   grossProfit: number;
-  profitMargin: number;
-  averageDaily?: number;
+  netProfit: number;
 }
+
+interface ProfitLossData {
+  success: boolean;
+  year: number;
+  monthlyData: Record<string, MonthData>;
+  dataSource?: {
+    salesRecords?: number;
+    loyverseRecords?: number;
+    expenseRecords?: number;
+  };
+}
+
+type Metric = {
+  label: string;
+  value: number | null;
+  suffix?: string;
+  missing?: string;
+};
 
 const sections = [
   {
@@ -33,13 +50,49 @@ const sections = [
 ];
 
 function fmt(n: number) {
-  return n?.toLocaleString("en-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? "—";
+  return n.toLocaleString("en-TH", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function moneyMetric(label: string, value: number | null, missing?: string): Metric {
+  return { label, value, missing };
+}
+
+function renderMetric(metric: Metric) {
+  const isMissing = metric.value === null || metric.value === undefined;
+  const value = isMissing ? "Missing data" : `${metric.suffix === "%" ? "" : "฿"}${fmt(metric.value)}${metric.suffix ?? ""}`;
+
+  return (
+    <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-900">
+      <p className="text-[10px] text-slate-400 uppercase tracking-wide">{metric.label}</p>
+      <p className={`text-base font-semibold text-slate-800 dark:text-slate-200 mt-1 ${isMissing ? "text-slate-400" : ""}`}>
+        {value}
+      </p>
+      {isMissing && metric.missing && (
+        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">{metric.missing}</p>
+      )}
+    </div>
+  );
 }
 
 export default function FinanceHub() {
-  const { data } = useQuery<FinancialOverview>({
-    queryKey: ["/api/reports/financial-overview"],
+  const { data, isLoading, isError } = useQuery<ProfitLossData>({
+    queryKey: ["/api/profit-loss"],
   });
+
+  const months = data?.monthlyData ? Object.values(data.monthlyData) : [];
+  const revenue = months.reduce((sum, month) => sum + Number(month.sales || 0), 0);
+  const expenses = months.reduce((sum, month) => sum + Number(month.expenses || 0), 0);
+  const hasRevenueSource = Boolean((data?.dataSource?.salesRecords || 0) > 0 || (data?.dataSource?.loyverseRecords || 0) > 0);
+  const hasExpenseSource = Boolean((data?.dataSource?.expenseRecords || 0) > 0);
+  const cogsMissing = "COGS source unavailable; hub will not use estimated COGS.";
+  const metrics: Metric[] = [
+    moneyMetric("Revenue", hasRevenueSource ? revenue : null, "No sales source records returned."),
+    moneyMetric("COGS", null, cogsMissing),
+    moneyMetric("Gross Profit", null, cogsMissing),
+    moneyMetric("Expenses", hasExpenseSource ? expenses : null, "No expense source records returned."),
+    moneyMetric("Net Profit", null, cogsMissing),
+    { label: "Margin %", value: null, suffix: "%", missing: cogsMissing },
+  ];
 
   return (
     <div className="p-4 space-y-6 max-w-4xl mx-auto">
@@ -48,22 +101,13 @@ export default function FinanceHub() {
         <p className="text-xs text-slate-500">Financial overview and reporting</p>
       </div>
 
-      {data && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-900">
-            <p className="text-[10px] text-slate-400 uppercase tracking-wide">Revenue</p>
-            <p className="text-base font-semibold text-slate-800 dark:text-slate-200 mt-1">฿{fmt(data.totalRevenue)}</p>
-          </div>
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-900">
-            <p className="text-[10px] text-slate-400 uppercase tracking-wide">Expenses</p>
-            <p className="text-base font-semibold text-slate-800 dark:text-slate-200 mt-1">฿{fmt(data.totalExpenses)}</p>
-          </div>
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-900">
-            <p className="text-[10px] text-slate-400 uppercase tracking-wide">Gross Profit</p>
-            <p className={`text-base font-semibold mt-1 ${data.grossProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
-              ฿{fmt(data.grossProfit)}
-            </p>
-          </div>
+      {isLoading && <div className="text-xs text-slate-400">Loading finance metrics...</div>}
+      {isError && <div className="text-xs text-red-500">Failed to load finance metrics.</div>}
+      {!isLoading && !isError && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {metrics.map((metric) => (
+            <div key={metric.label}>{renderMetric(metric)}</div>
+          ))}
         </div>
       )}
 

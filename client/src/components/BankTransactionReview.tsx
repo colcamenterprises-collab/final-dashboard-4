@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Search, Filter, Check, X, Edit2, Trash2, ChevronLeft } from "lucide-react";
+import { Filter, Check, X, Edit2, Trash2, ChevronLeft, PauseCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ interface BankTransaction {
   description: string;
   amountTHB: string;
   ref?: string;
-  status: 'pending' | 'approved' | 'rejected' | 'deleted';
+  status: 'pending' | 'approved' | 'rejected' | 'deleted' | 'hold';
   category?: string;
   supplier?: string;
   notes?: string;
@@ -68,13 +68,16 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
     mutationFn: async ({ ids, defaults }: { ids: string[]; defaults?: any }) => {
       return apiRequest(`/api/bank-imports/${batchId}/approve`, {
         method: 'POST',
-        body: { ids, defaults },
+        body: JSON.stringify({ ids, defaults }),
       });
     },
     onSuccess: (data) => {
       toast({
-        title: "Transactions approved",
-        description: `${data.approved} transactions approved successfully`,
+        title: data.blockers?.length ? "Approval completed with blockers" : "Transactions approved",
+        description: data.blockers?.length
+          ? `${data.approved} approved; ${data.blockers.length} blocked. Supplier and category are required.`
+          : `${data.approved} transactions approved successfully`,
+        variant: data.blockers?.length ? "destructive" : undefined,
       });
       queryClient.invalidateQueries({ queryKey: ['/api/bank-imports', batchId, 'txns'] });
       setSelectedIds([]);
@@ -93,7 +96,7 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
     mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
       return apiRequest(`/api/bank-imports/txns/${id}`, {
         method: 'PATCH',
-        body: updates,
+        body: JSON.stringify(updates),
       });
     },
     onSuccess: () => {
@@ -165,8 +168,23 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
       case 'approved': return 'bg-green-100 text-green-800';
       case 'rejected': return 'bg-red-100 text-red-800';
       case 'deleted': return 'bg-gray-100 text-gray-800';
+      case 'hold': return 'bg-blue-100 text-blue-800';
       default: return 'bg-yellow-100 text-yellow-800';
     }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'approved': return 'Approved';
+      case 'rejected': return 'Rejected';
+      case 'deleted': return 'Deleted';
+      case 'hold': return 'Hold';
+      default: return 'Pending';
+    }
+  };
+
+  const handleReject = (id: string) => {
+    editMutation.mutate({ id, updates: { status: 'rejected' } });
   };
 
   const getAmountColor = (amount: string) => {
@@ -373,7 +391,7 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(txn.status)}>
-                          {txn.status}
+                          {getStatusLabel(txn.status)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -394,8 +412,28 @@ export function BankTransactionReview({ batchId, onClose }: ReviewPanelProps) {
                                 variant="ghost"
                                 onClick={() => setEditingTxn(txn)}
                                 className="h-7 w-7 p-0"
+                                title="Edit supplier/category before approval"
                               >
                                 <Edit2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled
+                                className="h-7 w-7 p-0"
+                                title="Hold requires bank_txn_status schema support; no migration performed"
+                              >
+                                <PauseCircle className="h-3 w-3 text-blue-600" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleReject(txn.id)}
+                                disabled={editMutation.isPending}
+                                className="h-7 w-7 p-0"
+                                title="Reject"
+                              >
+                                <X className="h-3 w-3 text-red-600" />
                               </Button>
                             </>
                           )}
