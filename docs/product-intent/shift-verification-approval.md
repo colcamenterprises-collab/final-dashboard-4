@@ -68,4 +68,5 @@ Approval is the management checkpoint that confirms:
 - cash register reconciliation is acceptable
 - cash banked and QR banked are checked
 - expenses are understood
+- discrepancies, if any, are recorded for management review
 - the shift is suitable for trusted reporting
