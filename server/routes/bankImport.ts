@@ -252,14 +252,26 @@ async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTran
   });
 }
 
+function getUploadedCsvFile(req: any): Express.Multer.File | undefined {
+  if (req.file) return req.file;
+  const files = req.files as Record<string, Express.Multer.File[]> | undefined;
+  return files?.csv?.[0] || files?.file?.[0];
+}
+
+const csvUploadFields = upload.fields([
+  { name: 'csv', maxCount: 1 },
+  { name: 'file', maxCount: 1 },
+]);
+
 // POST /api/bank-imports - Upload and parse CSV
-router.post("/", upload.single('csv'), async (req, res) => {
+async function handleCsvUpload(req: any, res: any) {
   try {
-    if (!req.file) {
+    const uploadedFile = getUploadedCsvFile(req);
+    if (!uploadedFile) {
       return res.status(400).json({ error: "No CSV file uploaded" });
     }
 
-    const csvContent = req.file.buffer.toString('utf-8');
+    const csvContent = uploadedFile.buffer.toString('utf-8');
     let records: string[][];
     try {
       records = parseCsv(csvContent, {
@@ -317,7 +329,7 @@ router.post("/", upload.single('csv'), async (req, res) => {
     // Create batch
     const [batch] = await db.insert(bankImportBatch).values({
       source,
-      filename: req.file.originalname || 'upload.csv',
+      filename: uploadedFile.originalname || 'upload.csv',
       status: 'pending',
     }).returning();
 
@@ -368,7 +380,10 @@ router.post("/", upload.single('csv'), async (req, res) => {
       details: error.details,
     });
   }
-});
+}
+
+router.post("/", csvUploadFields, handleCsvUpload);
+router.post("/csv", csvUploadFields, handleCsvUpload);
 
 // GET /api/bank-imports/:batchId/txns - List transactions with filters
 const listTxnsSchema = z.object({

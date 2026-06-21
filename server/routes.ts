@@ -3741,6 +3741,8 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     app.use('/api/expensesV2/imports', expenseModule.default);
   }).catch(err => console.warn('Legacy expense imports unavailable:', err));
 
+  // Canonical Finance bank CSV import routes must be mounted before legacy PDF/CSV stubs.
+  app.use("/api/bank-imports", bankImportRouter);
   app.use("/api/bank-imports", bankUploadRouter);
 
   // Import and register finance router
