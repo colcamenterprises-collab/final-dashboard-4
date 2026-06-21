@@ -67,6 +67,8 @@ export default function ExpensesImport() {
     onSuccess: (data) => {
       setUploadError("");
       setUploadResult(data);
+      const uploadedBatchId = data.batchId ?? data.batch?.id ?? null;
+      if (uploadedBatchId) setSelectedBatch(uploadedBatchId);
       refetchBatches();
     },
     onError: (e: Error) => {
