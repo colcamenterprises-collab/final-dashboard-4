@@ -38,25 +38,28 @@ export function usePinAuth() {
 
 // ─── Public path bypass ───────────────────────────────────────────────────────
 
-const PUBLIC_PATH_PREFIXES = [
+const PUBLIC_EXACT_PATHS = new Set([
   "/",
-  "/website",
   "/menu",
   "/membership",
   "/staff",
+  "/login",
+  "/pos-login",
+]);
+
+const PUBLIC_PATH_PREFIXES = [
+  "/website",
   "/order",
   "/online-ordering",
   "/ordering/tablet",
   "/kitchen/display",
-  "/login",
-  "/pos-login",
 ];
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATH_PREFIXES.some((p) => {
-    if (p === "/") return pathname === "/";
-    return pathname === p || pathname.startsWith(p + "/");
-  });
+  if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
+  return PUBLIC_PATH_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/")
+  );
 }
 
 // ─── Main gate component ─────────────────────────────────────────────────────
