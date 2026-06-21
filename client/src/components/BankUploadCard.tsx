@@ -22,14 +22,14 @@ export default function BankUploadCard({ onImported }: Props) {
     setMsg(null);
     try {
       const fd = new FormData();
-      fd.append("file", file);
+      fd.append("csv", file);
 
-      // CSV -> /csv, PDF -> /pdf
       const isPDF =
         file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-      const url = isPDF
-        ? "/api/bank-imports/pdf"
-        : "/api/bank-imports/csv";
+      if (isPDF) {
+        throw new Error("Only CSV bank statements are supported in this Finance import flow.");
+      }
+      const url = "/api/bank-imports";
 
       const res = await fetch(url, {
         method: "POST",
@@ -60,7 +60,7 @@ export default function BankUploadCard({ onImported }: Props) {
         <div>
           <h3 className="text-xl font-semibold">Bank Statement Upload</h3>
           <p className="text-sm text-gray-500">
-            Upload CSV or PDF statements to create expense entries. Approve / Edit / Delete after import.
+            Upload CSV statements to create expense entries. Approve / Edit / Delete after import.
           </p>
         </div>
       </div>
@@ -72,7 +72,7 @@ export default function BankUploadCard({ onImported }: Props) {
           value={bank}
           onChange={() => setBank("generic")}
         >
-          <option value="generic">Generic CSV / PDF</option>
+          <option value="generic">Generic CSV</option>
         </select>
       </div>
 
@@ -85,7 +85,7 @@ export default function BankUploadCard({ onImported }: Props) {
       >
         <div className="text-4xl mb-2">📄</div>
         <div className="text-gray-700 font-medium">
-          Drag & drop a <b>CSV or PDF</b> here,
+          Drag & drop a <b>CSV</b> here,
         </div>
         <div className="text-gray-500 mb-3">or click to select</div>
 
@@ -100,7 +100,7 @@ export default function BankUploadCard({ onImported }: Props) {
         <input
           ref={fileInput}
           type="file"
-          accept=".csv,application/pdf"
+          accept=".csv,text/csv"
           className="hidden"
           onChange={onSelectFile}
         />
@@ -114,7 +114,6 @@ export default function BankUploadCard({ onImported }: Props) {
 
       <p className="text-xs text-gray-400 mt-4">
         Expected CSV columns (Generic): <b>Date, Description, Amount (THB)</b>.
-        PDFs will be parsed automatically (beta).
       </p>
     </div>
   );
