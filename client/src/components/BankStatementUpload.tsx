@@ -15,6 +15,7 @@ interface UploadResult {
   inserted: number;
   skippedDupes: number;
   format: string;
+  source?: string;
 }
 
 interface BankStatementUploadProps {
@@ -118,7 +119,11 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
           <div className="space-y-3">
             <div className="text-sm">
               <div className="flex justify-between">
-                <span>Format detected:</span>
+                <span>Bank source:</span>
+                <span className="font-medium">{result.source || source}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Parser format:</span>
                 <span className="font-medium">{result.format}</span>
               </div>
               <div className="flex justify-between">

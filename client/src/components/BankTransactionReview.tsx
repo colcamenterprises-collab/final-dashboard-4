@@ -40,7 +40,6 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
     search: '',
     min: '',
     max: '',
-    month: new Date().toISOString().slice(0, 7), // YYYY-MM
   });
   const [editingTxn, setEditingTxn] = useState<BankTransaction | null>(null);
   const [bulkDefaults, setBulkDefaults] = useState({
@@ -60,6 +59,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.append(key, value);
       });
+      params.set('limit', '500');
       return apiRequest(`/api/bank-imports/${batchId}/txns?${params}`);
     },
   });
@@ -127,7 +127,11 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
   });
 
   const transactions = txnsData?.txns || [];
-  const pagination = txnsData?.pagination || {};
+  const batchSummary = txnsData?.batch || {
+    id: batchId,
+    importedCount: txnsData?.pagination?.total ?? transactions.length,
+    visibleCount: transactions.length,
+  };
 
   const handleSelectAll = () => {
     if (selectedIds.length === transactions.length) {
@@ -208,6 +212,9 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
             <h2 className="text-xl font-semibold">Review Bank Transactions</h2>
             <p className="text-sm text-muted-foreground">
               Review and approve imported transactions
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Batch {batchSummary.id} · Imported {batchSummary.importedCount} · Visible {batchSummary.visibleCount}
             </p>
           </div>
         </div>
