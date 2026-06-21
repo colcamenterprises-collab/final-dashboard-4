@@ -9,6 +9,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import PinLoginGate, { usePinAuth } from "./components/PinLoginGate";
 import PageShell from "./layouts/PageShell";
 import Home from "./pages/Home";
+import { PublicHome, PublicMenu, PublicMembership, StaffEntry } from "./pages/PublicWebsite";
 import Login from "./pages/auth/Login";
 import NotFound from "./pages/NotFound";
 
@@ -77,8 +78,11 @@ export default function App() {
             <BrowserRouter>
               <PinLoginGate>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/" element={<PublicHome />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/menu" element={<PublicMenu />} />
+                  <Route path="/membership" element={<PublicMembership />} />
+                  <Route path="/staff" element={<StaffEntry />} />
                   <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
                   <Route path="/order" element={<OrderPage />} />
                   <Route path="/order/:venueCode" element={<OrderPage />} />
