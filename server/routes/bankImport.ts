@@ -46,13 +46,8 @@ function detectBankFormat(headers: string[]): BankFormat {
   const normalized = headers.map(normalizeHeader);
   const compact = headers.map(compactHeader);
   const headerStr = normalized.join(',');
-
   if (compact.some(h => h.includes('withdrawal') || h.includes('ถอน')) && compact.some(h => h.includes('deposit') || h.includes('ฝาก'))) {
     return 'scb';
-  }
-
-  if (compact.some(h => h.includes('amountthb') || h === 'amount' || h.includes('จำนวนเงิน')) && compact.some(h => h.includes('description') || h.includes('details') || h.includes('รายการ'))) {
-    return 'kbank';
   }
 
   if (headerStr.includes('debit') || headerStr.includes('credit')) {
@@ -61,6 +56,10 @@ function detectBankFormat(headers: string[]): BankFormat {
 
   if (headerStr.includes('paid out') || headerStr.includes('paid in')) {
     return 'krungsri';
+  }
+
+  if (compact.some(h => h.includes('kbank') || h.includes('kasikorn') || h.includes('กสิกร'))) {
+    return 'kbank';
   }
 
   return 'generic';
@@ -293,8 +292,9 @@ async function handleCsvUpload(req: any, res: any) {
       throw new CsvValidationError("CSV header row is empty");
     }
 
+    const requestedSource = typeof req.body.source === 'string' ? req.body.source.trim() : '';
     const format = detectBankFormat(headers);
-    const source = req.body.source || format.toUpperCase();
+    const source = requestedSource && requestedSource !== 'CSV' ? requestedSource : format.toUpperCase();
     const rowErrors: string[] = [];
     const rawTxns: ParsedTransaction[] = [];
 
@@ -369,6 +369,7 @@ async function handleCsvUpload(req: any, res: any) {
       inserted,
       skippedDupes,
       format,
+      source,
     });
 
   } catch (error: any) {
@@ -439,7 +440,7 @@ router.get("/:batchId/txns", async (req, res) => {
       );
     }
 
-    const [txns, totalResult] = await Promise.all([
+    const [txns, totalResult, batchTotalResult] = await Promise.all([
       db.select()
         .from(bankTxn)
         .where(and(...whereConditions))
@@ -449,14 +450,24 @@ router.get("/:batchId/txns", async (req, res) => {
       
       db.select({ count: sql<number>`count(*)` })
         .from(bankTxn)
-        .where(and(...whereConditions))
+        .where(and(...whereConditions)),
+
+      db.select({ count: sql<number>`count(*)` })
+        .from(bankTxn)
+        .where(eq(bankTxn.batchId, batchId))
     ]);
 
-    const total = totalResult[0]?.count || 0;
+    const total = Number(totalResult[0]?.count || 0);
+    const batchTotal = Number(batchTotalResult[0]?.count || 0);
     const totalPages = Math.ceil(total / limit);
 
     res.json({
       ok: true,
+      batch: {
+        id: batchId,
+        importedCount: batchTotal,
+        visibleCount: total,
+      },
       txns,
       pagination: {
         page,
