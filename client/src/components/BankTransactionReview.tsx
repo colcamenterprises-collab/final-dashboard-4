@@ -40,7 +40,6 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
     search: '',
     min: '',
     max: '',
-    month: new Date().toISOString().slice(0, 7), // YYYY-MM
   });
   const [editingTxn, setEditingTxn] = useState<BankTransaction | null>(null);
   const [bulkDefaults, setBulkDefaults] = useState({
