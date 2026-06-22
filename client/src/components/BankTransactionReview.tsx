@@ -1,15 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Filter, Check, X, Edit2, Trash2, ChevronLeft, PauseCircle } from "lucide-react";
+import { Filter, Check, X, Trash2, ChevronLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -23,7 +21,10 @@ interface BankTransaction {
   status: 'pending' | 'approved' | 'rejected' | 'deleted' | 'hold';
   category?: string;
   supplier?: string;
-  transactionType?: 'business_expense' | 'personal' | 'deposit' | 'transfer' | 'unknown';
+  transactionType?: 'business_expense' | 'personal' | 'deposit' | 'transfer' | 'ignored_duplicate' | 'needs_review';
+  transactionTypeLabel?: string;
+  accountingAmountTHB?: number;
+  accountingDirection?: 'expense_outflow' | 'income_inflow';
   merchantSuggestion?: string | null;
   readableAction?: string;
   notes?: string;
@@ -44,7 +45,6 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
     min: '',
     max: '',
   });
-  const [, setEditingTxn] = useState<BankTransaction | null>(null);
   const [bulkDefaults, setBulkDefaults] = useState({
     category: '',
     supplier: '',
@@ -111,7 +111,6 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
         description: "Transaction details updated successfully",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/bank-imports', batchId, 'txns'] });
-      setEditingTxn(null);
     },
   });
 
@@ -145,19 +144,11 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
     'Fuel & Transport',
     'Other Business Expense',
   ];
-  const reviewCategories = [...businessCategories, 'Personal', 'Deposit', 'Transfer'];
+  const reviewCategories = [...businessCategories, 'Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate'];
   const batchSummary = txnsData?.batch || {
     id: batchId,
     importedCount: txnsData?.pagination?.total ?? transactions.length,
     visibleCount: transactions.length,
-  };
-
-  const handleSelectAll = () => {
-    if (selectedIds.length === transactions.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(transactions.map((t: BankTransaction) => t.id));
-    }
   };
 
   const handleSelectTransaction = (id: string) => {
@@ -213,9 +204,15 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
     editMutation.mutate({ id, updates: { status: 'rejected' } });
   };
 
-  const getAmountColor = (amount: string) => {
-    const num = parseFloat(amount);
-    return num > 0 ? 'text-red-600' : 'text-green-600'; // Red for expenses, green for income
+  const getAmountTone = (txn: BankTransaction) => {
+    return txn.accountingDirection === 'income_inflow' || parseFloat(txn.amountTHB) < 0 ? 'text-green-700' : 'text-red-700';
+  };
+
+  const getAmountLabel = (txn: BankTransaction) => {
+    const raw = parseFloat(txn.amountTHB);
+    const amount = txn.accountingAmountTHB ?? Math.abs(raw);
+    const label = raw < 0 || txn.accountingDirection === 'income_inflow' ? 'Deposit / Inflow' : 'Expense / Outflow';
+    return `${label}: ${formatCurrency(amount)}`;
   };
 
   return (
@@ -360,9 +357,9 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
         </Card>
       )}
 
-      {/* Transactions Table */}
+      {/* Transactions Review */}
       <Card>
-        <CardContent className="p-0">
+        <CardContent className="p-3 sm:p-4">
           {isLoading ? (
             <div className="p-8 text-center">Loading transactions...</div>
           ) : transactions.length === 0 ? (
@@ -370,161 +367,120 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
               No transactions found. Adjust your filters or upload a CSV file.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        checked={selectedIds.length === transactions.length}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Category</TableHead>
-                    <TableHead>Supplier</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Required Action</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((txn: BankTransaction) => (
-                    <TableRow key={txn.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.includes(txn.id)}
-                          onCheckedChange={() => handleSelectTransaction(txn.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {formatDate(txn.postedAt)}
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        <div className="truncate" title={txn.description}>
-                          {txn.description}
+            <div className="space-y-3">
+              {transactions.map((txn: BankTransaction) => (
+                <div key={txn.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      checked={selectedIds.includes(txn.id)}
+                      onCheckedChange={() => handleSelectTransaction(txn.id)}
+                      className="mt-1"
+                    />
+                    <div className="min-w-0 flex-1 space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="text-xs font-mono text-slate-500">{formatDate(txn.postedAt)}</div>
+                          <div className="break-words text-sm font-semibold text-slate-900 dark:text-slate-100">{txn.description}</div>
+                          {txn.ref && <div className="break-words text-[11px] text-slate-400">Ref: {txn.ref}</div>}
                         </div>
-                      </TableCell>
-                      <TableCell className={`text-right font-medium ${getAmountColor(txn.amountTHB)}`}>
-                        {formatCurrency(parseFloat(txn.amountTHB))}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{txn.transactionType || 'unknown'}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={txn.category || ''}
-                          onValueChange={(category) => editMutation.mutate({ id: txn.id, updates: { category } })}
-                          disabled={txn.status !== 'pending' || editMutation.isPending}
-                        >
-                          <SelectTrigger className="w-52">
-                            <SelectValue placeholder="Classify transaction" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {reviewCategories.map((category) => (
-                              <SelectItem key={category} value={category}>{category}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
+                        <div className={`text-sm font-semibold sm:text-right ${getAmountTone(txn)}`}>
+                          {getAmountLabel(txn)}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                         <div className="space-y-1">
+                          <Label className="text-[11px]">Classification</Label>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                            <Badge variant="outline" className="w-fit">{txn.transactionTypeLabel || 'Needs review'}</Badge>
+                            <Select
+                              value={txn.category || ''}
+                              onValueChange={(category) => editMutation.mutate({ id: txn.id, updates: { category } })}
+                              disabled={txn.status !== 'pending' || editMutation.isPending}
+                            >
+                              <SelectTrigger className="w-full sm:w-64">
+                                <SelectValue placeholder="Classify transaction" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {reviewCategories.map((category) => (
+                                  <SelectItem key={category} value={category}>{category}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[11px]">Supplier</Label>
                           <Input
                             key={`${txn.id}:${txn.supplier || ''}`}
                             defaultValue={txn.supplier || ''}
-                            placeholder={txn.merchantSuggestion || 'Select or enter supplier'}
+                            placeholder={txn.merchantSuggestion || 'Required for business expenses'}
                             onBlur={(e) => editMutation.mutate({ id: txn.id, updates: { supplier: e.target.value } })}
                             disabled={txn.status !== 'pending' || editMutation.isPending}
-                            className="h-8 w-48"
+                            className="h-9 w-full"
                           />
                           {txn.merchantSuggestion && !txn.supplier && (
                             <Button
                               type="button"
                               size="sm"
                               variant="ghost"
-                              className="h-6 px-1 text-xs"
+                              className="h-auto px-0 py-1 text-left text-xs"
                               onClick={() => editMutation.mutate({ id: txn.id, updates: { supplier: txn.merchantSuggestion } })}
                             >
                               Use suggestion: {txn.merchantSuggestion}
                             </Button>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getStatusColor(txn.status)}>
-                          {getStatusLabel(txn.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-xs text-xs text-muted-foreground">
-                        {txn.readableAction || 'Review before approval.'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
+                      </div>
+
+                      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="space-y-1">
+                          <Badge className={getStatusColor(txn.status)}>{getStatusLabel(txn.status)}</Badge>
+                          <div className="text-xs text-muted-foreground">{txn.readableAction || 'Needs review before approval.'}</div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
                           {txn.status === 'pending' && (
                             <>
                               <Button
                                 size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={() => approveMutation.mutate({ ids: [txn.id] })}
                                 disabled={approveMutation.isPending}
-                                className="h-7 px-2"
                                 title="Approve business expense"
                               >
                                 <Check className="h-3 w-3 text-green-600 mr-1" />Approve
                               </Button>
                               <Button
                                 size="sm"
-                                variant="ghost"
-                                onClick={() => setEditingTxn(txn)}
-                                className="h-7 w-7 p-0"
-                                title="Edit supplier/category before approval"
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled
-                                className="h-7 w-7 p-0"
-                                title="Hold unavailable: bank_txn_status schema does not support hold; no migration performed"
-                              >
-                                <PauseCircle className="h-3 w-3 text-blue-600" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
+                                variant="outline"
                                 onClick={() => handleReject(txn.id)}
                                 disabled={editMutation.isPending}
-                                className="h-7 w-7 p-0"
                                 title="Reject"
                               >
-                                <X className="h-3 w-3 text-red-600" />
+                                <X className="h-3 w-3 text-red-600 mr-1" />Reject
                               </Button>
                             </>
                           )}
                           <Button
                             size="sm"
-                            variant="ghost"
+                            variant="outline"
                             onClick={() => deleteMutation.mutate(txn.id)}
                             disabled={deleteMutation.isPending}
-                            className="h-7 w-7 p-0"
                           >
-                            <X className="h-3 w-3 text-red-600" />
+                            <Trash2 className="h-3 w-3 text-red-600 mr-1" />Delete
                           </Button>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>
       </Card>
-
 
     </div>
   );

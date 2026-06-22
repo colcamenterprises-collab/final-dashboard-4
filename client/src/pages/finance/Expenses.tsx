@@ -1,12 +1,10 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useMemo, useState } from "react";
+import { useLocation } from "wouter";
 import { Search, Upload } from "lucide-react";
-import { BankStatementUpload } from "@/components/BankStatementUpload";
-import { BankTransactionReview } from "@/components/BankTransactionReview";
 
 interface Expense {
   id: string;
@@ -37,7 +35,7 @@ function weekKey(dateValue: string) {
 }
 
 export default function Expenses() {
-  const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -46,8 +44,6 @@ export default function Expenses() {
   const [category, setCategory] = useState("");
   const [supplier, setSupplier] = useState("");
   const [source, setSource] = useState("");
-  const [importOpen, setImportOpen] = useState(false);
-  const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
 
   const { data: expenses = [], isLoading, isError } = useQuery<Expense[]>({
     queryKey: ["/api/expensesV2"],
@@ -72,7 +68,6 @@ export default function Expenses() {
   });
 
   const total = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
-  const refreshExpenses = () => queryClient.invalidateQueries({ queryKey: ["/api/expensesV2"] });
 
   return (
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
@@ -82,7 +77,7 @@ export default function Expenses() {
           <p className="text-xs text-slate-500">{expenses.length} records</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button size="sm" onClick={() => setImportOpen(true)}>
+          <Button size="sm" onClick={() => navigate("/finance/expenses-import")}>
             <Upload className="h-4 w-4 mr-2" />
             Import Bank Statement
           </Button>
@@ -141,19 +136,6 @@ export default function Expenses() {
           </table>
         </div>
       )}
-
-      <Dialog open={importOpen} onOpenChange={setImportOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Import Bank Statement</DialogTitle>
-            <DialogDescription>Upload a CSV, then review and approve outflow rows into expenses.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <BankStatementUpload onUploadComplete={(result) => setSelectedBatch(result.batchId)} />
-            {selectedBatch && <BankTransactionReview batchId={selectedBatch} onClose={() => setSelectedBatch(null)} onApproved={refreshExpenses} />}
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

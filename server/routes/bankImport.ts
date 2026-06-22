@@ -28,7 +28,7 @@ interface EnhancedTransaction extends ParsedTransaction {
   readableAction?: string;
 }
 
-type TransactionType = 'business_expense' | 'personal' | 'deposit' | 'transfer' | 'unknown';
+type TransactionType = 'business_expense' | 'personal' | 'deposit' | 'transfer' | 'ignored_duplicate' | 'needs_review';
 
 const BUSINESS_EXPENSE_CATEGORIES = [
   'Food & Beverage',
@@ -46,15 +46,16 @@ const BUSINESS_EXPENSE_CATEGORIES = [
   'Other Business Expense',
 ];
 
-const BLOCKED_REVIEW_CATEGORIES = ['Personal', 'Deposit', 'Transfer'];
+const BLOCKED_REVIEW_CATEGORIES = ['Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate'];
 
 function inferTransactionType(amountTHB: number, description: string, category?: string | null): TransactionType {
   const normalized = `${description} ${category || ''}`.toLowerCase();
-  if (amountTHB < 0) return 'deposit';
+  if (amountTHB < 0 || normalized.includes('deposit / inflow')) return 'deposit';
+  if (normalized.includes('ignore / duplicate') || normalized.includes('duplicate')) return 'ignored_duplicate';
   if (normalized.includes('transfer') || normalized.includes('promptpay') || normalized.includes('prompt pay')) return 'transfer';
-  if (normalized.includes('personal') || normalized.includes('owner draw') || normalized.includes('owner withdrawal')) return 'personal';
+  if (normalized.includes('personal / owner') || normalized.includes('personal') || normalized.includes('owner draw') || normalized.includes('owner withdrawal')) return 'personal';
   if (amountTHB > 0 && category && !BLOCKED_REVIEW_CATEGORIES.includes(category)) return 'business_expense';
-  return amountTHB > 0 ? 'unknown' : 'deposit';
+  return 'needs_review';
 }
 
 function readableActionFor(type: TransactionType): string {
@@ -62,24 +63,40 @@ function readableActionFor(type: TransactionType): string {
     case 'business_expense':
       return 'Can approve after supplier and category are confirmed.';
     case 'personal':
-      return 'Blocked: personal transactions cannot create business expenses.';
+      return 'Blocked: Personal / Owner rows cannot create business expenses.';
     case 'deposit':
-      return 'Blocked: deposits/inflows cannot create business expenses.';
+      return 'Blocked: Deposit / Inflow rows cannot create business expenses.';
     case 'transfer':
-      return 'Blocked: transfers must be reviewed outside expense approval.';
+      return 'Blocked: Transfer rows must be reviewed outside expense approval.';
+    case 'ignored_duplicate':
+      return 'Blocked: Ignore / Duplicate rows cannot create business expenses.';
     default:
-      return 'Needs classification before approval.';
+      return 'Needs review before approval.';
   }
 }
 
-function decorateTransaction<T extends { amountTHB: any; description: string; category?: string | null; supplier?: string | null }>(txn: T): T & { transactionType: TransactionType; merchantSuggestion: string | null; readableAction: string } {
+function displayLabelFor(type: TransactionType): string {
+  switch (type) {
+    case 'business_expense': return 'Business Expense';
+    case 'personal': return 'Personal / Owner';
+    case 'deposit': return 'Deposit / Inflow';
+    case 'transfer': return 'Transfer';
+    case 'ignored_duplicate': return 'Ignore / Duplicate';
+    default: return 'Needs review';
+  }
+}
+
+function decorateTransaction<T extends { amountTHB: any; description: string; category?: string | null; supplier?: string | null }>(txn: T): T & { transactionType: TransactionType; transactionTypeLabel: string; merchantSuggestion: string | null; readableAction: string; accountingAmountTHB: number; accountingDirection: 'expense_outflow' | 'income_inflow' } {
   const amount = Number(txn.amountTHB);
   const transactionType = inferTransactionType(amount, txn.description, txn.category);
   return {
     ...txn,
     transactionType,
+    transactionTypeLabel: displayLabelFor(transactionType),
     merchantSuggestion: txn.supplier || extractMerchantSuggestion(txn.description),
     readableAction: readableActionFor(transactionType),
+    accountingAmountTHB: Math.abs(amount),
+    accountingDirection: amount > 0 ? 'expense_outflow' : 'income_inflow',
   };
 }
 
@@ -628,7 +645,7 @@ router.post("/:batchId/approve", async (req, res) => {
 
       if (transactionType !== 'business_expense') {
         blockers.push({
-          code: transactionType === 'deposit' ? 'BANK_TXN_DEPOSIT_BLOCKED' : transactionType === 'transfer' ? 'BANK_TXN_TRANSFER_BLOCKED' : transactionType === 'personal' ? 'BANK_TXN_PERSONAL_BLOCKED' : 'BANK_TXN_CLASSIFICATION_REQUIRED',
+          code: transactionType === 'deposit' ? 'BANK_TXN_DEPOSIT_BLOCKED' : transactionType === 'transfer' ? 'BANK_TXN_TRANSFER_BLOCKED' : transactionType === 'personal' ? 'BANK_TXN_PERSONAL_BLOCKED' : transactionType === 'ignored_duplicate' ? 'BANK_TXN_IGNORED_DUPLICATE_BLOCKED' : 'BANK_TXN_CLASSIFICATION_REQUIRED',
           message: readableActionFor(transactionType),
           where: `bank_txn:${txn.id}`,
           canonical_source: 'bank_txn',
