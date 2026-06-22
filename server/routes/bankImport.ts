@@ -23,6 +23,73 @@ interface ParsedTransaction {
 interface EnhancedTransaction extends ParsedTransaction {
   category?: string | null;
   supplier?: string | null;
+  transactionType?: TransactionType;
+  merchantSuggestion?: string | null;
+  readableAction?: string;
+}
+
+type TransactionType = 'business_expense' | 'personal' | 'deposit' | 'transfer' | 'unknown';
+
+const BUSINESS_EXPENSE_CATEGORIES = [
+  'Food & Beverage',
+  'Kitchen Supplies & Packaging',
+  'Utilities',
+  'Rent',
+  'Staff Expenses',
+  'Repairs & Maintenance',
+  'Marketing',
+  'Administration',
+  'Software & Subscriptions',
+  'Bank Fees',
+  'Equipment',
+  'Fuel & Transport',
+  'Other Business Expense',
+];
+
+const BLOCKED_REVIEW_CATEGORIES = ['Personal', 'Deposit', 'Transfer'];
+
+function inferTransactionType(amountTHB: number, description: string, category?: string | null): TransactionType {
+  const normalized = `${description} ${category || ''}`.toLowerCase();
+  if (amountTHB < 0) return 'deposit';
+  if (normalized.includes('transfer') || normalized.includes('promptpay') || normalized.includes('prompt pay')) return 'transfer';
+  if (normalized.includes('personal') || normalized.includes('owner draw') || normalized.includes('owner withdrawal')) return 'personal';
+  if (amountTHB > 0 && category && !BLOCKED_REVIEW_CATEGORIES.includes(category)) return 'business_expense';
+  return amountTHB > 0 ? 'unknown' : 'deposit';
+}
+
+function readableActionFor(type: TransactionType): string {
+  switch (type) {
+    case 'business_expense':
+      return 'Can approve after supplier and category are confirmed.';
+    case 'personal':
+      return 'Blocked: personal transactions cannot create business expenses.';
+    case 'deposit':
+      return 'Blocked: deposits/inflows cannot create business expenses.';
+    case 'transfer':
+      return 'Blocked: transfers must be reviewed outside expense approval.';
+    default:
+      return 'Needs classification before approval.';
+  }
+}
+
+function decorateTransaction<T extends { amountTHB: any; description: string; category?: string | null; supplier?: string | null }>(txn: T): T & { transactionType: TransactionType; merchantSuggestion: string | null; readableAction: string } {
+  const amount = Number(txn.amountTHB);
+  const transactionType = inferTransactionType(amount, txn.description, txn.category);
+  return {
+    ...txn,
+    transactionType,
+    merchantSuggestion: txn.supplier || extractMerchantSuggestion(txn.description),
+    readableAction: readableActionFor(transactionType),
+  };
+}
+
+function extractMerchantSuggestion(description: string): string | null {
+  const cleaned = description
+    .replace(/\b(pos|visa|mastercard|promptpay|transfer|payment|purchase|debit|card)\b/gi, ' ')
+    .replace(/[^a-z0-9ก-๙&.' -]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned ? cleaned.slice(0, 80) : null;
 }
 
 // Bank format detection and parsing
@@ -243,11 +310,11 @@ async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTran
       txn.description.toUpperCase().includes(r.matchText.toUpperCase())
     );
     
-    return {
+    return decorateTransaction({
       ...txn,
       category: rule?.category,
       supplier: rule?.supplier,
-    };
+    });
   });
 }
 
@@ -468,7 +535,9 @@ router.get("/:batchId/txns", async (req, res) => {
         importedCount: batchTotal,
         visibleCount: total,
       },
-      txns,
+      txns: txns.map(decorateTransaction),
+      allowedBusinessCategories: BUSINESS_EXPENSE_CATEGORIES,
+      blockedCategories: BLOCKED_REVIEW_CATEGORIES,
       pagination: {
         page,
         limit,
@@ -555,6 +624,19 @@ router.post("/:batchId/approve", async (req, res) => {
       const supplier = defaults?.supplier || txn.supplier;
       const category = defaults?.category || txn.category;
 
+      const transactionType = inferTransactionType(amountTHB, txn.description, category);
+
+      if (transactionType !== 'business_expense') {
+        blockers.push({
+          code: transactionType === 'deposit' ? 'BANK_TXN_DEPOSIT_BLOCKED' : transactionType === 'transfer' ? 'BANK_TXN_TRANSFER_BLOCKED' : transactionType === 'personal' ? 'BANK_TXN_PERSONAL_BLOCKED' : 'BANK_TXN_CLASSIFICATION_REQUIRED',
+          message: readableActionFor(transactionType),
+          where: `bank_txn:${txn.id}`,
+          canonical_source: 'bank_txn',
+          auto_build_attempted: false,
+        });
+        continue;
+      }
+
       if (!supplier || !category) {
         blockers.push({
           code: 'BANK_TXN_EXPENSE_MAPPING_INCOMPLETE',
@@ -624,6 +706,8 @@ router.post("/:batchId/approve", async (req, res) => {
       blockers,
       holdSupported: false,
       holdSchemaGap: 'bank_txn_status enum does not include hold; no schema migration was performed.',
+      allowedBusinessCategories: BUSINESS_EXPENSE_CATEGORIES,
+      blockedCategories: BLOCKED_REVIEW_CATEGORIES,
     });
 
   } catch (error) {

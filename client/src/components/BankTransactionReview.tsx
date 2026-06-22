@@ -23,6 +23,9 @@ interface BankTransaction {
   status: 'pending' | 'approved' | 'rejected' | 'deleted' | 'hold';
   category?: string;
   supplier?: string;
+  transactionType?: 'business_expense' | 'personal' | 'deposit' | 'transfer' | 'unknown';
+  merchantSuggestion?: string | null;
+  readableAction?: string;
   notes?: string;
   expenseId?: string;
 }
@@ -41,7 +44,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
     min: '',
     max: '',
   });
-  const [editingTxn, setEditingTxn] = useState<BankTransaction | null>(null);
+  const [, setEditingTxn] = useState<BankTransaction | null>(null);
   const [bulkDefaults, setBulkDefaults] = useState({
     category: '',
     supplier: '',
@@ -127,6 +130,22 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
   });
 
   const transactions = txnsData?.txns || [];
+  const businessCategories = txnsData?.allowedBusinessCategories || [
+    'Food & Beverage',
+    'Kitchen Supplies & Packaging',
+    'Utilities',
+    'Rent',
+    'Staff Expenses',
+    'Repairs & Maintenance',
+    'Marketing',
+    'Administration',
+    'Software & Subscriptions',
+    'Bank Fees',
+    'Equipment',
+    'Fuel & Transport',
+    'Other Business Expense',
+  ];
+  const reviewCategories = [...businessCategories, 'Personal', 'Deposit', 'Transfer'];
   const batchSummary = txnsData?.batch || {
     id: batchId,
     importedCount: txnsData?.pagination?.total ?? transactions.length,
@@ -300,10 +319,9 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
                       <SelectValue placeholder="Set category" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Supplies">Supplies</SelectItem>
-                      <SelectItem value="Marketing">Marketing</SelectItem>
-                      <SelectItem value="Utilities">Utilities</SelectItem>
-                      <SelectItem value="Equipment">Equipment</SelectItem>
+                      {reviewCategories.map((category) => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   
@@ -365,9 +383,11 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
                     <TableHead>Date</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Type</TableHead>
                     <TableHead>Category</TableHead>
                     <TableHead>Supplier</TableHead>
                     <TableHead>Status</TableHead>
+                    <TableHead>Required Action</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -392,19 +412,54 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
                         {formatCurrency(parseFloat(txn.amountTHB))}
                       </TableCell>
                       <TableCell>
-                        {txn.category ? (
-                          <Badge variant="outline">{txn.category}</Badge>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+                        <Badge variant="outline">{txn.transactionType || 'unknown'}</Badge>
                       </TableCell>
                       <TableCell>
-                        {txn.supplier || <span className="text-gray-400">-</span>}
+                        <Select
+                          value={txn.category || ''}
+                          onValueChange={(category) => editMutation.mutate({ id: txn.id, updates: { category } })}
+                          disabled={txn.status !== 'pending' || editMutation.isPending}
+                        >
+                          <SelectTrigger className="w-52">
+                            <SelectValue placeholder="Classify transaction" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {reviewCategories.map((category) => (
+                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          <Input
+                            key={`${txn.id}:${txn.supplier || ''}`}
+                            defaultValue={txn.supplier || ''}
+                            placeholder={txn.merchantSuggestion || 'Select or enter supplier'}
+                            onBlur={(e) => editMutation.mutate({ id: txn.id, updates: { supplier: e.target.value } })}
+                            disabled={txn.status !== 'pending' || editMutation.isPending}
+                            className="h-8 w-48"
+                          />
+                          {txn.merchantSuggestion && !txn.supplier && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 px-1 text-xs"
+                              onClick={() => editMutation.mutate({ id: txn.id, updates: { supplier: txn.merchantSuggestion } })}
+                            >
+                              Use suggestion: {txn.merchantSuggestion}
+                            </Button>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(txn.status)}>
                           {getStatusLabel(txn.status)}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-xs text-xs text-muted-foreground">
+                        {txn.readableAction || 'Review before approval.'}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
@@ -415,9 +470,10 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
                                 variant="ghost"
                                 onClick={() => approveMutation.mutate({ ids: [txn.id] })}
                                 disabled={approveMutation.isPending}
-                                className="h-7 w-7 p-0"
+                                className="h-7 px-2"
+                                title="Approve business expense"
                               >
-                                <Check className="h-3 w-3 text-green-600" />
+                                <Check className="h-3 w-3 text-green-600 mr-1" />Approve
                               </Button>
                               <Button
                                 size="sm"
@@ -469,8 +525,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
         </CardContent>
       </Card>
 
-      {/* Edit Transaction Modal would go here */}
-      {/* For now, we'll keep it simple without a modal */}
+
     </div>
   );
 }
