@@ -1,7 +1,7 @@
 import { Link, Navigate } from "react-router-dom";
 import "./PublicWebsite.css";
 
-const headerImage = "https://assets.website-files.com/6424633f5e28ae5f3582e4ec/64248cf05e011405c2824b67_Header-img.png";
+const providedHeroImage = "https://assets.website-files.com/6424633f5e28ae5f3582e4ec/64248cf05e011405c2824b67_Header-img.png";
 const friesImage = "https://assets.website-files.com/6424633f5e28ae5f3582e4ec/6424945a7580c4e4c1368fdc_fries.jpg";
 const burgerImage = "https://assets.website-files.com/6424633f5e28ae5f3582e4ec/642497dad1c7c739c55cc3c6_burger-img.jpg";
 
@@ -57,7 +57,7 @@ function SampleHome() {
         <Header />
         <div className="bh-hero-inner">
           <h1>NEW YORK’S FAVORITE ORGANIC HAMBURGER JOINT</h1>
-          <img className="bh-hero-burger" src={headerImage} alt="Burger Heaven hamburgers" />
+          <img className="bh-hero-burger" src={providedHeroImage} alt="Burger Heaven hamburgers" />
         </div>
       </section>
 
