@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Upload, FileText, CheckCircle, AlertCircle, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-import { BankStatementUpload } from "@/components/BankStatementUpload";
 import { BankTransactionReview } from "@/components/BankTransactionReview";
 
 interface UploadResult {
@@ -13,8 +14,8 @@ interface UploadResult {
 }
 
 export default function ExpensesImport() {
-  console.log("EXPENSES_IMPORT_VERSION", "8c1a014a1f3b1d79e1c4d1b5560c3efa4f829d57");
   const navigate = useNavigate();
+  const fileRef = useRef<HTMLInputElement>(null);
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
 
   const handleUploadComplete = (result: UploadResult) => {
