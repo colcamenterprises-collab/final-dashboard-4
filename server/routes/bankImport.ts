@@ -48,6 +48,85 @@ const BUSINESS_EXPENSE_CATEGORIES = [
 
 const BLOCKED_REVIEW_CATEGORIES = ['Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate'];
 
+
+const REVIEW_QUEUE_TABS = [
+  'pending_review',
+  'approved',
+  'rejected_ignored',
+  'personal_owner',
+  'deposits_transfers',
+  'all_imported',
+] as const;
+
+type ReviewQueueTab = typeof REVIEW_QUEUE_TABS[number];
+
+const listTxnsSchema = z.object({
+  status: z.string().optional(),
+  search: z.string().optional(),
+  min: z.string().optional(),
+  max: z.string().optional(),
+  month: z.string().optional(), // YYYY-MM
+  page: z.string().optional(),
+  limit: z.string().optional(),
+});
+
+const BLOCKED_CATEGORY_SQL = sql`('Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate')`;
+
+function reviewQueueWhere(tab: ReviewQueueTab, query: { search?: string; min?: string; max?: string; month?: string }) {
+  const conditions: any[] = [];
+
+  switch (tab) {
+    case 'pending_review':
+      conditions.push(sql`${bankTxn.status} = 'pending' AND (${bankTxn.category} IS NULL OR ${bankTxn.category} NOT IN ${BLOCKED_CATEGORY_SQL})`);
+      break;
+    case 'approved':
+      conditions.push(eq(bankTxn.status, 'approved'));
+      break;
+    case 'rejected_ignored':
+      conditions.push(sql`(${bankTxn.status} IN ('rejected', 'deleted') OR ${bankTxn.category} = 'Ignore / Duplicate')`);
+      break;
+    case 'personal_owner':
+      conditions.push(eq(bankTxn.category, 'Personal / Owner'));
+      break;
+    case 'deposits_transfers':
+      conditions.push(sql`(${bankTxn.category} IN ('Deposit / Inflow', 'Transfer') OR ${bankTxn.amountTHB} < 0)`);
+      break;
+    case 'all_imported':
+      break;
+  }
+
+  if (query.search) conditions.push(like(bankTxn.description, `%${query.search}%`));
+  if (query.min) conditions.push(gte(bankTxn.amountTHB, String(parseFloat(query.min))));
+  if (query.max) conditions.push(lte(bankTxn.amountTHB, String(parseFloat(query.max))));
+  if (query.month) {
+    const monthStart = new Date(`${query.month}-01`);
+    const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+    conditions.push(and(gte(bankTxn.postedAt, monthStart), lte(bankTxn.postedAt, monthEnd))!);
+  }
+
+  return conditions.length ? and(...conditions) : undefined;
+}
+
+async function getReviewQueueCounts() {
+  const [row] = await db.select({
+    pendingReview: sql<number>`count(*) filter (where ${bankTxn.status} = 'pending' and (${bankTxn.category} is null or ${bankTxn.category} not in ${BLOCKED_CATEGORY_SQL}))`,
+    approved: sql<number>`count(*) filter (where ${bankTxn.status} = 'approved')`,
+    rejectedIgnored: sql<number>`count(*) filter (where ${bankTxn.status} in ('rejected', 'deleted') or ${bankTxn.category} = 'Ignore / Duplicate')`,
+    personalOwner: sql<number>`count(*) filter (where ${bankTxn.category} = 'Personal / Owner')`,
+    depositsTransfers: sql<number>`count(*) filter (where ${bankTxn.category} in ('Deposit / Inflow', 'Transfer') or ${bankTxn.amountTHB} < 0)`,
+    allImported: sql<number>`count(*)`,
+  }).from(bankTxn);
+
+  return {
+    pending_review: Number(row?.pendingReview || 0),
+    approved: Number(row?.approved || 0),
+    rejected_ignored: Number(row?.rejectedIgnored || 0),
+    personal_owner: Number(row?.personalOwner || 0),
+    deposits_transfers: Number(row?.depositsTransfers || 0),
+    all_imported: Number(row?.allImported || 0),
+  };
+}
+
 function inferTransactionType(amountTHB: number, description: string, category?: string | null): TransactionType {
   const normalized = `${description} ${category || ''}`.toLowerCase();
   if (amountTHB < 0 || normalized.includes('deposit / inflow')) return 'deposit';
@@ -470,17 +549,44 @@ async function handleCsvUpload(req: any, res: any) {
 router.post("/", csvUploadFields, handleCsvUpload);
 router.post("/csv", csvUploadFields, handleCsvUpload);
 
-// GET /api/bank-imports/:batchId/txns - List transactions with filters
-const listTxnsSchema = z.object({
-  status: z.string().optional(),
-  search: z.string().optional(), 
-  min: z.string().optional(),
-  max: z.string().optional(),
-  month: z.string().optional(), // YYYY-MM
-  page: z.string().optional(),
-  limit: z.string().optional(),
+
+// GET /api/bank-imports/review-queue - Persistent transaction review queue across all batches
+router.get("/review-queue", async (req, res) => {
+  try {
+    const query = listTxnsSchema.extend({ tab: z.enum(REVIEW_QUEUE_TABS).optional() }).parse(req.query);
+    const page = parseInt(query.page || '1');
+    const limit = Math.min(parseInt(query.limit || '500'), 1000);
+    const offset = (page - 1) * limit;
+    const tab = query.tab || 'pending_review';
+    const whereClause = reviewQueueWhere(tab, query);
+
+    const [txns, totalResult, counts] = await Promise.all([
+      db.select().from(bankTxn).where(whereClause).orderBy(desc(bankTxn.postedAt)).limit(limit).offset(offset),
+      db.select({ count: sql<number>`count(*)` }).from(bankTxn).where(whereClause),
+      getReviewQueueCounts(),
+    ]);
+
+    const total = Number(totalResult[0]?.count || 0);
+    const totalPages = Math.ceil(total / limit);
+    res.json({
+      ok: true,
+      source: 'bank_txn',
+      scope: 'all_batches',
+      activeTab: tab,
+      counts,
+      batch: { id: 'all_batches', importedCount: counts.all_imported, visibleCount: total },
+      txns: txns.map(decorateTransaction),
+      allowedBusinessCategories: BUSINESS_EXPENSE_CATEGORIES,
+      blockedCategories: BLOCKED_REVIEW_CATEGORIES,
+      pagination: { page, limit, total, totalPages, hasNext: page < totalPages, hasPrev: page > 1 },
+    });
+  } catch (error) {
+    console.error('Review queue error:', error);
+    res.status(500).json({ error: "Failed to fetch persistent review queue" });
+  }
 });
 
+// GET /api/bank-imports/:batchId/txns - List transactions with filters
 router.get("/:batchId/txns", async (req, res) => {
   try {
     const { batchId } = req.params;
