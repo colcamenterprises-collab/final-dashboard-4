@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import { Search, Upload } from "lucide-react";
 
 interface Expense {
@@ -35,7 +35,7 @@ function weekKey(dateValue: string) {
 }
 
 export default function Expenses() {
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
