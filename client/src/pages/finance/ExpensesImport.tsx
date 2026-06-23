@@ -2,7 +2,7 @@ import { useState, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Upload, FileText, CheckCircle, AlertCircle, ChevronDown, ChevronRight, ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { useLocation } from "wouter";
+import { useNavigate } from "react-router-dom";
 import { BankTransactionReview } from "@/components/BankTransactionReview";
 
 const AUTH_HEADERS = {
@@ -49,7 +49,7 @@ function FmtDate(s?: string) {
 }
 
 export default function ExpensesImport() {
-  const [, navigate] = useLocation();
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement>(null);
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState("");
@@ -88,7 +88,7 @@ export default function ExpensesImport() {
   const batches = batchesData?.batches ?? [];
 
   return (
-    <div className="p-4 space-y-4 max-w-3xl mx-auto">
+    <div className="p-4 space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate("/finance")} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
           <ArrowLeft className="h-4 w-4 text-slate-500" />
