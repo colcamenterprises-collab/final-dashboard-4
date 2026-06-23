@@ -30,7 +30,7 @@ function Header() {
       <nav className="sbw-nav" aria-label="Customer navigation">
         <Link to="/menu">View Menu</Link>
         <Link to="/membership">Membership</Link>
-        <Link className="sbw-nav-cta" to="/order">Order Online</Link>
+        <Link to="/order">Order Online</Link>
       </nav>
     </header>
   );
@@ -56,7 +56,7 @@ function Footer() {
   );
 }
 
-function ProductCard({ item, tall = false }: { item: typeof featured[number]; tall?: boolean }) {
+function ProductFeature({ product }: { product: typeof featuredProducts[number] }) {
   return (
     <Link className={`sbw-product-card ${tall ? "is-tall" : ""}`} to="/order">
       <img src={item.image} alt={item.name} />
@@ -66,6 +66,23 @@ function ProductCard({ item, tall = false }: { item: typeof featured[number]; ta
         <span>Order Online</span>
       </div>
     </Link>
+  );
+}
+
+function PublicHero() {
+  return (
+    <section className="sbw-hero" style={{ "--sbw-hero-image": `url(${heroImage})` } as React.CSSProperties}>
+      <Header />
+      <div className="sbw-hero-content">
+        <p className="sbw-eyebrow">Smash Brothers Burgers</p>
+        <h1>Premium Smash Burgers in Rawai</h1>
+        <p>Fresh smashed burgers, crispy sides, cold drinks, and fast online ordering.</p>
+        <div className="sbw-hero-actions">
+          <Link to="/order">Order Online</Link>
+          <Link to="/menu">View Menu</Link>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -114,6 +131,24 @@ export function PublicMenu() {
       <section className="sbw-product-grid sbw-menu-products">{featured.map((item) => <ProductCard key={item.name} item={item} />)}</section>
       <Footer />
     </main>
+  );
+}
+
+function SmashClubSection() {
+  return (
+    <section className="sbw-smash-club">
+      <div>
+        <span>Membership</span>
+        <h2>SMASH CLUB</h2>
+      </div>
+      <div className="sbw-smash-club-copy">
+        <p>Earn rewards.</p>
+        <p>Exclusive offers.</p>
+        <p>Faster ordering.</p>
+        <p>Skip the queue.</p>
+        <Link to="/membership">Join Smash Club</Link>
+      </div>
+    </section>
   );
 }
 
