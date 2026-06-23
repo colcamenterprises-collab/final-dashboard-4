@@ -14,6 +14,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface BankTransaction {
   id: string;
+  batchId?: string;
   postedAt: string;
   description: string;
   amountTHB: string;
@@ -32,15 +33,16 @@ interface BankTransaction {
 }
 
 interface ReviewPanelProps {
-  batchId: string;
-  onClose: () => void;
+  batchId?: string;
+  onClose?: () => void;
+  aggregateQueue?: boolean;
   onApproved?: () => void;
 }
 
-export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPanelProps) {
+export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQueue = false }: ReviewPanelProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filters, setFilters] = useState({
-    status: '',
+    status: aggregateQueue ? 'pending_review' : '',
     search: '',
     min: '',
     max: '',
@@ -56,20 +58,41 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
 
   // Fetch transactions
   const { data: txnsData, isLoading } = useQuery({
-    queryKey: ['/api/bank-imports', batchId, 'txns', filters],
+    queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue', filters] : ['/api/bank-imports', batchId, 'txns', filters],
     queryFn: () => {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.append(key, value);
+        if (!value) return;
+        if (aggregateQueue && key === 'status') params.append('tab', value);
+        else params.append(key, value);
       });
       params.set('limit', '500');
-      return apiRequest(`/api/bank-imports/${batchId}/txns?${params}`);
+      return apiRequest(aggregateQueue ? `/api/bank-imports/review-queue?${params}` : `/api/bank-imports/${batchId}/txns?${params}`);
     },
   });
 
   // Approve transactions mutation
   const approveMutation = useMutation({
     mutationFn: async ({ ids, defaults }: { ids: string[]; defaults?: any }) => {
+      if (aggregateQueue) {
+        const txnById = new Map(transactions.map((txn: BankTransaction) => [txn.id, txn]));
+        const idsByBatch = ids.reduce<Record<string, string[]>>((acc, id) => {
+          const txn = txnById.get(id);
+          if (txn?.batchId) (acc[txn.batchId] ||= []).push(id);
+          return acc;
+        }, {});
+        const results = await Promise.all(Object.entries(idsByBatch).map(([txnBatchId, txnIds]) =>
+          apiRequest(`/api/bank-imports/${txnBatchId}/approve`, {
+            method: 'POST',
+            body: JSON.stringify({ ids: txnIds, defaults }),
+          })
+        ));
+        return {
+          ok: results.every((result: any) => result.ok),
+          approved: results.reduce((sum: number, result: any) => sum + Number(result.approved || 0), 0),
+          blockers: results.flatMap((result: any) => result.blockers || []),
+        };
+      }
       return apiRequest(`/api/bank-imports/${batchId}/approve`, {
         method: 'POST',
         body: JSON.stringify({ ids, defaults }),
@@ -83,7 +106,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
           : `${data.approved} transactions approved successfully`,
         variant: data.blockers?.length ? "destructive" : undefined,
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
       onApproved?.();
       setSelectedIds([]);
@@ -110,7 +133,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
         title: "Transaction updated",
         description: "Transaction details updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
     },
   });
 
@@ -124,12 +147,13 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
         title: "Transaction deleted",
         description: "Transaction deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
     },
   });
 
-  const transactions = txnsData?.txns || [];
-  const businessCategories = txnsData?.allowedBusinessCategories || [
+  const queueData = txnsData as any;
+  const transactions: BankTransaction[] = queueData?.txns || [];
+  const businessCategories = queueData?.allowedBusinessCategories || [
     'Food & Beverage',
     'Kitchen Supplies & Packaging',
     'Utilities',
@@ -147,7 +171,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
   const reviewCategories = [...businessCategories, 'Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate'];
   const batchSummary = txnsData?.batch || {
     id: batchId,
-    importedCount: txnsData?.pagination?.total ?? transactions.length,
+    importedCount: queueData?.pagination?.total ?? transactions.length,
     visibleCount: transactions.length,
   };
 
@@ -220,21 +244,48 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          {onClose && <Button variant="ghost" size="sm" onClick={onClose}>
             <ChevronLeft className="h-4 w-4" />
             Back
-          </Button>
+          </Button>}
           <div>
             <h2 className="text-xl font-semibold">Review Bank Transactions</h2>
             <p className="text-sm text-muted-foreground">
-              Review and approve imported transactions
+              {aggregateQueue ? 'Persistent review queue across all imported batches' : 'Review and approve imported transactions'}
             </p>
             <p className="text-xs text-muted-foreground">
-              Batch {batchSummary.id} · Imported {batchSummary.importedCount} · Visible {batchSummary.visibleCount}
+              {aggregateQueue ? 'All batches' : `Batch ${batchSummary.id}`} · Imported {batchSummary.importedCount} · Visible {batchSummary.visibleCount}
             </p>
           </div>
         </div>
       </div>
+
+
+      {aggregateQueue && (
+        <Card>
+          <CardContent className="flex flex-wrap gap-2 p-3 sm:p-4">
+            {[
+              ['pending_review', 'Pending Review', queueData?.counts?.pending_review ?? 0],
+              ['approved', 'Approved', queueData?.counts?.approved ?? 0],
+              ['rejected_ignored', 'Rejected/Ignored', queueData?.counts?.rejected_ignored ?? 0],
+              ['personal_owner', 'Personal/Owner', queueData?.counts?.personal_owner ?? 0],
+              ['deposits_transfers', 'Deposits/Transfers', queueData?.counts?.deposits_transfers ?? 0],
+              ['all_imported', 'All Imported', queueData?.counts?.all_imported ?? 0],
+            ].map(([value, label, count]) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={filters.status === value ? 'default' : 'outline'}
+                className="min-w-0 whitespace-normal text-left"
+                onClick={() => setFilters(prev => ({ ...prev, status: String(value) }))}
+              >
+                {label} ({count})
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -263,12 +314,21 @@ export function BankTransactionReview({ batchId, onClose, onApproved }: ReviewPa
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">All statuses</SelectItem>
-                  <SelectItem value="pending">Pending</SelectItem>
-                  <SelectItem value="approved">Approved</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="deleted">Deleted</SelectItem>
-                  <SelectItem value="hold_unavailable" disabled>Hold — unavailable</SelectItem>
+                  {aggregateQueue ? (<>
+                    <SelectItem value="pending_review">Pending Review ({queueData?.counts?.pending_review ?? 0})</SelectItem>
+                    <SelectItem value="approved">Approved ({queueData?.counts?.approved ?? 0})</SelectItem>
+                    <SelectItem value="rejected_ignored">Rejected/Ignored ({queueData?.counts?.rejected_ignored ?? 0})</SelectItem>
+                    <SelectItem value="personal_owner">Personal/Owner ({queueData?.counts?.personal_owner ?? 0})</SelectItem>
+                    <SelectItem value="deposits_transfers">Deposits/Transfers ({queueData?.counts?.deposits_transfers ?? 0})</SelectItem>
+                    <SelectItem value="all_imported">All Imported ({queueData?.counts?.all_imported ?? 0})</SelectItem>
+                  </>) : (<>
+                    <SelectItem value="__all__">All statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="deleted">Deleted</SelectItem>
+                    <SelectItem value="hold_unavailable" disabled>Hold — unavailable</SelectItem>
+                  </>)}
                 </SelectContent>
               </Select>
               <p className="mt-1 text-[10px] text-slate-500">Hold unavailable: bank_txn_status schema does not support hold.</p>

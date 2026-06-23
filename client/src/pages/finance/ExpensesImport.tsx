@@ -35,15 +35,14 @@ export default function ExpensesImport() {
 
       <BankStatementUploadComponent onUploadComplete={handleUploadComplete} />
 
-      {selectedBatch && (
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold text-slate-900 dark:text-white">Review Transactions</h2>
-            <p className="text-xs text-slate-500">Batch {selectedBatch}</p>
+      <section className="space-y-3">
+        {selectedBatch && (
+          <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+            Upload complete. Batch {selectedBatch} was appended to the persistent review queue.
           </div>
-          <BankTransactionReview batchId={selectedBatch} onClose={() => setSelectedBatch(null)} />
-        </section>
-      )}
+        )}
+        <BankTransactionReview key={selectedBatch || 'persistent-queue'} aggregateQueue />
+      </section>
     </div>
   );
 }
