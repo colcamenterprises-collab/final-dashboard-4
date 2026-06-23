@@ -10,7 +10,6 @@ import PinLoginGate, { usePinAuth } from "./components/PinLoginGate";
 import PageShell from "./layouts/PageShell";
 import Home from "./pages/Home";
 import { PublicHome, PublicMenu, PublicMembership, StaffEntry } from "./pages/PublicWebsite";
-import Login from "./pages/auth/Login";
 import NotFound from "./pages/NotFound";
 
 import DailySalesForm from "./pages/operations/daily-sales/Form";
@@ -79,7 +78,7 @@ export default function App() {
               <PinLoginGate>
                 <Routes>
                   <Route path="/" element={<PublicHome />} />
-                  <Route path="/login" element={<Login />} />
+                  <Route path="/login" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/menu" element={<PublicMenu />} />
                   <Route path="/membership" element={<PublicMembership />} />
                   <Route path="/staff" element={<StaffEntry />} />
