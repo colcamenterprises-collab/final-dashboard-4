@@ -166,4 +166,7 @@ export function PublicMembership() {
   );
 }
 
+export function PublicHome() { return <SampleHome />; }
+export function PublicMenu() { return <SampleHome />; }
+export function PublicMembership() { return <SampleHome />; }
 export function StaffEntry() { return <Navigate to="/login" replace />; }
