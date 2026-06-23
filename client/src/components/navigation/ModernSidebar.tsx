@@ -97,6 +97,7 @@ const navigationGroups: NavGroup[] = [
       { to: "/finance",             label: "Finance Hub",     icon: Wallet,     testId: "nav-finance-hub" },
       { to: "/finance/profit-loss", label: "Profit and Loss", icon: TrendingUp, testId: "nav-profit-loss" },
       { to: "/finance/expenses",    label: "Expenses",        icon: DollarSign, testId: "nav-expenses" },
+      { to: "/finance/expenses-import", label: "Bank Statement Import", icon: DollarSign, testId: "nav-bank-statement-import" },
     ],
   },
   {
