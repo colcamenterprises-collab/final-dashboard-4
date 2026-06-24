@@ -32,6 +32,7 @@ function Header() {
         <Link to="/membership">Membership</Link>
         <Link to="/order">Order Online</Link>
       </nav>
+      <Link className="sbw-order-button" to="/order">Order Online</Link>
     </header>
   );
 }
@@ -89,7 +90,6 @@ function PublicHero() {
 export function PublicHome() {
   return (
     <main className="sbw-page">
-      <Header />
       <section className="sbw-hero">
         <div className="sbw-hero-copy">
           <p className="sbw-eyebrow">Rawai, Phuket</p>
