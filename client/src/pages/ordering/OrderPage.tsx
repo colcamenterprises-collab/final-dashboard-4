@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import OrderingCart from "@/components/ordering/OrderingCart";
 import OrderingMenu from "@/components/ordering/OrderingMenu";
 import { fetchOrderingMenu, submitOrderingOrder, type CartItem, type OrderingLanguage } from "@/components/ordering/orderingApi";
+import "./OrderPage.css";
 
 export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   const { tableCode } = useParams();
@@ -49,25 +50,26 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   }
 
   return (
-    <main className={`mx-auto max-w-7xl p-4 ${tablet ? "text-lg" : ""}`}>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <main className={`sbo-page ${tablet ? "is-tablet" : ""}`}>
+      <header className="sbo-header">
         <div>
-          <h1 className="text-3xl font-bold">SBB Ordering</h1>
-          <p className="text-gray-600">{tablet ? "Tablet counter mode" : tableCode ? `Table ${tableCode}` : "Online order"}</p>
+          <p>Smash Brothers Burgers</p>
+          <h1>Order Online</h1>
+          <span>{tablet ? "Tablet counter mode" : tableCode ? `Table ${tableCode}` : "Fresh smash burgers, sides, and drinks."}</span>
         </div>
-        <div className="flex gap-2"><button className="rounded border px-4 py-2" onClick={() => setLanguage("en")}>English</button><button className="rounded border px-4 py-2" onClick={() => setLanguage("th")}>ไทย</button></div>
-      </div>
-      {error && <div className="mb-4 rounded border border-red-300 bg-red-50 p-3 text-red-700">{error}</div>}
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="sbo-language" aria-label="Language selection"><button className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>English</button><button className={language === "th" ? "active" : ""} onClick={() => setLanguage("th")}>ไทย</button></div>
+      </header>
+      {error && <div className="sbo-error">{error}</div>}
+      <div className="sbo-layout">
         <OrderingMenu categories={menu} language={language} large={tablet} onAdd={add} />
-        <div className="space-y-4">
+        <div className="sbo-sidebar">
           <OrderingCart cart={cart} language={language} onQty={qty} onRemove={remove} />
-          <section className="rounded-lg border bg-white p-4 shadow-sm">
-            <h2 className="text-xl font-semibold">Order details</h2>
-            {!tablet && <><input className="mt-3 w-full rounded border p-2" placeholder="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><input className="mt-3 w-full rounded border p-2" placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></>}
-            <textarea className="mt-3 w-full rounded border p-2" placeholder="Order notes" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} />
-            <select className="mt-3 w-full rounded border p-2" value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}><option value="pay_at_counter">Pay at counter</option><option value="cash">Cash</option><option value="manual_qr_transfer">QR</option></select>
-            <button disabled={!cart.length || loading} className="mt-4 w-full rounded bg-black px-4 py-3 font-semibold text-white disabled:bg-gray-400" onClick={submit}>{loading ? "Submitting..." : "Submit order"}</button>
+          <section className="sbo-panel">
+            <h2>Order details</h2>
+            {!tablet && <><input placeholder="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></>}
+            <textarea placeholder="Order notes" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} />
+            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}><option value="pay_at_counter">Pay at counter</option><option value="cash">Cash</option><option value="manual_qr_transfer">QR</option></select>
+            <button disabled={!cart.length || loading} onClick={submit}>{loading ? "Submitting..." : "Submit order"}</button>
           </section>
         </div>
       </div>
