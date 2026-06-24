@@ -43,7 +43,6 @@ const PUBLIC_EXACT_PATHS = new Set([
   "/menu",
   "/membership",
   "/staff",
-  "/login",
   "/pos-login",
 ]);
 
