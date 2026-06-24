@@ -141,47 +141,48 @@ router.get("/users", async (_req: Request, res: Response) => {
   }
 });
 
-// ─── POST /login — verify email + PIN or userId + PIN ───────────────────────
+// ─── POST /login — verify username/name + PIN or userId + PIN ───────────────
 
 router.post("/login", async (req: Request, res: Response) => {
-  const { email, userId, pin } = req.body as { email?: string; userId?: number; pin?: string };
-  if (!pin) {
-    return res.status(400).json({ error: "pin is required" });
+  const { email, username, name, userId, pin, passcode } = req.body as { email?: string; username?: string; name?: string; userId?: number; pin?: string; passcode?: string };
+  const submittedPin = pin || passcode;
+  const loginName = (username || name || email || "").trim();
+  if (!submittedPin) {
+    return res.status(400).json({ error: "PIN/passcode is required" });
   }
-  if (!email && !userId) {
-    return res.status(400).json({ error: "email or userId is required" });
+  if (!loginName && !userId) {
+    return res.status(400).json({ error: "username or name is required" });
   }
 
   try {
     let userRow: (typeof internalUsers.$inferSelect) | undefined;
 
-    if (email) {
-      // Try email match first
-      const [byEmail] = await db
+    if (loginName) {
+      // Canonical staff login is username/name + PIN. Email remains a legacy
+      // fallback for existing accounts, but the UI no longer prompts email-only.
+      const [byUsername] = await db
         .select()
         .from(internalUsers)
-        .where(ilike(internalUsers.email, email.trim()))
+        .where(ilike(internalUsers.username, loginName))
         .limit(1);
-      userRow = byEmail;
+      userRow = byUsername;
 
-      // Fallback 1: match by username
-      if (!userRow) {
-        const [byUsername] = await db
-          .select()
-          .from(internalUsers)
-          .where(ilike(internalUsers.username, email.trim()))
-          .limit(1);
-        userRow = byUsername;
-      }
-
-      // Fallback 2: match by display name (legacy accounts with no email/username)
       if (!userRow) {
         const [byName] = await db
           .select()
           .from(internalUsers)
-          .where(ilike(internalUsers.name, email.trim()))
+          .where(ilike(internalUsers.name, loginName))
           .limit(1);
         userRow = byName;
+      }
+
+      if (!userRow) {
+        const [byEmail] = await db
+          .select()
+          .from(internalUsers)
+          .where(ilike(internalUsers.email, loginName))
+          .limit(1);
+        userRow = byEmail;
       }
     } else {
       const [found] = await db
@@ -193,10 +194,10 @@ router.post("/login", async (req: Request, res: Response) => {
     }
 
     if (!userRow || !userRow.active) {
-      return res.status(401).json({ error: "Account not found. Enter your email or name, then your PIN." });
+      return res.status(401).json({ error: "Account not found. Enter your username or name, then your PIN." });
     }
 
-    const match = await bcrypt.compare(String(pin), userRow.pinHash);
+    const match = await bcrypt.compare(String(submittedPin), userRow.pinHash);
     if (!match) {
       return res.status(401).json({ error: "Incorrect PIN" });
     }
