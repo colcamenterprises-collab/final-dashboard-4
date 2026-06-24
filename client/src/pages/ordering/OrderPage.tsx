@@ -54,8 +54,8 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
       <header className="sbo-header">
         <div>
           <p>Smash Brothers Burgers</p>
-          <h1>Order Online</h1>
-          <span>{tablet ? "Tablet counter mode" : tableCode ? `Table ${tableCode}` : "Fresh smash burgers, sides, and drinks."}</span>
+          <h1>Build Your Smash</h1>
+          <span>{tablet ? "Tablet-first customer ordering" : tableCode ? `Table ${tableCode}` : "Choose a category, add your burger, and keep your cart in view."}</span>
         </div>
         <div className="sbo-language" aria-label="Language selection"><button className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>English</button><button className={language === "th" ? "active" : ""} onClick={() => setLanguage("th")}>ไทย</button></div>
       </header>
@@ -65,11 +65,11 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
         <div className="sbo-sidebar">
           <OrderingCart cart={cart} language={language} onQty={qty} onRemove={remove} />
           <section className="sbo-panel">
-            <h2>Order details</h2>
+            <h2>Checkout</h2>
             {!tablet && <><input placeholder="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></>}
             <textarea placeholder="Order notes" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} />
             <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}><option value="pay_at_counter">Pay at counter</option><option value="cash">Cash</option><option value="manual_qr_transfer">QR</option></select>
-            <button disabled={!cart.length || loading} onClick={submit}>{loading ? "Submitting..." : "Submit order"}</button>
+            <button disabled={!cart.length || loading} onClick={submit}>{loading ? "Submitting..." : "Place Order"}</button>
           </section>
         </div>
       </div>
