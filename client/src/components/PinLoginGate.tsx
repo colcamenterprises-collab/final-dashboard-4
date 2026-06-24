@@ -334,7 +334,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
             <button
               type="submit"
               disabled={!username.trim() || pin.length < PIN_LENGTH || status === "loading"}
-              className="w-full h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-40"
+              className="w-full h-11 rounded-lg border border-emerald-600 bg-emerald-600 text-white text-sm font-semibold shadow-sm transition-colors hover:bg-emerald-700 active:bg-emerald-800 disabled:cursor-not-allowed disabled:border-gray-300 disabled:bg-gray-200 disabled:text-gray-500 disabled:opacity-100 disabled:shadow-sm disabled:hover:bg-gray-200 disabled:active:bg-gray-200"
             >
               {status === "loading" ? "Signing in..." : "Sign in"}
             </button>
