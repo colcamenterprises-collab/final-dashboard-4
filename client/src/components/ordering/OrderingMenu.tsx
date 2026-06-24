@@ -2,6 +2,18 @@ import { useMemo, useState } from "react";
 import type { CartItem, OrderingLanguage } from "./orderingApi";
 import { itemLabel, money } from "./orderingApi";
 
+const fallbackImages = [
+  "/images/menu/super-double-set.jpg",
+  "/images/menu/double-set.jpg",
+  "/images/menu/single-smash-set.jpg",
+  "/images/menu/triple-smash-set.jpg",
+  "/images/menu/karaage-chicken-burger-meal-deal.jpg",
+];
+
+function imageForItem(item: any, index: number) {
+  return item.image_url || item.imageUrl || item.photo_url || item.photoUrl || fallbackImages[index % fallbackImages.length];
+}
+
 type Props = {
   categories: any[];
   language: OrderingLanguage;
@@ -51,10 +63,11 @@ export default function OrderingMenu({ categories, language, large, onAdd }: Pro
         <section key={category.id} className="sbo-category">
           <h2>{language === "th" && category.name_th ? category.name_th : category.name_en}</h2>
           <div className="sbo-menu-grid">
-            {(category.items ?? []).map((item: any) => {
+            {(category.items ?? []).map((item: any, itemIndex: number) => {
               const soldOut = item.is_sold_out || !item.is_active;
               return (
                 <article key={item.id} className="sbo-menu-card">
+                  <div className="sbo-menu-photo"><img src={imageForItem(item, itemIndex)} alt={itemLabel(item, language)} /></div>
                   <header>
                     <div>
                       <h3>{itemLabel(item, language)}</h3>
@@ -79,7 +92,7 @@ export default function OrderingMenu({ categories, language, large, onAdd }: Pro
                   {!soldOut && (
                     <>
                       <textarea className="sbo-item-notes" placeholder="Item notes" value={notesByItem[item.id] ?? ""} onChange={(event) => setNotesByItem((prev) => ({ ...prev, [item.id]: event.target.value }))} />
-                      <button className={buttonClass} onClick={() => addItem(item)}>Add</button>
+                      <button className={buttonClass} onClick={() => addItem(item)}>Add to Cart</button>
                     </>
                   )}
                 </article>

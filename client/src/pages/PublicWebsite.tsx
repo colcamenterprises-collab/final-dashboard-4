@@ -1,20 +1,22 @@
 import { Link, Navigate } from "react-router-dom";
 import "./PublicWebsite.css";
 
-const heroSet = "/images/menu/super-double-set.jpg";
+const heroImage = "/images/menu/super-double-set.jpg";
+const friesImage = "/images/menu/single-smash-set.jpg";
 const doubleSet = "/images/menu/double-set.jpg";
 const singleSet = "/images/menu/single-smash-set.jpg";
 const tripleSet = "/images/menu/triple-smash-set.jpg";
 const chickenSet = "/images/menu/karaage-chicken-burger-meal-deal.jpg";
 
-const featured = [
-  { name: "Super Double Set", kicker: "Double smash burger, fries, and drink.", image: heroSet },
-  { name: "Triple Smash Set", kicker: "Three patties, melted cheese, fries, and drink.", image: tripleSet },
-  { name: "Karaage Chicken Burger", kicker: "Crispy chicken burger meal with fries.", image: chickenSet },
+const featuredProducts = [
+  { name: "Salt & Pepper Smash Fries", kicker: "Loaded fries, burger sauce, cheese, and crunch.", image: friesImage },
+  { name: "Karaage Chicken Burger", kicker: "Crispy chicken, fries, and cold drink.", image: chickenSet },
+  { name: "Super Double Set", kicker: "Double smashed patties, cheese, fries, and drink.", image: doubleSet },
+  { name: "Triple Smash Set", kicker: "Three patties stacked for serious burger people.", image: tripleSet },
 ];
 
-const menuGroups = [
-  { title: "Smash Burger Sets", items: ["Single Smash Set", "Double Set", "Super Double Set", "Triple Smash Set"] },
+const menuSections = [
+  { title: "Signature Smash", items: ["Single Smash Set", "Double Set", "Super Double Set", "Triple Smash Set"] },
   { title: "Chicken", items: ["Karaage Chicken Burger Meal Deal", "Crispy Chicken Burger", "Chicken Loaded Fries"] },
   { title: "Sides", items: ["House Fries", "Dirty Fries", "Cheese Fries", "Onion Rings"] },
   { title: "Drinks", items: ["Soft Drinks", "Water", "Milkshakes", "Seasonal Specials"] },
@@ -23,17 +25,26 @@ const menuGroups = [
 function Header() {
   return (
     <header className="sbw-header">
-      <Link className="sbw-brand" to="/" aria-label="Smash Brothers home">
-        <span className="sbw-logo-mark" aria-hidden="true">SB</span>
-        <span>Smash Brothers</span>
-      </Link>
-      <nav className="sbw-nav" aria-label="Customer navigation">
-        <Link to="/menu">View Menu</Link>
-        <Link to="/membership">Membership</Link>
-        <Link to="/order">Order Online</Link>
+      <Link className="sbw-brand" to="/" aria-label="Smash Brothers Burgers home">SMASH BROTHERS</Link>
+      <nav className="sbw-nav" aria-label="Public navigation">
+        <Link to="/">Home</Link>
+        <Link to="/menu">Menu</Link>
+        <Link className="sbw-nav-cta" to="/order">Order Online</Link>
       </nav>
-      <Link className="sbw-order-button" to="/order">Order Online</Link>
     </header>
+  );
+}
+
+function ProductCard({ product, tall = false }: { product: typeof featuredProducts[number]; tall?: boolean }) {
+  return (
+    <Link className={`sbw-product-card ${tall ? "is-tall" : ""}`} to="/order">
+      <img src={product.image} alt={product.name} />
+      <div className="sbw-product-copy">
+        <h3>{product.name}</h3>
+        <p>{product.kicker}</p>
+        <span>Order Online</span>
+      </div>
+    </Link>
   );
 }
 
@@ -41,47 +52,29 @@ function Footer() {
   return (
     <footer className="sbw-footer">
       <div className="sbw-footer-card">
-        <div className="sbw-footer-brand">
-          <span className="sbw-logo-mark" aria-hidden="true">SB</span>
-          <strong>Smash Brothers</strong>
-          <span>Rawai, Phuket</span>
-        </div>
-        <div className="sbw-footer-links">
-          <Link to="/menu">View Menu</Link>
-          <Link to="/membership">Membership</Link>
+        <strong>SMASH BROTHERS</strong>
+        <nav>
+          <Link to="/menu">Menu</Link>
           <Link to="/order">Order Online</Link>
+          <Link to="/staff">Staff Login</Link>
+        </nav>
+        <div>
+          <h2>Join Our Newsletter</h2>
+          <button type="button">Submit</button>
         </div>
-        <Link className="sbw-staff-link" to="/staff">Staff Login</Link>
+        <small>Copyright Smash Brothers Burgers</small>
       </div>
     </footer>
   );
 }
 
-function ProductFeature({ product }: { product: typeof featuredProducts[number] }) {
+function BrandPanel() {
   return (
-    <Link className={`sbw-product-card ${tall ? "is-tall" : ""}`} to="/order">
-      <img src={item.image} alt={item.name} />
-      <div className="sbw-product-copy">
-        <h3>{item.name}</h3>
-        <p>{item.kicker}</p>
-        <span>Order Online</span>
-      </div>
-    </Link>
-  );
-}
-
-function PublicHero() {
-  return (
-    <section className="sbw-hero" style={{ "--sbw-hero-image": `url(${heroImage})` } as React.CSSProperties}>
-      <Header />
-      <div className="sbw-hero-content">
-        <p className="sbw-eyebrow">Smash Brothers Burgers</p>
-        <h1>Premium Smash Burgers in Rawai</h1>
-        <p>Fresh smashed burgers, crispy sides, cold drinks, and fast online ordering.</p>
-        <div className="sbw-hero-actions">
-          <Link to="/order">Order Online</Link>
-          <Link to="/menu">View Menu</Link>
-        </div>
+    <section className="sbw-brand-panel">
+      <h2>The Smash Above All Burgers</h2>
+      <div>
+        <p>Big sear, soft buns, sharp cheese, crispy sides, and a customer-first online ordering flow.</p>
+        <Link to="/menu">About Us</Link>
       </div>
     </section>
   );
@@ -90,65 +83,50 @@ function PublicHero() {
 export function PublicHome() {
   return (
     <main className="sbw-page">
-      <section className="sbw-hero">
+      <section className="sbw-hero-shell">
+        <Header />
         <div className="sbw-hero-copy">
-          <p className="sbw-eyebrow">Rawai, Phuket</p>
-          <h1>Smash Brothers Burgers</h1>
-          <p className="sbw-hero-text">Premium smash burger sets built for fast ordering, clean pickup, and serious burger people.</p>
-          <div className="sbw-hero-actions">
-            <Link to="/order">Order Online</Link>
-            <Link to="/menu">View Menu</Link>
-          </div>
-        </div>
-        <div className="sbw-hero-media">
-          <img src={heroSet} alt="Super Double Smash Burger Set" />
-          <div className="sbw-hero-badge"><strong>Smash Sets</strong><span>Burger. Fries. Drink.</span></div>
+          <h1>Phuket's Favorite Smash Burger Joint</h1>
+          <img src={heroImage} alt="Three Smash Brothers burgers" />
         </div>
       </section>
-
-      <section className="sbw-club-block">
-        <div><p className="sbw-eyebrow dark">Smash Club</p><h2>Members Eat First</h2></div>
-        <div><p>Digital membership is prepared for rewards, faster ordering, and regular customer access.</p><Link to="/membership">Join Membership</Link></div>
+      <BrandPanel />
+      <section className="sbw-featured" aria-label="Featured products">
+        <div className="sbw-product-grid">
+          {featuredProducts.map((product, index) => <ProductCard key={product.name} product={product} tall={index === 0} />)}
+        </div>
       </section>
-
-      <section className="sbw-featured" aria-labelledby="featured-title">
-        <div className="sbw-section-title"><p className="sbw-eyebrow">Featured Sets</p><h2 id="featured-title">Built To Order</h2></div>
-        <div className="sbw-product-grid">{featured.map((item, index) => <ProductCard key={item.name} item={item} tall={index === 0} />)}</div>
+      <section className="sbw-marquee" aria-hidden="true">BEST BURGER I'VE EVER HAD</section>
+      <section className="sbw-visit-band">
+        <h2>Order Online or Come Visit Us Today</h2>
+        <Link to="/order">Get Started</Link>
       </section>
-
-      <section className="sbw-order-band"><h2>Order Online or Visit Us Today</h2><Link to="/order">Start Order</Link></section>
       <Footer />
     </main>
   );
 }
 
-function PublicMenu() {
+export function PublicMenu() {
   return (
-    <main className="sbw-page">
+    <main className="sbw-page sbw-menu-page">
       <Header />
-      <section className="sbw-page-hero"><p className="sbw-eyebrow">Public Menu</p><h1>Made to Smash</h1><p>Premium burger sets, crispy chicken, sides, and drinks.</p></section>
-      <section className="sbw-menu-grid">{menuGroups.map((group) => <article className="sbw-menu-card" key={group.title}><h2>{group.title}</h2>{group.items.map((item) => <Link to="/order" key={item}><span>{item}</span><small>Order Online</small></Link>)}</article>)}</section>
-      <section className="sbw-product-grid sbw-menu-products">{featured.map((item) => <ProductCard key={item.name} item={item} />)}</section>
+      <section className="sbw-menu-hero">
+        <h1>Menu</h1>
+        <p>Premium fast-food sets with bold smash flavor, black-and-yellow presentation, and large product photography.</p>
+      </section>
+      <section className="sbw-product-grid sbw-menu-photo-grid">
+        {featuredProducts.map((product, index) => <ProductCard key={product.name} product={product} tall={index === 0} />)}
+      </section>
+      <section className="sbw-menu-list">
+        {menuSections.map((section) => (
+          <article key={section.title}>
+            <h2>{section.title}</h2>
+            {section.items.map((item) => <Link key={item} to="/order"><span>{item}</span><small>Order Online</small></Link>)}
+          </article>
+        ))}
+      </section>
       <Footer />
     </main>
-  );
-}
-
-function SmashClubSection() {
-  return (
-    <section className="sbw-smash-club">
-      <div>
-        <span>Membership</span>
-        <h2>SMASH CLUB</h2>
-      </div>
-      <div className="sbw-smash-club-copy">
-        <p>Earn rewards.</p>
-        <p>Exclusive offers.</p>
-        <p>Faster ordering.</p>
-        <p>Skip the queue.</p>
-        <Link to="/membership">Join Smash Club</Link>
-      </div>
-    </section>
   );
 }
 
@@ -156,17 +134,11 @@ export function PublicMembership() {
   return (
     <main className="sbw-page">
       <Header />
-      <section className="sbw-membership-hero">
-        <div><p className="sbw-eyebrow">Membership</p><h1>Smash Club</h1><p>Digital member access for future rewards, faster ordering, and regular customer updates.</p><Link to="/order">Order Now</Link></div>
-        <div className="sbw-card-preview"><span className="sbw-logo-mark" aria-hidden="true">SB</span><span>Member Card</span><strong>SMASH CLUB</strong><small>Rewards coming soon</small></div>
-      </section>
-      <section className="sbw-membership-strip"><img src={singleSet} alt="Single Smash Set" /><img src={doubleSet} alt="Double Set" /><img src={tripleSet} alt="Triple Smash Set" /></section>
+      <BrandPanel />
+      <section className="sbw-visit-band"><h2>Smash Club Coming Soon</h2><Link to="/order">Order Now</Link></section>
       <Footer />
     </main>
   );
 }
 
-export function PublicHome() { return <SampleHome />; }
-export function PublicMenu() { return <SampleHome />; }
-export function PublicMembership() { return <SampleHome />; }
 export function StaffEntry() { return <Navigate to="/login" replace />; }
