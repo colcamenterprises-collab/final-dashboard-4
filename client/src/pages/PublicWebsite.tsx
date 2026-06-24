@@ -122,7 +122,7 @@ export function PublicHome() {
   );
 }
 
-export function PublicMenu() {
+function PublicMenu() {
   return (
     <main className="sbw-page">
       <Header />
