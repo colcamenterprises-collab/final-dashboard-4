@@ -164,23 +164,20 @@ const KEYPAD_ROWS = [
   ["", "0", "⌫"],
 ];
 
-type LoginStep = "email" | "pin";
-
 function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
-  const [step, setStep] = useState<LoginStep>("email");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [shake, setShake] = useState(false);
 
-  // Hardware keyboard support for PIN step
+  // Hardware keyboard support for PIN entry when focus is not in the username field
   useEffect(() => {
-    if (step !== "pin") return;
     const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.tagName === "INPUT") return;
       if (e.key >= "0" && e.key <= "9") appendDigit(e.key);
       else if (e.key === "Backspace") deleteDigit();
-      else if (e.key === "Escape") goBack();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -199,31 +196,16 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
     setErrorMsg("");
   }
 
-  function goBack() {
-    setStep("email");
-    setPin("");
-    setStatus("idle");
-    setErrorMsg("");
-  }
-
-  async function submitEmail(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setStep("pin");
-    setPin("");
-    setStatus("idle");
-    setErrorMsg("");
-  }
-
-  async function submitPin(currentPin: string) {
-    if (!email || currentPin.length < PIN_LENGTH) return;
+  async function submitLogin(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!username.trim() || pin.length < PIN_LENGTH || status === "loading") return;
     setStatus("loading");
     try {
       const res = await fetch("/api/pin-auth/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), pin: currentPin }),
+        body: JSON.stringify({ username: username.trim(), pin }),
       });
       const data = await res.json();
       if (res.ok && data.user) {
@@ -241,14 +223,6 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
       setPin("");
     }
   }
-
-  // Auto-submit when PIN_LENGTH digits entered
-  useEffect(() => {
-    if (pin.length === PIN_LENGTH && step === "pin" && status === "idle") {
-      submitPin(pin);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin]);
 
   return (
     <div
@@ -269,63 +243,30 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
               Staff Sign In
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              {step === "email" ? "Enter your email, username, or name" : "Enter your PIN"}
+              Enter your username/name and PIN
             </p>
           </div>
 
-          {/* ── Step 1: Email entry ──────────────────────────────── */}
-          {step === "email" && (
-            <form onSubmit={submitEmail} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                  Email, username, or name
-                </label>
-                <input
-                  type="text"
-                  autoFocus
-                  autoComplete="username"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. cparker, cameron@email.com"
-                  className="w-full h-11 rounded-lg border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={!email.trim()}
-                className="w-full h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
-              >
-                Continue
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            </form>
-          )}
-
-          {/* ── Step 2: PIN entry ─────────────────────────────────── */}
-          {step === "pin" && (
+          <form onSubmit={submitLogin} className="space-y-5">
             <div>
-              {/* Email shown + back link */}
-              <div className="flex items-center justify-between mb-6">
-                <button
-                  onClick={goBack}
-                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 transition-colors"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                  Back
-                </button>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-bold text-emerald-700">
-                    {email.slice(0, 1).toUpperCase()}
-                  </div>
-                  <span className="text-xs text-gray-600 truncate max-w-[160px]">{email}</span>
-                </div>
-              </div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Username or name
+              </label>
+              <input
+                type="text"
+                autoFocus
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter staff username or name"
+                className="w-full h-11 rounded-lg border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all"
+              />
+            </div>
 
-              {/* PIN dots */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-3 text-center">
+                PIN / passcode
+              </label>
               <div className={`flex items-center justify-center gap-4 mb-2 ${shake ? "animate-shake" : ""}`}>
                 {Array.from({ length: PIN_LENGTH }).map((_, i) => (
                   <div
@@ -342,14 +283,12 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
                 ))}
               </div>
 
-              {/* Error */}
               <div className="h-6 mb-5 text-center">
                 {status === "error" && errorMsg && (
                   <p className="text-xs text-red-500 font-medium">{errorMsg}</p>
                 )}
               </div>
 
-              {/* Phone-style keypad */}
               <div
                 style={{
                   display: "grid",
@@ -367,6 +306,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
                   return (
                     <button
                       key={key}
+                      type="button"
                       disabled={isLoading}
                       onClick={() => {
                         if (isLoading) return;
@@ -390,7 +330,15 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
                 })}
               </div>
             </div>
-          )}
+
+            <button
+              type="submit"
+              disabled={!username.trim() || pin.length < PIN_LENGTH || status === "loading"}
+              className="w-full h-11 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-40"
+            >
+              {status === "loading" ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
 
           {/* Footer */}
           <p className="mt-10 text-center text-xs text-gray-300">
