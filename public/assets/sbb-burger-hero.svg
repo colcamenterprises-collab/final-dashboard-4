@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Smash Brothers burger hero</title>
+  <desc id="desc">A branded Smash Brothers double cheeseburger with fries on a dark background.</desc>
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="42%" r="58%"><stop offset="0" stop-color="#ffd51e" stop-opacity=".42"/><stop offset="1" stop-color="#111" stop-opacity="0"/></radialGradient>
+    <linearGradient id="bun" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f6b446"/><stop offset="1" stop-color="#b96524"/></linearGradient>
+    <linearGradient id="patty" x1="0" x2="1"><stop offset="0" stop-color="#3a170e"/><stop offset="1" stop-color="#111"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="#181818"/>
+  <circle cx="600" cy="390" r="390" fill="url(#glow)"/>
+  <g transform="translate(160 145)">
+    <g transform="translate(650 250) rotate(9)">
+      <rect x="0" y="80" width="58" height="280" rx="14" fill="#f8d45c"/>
+      <rect x="74" y="35" width="58" height="325" rx="14" fill="#ffd966"/>
+      <rect x="148" y="100" width="58" height="260" rx="14" fill="#f0b937"/>
+      <rect x="222" y="55" width="58" height="305" rx="14" fill="#ffe184"/>
+    </g>
+    <ellipse cx="450" cy="520" rx="430" ry="72" fill="#070707" opacity=".46"/>
+    <path d="M118 286c18-128 141-215 334-215 191 0 322 88 342 215 5 30-18 57-49 57H167c-31 0-54-27-49-57Z" fill="url(#bun)"/>
+    <g fill="#fff0b2" opacity=".95">
+      <ellipse cx="255" cy="152" rx="15" ry="7" transform="rotate(-18 255 152)"/><ellipse cx="360" cy="113" rx="15" ry="7"/><ellipse cx="510" cy="126" rx="15" ry="7" transform="rotate(14 510 126)"/><ellipse cx="620" cy="180" rx="15" ry="7" transform="rotate(-10 620 180)"/>
+    </g>
+    <path d="M150 342c58 24 103-22 161 0 58 21 99-20 154 0 68 25 105-21 169 0 57 19 103-14 143 2 18 7 26 32 13 47-20 25-65 37-119 34l-498-3c-62-1-91-57-23-80Z" fill="#53b96f"/>
+    <path d="M154 388h624c28 0 51 21 51 48 0 24-20 45-47 48l-634 63c-36 4-67-22-67-56v-23c0-44 33-80 73-80Z" fill="url(#patty)"/>
+    <path d="M123 500h675l-77 86H202l-79-86Z" fill="#ffd51e"/>
+    <path d="M160 574h614c36 0 65 24 65 54s-29 54-65 54H160c-36 0-65-24-65-54s29-54 65-54Z" fill="url(#patty)"/>
+    <path d="M142 640h664c31 0 56 25 56 56v4H86v-4c0-31 25-56 56-56Z" fill="#b96524"/>
+  </g>
+</svg>
