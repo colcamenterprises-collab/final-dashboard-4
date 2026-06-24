@@ -30,6 +30,7 @@ const purchasingItemSafeSelect = {
   supplierSku: true,
   orderUnit: true,
   unitDescription: true,
+  purchaseUnitLabel: true,
   unitCost: true,
   lastReviewDate: true,
   active: true,
@@ -49,6 +50,7 @@ const purchasingItemSchema = z.object({
   supplierSku: z.string().optional().nullable(),
   orderUnit: z.string().optional().nullable(),
   unitDescription: z.string().optional().nullable(),
+  purchaseUnitLabel: z.string().optional().nullable(),
   unitCost: z.number().optional().nullable(),
   lastReviewDate: z.string().optional().nullable(),
   active: z.boolean().optional(),
@@ -237,7 +239,7 @@ router.get('/export/csv', async (req, res) => {
       ],
     });
 
-    const headers = ['id', 'item', 'category', 'supplierName', 'brand', 'supplierSku', 'orderUnit', 'unitDescription', 'unitCost', 'lastReviewDate'];
+    const headers = ['id', 'item', 'category', 'supplierName', 'brand', 'supplierSku', 'purchaseUnitLabel', 'orderUnit', 'unitDescription', 'unitCost', 'lastReviewDate'];
     const csvLines = [headers.join(',')];
     
     for (const row of items) {
@@ -248,6 +250,7 @@ router.get('/export/csv', async (req, res) => {
         `"${(row.supplierName || '').replace(/"/g, '""')}"`,
         `"${(row.brand || '').replace(/"/g, '""')}"`,
         `"${(row.supplierSku || '').replace(/"/g, '""')}"`,
+        `"${(row.purchaseUnitLabel || '').replace(/"/g, '""')}"`,
         `"${(row.orderUnit || '').replace(/"/g, '""')}"`,
         `"${(row.unitDescription || '').replace(/"/g, '""')}"`,
         row.unitCost || '',
@@ -284,6 +287,18 @@ router.post('/import/csv', async (req, res) => {
       const item = (row.item || '').trim();
       const supplierName = (row.supplierName || '').trim() || null;
       const brand = (row.brand || '').trim() || null;
+      const supplierSku = (row.supplierSku || row.sku || row.SKU || '').trim() || null;
+      const purchaseUnitLabel = (
+        row.purchaseUnitLabel ||
+        row.package_size ||
+        row.pack_size ||
+        row.packageSize ||
+        row.packSize ||
+        row.sizePack ||
+        row['Size / Pack'] ||
+        row['size / pack'] ||
+        ''
+      ).trim() || null;
       
       if (!item) continue;
       
@@ -307,7 +322,8 @@ router.post('/import/csv', async (req, res) => {
           where: { id: existing.id },
           data: {
             category: normalizedCategory,
-            supplierSku: row.supplierSku || null,
+            supplierSku,
+            purchaseUnitLabel,
             orderUnit: row.orderUnit || null,
             unitDescription: row.unitDescription || null,
             unitCost: row.unitCost ? parseFloat(row.unitCost) : null,
@@ -323,7 +339,8 @@ router.post('/import/csv', async (req, res) => {
             category: normalizedCategory,
             supplierName: supplierName,
             brand: brand,
-            supplierSku: row.supplierSku || null,
+            supplierSku,
+            purchaseUnitLabel,
             orderUnit: row.orderUnit || null,
             unitDescription: row.unitDescription || null,
             unitCost: row.unitCost ? parseFloat(row.unitCost) : null,

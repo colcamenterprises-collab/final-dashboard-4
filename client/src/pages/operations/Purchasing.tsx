@@ -49,6 +49,7 @@ type PurchasingItem = {
   supplierSku: string | null;
   orderUnit: string | null;
   unitDescription: string | null;
+  purchaseUnitLabel: string | null;
   unitCost: number | null;
   lastReviewDate: string | null;
   active: boolean;
@@ -69,6 +70,15 @@ const isLegacyCategory = (category: string | null | undefined): boolean => {
 const thb = (v: unknown): string => {
   const n = typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0;
   return "฿" + n.toLocaleString("en-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const displayText = (value: string | null | undefined): string => {
+  const normalized = value?.trim();
+  return normalized ? normalized : "—";
+};
+
+const getSizePack = (item: PurchasingItem): string => {
+  return displayText(item.purchaseUnitLabel || item.unitDescription || item.orderUnit);
 };
 
 export default function PurchasingPage() {
@@ -213,6 +223,7 @@ export default function PurchasingPage() {
       supplierName: formData.get('supplierName') as string || null,
       brand: formData.get('brand') as string || null,
       supplierSku: formData.get('supplierSku') as string || null,
+      purchaseUnitLabel: formData.get('purchaseUnitLabel') as string || null,
       orderUnit: formData.get('orderUnit') as string || null,
       unitDescription: formData.get('unitDescription') as string || null,
       unitCost: newCost,
@@ -254,6 +265,7 @@ export default function PurchasingPage() {
           supplierName: formData.get('supplierName') as string || null,
           brand: formData.get('brand') as string || null,
           supplierSku: formData.get('supplierSku') as string || null,
+          purchaseUnitLabel: formData.get('purchaseUnitLabel') as string || null,
           orderUnit: formData.get('orderUnit') as string || null,
           unitDescription: formData.get('unitDescription') as string || null,
           unitCost: pendingCostUpdate.newCost,
@@ -427,18 +439,15 @@ export default function PurchasingPage() {
       ) : (
         <Card className="rounded-[4px] border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="min-w-[600px]">
+            <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow className="border-slate-200">
                   <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Item</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">SKU</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Supplier</TableHead>
+                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Size / Pack</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 text-right px-2 py-2">Cost</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden md:table-cell">Category</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden lg:table-cell">Brand</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">SKU</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Order Unit</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Unit Desc</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden xl:table-cell">Last Review</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 w-10 text-center px-1.5 py-2">Active</TableHead>
                   <TableHead className="text-[11px] font-medium text-slate-900 text-center px-1.5 py-2">Actions</TableHead>
                 </TableRow>
@@ -456,16 +465,13 @@ export default function PurchasingPage() {
                         <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Inactive</Badge>
                       )}
                     </TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5">{displayText(item.supplierSku)}</TableCell>
                     <TableCell className="text-[11px] text-slate-600 px-2 py-1.5">{item.supplierName || <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5">{getSizePack(item)}</TableCell>
                     <TableCell className="text-[11px] text-slate-900 font-medium text-right px-2 py-1.5">
                       {item.unitCost !== null ? thb(item.unitCost) : <span className="text-amber-600 text-[10px]">Missing</span>}
                     </TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden md:table-cell">{item.category || '-'}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden lg:table-cell">{item.brand || '-'}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.supplierSku || '-'}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.orderUnit || <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.unitDescription || '-'}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden xl:table-cell">{item.lastReviewDate || '-'}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden md:table-cell">{item.category || '—'}</TableCell>
                     <TableCell className="text-center px-1.5 py-1.5">
                       <Switch
                         data-testid={`switch-active-${item.id}`}
@@ -507,7 +513,7 @@ export default function PurchasingPage() {
                 ))}
                 {filteredItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center text-[11px] text-slate-600 py-6">
+                    <TableCell colSpan={8} className="text-center text-[11px] text-slate-600 py-6">
                       No items found
                     </TableCell>
                   </TableRow>
@@ -590,6 +596,16 @@ export default function PurchasingPage() {
                   data-testid="input-sku"
                   name="supplierSku"
                   defaultValue={editingItem?.supplierSku || ''}
+                  className="text-xs rounded-[4px] border-slate-200"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-900 mb-1 block">Size / Pack</label>
+                <Input
+                  data-testid="input-size-pack"
+                  name="purchaseUnitLabel"
+                  placeholder="330 ml can / 24 pack"
+                  defaultValue={editingItem?.purchaseUnitLabel || editingItem?.unitDescription || editingItem?.orderUnit || ''}
                   className="text-xs rounded-[4px] border-slate-200"
                 />
               </div>
