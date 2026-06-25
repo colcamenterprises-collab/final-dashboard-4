@@ -26,10 +26,7 @@ import IssueRegister from "./pages/operations/IssueRegister";
 import ManagerChecklist from "./pages/operations/ManagerChecklist";
 import HealthSafety from "./pages/operations/HealthSafety";
 
-import Ingredients from "./pages/menu/Ingredients";
-import MenuItems from "./pages/menu/MenuItems";
-import CostCalculator from "./pages/menu/CostCalculator";
-import Recipes from "./pages/menu/Recipes";
+import MenuWorkspace from "./pages/menu/MenuWorkspace";
 
 import FinanceHub from "./pages/finance/FinanceHub";
 import ProfitLoss from "./pages/finance/ProfitLoss";
@@ -110,10 +107,10 @@ export default function App() {
                     <Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
 
                     {/* Menu */}
-                    <Route path="/menu/ingredients" element={<ProtectedRoute><Ingredients /></ProtectedRoute>} />
-                    <Route path="/menu/items" element={<ProtectedRoute><MenuItems /></ProtectedRoute>} />
-                    <Route path="/menu/cost-calculator" element={<ProtectedRoute><CostCalculator /></ProtectedRoute>} />
-                    <Route path="/menu/recipes" element={<ProtectedRoute><Recipes /></ProtectedRoute>} />
+                    <Route path="/menu/items" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
+                    <Route path="/menu/recipes" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
+                    <Route path="/menu/ingredients" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
+                    <Route path="/menu/cost-calculator" element={<ProtectedRoute><Navigate to="/menu/recipes" replace /></ProtectedRoute>} />
 
                     {/* Finance */}
                     <Route path="/finance" element={<ProtectedRoute><FinanceHub /></ProtectedRoute>} />
