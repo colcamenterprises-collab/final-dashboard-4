@@ -1,23 +1,93 @@
 // RECEIPT ANALYTICS — READ ONLY
 // Source: lv_receipt, lv_line_item, lv_modifier
-// Business window: 18:00–03:00 Asia/Bangkok
+// Business window: 17:00–03:00 Asia/Bangkok
 
 import { Router } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import { DateTime } from "luxon";
 
 const router = Router();
 
 // ── helpers ──────────────────────────────────────────────────────────────────
+const REPORT_TZ = "Asia/Bangkok";
+const DEFAULT_SHIFT_START_TIME = "17:00";
+const DEFAULT_SHIFT_END_TIME = "03:00";
+
 const toNum = (v: unknown): number => (v == null ? 0 : Number(v));
 const toStr = (v: unknown): string => (v == null ? "" : String(v));
+const validDate = (v: unknown): string | null => /^\d{4}-\d{2}-\d{2}$/.test(toStr(v)) ? toStr(v) : null;
+const validTime = (v: unknown, fallback: string): string => /^\d{2}:\d{2}$/.test(toStr(v)) ? toStr(v) : fallback;
 
-// Business date CTE — used in every query
-const BIZ_FILTER = (from: string, to: string) => sql`
-  CASE WHEN EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-    THEN (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date
-    ELSE ((datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date - 1)
-  END BETWEEN ${from}::date AND ${to}::date
+function shiftEndDateFor(startDate: string, startTime: string, endTime: string): string {
+  return endTime <= startTime
+    ? DateTime.fromISO(startDate, { zone: REPORT_TZ }).plus({ days: 1 }).toISODate()!
+    : startDate;
+}
+
+function shiftWindow(startDate: string, startTime: string, endTime: string) {
+  const endDate = shiftEndDateFor(startDate, startTime, endTime);
+  return {
+    startDate,
+    endDate,
+    startLocal: `${startDate} ${startTime}:00`,
+    endLocal: `${endDate} ${endTime}:00`,
+  };
+}
+
+function getCurrentShiftStart(now = DateTime.now().setZone(REPORT_TZ), startTime = DEFAULT_SHIFT_START_TIME, endTime = DEFAULT_SHIFT_END_TIME): string {
+  const [sh, sm] = startTime.split(":").map(Number);
+  const [eh, em] = endTime.split(":").map(Number);
+  const startToday = now.set({ hour: sh, minute: sm, second: 0, millisecond: 0 });
+  const endToday = now.set({ hour: eh, minute: em, second: 0, millisecond: 0 });
+  if (endTime <= startTime && now < endToday) return now.minus({ days: 1 }).toISODate()!;
+  if (now >= startToday) return now.toISODate()!;
+  return now.minus({ days: 1 }).toISODate()!;
+}
+
+function resolveWindow(query: Record<string, unknown>) {
+  const shiftStartTime = validTime(query.shiftStartTime, DEFAULT_SHIFT_START_TIME);
+  const shiftEndTime = validTime(query.shiftEndTime, DEFAULT_SHIFT_END_TIME);
+  const mode = toStr(query.mode || query.preset || "last_completed_shift");
+  const now = DateTime.now().setZone(REPORT_TZ);
+  const currentShiftStart = getCurrentShiftStart(now, shiftStartTime, shiftEndTime);
+
+  if (mode === "custom" || (query.shiftStartDate && query.shiftEndDate)) {
+    const startDate = validDate(query.shiftStartDate || query.from);
+    const endDate = validDate(query.shiftEndDate || query.to);
+    if (!startDate || !endDate) throw new Error("Custom shift range requires shiftStartDate and shiftEndDate as YYYY-MM-DD.");
+    const first = shiftWindow(startDate, shiftStartTime, shiftEndTime);
+    const last = shiftWindow(endDate, shiftStartTime, shiftEndTime);
+    return { mode: "custom_shift_range", fromDate: startDate, toDate: endDate, startLocal: first.startLocal, endLocal: last.endLocal, shiftStartTime, shiftEndTime };
+  }
+
+  if (mode === "current_shift") {
+    const w = shiftWindow(currentShiftStart, shiftStartTime, shiftEndTime);
+    return { mode: "current_shift", fromDate: w.startDate, toDate: w.startDate, startLocal: w.startLocal, endLocal: w.endLocal, shiftStartTime, shiftEndTime };
+  }
+
+  const limitRaw = query.limit ? parseInt(toStr(query.limit), 10) : null;
+  if (limitRaw && limitRaw > 1) {
+    const limitN = Math.min(Math.max(limitRaw, 1), 90);
+    const lastCompleted = DateTime.fromISO(currentShiftStart, { zone: REPORT_TZ }).minus({ days: 1 });
+    const first = lastCompleted.minus({ days: limitN - 1 }).toISODate()!;
+    const last = lastCompleted.toISODate()!;
+    return { mode: `last_${limitN}_shifts`, fromDate: first, toDate: last, startLocal: shiftWindow(first, shiftStartTime, shiftEndTime).startLocal, endLocal: shiftWindow(last, shiftStartTime, shiftEndTime).endLocal, shiftStartTime, shiftEndTime };
+  }
+
+  const lastCompleted = DateTime.fromISO(currentShiftStart, { zone: REPORT_TZ }).minus({ days: 1 }).toISODate()!;
+  const w = shiftWindow(lastCompleted, shiftStartTime, shiftEndTime);
+  return { mode: "last_completed_shift", fromDate: w.startDate, toDate: w.startDate, startLocal: w.startLocal, endLocal: w.endLocal, shiftStartTime, shiftEndTime };
+}
+
+const RECEIPT_WINDOW_FILTER = (startLocal: string, endLocal: string) => sql`
+  (r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= ${startLocal}::timestamp
+  AND (r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') < ${endLocal}::timestamp
+`;
+
+const RECEIPT_WINDOW_FILTER_UNALIASED = (startLocal: string, endLocal: string) => sql`
+  (datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= ${startLocal}::timestamp
+  AND (datetime_bkk AT TIME ZONE 'Asia/Bangkok') < ${endLocal}::timestamp
 `;
 
 // Category mapping — order matters (Chicken > Fries > Drinks > Sides > Burgers)
@@ -42,53 +112,19 @@ const CAT_CASE = sql`
   END
 `;
 
-// Patty count per line item (beef burgers only — excludes chicken)
-const PATTY_CASE = sql`
-  CASE
-    WHEN lower(li.name) LIKE '%chicken%' OR lower(li.name) LIKE '%rooster%'
-      OR lower(li.name) LIKE '%nugget%' OR lower(li.name) LIKE '%karaage%' THEN 0
-    WHEN lower(li.name) LIKE '%triple%' THEN li.qty * 3
-    WHEN lower(li.name) LIKE '%super double%' OR lower(li.name) LIKE '%ultimate%'
-      OR lower(li.name) LIKE '%double%' THEN li.qty * 2
-    WHEN lower(li.name) LIKE '%burger%' OR lower(li.name) LIKE '%smash%'
-      OR lower(li.name) LIKE '%single%' THEN li.qty * 1
-    ELSE 0
-  END
-`;
-
 // ── main route ────────────────────────────────────────────────────────────────
 router.get("/", async (req, res) => {
   if (!db) return res.json({ ok: false, blockers: [{ code: "DB_UNAVAILABLE", message: "Database not available." }] });
 
   try {
-    let fromDate: string, toDate: string;
-    const businessDates: string[] = [];
+    const window = resolveWindow(req.query as Record<string, unknown>);
+    const { fromDate, toDate, startLocal, endLocal, shiftStartTime, shiftEndTime } = window;
+    const shiftStartHour = Number(shiftStartTime.slice(0, 2));
+    const hoursAfterMidnightOffset = 24 - shiftStartHour;
 
-    if (req.query.from && req.query.to) {
-      fromDate = String(req.query.from);
-      toDate = String(req.query.to);
-    } else {
-      // Last N completed business shifts (limit param, default 7, max 90)
-      const limitN = Math.min(Math.max(parseInt(String(req.query.limit ?? "7")) || 7, 1), 90);
-      const { rows: dateRows } = await db.execute(sql`
-        SELECT DISTINCT
-          CASE WHEN EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-            THEN (datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date
-            ELSE ((datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date - 1)
-          END AS biz_date
-        FROM lv_receipt
-        WHERE EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-           OR EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3
-        ORDER BY biz_date DESC
-        LIMIT ${sql.raw(String(limitN))}
-      `);
-      if (dateRows.length === 0) {
-        return res.json({ ok: false, blockers: [{ code: "NO_RECEIPTS", message: "No POS receipts found for this period." }] });
-      }
-      const sorted = dateRows.map((r: any) => String(r.biz_date).slice(0, 10)).sort();
-      fromDate = sorted[0];
-      toDate = sorted[sorted.length - 1];
-      businessDates.push(...sorted.reverse());
+    const businessDates: string[] = [];
+    for (let cursor = DateTime.fromISO(fromDate, { zone: REPORT_TZ }); cursor <= DateTime.fromISO(toDate, { zone: REPORT_TZ }); cursor = cursor.plus({ days: 1 })) {
+      businessDates.push(cursor.toISODate()!);
     }
 
     const searchFilter = req.query.search ? `%${String(req.query.search).toLowerCase()}%` : null;
@@ -102,9 +138,7 @@ router.get("/", async (req, res) => {
         WITH biz AS (
           SELECT r.receipt_id, r.total_amount
           FROM lv_receipt r
-          WHERE (EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-              OR EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3)
-            AND ${BIZ_FILTER(fromDate, toDate)}
+          WHERE ${RECEIPT_WINDOW_FILTER(startLocal, endLocal)}
         )
         SELECT
           COUNT(DISTINCT b.receipt_id)::int AS receipt_count,
@@ -129,9 +163,7 @@ router.get("/", async (req, res) => {
         WITH biz AS (
           SELECT receipt_id
           FROM lv_receipt
-          WHERE (EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-              OR EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3)
-            AND ${BIZ_FILTER(fromDate, toDate)}
+          WHERE ${RECEIPT_WINDOW_FILTER_UNALIASED(startLocal, endLocal)}
         ),
         items AS (
           SELECT li.name, li.sku,
@@ -158,9 +190,7 @@ router.get("/", async (req, res) => {
         WITH biz AS (
           SELECT receipt_id
           FROM lv_receipt
-          WHERE (EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-              OR EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3)
-            AND ${BIZ_FILTER(fromDate, toDate)}
+          WHERE ${RECEIPT_WINDOW_FILTER_UNALIASED(startLocal, endLocal)}
         ),
         mods AS (
           SELECT m.name, SUM(m.qty)::int AS qty_sold
@@ -182,9 +212,7 @@ router.get("/", async (req, res) => {
         WITH biz AS (
           SELECT receipt_id
           FROM lv_receipt
-          WHERE (EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-              OR EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3)
-            AND ${BIZ_FILTER(fromDate, toDate)}
+          WHERE ${RECEIPT_WINDOW_FILTER_UNALIASED(startLocal, endLocal)}
         )
         SELECT
           ${CAT_CASE} AS category,
@@ -200,14 +228,12 @@ router.get("/", async (req, res) => {
       db.execute(sql`
         WITH biz AS (
           SELECT r.receipt_id, r.total_amount,
-            CASE WHEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
+            CASE WHEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= ${shiftStartHour}
               THEN (r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date
               ELSE ((r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date - 1)
             END AS biz_date
           FROM lv_receipt r
-          WHERE (EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-              OR EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3)
-            AND ${BIZ_FILTER(fromDate, toDate)}
+          WHERE ${RECEIPT_WINDOW_FILTER(startLocal, endLocal)}
         )
         SELECT
           b.biz_date::text,
@@ -234,25 +260,30 @@ router.get("/", async (req, res) => {
           COALESCE(SUM(li.qty), 0)::int AS items_sold
         FROM lv_receipt r
         LEFT JOIN lv_line_item li ON li.receipt_id = r.receipt_id
-        WHERE (EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18
-            OR EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3)
-          AND ${BIZ_FILTER(fromDate, toDate)}
+        WHERE ${RECEIPT_WINDOW_FILTER(startLocal, endLocal)}
         GROUP BY EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int
         ORDER BY CASE
-          WHEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int >= 18
-          THEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int - 18
-          ELSE EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int + 6
+          WHEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int >= ${shiftStartHour}
+          THEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int - ${shiftStartHour}
+          ELSE EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int + ${hoursAfterMidnightOffset}
         END
       `),
     ]);
 
     // ── Parse results ────────────────────────────────────────────────────────
     const s = (summaryRes.rows as any[])[0] ?? {};
+    if (toNum(s.receipt_count) === 0) {
+      return res.json({
+        ok: false,
+        source: { receipts: "lv_receipt", lineItems: "lv_line_item", modifiers: "lv_modifier", window: `${shiftStartTime}–${shiftEndTime} ${REPORT_TZ}` },
+        filters: { from: fromDate, to: toDate, businessDates, mode: window.mode, shiftStartDate: fromDate, shiftEndDate: toDate, shiftStartTime, shiftEndTime, timezone: REPORT_TZ, windowStart: startLocal, windowEnd: endLocal },
+        blockers: [{ code: "NO_RECEIPTS", message: "No receipts found for selected shift window" }],
+      });
+    }
     const burgersSold = toNum(s.burgers_sold);
     const friesSold = toNum(s.fries_sold);
     const drinksSold = toNum(s.drinks_sold);
 
-    // Stock usage estimates from products data
     const products = (productsRes.rows as any[]).map((r) => ({
       name: toStr(r.name),
       sku: toStr(r.sku),
@@ -261,20 +292,6 @@ router.get("/", async (req, res) => {
       revenue: toNum(r.revenue),
       pctOfTotal: toNum(r.pct_of_total),
     }));
-
-    let pattiesEstimate = 0;
-    let nuggetsEstimate = 0;
-    let friesPortions = 0;
-    for (const p of products) {
-      const n = p.name.toLowerCase();
-      const qty = p.qtySold;
-      if (n.includes("nugget")) { nuggetsEstimate += qty; continue; }
-      if (n.includes("chicken") || n.includes("rooster") || n.includes("karaage")) continue;
-      if (n.includes("triple")) { pattiesEstimate += qty * 3; continue; }
-      if (n.includes("super double") || n.includes("ultimate") || n.includes("double")) { pattiesEstimate += qty * 2; continue; }
-      if (n.includes("burger") || n.includes("smash") || n.includes("single")) { pattiesEstimate += qty * 1; }
-      if (n.includes("fries") || n.includes("cajun") || n.includes("sweet potato") || n.includes("dirty") || n.includes("loaded")) { friesPortions += qty; }
-    }
 
     const trendRows = (trendRes.rows as any[]).map((r) => ({
       bizDate: toStr(r.biz_date).slice(0, 10),
@@ -299,9 +316,9 @@ router.get("/", async (req, res) => {
         receipts: "lv_receipt",
         lineItems: "lv_line_item",
         modifiers: "lv_modifier",
-        window: "18:00–03:00 Asia/Bangkok",
+        window: `${shiftStartTime}–${shiftEndTime} ${REPORT_TZ}`,
       },
-      filters: { from: fromDate, to: toDate, businessDates },
+      filters: { from: fromDate, to: toDate, businessDates, mode: window.mode, shiftStartDate: fromDate, shiftEndDate: toDate, shiftStartTime, shiftEndTime, timezone: REPORT_TZ, windowStart: startLocal, windowEnd: endLocal },
       summary: {
         grossSales: toNum(s.gross_sales),
         receiptCount: toNum(s.receipt_count),
@@ -326,13 +343,6 @@ router.get("/", async (req, res) => {
       })),
       dailyTrend: trendRows,
       hourlySales: hourlyRows,
-      stockUsage: [
-        { item: "Beef Patties", qty: pattiesEstimate, unit: "patties", detail: `${pattiesEstimate * 95}g meat` },
-        { item: "Burger Buns", qty: burgersSold, unit: "buns", detail: "1 bun per burger" },
-        { item: "Fries Portions", qty: friesPortions, unit: "portions", detail: `~${friesPortions * 130}g total` },
-        { item: "Drinks", qty: drinksSold, unit: "units", detail: "POS drink items" },
-        { item: "Nuggets", qty: nuggetsEstimate, unit: "portions", detail: "From nugget items" },
-      ],
       blockers: [],
     });
   } catch (err: any) {
