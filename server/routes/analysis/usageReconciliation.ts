@@ -208,7 +208,8 @@ export async function getUsageReconciliation(date: string) {
   const receivedTallyResult = await pool.query(
     `SELECT
        COALESCE(SUM(CASE WHEN rolls_pcs > 0 THEN rolls_pcs ELSE 0 END), 0)  AS received_buns,
-       COALESCE(SUM(CASE WHEN meat_grams > 0 THEN meat_grams ELSE 0 END), 0) AS received_meat_g
+       COALESCE(SUM(CASE WHEN meat_grams > 0 THEN meat_grams ELSE 0 END), 0) AS received_meat_g,
+       COALESCE(SUM(CASE WHEN fries_grams > 0 THEN fries_grams ELSE 0 END), 0) AS received_fries_g
      FROM purchase_tally
      WHERE date::date = $1::date`,
     [date]
@@ -244,6 +245,7 @@ export async function getUsageReconciliation(date: string) {
   const tallyRow = receivedTallyResult.rows[0];
   const receivedBuns = Number(tallyRow?.received_buns ?? 0);
   const receivedMeatG = Number(tallyRow?.received_meat_g ?? 0);
+  const receivedFriesG = Number(tallyRow?.received_fries_g ?? 0);
 
   // Received drinks from purchase_tally_drink — normalize names via DRINK_NAME_MAP
   const receivedDrinks: Record<string, number> = {};
@@ -275,6 +277,18 @@ export async function getUsageReconciliation(date: string) {
   if (meatGOpening !== null && meatGClosing !== null) {
     meatGPhysicalUsed = meatGOpening + receivedMeatG - meatGClosing;
     if (meatGExpected !== null) meatGVariance = meatGPhysicalUsed - meatGExpected;
+  }
+
+  // ─── Fries ────────────────────────────────────────────────────────────────
+  const friesExpected = engineBuilt ? Number(eng.fries_expected) : null;
+  const friesOpening = prevForm2Available ? Number(opening!.fries) : null;
+  const friesClosing = form2Available ? Number(curr!.fries) : null;
+
+  let friesPhysicalUsed: number | null = null;
+  let friesVariance: number | null = null;
+  if (friesOpening !== null && friesClosing !== null) {
+    friesPhysicalUsed = friesOpening + receivedFriesG - friesClosing;
+    if (friesExpected !== null) friesVariance = friesPhysicalUsed - friesExpected;
   }
 
   // ─── Drinks ───────────────────────────────────────────────────────────────
@@ -342,15 +356,17 @@ export async function getUsageReconciliation(date: string) {
   // ─── Severity ─────────────────────────────────────────────────────────────
   const bunsSeverity = severity(bunsVariance, 5, 10);
   const meatSeverity = severity(meatGVariance, 500, 1000);
+  const friesSeverity = severity(friesVariance, 2, 4);
   const drinkSeverities = drinkRows.map(d => d.severity);
-  const hasWarning = [bunsSeverity, meatSeverity, ...drinkSeverities].some(s => s === "warn");
-  const hasCritical = [bunsSeverity, meatSeverity, ...drinkSeverities].some(s => s === "critical");
+  const hasWarning = [bunsSeverity, meatSeverity, friesSeverity, ...drinkSeverities].some(s => s === "warn");
+  const hasCritical = [bunsSeverity, meatSeverity, friesSeverity, ...drinkSeverities].some(s => s === "critical");
   const overallSeverity = hasCritical ? "critical" : hasWarning ? "warn" : engineBuilt && form2Available ? "ok" : "unknown";
 
   // Flag: no purchases at all logged for this shift date
   const noPurchasesLogged =
     receivedBuns === 0 &&
     receivedMeatG === 0 &&
+    receivedFriesG === 0 &&
     Object.values(receivedDrinks).every((v) => v === 0) &&
     receivedDrinksResult.rows.length === 0;
 
@@ -366,7 +382,7 @@ export async function getUsageReconciliation(date: string) {
     overallSeverity,
     noPurchasesLogged,
     stockSource,
-    receivedStock: { buns: receivedBuns, meatG: receivedMeatG, drinks: receivedDrinks },
+    receivedStock: { buns: receivedBuns, meatG: receivedMeatG, friesG: receivedFriesG, drinks: receivedDrinks },
     buns: {
       expected: bunsExpected,
       opening: bunsOpening,
@@ -386,6 +402,16 @@ export async function getUsageReconciliation(date: string) {
       varianceGrams: meatGVariance,
       severity: meatSeverity,
       thresholds: { warn: 500, critical: 1000 },
+    },
+    fries: {
+      expected: friesExpected,
+      opening: friesOpening,
+      received: receivedFriesG,
+      closing: friesClosing,
+      physicalUsed: friesPhysicalUsed,
+      variance: friesVariance,
+      severity: friesSeverity,
+      thresholds: { warn: 2, critical: 4 },
     },
     drinks: {
       totalExpected: totalDrinksExpected,

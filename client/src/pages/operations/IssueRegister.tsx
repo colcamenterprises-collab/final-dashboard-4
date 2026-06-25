@@ -64,10 +64,14 @@ export default function IssueRegister() {
           <div>
             <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Issue Register</h1>
             <p className="text-xs text-slate-500">
-              {issues.length} total · {criticalCount} critical
+              Developer/admin direct route · {issues.length} total · {criticalCount} critical
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-medium text-amber-900">
+        Operational variances are now reviewed in Shift Analysis. This register remains available by direct URL for developer/admin review.
       </div>
 
       <div className="relative">

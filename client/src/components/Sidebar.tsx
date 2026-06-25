@@ -30,7 +30,6 @@ const groups: Group[] = [
     items: [
       { to: "/operations/health-safety-audit", label: "Operations Audit" },
       { to: "/operations/variance-monitor", label: "Variance Monitor" },
-      { to: "/operations/issue-register", label: "Issue Register" },
       { to: "/operations/daily-stock-analysis", label: "Daily Stock Analysis" },
       { to: "/operations/loyverse-mirror", label: "Loyverse Mirror" },
     ],
