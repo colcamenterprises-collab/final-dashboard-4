@@ -14,28 +14,21 @@ interface Modifier { name: string; qtySold: number; pctOfTotal: number; }
 interface CategoryRow { category: string; qtySold: number; revenue: number; }
 interface TrendRow { bizDate: string; grossSales: number; receiptCount: number; burgers: number; fries: number; drinks: number; }
 interface HourRow { hour: number; label: string; receiptCount: number; grossSales: number; }
-interface StockRow { item: string; qty: number; unit: string; detail: string; }
-interface AnalyticsResponse { ok: boolean; summary: Summary; topProducts: Product[]; topModifiers: Modifier[]; categoryMix: CategoryRow[]; dailyTrend: TrendRow[]; hourlySales: HourRow[]; stockUsage: StockRow[]; filters: { from: string; to: string }; blockers?: { code: string; message: string }[]; }
+interface AnalyticsResponse { ok: boolean; summary: Summary; topProducts: Product[]; topModifiers: Modifier[]; categoryMix: CategoryRow[]; dailyTrend: TrendRow[]; hourlySales: HourRow[]; filters: { from: string; to: string; mode?: string; shiftStartDate?: string; shiftEndDate?: string; shiftStartTime?: string; shiftEndTime?: string; timezone?: string; windowStart?: string; windowEnd?: string }; blockers?: { code: string; message: string }[]; }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const m = (n: number) => `฿${Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 const fmtDate = (d: string) => { if (!d) return ""; const [y, mo, day] = d.split("-"); return `${day}/${mo}/${y}`; };
+const fmtWindow = (d: string) => { if (!d) return ""; const [datePart, timePart = ""] = d.split(" "); const [y, mo, day] = datePart.split("-"); const dt = new Date(`${y}-${mo}-${day}T00:00:00Z`); const label = dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }); return `${label}, ${timePart.slice(0, 5)}`; };
 const fmtShort = (d: string) => { if (!d) return ""; const dt = new Date(`${d}T00:00:00Z`); return dt.toLocaleDateString("en-GB", { day: "2-digit", month: "short", timeZone: "UTC" }); };
 
 const CAT_COLORS: Record<string, string> = { Burgers: "#f59e0b", Fries: "#f97316", Drinks: "#3b82f6", Chicken: "#ef4444", Sides: "#10b981", Other: "#8b5cf6" };
 const CAT_ORDER = ["Burgers", "Fries", "Drinks", "Chicken", "Sides", "Other"];
 
 // ── preset helpers ────────────────────────────────────────────────────────────
-type Preset = "7d" | "14d" | "30d" | "custom";
-function getBkkToday() {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Bangkok" }); // YYYY-MM-DD
-}
-function presetDates(p: Preset): { from?: string; to?: string } {
-  if (p === "7d" || p === "14d" || p === "30d") return {};
-  return {};
-}
+type Preset = "last_completed_shift" | "current_shift" | "7s" | "14s" | "30s" | "custom";
 function presetLabel(p: Preset) {
-  return p === "7d" ? "Last 7 shifts" : p === "14d" ? "Last 14 shifts" : p === "30d" ? "Last 30 shifts" : "Custom";
+  return p === "last_completed_shift" ? "Last Completed Shift" : p === "current_shift" ? "Current Shift" : p === "7s" ? "Last 7 Shifts" : p === "14s" ? "Last 14 Shifts" : p === "30s" ? "Last 30 Shifts" : "Custom Shift Range";
 }
 
 // ── sub-components ────────────────────────────────────────────────────────────
@@ -71,25 +64,32 @@ function CategoryBar({ rows }: { rows: CategoryRow[] }) {
 
 // ── main page ─────────────────────────────────────────────────────────────────
 export default function ReceiptAnalytics() {
-  const [preset, setPreset] = useState<Preset>("7d");
+  const [preset, setPreset] = useState<Preset>("last_completed_shift");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [shiftStartTime, setShiftStartTime] = useState("17:00");
+  const [shiftEndTime, setShiftEndTime] = useState("03:00");
   const [search, setSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
 
   // Build query params
   const params = useMemo(() => {
     const p = new URLSearchParams();
-    if (preset === "7d") { /* default — API handles */ }
-    else if (preset === "14d") { p.set("limit", "14"); }
-    else if (preset === "30d") { p.set("limit", "30"); }
+    p.set("timezone", "Asia/Bangkok");
+    p.set("shiftStartTime", shiftStartTime);
+    p.set("shiftEndTime", shiftEndTime);
+    if (preset === "last_completed_shift") p.set("mode", "last_completed_shift");
+    else if (preset === "current_shift") p.set("mode", "current_shift");
+    else if (preset === "7s") { p.set("limit", "7"); }
+    else if (preset === "14s") { p.set("limit", "14"); }
+    else if (preset === "30s") { p.set("limit", "30"); }
     else if (preset === "custom" && customFrom && customTo) {
-      p.set("from", customFrom); p.set("to", customTo);
+      p.set("mode", "custom"); p.set("shiftStartDate", customFrom); p.set("shiftEndDate", customTo);
     }
     if (search) p.set("search", search);
     if (catFilter) p.set("category", catFilter);
     return p.toString();
-  }, [preset, customFrom, customTo, search, catFilter]);
+  }, [preset, customFrom, customTo, shiftStartTime, shiftEndTime, search, catFilter]);
 
   const queryKey = useMemo(() => ["/api/reports/receipt-analytics", params], [params]);
   const { data, isLoading, isError } = useQuery<AnalyticsResponse>({
@@ -111,8 +111,8 @@ export default function ReceiptAnalytics() {
   const trend = data?.dailyTrend ?? [];
   const hourly = data?.hourlySales ?? [];
   const catMix = data?.categoryMix ?? [];
-  const stock = data?.stockUsage ?? [];
-  const dateRange = data?.filters ? `${fmtDate(data.filters.from)} – ${fmtDate(data.filters.to)}` : "";
+  const dateRange = data?.filters?.windowStart && data?.filters?.windowEnd ? `${fmtWindow(data.filters.windowStart)} → ${fmtWindow(data.filters.windowEnd)}` : data?.filters ? `${fmtDate(data.filters.from)} – ${fmtDate(data.filters.to)}` : "";
+  const reportLabel = data?.filters?.mode === "current_shift" ? "Current Shift" : data?.filters?.mode?.startsWith("last_") && data.filters.mode.endsWith("_shifts") ? presetLabel(preset) : data?.filters?.mode === "custom_shift_range" ? "Custom Shift Range" : "Last Completed Shift";
 
   const filteredProducts = useMemo(() =>
     catFilter ? products.filter(p => p.category === catFilter) : products,
@@ -120,11 +120,11 @@ export default function ReceiptAnalytics() {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto">
-      <PageTitle title="Receipt Analytics" meta="POS receipt item analysis · 18:00–03:00 Bangkok shifts" />
+      <PageTitle title="Receipt Analytics" meta="POS receipt item analysis · shift-based reporting" />
 
       {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-2">
-        {(["7d", "14d", "30d"] as Preset[]).map((p) => (
+        {(["last_completed_shift", "current_shift", "7s", "14s", "30s"] as Preset[]).map((p) => (
           <button key={p} onClick={() => setPreset(p)}
             className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${preset === p ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
             {presetLabel(p)}
@@ -132,7 +132,7 @@ export default function ReceiptAnalytics() {
         ))}
         <button onClick={() => setPreset("custom")}
           className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${preset === "custom" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}>
-          Custom range
+          Custom Shift Range
         </button>
         {preset === "custom" && (
           <div className="flex items-center gap-2">
@@ -140,6 +140,12 @@ export default function ReceiptAnalytics() {
               className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white" />
             <span className="text-xs text-slate-400">to</span>
             <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white" />
+            <span className="text-xs text-slate-400">shift</span>
+            <input type="time" value={shiftStartTime} onChange={e => setShiftStartTime(e.target.value)}
+              className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white" />
+            <span className="text-xs text-slate-400">to</span>
+            <input type="time" value={shiftEndTime} onChange={e => setShiftEndTime(e.target.value)}
               className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white" />
           </div>
         )}
@@ -170,14 +176,14 @@ export default function ReceiptAnalytics() {
       {isError && <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"><XCircle className="h-4 w-4" />Could not load receipt data. Check server connection.</div>}
       {!isLoading && !isError && blockers.length > 0 && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 space-y-1">
-          <div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />No data</div>
+          <div className="flex items-center gap-2 font-semibold"><AlertTriangle className="h-4 w-4" />No receipts found for selected shift window</div>
           {blockers.map(b => <p key={b.code}>{b.message}</p>)}
         </div>
       )}
       {!isLoading && !isError && ok && (
         <>
           {/* Date range label */}
-          {dateRange && <p className="text-[10px] text-slate-400 -mt-3">Period: {dateRange} (Bangkok business shifts)</p>}
+          {dateRange && <p className="text-[10px] text-slate-400 -mt-3">{reportLabel}: {dateRange} ({data?.filters?.timezone ?? "Asia/Bangkok"})</p>}
 
           {/* KPI cards */}
           <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
@@ -195,7 +201,7 @@ export default function ReceiptAnalytics() {
             <div className="md:col-span-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-3">Daily Trend</h2>
               {trend.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">No trend data</p>
+                <p className="text-sm text-slate-400 text-center py-8">No receipts found for selected shift window</p>
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={trend} margin={{ top: 0, right: 8, left: -16, bottom: 0 }}>
@@ -216,7 +222,7 @@ export default function ReceiptAnalytics() {
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-3">Category Mix</h2>
               {catMix.length === 0 ? (
-                <p className="text-sm text-slate-400 text-center py-8">No data</p>
+                <p className="text-sm text-slate-400 text-center py-8">No receipts found for selected shift window</p>
               ) : (
                 <CategoryBar rows={catMix} />
               )}
@@ -225,9 +231,9 @@ export default function ReceiptAnalytics() {
 
           {/* Hourly Sales */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-3">Hourly Sales (Bangkok)</h2>
+            <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-3">Hourly Sales</h2>
             {hourly.length === 0 ? (
-              <p className="text-sm text-slate-400 text-center py-6">No hourly data</p>
+              <p className="text-sm text-slate-400 text-center py-6">No receipts found for selected shift window</p>
             ) : (
               <ResponsiveContainer width="100%" height={160}>
                 <BarChart data={hourly} margin={{ top: 0, right: 8, left: -16, bottom: 0 }}>
@@ -240,10 +246,10 @@ export default function ReceiptAnalytics() {
             )}
           </div>
 
-          {/* Top Products */}
+          {/* Product Leaderboard */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700">Top Products</h2>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700">Product Leaderboard</h2>
               <span className="text-[10px] text-slate-400">{filteredProducts.length} items · sorted by qty sold</span>
             </div>
             <div className="overflow-x-auto">
@@ -272,25 +278,25 @@ export default function ReceiptAnalytics() {
                     </tr>
                   ))}
                   {filteredProducts.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">No POS receipts found for this period.</td></tr>
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-slate-400">No receipts found for selected shift window</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Top Modifiers */}
+          {/* Set Choices & Add-ons */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-100">
-              <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700">Top Modifiers</h2>
-              <p className="text-[10px] text-slate-400 mt-0.5">Add-ons, removals, and customisations</p>
+              <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700">Set Choices & Add-ons</h2>
+              <p className="text-[10px] text-slate-400 mt-0.5">Set choices, drink selections, add-ons, and extras</p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs min-w-[400px]">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-2">#</th>
-                    <th className="px-4 py-2">Modifier</th>
+                    <th className="px-4 py-2">Set Choice / Add-on</th>
                     <th className="px-4 py-2 text-right">Qty</th>
                     <th className="px-4 py-2 text-right">% of Total</th>
                   </tr>
@@ -305,28 +311,13 @@ export default function ReceiptAnalytics() {
                     </tr>
                   ))}
                   {modifiers.length === 0 && (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-400">No modifier data for this period.</td></tr>
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-slate-400">No receipts found for selected shift window</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Stock Usage Estimates */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-1">Stock Usage Estimates</h2>
-            <p className="text-[10px] text-slate-400 mb-3">Estimated from POS items sold — not actual stock count</p>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {stock.map((row) => (
-                <div key={row.item} className="rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{row.item}</p>
-                  <p className="mt-0.5 text-lg font-bold text-slate-900">{row.qty}</p>
-                  <p className="text-[10px] text-slate-400">{row.unit}</p>
-                  <p className="text-[10px] text-amber-600 mt-0.5">{row.detail}</p>
-                </div>
-              ))}
-            </div>
-          </div>
         </>
       )}
     </div>
