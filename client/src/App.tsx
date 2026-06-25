@@ -106,7 +106,7 @@ export default function App() {
                     <Route path="/operations/manager-checklist" element={<ProtectedRoute><ManagerChecklist /></ProtectedRoute>} />
                     <Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
 
-                    {/* Menu */}
+                    {/* Menu: unified workspace plus legacy compatibility routes. */}
                     <Route path="/menu/items" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/recipes" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/modifiers" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />

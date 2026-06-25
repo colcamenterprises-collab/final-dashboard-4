@@ -9,6 +9,9 @@ import { asArray, normalizeMenuCategories, normalizeMenuItems } from "@/lib/menu
 
 type TabKey = "items" | "recipes" | "modifiers" | "categories" | "purchasing";
 
+// /menu/ingredients is intentionally kept as a compatibility-only purchasing-source view;
+// it is not linked from primary Menu navigation because Operations > Purchasing remains canonical.
+
 type MenuCategory = { id: string; name: string; sortOrder?: number; isActive?: boolean; visibleOnline?: boolean; visiblePOS?: boolean; visibleDelivery?: boolean; visiblePartner?: boolean };
 type ModifierOption = { id: string; name: string; thaiName?: string; price: number; sortOrder?: number; isActive?: boolean };
 type ModifierGroup = { id: string; name: string; minSelect?: number; maxSelect?: number; required?: boolean; isActive?: boolean; modifiers?: ModifierOption[]; appliesToItems?: MenuItem[] };
