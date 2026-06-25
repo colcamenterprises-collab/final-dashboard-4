@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Search } from "lucide-react";
+import { asArray, logInvalidMenuShape, normalizeMenuCategories, normalizeMenuItems } from "@/lib/menuData";
 
 interface MenuItem {
   id: string;
@@ -28,22 +29,32 @@ interface MenuCategory {
 export default function MenuItems() {
   const [search, setSearch] = useState("");
 
-  const { data: items = [], isLoading: itemsLoading } = useQuery<MenuItem[]>({
+  const { data: rawItems, isLoading: itemsLoading } = useQuery<unknown>({
     queryKey: ["/api/menu-v3/items"],
   });
 
-  const { data: categories = [] } = useQuery<MenuCategory[]>({
+  const { data: rawCategories, isLoading: categoriesLoading } = useQuery<unknown>({
     queryKey: ["/api/menu-v3/categories"],
   });
 
+  const itemResult = normalizeMenuItems<MenuItem>(rawItems);
+  const categoryResult = normalizeMenuCategories<MenuCategory>(rawCategories);
+  const items = asArray<MenuItem>(itemResult.items);
+  const categories = asArray<MenuCategory>(categoryResult.items);
+  const hasInvalidMenuShape = !itemsLoading && !categoriesLoading && (!itemResult.isValidShape || !categoryResult.isValidShape);
+
+  if (hasInvalidMenuShape) {
+    logInvalidMenuShape("/menu/items", { items: rawItems, categories: rawCategories });
+  }
+
   const categoryMap = categories.reduce<Record<string, string>>((acc, cat) => {
-    acc[cat.id] = cat.name;
+    if (cat?.id) acc[cat.id] = cat.name || "";
     return acc;
   }, {});
 
-  const filtered = items.filter(
+  const filtered = asArray(items).filter(
     (i) =>
-      i.name.toLowerCase().includes(search.toLowerCase()) ||
+      (i.name || "").toLowerCase().includes(search.toLowerCase()) ||
       (categoryMap[i.categoryId] || "").toLowerCase().includes(search.toLowerCase())
   );
 
@@ -70,7 +81,11 @@ export default function MenuItems() {
         <div className="text-center py-12 text-slate-400 text-xs">Loading menu items...</div>
       )}
 
-      {!itemsLoading && filtered.length === 0 && (
+      {hasInvalidMenuShape && (
+        <div className="text-center py-12 text-red-500 text-xs">Menu data could not be loaded. Check API response shape.</div>
+      )}
+
+      {!itemsLoading && !hasInvalidMenuShape && filtered.length === 0 && (
         <div className="text-center py-12 text-slate-400 text-xs">No menu items found.</div>
       )}
 
@@ -95,7 +110,7 @@ export default function MenuItems() {
                   idx % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50/50 dark:bg-slate-800/50"
                 }`}
               >
-                <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{item.name}</td>
+                <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{item.name || "—"}</td>
                 <td className="px-3 py-2 text-slate-500">{categoryMap[item.categoryId] || "—"}</td>
                 <td className="px-3 py-2 text-slate-500">{item.kitchenStation || "—"}</td>
                 <td className="px-3 py-2 text-right font-mono text-slate-700 dark:text-slate-300">

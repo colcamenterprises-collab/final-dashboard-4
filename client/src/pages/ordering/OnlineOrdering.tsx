@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { ShoppingCart, Plus, Minus, Search } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { Badge } from "@/components/ui/badge";
+import { asArray, logInvalidMenuShape, normalizeMenuItems } from "@/lib/menuData";
 
 interface MenuItem {
   id: string;
@@ -16,17 +17,6 @@ interface MenuItem {
   categoryName?: string;
   onlineEnabled?: boolean;
   posEnabled?: boolean;
-}
-
-interface MenuResponse {
-  items?: MenuItem[];
-  products?: MenuItem[];
-}
-
-function toItems(data: MenuItem[] | MenuResponse | undefined): MenuItem[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data as MenuItem[];
-  return (data as MenuResponse).items ?? (data as MenuResponse).products ?? [];
 }
 
 const CATEGORY_ORDER = ["Burgers", "Side Orders", "Beverages", "Extras", "Sauce", "Other"];
@@ -63,16 +53,23 @@ export default function OnlineOrdering() {
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState("All");
 
-  const { data: rawData, isLoading, isError } = useQuery<MenuItem[] | MenuResponse>({
+  const { data: rawData, isLoading, isError } = useQuery<unknown>({
     queryKey: ["/api/menu-v3/items"],
   });
 
-  const allItems = toItems(rawData).filter((i) => i.isActive !== false);
+  const itemResult = normalizeMenuItems<MenuItem>(rawData);
+  const hasInvalidMenuShape = !isLoading && !itemResult.isValidShape;
+
+  if (hasInvalidMenuShape) {
+    logInvalidMenuShape("/order", rawData);
+  }
+
+  const allItems = asArray<MenuItem>(itemResult.items).filter((i) => i.isActive !== false);
   const categories = ["All", ...sortCategories(Array.from(new Set(allItems.map(getCatName))))];
 
-  const visible = allItems.filter((item) => {
+  const visible = asArray(allItems).filter((item) => {
     const matchesCat = filterCat === "All" || getCatName(item) === filterCat;
-    const matchesSearch = !search || item.name.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch = !search || (item.name || "").toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
   });
 
@@ -122,6 +119,7 @@ export default function OnlineOrdering() {
 
       {isLoading && <div className="text-center py-16 text-slate-400 text-xs">Loading menu...</div>}
       {isError && <div className="text-center py-16 text-red-500 text-xs">Failed to load menu.</div>}
+      {hasInvalidMenuShape && <div className="text-center py-16 text-red-500 text-xs">Menu data could not be loaded. Check API response shape.</div>}
 
       <div className="space-y-4">
         {Object.entries(byCategory).map(([cat, items]) => (
@@ -138,14 +136,14 @@ export default function OnlineOrdering() {
                     className="border border-slate-200 dark:border-slate-700 rounded-xl p-3 bg-white dark:bg-slate-900 flex flex-col gap-2"
                   >
                     <div className="flex-1">
-                      <p className="text-xs font-semibold text-slate-800 dark:text-white leading-tight">{item.name}</p>
+                      <p className="text-xs font-semibold text-slate-800 dark:text-white leading-tight">{item.name || "—"}</p>
                       {item.description && <p className="text-[10px] text-slate-400 mt-0.5 line-clamp-2">{item.description}</p>}
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-800 dark:text-white">{fmt(price)}</span>
                       {qty === 0 ? (
                         <button
-                          onClick={() => addItem({ id: item.id, name: item.name, price, categoryName: catName })}
+                          onClick={() => addItem({ id: item.id, name: item.name || "—", price, categoryName: catName })}
                           className="w-7 h-7 rounded-lg bg-black text-white flex items-center justify-center hover:bg-slate-800 transition-colors"
                         >
                           <Plus className="h-3.5 w-3.5" />
@@ -160,7 +158,7 @@ export default function OnlineOrdering() {
                           </button>
                           <span className="text-xs font-bold text-slate-800 dark:text-white w-4 text-center">{qty}</span>
                           <button
-                            onClick={() => addItem({ id: item.id, name: item.name, price, categoryName: catName })}
+                            onClick={() => addItem({ id: item.id, name: item.name || "—", price, categoryName: catName })}
                             className="w-6 h-6 rounded-md bg-black text-white flex items-center justify-center hover:bg-slate-800 transition-colors"
                           >
                             <Plus className="h-3 w-3" />

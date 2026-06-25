@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchOrderingMenu, money } from "@/components/ordering/orderingApi";
+import { asArray, logInvalidMenuShape, normalizeMenuCategories } from "@/lib/menuData";
 
 async function save(path: string, body: any) {
   const res = await fetch(path, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -12,13 +13,17 @@ export default function AdminMenu() {
   const [drafts, setDrafts] = useState<Record<string, any>>({});
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
-  const allItems = useMemo(() => menu.flatMap((category) => (category.items ?? []).map((item: any) => ({ ...item, categoryName: category.name_en }))), [menu]);
+  const allItems = useMemo(() => asArray(menu).flatMap((category) => asArray((category as any).items).map((item: any) => ({ ...item, categoryName: (category as any).name_en }))), [menu]);
 
   async function load() {
     try {
       const data = await fetchOrderingMenu(true);
-      setMenu(data.categories ?? []);
-      setError("");
+      const categoryResult = normalizeMenuCategories<any>(data);
+      setMenu(categoryResult.items);
+      setError(categoryResult.isValidShape ? "" : "Menu data could not be loaded. Check API response shape.");
+      if (!categoryResult.isValidShape) {
+        logInvalidMenuShape("/admin/ordering/menu", data);
+      }
     } catch (err: any) {
       setError(err.message);
     }
@@ -70,7 +75,7 @@ export default function AdminMenu() {
                 <td className="border p-2"><input className="w-full rounded border p-2" value={draft.name_en} onChange={(event) => updateDraft(item, { name_en: event.target.value })} /></td>
                 <td className="border p-2"><input className="w-full rounded border p-2" value={draft.description_en ?? ""} onChange={(event) => updateDraft(item, { description_en: event.target.value })} /></td>
                 <td className="border p-2"><input className="w-28 rounded border p-2" value={draft.price} onChange={(event) => updateDraft(item, { price: event.target.value })} /><div className="text-xs text-gray-600">{money(draft.price)}</div></td>
-                <td className="border p-2"><select className="w-full rounded border p-2" value={draft.category_id} onChange={(event) => updateDraft(item, { category_id: event.target.value })}>{menu.map((category) => <option key={category.id} value={category.id}>{category.name_en}</option>)}</select></td>
+                <td className="border p-2"><select className="w-full rounded border p-2" value={draft.category_id} onChange={(event) => updateDraft(item, { category_id: event.target.value })}>{asArray(menu).map((category) => <option key={category.id} value={category.id}>{category.name_en}</option>)}</select></td>
                 <td className="border p-2"><button className="rounded border px-3 py-2" onClick={() => saveItem(item)}>Save</button><button className="ml-2 rounded border px-3 py-2" onClick={() => saveItem(item, { is_active: !item.is_active })}>{item.is_active ? "Disable" : "Enable"}</button></td>
               </tr>;
             })}</tbody>
