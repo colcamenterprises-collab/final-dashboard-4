@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Search, BookOpen } from "lucide-react";
+import { asArray, logInvalidMenuShape, normalizeMenuCategories, normalizeMenuItems } from "@/lib/menuData";
 
 interface MenuItem {
   id: string;
@@ -23,45 +24,39 @@ interface MenuCategory {
   isActive: boolean;
 }
 
-interface MenuResponse {
-  ok?: boolean;
-  items?: MenuItem[];
-  products?: MenuItem[];
-  source?: string;
-  blockers?: Array<{ code: string; message: string }>;
-}
-
-function toItems(data: MenuItem[] | MenuResponse | undefined): MenuItem[] {
-  if (!data) return [];
-  if (Array.isArray(data)) return data;
-  return data.items ?? data.products ?? [];
-}
-
 export default function Catalog() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"all" | "online" | "pos">("all");
 
-  const { data: rawItems, isLoading } = useQuery<MenuItem[] | MenuResponse>({
+  const { data: rawItems, isLoading } = useQuery<unknown>({
     queryKey: ["/api/menu-v3/items"],
   });
 
-  const items = toItems(rawItems);
-
-  const { data: categories = [] } = useQuery<MenuCategory[]>({
+  const { data: rawCategories, isLoading: categoriesLoading } = useQuery<unknown>({
     queryKey: ["/api/menu-v3/categories"],
   });
 
+  const itemResult = normalizeMenuItems<MenuItem>(rawItems);
+  const categoryResult = normalizeMenuCategories<MenuCategory>(rawCategories);
+  const items = asArray<MenuItem>(itemResult.items);
+  const categories = asArray<MenuCategory>(categoryResult.items);
+  const hasInvalidMenuShape = !isLoading && !categoriesLoading && (!itemResult.isValidShape || !categoryResult.isValidShape);
+
+  if (hasInvalidMenuShape) {
+    logInvalidMenuShape("/menu catalog", { items: rawItems, categories: rawCategories });
+  }
+
   const categoryMap = categories.reduce<Record<string, MenuCategory>>((acc, cat) => {
-    acc[cat.id] = cat;
+    if (cat?.id) acc[cat.id] = cat;
     return acc;
   }, {});
 
-  const filtered = items.filter((i) => {
+  const filtered = asArray(items).filter((i) => {
     if (!i.isActive) return false;
     if (filter === "online" && !i.onlineEnabled) return false;
     if (filter === "pos" && !i.posEnabled) return false;
     return (
-      i.name.toLowerCase().includes(search.toLowerCase()) ||
+      (i.name || "").toLowerCase().includes(search.toLowerCase()) ||
       (categoryMap[i.categoryId]?.name || "").toLowerCase().includes(search.toLowerCase())
     );
   });
@@ -114,7 +109,11 @@ export default function Catalog() {
         <div className="text-center py-12 text-slate-400 text-xs">Loading catalog...</div>
       )}
 
-      {!isLoading && Object.keys(byCategory).length === 0 && (
+      {hasInvalidMenuShape && (
+        <div className="text-center py-12 text-red-500 text-xs">Menu data could not be loaded. Check API response shape.</div>
+      )}
+
+      {!isLoading && !hasInvalidMenuShape && Object.keys(byCategory).length === 0 && (
         <div className="text-center py-12 text-slate-400 text-xs">No items match the current filter.</div>
       )}
 
@@ -134,7 +133,7 @@ export default function Catalog() {
                     key={item.id}
                     className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-900 space-y-1.5"
                   >
-                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">{item.name}</p>
+                    <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-tight">{item.name || "—"}</p>
                     {item.description && (
                       <p className="text-[11px] text-slate-400 line-clamp-2 leading-tight">{item.description}</p>
                     )}
