@@ -7,7 +7,9 @@ interface ShoppingItem {
   unit?: string;
   quantity?: number;
   category?: string;
-  estimatedCost?: number;
+  estimatedCost?: number | null;
+  lineTotal?: number | null;
+  estCost?: number | null;
 }
 
 interface Blocker {
@@ -22,6 +24,79 @@ interface ShoppingListResponse {
   blockers?: Blocker[];
 }
 
+const formatBaht = (amount: number) =>
+  `฿${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+function getRowEstimatedTotal(item: ShoppingItem): number | null {
+  const value = item.lineTotal ?? item.estimatedCost ?? item.estCost;
+  const amount = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(amount) ? amount : null;
+}
+
+function getSectionCost(items: ShoppingItem[]) {
+  return items.reduce(
+    (summary, item) => {
+      const rowTotal = getRowEstimatedTotal(item);
+
+      if (rowTotal == null) {
+        summary.hasMissingCost = true;
+        return summary;
+      }
+
+      summary.total += rowTotal;
+      return summary;
+    },
+    { total: 0, hasMissingCost: false },
+  );
+}
+
+function ShoppingListTable({ items, category }: { items: ShoppingItem[]; category: string }) {
+  return (
+    <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+      <table className="w-full table-fixed text-xs">
+        <colgroup>
+          <col className="w-[52%]" />
+          <col className="w-[14%]" />
+          <col className="w-[16%]" />
+          <col className="w-[18%]" />
+        </colgroup>
+        <thead>
+          <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
+            <th className="text-left px-3 py-2 font-medium text-slate-500">Item</th>
+            <th className="text-right px-3 py-2 font-medium text-slate-500">Qty</th>
+            <th className="text-left px-3 py-2 font-medium text-slate-500">Unit</th>
+            <th className="text-right px-3 py-2 font-medium text-slate-500">Est. Cost (฿)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((item, idx) => {
+            const rowTotal = getRowEstimatedTotal(item);
+
+            return (
+              <tr
+                key={`${category}-${idx}`}
+                className={`border-b border-slate-100 dark:border-slate-800 last:border-0 ${
+                  idx % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50/50 dark:bg-slate-800/50"
+                }`}
+              >
+                <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200 break-words">
+                  {item.name}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-slate-600">{item.quantity ?? "—"}</td>
+                <td className="px-3 py-2 text-slate-500 break-words">{item.unit ?? "—"}</td>
+                <td className="px-3 py-2 text-right font-mono text-slate-600">
+                  {rowTotal != null ? formatBaht(rowTotal) : "—"}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ShoppingList() {
   const { data, isLoading, isError } = useQuery<ShoppingListResponse>({
     queryKey: ["/api/shopping-list"],
@@ -30,6 +105,15 @@ export default function ShoppingList() {
   const groups = data?.groupedList ?? {};
   const categories = Object.keys(groups);
   const blockers = data?.blockers ?? [];
+  const costSummary = Object.values(groups).reduce(
+    (summary, items) => {
+      const section = getSectionCost(items);
+      summary.total += section.total;
+      summary.hasMissingCost = summary.hasMissingCost || section.hasMissingCost;
+      return summary;
+    },
+    { total: 0, hasMissingCost: false },
+  );
 
   return (
     <div className="p-4 space-y-4 max-w-3xl mx-auto">
@@ -38,8 +122,12 @@ export default function ShoppingList() {
         <div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Shopping List</h1>
           <p className="text-xs text-slate-500">
-            {data?.totalItems ?? 0} items · Source: {data?.source ?? "—"}
+            {data?.totalItems ?? 0} items · Total Estimated Cost: {formatBaht(costSummary.total)} ·
+            Source: {data?.source ?? "—"}
           </p>
+          {costSummary.hasMissingCost && (
+            <p className="text-[11px] text-amber-600">Some items have no estimated cost.</p>
+          )}
         </div>
       </div>
 
@@ -67,43 +155,24 @@ export default function ShoppingList() {
         </div>
       )}
 
-      {categories.map((cat) => (
-        <div key={cat} className="space-y-1">
-          <div className="flex items-center gap-2 px-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{cat}</span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0">{groups[cat].length}</Badge>
+      {categories.map((cat) => {
+        const sectionCost = getSectionCost(groups[cat]);
+
+        return (
+          <div key={cat} className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{cat}</span>
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                {groups[cat].length}
+              </Badge>
+              <span className="text-[11px] font-medium text-slate-500">
+                Subtotal: {formatBaht(sectionCost.total)}
+              </span>
+            </div>
+            <ShoppingListTable items={groups[cat]} category={cat} />
           </div>
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
-                  <th className="text-left px-3 py-2 font-medium text-slate-500">Item</th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-500">Qty</th>
-                  <th className="text-left px-3 py-2 font-medium text-slate-500">Unit</th>
-                  <th className="text-right px-3 py-2 font-medium text-slate-500">Est. Cost (฿)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {groups[cat].map((item, idx) => (
-                  <tr
-                    key={`${cat}-${idx}`}
-                    className={`border-b border-slate-100 dark:border-slate-800 last:border-0 ${
-                      idx % 2 === 0 ? "bg-white dark:bg-slate-900" : "bg-slate-50/50 dark:bg-slate-800/50"
-                    }`}
-                  >
-                    <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{item.name}</td>
-                    <td className="px-3 py-2 text-right font-mono text-slate-600">{item.quantity ?? "—"}</td>
-                    <td className="px-3 py-2 text-slate-500">{item.unit ?? "—"}</td>
-                    <td className="px-3 py-2 text-right font-mono text-slate-600">
-                      {item.estimatedCost != null ? `฿${item.estimatedCost.toFixed(2)}` : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
