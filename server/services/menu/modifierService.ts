@@ -24,3 +24,34 @@ export async function applyGroupToItem(groupId: string, itemId: string) {
     }
   });
 }
+
+
+export async function updateModifierGroup(id: string, data: any) {
+  const { id: _id, modifiers: _modifiers, appliesToItems: _appliesToItems, createdAt: _createdAt, updatedAt: _updatedAt, ...safeData } = data;
+  return await db().menu_modifiers_group_v3.update({
+    where: { id },
+    data: safeData
+  });
+}
+
+export async function deleteModifierGroup(id: string) {
+  return await db().menu_modifiers_group_v3.update({
+    where: { id },
+    data: { isActive: false }
+  });
+}
+
+export async function updateModifier(id: string, data: any) {
+  const { id: _id, group: _group, createdAt: _createdAt, updatedAt: _updatedAt, ...safeData } = data;
+  return await db().menu_modifiers_v3.update({
+    where: { id },
+    data: safeData
+  });
+}
+
+export async function deleteModifier(id: string) {
+  return await db().menu_modifiers_v3.update({
+    where: { id },
+    data: { isActive: false }
+  });
+}
