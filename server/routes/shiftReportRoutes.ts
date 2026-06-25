@@ -4,6 +4,7 @@
 import { Router } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import { getUsageReconciliation } from "./analysis/usageReconciliation";
 
 const router = Router();
 
@@ -12,6 +13,8 @@ type CompareStatus = "MATCH" | "DIFFERENCE" | "NOT_AVAILABLE";
 type PosStatus = "VERIFIED" | "ISSUE" | "MISSING_RECEIPTS" | "MISSING_SHIFT_REPORT";
 type StaffStatus = "VERIFIED" | "ISSUE" | "MISSING_FORM";
 type OverallStatus = "VERIFIED" | "POS ISSUE" | "STAFF ISSUE" | "MISSING FORM";
+type VarianceStatus = "OK" | "Warning" | "Critical" | "Missing Data";
+type OperationalVariance = { item: string; expectedUsage: number | null; actualUsage: number | null; difference: number | null; status: VarianceStatus; notes: string; unit?: string };
 
 const SOURCE_MAPPING = {
   receipts: {
@@ -54,6 +57,61 @@ function issueSentence(prefix: string, field: string, difference: Amount, unit: 
   if (unit === "count") return `${prefix} ${field} differs by ${Math.abs(difference)} receipts.`;
   const direction = difference < 0 ? "under-reported" : "over-reported";
   return `${prefix} ${field} is ${direction} by ${absMoney(difference)}.`;
+}
+
+function varianceStatus(severity: string | undefined, expected: number | null, actual: number | null): VarianceStatus {
+  if (expected == null || actual == null || severity === "unknown") return "Missing Data";
+  if (severity === "critical") return "Critical";
+  if (severity === "warn") return "Warning";
+  return "OK";
+}
+
+function varianceNote(expected: number | null, actual: number | null, engineBuilt: boolean, hasOpening: boolean, hasClosing: boolean) {
+  if (!engineBuilt) return "Missing POS data.";
+  if (!hasOpening || !hasClosing) return "Missing stock count.";
+  if (expected == null || actual == null) return "Unable to calculate.";
+  return "Review in Daily Sales & Stock V2 if status is Warning or Critical.";
+}
+
+function buildOperationalVarianceRows(recon: any): OperationalVariance[] {
+  const rows: OperationalVariance[] = [];
+  rows.push({
+    item: "Meat",
+    expectedUsage: recon.meat.expectedGrams,
+    actualUsage: recon.meat.physicalUsedGrams,
+    difference: recon.meat.varianceGrams,
+    status: varianceStatus(recon.meat.severity, recon.meat.expectedGrams, recon.meat.physicalUsedGrams),
+    notes: varianceNote(recon.meat.expectedGrams, recon.meat.physicalUsedGrams, recon.engineBuilt, recon.meat.openingGrams != null, recon.meat.closingGrams != null),
+    unit: "g",
+  });
+  rows.push({
+    item: "Buns / rolls",
+    expectedUsage: recon.buns.expected,
+    actualUsage: recon.buns.physicalUsed,
+    difference: recon.buns.variance,
+    status: varianceStatus(recon.buns.severity, recon.buns.expected, recon.buns.physicalUsed),
+    notes: varianceNote(recon.buns.expected, recon.buns.physicalUsed, recon.engineBuilt, recon.buns.opening != null, recon.buns.closing != null),
+    unit: "pcs",
+  });
+  if (recon.fries) rows.push({
+    item: "Fries",
+    expectedUsage: recon.fries.expected,
+    actualUsage: recon.fries.physicalUsed,
+    difference: recon.fries.variance,
+    status: varianceStatus(recon.fries.severity, recon.fries.expected, recon.fries.physicalUsed),
+    notes: varianceNote(recon.fries.expected, recon.fries.physicalUsed, recon.engineBuilt, recon.fries.opening != null, recon.fries.closing != null),
+    unit: "servings",
+  });
+  for (const drink of recon.drinks.rows ?? []) rows.push({
+    item: `Drink — ${drink.label}`,
+    expectedUsage: drink.expected,
+    actualUsage: drink.physicalUsed,
+    difference: drink.variance,
+    status: varianceStatus(drink.severity, drink.expected, drink.physicalUsed),
+    notes: varianceNote(drink.expected, drink.physicalUsed, recon.engineBuilt, drink.opening != null, drink.closing != null),
+    unit: "pcs",
+  });
+  return rows;
 }
 
 async function buildShiftRows(limitOrDate: number | string) {
@@ -125,7 +183,7 @@ async function buildShiftRows(limitOrDate: number | string) {
     ${isDate ? sql`` : sql`ORDER BY s.shift_date DESC`}
   `);
 
-  return (rows as any[]).map((row) => {
+  return Promise.all((rows as any[]).map(async (row) => {
     const receipts = { grossSales: toNumber(row.receipt_gross), netSales: toNumber(row.receipt_net), cash: toNumber(row.receipt_cash), qr: toNumber(row.receipt_qr), grab: toNumber(row.receipt_grab), other: toNumber(row.receipt_other), receiptCount: toNumber(row.receipt_count) };
     const shiftReport = { grossSales: toNumber(row.shift_gross), netSales: toNumber(row.shift_net), cash: toNumber(row.shift_cash), qr: toNumber(row.shift_qr), grab: toNumber(row.shift_grab), other: toNumber(row.shift_other), receiptCount: toNumber(row.shift_receipts) };
     const dailySalesV2 = row.form_id ? { grossSales: toNumber(row.staff_gross), cash: toNumber(row.staff_cash), qr: toNumber(row.staff_qr), grab: toNumber(row.staff_grab), other: toNumber(row.staff_other), receiptCount: toNumber(row.staff_receipts) } : { grossSales: null, cash: null, qr: null, grab: null, other: null, receiptCount: null };
@@ -160,6 +218,14 @@ async function buildShiftRows(limitOrDate: number | string) {
     }
 
     const maxAbs = Math.max(...[...Object.values(posFields), ...Object.values(staffFields)].map((f) => Math.abs(f.difference ?? 0)));
+    const shiftDate = String(row.shift_date).slice(0, 10);
+    let operationalVariances: OperationalVariance[] = [];
+    try {
+      operationalVariances = buildOperationalVarianceRows(await getUsageReconciliation(shiftDate));
+    } catch (_) {
+      operationalVariances = [];
+    }
+
     return {
       id: `sr-${String(row.shift_date).slice(0, 10)}`,
       shiftDate: String(row.shift_date).slice(0, 10),
@@ -168,9 +234,10 @@ async function buildShiftRows(limitOrDate: number | string) {
       comparisons: { posIntegrity: posFields, staffVerification: staffFields },
       issueExplanation: explanations.length ? explanations.join(" ") : "Receipts match the Loyverse shift report and Daily Sales V2 matches the Loyverse shift report.",
       issues: explanations.map((explanation) => ({ shiftDate: String(row.shift_date).slice(0, 10), issueType: explanation.includes("Daily Sales V2 form is missing") ? "Missing Form" : explanation.startsWith("Staff") ? "Staff Issue" : "POS Issue", severity: maxAbs >= 500 ? "High" : maxAbs >= 100 ? "Medium" : "Low", explanation, status: "Open" })),
+      operationalVariances,
       sourceMapping: SOURCE_MAPPING,
     };
-  });
+  }));
 }
 
 router.get("/history", async (_req, res) => {

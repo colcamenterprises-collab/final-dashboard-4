@@ -59,7 +59,6 @@ const navigationGroups: NavGroup[] = [
       { to: "/operations/purchasing",              label: "Purchasing",               icon: ShoppingCart,  testId: "nav-purchasing" },
       { to: "/operations/shopping-list",           label: "Shopping List",            icon: ShoppingCart,  testId: "nav-shopping-list" },
       { to: "/operations/health-safety",           label: "Health & Safety",          icon: ShieldCheck,   testId: "nav-health-safety" },
-      { to: "/operations/issue-register",          label: "Issue Register",           icon: AlertTriangle, testId: "nav-issue-register" },
     ],
   },
   {

@@ -12,7 +12,9 @@ type FilterValue = "ALL" | "VERIFIED" | "POS ISSUE" | "STAFF ISSUE" | "MISSING F
 type MoneyBlock = { grossSales: number | null; netSales?: number | null; cash: number | null; qr: number | null; grab: number | null; other: number | null; receiptCount: number | null };
 type Comparison = { receiptsValue?: number | null; shiftReportValue: number | null; dailySalesV2Value?: number | null; difference: number | null; status: CompareStatus };
 type Issue = { shiftDate: string; issueType: "POS Issue" | "Staff Issue" | "Missing Form"; severity: "Low" | "Medium" | "High"; explanation: string; status: "Open" };
-interface ShiftReport { id: string; shiftDate: string; receipts: MoneyBlock; shiftReport: Required<MoneyBlock>; dailySalesV2: Omit<MoneyBlock, "netSales">; posIntegrityStatus: PosStatus; staffVerificationStatus: StaffStatus; overallStatus: OverallStatus; comparisons: { posIntegrity: Record<string, Comparison>; staffVerification: Record<string, Comparison> }; issueExplanation: string; issues: Issue[]; }
+type VarianceStatus = "OK" | "Warning" | "Critical" | "Missing Data";
+type OperationalVariance = { item: string; expectedUsage: number | null; actualUsage: number | null; difference: number | null; status: VarianceStatus; notes: string; unit?: string };
+interface ShiftReport { id: string; shiftDate: string; receipts: MoneyBlock; shiftReport: Required<MoneyBlock>; dailySalesV2: Omit<MoneyBlock, "netSales">; posIntegrityStatus: PosStatus; staffVerificationStatus: StaffStatus; overallStatus: OverallStatus; comparisons: { posIntegrity: Record<string, Comparison>; staffVerification: Record<string, Comparison> }; issueExplanation: string; issues: Issue[]; operationalVariances?: OperationalVariance[]; }
 interface HistoryResponse { reports: ShiftReport[]; blockers?: { code: string; message: string }[]; }
 
 const ALL_FIELDS = ["grossSales", "netSales", "cash", "qr", "grab", "other", "receiptCount"] as const;
@@ -23,6 +25,7 @@ function fmtIssueDate(d?: string) { if (!d) return "—"; return new Date(`${d}T
 function fmtMoney(n: number | null | undefined) { if (n == null) return "—"; return `฿${Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`; }
 function fmtCount(n: number | null | undefined) { return n == null ? "—" : Number(n).toLocaleString("en-US"); }
 function fmtVal(field: string, n: number | null | undefined) { return field === "receiptCount" ? fmtCount(n) : fmtMoney(n); }
+function fmtUsage(n: number | null | undefined, unit?: string) { return n == null ? "—" : `${Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 })}${unit ? ` ${unit}` : ""}`; }
 function fmtDiff(field: string, n: number | null | undefined, compact = false): { text: string; sign: "pos" | "neg" | "zero" | "na" } {
   if (n == null) return { text: "—", sign: "na" };
   if (Math.abs(n) < 0.005) return { text: field === "receiptCount" ? "0" : "฿0", sign: "zero" };
@@ -196,6 +199,40 @@ export default function ShiftReports() {
                           </tbody>
                         </table>
                       </div>
+
+
+                      {(r.operationalVariances ?? []).length > 0 && (
+                        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                          <div className="border-b border-slate-100 bg-slate-50 px-3 py-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Operational Variance</p>
+                            <p className="text-[11px] text-slate-500">Stock usage review from POS-derived expected usage and Daily Sales/Stock V2 counts. Missing inputs are labelled and not guessed.</p>
+                          </div>
+                          <table className="w-full min-w-[760px] text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-100 bg-slate-50 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                <th className="px-3 py-2">Item</th>
+                                <th className="px-3 py-2 text-right">Expected usage</th>
+                                <th className="px-3 py-2 text-right">Actual / counted usage</th>
+                                <th className="px-3 py-2 text-right">Difference</th>
+                                <th className="px-3 py-2">Status</th>
+                                <th className="px-3 py-2">Notes / investigation</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(r.operationalVariances ?? []).map((v) => (
+                                <tr key={v.item} className="border-t border-slate-100 hover:bg-slate-50/50">
+                                  <td className="px-3 py-2 font-semibold text-slate-700">{v.item}</td>
+                                  <td className="px-3 py-2 text-right text-slate-600">{fmtUsage(v.expectedUsage, v.unit)}</td>
+                                  <td className="px-3 py-2 text-right text-slate-600">{fmtUsage(v.actualUsage, v.unit)}</td>
+                                  <td className="px-3 py-2 text-right text-slate-600">{fmtUsage(v.difference, v.unit)}</td>
+                                  <td className="px-3 py-2"><span className={`rounded-full border px-2 py-1 text-[10px] font-semibold ${v.status === "OK" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : v.status === "Critical" ? "border-red-200 bg-red-50 text-red-700" : v.status === "Warning" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}>{v.status}</span></td>
+                                  <td className="px-3 py-2 text-slate-500">{v.notes}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
 
                       <div className="rounded-xl border border-slate-200 bg-white px-4 py-3">
                         <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-1">Issue Explanation</p>
