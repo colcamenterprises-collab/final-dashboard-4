@@ -25,3 +25,10 @@ export async function reorderCategories(orderList: string[]) {
     });
   }
 }
+
+export async function deleteCategory(id: string) {
+  return await db().menu_categories_v3.update({
+    where: { id },
+    data: { isActive: false }
+  });
+}
