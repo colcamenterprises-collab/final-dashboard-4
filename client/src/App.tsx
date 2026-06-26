@@ -109,6 +109,7 @@ export default function App() {
                     {/* Menu */}
                     <Route path="/menu/items" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/recipes" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
+                    <Route path="/menu/recipes/:recipeId/edit" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/modifiers" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/categories" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/ingredients" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
