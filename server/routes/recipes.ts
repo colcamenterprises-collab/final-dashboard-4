@@ -23,7 +23,6 @@ router.get('/', async (req, res) => {
         version, parent_id AS "parentId",
         created_at AS "createdAt", updated_at AS "updatedAt"
       FROM recipes
-      WHERE is_active = true
       ORDER BY category, name
     `);
     res.json(result.rows);
