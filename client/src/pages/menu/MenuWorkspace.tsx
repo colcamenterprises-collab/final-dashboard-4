@@ -19,7 +19,18 @@ type IngredientDraft = { id: string; name: string; sourceType: SourceType; purch
 type ModifierOption = { id?: string; name: string; thaiName?: string; price?: string | number; priceDelta?: string | number; active?: boolean; isActive?: boolean };
 type ModifierGroup = { id?: string; name: string; menuItemId?: string; linkedMenuItemIds?: string[]; modifiers?: ModifierOption[]; options?: ModifierOption[]; isActive?: boolean };
 
-const makeIngredient = (): IngredientDraft => ({ id: crypto.randomUUID(), name: "", sourceType: "manual", purchasingItemKey: "", quantityUsed: "", unitUsed: "", autoUnitCost: null, manualOverrideUnitCost: "", notes: "" });
+function createClientId(prefix = "tmp") {
+  const randomUUID =
+    typeof globalThis !== "undefined" &&
+    globalThis.crypto &&
+    typeof globalThis.crypto.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+  return `${prefix}-${randomUUID}`;
+}
+
+const makeIngredient = (): IngredientDraft => ({ id: createClientId("ingredient"), name: "", sourceType: "manual", purchasingItemKey: "", quantityUsed: "", unitUsed: "", autoUnitCost: null, manualOverrideUnitCost: "", notes: "" });
 function toNumber(value: unknown): number | null { if (value === null || value === undefined || value === "") return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
 function fmtMoney(value: unknown) { const n = toNumber(value); return n === null ? "UNMAPPED" : `฿${n.toFixed(2)}`; }
 function fmtPercent(value: unknown) { const n = toNumber(value); return n === null ? "UNMAPPED" : `${n.toFixed(1)}%`; }
@@ -32,7 +43,7 @@ export default function MenuWorkspace() {
   const [search, setSearch] = useState("");
   const [selectedRecipeId, setSelectedRecipeId] = useState<number | "new">("new");
   const [recipeForm, setRecipeForm] = useState({ name: "", category: "", description: "", imageUrl: "", yieldQuantity: "1", yieldUnit: "servings", manualOverrideCost: "", linkMenuItemId: "" });
-  const [ingredientRows, setIngredientRows] = useState<IngredientDraft[]>([makeIngredient()]);
+  const [ingredientRows, setIngredientRows] = useState<IngredientDraft[]>(() => [makeIngredient()]);
   const [modifierGroupForm, setModifierGroupForm] = useState({ name: "Make it Better", menuItemId: "" });
   const [modifierOptionForm, setModifierOptionForm] = useState({ groupId: "", name: "", thaiName: "", price: "", active: true });
 
