@@ -71,6 +71,7 @@ const navigationGroups: NavGroup[] = [
   {
     title: "Menu",
     defaultOpen: false,
+    // Purchasing stays under Operations; this primary Menu nav intentionally exposes only sellable menu workflow areas.
     items: [
       { to: "/menu/items",      label: "Menu Items",        icon: UtensilsCrossed, testId: "nav-menu-items" },
       { to: "/menu/recipes",    label: "Recipes & Costing", icon: BookOpen,        testId: "nav-recipes" },
