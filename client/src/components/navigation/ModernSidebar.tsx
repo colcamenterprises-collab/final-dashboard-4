@@ -72,9 +72,10 @@ const navigationGroups: NavGroup[] = [
     title: "Menu",
     defaultOpen: false,
     items: [
-      { to: "/menu/items",       label: "Items",                  icon: UtensilsCrossed, testId: "nav-menu-items" },
-      { to: "/menu/recipes",     label: "Recipes and Costing",    icon: BookOpen,        testId: "nav-recipes" },
-      { to: "/menu/ingredients", label: "Purchasing Ingredients", icon: List,            testId: "nav-ingredients" },
+      { to: "/menu/items",       label: "Menu Items",          icon: UtensilsCrossed, testId: "nav-menu-items" },
+      { to: "/menu/recipes",     label: "Recipes & Costing",   icon: BookOpen,        testId: "nav-recipes" },
+      { to: "/menu/modifiers",   label: "Modifiers",           icon: List,            testId: "nav-modifiers" },
+      { to: "/menu/categories",  label: "Categories",          icon: List,            testId: "nav-menu-categories" },
     ],
   },
   {

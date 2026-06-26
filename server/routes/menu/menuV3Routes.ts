@@ -6,7 +6,7 @@ import {
   getAllItems, createItem, updateItem, toggleItem
 } from "../../services/menu/itemService";
 import {
-  getModifierGroups, createModifierGroup, createModifier, applyGroupToItem
+  getModifierGroups, createModifierGroup, updateModifierGroup, deleteModifierGroup, createModifier, updateModifier, deleteModifier, applyGroupToItem
 } from "../../services/menu/modifierService";
 import {
   setRecipe, getRecipe
@@ -74,8 +74,24 @@ router.post("/modifiers/groups/create", async (req, res) => {
   return res.json(await createModifierGroup(req.body));
 });
 
+router.post("/modifiers/groups/update", async (req, res) => {
+  return res.json(await updateModifierGroup(req.body.id, req.body));
+});
+
+router.post("/modifiers/groups/delete", async (req, res) => {
+  return res.json(await deleteModifierGroup(req.body.id));
+});
+
 router.post("/modifiers/create", async (req, res) => {
   return res.json(await createModifier(req.body.groupId, req.body));
+});
+
+router.post("/modifiers/update", async (req, res) => {
+  return res.json(await updateModifier(req.body.id, req.body));
+});
+
+router.post("/modifiers/delete", async (req, res) => {
+  return res.json(await deleteModifier(req.body.id));
 });
 
 router.post("/modifiers/apply", async (req, res) => {
