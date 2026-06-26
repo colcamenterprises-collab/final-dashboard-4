@@ -7,265 +7,82 @@ import { Search } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { asArray, normalizeMenuCategories, normalizeMenuItems } from "@/lib/menuData";
 
-type TabKey = "items" | "recipes" | "purchasing";
+type TabKey = "items" | "recipes" | "modifiers" | "categories" | "purchasing";
+type SourceType = "purchasing" | "manual";
 
-type MenuItem = {
-  id: string;
-  categoryId: string;
-  name: string;
-  description: string | null;
-  basePrice: number;
-  imageUrl: string | null;
-  posEnabled: boolean;
-  onlineEnabled: boolean;
-  grabEnabled?: boolean;
-  foodpandaEnabled?: boolean;
-  kitchenStation: string | null;
-  isActive: boolean;
-  soldOut?: boolean;
-  recipeId?: number | null;
-  recipeCost?: number | string | null;
-};
+type MenuItem = { id: string; categoryId?: string; category?: string | { name?: string }; name: string; description?: string | null; basePrice?: number | string; price?: number | string; imageUrl?: string | null; posEnabled?: boolean; onlineEnabled?: boolean; isOnlineEnabled?: boolean; grabEnabled?: boolean; foodpandaEnabled?: boolean; isActive?: boolean; soldOut?: boolean; recipeId?: number | null; recipeCost?: number | string | null; recipes?: Array<{ recipeId?: number; recipe?: Recipe }> };
+type MenuCategory = { id: string; name: string; description?: string | null; sortOrder?: number; displayOrder?: number; isActive?: boolean; onlineEnabled?: boolean; grabEnabled?: boolean; foodpandaEnabled?: boolean };
+type Recipe = { id: number; name: string; description?: string | null; category?: string; yieldQuantity?: string | number; yieldUnit?: string; totalCost?: string | number | null; costPerServing?: string | number | null; cogsPercent?: string | number | null; suggestedPrice?: string | number | null; sellingPrice?: string | number | null; imageUrl?: string | null; isActive?: boolean };
+type PurchasingLine = { fieldKey?: string; id?: string; item?: string; name?: string; category?: string | null; supplier?: string | null; unitDescription?: string | null; purchaseUnit?: string | null; orderUnit?: string | null; unitCost?: number | string | null; manualOverrideUnitCost?: number | string | null; lineTotal?: number | string | null; quantity?: number | string | null; active?: boolean; isActive?: boolean };
+type PurchasingListResponse = { lines?: PurchasingLine[]; items?: PurchasingLine[]; rows?: PurchasingLine[]; noData?: boolean; message?: string };
+type IngredientDraft = { id: string; name: string; sourceType: SourceType; purchasingItemKey: string; quantityUsed: string; unitUsed: string; autoUnitCost: number | null; manualOverrideUnitCost: string; notes: string };
+type ModifierOption = { id?: string; name: string; thaiName?: string; price?: string | number; priceDelta?: string | number; active?: boolean; isActive?: boolean };
+type ModifierGroup = { id?: string; name: string; menuItemId?: string; linkedMenuItemIds?: string[]; modifiers?: ModifierOption[]; options?: ModifierOption[]; isActive?: boolean };
 
-type MenuCategory = {
-  id: string;
-  name: string;
-  description: string | null;
-  sortOrder: number;
-  isActive: boolean;
-};
-
-type Recipe = {
-  id: number;
-  name: string;
-  description?: string | null;
-  category: string;
-  yieldQuantity: string;
-  yieldUnit: string;
-  totalCost: string | number | null;
-  costPerServing: string | number | null;
-  cogsPercent?: string | number | null;
-  suggestedPrice?: string | number | null;
-  sellingPrice?: string | number | null;
-  margin?: string | number | null;
-  isActive: boolean;
-};
-
-type PurchasingLine = {
-  fieldKey?: string;
-  item?: string;
-  name?: string;
-  category?: string | null;
-  supplier?: string | null;
-  brand?: string | null;
-  unitDescription?: string | null;
-  purchaseUnit?: string | null;
-  orderUnit?: string | null;
-  unitCost?: number | string | null;
-  manualOverrideUnitCost?: number | string | null;
-  lineTotal?: number | string | null;
-  quantity?: number | string | null;
-  active?: boolean;
-  isActive?: boolean;
-};
-
-type PurchasingListResponse = {
-  lines?: PurchasingLine[];
-  items?: PurchasingLine[];
-  rows?: PurchasingLine[];
-  source?: string;
-  noData?: boolean;
-  message?: string;
-};
-
-function toNumber(value: unknown): number | null {
-  if (value === null || value === undefined || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function fmtMoney(value: unknown) {
-  const n = toNumber(value);
-  return n === null ? "UNMAPPED" : `฿${n.toFixed(2)}`;
-}
-
-function fmtPercent(value: unknown) {
-  const n = toNumber(value);
-  return n === null ? "UNMAPPED" : `${n.toFixed(1)}%`;
-}
-
-function yesNo(value: boolean | undefined) {
-  return value ? "Yes" : "No";
-}
-
-function calculateItemCost(item: MenuItem, recipes: Recipe[]) {
-  const directCost = toNumber(item.recipeCost);
-  if (directCost !== null) return directCost;
-  if (item.recipeId) {
-    const recipe = recipes.find((r) => r.id === item.recipeId);
-    return toNumber(recipe?.costPerServing);
-  }
-  const nameMatch = recipes.find((r) => r.name?.toLowerCase() === item.name?.toLowerCase());
-  return toNumber(nameMatch?.costPerServing);
-}
-
-function blockerText(message: string) {
-  return (
-    <div className="border border-amber-200 bg-amber-50 text-amber-800 rounded-lg p-3 text-xs">
-      <p className="font-semibold">INSUFFICIENT DATA</p>
-      <p>{message}</p>
-    </div>
-  );
-}
+const makeIngredient = (): IngredientDraft => ({ id: crypto.randomUUID(), name: "", sourceType: "manual", purchasingItemKey: "", quantityUsed: "", unitUsed: "", autoUnitCost: null, manualOverrideUnitCost: "", notes: "" });
+function toNumber(value: unknown): number | null { if (value === null || value === undefined || value === "") return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
+function fmtMoney(value: unknown) { const n = toNumber(value); return n === null ? "UNMAPPED" : `฿${n.toFixed(2)}`; }
+function fmtPercent(value: unknown) { const n = toNumber(value); return n === null ? "UNMAPPED" : `${n.toFixed(1)}%`; }
+function yesNo(value: boolean | undefined) { return value ? "Yes" : "No"; }
+function blockerText(message: string) { return <div className="border border-amber-200 bg-amber-50 text-amber-800 rounded-lg p-3 text-xs"><p className="font-semibold">INSUFFICIENT DATA</p><p>{message}</p></div>; }
 
 export default function MenuWorkspace() {
   const location = useLocation();
-  const activeTab: TabKey = location.pathname.includes("/menu/recipes") || location.pathname.includes("cost-calculator")
-    ? "recipes"
-    : location.pathname.includes("/menu/ingredients")
-      ? "purchasing"
-      : "items";
+  const activeTab: TabKey = location.pathname.includes("/menu/recipes") || location.pathname.includes("cost-calculator") ? "recipes" : location.pathname.includes("/menu/modifiers") ? "modifiers" : location.pathname.includes("/menu/categories") ? "categories" : location.pathname.includes("/menu/ingredients") ? "purchasing" : "items";
   const [search, setSearch] = useState("");
-  const [recipeForm, setRecipeForm] = useState({ name: "", category: "", description: "", yieldQuantity: "1", yieldUnit: "servings" });
+  const [selectedRecipeId, setSelectedRecipeId] = useState<number | "new">("new");
+  const [recipeForm, setRecipeForm] = useState({ name: "", category: "", description: "", imageUrl: "", yieldQuantity: "1", yieldUnit: "servings", manualOverrideCost: "", linkMenuItemId: "" });
+  const [ingredientRows, setIngredientRows] = useState<IngredientDraft[]>([makeIngredient()]);
+  const [modifierGroupForm, setModifierGroupForm] = useState({ name: "Make it Better", menuItemId: "" });
+  const [modifierOptionForm, setModifierOptionForm] = useState({ groupId: "", name: "", thaiName: "", price: "", active: true });
 
   const { data: rawItems, isLoading: itemsLoading } = useQuery<unknown>({ queryKey: ["/api/menu-v3/items"] });
   const { data: rawCategories, isLoading: categoriesLoading } = useQuery<unknown>({ queryKey: ["/api/menu-v3/categories"] });
   const { data: recipesData, isLoading: recipesLoading } = useQuery<Recipe[] | { rows?: Recipe[] }>({ queryKey: ["/api/recipes"] });
   const { data: purchasingData, isLoading: purchasingLoading } = useQuery<PurchasingListResponse>({ queryKey: ["/api/purchasing-list/latest"] });
+  const { data: modifierData, isLoading: modifiersLoading } = useQuery<{ groups?: ModifierGroup[] } | ModifierGroup[]>({ queryKey: ["/api/menu-v3/modifiers/groups"] });
 
-  const createRecipeMutation = useMutation({
-    mutationFn: () => apiRequest("/api/recipes", {
-      method: "POST",
-      body: JSON.stringify({
-        name: recipeForm.name,
-        category: recipeForm.category,
-        description: recipeForm.description || null,
-        yieldQuantity: recipeForm.yieldQuantity,
-        yieldUnit: recipeForm.yieldUnit,
-      }),
-    }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/recipes"] });
-      setRecipeForm({ name: "", category: "", description: "", yieldQuantity: "1", yieldUnit: "servings" });
-    },
-  });
-
-  const itemResult = normalizeMenuItems<MenuItem>(rawItems);
-  const categoryResult = normalizeMenuCategories<MenuCategory>(rawCategories);
-  const items = asArray<MenuItem>(itemResult.items);
-  const categories = asArray<MenuCategory>(categoryResult.items);
+  const items = asArray<MenuItem>(normalizeMenuItems<MenuItem>(rawItems).items);
+  const categories = asArray<MenuCategory>(normalizeMenuCategories<MenuCategory>(rawCategories).items);
   const recipes = Array.isArray(recipesData) ? recipesData : asArray<Recipe>(recipesData?.rows);
   const purchasingLines = asArray<PurchasingLine>(purchasingData?.lines ?? purchasingData?.items ?? purchasingData?.rows);
+  const modifierGroups = Array.isArray(modifierData) ? modifierData : asArray<ModifierGroup>(modifierData?.groups);
 
-  const categoryMap = useMemo(() => categories.reduce<Record<string, string>>((acc, category) => {
-    if (category.id) acc[category.id] = category.name;
-    return acc;
-  }, {}), [categories]);
-
-  const filteredItems = items.filter((item) => {
-    const q = search.toLowerCase();
-    return item.name?.toLowerCase().includes(q) || (categoryMap[item.categoryId] || "").toLowerCase().includes(q);
+  const categoryMap = useMemo(() => categories.reduce<Record<string, string>>((acc, category) => { if (category.id) acc[category.id] = category.name; return acc; }, {}), [categories]);
+  const selectedRecipe = selectedRecipeId === "new" ? null : recipes.find((recipe) => recipe.id === selectedRecipeId) ?? null;
+  const validIngredientCosts = ingredientRows.map((row) => {
+    const unitCost = toNumber(row.manualOverrideUnitCost) ?? row.autoUnitCost;
+    const qty = toNumber(row.quantityUsed);
+    return unitCost !== null && qty !== null ? unitCost * qty : null;
   });
+  const recipeTotal: number = toNumber(recipeForm.manualOverrideCost) ?? validIngredientCosts.reduce<number>((sum, cost) => sum + (cost ?? 0), 0);
+  const yieldQty = toNumber(recipeForm.yieldQuantity);
+  const costPerServing = yieldQty && recipeTotal !== null ? recipeTotal / yieldQty : null;
+  const suggestedPrice = costPerServing !== null ? costPerServing / 0.3 : null;
+  const missingCostRows = ingredientRows.filter((row) => row.name && (toNumber(row.manualOverrideUnitCost) ?? row.autoUnitCost) === null);
 
-  const filteredRecipes = recipes.filter((recipe) => {
-    const q = search.toLowerCase();
-    return recipe.name?.toLowerCase().includes(q) || recipe.category?.toLowerCase().includes(q);
+  const saveRecipeMutation = useMutation({
+    mutationFn: () => apiRequest(selectedRecipe ? `/api/recipes/${selectedRecipe.id}` : "/api/recipes", { method: selectedRecipe ? "PUT" : "POST", body: JSON.stringify({ name: recipeForm.name, category: recipeForm.category, description: recipeForm.description || null, yieldQuantity: recipeForm.yieldQuantity, yieldUnit: recipeForm.yieldUnit, imageUrl: recipeForm.imageUrl || null, notes: recipeForm.manualOverrideCost ? `Manual override recipe cost: ${recipeForm.manualOverrideCost}` : null }) }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/recipes"] }),
   });
+  const createModifierGroupMutation = useMutation({ mutationFn: () => apiRequest("/api/menu-v3/modifiers/groups/create", { method: "POST", body: JSON.stringify({ name: modifierGroupForm.name, menuItemId: modifierGroupForm.menuItemId }) }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/modifiers/groups"] }) });
+  const createModifierMutation = useMutation({ mutationFn: () => apiRequest("/api/menu-v3/modifiers/create", { method: "POST", body: JSON.stringify({ groupId: modifierOptionForm.groupId, name: modifierOptionForm.thaiName ? `${modifierOptionForm.name} (${modifierOptionForm.thaiName})` : modifierOptionForm.name, priceDelta: modifierOptionForm.price, isActive: modifierOptionForm.active }) }), onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/modifiers/groups"] }) });
 
-  const filteredPurchasing = purchasingLines.filter((line) => {
-    const q = search.toLowerCase();
-    return (line.item || line.name || "").toLowerCase().includes(q) || (line.supplier || "").toLowerCase().includes(q) || (line.category || "").toLowerCase().includes(q);
-  });
+  const filteredItems = items.filter((item) => (item.name || "").toLowerCase().includes(search.toLowerCase()) || (typeof item.category === "string" ? item.category : categoryMap[item.categoryId || ""] || item.category?.name || "").toLowerCase().includes(search.toLowerCase()));
+  const filteredRecipes = recipes.filter((recipe) => (recipe.name || "").toLowerCase().includes(search.toLowerCase()) || (recipe.category || "").toLowerCase().includes(search.toLowerCase()));
+  const filteredPurchasing = purchasingLines.filter((line) => (line.item || line.name || "").toLowerCase().includes(search.toLowerCase()) || (line.supplier || "").toLowerCase().includes(search.toLowerCase()) || (line.category || "").toLowerCase().includes(search.toLowerCase()));
 
-  return (
-    <div className="p-4 space-y-4 max-w-7xl mx-auto">
-      <div className="space-y-2">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Menu</h1>
-          <p className="text-xs text-slate-500">Purchasing List → recipe costing → sellable menu items → channel availability.</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link to="/menu/items" className={`text-xs px-3 py-1.5 rounded-lg border ${activeTab === "items" ? "bg-black text-white border-black" : "bg-white text-slate-600 border-slate-200"}`}>Items</Link>
-          <Link to="/menu/recipes" className={`text-xs px-3 py-1.5 rounded-lg border ${activeTab === "recipes" ? "bg-black text-white border-black" : "bg-white text-slate-600 border-slate-200"}`}>Recipes and Costing</Link>
-          <Link to="/menu/ingredients" className={`text-xs px-3 py-1.5 rounded-lg border ${activeTab === "purchasing" ? "bg-black text-white border-black" : "bg-white text-slate-600 border-slate-200"}`}>Purchasing Ingredients</Link>
-        </div>
-      </div>
+  const openRecipe = (recipe: Recipe | null) => { setSelectedRecipeId(recipe?.id ?? "new"); setRecipeForm({ name: recipe?.name ?? "", category: recipe?.category ?? "", description: recipe?.description ?? "", imageUrl: recipe?.imageUrl ?? "", yieldQuantity: String(recipe?.yieldQuantity ?? "1"), yieldUnit: recipe?.yieldUnit ?? "servings", manualOverrideCost: "", linkMenuItemId: "" }); setIngredientRows([makeIngredient()]); };
+  const updateIngredient = (id: string, patch: Partial<IngredientDraft>) => setIngredientRows((rows) => rows.map((row) => row.id === id ? { ...row, ...patch } : row));
+  const selectPurchasingLine = (rowId: string, key: string) => { const line = purchasingLines.find((candidate, index) => (candidate.fieldKey || candidate.id || `${candidate.item || candidate.name}-${index}`) === key); updateIngredient(rowId, { purchasingItemKey: key, sourceType: "purchasing", name: line?.item || line?.name || "", unitUsed: line?.unitDescription || line?.purchaseUnit || line?.orderUnit || "", autoUnitCost: toNumber(line?.unitCost) }); };
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-        <Input placeholder="Search menu workflow..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 text-xs" />
-      </div>
-
-      {activeTab === "items" && (
-        <div className="space-y-3">
-          <p className="text-xs text-slate-500">Main POS/menu item list. Cost and margin are shown only when recipe cost data is linked or name-matched; otherwise values remain UNMAPPED.</p>
-          {(itemsLoading || categoriesLoading || recipesLoading) && <div className="text-center py-12 text-slate-400 text-xs">Loading menu items...</div>}
-          {!itemsLoading && filteredItems.length === 0 && <div className="text-center py-12 text-slate-400 text-xs">No menu items found.</div>}
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-x-auto bg-white dark:bg-slate-900">
-            <table className="w-full min-w-[1050px] text-xs">
-              <thead><tr className="border-b bg-slate-50 dark:bg-slate-800">
-                <th className="text-left px-3 py-2 font-medium text-slate-500">Item name</th><th className="text-left px-3 py-2 font-medium text-slate-500">Category</th><th className="text-right px-3 py-2 font-medium text-slate-500">Price</th><th className="text-right px-3 py-2 font-medium text-slate-500">Cost</th><th className="text-right px-3 py-2 font-medium text-slate-500">Margin</th><th className="text-right px-3 py-2 font-medium text-slate-500">Food cost %</th><th className="text-center px-3 py-2 font-medium text-slate-500">Stock status</th><th className="text-center px-3 py-2 font-medium text-slate-500">POS enabled</th><th className="text-center px-3 py-2 font-medium text-slate-500">Online enabled</th><th className="text-center px-3 py-2 font-medium text-slate-500">Grab</th><th className="text-center px-3 py-2 font-medium text-slate-500">Foodpanda</th><th className="text-center px-3 py-2 font-medium text-slate-500">Status</th>
-              </tr></thead>
-              <tbody>{filteredItems.map((item) => {
-                const price = toNumber(item.basePrice);
-                const cost = calculateItemCost(item, recipes);
-                const grossProfit = price !== null && cost !== null ? price - cost : null;
-                const margin = price && grossProfit !== null ? (grossProfit / price) * 100 : null;
-                const foodCost = price && cost !== null ? (cost / price) * 100 : null;
-                return <tr key={item.id} className="border-b last:border-0">
-                  <td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{item.name || "UNMAPPED"}</td><td className="px-3 py-2 text-slate-500">{categoryMap[item.categoryId] || "UNMAPPED"}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(price)}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(cost)}</td><td className="px-3 py-2 text-right font-mono">{fmtPercent(margin)}</td><td className="px-3 py-2 text-right font-mono">{fmtPercent(foodCost)}</td><td className="px-3 py-2 text-center">{item.soldOut ? "Sold out" : "In stock"}</td><td className="px-3 py-2 text-center">{yesNo(item.posEnabled)}</td><td className="px-3 py-2 text-center">{yesNo(item.onlineEnabled)}</td><td className="px-3 py-2 text-center">{yesNo(item.grabEnabled)}</td><td className="px-3 py-2 text-center">{yesNo(item.foodpandaEnabled)}</td><td className="px-3 py-2 text-center"><Badge variant={item.isActive ? "default" : "outline"}>{item.isActive ? "Active" : "Inactive"}</Badge></td>
-                </tr>;
-              })}</tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "recipes" && (
-        <div className="space-y-3">
-          <p className="text-xs text-slate-500">Recipes may exist without being live menu items. Recipe costing is displayed from recipe cost fields and must be backed by Purchasing List ingredient costs or manual overrides.</p>
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-white dark:bg-slate-900 space-y-3">
-            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300">Create recipe from Purchasing List items</p>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-              <Input placeholder="Recipe name" value={recipeForm.name} onChange={(e) => setRecipeForm({ ...recipeForm, name: e.target.value })} className="text-xs" />
-              <Input placeholder="Category" value={recipeForm.category} onChange={(e) => setRecipeForm({ ...recipeForm, category: e.target.value })} className="text-xs" />
-              <Input placeholder="Description" value={recipeForm.description} onChange={(e) => setRecipeForm({ ...recipeForm, description: e.target.value })} className="text-xs" />
-              <Input placeholder="Yield qty" value={recipeForm.yieldQuantity} onChange={(e) => setRecipeForm({ ...recipeForm, yieldQuantity: e.target.value })} className="text-xs" />
-              <Input placeholder="Yield unit" value={recipeForm.yieldUnit} onChange={(e) => setRecipeForm({ ...recipeForm, yieldUnit: e.target.value })} className="text-xs" />
-            </div>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[10px] text-slate-500">Ingredient rows, auto unit cost, and manual override cost remain source-backed; missing costs are not filled here.</p>
-              <button
-                onClick={() => createRecipeMutation.mutate()}
-                disabled={!recipeForm.name || !recipeForm.category || createRecipeMutation.isPending}
-                className="text-xs px-3 py-1.5 bg-black text-white rounded-lg disabled:opacity-40"
-              >
-                {createRecipeMutation.isPending ? "Saving..." : "Save Recipe"}
-              </button>
-            </div>
-          </div>
-          {recipesLoading && <div className="text-center py-12 text-slate-400 text-xs">Loading recipes...</div>}
-          {!recipesLoading && recipes.length === 0 && blockerText("No active recipes were returned by /api/recipes. Create recipes from purchasable items before relying on menu item costs.")}
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-x-auto bg-white dark:bg-slate-900">
-            <table className="w-full min-w-[900px] text-xs"><thead><tr className="border-b bg-slate-50 dark:bg-slate-800">
-              <th className="text-left px-3 py-2 font-medium text-slate-500">Recipe name</th><th className="text-left px-3 py-2 font-medium text-slate-500">Category</th><th className="text-left px-3 py-2 font-medium text-slate-500">Description</th><th className="text-right px-3 py-2 font-medium text-slate-500">Yield quantity</th><th className="text-left px-3 py-2 font-medium text-slate-500">Yield unit</th><th className="text-right px-3 py-2 font-medium text-slate-500">Total recipe cost</th><th className="text-right px-3 py-2 font-medium text-slate-500">Cost per serving</th><th className="text-right px-3 py-2 font-medium text-slate-500">Suggested price</th><th className="text-right px-3 py-2 font-medium text-slate-500">Food cost %</th>
-            </tr></thead><tbody>{filteredRecipes.map((recipe) => <tr key={recipe.id} className="border-b last:border-0"><td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{recipe.name}</td><td className="px-3 py-2 text-slate-500">{recipe.category || "UNMAPPED"}</td><td className="px-3 py-2 text-slate-500">{recipe.description || "—"}</td><td className="px-3 py-2 text-right font-mono">{recipe.yieldQuantity || "UNMAPPED"}</td><td className="px-3 py-2 text-slate-500">{recipe.yieldUnit || "UNMAPPED"}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(recipe.totalCost)}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(recipe.costPerServing)}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(recipe.suggestedPrice || recipe.sellingPrice)}</td><td className="px-3 py-2 text-right font-mono">{fmtPercent(recipe.cogsPercent)}</td></tr>)}</tbody></table>
-          </div>
-        </div>
-      )}
-
-      {activeTab === "purchasing" && (
-        <div className="space-y-3">
-          <p className="text-xs text-slate-500">Purchasable items are read from the existing Purchasing List source. Missing cost data is not guessed.</p>
-          {purchasingLoading && <div className="text-center py-12 text-slate-400 text-xs">Loading purchasing ingredients...</div>}
-          {!purchasingLoading && purchasingData?.noData && blockerText(purchasingData.message || "No Purchasing List data is available.")}
-          <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-x-auto bg-white dark:bg-slate-900">
-            <table className="w-full min-w-[900px] text-xs"><thead><tr className="border-b bg-slate-50 dark:bg-slate-800">
-              <th className="text-left px-3 py-2 font-medium text-slate-500">Purchasable item</th><th className="text-left px-3 py-2 font-medium text-slate-500">Category</th><th className="text-left px-3 py-2 font-medium text-slate-500">Supplier</th><th className="text-left px-3 py-2 font-medium text-slate-500">Purchase unit</th><th className="text-right px-3 py-2 font-medium text-slate-500">Pack size / qty</th><th className="text-right px-3 py-2 font-medium text-slate-500">Purchase price</th><th className="text-right px-3 py-2 font-medium text-slate-500">Calculated unit cost</th><th className="text-right px-3 py-2 font-medium text-slate-500">Manual override unit cost</th><th className="text-center px-3 py-2 font-medium text-slate-500">Status</th>
-            </tr></thead><tbody>{filteredPurchasing.length === 0 && !purchasingLoading ? <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-400">No purchasing ingredients found.</td></tr> : filteredPurchasing.map((line, index) => <tr key={line.fieldKey || `${line.item}-${index}`} className="border-b last:border-0"><td className="px-3 py-2 font-medium text-slate-800 dark:text-slate-200">{line.item || line.name || "UNMAPPED"}</td><td className="px-3 py-2 text-slate-500">{line.category || "UNMAPPED"}</td><td className="px-3 py-2 text-slate-500">{line.supplier || "UNMAPPED"}</td><td className="px-3 py-2 text-slate-500">{line.unitDescription || line.purchaseUnit || line.orderUnit || "UNMAPPED"}</td><td className="px-3 py-2 text-right font-mono">{line.quantity ?? "UNMAPPED"}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(line.lineTotal)}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(line.unitCost)}</td><td className="px-3 py-2 text-right font-mono">{fmtMoney(line.manualOverrideUnitCost)}</td><td className="px-3 py-2 text-center">{line.active === false || line.isActive === false ? "Inactive" : "Active"}</td></tr>)}</tbody></table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+  return <div className="p-4 space-y-4 max-w-7xl mx-auto">
+    <div className="space-y-2"><div><h1 className="text-lg font-semibold text-slate-900 dark:text-white">Menu</h1><p className="text-xs text-slate-500">Purchasing List → recipe costing → sellable menu items → Loyverse-style modifiers → categories.</p></div><div className="flex flex-wrap gap-2"><Link to="/menu/items" className={`text-xs px-3 py-1.5 rounded-lg border ${activeTab === "items" ? "bg-black text-white border-black" : "bg-white text-slate-600 border-slate-200"}`}>Menu Items</Link><Link to="/menu/recipes" className={`text-xs px-3 py-1.5 rounded-lg border ${activeTab === "recipes" ? "bg-black text-white border-black" : "bg-white text-slate-600 border-slate-200"}`}>Recipes & Costing</Link><Link to="/menu/modifiers" className={`text-xs px-3 py-1.5 rounded-lg border ${activeTab === "modifiers" ? "bg-black text-white border-black" : "bg-white text-slate-600 border-slate-200"}`}>Modifiers</Link><Link to="/menu/categories" className={`text-xs px-3 py-1.5 rounded-lg border ${activeTab === "categories" ? "bg-black text-white border-black" : "bg-white text-slate-600 border-slate-200"}`}>Categories</Link>{activeTab === "purchasing" && <Link to="/menu/ingredients" className="text-xs px-3 py-1.5 rounded-lg border bg-black text-white border-black">Purchasing source compatibility</Link>}</div></div>
+    <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" /><Input placeholder="Search menu workflow..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 text-xs" /></div>
+    {activeTab === "items" && <div className="space-y-3"><p className="text-xs text-slate-500">Sellable items. Missing linked recipes or costs remain UNMAPPED.</p>{(itemsLoading || categoriesLoading || recipesLoading) && <div className="text-center py-12 text-slate-400 text-xs">Loading menu items...</div>}<div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-x-auto bg-white dark:bg-slate-900"><table className="w-full min-w-[1200px] text-xs"><thead><tr className="border-b bg-slate-50 dark:bg-slate-800">{["Item name","Category","Price","Linked recipe","Cost","Margin","Food cost %","Stock status","POS enabled","Online enabled","Grab enabled","Foodpanda enabled","Status"].map((h) => <th key={h} className="text-left px-3 py-2 font-medium text-slate-500">{h}</th>)}</tr></thead><tbody>{filteredItems.map((item) => { const price = toNumber(item.basePrice ?? item.price); const recipe = item.recipeId ? recipes.find((r) => r.id === item.recipeId) : item.recipes?.[0]?.recipe ?? recipes.find((r) => r.name?.toLowerCase() === item.name?.toLowerCase()); const cost = toNumber(item.recipeCost) ?? toNumber(recipe?.costPerServing); const margin = price && cost !== null ? ((price - cost) / price) * 100 : null; const foodCost = price && cost !== null ? (cost / price) * 100 : null; return <tr key={item.id} className="border-b last:border-0"><td className="px-3 py-2 font-medium">{item.name || "UNMAPPED"}</td><td className="px-3 py-2">{typeof item.category === "string" ? item.category : categoryMap[item.categoryId || ""] || item.category?.name || "UNMAPPED"}</td><td className="px-3 py-2 font-mono">{fmtMoney(price)}</td><td className="px-3 py-2">{recipe?.name || "UNMAPPED"}</td><td className="px-3 py-2 font-mono">{fmtMoney(cost)}</td><td className="px-3 py-2 font-mono">{fmtPercent(margin)}</td><td className="px-3 py-2 font-mono">{fmtPercent(foodCost)}</td><td className="px-3 py-2">{item.soldOut ? "Sold out" : "In stock"}</td><td className="px-3 py-2">{yesNo(item.posEnabled ?? true)}</td><td className="px-3 py-2">{yesNo(item.onlineEnabled ?? item.isOnlineEnabled)}</td><td className="px-3 py-2">{yesNo(item.grabEnabled)}</td><td className="px-3 py-2">{yesNo(item.foodpandaEnabled)}</td><td className="px-3 py-2"><Badge variant={item.isActive === false ? "outline" : "default"}>{item.isActive === false ? "Inactive" : "Active"}</Badge></td></tr>; })}</tbody></table></div></div>}
+    {activeTab === "recipes" && <div className="space-y-3"><p className="text-xs text-slate-500">Recipes are editable. Ingredient drafts can use Purchasing source lookup or manual/test entries without updating Purchasing.</p><div className="grid grid-cols-1 lg:grid-cols-3 gap-3"><div className="border rounded-lg bg-white dark:bg-slate-900 overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b bg-slate-50"><th className="text-left p-2">Recipe</th><th className="text-left p-2">Cost</th><th className="text-left p-2">Action</th></tr></thead><tbody>{recipesLoading ? <tr><td className="p-3" colSpan={3}>Loading recipes...</td></tr> : filteredRecipes.map((recipe) => <tr key={recipe.id} className="border-b"><td className="p-2 font-medium">{recipe.name}</td><td className="p-2 font-mono">{fmtMoney(recipe.costPerServing)}</td><td className="p-2"><button className="underline" onClick={() => openRecipe(recipe)}>Edit</button></td></tr>)}</tbody></table></div><div className="lg:col-span-2 border rounded-lg p-3 bg-white dark:bg-slate-900 space-y-3"><div className="flex justify-between"><p className="text-xs font-semibold">{selectedRecipe ? "Edit recipe" : "Create recipe"}</p><button className="text-xs underline" onClick={() => openRecipe(null)}>New recipe</button></div><div className="grid grid-cols-1 md:grid-cols-3 gap-2"><Input placeholder="Recipe name" value={recipeForm.name} onChange={(e) => setRecipeForm({ ...recipeForm, name: e.target.value })} className="text-xs" /><Input placeholder="Category" value={recipeForm.category} onChange={(e) => setRecipeForm({ ...recipeForm, category: e.target.value })} className="text-xs" /><Input placeholder="Image URL" value={recipeForm.imageUrl} onChange={(e) => setRecipeForm({ ...recipeForm, imageUrl: e.target.value })} className="text-xs" /><Input placeholder="Description" value={recipeForm.description} onChange={(e) => setRecipeForm({ ...recipeForm, description: e.target.value })} className="text-xs md:col-span-3" /><Input placeholder="Yield qty" value={recipeForm.yieldQuantity} onChange={(e) => setRecipeForm({ ...recipeForm, yieldQuantity: e.target.value })} className="text-xs" /><Input placeholder="Yield unit" value={recipeForm.yieldUnit} onChange={(e) => setRecipeForm({ ...recipeForm, yieldUnit: e.target.value })} className="text-xs" /><Input placeholder="Manual override total cost (optional)" value={recipeForm.manualOverrideCost} onChange={(e) => setRecipeForm({ ...recipeForm, manualOverrideCost: e.target.value })} className="text-xs" /></div><div className="overflow-x-auto"><table className="w-full min-w-[900px] text-xs"><thead><tr className="border-b bg-slate-50">{["Ingredient name","Source type","Purchasing lookup","Qty used","Unit used","Auto unit cost","Manual override unit cost","Line cost","Notes","Remove"].map((h) => <th key={h} className="text-left p-2">{h}</th>)}</tr></thead><tbody>{ingredientRows.map((row) => { const cost = toNumber(row.manualOverrideUnitCost) ?? row.autoUnitCost; const lineCost = cost !== null && toNumber(row.quantityUsed) !== null ? cost * Number(row.quantityUsed) : null; return <tr key={row.id} className="border-b"><td className="p-1"><Input value={row.name} onChange={(e) => updateIngredient(row.id, { name: e.target.value, sourceType: row.sourceType })} className="text-xs" /></td><td className="p-1"><select value={row.sourceType} onChange={(e) => updateIngredient(row.id, { sourceType: e.target.value as SourceType, purchasingItemKey: "", autoUnitCost: null })} className="border rounded px-2 py-2 text-xs"><option value="purchasing">Purchasing item</option><option value="manual">Manual/test ingredient</option></select></td><td className="p-1"><select value={row.purchasingItemKey} disabled={row.sourceType !== "purchasing"} onChange={(e) => selectPurchasingLine(row.id, e.target.value)} className="border rounded px-2 py-2 text-xs max-w-[180px]"><option value="">Select source</option>{purchasingLines.map((line, index) => { const key = line.fieldKey || line.id || `${line.item || line.name}-${index}`; return <option key={key} value={key}>{line.item || line.name || "UNMAPPED"}</option>; })}</select></td><td className="p-1"><Input value={row.quantityUsed} onChange={(e) => updateIngredient(row.id, { quantityUsed: e.target.value })} className="text-xs" /></td><td className="p-1"><Input value={row.unitUsed} onChange={(e) => updateIngredient(row.id, { unitUsed: e.target.value })} className="text-xs" /></td><td className="p-2 font-mono">{fmtMoney(row.autoUnitCost)}</td><td className="p-1"><Input placeholder="Clearly labelled override" value={row.manualOverrideUnitCost} onChange={(e) => updateIngredient(row.id, { manualOverrideUnitCost: e.target.value })} className="text-xs" /></td><td className="p-2 font-mono">{fmtMoney(lineCost)}</td><td className="p-1"><Input value={row.notes} onChange={(e) => updateIngredient(row.id, { notes: e.target.value })} className="text-xs" /></td><td className="p-2"><button className="underline" onClick={() => setIngredientRows((rows) => rows.filter((r) => r.id !== row.id))}>Remove</button></td></tr>; })}</tbody></table></div><button className="text-xs px-3 py-1.5 border rounded-lg" onClick={() => setIngredientRows((rows) => [...rows, makeIngredient()])}>Add ingredient row</button>{missingCostRows.length > 0 && blockerText(`${missingCostRows.length} ingredient row(s) are UNMAPPED and excluded from calculated totals.`)}<div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs"><div>Total recipe cost: <span className="font-mono">{fmtMoney(recipeTotal)}</span></div><div>Cost per serving: <span className="font-mono">{fmtMoney(costPerServing)}</span></div><div>Suggested price: <span className="font-mono">{fmtMoney(suggestedPrice)}</span></div><div>Food cost %: <span className="font-mono">{fmtPercent(suggestedPrice ? (costPerServing! / suggestedPrice) * 100 : null)}</span></div></div><select value={recipeForm.linkMenuItemId} onChange={(e) => setRecipeForm({ ...recipeForm, linkMenuItemId: e.target.value })} className="border rounded px-2 py-2 text-xs"><option value="">Optional link/create Menu Item later</option>{items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button onClick={() => saveRecipeMutation.mutate()} disabled={!recipeForm.name || !recipeForm.category || saveRecipeMutation.isPending} className="text-xs px-3 py-1.5 bg-black text-white rounded-lg disabled:opacity-40">{saveRecipeMutation.isPending ? "Saving..." : "Save recipe"}</button></div></div></div>}
+    {activeTab === "modifiers" && <div className="space-y-3"><p className="text-xs text-slate-500">Loyverse-style modifier groups/options. Modifier prices add to order totals and are not base recipe ingredients.</p><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><div className="border rounded-lg p-3 bg-white space-y-2"><p className="text-xs font-semibold">Create/edit modifier group</p><Input value={modifierGroupForm.name} onChange={(e) => setModifierGroupForm({ ...modifierGroupForm, name: e.target.value })} className="text-xs" /><select value={modifierGroupForm.menuItemId} onChange={(e) => setModifierGroupForm({ ...modifierGroupForm, menuItemId: e.target.value })} className="border rounded px-2 py-2 text-xs w-full"><option value="">Link to Menu Item</option>{items.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select><button onClick={() => createModifierGroupMutation.mutate()} disabled={!modifierGroupForm.name || !modifierGroupForm.menuItemId} className="text-xs px-3 py-1.5 bg-black text-white rounded-lg disabled:opacity-40">Save group</button></div><div className="border rounded-lg p-3 bg-white space-y-2"><p className="text-xs font-semibold">Add/edit modifier option</p><select value={modifierOptionForm.groupId} onChange={(e) => setModifierOptionForm({ ...modifierOptionForm, groupId: e.target.value })} className="border rounded px-2 py-2 text-xs w-full"><option value="">Select modifier group</option>{modifierGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}</select><Input placeholder="Option name" value={modifierOptionForm.name} onChange={(e) => setModifierOptionForm({ ...modifierOptionForm, name: e.target.value })} className="text-xs" /><Input placeholder="Optional Thai name" value={modifierOptionForm.thaiName} onChange={(e) => setModifierOptionForm({ ...modifierOptionForm, thaiName: e.target.value })} className="text-xs" /><Input placeholder="Price" value={modifierOptionForm.price} onChange={(e) => setModifierOptionForm({ ...modifierOptionForm, price: e.target.value })} className="text-xs" /><button onClick={() => createModifierMutation.mutate()} disabled={!modifierOptionForm.groupId || !modifierOptionForm.name} className="text-xs px-3 py-1.5 bg-black text-white rounded-lg disabled:opacity-40">Save option</button></div></div>{modifiersLoading ? <div className="text-xs text-slate-400">Loading modifiers...</div> : <div className="border rounded-lg overflow-x-auto bg-white"><table className="w-full min-w-[900px] text-xs"><thead><tr className="border-b bg-slate-50"><th className="text-left p-2">Group</th><th className="text-left p-2">Linked Menu Items</th><th className="text-left p-2">Options</th><th className="text-left p-2">Active</th></tr></thead><tbody>{modifierGroups.map((group) => <tr key={group.id || group.name} className="border-b"><td className="p-2 font-medium">{group.name}</td><td className="p-2">{items.filter((item) => item.id === group.menuItemId || group.linkedMenuItemIds?.includes(item.id)).map((item) => item.name).join(", ") || "UNMAPPED"}</td><td className="p-2">{(group.modifiers || group.options || []).map((option) => `${option.name} — ${fmtMoney(option.priceDelta ?? option.price)}`).join("; ") || "No options"}</td><td className="p-2">{group.isActive === false ? "Inactive" : "Active"}</td></tr>)}</tbody></table></div>}</div>}
+    {activeTab === "categories" && <div className="space-y-3"><p className="text-xs text-slate-500">Category management view. Existing category source is shown without changing schemas.</p><div className="border rounded-lg overflow-x-auto bg-white"><table className="w-full min-w-[700px] text-xs"><thead><tr className="border-b bg-slate-50"><th className="text-left p-2">Name</th><th className="text-left p-2">Display order</th><th className="text-left p-2">Active status</th><th className="text-left p-2">Channel visibility</th></tr></thead><tbody>{categories.map((category) => <tr key={category.id} className="border-b"><td className="p-2 font-medium">{category.name}</td><td className="p-2 font-mono">{category.sortOrder ?? category.displayOrder ?? "UNMAPPED"}</td><td className="p-2">{category.isActive === false ? "Inactive" : "Active"}</td><td className="p-2">Online: {yesNo(category.onlineEnabled)} / Grab: {yesNo(category.grabEnabled)} / Foodpanda: {yesNo(category.foodpandaEnabled)}</td></tr>)}</tbody></table></div></div>}
+    {activeTab === "purchasing" && <div className="space-y-3"><p className="text-xs text-slate-500">Compatibility route only. Use Operations &gt; Purchasing as source of truth; this route is hidden from primary Menu navigation.</p>{purchasingLoading && <div className="text-center py-12 text-slate-400 text-xs">Loading purchasing ingredients...</div>}{!purchasingLoading && purchasingData?.noData && blockerText(purchasingData.message || "No Purchasing List data is available.")}<div className="border rounded-lg overflow-x-auto bg-white"><table className="w-full min-w-[900px] text-xs"><thead><tr className="border-b bg-slate-50">{["Purchasable item","Category","Supplier","Purchase unit","Pack size / qty","Purchase price","Calculated unit cost","Manual override unit cost","Status"].map((h) => <th key={h} className="text-left p-2">{h}</th>)}</tr></thead><tbody>{filteredPurchasing.map((line, index) => <tr key={line.fieldKey || `${line.item}-${index}`} className="border-b"><td className="p-2 font-medium">{line.item || line.name || "UNMAPPED"}</td><td className="p-2">{line.category || "UNMAPPED"}</td><td className="p-2">{line.supplier || "UNMAPPED"}</td><td className="p-2">{line.unitDescription || line.purchaseUnit || line.orderUnit || "UNMAPPED"}</td><td className="p-2 font-mono">{line.quantity ?? "UNMAPPED"}</td><td className="p-2 font-mono">{fmtMoney(line.lineTotal)}</td><td className="p-2 font-mono">{fmtMoney(line.unitCost)}</td><td className="p-2 font-mono">{fmtMoney(line.manualOverrideUnitCost)}</td><td className="p-2">{line.active === false || line.isActive === false ? "Inactive" : "Active"}</td></tr>)}</tbody></table></div></div>}
+  </div>;
 }
