@@ -2265,27 +2265,33 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Finance / Expenses dashboard read model
   app.get("/api/finance/expenses-dashboard", async (req: Request, res: Response) => {
     try {
-      const dateFrom = typeof req.query.dateFrom === "string" && req.query.dateFrom ? req.query.dateFrom : null;
-      const dateTo = typeof req.query.dateTo === "string" && req.query.dateTo ? req.query.dateTo : null;
+      const requestedDateFrom = typeof req.query.dateFrom === "string" && req.query.dateFrom ? req.query.dateFrom : null;
+      const requestedDateTo = typeof req.query.dateTo === "string" && req.query.dateTo ? req.query.dateTo : null;
       const currentMonthStart = new Date();
       currentMonthStart.setUTCDate(1);
       currentMonthStart.setUTCHours(0, 0, 0, 0);
       const currentMonthEnd = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() + 1, 1));
+      const dateFrom = requestedDateFrom || currentMonthStart.toISOString().slice(0, 10);
+      const dateTo = requestedDateTo || new Date(currentMonthEnd.getTime() - 1).toISOString().slice(0, 10);
 
       const [inShiftRows, businessRows, bankRows, summaryRows] = await Promise.all([
         prisma.$queryRawUnsafe<any[]>(`
           SELECT
             concat(ds.id, ':expense:', line.ordinality) AS id,
             COALESCE(ds.shift_date, NULLIF(left(ds."shiftDate", 10), '')::date, ds."createdAt"::date) AS date,
-            ds."shiftDate" AS shift_reference,
-            COALESCE(line.item->>'category', line.item->>'type', 'UNMAPPED') AS category,
+            'Food and Beverage' AS category,
             NULLIF(line.item->>'shop', '') AS supplier,
-            COALESCE(NULLIF(line.item->>'item', ''), NULLIF(line.item->>'description', ''), 'UNMAPPED') AS description,
+            COALESCE(NULLIF(line.item->>'item', ''), NULLIF(line.item->>'description', ''), NULLIF(line.item->>'name', ''), NULLIF(line.item->>'person', ''), 'UNMAPPED') AS description,
             COALESCE(NULLIF(line.item->>'cost', '')::numeric, NULLIF(line.item->>'amount', '')::numeric, 0) AS amount,
             COALESCE(ds."completedBy", ds.staff) AS entered_by,
             ds.id AS submission_id
           FROM daily_sales_v2 ds
-          CROSS JOIN LATERAL jsonb_array_elements(COALESCE(ds.payload->'expenses', '[]'::jsonb)) WITH ORDINALITY AS line(item, ordinality)
+          CROSS JOIN LATERAL jsonb_array_elements(
+            COALESCE(ds.payload->'expenses', '[]'::jsonb) ||
+            COALESCE(ds.payload->'wages', '[]'::jsonb) ||
+            COALESCE(ds.payload->'staffWages', '[]'::jsonb) ||
+            COALESCE(ds.payload->'otherPayments', '[]'::jsonb)
+          ) WITH ORDINALITY AS line(item, ordinality)
           WHERE ($1::date IS NULL OR COALESCE(ds.shift_date, ds."createdAt"::date) >= $1::date)
             AND ($2::date IS NULL OR COALESCE(ds.shift_date, ds."createdAt"::date) <= $2::date)
           ORDER BY date DESC, submission_id DESC
@@ -2337,7 +2343,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           ), in_shift AS (
             SELECT COALESCE(SUM(COALESCE(NULLIF(line.item->>'cost', '')::numeric, NULLIF(line.item->>'amount', '')::numeric, 0)), 0) total
             FROM daily_sales_v2 ds
-            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(ds.payload->'expenses', '[]'::jsonb)) AS line(item)
+            CROSS JOIN LATERAL jsonb_array_elements(
+              COALESCE(ds.payload->'expenses', '[]'::jsonb) ||
+              COALESCE(ds.payload->'wages', '[]'::jsonb) ||
+              COALESCE(ds.payload->'staffWages', '[]'::jsonb) ||
+              COALESCE(ds.payload->'otherPayments', '[]'::jsonb)
+            ) AS line(item)
             WHERE COALESCE(ds.shift_date, ds."createdAt"::date) >= $1::date AND COALESCE(ds.shift_date, ds."createdAt"::date) < $2::date
           ), pending AS (
             SELECT COALESCE(SUM(ABS(ie.amount_cents::numeric) / 100), 0) total
