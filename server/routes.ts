@@ -2261,6 +2261,111 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+
+  // Finance / Expenses dashboard read model
+  app.get("/api/finance/expenses-dashboard", async (req: Request, res: Response) => {
+    try {
+      const dateFrom = typeof req.query.dateFrom === "string" && req.query.dateFrom ? req.query.dateFrom : null;
+      const dateTo = typeof req.query.dateTo === "string" && req.query.dateTo ? req.query.dateTo : null;
+      const currentMonthStart = new Date();
+      currentMonthStart.setUTCDate(1);
+      currentMonthStart.setUTCHours(0, 0, 0, 0);
+      const currentMonthEnd = new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() + 1, 1));
+
+      const [inShiftRows, businessRows, bankRows, summaryRows] = await Promise.all([
+        prisma.$queryRawUnsafe<any[]>(`
+          SELECT
+            concat(ds.id, ':expense:', line.ordinality) AS id,
+            COALESCE(ds.shift_date, NULLIF(left(ds."shiftDate", 10), '')::date, ds."createdAt"::date) AS date,
+            ds."shiftDate" AS shift_reference,
+            COALESCE(line.item->>'category', line.item->>'type', 'UNMAPPED') AS category,
+            NULLIF(line.item->>'shop', '') AS supplier,
+            COALESCE(NULLIF(line.item->>'item', ''), NULLIF(line.item->>'description', ''), 'UNMAPPED') AS description,
+            COALESCE(NULLIF(line.item->>'cost', '')::numeric, NULLIF(line.item->>'amount', '')::numeric, 0) AS amount,
+            COALESCE(ds."completedBy", ds.staff) AS entered_by,
+            ds.id AS submission_id
+          FROM daily_sales_v2 ds
+          CROSS JOIN LATERAL jsonb_array_elements(COALESCE(ds.payload->'expenses', '[]'::jsonb)) WITH ORDINALITY AS line(item, ordinality)
+          WHERE ($1::date IS NULL OR COALESCE(ds.shift_date, ds."createdAt"::date) >= $1::date)
+            AND ($2::date IS NULL OR COALESCE(ds.shift_date, ds."createdAt"::date) <= $2::date)
+          ORDER BY date DESC, submission_id DESC
+        `, dateFrom, dateTo),
+        prisma.$queryRawUnsafe<any[]>(`
+          SELECT
+            e.id,
+            e."shiftDate"::date AS date,
+            e.supplier,
+            e."expenseType" AS category,
+            e.item AS description,
+            COALESCE(e."costCents"::numeric, 0) AS amount,
+            COALESCE(e.source, 'DIRECT') AS payment_method,
+            e.source AS source,
+            e."createdAt" AS created_at,
+            e."createdAt" AS updated_at,
+            e.meta,
+            e."restaurantId" AS created_by
+          FROM expenses e
+          WHERE COALESCE(e.source, 'DIRECT') NOT IN ('SHIFT_FORM', 'STOCK_LODGMENT')
+            AND ($1::date IS NULL OR e."shiftDate"::date >= $1::date)
+            AND ($2::date IS NULL OR e."shiftDate"::date <= $2::date)
+          ORDER BY e."shiftDate" DESC, e."createdAt" DESC
+        `, dateFrom, dateTo),
+        prisma.$queryRawUnsafe<any[]>(`
+          SELECT
+            ie.id,
+            ie.date AS transaction_date,
+            ie.description,
+            COALESCE(ie.amount_cents::numeric / 100, 0) AS amount,
+            ie.source AS bank_source,
+            ie.import_batch_id,
+            ie.status,
+            ie.approved_by AS reviewed_by,
+            ie.approved_at AS reviewed_at,
+            concat('imported_expense:', ie.id) AS approved_expense_id,
+            ie.raw_data AS notes
+          FROM imported_expenses ie
+          WHERE ($1::date IS NULL OR ie.date >= $1::date)
+            AND ($2::date IS NULL OR ie.date <= $2::date)
+          ORDER BY ie.created_at DESC
+        `, dateFrom, dateTo),
+        prisma.$queryRawUnsafe<any[]>(`
+          WITH business AS (
+            SELECT COALESCE(SUM(e."costCents"::numeric), 0) total
+            FROM expenses e
+            WHERE COALESCE(e.source, 'DIRECT') NOT IN ('SHIFT_FORM', 'STOCK_LODGMENT')
+              AND e."shiftDate" >= $1::timestamp AND e."shiftDate" < $2::timestamp
+          ), in_shift AS (
+            SELECT COALESCE(SUM(COALESCE(NULLIF(line.item->>'cost', '')::numeric, NULLIF(line.item->>'amount', '')::numeric, 0)), 0) total
+            FROM daily_sales_v2 ds
+            CROSS JOIN LATERAL jsonb_array_elements(COALESCE(ds.payload->'expenses', '[]'::jsonb)) AS line(item)
+            WHERE COALESCE(ds.shift_date, ds."createdAt"::date) >= $1::date AND COALESCE(ds.shift_date, ds."createdAt"::date) < $2::date
+          ), pending AS (
+            SELECT COALESCE(SUM(ABS(ie.amount_cents::numeric) / 100), 0) total
+            FROM imported_expenses ie
+            WHERE UPPER(ie.status::text) IN ('PENDING', 'PENDING REVIEW')
+          ), personal AS (
+            SELECT COALESCE(SUM(ABS(ie.amount_cents::numeric) / 100), 0) total
+            FROM imported_expenses ie
+            WHERE UPPER(ie.status::text) IN ('PERSONAL', 'PERSONAL EXPENSE') AND ie.date >= $1::date AND ie.date < $2::date
+          ), declined AS (
+            SELECT COALESCE(SUM(ABS(ie.amount_cents::numeric) / 100), 0) total
+            FROM imported_expenses ie
+            WHERE UPPER(ie.status::text) IN ('DECLINED', 'REJECTED') AND ie.date >= $1::date AND ie.date < $2::date
+          )
+          SELECT business.total AS current_month_business_expenses, in_shift.total AS current_month_in_shift_expenses,
+                 pending.total AS pending_bank_statement_review, personal.total AS personal_expenses_this_month,
+                 declined.total AS declined_transactions_this_month
+          FROM business, in_shift, pending, personal, declined
+        `, currentMonthStart, currentMonthEnd),
+      ]);
+
+      res.json({ ok: true, source: "finance_expenses_dashboard", scope: { dateFrom, dateTo }, status: "ready", data: { summary: summaryRows[0] || {}, inShiftExpenses: inShiftRows, businessExpenses: businessRows, bankReviewQueue: bankRows }, warnings: [], blockers: [], last_updated: new Date().toISOString() });
+    } catch (error: any) {
+      console.error("[FINANCE_EXPENSES_DASHBOARD_ERROR]", error);
+      res.status(500).json({ ok: false, error: "FINANCE_EXPENSES_DASHBOARD_FAILED", message: error?.message || String(error) });
+    }
+  });
+
   // System status endpoint for lockdown monitoring
   app.get("/api/system/status", async (req: Request, res: Response) => {
     try {

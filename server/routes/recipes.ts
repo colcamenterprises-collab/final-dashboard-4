@@ -54,9 +54,12 @@ function recipeOrder(columns: Set<string>) {
 // Raw SQL using only columns confirmed in the live recipes table.
 router.get('/', async (req, res) => {
   try {
+
     if (!pool) throw new Error('Database unavailable');
-    const columns = await getRecipeColumns();
-    const result = await pool.query(`SELECT ${recipeSelect(columns)} FROM recipes ORDER BY ${recipeOrder(columns)}`);
+const columns = await getRecipeColumns();
+const result = await pool.query(
+  `SELECT ${recipeSelect(columns)} FROM recipes ORDER BY ${recipeOrder(columns)}`
+);
     res.json(result.rows);
   } catch (e: any) {
     res.status(200).json({ rows: [], source: 'recipes', blockers: [{ code: 'RECIPES_UNAVAILABLE', message: e.message, where: '/api/recipes', canonical_source: 'recipes', auto_build_attempted: false }] });
