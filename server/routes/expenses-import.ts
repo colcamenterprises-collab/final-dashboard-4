@@ -3,7 +3,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { db } from '../db.js';
-import { importedExpenses, partnerStatements, expenses, supplierDefaults } from '../../shared/schema.js';
+import { importedExpenses, partnerStatements, supplierDefaults } from '../../shared/schema.js';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
@@ -539,17 +539,25 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
 
     const approvedExpenseId = `imported_expense:${pendingExpense.id}`;
 
-    // Insert into canonical expenses table with deterministic id to prevent duplicate approvals
-    await db.insert(expenses).values({
-      id: approvedExpenseId,
-      restaurantId: pendingExpense.restaurantId || '', // Add null safety
-      date: pendingExpense.date || new Date().toISOString().split('T')[0],
-      description: pendingExpense.description || 'Bank Import',
-      amountCents: Math.abs(pendingExpense.amountCents), // Convert to positive for expense ledger
-      supplier: finalSupplier || 'Bank Import',
-      category: finalCategory || 'General',
-      source: 'UPLOAD' // Golden Patch: Use valid schema enum value
-    });
+    // Insert into the active business expenses ledger.
+    // The runtime expenses table is the legacy ledger used by /api/finance/expenses-dashboard
+    // and /api/expensesV2 (camelCase columns). Keep the imported_expenses id in meta so
+    // repeated approval attempts are deterministic and auditable.
+    await db.execute(sql`
+      INSERT INTO expenses (id, "restaurantId", "shiftDate", item, "costCents", supplier, "expenseType", meta, source)
+      VALUES (
+        ${approvedExpenseId},
+        ${pendingExpense.restaurantId || authReq.restaurantId},
+        ${pendingExpense.date}::date,
+        ${pendingExpense.description || 'Bank Import'},
+        ${Math.round(Math.abs(pendingExpense.amountCents) / 100)},
+        ${finalSupplier || 'Bank Import'},
+        ${finalCategory || 'General'},
+        ${JSON.stringify({ importedExpenseId: pendingExpense.id, source: 'BANK_UPLOAD', notes: notes || null })}::jsonb,
+        ${'UPLOAD'}
+      )
+      ON CONFLICT (id) DO NOTHING
+    `);
 
     // Save supplier default if rememberDefault is true and both supplier and category are provided
     if (rememberDefault && finalSupplier && finalCategory && finalSupplier !== 'Bank Import') {

@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Upload } from "lucide-react";
+import { Pencil, Trash2, Upload } from "lucide-react";
 
 type DashboardResponse = {
   ok: boolean;
@@ -41,7 +41,7 @@ function DataTable({ title, children }: { title: string; children: React.ReactNo
     <section className="space-y-2">
       <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h2>
       <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-        <table className="w-full min-w-[900px] text-xs">{children}</table>
+        <table className="w-full min-w-[760px] text-xs">{children}</table>
       </div>
     </section>
   );
@@ -49,6 +49,7 @@ function DataTable({ title, children }: { title: string; children: React.ReactNo
 
 export default function Expenses() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -68,7 +69,14 @@ export default function Expenses() {
   const summary = data?.data?.summary || {};
   const inShiftExpenses = data?.data?.inShiftExpenses || [];
   const businessExpenses = data?.data?.businessExpenses || [];
-  const bankReviewQueue = data?.data?.bankReviewQueue || [];
+  const deleteBusinessExpense = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await fetch(`/api/expensesV2/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error("Failed to delete business expense");
+      return response.json();
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] }),
+  });
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
@@ -102,26 +110,18 @@ export default function Expenses() {
       {!isLoading && !isError && (
         <>
           <DataTable title="Table 1 — In-Shift Expenses">
-            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Shift Ref</th><th className="px-3 py-2">Category/Type</th><th className="px-3 py-2">Supplier/Payee</th><th className="px-3 py-2">Description</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Entered By</th><th className="px-3 py-2">Daily Sales V2 ID</th></tr></thead>
+            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-2 py-1.5">Date</th><th className="px-2 py-1.5">Category/Type</th><th className="px-2 py-1.5">Supplier/Payee</th><th className="px-2 py-1.5">Description</th><th className="px-2 py-1.5 text-right">Amount</th><th className="px-2 py-1.5">Entered By</th><th className="px-2 py-1.5">Daily Sales V2 ID</th><th className="px-2 py-1.5 text-right">Actions</th></tr></thead>
             <tbody>
               {inShiftExpenses.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-400">No in-shift expenses found.</td></tr>}
-              {inShiftExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.date)}</td><td className="px-3 py-2">{row.shift_reference || "—"}</td><td className="px-3 py-2">{row.category || "UNMAPPED"}</td><td className="px-3 py-2">{row.supplier || "—"}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(row.amount)}</td><td className="px-3 py-2">{row.entered_by || "—"}</td><td className="px-3 py-2 font-mono">{row.submission_id || "—"}</td></tr>)}
+              {inShiftExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-2 py-1.5">{formatDate(row.date)}</td><td className="px-2 py-1.5">{row.category || "UNMAPPED"}</td><td className="px-2 py-1.5">{row.supplier || "—"}</td><td className="px-2 py-1.5">{row.description || "—"}</td><td className="px-2 py-1.5 text-right font-mono">{money(row.amount)}</td><td className="px-2 py-1.5">{row.entered_by || "—"}</td><td className="px-2 py-1.5 font-mono">{row.submission_id || "—"}</td><td className="px-2 py-1.5"><div className="flex justify-end gap-1"><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate(`/operations/daily-sales?edit=${encodeURIComponent(row.submission_id || "")}`)}><Pencil className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate(`/operations/daily-sales?edit=${encodeURIComponent(row.submission_id || "")}`)}><Trash2 className="h-3 w-3" /></Button></div></td></tr>)}
             </tbody>
           </DataTable>
 
           <DataTable title="Table 2 — Business Expenses Outside Shift">
-            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Supplier/Payee</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Description</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Payment Source</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Created</th></tr></thead>
+            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Supplier/Payee</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Description</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Payment Source</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Created</th><th className="px-3 py-2 text-right">Actions</th></tr></thead>
             <tbody>
-              {businessExpenses.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-400">No business expenses found.</td></tr>}
-              {businessExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.date)}</td><td className="px-3 py-2">{row.supplier || "—"}</td><td className="px-3 py-2">{row.category || "UNMAPPED"}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(row.amount)}</td><td className="px-3 py-2">{row.payment_method || "—"}</td><td className="px-3 py-2">Recorded</td><td className="px-3 py-2">{formatDate(row.created_at)}</td></tr>)}
-            </tbody>
-          </DataTable>
-
-          <DataTable title="Table 3 — Bank Statement Upload / Review Queue">
-            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Transaction Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Bank/Source</th><th className="px-3 py-2">Batch</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Reviewed By</th><th className="px-3 py-2">Reviewed At</th><th className="px-3 py-2">Approved Expense Ref</th></tr></thead>
-            <tbody>
-              {bankReviewQueue.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-400">No bank statement transactions found.</td></tr>}
-              {bankReviewQueue.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.transaction_date)}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(row.amount)}</td><td className="px-3 py-2">{row.bank_source || "—"}</td><td className="px-3 py-2 font-mono">{row.import_batch_id || "—"}</td><td className="px-3 py-2">{row.status || "Pending Review"}</td><td className="px-3 py-2">{row.reviewed_by || "—"}</td><td className="px-3 py-2">{formatDate(row.reviewed_at)}</td><td className="px-3 py-2 font-mono">{String(row.status).toUpperCase() === "APPROVED" ? row.approved_expense_id : "—"}</td></tr>)}
+              {businessExpenses.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-400">No business expenses found.</td></tr>}
+              {businessExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.date)}</td><td className="px-3 py-2">{row.supplier || "—"}</td><td className="px-3 py-2">{row.category || "UNMAPPED"}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(row.amount)}</td><td className="px-3 py-2">{row.payment_method || "—"}</td><td className="px-3 py-2">Recorded</td><td className="px-3 py-2">{formatDate(row.created_at)}</td><td className="px-3 py-2"><div className="flex justify-end gap-1"><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate(`/expenses?edit=${encodeURIComponent(row.id)}`)}><Pencil className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => deleteBusinessExpense.mutate(row.id)} disabled={deleteBusinessExpense.isPending}><Trash2 className="h-3 w-3" /></Button></div></td></tr>)}
             </tbody>
           </DataTable>
         </>
