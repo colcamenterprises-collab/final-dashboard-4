@@ -2277,23 +2277,29 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const [inShiftRows, businessRows, bankRows, summaryRows] = await Promise.all([
         prisma.$queryRawUnsafe<any[]>(`
           SELECT
-            concat(ds.id, ':expense:', line.ordinality) AS id,
+            concat(ds.id, ':', line.kind, ':', line.ordinality) AS id,
             COALESCE(ds.shift_date, NULLIF(left(ds."shiftDate", 10), '')::date, ds."createdAt"::date) AS date,
-            'Food and Beverage' AS category,
-            NULLIF(line.item->>'shop', '') AS supplier,
-            COALESCE(NULLIF(line.item->>'item', ''), NULLIF(line.item->>'description', ''), NULLIF(line.item->>'name', ''), NULLIF(line.item->>'person', ''), 'UNMAPPED') AS description,
+            CASE WHEN line.kind IN ('wages', 'staffWages') THEN 'Wages' ELSE 'Food and Beverage' END AS category,
+            CASE WHEN line.kind IN ('wages', 'staffWages') THEN NULL ELSE NULLIF(line.item->>'shop', '') END AS supplier,
+            CASE
+              WHEN line.kind IN ('wages', 'staffWages') THEN COALESCE(NULLIF(line.item->>'person', ''), NULLIF(line.item->>'staff', ''), NULLIF(line.item->>'employee', ''), NULLIF(line.item->>'name', ''), 'UNMAPPED')
+              ELSE COALESCE(NULLIF(line.item->>'item', ''), NULLIF(line.item->>'description', ''), NULLIF(line.item->>'name', ''), 'UNMAPPED')
+            END AS description,
             COALESCE(NULLIF(line.item->>'cost', '')::numeric, NULLIF(line.item->>'amount', '')::numeric, 0) AS amount,
             COALESCE(ds."completedBy", ds.staff) AS entered_by,
             ds.id AS submission_id
           FROM daily_sales_v2 ds
-          CROSS JOIN LATERAL jsonb_array_elements(
-            COALESCE(ds.payload->'expenses', '[]'::jsonb) ||
-            COALESCE(ds.payload->'wages', '[]'::jsonb) ||
-            COALESCE(ds.payload->'staffWages', '[]'::jsonb) ||
-            COALESCE(ds.payload->'otherPayments', '[]'::jsonb)
-          ) WITH ORDINALITY AS line(item, ordinality)
-          WHERE ($1::date IS NULL OR COALESCE(ds.shift_date, ds."createdAt"::date) >= $1::date)
-            AND ($2::date IS NULL OR COALESCE(ds.shift_date, ds."createdAt"::date) <= $2::date)
+          CROSS JOIN LATERAL (
+            SELECT 'expenses' AS kind, item, ordinality FROM jsonb_array_elements(COALESCE(ds.payload->'expenses', '[]'::jsonb)) WITH ORDINALITY AS expense_lines(item, ordinality)
+            UNION ALL
+            SELECT 'wages' AS kind, item, ordinality FROM jsonb_array_elements(COALESCE(ds.payload->'wages', '[]'::jsonb)) WITH ORDINALITY AS wage_lines(item, ordinality)
+            UNION ALL
+            SELECT 'staffWages' AS kind, item, ordinality FROM jsonb_array_elements(COALESCE(ds.payload->'staffWages', '[]'::jsonb)) WITH ORDINALITY AS staff_wage_lines(item, ordinality)
+            UNION ALL
+            SELECT 'otherPayments' AS kind, item, ordinality FROM jsonb_array_elements(COALESCE(ds.payload->'otherPayments', '[]'::jsonb)) WITH ORDINALITY AS other_payment_lines(item, ordinality)
+          ) AS line
+          WHERE ($1::date IS NULL OR COALESCE(ds.shift_date, NULLIF(left(ds."shiftDate", 10), '')::date, ds."createdAt"::date) >= $1::date)
+            AND ($2::date IS NULL OR COALESCE(ds.shift_date, NULLIF(left(ds."shiftDate", 10), '')::date, ds."createdAt"::date) <= $2::date)
           ORDER BY date DESC, submission_id DESC
         `, dateFrom, dateTo),
         prisma.$queryRawUnsafe<any[]>(`

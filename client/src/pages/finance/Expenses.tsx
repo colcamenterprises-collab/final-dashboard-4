@@ -100,8 +100,14 @@ export default function Expenses() {
       </div>
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="text-xs" aria-label="Date from" />
-        <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="text-xs" aria-label="Date to" />
+        <label className="space-y-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+          <span>Start date</span>
+          <Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} className="text-xs" aria-label="Start date" placeholder="Start date" />
+        </label>
+        <label className="space-y-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+          <span>End date</span>
+          <Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} className="text-xs" aria-label="End date" placeholder="End date" />
+        </label>
       </div>
 
       {isLoading && <div className="py-12 text-center text-xs text-slate-400">Loading expenses...</div>}
@@ -110,10 +116,10 @@ export default function Expenses() {
       {!isLoading && !isError && (
         <>
           <DataTable title="Table 1 — In-Shift Expenses">
-            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-2 py-1.5">Date</th><th className="px-2 py-1.5">Category/Type</th><th className="px-2 py-1.5">Supplier/Payee</th><th className="px-2 py-1.5">Description</th><th className="px-2 py-1.5 text-right">Amount</th><th className="px-2 py-1.5">Entered By</th><th className="px-2 py-1.5">Daily Sales V2 ID</th><th className="px-2 py-1.5 text-right">Actions</th></tr></thead>
+            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-2 py-1.5">Date</th><th className="px-2 py-1.5">Category/Type</th><th className="px-2 py-1.5">Supplier/Payee</th><th className="px-2 py-1.5">Description</th><th className="px-2 py-1.5 text-right">Amount</th><th className="px-2 py-1.5">Entered By</th></tr></thead>
             <tbody>
-              {inShiftExpenses.length === 0 && <tr><td colSpan={8} className="px-3 py-8 text-center text-slate-400">No in-shift expenses found.</td></tr>}
-              {inShiftExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-2 py-1.5">{formatDate(row.date)}</td><td className="px-2 py-1.5">{row.category || "UNMAPPED"}</td><td className="px-2 py-1.5">{row.supplier || "—"}</td><td className="px-2 py-1.5">{row.description || "—"}</td><td className="px-2 py-1.5 text-right font-mono">{money(row.amount)}</td><td className="px-2 py-1.5">{row.entered_by || "—"}</td><td className="px-2 py-1.5 font-mono">{row.submission_id || "—"}</td><td className="px-2 py-1.5"><div className="flex justify-end gap-1"><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate(`/operations/daily-sales?edit=${encodeURIComponent(row.submission_id || "")}`)}><Pencil className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate(`/operations/daily-sales?edit=${encodeURIComponent(row.submission_id || "")}`)}><Trash2 className="h-3 w-3" /></Button></div></td></tr>)}
+              {inShiftExpenses.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400">No in-shift expenses found.</td></tr>}
+              {inShiftExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-2 py-1.5">{formatDate(row.date)}</td><td className="px-2 py-1.5">{row.category || "UNMAPPED"}</td><td className="px-2 py-1.5">{row.supplier || "—"}</td><td className="px-2 py-1.5">{row.description || "—"}</td><td className="px-2 py-1.5 text-right font-mono">{money(row.amount)}</td><td className="px-2 py-1.5">{row.entered_by || "—"}</td></tr>)}
             </tbody>
           </DataTable>
 
