@@ -1,6 +1,6 @@
 import express from "express";
 import {
-  getAllCategories, createCategory, updateCategory, reorderCategories
+  getAllCategories, createCategory, updateCategory, reorderCategories, deleteCategory
 } from "../../services/menu/categoryService";
 import {
   getAllItems, createItem, updateItem, toggleItem
@@ -35,6 +35,10 @@ router.post("/categories/update", async (req, res) => {
 router.post("/categories/reorder", async (req, res) => {
   await reorderCategories(req.body.order);
   return res.json({ success: true });
+});
+
+router.post("/categories/delete", async (req, res) => {
+  return res.json(await deleteCategory(req.body.id));
 });
 
 // Items

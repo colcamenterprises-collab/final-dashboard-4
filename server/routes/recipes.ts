@@ -1,31 +1,62 @@
 import { Router } from 'express';
-import { db } from '../db';
+import { db, pool } from '../db';
 import { sql } from 'drizzle-orm';
 
 const router = Router();
 
-// Raw SQL using only confirmed DB columns (no ORM schema dependency)
+async function getRecipeColumns(): Promise<Set<string>> {
+  if (!pool) throw new Error('Database unavailable');
+  const result = await pool.query(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'recipes'`
+  );
+  return new Set(result.rows.map((row: { column_name: string }) => row.column_name));
+}
+
+function recipeSelect(columns: Set<string>) {
+  const has = (name: string) => columns.has(name);
+  const expr = (column: string, alias: string, fallback = 'NULL') =>
+    has(column) ? `${column} AS "${alias}"` : `${fallback} AS "${alias}"`;
+  const priceExpr = has('selling_price')
+    ? 'selling_price AS "sellingPrice"'
+    : expr('menu_price_thb', 'sellingPrice');
+  const suggestedExpr = has('suggested_price')
+    ? 'suggested_price AS "suggestedPrice"'
+    : expr('menu_price_thb', 'suggestedPrice');
+
+  return [
+    'id',
+    'name',
+    expr('description', 'description'),
+    expr('category', 'category'),
+    expr('yield_quantity', 'yieldQuantity'),
+    expr('yield_unit', 'yieldUnit'),
+    expr('total_cost', 'totalCost'),
+    expr('cost_per_serving', 'costPerServing'),
+    expr('cogs_percent', 'cogsPercent'),
+    suggestedExpr,
+    priceExpr,
+    expr('waste_factor', 'wasteFactor'),
+    expr('image_url', 'imageUrl'),
+    expr('instructions', 'instructions'),
+    expr('notes', 'notes'),
+    expr('is_active', 'isActive', 'true'),
+    expr('version', 'version'),
+    expr('parent_id', 'parentId'),
+    expr('created_at', 'createdAt'),
+    expr('updated_at', 'updatedAt'),
+  ].join(', ');
+}
+
+function recipeOrder(columns: Set<string>) {
+  return columns.has('category') ? 'category NULLS LAST, name' : 'name';
+}
+
+// Raw SQL using only columns confirmed in the live recipes table.
 router.get('/', async (req, res) => {
   try {
-    const result = await db.execute(sql`
-      SELECT
-        id, name, description, category,
-        yield_quantity AS "yieldQuantity",
-        yield_unit AS "yieldUnit",
-        total_cost AS "totalCost",
-        cost_per_serving AS "costPerServing",
-        cogs_percent AS "cogsPercent",
-        suggested_price AS "suggestedPrice",
-        selling_price AS "sellingPrice",
-        waste_factor AS "wasteFactor",
-        image_url AS "imageUrl",
-        instructions, notes, is_active AS "isActive",
-        version, parent_id AS "parentId",
-        created_at AS "createdAt", updated_at AS "updatedAt"
-      FROM recipes
-      WHERE is_active = true
-      ORDER BY category, name
-    `);
+    if (!pool) throw new Error('Database unavailable');
+    const columns = await getRecipeColumns();
+    const result = await pool.query(`SELECT ${recipeSelect(columns)} FROM recipes ORDER BY ${recipeOrder(columns)}`);
     res.json(result.rows);
   } catch (e: any) {
     res.status(200).json({ rows: [], source: 'recipes', blockers: [{ code: 'RECIPES_UNAVAILABLE', message: e.message, where: '/api/recipes', canonical_source: 'recipes', auto_build_attempted: false }] });
@@ -34,27 +65,11 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
+    if (!pool) throw new Error('Database unavailable');
     const id = Number(req.params.id);
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
-    const result = await db.execute(sql`
-      SELECT
-        id, name, description, category,
-        yield_quantity AS "yieldQuantity",
-        yield_unit AS "yieldUnit",
-        total_cost AS "totalCost",
-        cost_per_serving AS "costPerServing",
-        cogs_percent AS "cogsPercent",
-        suggested_price AS "suggestedPrice",
-        selling_price AS "sellingPrice",
-        waste_factor AS "wasteFactor",
-        image_url AS "imageUrl",
-        instructions, notes, is_active AS "isActive",
-        version, parent_id AS "parentId",
-        created_at AS "createdAt", updated_at AS "updatedAt"
-      FROM recipes
-      WHERE id = ${id}
-      LIMIT 1
-    `);
+    const columns = await getRecipeColumns();
+    const result = await pool.query(`SELECT ${recipeSelect(columns)} FROM recipes WHERE id = $1 LIMIT 1`, [id]);
     if (!result.rows.length) return res.status(404).json({ error: 'Recipe not found' });
     res.json(result.rows[0]);
   } catch (e: any) {
