@@ -4,7 +4,7 @@ import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { db } from '../db.js';
 import { importedExpenses, partnerStatements, expenses, supplierDefaults } from '../../shared/schema.js';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 
 // Extend Express Request interface
@@ -537,8 +537,11 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
       }
     }
 
-    // Insert into canonical expenses table with correct enum value
+    const approvedExpenseId = `imported_expense:${pendingExpense.id}`;
+
+    // Insert into canonical expenses table with deterministic id to prevent duplicate approvals
     await db.insert(expenses).values({
+      id: approvedExpenseId,
       restaurantId: pendingExpense.restaurantId || '', // Add null safety
       date: pendingExpense.date || new Date().toISOString().split('T')[0],
       description: pendingExpense.description || 'Bank Import',
@@ -597,6 +600,7 @@ router.patch('/:id/approve', requireManagerRole, async (req: Request, res: Respo
     res.json({ 
       success: true, 
       message: 'Expense approved and added to ledger',
+      approvedExpenseId,
       defaultsApplied,
       appliedSupplier: finalSupplier,
       appliedCategory: finalCategory
@@ -646,6 +650,75 @@ router.patch('/:id/reject', requireManagerRole, async (req: Request, res: Respon
       success: false,
       error: "EXPENSE_REJECT_FAILED",
       message: error instanceof Error ? error.message : "Failed to reject expense.",
+    });
+  }
+});
+
+
+// PATCH /api/expenses/:id/decline - REQUIRES MANAGER ROLE
+router.patch('/:id/decline', requireManagerRole, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { id } = req.params;
+    const reviewedBy = authReq.approvedBy;
+
+    const result = await db
+      .update(importedExpenses)
+      .set({
+        status: 'REJECTED',
+        approvedBy: reviewedBy,
+        approvedAt: new Date()
+      })
+      .where(and(
+        eq(importedExpenses.id, id),
+        eq(importedExpenses.status, 'PENDING'),
+        eq(importedExpenses.restaurantId, authReq.restaurantId)
+      ))
+      .returning();
+
+    if (result.length === 0) {
+      return res.status(404).json({ error: 'Pending expense not found' });
+    }
+
+    res.json({ success: true, message: 'Transaction declined' });
+  } catch (error) {
+    console.error('[EXPENSE_SAFE_FAIL] decline:', error);
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_DECLINE_FAILED",
+      message: error instanceof Error ? error.message : "Failed to decline expense.",
+    });
+  }
+});
+
+// PATCH /api/expenses/:id/personal - REQUIRES MANAGER ROLE
+router.patch('/:id/personal', requireManagerRole, async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const { id } = req.params;
+    const reviewedBy = authReq.approvedBy;
+
+    const result = await db.execute(sql`
+      UPDATE imported_expenses
+      SET status = 'PERSONAL', approved_by = ${reviewedBy}, approved_at = NOW()
+      WHERE id = ${id}
+        AND status::text = 'PENDING'
+        AND restaurant_id = ${authReq.restaurantId}
+      RETURNING *
+    `);
+
+    const rows = Array.isArray((result as any).rows) ? (result as any).rows : [];
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Pending expense not found' });
+    }
+
+    res.json({ success: true, message: 'Transaction marked as personal expense' });
+  } catch (error) {
+    console.error('[EXPENSE_SAFE_FAIL] personal:', error);
+    res.status(500).json({
+      success: false,
+      error: "EXPENSE_PERSONAL_FAILED",
+      message: error instanceof Error ? error.message : "Failed to mark expense as personal.",
     });
   }
 });
@@ -713,8 +786,11 @@ router.patch('/batch-approve', requireManagerRole, async (req: Request, res: Res
         }
       }
 
-      // Insert into canonical expenses table
+      const approvedExpenseId = `imported_expense:${pendingExpense.id}`;
+
+      // Insert into canonical expenses table with deterministic id to prevent duplicate approvals
       await db.insert(expenses).values({
+        id: approvedExpenseId,
         restaurantId: pendingExpense.restaurantId || '',
         date: pendingExpense.date || new Date().toISOString().split('T')[0],
         description: pendingExpense.description || 'Bank Import',
@@ -726,6 +802,7 @@ router.patch('/batch-approve', requireManagerRole, async (req: Request, res: Res
 
       approvedExpenses.push({
         id: pendingExpense.id,
+        approvedExpenseId,
         supplier: finalSupplier || 'Bank Import',
         category: finalCategory || 'General',
         defaultsApplied
