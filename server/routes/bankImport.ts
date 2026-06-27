@@ -773,11 +773,11 @@ router.post("/:batchId/approve", async (req, res) => {
 
 
       const expenseId = `bank_txn:${txn.id}`;
-      // expenses."costCents" is a legacy/misnamed column in this app. Existing
-      // expensesV2 reads and totals it as whole Thai Baht, not satang/cents, so
-      // bank_txn.amountTHB is written through unchanged with no ×100 conversion.
-      const expenseAmountTHB = amountTHB;
-      await db.execute(sql`
+      // expenses."costCents" is a legacy/misnamed integer column in this app.
+      // Existing expensesV2 reads and totals it as whole Thai Baht, not satang/cents.
+      const expenseAmountTHB = Math.round(amountTHB);
+      try {
+        await db.execute(sql`
         INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
         VALUES (
           ${expenseId},
@@ -801,6 +801,23 @@ router.post("/:batchId/approve", async (req, res) => {
         )
         ON CONFLICT (id) DO NOTHING
       `);
+      } catch (insertError: any) {
+        console.error('[BANK_IMPORT_APPROVE_EXPENSE_INSERT_FAILED]', {
+          batchId,
+          bankTxnId: txn.id,
+          expenseId,
+          postedAt: txn.postedAt,
+          supplier,
+          category,
+          amountTHB,
+          expenseAmountTHB,
+          error: insertError?.message || String(insertError),
+          code: insertError?.code,
+          detail: insertError?.detail,
+          constraint: insertError?.constraint,
+        });
+        throw insertError;
+      }
 
       const [updatedTxn] = await db.update(bankTxn)
         .set({
@@ -833,9 +850,22 @@ router.post("/:batchId/approve", async (req, res) => {
       blockedCategories: BLOCKED_REVIEW_CATEGORIES,
     });
 
-  } catch (error) {
-    console.error('Approve txns error:', error);
-    res.status(500).json({ error: "Failed to approve transactions" });
+  } catch (error: any) {
+    console.error('[BANK_IMPORT_APPROVE_FAILED]', {
+      batchId: req.params.batchId,
+      ids: req.body?.ids,
+      error: error?.message || String(error),
+      code: error?.code,
+      detail: error?.detail,
+      constraint: error?.constraint,
+      stack: error?.stack,
+    });
+    res.status(500).json({
+      error: "Failed to approve transactions",
+      detail: error?.message || String(error),
+      code: error?.code,
+      constraint: error?.constraint,
+    });
   }
 });
 
