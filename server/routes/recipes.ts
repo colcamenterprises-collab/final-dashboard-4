@@ -147,7 +147,7 @@ async function syncRecipeToMenu(recipeId: number) {
     return { ok: true, status: 'inactive' };
   }
 
-  const price = decimalOrNull(recipe.suggestedPrice) ?? decimalOrNull(recipe.sellingPrice);
+  const price = decimalOrNull(recipe.sellingPrice) ?? decimalOrNull(recipe.suggestedPrice);
   if (price === null) {
     return {
       ok: false,
@@ -155,7 +155,7 @@ async function syncRecipeToMenu(recipeId: number) {
         code: 'LIVE_RECIPE_PRICE_MISSING',
         message:
           'Live recipe has no suggested or selling price, so no active menu item was created.',
-        where: 'recipes.suggested_price',
+        where: 'recipes.selling_price',
         canonical_source: 'recipes',
         auto_build_attempted: false,
       },
