@@ -1,7 +1,8 @@
 import { db } from "../../lib/prisma";
 
 export async function getAllItems() {
-  return await db().menu_items_v3.findMany({
+  const prisma = db();
+  const items = await prisma.menu_items_v3.findMany({
     orderBy: { sortOrder: "asc" },
     include: {
       category: true,
@@ -9,6 +10,16 @@ export async function getAllItems() {
       recipes: true
     }
   });
+
+  try {
+    const links = await prisma.$queryRawUnsafe<Array<{ itemId: string; recipeId: number | null }>>(
+      `SELECT "itemId", recipe_id AS "recipeId" FROM menu_item_recipes_v3 WHERE recipe_id IS NOT NULL`
+    );
+    const recipeByItem = new Map(links.map((link) => [link.itemId, link.recipeId]));
+    return items.map((item) => ({ ...item, recipeId: recipeByItem.get(item.id) ?? null }));
+  } catch (_error) {
+    return items;
+  }
 }
 
 export async function createItem(data: any) {
