@@ -747,7 +747,7 @@ export default function DailySales() {
         setTimeout(() => {
           const target = `${FORM2_PATH}?shift=${shiftIdString}`;
           console.log('[Form1] will navigate:', target);
-          window.location.assign(target);
+          navigate(target);
         }, 500);
       }
     } catch (e: any) {

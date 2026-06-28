@@ -6,6 +6,13 @@ import { db } from '../lib/prisma';
 
 const router = express.Router();
 const VALID_STATUSES = new Set(['Pass', 'Requires Attention']);
+const PHASE_1_TASKS = [
+  { id: 'clean_daily_kitchen_floors', taskId: 'kitchen-floors', taskName: 'Kitchen Floors', standard: ['Swept', 'Mopped', 'No food debris', 'No grease', 'No standing water'], moduleType: 'daily_cleaning', taskType: 'cleaning', frequency: 'daily', photoRequired: true, active: true, sortOrder: 10 },
+  { id: 'clean_daily_food_prep', taskId: 'food-preparation-area', taskName: 'Food Preparation Area', standard: ['Prep benches sanitised', 'Meat prep area cleaned', 'Food contact surfaces sanitised', 'No food residue'], moduleType: 'daily_cleaning', taskType: 'cleaning', frequency: 'daily', photoRequired: true, active: true, sortOrder: 20 },
+  { id: 'clean_daily_grill_fryer', taskId: 'grill-fryer-station', taskName: 'Grill & Fryer Station', standard: ['Grill chemically cleaned', 'Fryer exterior cleaned', 'Splashbacks cleaned', 'Cooking line grease free'], moduleType: 'daily_cleaning', taskType: 'cleaning', frequency: 'daily', photoRequired: true, active: true, sortOrder: 30 },
+  { id: 'clean_daily_customer_area', taskId: 'customer-area', taskName: 'Customer Area', standard: ['Tables clean', 'Front counter clean', 'Customer area clean', 'Floor free of rubbish'], moduleType: 'daily_cleaning', taskType: 'cleaning', frequency: 'daily', photoRequired: true, active: true, sortOrder: 40 },
+  { id: 'clean_daily_waste_washing', taskId: 'waste-washing-area', taskName: 'Waste & Washing Area', standard: ['Bins emptied', 'Bins cleaned', 'Washing area clean', 'Equipment washed and stored'], moduleType: 'daily_cleaning', taskType: 'cleaning', frequency: 'daily', photoRequired: true, active: true, sortOrder: 50 },
+];
 
 function dateParts(shiftDate: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)) return null;
@@ -44,17 +51,30 @@ const upload = multer({
 });
 
 async function activeTasks() {
-  return db().dailyCleaningTaskDefinition.findMany({
+  const tasks = await db().dailyCleaningTaskDefinition.findMany({
     where: { active: true },
     orderBy: [{ sortOrder: 'asc' }, { taskName: 'asc' }],
   });
+  if (tasks.length === 0) {
+    console.error('[daily-cleaning/tasks] No active task definitions found in daily_cleaning_task_definitions; using Phase 1 fallback tasks.');
+    return PHASE_1_TASKS;
+  }
+  return tasks;
+}
+
+function taskById(taskId: string) {
+  return PHASE_1_TASKS.find((task) => task.taskId === taskId);
 }
 
 router.get('/tasks', async (_req, res) => {
   try {
     const tasks = await activeTasks();
+    if (tasks.length === 0) {
+      console.error('[daily-cleaning/tasks] Task lookup returned zero tasks after fallback.');
+    }
     res.json({ ok: true, source: 'daily_cleaning_task_definitions', data: tasks, blockers: [] });
   } catch (error: any) {
+    console.error('[daily-cleaning/tasks] Failed to load cleaning tasks:', error);
     res.status(200).json({
       ok: false,
       source: 'daily_cleaning_task_definitions',
@@ -93,8 +113,13 @@ router.post('/task', upload.single('photo'), async (req, res) => {
     if (!req.file) errors.push('photo is required');
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
-    const task = await db().dailyCleaningTaskDefinition.findUnique({ where: { taskId: String(taskId) } });
-    if (!task || !task.active) return res.status(400).json({ ok: false, errors: ['Unknown or inactive cleaning task'] });
+    const dbTask = await db().dailyCleaningTaskDefinition.findUnique({ where: { taskId: String(taskId) } });
+    const task = dbTask?.active ? dbTask : taskById(String(taskId));
+    if (!task) {
+      console.error('[daily-cleaning/task] Unknown or inactive cleaning task:', taskId);
+      return res.status(400).json({ ok: false, errors: ['Unknown or inactive cleaning task'] });
+    }
+    if (!dbTask?.active) console.error('[daily-cleaning/task] Saving with Phase 1 fallback task definition because DB definition is missing or inactive:', taskId);
 
     const imagePath = `/uploads/cleaning/${String(shiftDate).replaceAll('-', '/')}/${req.file!.filename}`;
     const record = await db().dailyCleaningRecord.upsert({
