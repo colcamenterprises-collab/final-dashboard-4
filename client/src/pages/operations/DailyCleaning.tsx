@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 type CleaningTask = { taskId: string; taskName: string; standard: string[]; photoRequired: boolean };
 type CompletionSummary = { completedAt: string; manager: string; tasksCompleted: number; overallStatus: string; cleaningScore: number };
@@ -19,6 +19,7 @@ type TaskState = {
 const blankTaskState: TaskState = { status: "", comments: "", followUpAction: "", assignedTo: "", followUpStatus: "", file: null };
 
 export default function DailyCleaning() {
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const shiftId = params.get("shift") || "";
   const [tasks, setTasks] = useState<CleaningTask[]>([]);
@@ -41,9 +42,17 @@ export default function DailyCleaning() {
       const salesJson = salesRes ? await salesRes.json() : null;
       const cleaningJson = cleaningRes ? await cleaningRes.json() : null;
       if (taskJson.ok) setTasks(taskJson.data || []);
+      let workflowContext: any = null;
+      try {
+        const rawContext = localStorage.getItem("daily_shift_workflow_context");
+        workflowContext = rawContext ? JSON.parse(rawContext) : null;
+      } catch {}
       if (salesJson?.ok) {
-        setShiftDate(salesJson.record?.date || new Date().toISOString().slice(0, 10));
-        setManager(salesJson.record?.staff || "");
+        setShiftDate(salesJson.record?.date || workflowContext?.shiftDate || new Date().toISOString().slice(0, 10));
+        setManager(salesJson.record?.staff || workflowContext?.staffName || "");
+      } else if (workflowContext?.shiftId === shiftId || workflowContext?.salesId === shiftId) {
+        setShiftDate(workflowContext.shiftDate || new Date().toISOString().slice(0, 10));
+        setManager(workflowContext.staffName || "");
       }
       const next: Record<string, TaskState> = {};
       for (const row of cleaningJson?.rows || []) {
@@ -133,6 +142,7 @@ export default function DailyCleaning() {
     const data = await res.json();
     if (!res.ok || !data.ok) { setMessage(data.error || `Shift cannot be submitted. Missing: Daily Cleaning.`); return; }
     setCompletion({ completedAt: data.completedAt, manager: data.manager || manager, tasksCompleted: data.tasksCompleted, overallStatus: data.overallStatus, cleaningScore: data.cleaningScore });
+    setTimeout(() => navigate(`/operations/daily-stock?shift=${shiftId}`), 500);
   }
 
   if (loading) return <div className="p-4 text-xs">Loading cleaning form...</div>;
