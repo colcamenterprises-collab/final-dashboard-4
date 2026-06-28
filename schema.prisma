@@ -471,6 +471,7 @@ model DailySalesV2 {
   q5AmountToBanked       Int?
   q6ManagerName          String?
   stock                  DailyStockV2?
+  cleaningRecords        DailyCleaningRecord[]
   others                 OtherExpenseV2[]
   shopping               ShoppingPurchaseV2[]
   wages                  WageEntryV2[]
@@ -479,6 +480,50 @@ model DailySalesV2 {
   @@index([createdAt], map: "idx_daily_sales_v2_created_at")
   @@index([shiftDate], map: "idx_daily_sales_v2_shift_date")
   @@map("daily_sales_v2")
+}
+
+model DailyCleaningTaskDefinition {
+  id            String   @id
+  taskId        String   @unique @map("task_id")
+  taskName      String   @map("task_name")
+  standard      Json     @default("[]")
+  moduleType    String   @default("daily_cleaning") @map("module_type")
+  taskType      String   @default("cleaning") @map("task_type")
+  frequency     String   @default("daily")
+  photoRequired Boolean  @default(true) @map("photo_required")
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0) @map("sort_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("daily_cleaning_task_definitions")
+}
+
+model DailyCleaningRecord {
+  cleaningRecordId String       @id @default(uuid()) @map("cleaning_record_id")
+  salesId          String       @map("sales_id")
+  shiftDate        String       @map("shift_date")
+  store            String
+  manager          String
+  taskId           String       @map("task_id")
+  taskName         String       @map("task_name")
+  imagePath        String       @map("image_path")
+  timestamp        DateTime
+  status           String
+  comments         String?
+  followUpAction   String?      @map("follow_up_action")
+  assignedTo       String?      @map("assigned_to")
+  followUpStatus   String?      @map("follow_up_status")
+  cleaningScore    Int          @default(0) @map("cleaning_score")
+  moduleType       String       @default("daily_cleaning") @map("module_type")
+  createdAt        DateTime     @default(now()) @map("created_at")
+  updatedAt        DateTime     @updatedAt @map("updated_at")
+  sales            DailySalesV2 @relation(fields: [salesId], references: [id], onDelete: Restrict)
+
+  @@unique([salesId, taskId], map: "daily_cleaning_records_sales_task_unique")
+  @@index([shiftDate], map: "idx_daily_cleaning_records_shift_date")
+  @@index([salesId], map: "idx_daily_cleaning_records_sales_id")
+  @@map("daily_cleaning_records")
 }
 
 model ShoppingPurchaseV2 {

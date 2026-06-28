@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 import { queryClient } from "@/lib/queryClient";
 
 
-const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
+const FORM2_PATH = "/operations/daily-cleaning"; // Route to mandatory cleaning before Daily Stock
 
 type RefundRow = {
   id: string;

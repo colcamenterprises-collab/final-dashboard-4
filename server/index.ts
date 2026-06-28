@@ -421,6 +421,10 @@ async function checkSchema() {
   const dailyStockRouter = (await import('./api/daily-stock')).default;
   app.use('/api/daily-stock', dailyStockRouter);
 
+  // Mount the daily cleaning verification API router
+  const dailyCleaningRouter = (await import('./api/daily-cleaning')).default;
+  app.use('/api/daily-cleaning', dailyCleaningRouter);
+
   // Mount shift expenses router for extracting line items from Daily Sales & Stock forms
   const shiftExpensesRouter = (await import('./routes/shiftExpenses')).default;
   app.use('/api/shift-expenses', shiftExpensesRouter);
