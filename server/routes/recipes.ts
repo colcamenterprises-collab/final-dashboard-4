@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { db, pool } from '../db';
 import { sql } from 'drizzle-orm';
+import { calculateRecipeWorkflow, decimalOrNull, recipeStatusFromBody } from '../services/recipes/workflow';
 
 const router = Router();
 
@@ -58,6 +59,7 @@ function recipeSelect(columns: ColumnSet) {
     expr('image_url', 'imageUrl'),
     expr('instructions', 'instructions'),
     expr('notes', 'notes'),
+    expr('ingredients', 'ingredients', "'[]'::jsonb"),
     expr('is_active', 'isActive', 'true'),
     expr('version', 'version'),
     expr('parent_id', 'parentId'),
@@ -68,12 +70,6 @@ function recipeSelect(columns: ColumnSet) {
 
 function recipeOrder(columns: ColumnSet) {
   return columns.has('category') ? 'category NULLS LAST, name' : 'name';
-}
-
-function decimalOrNull(value: unknown): string | null {
-  if (value === null || value === undefined || value === '') return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? String(n) : null;
 }
 
 function isLiveRecipe(row: any) {
@@ -169,13 +165,6 @@ async function syncRecipeToMenu(recipeId: number) {
       [recipe.category]
     );
     categoryId = category.rows[0]?.id ?? null;
-    if (!categoryId) {
-      categoryId = randomUUID();
-      await pool.query(
-        'INSERT INTO menu_categories_v3 (id, name, "sortOrder", "isActive", "createdAt", "updatedAt") VALUES ($1, $2, 0, true, NOW(), NOW())',
-        [categoryId, recipe.category]
-      );
-    }
   }
   if (!categoryId)
     return {
@@ -283,14 +272,17 @@ router.post('/', async (req, res) => {
       costPerServing,
       sellingPrice,
       suggestedPrice,
-      deliveryPartnerMarginPercent,
-      directMarginPercent,
       instructions,
       notes,
       isActive,
+      status,
+      recipeIngredients,
     } = req.body;
     if (!name || !category)
       return res.status(400).json({ error: 'name and category are required' });
+
+    const recipeStatus = recipeStatusFromBody({ status, isActive });
+    const workflow = calculateRecipeWorkflow({ ingredients: recipeIngredients, yieldQuantity, sellingPrice, suggestedPrice });
 
     const insertColumns: string[] = [];
     const values: unknown[] = [];
@@ -306,15 +298,16 @@ router.post('/', async (req, res) => {
     add('yield_quantity', String(yieldQuantity ?? 1));
     add('yield_unit', yieldUnit ?? 'servings');
     add('image_url', imageUrl ?? null);
-    add('total_cost', totalCost ?? null);
-    add('cost_per_serving', costPerServing ?? null);
-    add('selling_price', sellingPrice ?? null);
-    add('suggested_price', suggestedPrice ?? null);
-    add('delivery_partner_margin_percent', deliveryPartnerMarginPercent ?? null);
-    add('direct_margin_percent', directMarginPercent ?? null);
+    add('total_cost', workflow.totalCost);
+    add('cost_per_serving', workflow.costPerServing);
+    add('ingredients', JSON.stringify(workflow.ingredients));
+    add('selling_price', decimalOrNull(sellingPrice));
+    add('suggested_price', decimalOrNull(suggestedPrice));
+    add('delivery_partner_margin_percent', workflow.deliveryPartnerMarginPercent);
+    add('direct_margin_percent', workflow.directMarginPercent);
     add('instructions', instructions ?? null);
     add('notes', notes ?? null);
-    add('is_active', isActive === true);
+    add('is_active', recipeStatus === 'Live');
 
     const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
     const result = await pool.query(
@@ -322,7 +315,7 @@ router.post('/', async (req, res) => {
       values
     );
     const sync = await syncRecipeToMenu(Number((result.rows[0] as any).id));
-    res.json({ ...(result.rows[0] as any), menuSync: sync });
+    res.json({ ...(result.rows[0] as any), costingBlockers: workflow.blockers, menuSync: sync });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -335,6 +328,8 @@ router.put('/:id', async (req, res) => {
     if (!Number.isInteger(id)) return res.status(400).json({ error: 'Invalid id' });
     const columns = await getRecipeColumns();
     const b = req.body;
+    const recipeStatus = recipeStatusFromBody(b);
+    const workflow = calculateRecipeWorkflow({ ingredients: b.recipeIngredients, yieldQuantity: b.yieldQuantity, sellingPrice: b.sellingPrice, suggestedPrice: b.suggestedPrice });
     const values: unknown[] = [];
     const sets: string[] = [];
     const add = (column: string, value: unknown) => {
@@ -354,15 +349,16 @@ router.put('/:id', async (req, res) => {
     add('yield_quantity', b.yieldQuantity ?? null);
     add('yield_unit', b.yieldUnit ?? null);
     add('image_url', b.imageUrl ?? null);
-    set('total_cost', b.totalCost ?? null);
-    set('cost_per_serving', b.costPerServing ?? null);
-    add('selling_price', b.sellingPrice ?? null);
-    add('suggested_price', b.suggestedPrice ?? null);
-    set('delivery_partner_margin_percent', b.deliveryPartnerMarginPercent ?? null);
-    set('direct_margin_percent', b.directMarginPercent ?? null);
+    set('total_cost', workflow.totalCost);
+    set('cost_per_serving', workflow.costPerServing);
+    set('ingredients', JSON.stringify(workflow.ingredients));
+    set('selling_price', decimalOrNull(b.sellingPrice));
+    set('suggested_price', decimalOrNull(b.suggestedPrice));
+    set('delivery_partner_margin_percent', workflow.deliveryPartnerMarginPercent);
+    set('direct_margin_percent', workflow.directMarginPercent);
     if (columns.has('is_active')) {
-      values.push(typeof b.isActive === 'boolean' ? b.isActive : null);
-      sets.push(`is_active = COALESCE($${values.length}, is_active)`);
+      values.push(recipeStatus === 'Live');
+      sets.push(`is_active = $${values.length}`);
     }
     add('instructions', b.instructions ?? null);
     add('notes', b.notes ?? null);
@@ -375,7 +371,7 @@ router.put('/:id', async (req, res) => {
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Recipe not found' });
     const sync = await syncRecipeToMenu(id);
-    res.json({ ...(result.rows[0] as any), menuSync: sync });
+    res.json({ ...(result.rows[0] as any), costingBlockers: workflow.blockers, menuSync: sync });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
