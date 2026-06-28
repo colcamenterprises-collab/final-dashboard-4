@@ -7,7 +7,8 @@ import { useState, useEffect } from "react";
 import { queryClient } from "@/lib/queryClient";
 
 
-const FORM2_PATH = "/operations/daily-stock"; // Route to Form 2
+const FORM2_PATH = "/operations/daily-cleaning"; // Route to mandatory cleaning before Daily Stock
+const WORKFLOW_CONTEXT_KEY = "sbb_daily_shift_workflow";
 
 type RefundRow = {
   id: string;
@@ -318,7 +319,7 @@ export default function DailySales() {
       setCountdown((c) => {
         if (c <= 1) {
           clearInterval(t);
-          if (shiftId) navigate(`${FORM2_PATH}?shift=${shiftId}`);
+          if (shiftId) navigate(`${FORM2_PATH}?shift=${encodeURIComponent(shiftId)}`, { replace: true });
           return 0;
         }
         return c - 1;
@@ -665,7 +666,9 @@ export default function DailySales() {
         throw new Error("Server error: missing shift ID. Please try again.");
       }
 
-      setShiftId(String(shiftId));
+      const nextShiftId = String(shiftId);
+      setShiftId(nextShiftId);
+      localStorage.setItem(WORKFLOW_CONTEXT_KEY, JSON.stringify({ shiftId: nextShiftId, staff: completedBy, shiftDate: submitData.shiftDate, step: "cleaning", updatedAt: new Date().toISOString() }));
       
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
@@ -700,16 +703,12 @@ export default function DailySales() {
           window.location.assign('/operations/daily-sales-library');
         }, 500);
       } else {
-        // Show loading indicator before navigation
+        // Keep the authenticated SPA session alive while moving to Daily Cleaning.
         setSubmitting(true);
         resetForm();
-        
-        // Brief delay to show loading state before navigation
-        setTimeout(() => {
-          const target = `${FORM2_PATH}?shift=${shiftId}`;
-          console.log('[Form1] will navigate:', target);
-          window.location.assign(target);
-        }, 500);
+        const target = `${FORM2_PATH}?shift=${encodeURIComponent(String(shiftId))}`;
+        console.log('[Form1] will navigate:', target);
+        navigate(target, { replace: true });
       }
     } catch (e: any) {
       console.error("[Form1] submit error:", e);
@@ -1495,7 +1494,7 @@ export default function DailySales() {
         open={showSuccess}
         countdown={countdown}
         onClose={() => setShowSuccess(false)}
-        onGo={() => shiftId && navigate(`${FORM2_PATH}?shift=${shiftId}`)}
+        onGo={() => shiftId && navigate(`${FORM2_PATH}?shift=${encodeURIComponent(shiftId)}`, { replace: true })}
         lang={lang}
       />
     </>

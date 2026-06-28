@@ -68,6 +68,7 @@ type FullRecord = {
   expenses: any;
   wages?: any[];
   banking: any;
+  cleaning: Array<{ taskId: string; taskName: string; status: string; imagePath: string; timestamp?: string; cleaningScore?: number; comments?: string | null }>;
   stock: any;
   shoppingList: { name: string; qty: number; unit: string; category?: string }[];
   audit?: Array<{ id: string; actor: string; actionType: string; changedFields: Array<{ field: string; from: any; to: any }>; createdAt: string }>;
@@ -259,8 +260,12 @@ export default function DailySalesV2Library() {
   }
 
   async function viewRecord(id: string) {
-    const res = await fetch(`/api/forms/daily-sales/v2/${id}`);
+    const [res, cleaningRes] = await Promise.all([
+      fetch(`/api/forms/daily-sales/v2/${id}`),
+      fetch(`/api/daily-cleaning?salesId=${encodeURIComponent(id)}`)
+    ]);
     const data = await res.json();
+    const cleaningData = await cleaningRes.json();
     if (data.ok) {
       const record = data.record;
       const p = record.payload || {};
@@ -305,6 +310,7 @@ export default function DailySalesV2Library() {
           cashBanked: p.cashBanked || 0,
           qrTransfer: p.qrTransfer || 0
         },
+        cleaning: cleaningData?.ok ? cleaningData.rows || [] : [],
         stock: {
           rolls: p.rollsEnd ?? 0,
           meat: p.meatEnd ?? 0,
@@ -326,7 +332,7 @@ export default function DailySalesV2Library() {
   }
 
   function completeStockRecord(id: string) {
-    window.location.href = `/operations/daily-stock?shift=${id}`;
+    window.location.href = `/operations/daily-cleaning?shift=${id}`;
   }
 
   const hasForm2Data = (rec: RecordType) => Boolean(rec.hasStock);
@@ -621,9 +627,49 @@ export default function DailySalesV2Library() {
                 </div>
               </div>
 
+              {/* FORM 2 - Daily Cleaning Data */}
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-blue-700 border-b pb-2">Daily Cleaning (Form 2)</h3>
+                {selected.cleaning.length === 0 ? (
+                  <p className="text-xs text-slate-400 italic">No Daily Cleaning records found.</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="rounded border border-slate-200 bg-slate-50 p-2">
+                      <p className="font-semibold">Cleaning Score</p>
+                      <p>{selected.cleaning[0]?.cleaningScore ?? 0}%</p>
+                    </div>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left p-1">Task</th>
+                          <th className="text-left p-1">Status</th>
+                          <th className="text-left p-1">Time</th>
+                          <th className="text-left p-1">Photo</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selected.cleaning.map((task) => (
+                          <tr key={task.taskId} className="border-b align-top">
+                            <td className="p-1 font-medium">{task.taskName}</td>
+                            <td className="p-1 uppercase">{task.status}</td>
+                            <td className="p-1">{task.timestamp ? new Date(task.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</td>
+                            <td className="p-1">
+                              <div className="flex items-center gap-2">
+                                <img src={task.imagePath} alt={`${task.taskName} evidence`} className="h-12 w-12 rounded border object-cover" />
+                                <a className="text-blue-700 underline" href={task.imagePath} target="_blank" rel="noreferrer">View Full Size</a>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* FORM 2 - Stock Data */}
               <div className="space-y-3">
-                <h3 className="text-sm font-semibold text-purple-700 border-b pb-2">Stock Management (Form 2)</h3>
+                <h3 className="text-sm font-semibold text-purple-700 border-b pb-2">Daily Stock (Form 3)</h3>
                 
                 <div className="bg-red-50 p-3 rounded text-xs">
                   <h4 className="text-xs font-semibold mb-2">End Count</h4>

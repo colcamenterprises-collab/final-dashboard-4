@@ -54,6 +54,7 @@ const navigationGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { to: "/operations/daily-sales",             label: "Daily Sales & Stock Form", icon: Receipt,       testId: "nav-daily-sales" },
+      { to: "/operations/daily-cleaning",          label: "Daily Cleaning & Operations", icon: Receipt,       testId: "nav-daily-cleaning" },
       { to: "/operations/daily-sales-v2/library",  label: "Daily Form Library",       icon: BarChart3,     testId: "nav-library", ownerOnly: true },
       { to: "/operations/purchasing",              label: "Purchasing",               icon: ShoppingCart,  testId: "nav-purchasing" },
       { to: "/operations/shopping-list",           label: "Shopping List",            icon: ShoppingCart,  testId: "nav-shopping-list" },

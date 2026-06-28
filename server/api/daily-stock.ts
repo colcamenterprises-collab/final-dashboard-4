@@ -112,6 +112,35 @@ export async function saveDailyStock(req: express.Request, res: express.Response
       });
     }
 
+    const salesRecord = shiftId
+      ? await db().dailySalesV2.findUnique({ where: { id: shiftId }, select: { id: true, shiftDate: true, deletedAt: true } })
+      : null;
+    if (!salesRecord || salesRecord.deletedAt) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Shift cannot be submitted. Missing: Daily Sales.',
+        missing: ['Daily Sales']
+      });
+    }
+
+    const [cleaningTasks, cleaningRecords] = await Promise.all([
+      db().dailyCleaningTaskDefinition.findMany({ where: { active: true }, select: { taskId: true, taskName: true } }),
+      db().dailyCleaningRecord.findMany({ where: { salesId: shiftId || '' }, select: { taskId: true, status: true, imagePath: true, comments: true, followUpAction: true, assignedTo: true, followUpStatus: true } })
+    ]);
+    const cleaningByTask = new Map(cleaningRecords.map((record) => [record.taskId, record]));
+    const missingCleaning = cleaningTasks.filter((task) => {
+      const record = cleaningByTask.get(task.taskId);
+      return !record || !record.status || !record.imagePath || (record.status === 'Requires Attention' && (!record.comments?.trim() || !record.followUpAction?.trim() || !record.assignedTo?.trim() || !record.followUpStatus?.trim()));
+    });
+    if (missingCleaning.length > 0) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Shift cannot be submitted. Missing: Daily Cleaning.',
+        missing: ['Daily Cleaning'],
+        details: missingCleaning.map((task) => task.taskName)
+      });
+    }
+
     // Generate a saved ID for the response
     const savedId = shiftId || uuidv4();
 
@@ -136,14 +165,13 @@ export async function saveDailyStock(req: express.Request, res: express.Response
     try {
       const stockRecord = await db().dailyStockV2.create({
         data: {
-          salesId: shiftId ?? undefined,
+          sales: { connect: { id: shiftId! } },
           burgerBuns: rolls,
           meatWeightG: meatGrams,
           purchasingJson: items,
           drinksJson: items.filter(item => 
             item.category?.toLowerCase().includes('drink')
-          ),
-          status: 'completed'
+          )
         }
       });
 

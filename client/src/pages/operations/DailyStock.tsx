@@ -12,6 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
 
+const WORKFLOW_CONTEXT_KEY = "sbb_daily_shift_workflow";
+
 // Server ingredient catalog from CSV import
 type IngredientItem = {
   id: string;
@@ -223,7 +225,16 @@ const DailyStock: React.FC = () => {
   const [showZeroConfirm, setShowZeroConfirm] = useState(false);
   const [zeroConfirmFields, setZeroConfirmFields] = useState<string[]>([]);
 
-  const shiftId = useMemo(() => new URLSearchParams(location.search).get("shift"), []);
+  const shiftId = useMemo(() => {
+    const fromUrl = new URLSearchParams(location.search).get("shift");
+    if (fromUrl) return fromUrl;
+    try {
+      const workflow = JSON.parse(localStorage.getItem(WORKFLOW_CONTEXT_KEY) || "{}");
+      return workflow.step === "stock" && workflow.shiftId ? String(workflow.shiftId) : null;
+    } catch {
+      return null;
+    }
+  }, []);
   const [syncing, setSyncing] = useState(false);
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -679,6 +690,7 @@ const DailyStock: React.FC = () => {
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
       
+      localStorage.setItem(WORKFLOW_CONTEXT_KEY, JSON.stringify({ shiftId, step: "complete", completedAt: new Date().toISOString() }));
       setStockCompleted(true);
       setMessage({ type: "success", text: L.stockSaved });
 

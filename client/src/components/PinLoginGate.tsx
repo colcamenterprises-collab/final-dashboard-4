@@ -61,6 +61,12 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
+function isShiftWorkflowPath(pathname: string): boolean {
+  return pathname === "/operations/daily-sales" ||
+    pathname === "/operations/daily-cleaning" ||
+    pathname === "/operations/daily-stock";
+}
+
 // ─── Main gate component ─────────────────────────────────────────────────────
 
 export default function PinLoginGate({ children }: { children: ReactNode }) {
@@ -69,6 +75,7 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<PinUser | null>(null);
 
   const isPublic = isPublicPath(location.pathname);
+  const isShiftWorkflow = isShiftWorkflowPath(location.pathname);
 
   const checkSession = useCallback(async () => {
     if (isPublic) { setGateState("unlocked"); return; }
@@ -136,12 +143,21 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
   if (gateState === "locked" && !isPublic) {
     return (
       <PinAuthContext.Provider value={contextValue}>
-        <PinLoginScreen
-          onLogin={(user) => {
-            setCurrentUser(user);
-            setGateState("unlocked");
-          }}
-        />
+        {isShiftWorkflow ? (
+          <SessionExpiredScreen
+            onLogin={(user) => {
+              setCurrentUser(user);
+              setGateState("unlocked");
+            }}
+          />
+        ) : (
+          <PinLoginScreen
+            onLogin={(user) => {
+              setCurrentUser(user);
+              setGateState("unlocked");
+            }}
+          />
+        )}
       </PinAuthContext.Provider>
     );
   }
@@ -150,6 +166,22 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
     <PinAuthContext.Provider value={contextValue}>
       {children}
     </PinAuthContext.Provider>
+  );
+}
+
+function SessionExpiredScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
+  return (
+    <div className="fixed inset-0 z-[9999] bg-white overflow-y-auto" style={{ fontFamily: "\'Inter\', system-ui, sans-serif" }}>
+      <div className="min-h-full flex flex-col items-center justify-center px-6 py-10">
+        <div className="w-full max-w-sm rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-950">
+          <h1 className="text-lg font-semibold">Session expired</h1>
+          <p className="mt-2 text-sm">Your staff session expired during the daily shift workflow. Sign in again to continue from the saved shift step.</p>
+        </div>
+        <div className="mt-6 w-full max-w-xs sm:max-w-sm">
+          <PinLoginScreen onLogin={onLogin} compact />
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -164,7 +196,7 @@ const KEYPAD_ROWS = [
   ["", "0", "⌫"],
 ];
 
-function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
+function PinLoginScreen({ onLogin, compact = false }: { onLogin: (user: PinUser) => void; compact?: boolean }) {
   const [username, setUsername] = useState("");
   const [pin, setPin] = useState("");
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
@@ -226,14 +258,14 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] bg-white overflow-y-auto"
+      className={compact ? "bg-white" : "fixed inset-0 z-[9999] bg-white overflow-y-auto"}
       style={{ fontFamily: "'Inter', system-ui, sans-serif" }}
     >
-      <div className="min-h-full flex flex-col items-center justify-center px-6 py-10">
+      <div className={compact ? "flex flex-col items-center justify-center" : "min-h-full flex flex-col items-center justify-center px-6 py-10"}>
         <div className="w-full max-w-xs sm:max-w-sm">
 
           {/* Brand header */}
-          <div className="mb-8 text-center">
+          <div className={compact ? "mb-4 text-center" : "mb-8 text-center"}>
             <div className="inline-flex items-center gap-1.5 mb-3">
               <span className="text-xs font-bold tracking-widest text-emerald-600 uppercase">
                 Smash Brothers
