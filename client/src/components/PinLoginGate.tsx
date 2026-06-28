@@ -61,6 +61,33 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
+function workflowUserFromDailySalesContext(pathname: string, search: string): PinUser | null {
+  if (pathname !== "/operations/daily-cleaning" && pathname !== "/operations/daily-stock") return null;
+  const shiftId = new URLSearchParams(search).get("shift");
+  if (!shiftId) return null;
+  try {
+    const rawContext = window.localStorage.getItem("daily_shift_workflow_context");
+    const context = rawContext ? JSON.parse(rawContext) : null;
+    const contextShiftId = String(context?.shiftId || context?.salesId || "");
+    const savedAt = Date.parse(String(context?.savedAt || ""));
+    const isFresh = Number.isFinite(savedAt) && Date.now() - savedAt <= 12 * 60 * 60 * 1000;
+    if (!contextShiftId || contextShiftId !== shiftId || !isFresh) return null;
+    return {
+      id: 0,
+      name: String(context?.staffName || "Daily Sales Staff"),
+      role: "staff",
+      permissions: {
+        "dashboard.view": true,
+        "operations.view": true,
+        "forms.daily_sales": true,
+        "forms.daily_stock": true,
+      } as StaffPermissions,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ─── Main gate component ─────────────────────────────────────────────────────
 
 export default function PinLoginGate({ children }: { children: ReactNode }) {
@@ -102,9 +129,16 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       return;
     }
 
+    const workflowUser = workflowUserFromDailySalesContext(location.pathname, location.search);
+    if (workflowUser) {
+      setCurrentUser(workflowUser);
+      setGateState("unlocked");
+      return;
+    }
+
     setCurrentUser(null);
     setGateState("locked");
-  }, [isPublic]);
+  }, [isPublic, location.pathname, location.search]);
 
   useEffect(() => { checkSession(); }, [checkSession]);
 

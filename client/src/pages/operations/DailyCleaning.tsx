@@ -28,6 +28,7 @@ export default function DailyCleaning() {
   const [state, setState] = useState<Record<string, TaskState>>({});
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
+  const [taskLoadError, setTaskLoadError] = useState("");
   const [completion, setCompletion] = useState<CompletionSummary | null>(null);
 
   useEffect(() => {
@@ -41,7 +42,14 @@ export default function DailyCleaning() {
       const taskJson = await taskRes.json();
       const salesJson = salesRes ? await salesRes.json() : null;
       const cleaningJson = cleaningRes ? await cleaningRes.json() : null;
-      if (taskJson.ok) setTasks(taskJson.data || []);
+      const loadedTasks = taskJson.ok && Array.isArray(taskJson.data) ? taskJson.data : [];
+      setTasks(loadedTasks);
+      if (!taskJson.ok || loadedTasks.length === 0) {
+        const blockerMessage = taskJson.blockers?.map((blocker: any) => blocker.message).filter(Boolean).join(" ") || "";
+        setTaskLoadError(blockerMessage || "Daily Cleaning tasks could not be loaded. Please contact manager.");
+      } else {
+        setTaskLoadError("");
+      }
       let workflowContext: any = null;
       try {
         const rawContext = localStorage.getItem("daily_shift_workflow_context");
@@ -70,7 +78,11 @@ export default function DailyCleaning() {
       setState(next);
       setLoading(false);
     }
-    load().catch(() => { setMessage("Unable to load cleaning form."); setLoading(false); });
+    load().catch(() => {
+      setTaskLoadError("Daily Cleaning tasks could not be loaded. Please contact manager.");
+      setMessage("Unable to load cleaning form.");
+      setLoading(false);
+    });
   }, [shiftId]);
 
   const completedCount = useMemo(() => tasks.filter((task) => {
@@ -134,6 +146,14 @@ export default function DailyCleaning() {
   async function continueToStock() {
     setMessage("");
     setCompletion(null);
+    if (tasks.length === 0) {
+      setMessage("Daily Cleaning tasks could not be loaded. Please contact manager.");
+      return;
+    }
+    if (missing.length > 0) {
+      setMessage(`Complete status, photo, and required follow-up fields for: ${missing.map((task) => task.taskName).join(", ")}.`);
+      return;
+    }
     for (const task of tasks) {
       const saved = await saveTask(task);
       if (!saved) return;
@@ -187,6 +207,7 @@ export default function DailyCleaning() {
     </div>
 
     {message && <div className="rounded border border-red-200 bg-red-50 p-3 text-red-900">{message}</div>}
+    {taskLoadError && <div className="rounded border border-red-200 bg-red-50 p-3 text-red-900">{taskLoadError}</div>}
     {tasks.map((task) => {
       const row = state[task.taskId] || blankTaskState;
       const previewSrc = row.previewUrl || row.imagePath;
@@ -245,6 +266,6 @@ export default function DailyCleaning() {
       </section>;
     })}
     {missing.length > 0 && <div className="rounded border border-amber-200 bg-amber-50 p-3 text-amber-900">Complete status, photo, and required follow-up fields for: {missing.map((task) => task.taskName).join(", ")}.</div>}
-    <button type="button" className="rounded bg-emerald-600 px-4 py-3 text-sm font-medium text-white" onClick={continueToStock}>Submit Daily Cleaning</button>
+    <button type="button" className="rounded bg-emerald-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400" disabled={tasks.length === 0} onClick={continueToStock}>Submit Daily Cleaning</button>
   </div>;
 }
