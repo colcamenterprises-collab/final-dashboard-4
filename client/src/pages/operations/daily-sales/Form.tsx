@@ -44,11 +44,13 @@ const labels = {
     shiftDate: 'Shift Date',
     completedBy: 'Completed By',
     startingCash: 'Starting Cash',
-    salesInfo: 'Sales Information',
+    salesInfo: 'Sales Figures by Payment Type',
+    salesFiguresHint: 'Enter the sales figures from the shift',
     cashSales: 'Cash Sales',
-    qrSales: 'QR Sales',
+    qrSales: 'QR / Scan Sales',
     grabSales: 'Grab Sales',
     otherSales: 'Other Sales',
+    staffTotal: 'Staff Total',
     totalSales: 'Total Sales',
     expenses: 'Expenses',
     shiftExpenses: 'Shift Expenses',
@@ -124,11 +126,13 @@ const labels = {
     shiftDate: 'วันที่กะ',
     completedBy: 'กรอกโดย',
     startingCash: 'เงินสดเริ่มต้น',
-    salesInfo: 'ข้อมูลยอดขาย',
+    salesInfo: 'ยอดขายแยกตามประเภทการชำระเงิน',
+    salesFiguresHint: 'กรอกยอดขายจากกะนี้',
     cashSales: 'ยอดขายเงินสด',
-    qrSales: 'ยอดขาย QR',
+    qrSales: 'ยอดขาย QR / สแกน',
     grabSales: 'ยอดขาย Grab',
     otherSales: 'ยอดขายอื่นๆ',
+    staffTotal: 'ยอดรวมพนักงาน',
     totalSales: 'ยอดขายรวม',
     expenses: 'ค่าใช้จ่าย',
     shiftExpenses: 'ค่าใช้จ่ายกะ',
@@ -197,7 +201,7 @@ const labels = {
 };
 
 // EXACT LanguageToggle as inline component (NO new file) - styled as toggle switch
-const LanguageToggle = ({ onChange }: { onChange: (lang: string) => void }) => {
+const LanguageToggle = ({ onChange }: { onChange: (lang: 'en' | 'th') => void }) => {
   const [lang, setLang] = useState('en');
   return (
     <div className="mb-4 flex items-center gap-3">
@@ -570,6 +574,28 @@ export default function DailySales() {
     if (invalidSuppliers) {
       newErrors.push('expenseSupplier');
     }
+
+    if (cashSales + qrSales + grabSales + otherSales <= 0) {
+      newErrors.push('salesFigures');
+    }
+
+    const invalidExpenseRows = shiftExpenses.some((row) => {
+      const hasAny = Boolean(row.item?.trim()) || Number(row.cost) > 0 || Boolean(row.shop?.trim());
+      return hasAny && (!row.item?.trim() || Number(row.cost) < 0 || !row.shop?.trim());
+    });
+    if (invalidExpenseRows) {
+      newErrors.push('expenseRows');
+    }
+
+    const invalidStaffWages = staffWages.some((row) => Number(row.amount) > 0 && !row.staff.trim());
+    if (invalidStaffWages) {
+      newErrors.push('staffWages');
+    }
+
+    const invalidOtherPayments = otherPayments.some((row) => Number(row.amount) > 0 && (!row.staff.trim() || !row.type));
+    if (invalidOtherPayments) {
+      newErrors.push('otherPayments');
+    }
     
     setErrors(newErrors);
     if (newErrors.length) {
@@ -588,6 +614,10 @@ export default function DailySales() {
         refundRows: 'You selected Yes for refunds — please add at least one refund row',
         refundRowFields: 'Each refund row must have: Receipt Number, Amount, Payment Type, Reason, and Approved By',
         expenseSupplier: 'Every expense must have a supplier selected',
+        salesFigures: 'Sales Figures by Payment Type is incomplete — enter at least one sales amount for Cash, QR / Scan, Grab, or Other',
+        expenseRows: 'Expense rows with entries must include item, cost, and supplier',
+        staffWages: 'Staff wage rows with an amount must include a staff name',
+        otherPayments: 'Other staff payment rows with an amount must include staff name and payment type',
       };
       for (const err of newErrors) {
         messages.push(fieldLabels[err] || `Please check: ${err}`);
@@ -854,15 +884,15 @@ export default function DailySales() {
             <p className="mt-2 text-xs text-gray-500">{L.autoTimestamp}: {new Date().toISOString()}</p>
           </section>
 
-          {/* Staff Sales Entry — for POS comparison only */}
+          {/* Sales Figures by Payment Type */}
           <section className="rounded-[4px] border border-amber-200 bg-amber-50 p-5">
             <div className="mb-3">
-              <h3 className="text-sm font-semibold text-amber-800">Staff Sales Entry — for POS comparison only</h3>
-              <p className="text-xs text-amber-600 mt-0.5">Enter the sales figures from the shift. POS is the source of truth — these values are used for cross-checking only.</p>
+              <h3 className="text-sm font-semibold text-amber-800">{L.salesInfo}</h3>
+              <p className="text-xs text-amber-600 mt-0.5">{L.salesFiguresHint}</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Cash Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.cashSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -870,11 +900,11 @@ export default function DailySales() {
                   placeholder="0"
                   value={cashSales || ''}
                   onChange={e => setCashSales(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-white ${errors.includes('salesFigures') ? 'border-red-500' : 'border-amber-300'}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">QR / Scan Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.qrSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -882,11 +912,11 @@ export default function DailySales() {
                   placeholder="0"
                   value={qrSales || ''}
                   onChange={e => setQrSales(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-white ${errors.includes('salesFigures') ? 'border-red-500' : 'border-amber-300'}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Grab Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.grabSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -894,11 +924,11 @@ export default function DailySales() {
                   placeholder="0"
                   value={grabSales || ''}
                   onChange={e => setGrabSales(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-white ${errors.includes('salesFigures') ? 'border-red-500' : 'border-amber-300'}`}
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Other Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.otherSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -906,12 +936,12 @@ export default function DailySales() {
                   placeholder="0"
                   value={otherSales || ''}
                   onChange={e => setOtherSales(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-full border border-amber-300 rounded-[4px] px-3 py-2 h-9 text-sm bg-white"
+                  className={`w-full border rounded-[4px] px-3 py-2 h-9 text-sm bg-white ${errors.includes('salesFigures') ? 'border-red-500' : 'border-amber-300'}`}
                 />
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-3">
-              <span className="text-xs text-amber-700 font-medium">Staff Total (auto-calculated):</span>
+              <span className="text-xs text-amber-700 font-medium">{L.staffTotal}:</span>
               <span className="text-sm font-bold text-amber-900">
                 ฿{(cashSales + qrSales + grabSales + otherSales).toLocaleString()}
               </span>

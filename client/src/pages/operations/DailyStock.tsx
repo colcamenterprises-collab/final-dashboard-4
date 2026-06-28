@@ -314,7 +314,7 @@ const DailyStock: React.FC = () => {
 
     const latestItems = await fetchLatestPurchasingItems();
     const syncedList = latestItems.length > 0 ? latestItems : (Array.isArray(data.list) ? data.list : []);
-    const drinkCount = syncedList.filter((item) => normalizeCategory(item.category) === 'Drinks').length;
+    const drinkCount = syncedList.filter((item: { category?: string | null }) => normalizeCategory(item.category) === 'Drinks').length;
 
     setSyncError(null);
     setSyncWarning(drinkCount === 0
