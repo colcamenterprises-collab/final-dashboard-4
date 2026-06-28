@@ -43,8 +43,11 @@ const labels = {
     shiftDate: 'Shift Date',
     completedBy: 'Completed By',
     startingCash: 'Starting Cash',
-    salesInfo: 'Sales Information',
+    salesInfo: 'Sales Figures by Payment Type',
+    salesFiguresHint: 'Enter the sales figures from the shift',
     cashSales: 'Cash Sales',
+    qrScanSales: 'QR / Scan Sales',
+    staffTotal: 'Staff Total',
     qrSales: 'QR Sales',
     grabSales: 'Grab Sales',
     otherSales: 'Other Sales',
@@ -123,8 +126,11 @@ const labels = {
     shiftDate: 'วันที่กะ',
     completedBy: 'กรอกโดย',
     startingCash: 'เงินสดเริ่มต้น',
-    salesInfo: 'ข้อมูลยอดขาย',
+    salesInfo: 'ยอดขายตามประเภทการชำระเงิน',
+    salesFiguresHint: 'กรอกยอดขายจากกะนี้',
     cashSales: 'ยอดขายเงินสด',
+    qrScanSales: 'ยอดขาย QR / สแกน',
+    staffTotal: 'ยอดรวมพนักงาน',
     qrSales: 'ยอดขาย QR',
     grabSales: 'ยอดขาย Grab',
     otherSales: 'ยอดขายอื่นๆ',
@@ -287,7 +293,7 @@ export default function DailySales() {
   const [qrReceiptCount, setQrReceiptCount] = useState(0);
   const [directReceiptCount, setDirectReceiptCount] = useState(0);
 
-  // Staff-reported sales — for POS comparison only
+  // Staff-entered sales figures by payment type
   const [cashSales, setCashSales] = useState(0);
   const [qrSales, setQrSales] = useState(0);
   const [grabSales, setGrabSales] = useState(0);
@@ -528,6 +534,11 @@ export default function DailySales() {
     localStorage.removeItem("daily_sales_draft");
   };
 
+  const rowStarted = (values: Array<string | number | null | undefined>) =>
+    values.some((value) => String(value ?? "").trim() !== "" && Number(value) !== 0);
+
+  const rowAmountMissing = (value: number) => !Number.isFinite(Number(value)) || Number(value) <= 0;
+
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault(); // allow call from button with no event
     if (submitting) return;
@@ -565,10 +576,26 @@ export default function DailySales() {
       }
     }
     
-    const invalidSuppliers = shiftExpenses.some((row) => !row.shop || row.shop.trim() === '');
-    if (invalidSuppliers) {
-      newErrors.push('expenseSupplier');
-    }
+    const invalidExpenseRows = shiftExpenses.some((row) => {
+      const started = rowStarted([row.item, row.cost, row.shop]);
+      return started && (!row.item.trim() || rowAmountMissing(row.cost) || !row.shop.trim());
+    });
+    if (invalidExpenseRows) newErrors.push('expenseRows');
+
+    const invalidStaffWageRows = staffWages.some((row) => {
+      const started = rowStarted([row.staff, row.amount]);
+      return started && (!row.staff.trim() || rowAmountMissing(row.amount));
+    });
+    if (invalidStaffWageRows) newErrors.push('staffWageRows');
+
+    const invalidOtherPaymentRows = otherPayments.some((row) => {
+      const started = rowStarted([row.staff, row.amount]);
+      return started && (!row.staff.trim() || rowAmountMissing(row.amount) || !row.type);
+    });
+    if (invalidOtherPaymentRows) newErrors.push('otherPaymentRows');
+
+    const invalidSalesFigures = [cashSales, qrSales, grabSales, otherSales].some((value) => !Number.isFinite(Number(value)) || Number(value) < 0);
+    if (invalidSalesFigures) newErrors.push('salesFigures');
     
     setErrors(newErrors);
     if (newErrors.length) {
@@ -587,6 +614,10 @@ export default function DailySales() {
         refundRows: 'You selected Yes for refunds — please add at least one refund row',
         refundRowFields: 'Each refund row must have: Receipt Number, Amount, Payment Type, Reason, and Approved By',
         expenseSupplier: 'Every expense must have a supplier selected',
+        expenseRows: 'Started expense rows must include item, cost, and supplier',
+        staffWageRows: 'Started staff wage rows must include staff name and amount',
+        otherPaymentRows: 'Started other staff payment rows must include staff name, amount, and type',
+        salesFigures: 'Sales figures by payment type must be valid non-negative numbers',
       };
       for (const err of newErrors) {
         messages.push(fieldLabels[err] || `Please check: ${err}`);
@@ -665,7 +696,15 @@ export default function DailySales() {
         throw new Error("Server error: missing shift ID. Please try again.");
       }
 
-      setShiftId(String(shiftId));
+      const shiftIdString = String(shiftId);
+      setShiftId(shiftIdString);
+      localStorage.setItem("daily_shift_workflow_context", JSON.stringify({
+        shiftId: shiftIdString,
+        salesId: shiftIdString,
+        staffName: completedBy,
+        shiftDate: submitData.shiftDate.slice(0, 10),
+        savedAt: new Date().toISOString(),
+      }));
       
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
@@ -706,7 +745,7 @@ export default function DailySales() {
         
         // Brief delay to show loading state before navigation
         setTimeout(() => {
-          const target = `${FORM2_PATH}?shift=${shiftId}`;
+          const target = `${FORM2_PATH}?shift=${shiftIdString}`;
           console.log('[Form1] will navigate:', target);
           window.location.assign(target);
         }, 500);
@@ -855,15 +894,15 @@ export default function DailySales() {
             <p className="mt-2 text-xs text-gray-500">{L.autoTimestamp}: {new Date().toISOString()}</p>
           </section>
 
-          {/* Staff Sales Entry — for POS comparison only */}
+          {/* Sales Figures by Payment Type */}
           <section className="rounded-[4px] border border-amber-200 bg-amber-50 p-5">
             <div className="mb-3">
-              <h3 className="text-sm font-semibold text-amber-800">Staff Sales Entry — for POS comparison only</h3>
-              <p className="text-xs text-amber-600 mt-0.5">Enter the sales figures from the shift. POS is the source of truth — these values are used for cross-checking only.</p>
+              <h3 className="text-sm font-semibold text-amber-800">{L.salesInfo}</h3>
+              <p className="text-xs text-amber-600 mt-0.5">{L.salesFiguresHint}</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Cash Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.cashSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -875,7 +914,7 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">QR / Scan Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.qrScanSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -887,7 +926,7 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Grab Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.grabSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -899,7 +938,7 @@ export default function DailySales() {
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Other Sales (฿)</label>
+                <label className="text-sm text-gray-600 block mb-1">{L.otherSales} (฿)</label>
                 <input
                   type="number"
                   min="0"
@@ -912,7 +951,7 @@ export default function DailySales() {
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-amber-200 flex items-center gap-3">
-              <span className="text-xs text-amber-700 font-medium">Staff Total (auto-calculated):</span>
+              <span className="text-xs text-amber-700 font-medium">{L.staffTotal}:</span>
               <span className="text-sm font-bold text-amber-900">
                 ฿{(cashSales + qrSales + grabSales + otherSales).toLocaleString()}
               </span>

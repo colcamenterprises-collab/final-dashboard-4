@@ -104,7 +104,8 @@ const labels = {
     startSales: 'Start Daily Sales & Stock Form',
     openLibrary: 'Open Daily Form Library',
     completionTitle: 'Shift-close workflow complete',
-    completionMessage: 'Daily Sales and Daily Stock have both been saved for this shift.',
+    completionMessage: 'Daily Sales, Daily Cleaning, and Daily Stock have been saved for this shift.',
+    cleaningIncomplete: 'Daily Cleaning must be completed before Daily Stock.',
   },
   th: {
     pageTitle: 'สต๊อกประจำวัน',
@@ -166,7 +167,8 @@ const labels = {
     startSales: 'เริ่ม Daily Sales & Stock Form',
     openLibrary: 'เปิด Daily Form Library',
     completionTitle: 'ขั้นตอนปิดกะเสร็จสมบูรณ์',
-    completionMessage: 'บันทึกยอดขายและสต๊อกประจำวันสำหรับกะนี้แล้ว',
+    completionMessage: 'บันทึกยอดขาย การทำความสะอาด และสต๊อกประจำวันสำหรับกะนี้แล้ว',
+    cleaningIncomplete: 'ต้องทำ Daily Cleaning ให้เสร็จก่อน Daily Stock',
   }
 };
 
@@ -525,6 +527,23 @@ const DailyStock: React.FC = () => {
     setPurchasesStep('confirmed');
   };
 
+  const ensureCleaningComplete = async () => {
+    const [taskRes, cleaningRes] = await Promise.all([
+      fetch("/api/daily-cleaning/tasks"),
+      fetch(`/api/daily-cleaning?salesId=${encodeURIComponent(String(shiftId))}`),
+    ]);
+    const taskJson = await taskRes.json();
+    const cleaningJson = await cleaningRes.json();
+    const tasks = Array.isArray(taskJson?.data) ? taskJson.data : [];
+    const rows = Array.isArray(cleaningJson?.rows) ? cleaningJson.rows : [];
+    const rowByTask = new Map(rows.map((row: any) => [row.taskId, row]));
+    const missing = tasks.filter((task: any) => {
+      const row: any = rowByTask.get(task.taskId);
+      return !row || !row.status || !row.imagePath || (row.status === "Requires Attention" && (!row.comments?.trim() || !row.followUpAction?.trim() || !row.assignedTo?.trim() || !row.followUpStatus?.trim()));
+    });
+    return missing.map((task: any) => task.taskName || task.taskId);
+  };
+
   const handleSubmit = async () => {
     if (submitting) return;
     if (purchasesStep !== 'confirmed') {
@@ -537,6 +556,13 @@ const DailyStock: React.FC = () => {
       return;
     }
     
+    const missingCleaning = await ensureCleaningComplete();
+    if (missingCleaning.length > 0) {
+      setMessage({ type: "error", text: `${L.cleaningIncomplete} Missing: ${missingCleaning.join(", ")}` });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
     // V3.2A Stock validation
     const validationErrs: any = {};
     const details: { rolls?: string; meat?: string; drinks?: string[] } = {};
