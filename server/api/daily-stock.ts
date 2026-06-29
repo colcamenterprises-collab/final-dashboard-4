@@ -124,8 +124,19 @@ export async function saveDailyStock(req: express.Request, res: express.Response
     }
 
     const [cleaningTasks, cleaningRecords] = await Promise.all([
-      db().dailyCleaningTaskDefinition.findMany({ where: { active: true }, select: { taskId: true, taskName: true } }),
-      db().dailyCleaningRecord.findMany({ where: { salesId: shiftId || '' }, select: { taskId: true, status: true, imagePath: true, comments: true, followUpAction: true, assignedTo: true, followUpStatus: true } })
+      db().$queryRawUnsafe<Array<{ taskId: string; taskName: string }>>(
+        `SELECT task_id AS "taskId", task_name AS "taskName"
+         FROM daily_cleaning_task_definitions
+         WHERE active = true
+         ORDER BY sort_order ASC, task_name ASC`
+      ),
+      db().$queryRawUnsafe<Array<{ taskId: string; status: string | null; imagePath: string | null; comments: string | null; followUpAction: string | null; assignedTo: string | null; followUpStatus: string | null }>>(
+        `SELECT task_id AS "taskId", status, image_path AS "imagePath", comments,
+                follow_up_action AS "followUpAction", assigned_to AS "assignedTo", follow_up_status AS "followUpStatus"
+         FROM daily_cleaning_records
+         WHERE sales_id = $1`,
+        shiftId || ''
+      )
     ]);
     const cleaningByTask = new Map(cleaningRecords.map((record) => [record.taskId, record]));
     const missingCleaning = cleaningTasks.filter((task) => {
