@@ -2,6 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { syncPurchasingShiftItems } from '../services/purchasingShiftSync';
 import { db } from '../lib/prisma';
+import { missingCleaningTasks, readActiveCleaningTasks, readCleaningRecordsForSales } from '../services/dailyCleaningSql';
 
 const router = express.Router();
 
@@ -124,14 +125,18 @@ export async function saveDailyStock(req: express.Request, res: express.Response
     }
 
     const [cleaningTasks, cleaningRecords] = await Promise.all([
-      db().dailyCleaningTaskDefinition.findMany({ where: { active: true }, select: { taskId: true, taskName: true } }),
-      db().dailyCleaningRecord.findMany({ where: { salesId: shiftId || '' }, select: { taskId: true, status: true, imagePath: true, comments: true, followUpAction: true, assignedTo: true, followUpStatus: true } })
+      readActiveCleaningTasks(),
+      readCleaningRecordsForSales(shiftId || '')
     ]);
-    const cleaningByTask = new Map(cleaningRecords.map((record) => [record.taskId, record]));
-    const missingCleaning = cleaningTasks.filter((task) => {
-      const record = cleaningByTask.get(task.taskId);
-      return !record || !record.status || !record.imagePath || (record.status === 'Requires Attention' && (!record.comments?.trim() || !record.followUpAction?.trim() || !record.assignedTo?.trim() || !record.followUpStatus?.trim()));
-    });
+    if (cleaningTasks.length === 0) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Shift cannot be submitted. Missing: Daily Cleaning task definitions.',
+        missing: ['Daily Cleaning'],
+        details: ['No active Daily Cleaning task definitions found in daily_cleaning_task_definitions']
+      });
+    }
+    const missingCleaning = missingCleaningTasks(cleaningTasks, cleaningRecords);
     if (missingCleaning.length > 0) {
       return res.status(400).json({
         ok: false,
