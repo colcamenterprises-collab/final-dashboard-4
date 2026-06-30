@@ -89,7 +89,7 @@ router.get('/', async (req, res) => {
 
 router.post('/task', upload.single('photo'), async (req, res) => {
   try {
-    const { salesId, shiftDate, store = 'SBB', manager = '', taskId, status, comments = '', followUpAction = '', assignedTo = '', followUpStatus = '' } = req.body;
+    const { salesId, shiftDate, store = 'SBB', manager = '', taskId, status, comments = '', followUpAction = '', assignedTo = '', followUpStatus = '', existingImagePath = '' } = req.body;
     const errors: string[] = [];
     if (!salesId) errors.push('salesId is required');
     if (!dateParts(String(shiftDate))) errors.push('shiftDate must be YYYY-MM-DD');
@@ -99,7 +99,7 @@ router.post('/task', upload.single('photo'), async (req, res) => {
     if (status === 'Requires Attention' && !String(followUpAction).trim()) errors.push('follow-up action is required when status is Requires Attention');
     if (status === 'Requires Attention' && !String(assignedTo).trim()) errors.push('assigned to is required when status is Requires Attention');
     if (status === 'Requires Attention' && !['Open', 'Closed'].includes(String(followUpStatus))) errors.push('follow-up status must be Open or Closed when status is Requires Attention');
-    if (!req.file) errors.push('photo is required');
+    if (!req.file && !String(existingImagePath).startsWith('/uploads/cleaning/')) errors.push('photo is required');
     if (errors.length) return res.status(400).json({ ok: false, errors });
 
     const task = await readActiveCleaningTask(String(taskId));
@@ -108,7 +108,9 @@ router.post('/task', upload.single('photo'), async (req, res) => {
       return res.status(400).json({ ok: false, errors: ['Unknown or inactive cleaning task'] });
     }
 
-    const imagePath = `/uploads/cleaning/${String(shiftDate).replaceAll('-', '/')}/${req.file!.filename}`;
+    const imagePath = req.file
+      ? `/uploads/cleaning/${String(shiftDate).replaceAll('-', '/')}/${req.file.filename}`
+      : String(existingImagePath);
     const record = await upsertCleaningRecord({
       salesId: String(salesId), shiftDate: String(shiftDate), store: String(store), manager: String(manager),
       task, imagePath, status: String(status), comments: String(comments || ''),
