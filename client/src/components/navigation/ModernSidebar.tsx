@@ -153,6 +153,12 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
     return () => document.removeEventListener("keydown", handleEscape);
   }, [isOpen, onClose]);
 
+  const closeOnMobile = () => {
+    if (window.matchMedia("(max-width: 1023px)").matches) {
+      onClose();
+    }
+  };
+
   const toggleGroup = (title: string) => {
     setOpenGroups(prev => {
       const next = new Set(prev);
@@ -187,7 +193,8 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
         className={cn(
           "fixed top-0 left-0 z-50 h-full bg-[#111111] border-r border-neutral-800/60 transform transition-transform duration-300",
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-          isCollapsed ? "w-[72px] lg:w-[72px]" : "w-80 lg:w-64",
+          "w-80",
+          isCollapsed ? "lg:w-[72px]" : "lg:w-64",
           "lg:fixed lg:z-auto",
           className
         )}
@@ -195,14 +202,14 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
         {/* Header — logo + collapse toggle */}
         <div className={cn(
           "flex items-center border-b border-neutral-800/60",
-          isCollapsed ? "justify-center p-3 flex-col gap-2" : "justify-between p-4"
+          isCollapsed ? "justify-between p-4 lg:justify-center lg:p-3 lg:flex-col lg:gap-2" : "justify-between p-4"
         )}>
           <img
             src="/attached_assets/Yellow Circle - Black Logo_1757766401641.png"
             alt="SBB Logo"
-            className={cn("object-contain rounded-lg", isCollapsed ? "w-8 h-8" : "w-9 h-9")}
+            className={cn("object-contain rounded-lg", isCollapsed ? "w-9 h-9 lg:w-8 lg:h-8" : "w-9 h-9")}
           />
-          {!isCollapsed && (
+          {(!isCollapsed || isOpen) && (
             <div className="flex items-center gap-1">
               <button
                 onClick={onCollapseToggle}
@@ -242,7 +249,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
             return (
               <NavLink
                 to={homeNavItem.to}
-                onClick={onClose}
+                onClick={closeOnMobile}
                 className={cn(
                   "flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg transition-all duration-150",
                   isCollapsed && "lg:justify-center lg:px-2",
@@ -256,7 +263,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                   "h-4 w-4 flex-shrink-0",
                   active ? "text-[#111111]" : "text-neutral-500 group-hover:text-neutral-300"
                 )} />
-                {!isCollapsed && <span className="truncate">{homeNavItem.label}</span>}
+                <span className={cn("truncate", isCollapsed && "lg:hidden")}>{homeNavItem.label}</span>
               </NavLink>
             );
           })()}
@@ -266,51 +273,56 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
 
             return (
               <div key={group.title} className="space-y-0.5">
-                {!isCollapsed && (
-                  <button
-                    onClick={() => toggleGroup(group.title)}
-                    className="w-full flex items-center justify-between px-2.5 py-1.5 text-[10px] font-semibold text-neutral-600 hover:text-neutral-400 uppercase tracking-wider rounded-md hover:bg-neutral-800/50 transition-colors"
-                    aria-expanded={isGroupOpen}
-                    data-testid={`group-toggle-${group.title.toLowerCase().replace(/\s+/g, "-")}`}
-                  >
-                    <span>{group.title}</span>
-                    <ChevronDown
-                      className={cn(
-                        "h-3 w-3 transition-transform duration-200",
-                        isGroupOpen ? "rotate-180" : "rotate-0"
-                      )}
-                    />
-                  </button>
-                )}
+                <button
+                  onClick={() => toggleGroup(group.title)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-2.5 py-1.5 text-[13px] font-bold text-white hover:text-neutral-100 uppercase tracking-wider rounded-md hover:bg-neutral-800/50 transition-colors",
+                    isCollapsed && "lg:hidden"
+                  )}
+                  aria-expanded={isGroupOpen}
+                  data-testid={`group-toggle-${group.title.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <span>{group.title}</span>
+                  <ChevronDown
+                    className={cn(
+                      "h-3 w-3 transition-transform duration-200",
+                      isGroupOpen ? "rotate-180" : "rotate-0"
+                    )}
+                  />
+                </button>
 
-                {(isGroupOpen || isCollapsed) && (
-                  <div className={cn("space-y-0.5", !isCollapsed && "ml-0.5")}>
-                    {group.items.map((item) => {
-                      const active = isActive(item.to);
-                      return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          onClick={onClose}
-                          className={cn(
-                            "flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg transition-all duration-150",
-                            isCollapsed && "lg:justify-center lg:px-2",
-                            active
-                              ? "bg-[#FFD400] text-[#111111]"
-                              : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"
-                          )}
-                          data-testid={item.testId}
-                        >
-                          <item.icon className={cn(
-                            "h-4 w-4 flex-shrink-0",
-                            active ? "text-[#111111]" : "text-neutral-500 group-hover:text-neutral-300"
-                          )} />
-                          {!isCollapsed && <span className="truncate">{item.label}</span>}
-                        </NavLink>
-                      );
-                    })}
-                  </div>
-                )}
+                <div
+                  className={cn(
+                    "space-y-0.5",
+                    !isCollapsed && "ml-0.5",
+                    !isGroupOpen && (isCollapsed ? "hidden lg:block" : "hidden")
+                  )}
+                >
+                  {group.items.map((item) => {
+                    const active = isActive(item.to);
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={closeOnMobile}
+                        className={cn(
+                          "flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg transition-all duration-150",
+                          isCollapsed && "lg:justify-center lg:px-2",
+                          active
+                            ? "bg-[#FFD400] text-[#111111]"
+                            : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"
+                        )}
+                        data-testid={item.testId}
+                      >
+                        <item.icon className={cn(
+                          "h-4 w-4 flex-shrink-0",
+                          active ? "text-[#111111]" : "text-neutral-500 group-hover:text-neutral-300"
+                        )} />
+                        <span className={cn("truncate", isCollapsed && "lg:hidden")}>{item.label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
               </div>
             );
           })}
@@ -321,9 +333,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
           "absolute bottom-0 left-0 right-0 border-t border-neutral-800/60",
           isCollapsed ? "p-2" : "px-4 py-3"
         )}>
-          {!isCollapsed && (
-            <p className="text-[10px] text-neutral-700">Smash Brothers Dashboard</p>
-          )}
+          <p className={cn("text-[10px] text-neutral-700", isCollapsed && "lg:hidden")}>Smash Brothers Dashboard</p>
         </div>
       </div>
     </>
