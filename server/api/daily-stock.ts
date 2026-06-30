@@ -2,7 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { syncPurchasingShiftItems } from '../services/purchasingShiftSync';
 import { db } from '../lib/prisma';
-import { missingCleaningTasks, readActiveCleaningTasks, readCleaningRecordsForSales, safeDailyCleaningErrorMessage } from '../services/dailyCleaningSql';
+import { dailyCleaningInfrastructureBlocker, isDailyCleaningInfrastructureUnavailableError, missingCleaningTasks, readActiveCleaningTasks, readCleaningRecordsForSales, safeDailyCleaningErrorMessage } from '../services/dailyCleaningSql';
 
 const router = express.Router();
 
@@ -135,8 +135,11 @@ export async function saveDailyStock(req: express.Request, res: express.Response
       console.error('[daily-stock] Daily Cleaning validation failed:', cleaningError);
       return res.status(400).json({
         ok: false,
-        error: safeDailyCleaningErrorMessage('validation'),
-        missing: ['Daily Cleaning']
+        error: isDailyCleaningInfrastructureUnavailableError(cleaningError)
+          ? 'Daily Cleaning infrastructure is not available. Please contact an administrator.'
+          : safeDailyCleaningErrorMessage('validation'),
+        missing: ['Daily Cleaning'],
+        blockers: isDailyCleaningInfrastructureUnavailableError(cleaningError) ? [dailyCleaningInfrastructureBlocker(cleaningError)] : []
       });
     }
     if (cleaningTasks.length === 0) {

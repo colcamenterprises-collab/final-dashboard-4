@@ -38,6 +38,49 @@ export function dailyCleaningBlocker(code: string, message: string, where: strin
   return { code, message, where, canonical_source: canonicalSource, auto_build_attempted: false };
 }
 
+export const DAILY_CLEANING_INFRASTRUCTURE_MISSING = 'DAILY_CLEANING_INFRASTRUCTURE_MISSING';
+export const DAILY_CLEANING_RECORDS_INFRASTRUCTURE_MISSING = 'DAILY_CLEANING_RECORDS_INFRASTRUCTURE_MISSING';
+
+export class DailyCleaningInfrastructureUnavailableError extends Error {
+  code: string;
+  where: string;
+  canonicalSource: string;
+
+  constructor(code: string, message: string, where: string, canonicalSource: string) {
+    super(message);
+    this.name = 'DailyCleaningInfrastructureUnavailableError';
+    this.code = code;
+    this.where = where;
+    this.canonicalSource = canonicalSource;
+  }
+}
+
+export function isDailyCleaningInfrastructureUnavailableError(error: unknown): error is DailyCleaningInfrastructureUnavailableError {
+  return error instanceof DailyCleaningInfrastructureUnavailableError;
+}
+
+export function dailyCleaningInfrastructureBlocker(error: DailyCleaningInfrastructureUnavailableError) {
+  return dailyCleaningBlocker(error.code, error.message, error.where, error.canonicalSource);
+}
+
+function missingTaskDefinitionsError(where: string) {
+  return new DailyCleaningInfrastructureUnavailableError(
+    DAILY_CLEANING_INFRASTRUCTURE_MISSING,
+    'Daily Cleaning infrastructure is not available. Please apply the database migration.',
+    where,
+    'daily_cleaning_task_definitions'
+  );
+}
+
+function missingRecordsError(where: string) {
+  return new DailyCleaningInfrastructureUnavailableError(
+    DAILY_CLEANING_RECORDS_INFRASTRUCTURE_MISSING,
+    'Daily Cleaning records infrastructure is not available. Please apply the database migration.',
+    where,
+    'daily_cleaning_records'
+  );
+}
+
 export function safeDailyCleaningErrorMessage(action: string) {
   return `Daily Cleaning ${action} is currently unavailable. Please contact an administrator.`;
 }
@@ -77,7 +120,7 @@ export async function readActiveCleaningTasks(): Promise<DailyCleaningTaskDefini
   } catch (error) {
     if (isMissingDailyCleaningInfrastructureError(error)) {
       console.error('[daily-cleaning] Missing Daily Cleaning task definition infrastructure. Apply migration 202606300001_daily_cleaning_infrastructure.');
-      return [];
+      throw missingTaskDefinitionsError('/api/daily-cleaning/tasks');
     }
     throw error;
   }
@@ -94,7 +137,7 @@ export async function readActiveCleaningTask(taskId: string): Promise<DailyClean
   } catch (error) {
     if (isMissingDailyCleaningInfrastructureError(error)) {
       console.error('[daily-cleaning] Missing Daily Cleaning task definition infrastructure while reading one task.');
-      return null;
+      throw missingTaskDefinitionsError('/api/daily-cleaning/task');
     }
     throw error;
   }
@@ -137,7 +180,7 @@ export async function readCleaningRecords(filters: { shiftDate?: string; salesId
   } catch (error) {
     if (isMissingDailyCleaningInfrastructureError(error)) {
       console.error('[daily-cleaning] Missing Daily Cleaning records infrastructure. Apply migration 202606300001_daily_cleaning_infrastructure.');
-      return [];
+      throw missingRecordsError('/api/daily-cleaning');
     }
     throw error;
   }

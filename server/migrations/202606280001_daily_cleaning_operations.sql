@@ -70,3 +70,21 @@ ON CONFLICT (task_id) DO UPDATE SET
   active = TRUE,
   sort_order = EXCLUDED.sort_order,
   updated_at = NOW();
+
+
+UPDATE daily_cleaning_task_definitions
+SET active = FALSE,
+    updated_at = NOW()
+WHERE active = TRUE
+  AND task_id NOT IN (
+    'clean-grill',
+    'clean-fryer',
+    'clean-prep-benches',
+    'empty-grease-traps',
+    'clean-sinks',
+    'mop-kitchen-floor',
+    'clean-dining-area',
+    'empty-rubbish-bins',
+    'clean-bathrooms',
+    'lock-secure-premises'
+  );

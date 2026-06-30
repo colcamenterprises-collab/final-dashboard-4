@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
-import { dailyCleaningBlocker, missingCleaningTasks, readActiveCleaningTask, readActiveCleaningTasks, readCleaningRecords, readCleaningRecordsForSales, safeDailyCleaningErrorMessage, updateCleaningScoreForSales, upsertCleaningRecord } from '../services/dailyCleaningSql';
+import { dailyCleaningBlocker, dailyCleaningInfrastructureBlocker, isDailyCleaningInfrastructureUnavailableError, missingCleaningTasks, readActiveCleaningTask, readActiveCleaningTasks, readCleaningRecords, readCleaningRecordsForSales, safeDailyCleaningErrorMessage, updateCleaningScoreForSales, upsertCleaningRecord } from '../services/dailyCleaningSql';
 
 const router = express.Router();
 const VALID_STATUSES = new Set(['Pass', 'Requires Attention']);
@@ -50,13 +50,23 @@ async function activeTasks() {
 router.get('/tasks', async (_req, res) => {
   try {
     const tasks = await activeTasks();
-    res.json({ ok: true, source: 'daily_cleaning_task_definitions', data: tasks, blockers: [] });
+    res.json({ ok: true, source: 'daily_cleaning_task_definitions', data: tasks, tasks, blockers: [] });
   } catch (error: any) {
     console.error('[daily-cleaning/tasks] Failed to load cleaning tasks:', error);
+    if (isDailyCleaningInfrastructureUnavailableError(error)) {
+      return res.status(200).json({
+        ok: false,
+        source: 'daily_cleaning_task_definitions',
+        data: [],
+        tasks: [],
+        blockers: [dailyCleaningInfrastructureBlocker(error)],
+      });
+    }
     res.status(200).json({
       ok: false,
       source: 'daily_cleaning_task_definitions',
       data: [],
+      tasks: [],
       blockers: [dailyCleaningBlocker('CLEANING_TASKS_UNAVAILABLE', safeDailyCleaningErrorMessage('tasks'), '/api/daily-cleaning/tasks', 'daily_cleaning_task_definitions')],
     });
   }
@@ -70,6 +80,9 @@ router.get('/', async (req, res) => {
     res.json({ ok: true, source: 'daily_cleaning_records', rows, count: rows.length, blockers: [] });
   } catch (error: any) {
     console.error('[daily-cleaning] Failed to load cleaning records:', error);
+    if (isDailyCleaningInfrastructureUnavailableError(error)) {
+      return res.status(200).json({ ok: false, source: 'daily_cleaning_records', rows: [], count: 0, blockers: [dailyCleaningInfrastructureBlocker(error)] });
+    }
     res.status(200).json({ ok: false, source: 'daily_cleaning_records', rows: [], count: 0, blockers: [dailyCleaningBlocker('CLEANING_RECORDS_UNAVAILABLE', safeDailyCleaningErrorMessage('records'), '/api/daily-cleaning', 'daily_cleaning_records')] });
   }
 });
@@ -109,6 +122,9 @@ router.post('/task', upload.single('photo'), async (req, res) => {
     res.json({ ok: true, record: { ...record, cleaningScore }, cleaningScore });
   } catch (error: any) {
     console.error('[daily-cleaning/task] Failed to save cleaning task:', error);
+    if (isDailyCleaningInfrastructureUnavailableError(error)) {
+      return res.status(200).json({ ok: false, status: 'Blocked', blockers: [dailyCleaningInfrastructureBlocker(error)] });
+    }
     res.status(500).json({ ok: false, error: 'Unable to save cleaning task. Please contact an administrator.' });
   }
 });
@@ -130,10 +146,13 @@ router.post('/complete', async (req, res) => {
     const overallStatus = rows.some((row) => row.status === 'Requires Attention') ? 'Requires Attention' : 'Pass';
     return res.json({ ok: true, status: 'Completed', completedAt: new Date().toISOString(), manager: rows[0]?.manager || '', tasksCompleted: rows.length, overallStatus, cleaningScore });
   } catch (error: any) {
+    console.error('[daily-cleaning/complete] Failed to complete cleaning:', error);
     return res.status(200).json({
       ok: false,
       status: 'Blocked',
-      blockers: [dailyCleaningBlocker('CLEANING_COMPLETION_UNAVAILABLE', safeDailyCleaningErrorMessage('completion'), '/api/daily-cleaning/complete', 'daily_cleaning_task_definitions + daily_cleaning_records')],
+      blockers: [isDailyCleaningInfrastructureUnavailableError(error)
+        ? dailyCleaningInfrastructureBlocker(error)
+        : dailyCleaningBlocker('CLEANING_COMPLETION_UNAVAILABLE', safeDailyCleaningErrorMessage('completion'), '/api/daily-cleaning/complete', 'daily_cleaning_task_definitions + daily_cleaning_records')],
     });
   }
 });

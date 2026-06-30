@@ -47,7 +47,10 @@ export default function DailyCleaning() {
       if (taskJson.ok && loadedTasks.length === 0) {
         setTaskLoadError("No cleaning tasks have been configured. Please contact an administrator.");
       } else if (!taskJson.ok) {
-        setTaskLoadError("Daily Cleaning tasks could not be loaded. Please contact an administrator.");
+        const hasInfrastructureBlocker = Array.isArray(taskJson.blockers) && taskJson.blockers.some((blocker: any) => blocker?.code === "DAILY_CLEANING_INFRASTRUCTURE_MISSING");
+        setTaskLoadError(hasInfrastructureBlocker
+          ? "Daily Cleaning infrastructure is not available. Please contact an administrator."
+          : "Daily Cleaning tasks could not be loaded. Please contact an administrator.");
       } else {
         setTaskLoadError("");
       }
