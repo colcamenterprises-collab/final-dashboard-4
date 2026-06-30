@@ -81,7 +81,7 @@ const labels = {
     directReceipts: 'Direct Sales Receipts',
     cashBanking: 'Cash & Banking',
     closingCash: 'Closing Cash',
-    closingCashHint: 'Enter the total amount of cash that remains in the register after all expenses. Include the starting cash (float amount)',
+    closingCashHint: 'Enter the actual cash physically counted in the register after expenses are paid.',
     cashBanked: 'Cash Banked',
     qrBanked: 'QR Banked',
     summary: 'Summary',
@@ -164,7 +164,7 @@ const labels = {
     directReceipts: 'ใบเสร็จขายตรง',
     cashBanking: 'เงินสดและธนาคาร',
     closingCash: 'เงินสดปิดยอด',
-    closingCashHint: 'ใส่จำนวนเงินสดที่เหลือในลิ้นชักหลังหักค่าใช้จ่าย รวมเงินสดเริ่มต้นด้วย',
+    closingCashHint: 'ใส่จำนวนเงินสดจริงที่นับได้ในลิ้นชักหลังจ่ายค่าใช้จ่ายแล้ว',
     cashBanked: 'เงินสดที่นำส่งธนาคาร',
     qrBanked: 'ยอด QR ที่โอนเข้าธนาคาร',
     summary: 'สรุป',
@@ -843,7 +843,7 @@ export default function DailySales() {
 
         <form onSubmit={submit} className="mt-6 space-y-6">
           {/* EXACT LanguageToggle from consolidated patch */}
-          <LanguageToggle onChange={setLang} />
+          <LanguageToggle onChange={(nextLang) => setLang(nextLang === 'th' ? 'th' : 'en')} />
           
           {/* EXACT error display from consolidated patch */}
           {errors.length > 0 && <p className="text-red-500 text-sm">{L.validationError}</p>}
