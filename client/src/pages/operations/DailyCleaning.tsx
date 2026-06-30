@@ -30,6 +30,8 @@ export default function DailyCleaning() {
   const [message, setMessage] = useState("");
   const [taskLoadError, setTaskLoadError] = useState("");
   const [completion, setCompletion] = useState<CompletionSummary | null>(null);
+  const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -100,10 +102,39 @@ export default function DailyCleaning() {
     return Math.round((passCount / tasks.length) * 100);
   }, [tasks, state]);
 
-  const missing = useMemo(() => tasks.filter((task) => {
-    const row = state[task.taskId];
-    return !row?.status || (!row.file && !row.imagePath) || (row.status === "Requires Attention" && (!row.comments.trim() || !row.followUpAction.trim() || !row.assignedTo.trim() || !row.followUpStatus));
-  }), [tasks, state]);
+  function missingReasons(_task: CleaningTask, row: TaskState | undefined) {
+    const reasons: string[] = [];
+    if (!row?.status) reasons.push("status missing");
+    if (!row?.file && !row?.imagePath) reasons.push("photo missing");
+    if (row?.status === "Requires Attention") {
+      if (!row.comments.trim()) reasons.push("issue comments missing");
+      if (!row.followUpAction.trim()) reasons.push("follow-up note missing");
+      if (!row.assignedTo.trim()) reasons.push("assigned person missing");
+      if (!row.followUpStatus) reasons.push("follow-up status missing");
+    }
+    if (row?.status && (row.file || row.imagePath) && row.saved !== true) reasons.push("task not saved");
+    return reasons;
+  }
+
+  const missing = useMemo(() => tasks
+    .map((task) => ({ task, reasons: missingReasons(task, state[task.taskId]) }))
+    .filter((item) => item.reasons.length > 0), [tasks, state]);
+
+  function showMessage(text: string) {
+    setMessage(text);
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function validateTaskForSave(_task: CleaningTask, row: TaskState | undefined) {
+    if (!row?.status) return "Please select Pass or Requires Attention before saving this task.";
+    if (!row.file && !row.imagePath) return "Please add a photo before saving this task.";
+    if (row.status === "Requires Attention") {
+      if (!row.comments.trim() || !row.followUpAction.trim() || !row.assignedTo.trim() || !row.followUpStatus) {
+        return "Please add a follow-up note before saving this task.";
+      }
+    }
+    return "";
+  }
 
   function update(taskId: string, patch: Partial<TaskState>) {
     const current = state[taskId] || blankTaskState;
@@ -118,16 +149,18 @@ export default function DailyCleaning() {
 
   async function saveTask(task: CleaningTask) {
     const row = state[task.taskId];
-    const errors = [];
-    if (!row?.status) errors.push("Choose Pass or Requires Attention.");
-    if (!row?.file && !row?.imagePath) errors.push("Photo is required.");
-    if (row?.status === "Requires Attention" && !row.comments.trim()) errors.push("Issue comments are required.");
-    if (row?.status === "Requires Attention" && !row.followUpAction.trim()) errors.push("Follow-up action is required.");
-    if (row?.status === "Requires Attention" && !row.assignedTo.trim()) errors.push("Assigned To is required.");
-    if (row?.status === "Requires Attention" && !row.followUpStatus) errors.push("Follow-up status is required.");
-    if (errors.length) { update(task.taskId, { error: errors.join(" ") }); return false; }
-    if (!row.file) return true;
-
+    const validationError = validateTaskForSave(task, row);
+    if (validationError) {
+      update(task.taskId, { error: validationError });
+      showMessage(validationError);
+      return false;
+    }
+    if (!row) {
+      showMessage("Please complete all required fields before saving this task.");
+      return false;
+    }
+    setSavingTaskId(task.taskId);
+    setMessage("");
     const formData = new FormData();
     formData.append("salesId", shiftId);
     formData.append("shiftDate", shiftDate);
@@ -139,34 +172,63 @@ export default function DailyCleaning() {
     formData.append("followUpAction", row.followUpAction || "");
     formData.append("assignedTo", row.assignedTo || "");
     formData.append("followUpStatus", row.followUpStatus || "");
-    formData.append("photo", row.file);
-    const res = await fetch("/api/daily-cleaning/task", { method: "POST", body: formData });
-    const data = await res.json();
-    if (!res.ok || !data.ok) { update(task.taskId, { error: data.errors?.join(" ") || data.error || "Unable to save task." }); return false; }
-    setState((prev) => ({ ...prev, [task.taskId]: { ...prev[task.taskId], saved: true, imagePath: data.record.imagePath, error: undefined } }));
-    return true;
+    if (row.imagePath) formData.append("existingImagePath", row.imagePath);
+    if (row.file) formData.append("photo", row.file);
+    try {
+      const res = await fetch("/api/daily-cleaning/task", { method: "POST", body: formData });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        const text = "This task could not be saved. Please try again.";
+        update(task.taskId, { error: text });
+        showMessage(text);
+        return false;
+      }
+      setState((prev) => ({ ...prev, [task.taskId]: { ...prev[task.taskId], saved: true, imagePath: data.record.imagePath, error: undefined } }));
+      showMessage("Task saved.");
+      return true;
+    } catch {
+      const text = "This task could not be saved. Please try again.";
+      update(task.taskId, { error: text });
+      showMessage(text);
+      return false;
+    } finally {
+      setSavingTaskId(null);
+    }
   }
 
   async function continueToStock() {
     setMessage("");
     setCompletion(null);
+    setSubmitting(true);
     if (tasks.length === 0) {
-      setMessage("No cleaning tasks have been configured. Please contact an administrator.");
+      showMessage("No cleaning tasks have been configured. Please contact an administrator.");
+      setSubmitting(false);
       return;
     }
     if (missing.length > 0) {
-      setMessage(`Complete status, photo, and required follow-up fields for: ${missing.map((task) => task.taskName).join(", ")}.`);
+      const missingLines = missing.map(({ task, reasons }) => `- ${task.taskName}: ${reasons.join(", ")}`).join("\n");
+      showMessage(`Daily Cleaning is not ready to submit. Please complete these tasks first:\n${missingLines}`);
+      setSubmitting(false);
       return;
     }
     for (const task of tasks) {
       const saved = await saveTask(task);
-      if (!saved) return;
+      if (!saved) { setSubmitting(false); return; }
     }
-    const res = await fetch("/api/daily-cleaning/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ salesId: shiftId }) });
-    const data = await res.json();
-    if (!res.ok || !data.ok) { setMessage(data.error || `Shift cannot be submitted. Missing: Daily Cleaning.`); return; }
-    setCompletion({ completedAt: data.completedAt, manager: data.manager || manager, tasksCompleted: data.tasksCompleted, overallStatus: data.overallStatus, cleaningScore: data.cleaningScore });
-    setTimeout(() => navigate(`/operations/daily-stock?shift=${shiftId}`), 500);
+    try {
+      const res = await fetch("/api/daily-cleaning/complete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ salesId: shiftId }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        showMessage("Daily Cleaning could not be submitted. Please try again or contact an administrator.");
+        return;
+      }
+      setCompletion({ completedAt: data.completedAt, manager: data.manager || manager, tasksCompleted: data.tasksCompleted, overallStatus: data.overallStatus, cleaningScore: data.cleaningScore });
+      setTimeout(() => navigate(`/operations/daily-stock?shift=${shiftId}`), 500);
+    } catch {
+      showMessage("Daily Cleaning could not be submitted. Please try again or contact an administrator.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   if (loading) return <div className="p-4 text-xs">Loading cleaning form...</div>;
@@ -210,7 +272,7 @@ export default function DailyCleaning() {
       </div>
     </div>
 
-    {message && <div className="rounded border border-red-200 bg-red-50 p-3 text-red-900">{message}</div>}
+    {message && <div role="alert" aria-live="assertive" className={`whitespace-pre-line rounded border p-3 ${message === "Task saved." ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`}>{message}</div>}
     {taskLoadError && <div className="rounded border border-red-200 bg-red-50 p-3 text-red-900">{taskLoadError}</div>}
     {tasks.map((task) => {
       const row = state[task.taskId] || blankTaskState;
@@ -265,11 +327,11 @@ export default function DailyCleaning() {
         </div>}
 
         {row.error && <p className="text-red-700">{row.error}</p>}
-        <button type="button" className="rounded bg-slate-800 px-3 py-2 text-white" onClick={() => saveTask(task)}>Save task</button>
+        <button type="button" className="rounded bg-slate-800 px-3 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400" disabled={savingTaskId === task.taskId} onClick={() => saveTask(task)}>{savingTaskId === task.taskId ? "Saving..." : "Save task"}</button>
         {row.saved && <span className="ml-3 text-green-700">Saved</span>}
       </section>;
     })}
-    {missing.length > 0 && <div className="rounded border border-amber-200 bg-amber-50 p-3 text-amber-900">Complete status, photo, and required follow-up fields for: {missing.map((task) => task.taskName).join(", ")}.</div>}
-    <button type="button" className="rounded bg-emerald-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400" disabled={tasks.length === 0} onClick={continueToStock}>Submit Daily Cleaning</button>
+    {missing.length > 0 && <div className="rounded border border-amber-200 bg-amber-50 p-3 text-amber-900">Daily Cleaning has incomplete tasks. Press Submit Daily Cleaning to see the exact task list.</div>}
+    <button type="button" className="rounded bg-emerald-600 px-4 py-3 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400" disabled={submitting} onClick={continueToStock}>{submitting ? "Submitting..." : "Submit Daily Cleaning"}</button>
   </div>;
 }
