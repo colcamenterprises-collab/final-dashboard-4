@@ -52,6 +52,7 @@ const labels = {
     grabSales: 'Grab Sales',
     otherSales: 'Other Sales',
     totalSales: 'Total Sales',
+    totalIncome: 'Total Income',
     expenses: 'Expenses',
     shiftExpenses: 'Shift Expenses',
     shiftExpensesHint: 'One expense item per line',
@@ -135,6 +136,7 @@ const labels = {
     grabSales: 'ยอดขาย Grab',
     otherSales: 'ยอดขายอื่นๆ',
     totalSales: 'ยอดขายรวม',
+    totalIncome: 'รายรับรวม',
     expenses: 'ค่าใช้จ่าย',
     shiftExpenses: 'ค่าใช้จ่ายกะ',
     shiftExpensesHint: 'หนึ่งรายการต่อหนึ่งบรรทัด',
@@ -1435,6 +1437,28 @@ export default function DailySales() {
             <h3 className="mb-4 text-sm font-semibold">{L.summary}</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between font-medium">
+                <span>{L.totalIncome}:</span>
+                <span>฿{(cashSales + qrSales + grabSales + otherSales).toLocaleString()}</span>
+              </div>
+              <div className="ml-4 space-y-1 text-xs text-gray-600">
+                <div className="flex justify-between">
+                  <span>• {L.cashSales}:</span>
+                  <span>฿{cashSales.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>• {L.qrSales}:</span>
+                  <span>฿{qrSales.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>• {L.grabSales}:</span>
+                  <span>฿{grabSales.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>• {L.otherSales}:</span>
+                  <span>฿{otherSales.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="flex justify-between font-medium border-t pt-2">
                 <span>{L.totalExpenses}:</span>
                 <span>฿{(shiftExpenses.reduce((sum, r) => sum + r.cost, 0) + staffWages.reduce((sum, r) => sum + r.amount, 0) + otherPayments.reduce((sum, r) => sum + r.amount, 0)).toLocaleString()}</span>
               </div>
@@ -1451,10 +1475,6 @@ export default function DailySales() {
                   <span>• {L.otherPayments}:</span>
                   <span>฿{otherPayments.reduce((sum, r) => sum + r.amount, 0).toLocaleString()}</span>
                 </div>
-              </div>
-              <div className="flex justify-between font-medium border-t pt-2">
-                <span>{L.closingCash}:</span>
-                <span>฿{closingCash.toLocaleString()}</span>
               </div>
             </div>
           </section>

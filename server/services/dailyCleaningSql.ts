@@ -102,6 +102,46 @@ export function isMissingDailyCleaningInfrastructureError(error: unknown) {
     || /daily_cleaning_(task_definitions|records)/i.test(message) && /(does not exist|doesn't exist|relation .* does not exist|42P01)/i.test(message);
 }
 
+
+export async function ensureApprovedDailyCleaningTasks(): Promise<void> {
+  try {
+    await db().$transaction([
+      db().$executeRaw`
+        INSERT INTO daily_cleaning_task_definitions (id, task_id, task_name, standard, module_type, task_type, frequency, photo_required, active, sort_order)
+        VALUES
+          ('clean_daily_floors_under_benches', 'floors-under-benches', 'Floors & Under Benches', '["Floors are mopped, under benches are clean, and no food scraps or rubbish remain."]'::jsonb, 'daily_cleaning', 'cleaning', 'daily', TRUE, TRUE, 10),
+          ('clean_daily_grill_extraction_system', 'grill-extraction-system', 'Grill & Extraction System', '["Grill, splashback, extraction hood and extraction filters/fans are clean and free from grease."]'::jsonb, 'daily_cleaning', 'cleaning', 'daily', TRUE, TRUE, 20),
+          ('clean_daily_benches_food_prep_areas', 'benches-food-prep-areas', 'Benches & Food Prep Areas', '["All benches, food preparation areas and equipment are cleaned and sanitised."]'::jsonb, 'daily_cleaning', 'cleaning', 'daily', TRUE, TRUE, 30),
+          ('clean_daily_outside_wash_area', 'outside-wash-area', 'Outside & Wash Area', '["Outside area is clean, rubbish removed, and sink/wash area is clean and tidy."]'::jsonb, 'daily_cleaning', 'cleaning', 'daily', TRUE, TRUE, 40),
+          ('clean_daily_kitchen_ready_tomorrow', 'kitchen-ready-for-tomorrow', 'Kitchen Ready for Tomorrow', '["Kitchen is clean, organised and ready for the next shift."]'::jsonb, 'daily_cleaning', 'cleaning', 'daily', TRUE, TRUE, 50)
+        ON CONFLICT (task_id) DO UPDATE SET
+          task_name = EXCLUDED.task_name,
+          standard = EXCLUDED.standard,
+          module_type = EXCLUDED.module_type,
+          task_type = EXCLUDED.task_type,
+          frequency = EXCLUDED.frequency,
+          photo_required = TRUE,
+          active = TRUE,
+          sort_order = EXCLUDED.sort_order,
+          updated_at = NOW()
+      `,
+      db().$executeRaw`
+        UPDATE daily_cleaning_task_definitions
+        SET active = FALSE,
+            updated_at = NOW()
+        WHERE module_type = 'daily_cleaning'
+          AND task_id NOT IN (${Prisma.join(APPROVED_DAILY_CLEANING_TASK_IDS)})
+      `,
+    ]);
+  } catch (error) {
+    if (isMissingDailyCleaningInfrastructureError(error)) {
+      console.error('[daily-cleaning] Missing Daily Cleaning task definition infrastructure while enforcing approved task seed.');
+      throw missingTaskDefinitionsError('/api/daily-cleaning/tasks');
+    }
+    throw error;
+  }
+}
+
 function taskSelectSql() {
   return Prisma.sql`
     SELECT
@@ -121,6 +161,7 @@ function taskSelectSql() {
 
 export async function readActiveCleaningTasks(): Promise<DailyCleaningTaskDefinition[]> {
   try {
+    await ensureApprovedDailyCleaningTasks();
     return await db().$queryRaw<DailyCleaningTaskDefinition[]>`
       ${taskSelectSql()}
       WHERE active = TRUE
@@ -139,6 +180,7 @@ export async function readActiveCleaningTasks(): Promise<DailyCleaningTaskDefini
 
 export async function readActiveCleaningTask(taskId: string): Promise<DailyCleaningTaskDefinition | null> {
   try {
+    await ensureApprovedDailyCleaningTasks();
     const rows = await db().$queryRaw<DailyCleaningTaskDefinition[]>`
       ${taskSelectSql()}
       WHERE active = TRUE
