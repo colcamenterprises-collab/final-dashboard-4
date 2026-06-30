@@ -3,6 +3,12 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 type CleaningTask = { taskId: string; taskName: string; standard: string[]; photoRequired: boolean };
 type CompletionSummary = { completedAt: string; manager: string; tasksCompleted: number; overallStatus: string; cleaningScore: number };
+
+function displayStatus(status: string) {
+  if (status === "Pass") return "Meets Standard";
+  if (status === "Requires Attention") return "Needs Attention";
+  return status;
+}
 type TaskState = {
   status: string;
   comments: string;
@@ -32,6 +38,7 @@ export default function DailyCleaning() {
   const [completion, setCompletion] = useState<CompletionSummary | null>(null);
   const [savingTaskId, setSavingTaskId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [popupMessage, setPopupMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -122,15 +129,15 @@ export default function DailyCleaning() {
 
   function showMessage(text: string) {
     setMessage(text);
-    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
+    setPopupMessage(text);
   }
 
   function validateTaskForSave(_task: CleaningTask, row: TaskState | undefined) {
-    if (!row?.status) return "Please select Pass or Requires Attention before saving this task.";
+    if (!row?.status) return "Please select Meets Standard or Needs Attention before saving this task.";
     if (!row.file && !row.imagePath) return "Please add a photo before saving this task.";
     if (row.status === "Requires Attention") {
       if (!row.comments.trim() || !row.followUpAction.trim() || !row.assignedTo.trim() || !row.followUpStatus) {
-        return "Please add a follow-up note before saving this task.";
+        return "Please add notes before saving this task.";
       }
     }
     return "";
@@ -178,7 +185,7 @@ export default function DailyCleaning() {
       const res = await fetch("/api/daily-cleaning/task", { method: "POST", body: formData });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) {
-        const text = "This task could not be saved. Please try again.";
+        const text = "This task could not be saved. Please try again or contact an administrator.";
         update(task.taskId, { error: text });
         showMessage(text);
         return false;
@@ -187,7 +194,7 @@ export default function DailyCleaning() {
       showMessage("Task saved.");
       return true;
     } catch {
-      const text = "This task could not be saved. Please try again.";
+      const text = "This task could not be saved. Please try again or contact an administrator.";
       update(task.taskId, { error: text });
       showMessage(text);
       return false;
@@ -242,7 +249,7 @@ export default function DailyCleaning() {
           <tr><td className="py-1 font-semibold">Completed time</td><td>{new Date(completion.completedAt).toLocaleString()}</td></tr>
           <tr><td className="py-1 font-semibold">Manager</td><td>{completion.manager || "Not recorded"}</td></tr>
           <tr><td className="py-1 font-semibold">Tasks completed</td><td>{completion.tasksCompleted} / {tasks.length}</td></tr>
-          <tr><td className="py-1 font-semibold">Overall status</td><td>{completion.overallStatus}</td></tr>
+          <tr><td className="py-1 font-semibold">Overall status</td><td>{displayStatus(completion.overallStatus)}</td></tr>
           <tr><td className="py-1 font-semibold">Cleaning Score</td><td>{completion.cleaningScore}%</td></tr>
         </tbody></table>
         <a className="mt-4 inline-flex rounded bg-emerald-600 px-4 py-2 font-medium text-white" href={`/operations/daily-stock?shift=${shiftId}`}>Continue to Daily Stock</a>
@@ -251,6 +258,14 @@ export default function DailyCleaning() {
   }
 
   return <div className="p-4 space-y-4 text-xs max-w-4xl">
+    {popupMessage && <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4" role="dialog" aria-modal="true" aria-labelledby="daily-cleaning-message-title">
+      <div className="w-full max-w-sm rounded border border-slate-200 bg-white p-4 shadow-lg">
+        <h2 id="daily-cleaning-message-title" className="text-base font-semibold">Daily Cleaning</h2>
+        <p className="mt-2 whitespace-pre-line text-sm text-slate-800">{popupMessage}</p>
+        <button type="button" className="mt-4 rounded bg-slate-900 px-4 py-2 text-sm font-medium text-white" onClick={() => setPopupMessage("")}>OK</button>
+      </div>
+    </div>}
+
     <div>
       <h1 className="text-lg font-semibold">Daily Cleaning & Operations</h1>
       <p className="mt-1 text-slate-600">Cleaning verification is required before Daily Stock. Shift date: {shiftDate}</p>
@@ -284,8 +299,8 @@ export default function DailyCleaning() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          <button type="button" className={`min-h-14 rounded border px-4 py-3 text-base font-semibold ${row.status === "Pass" ? "border-emerald-700 bg-emerald-600 text-white" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`} onClick={() => update(task.taskId, { status: "Pass", comments: "", followUpAction: "", assignedTo: "", followUpStatus: "" })}>Pass</button>
-          <button type="button" className={`min-h-14 rounded border px-4 py-3 text-base font-semibold ${row.status === "Requires Attention" ? "border-red-700 bg-red-600 text-white" : "border-red-300 bg-red-50 text-red-900"}`} onClick={() => update(task.taskId, { status: "Requires Attention", followUpStatus: row.followUpStatus || "Open" })}>Requires Attention</button>
+          <button type="button" className={`min-h-14 rounded border px-4 py-3 text-base font-semibold ${row.status === "Pass" ? "border-emerald-700 bg-emerald-600 text-white" : "border-emerald-300 bg-emerald-50 text-emerald-900"}`} onClick={() => update(task.taskId, { status: "Pass", comments: "", followUpAction: "", assignedTo: "", followUpStatus: "" })}>Meets Standard</button>
+          <button type="button" className={`min-h-14 rounded border px-4 py-3 text-base font-semibold ${row.status === "Requires Attention" ? "border-red-700 bg-red-600 text-white" : "border-red-300 bg-red-50 text-red-900"}`} onClick={() => update(task.taskId, { status: "Requires Attention", followUpStatus: row.followUpStatus || "Open" })}>Needs Attention</button>
         </div>
 
         <div className="space-y-2">
@@ -327,7 +342,7 @@ export default function DailyCleaning() {
         </div>}
 
         {row.error && <p className="text-red-700">{row.error}</p>}
-        <button type="button" className="rounded bg-slate-800 px-3 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400" disabled={savingTaskId === task.taskId} onClick={() => saveTask(task)}>{savingTaskId === task.taskId ? "Saving..." : "Save task"}</button>
+        <button type="button" className="rounded bg-slate-800 px-3 py-2 text-white disabled:cursor-not-allowed disabled:bg-slate-400" disabled={savingTaskId === task.taskId} onClick={() => saveTask(task)}>{savingTaskId === task.taskId ? "Saving..." : "Save Task"}</button>
         {row.saved && <span className="ml-3 text-green-700">Saved</span>}
       </section>;
     })}

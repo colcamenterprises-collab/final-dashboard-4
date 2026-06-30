@@ -6,6 +6,7 @@ import { dailyCleaningBlocker, dailyCleaningInfrastructureBlocker, isDailyCleani
 
 const router = express.Router();
 const VALID_STATUSES = new Set(['Pass', 'Requires Attention']);
+const STAFF_SAVE_FAILURE_MESSAGE = 'This task could not be saved. Please try again or contact an administrator.';
 
 function dateParts(shiftDate: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)) return null;
@@ -87,7 +88,15 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.post('/task', upload.single('photo'), async (req, res) => {
+router.post('/task', (req, res, next) => {
+  upload.single('photo')(req, res, (error: any) => {
+    if (error) {
+      console.error('[daily-cleaning/task] Failed to receive cleaning task upload:', error);
+      return res.status(400).json({ ok: false, error: STAFF_SAVE_FAILURE_MESSAGE });
+    }
+    next();
+  });
+}, async (req, res) => {
   try {
     const { salesId, shiftDate, store = 'SBB', manager = '', taskId, status, comments = '', followUpAction = '', assignedTo = '', followUpStatus = '', existingImagePath = '' } = req.body;
     const errors: string[] = [];
@@ -114,7 +123,7 @@ router.post('/task', upload.single('photo'), async (req, res) => {
     const record = await upsertCleaningRecord({
       salesId: String(salesId), shiftDate: String(shiftDate), store: String(store), manager: String(manager),
       task, imagePath, status: String(status), comments: String(comments || ''),
-      followUpAction: String(followUpAction || ''), assignedTo: String(assignedTo || ''), followUpStatus: String(followUpStatus || ''),
+      followUpAction: String(followUpAction || ''), assignedTo: String(assignedTo || ''), followUpStatus: status === 'Requires Attention' ? String(followUpStatus) : null,
     });
     const allRows = await readCleaningRecordsForSales(String(salesId));
     const allTasks = await activeTasks();
@@ -127,7 +136,7 @@ router.post('/task', upload.single('photo'), async (req, res) => {
     if (isDailyCleaningInfrastructureUnavailableError(error)) {
       return res.status(200).json({ ok: false, status: 'Blocked', blockers: [dailyCleaningInfrastructureBlocker(error)] });
     }
-    res.status(500).json({ ok: false, error: 'Unable to save cleaning task. Please contact an administrator.' });
+    res.status(500).json({ ok: false, error: STAFF_SAVE_FAILURE_MESSAGE });
   }
 });
 
