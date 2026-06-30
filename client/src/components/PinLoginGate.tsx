@@ -112,6 +112,13 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       }
     } catch {}
 
+    const storedUser = !forcePin ? readStoredPinUser() : null;
+    if (storedUser) {
+      setCurrentUser(storedUser);
+      setGateState("unlocked");
+      return;
+    }
+
     // Dev bypass — only when no real session exists and not force-locked
     if (process.env.NODE_ENV === "development" && !forcePin) {
       setCurrentUser({
@@ -144,6 +151,7 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await fetch("/api/pin-auth/logout", { method: "POST", credentials: "include" });
+    clearStoredPinUser();
     setCurrentUser(null);
     setGateState("locked");
   }, []);
@@ -172,6 +180,7 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       <PinAuthContext.Provider value={contextValue}>
         <PinLoginScreen
           onLogin={(user) => {
+            storePinUser(user);
             setCurrentUser(user);
             setGateState("unlocked");
           }}
@@ -188,6 +197,33 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 }
 
 // ─── PIN Login Screen ────────────────────────────────────────────────────────
+
+const PIN_SESSION_STORAGE_KEY = "sbb_pin_session_user";
+const PIN_SESSION_MAX_AGE = 12 * 60 * 60 * 1000;
+
+function readStoredPinUser(): PinUser | null {
+  try {
+    const raw = window.localStorage.getItem(PIN_SESSION_STORAGE_KEY);
+    const stored = raw ? JSON.parse(raw) : null;
+    const savedAt = Date.parse(String(stored?.savedAt || ""));
+    if (!stored?.user || !Number.isFinite(savedAt) || Date.now() - savedAt > PIN_SESSION_MAX_AGE) {
+      window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
+      return null;
+    }
+    return stored.user as PinUser;
+  } catch {
+    window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
+    return null;
+  }
+}
+
+function storePinUser(user: PinUser) {
+  window.localStorage.setItem(PIN_SESSION_STORAGE_KEY, JSON.stringify({ user, savedAt: new Date().toISOString() }));
+}
+
+function clearStoredPinUser() {
+  window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
+}
 
 const PIN_LENGTH = 4;
 
