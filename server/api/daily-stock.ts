@@ -2,7 +2,7 @@ import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { syncPurchasingShiftItems } from '../services/purchasingShiftSync';
 import { db } from '../lib/prisma';
-import { missingCleaningTasks, readActiveCleaningTasks, readCleaningRecordsForSales } from '../services/dailyCleaningSql';
+import { missingCleaningTasks, readActiveCleaningTasks, readCleaningRecordsForSales, safeDailyCleaningErrorMessage } from '../services/dailyCleaningSql';
 
 const router = express.Router();
 
@@ -124,16 +124,26 @@ export async function saveDailyStock(req: express.Request, res: express.Response
       });
     }
 
-    const [cleaningTasks, cleaningRecords] = await Promise.all([
-      readActiveCleaningTasks(),
-      readCleaningRecordsForSales(shiftId || '')
-    ]);
+    let cleaningTasks;
+    let cleaningRecords;
+    try {
+      [cleaningTasks, cleaningRecords] = await Promise.all([
+        readActiveCleaningTasks(),
+        readCleaningRecordsForSales(shiftId || '')
+      ]);
+    } catch (cleaningError) {
+      console.error('[daily-stock] Daily Cleaning validation failed:', cleaningError);
+      return res.status(400).json({
+        ok: false,
+        error: safeDailyCleaningErrorMessage('validation'),
+        missing: ['Daily Cleaning']
+      });
+    }
     if (cleaningTasks.length === 0) {
       return res.status(400).json({
         ok: false,
-        error: 'Shift cannot be submitted. Missing: Daily Cleaning task definitions.',
-        missing: ['Daily Cleaning'],
-        details: ['No active Daily Cleaning task definitions found in daily_cleaning_task_definitions']
+        error: 'No cleaning tasks have been configured. Please contact an administrator.',
+        missing: ['Daily Cleaning']
       });
     }
     const missingCleaning = missingCleaningTasks(cleaningTasks, cleaningRecords);
@@ -220,8 +230,7 @@ export async function saveDailyStock(req: express.Request, res: express.Response
     console.error('[daily-stock] Save error:', error);
     res.status(500).json({
       ok: false,
-      error: 'Failed to save daily stock data',
-      details: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Failed to save daily stock data'
     });
   }
 }

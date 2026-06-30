@@ -38,6 +38,18 @@ export function dailyCleaningBlocker(code: string, message: string, where: strin
   return { code, message, where, canonical_source: canonicalSource, auto_build_attempted: false };
 }
 
+export function safeDailyCleaningErrorMessage(action: string) {
+  return `Daily Cleaning ${action} is currently unavailable. Please contact an administrator.`;
+}
+
+export function isMissingDailyCleaningInfrastructureError(error: unknown) {
+  const err = error as { code?: string; meta?: { code?: string; message?: string }; message?: string };
+  const message = `${err?.message || ''} ${err?.meta?.message || ''}`;
+  return err?.code === 'P2021'
+    || err?.meta?.code === '42P01'
+    || /daily_cleaning_(task_definitions|records)/i.test(message) && /(does not exist|doesn't exist|relation .* does not exist|42P01)/i.test(message);
+}
+
 function taskSelectSql() {
   return Prisma.sql`
     SELECT
@@ -56,20 +68,36 @@ function taskSelectSql() {
 }
 
 export async function readActiveCleaningTasks(): Promise<DailyCleaningTaskDefinition[]> {
-  return db().$queryRaw<DailyCleaningTaskDefinition[]>`
-    ${taskSelectSql()}
-    WHERE active = TRUE
-    ORDER BY sort_order ASC, task_name ASC
-  `;
+  try {
+    return await db().$queryRaw<DailyCleaningTaskDefinition[]>`
+      ${taskSelectSql()}
+      WHERE active = TRUE
+      ORDER BY sort_order ASC, task_name ASC
+    `;
+  } catch (error) {
+    if (isMissingDailyCleaningInfrastructureError(error)) {
+      console.error('[daily-cleaning] Missing Daily Cleaning task definition infrastructure. Apply migration 202606300001_daily_cleaning_infrastructure.');
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function readActiveCleaningTask(taskId: string): Promise<DailyCleaningTaskDefinition | null> {
-  const rows = await db().$queryRaw<DailyCleaningTaskDefinition[]>`
-    ${taskSelectSql()}
-    WHERE active = TRUE AND task_id = ${taskId}
-    LIMIT 1
-  `;
-  return rows[0] ?? null;
+  try {
+    const rows = await db().$queryRaw<DailyCleaningTaskDefinition[]>`
+      ${taskSelectSql()}
+      WHERE active = TRUE AND task_id = ${taskId}
+      LIMIT 1
+    `;
+    return rows[0] ?? null;
+  } catch (error) {
+    if (isMissingDailyCleaningInfrastructureError(error)) {
+      console.error('[daily-cleaning] Missing Daily Cleaning task definition infrastructure while reading one task.');
+      return null;
+    }
+    throw error;
+  }
 }
 
 function recordSelectSql() {
@@ -100,19 +128,23 @@ export async function readCleaningRecords(filters: { shiftDate?: string; salesId
   if (filters.shiftDate) conditions.push(Prisma.sql`shift_date = ${filters.shiftDate}`);
   if (filters.salesId) conditions.push(Prisma.sql`sales_id = ${filters.salesId}`);
   const whereSql = conditions.length ? Prisma.sql`WHERE ${Prisma.join(conditions, ' AND ')}` : Prisma.empty;
-  return db().$queryRaw<DailyCleaningRecord[]>`
-    ${recordSelectSql()}
-    ${whereSql}
-    ORDER BY shift_date DESC, task_name ASC
-  `;
+  try {
+    return await db().$queryRaw<DailyCleaningRecord[]>`
+      ${recordSelectSql()}
+      ${whereSql}
+      ORDER BY shift_date DESC, task_name ASC
+    `;
+  } catch (error) {
+    if (isMissingDailyCleaningInfrastructureError(error)) {
+      console.error('[daily-cleaning] Missing Daily Cleaning records infrastructure. Apply migration 202606300001_daily_cleaning_infrastructure.');
+      return [];
+    }
+    throw error;
+  }
 }
 
 export async function readCleaningRecordsForSales(salesId: string): Promise<DailyCleaningRecord[]> {
-  return db().$queryRaw<DailyCleaningRecord[]>`
-    ${recordSelectSql()}
-    WHERE sales_id = ${salesId}
-    ORDER BY task_name ASC
-  `;
+  return readCleaningRecords({ salesId });
 }
 
 export async function upsertCleaningRecord(input: {
@@ -128,7 +160,8 @@ export async function upsertCleaningRecord(input: {
   assignedTo: string;
   followUpStatus: string;
 }): Promise<DailyCleaningRecord> {
-  const rows = await db().$queryRaw<DailyCleaningRecord[]>`
+  try {
+    const rows = await db().$queryRaw<DailyCleaningRecord[]>`
     INSERT INTO daily_cleaning_records (
       cleaning_record_id, sales_id, shift_date, store, manager, task_id, task_name,
       image_path, timestamp, status, comments, follow_up_action, assigned_to,
@@ -159,15 +192,24 @@ export async function upsertCleaningRecord(input: {
       timestamp, status, comments, follow_up_action AS "followUpAction", assigned_to AS "assignedTo",
       follow_up_status AS "followUpStatus", cleaning_score AS "cleaningScore", module_type AS "moduleType"
   `;
-  return rows[0];
+    return rows[0];
+  } catch (error) {
+    console.error('[daily-cleaning] Failed to upsert Daily Cleaning record:', error);
+    throw error;
+  }
 }
 
 export async function updateCleaningScoreForSales(salesId: string, cleaningScore: number): Promise<void> {
-  await db().$executeRaw`
-    UPDATE daily_cleaning_records
-    SET cleaning_score = ${cleaningScore}, updated_at = NOW()
-    WHERE sales_id = ${salesId}
-  `;
+  try {
+    await db().$executeRaw`
+      UPDATE daily_cleaning_records
+      SET cleaning_score = ${cleaningScore}, updated_at = NOW()
+      WHERE sales_id = ${salesId}
+    `;
+  } catch (error) {
+    console.error('[daily-cleaning] Failed to update Daily Cleaning score:', error);
+    throw error;
+  }
 }
 
 export function missingCleaningTasks(tasks: DailyCleaningTaskDefinition[], records: DailyCleaningRecord[]) {

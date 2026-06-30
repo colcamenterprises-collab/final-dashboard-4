@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import multer from 'multer';
-import { dailyCleaningBlocker, missingCleaningTasks, readActiveCleaningTask, readActiveCleaningTasks, readCleaningRecords, readCleaningRecordsForSales, updateCleaningScoreForSales, upsertCleaningRecord } from '../services/dailyCleaningSql';
+import { dailyCleaningBlocker, missingCleaningTasks, readActiveCleaningTask, readActiveCleaningTasks, readCleaningRecords, readCleaningRecordsForSales, safeDailyCleaningErrorMessage, updateCleaningScoreForSales, upsertCleaningRecord } from '../services/dailyCleaningSql';
 
 const router = express.Router();
 const VALID_STATUSES = new Set(['Pass', 'Requires Attention']);
@@ -44,11 +44,7 @@ const upload = multer({
 });
 
 async function activeTasks() {
-  const tasks = await readActiveCleaningTasks();
-  if (tasks.length === 0) {
-    throw new Error('No active Daily Cleaning task definitions found. Run migration 202606280001_daily_cleaning_operations.sql to seed the 5 Phase 1 tasks.');
-  }
-  return tasks;
+  return readActiveCleaningTasks();
 }
 
 router.get('/tasks', async (_req, res) => {
@@ -61,7 +57,7 @@ router.get('/tasks', async (_req, res) => {
       ok: false,
       source: 'daily_cleaning_task_definitions',
       data: [],
-      blockers: [dailyCleaningBlocker('CLEANING_TASKS_UNAVAILABLE', error?.message || 'Unable to load cleaning tasks', '/api/daily-cleaning/tasks', 'daily_cleaning_task_definitions')],
+      blockers: [dailyCleaningBlocker('CLEANING_TASKS_UNAVAILABLE', safeDailyCleaningErrorMessage('tasks'), '/api/daily-cleaning/tasks', 'daily_cleaning_task_definitions')],
     });
   }
 });
@@ -73,7 +69,8 @@ router.get('/', async (req, res) => {
     const rows = await readCleaningRecords({ shiftDate, salesId });
     res.json({ ok: true, source: 'daily_cleaning_records', rows, count: rows.length, blockers: [] });
   } catch (error: any) {
-    res.status(200).json({ ok: false, source: 'daily_cleaning_records', rows: [], count: 0, blockers: [dailyCleaningBlocker('CLEANING_RECORDS_UNAVAILABLE', error?.message || 'Unable to load cleaning records', '/api/daily-cleaning', 'daily_cleaning_records')] });
+    console.error('[daily-cleaning] Failed to load cleaning records:', error);
+    res.status(200).json({ ok: false, source: 'daily_cleaning_records', rows: [], count: 0, blockers: [dailyCleaningBlocker('CLEANING_RECORDS_UNAVAILABLE', safeDailyCleaningErrorMessage('records'), '/api/daily-cleaning', 'daily_cleaning_records')] });
   }
 });
 
@@ -111,7 +108,8 @@ router.post('/task', upload.single('photo'), async (req, res) => {
     await updateCleaningScoreForSales(String(salesId), cleaningScore);
     res.json({ ok: true, record: { ...record, cleaningScore }, cleaningScore });
   } catch (error: any) {
-    res.status(500).json({ ok: false, error: error?.message || 'Failed to save cleaning task' });
+    console.error('[daily-cleaning/task] Failed to save cleaning task:', error);
+    res.status(500).json({ ok: false, error: 'Unable to save cleaning task. Please contact an administrator.' });
   }
 });
 
@@ -120,6 +118,9 @@ router.post('/complete', async (req, res) => {
     const { salesId } = req.body;
     if (!salesId) return res.status(400).json({ ok: false, error: 'salesId is required' });
     const tasks = await activeTasks();
+    if (tasks.length === 0) {
+      return res.status(400).json({ ok: false, error: 'No cleaning tasks have been configured. Please contact an administrator.' });
+    }
     const rows = await readCleaningRecordsForSales(String(salesId));
     const missing = missingCleaningTasks(tasks, rows);
     if (missing.length) return res.status(400).json({ ok: false, error: `Shift cannot be submitted. Missing: Daily Cleaning.`, missing: missing.map((task) => task.taskName) });
@@ -132,7 +133,7 @@ router.post('/complete', async (req, res) => {
     return res.status(200).json({
       ok: false,
       status: 'Blocked',
-      blockers: [dailyCleaningBlocker('CLEANING_COMPLETION_UNAVAILABLE', error?.message || 'Unable to validate Daily Cleaning completion', '/api/daily-cleaning/complete', 'daily_cleaning_task_definitions + daily_cleaning_records')],
+      blockers: [dailyCleaningBlocker('CLEANING_COMPLETION_UNAVAILABLE', safeDailyCleaningErrorMessage('completion'), '/api/daily-cleaning/complete', 'daily_cleaning_task_definitions + daily_cleaning_records')],
     });
   }
 });
