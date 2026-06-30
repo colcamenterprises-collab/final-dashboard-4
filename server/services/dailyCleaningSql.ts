@@ -201,7 +201,7 @@ export async function upsertCleaningRecord(input: {
   comments: string;
   followUpAction: string;
   assignedTo: string;
-  followUpStatus: string;
+  followUpStatus: string | null;
 }): Promise<DailyCleaningRecord> {
   try {
     const rows = await db().$queryRaw<DailyCleaningRecord[]>`
@@ -212,7 +212,7 @@ export async function upsertCleaningRecord(input: {
     ) VALUES (
       ${uuidv4()}, ${input.salesId}, ${input.shiftDate}, ${input.store}, ${input.manager},
       ${input.task.taskId}, ${input.task.taskName}, ${input.imagePath}, NOW(), ${input.status},
-      ${input.comments}, ${input.followUpAction}, ${input.assignedTo}, ${input.followUpStatus},
+      ${input.comments}, ${input.followUpAction}, ${input.assignedTo}, ${input.followUpStatus || null},
       0, ${input.task.moduleType}, NOW(), NOW()
     )
     ON CONFLICT (sales_id, task_id) DO UPDATE SET
