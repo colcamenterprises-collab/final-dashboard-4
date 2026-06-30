@@ -1,28 +1,17 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import { ModernHeader, ModernSidebar, BottomNav } from "@/components/navigation";
+import { ModernHeader, ModernSidebar } from "@/components/navigation";
 import DataConfidenceBanner from "@/components/DataConfidenceBanner";
 import { cn } from "@/lib/utils";
 import { usePinAuth } from "@/components/PinLoginGate";
 
 export default function PageShell() {
   usePinAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
-
-  useEffect(() => {
-    const savedState = window.localStorage.getItem("sidebarCollapsed");
-    if (savedState !== null) {
-      setIsSidebarCollapsed(savedState === "true");
-    }
-  }, []);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const handleSidebarCollapseToggle = () => {
-    setIsSidebarCollapsed((prev) => {
-      const next = !prev;
-      window.localStorage.setItem("sidebarCollapsed", String(next));
-      return next;
-    });
+    setIsSidebarCollapsed((prev) => !prev);
   };
 
   return (
@@ -55,15 +44,12 @@ export default function PageShell() {
 
           {/* Content */}
           <main className="flex-1 overflow-y-scroll bg-neutral-100">
-            <div className="px-4 sm:px-5 lg:px-6 py-5 pb-20 lg:pb-6">
+            <div className="px-4 sm:px-5 lg:px-6 py-5 pb-6">
               <Outlet />
             </div>
           </main>
         </div>
       </div>
-
-      {/* Bottom Navigation — Mobile Only */}
-      <BottomNav />
     </div>
   );
 }
