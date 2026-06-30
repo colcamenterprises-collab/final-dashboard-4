@@ -42,11 +42,15 @@ export default function DailyCleaning() {
       const taskJson = await taskRes.json();
       const salesJson = salesRes ? await salesRes.json() : null;
       const cleaningJson = cleaningRes ? await cleaningRes.json() : null;
-      const loadedTasks = taskJson.ok && Array.isArray(taskJson.data) ? taskJson.data : [];
+      const loadedTasks = taskJson.ok && Array.isArray(taskJson.data) ? taskJson.data.map((task: CleaningTask) => ({ ...task, standard: Array.isArray(task.standard) ? task.standard : [] })) : [];
       setTasks(loadedTasks);
-      if (!taskJson.ok || loadedTasks.length === 0) {
-        const blockerMessage = taskJson.blockers?.map((blocker: any) => blocker.message).filter(Boolean).join(" ") || "";
-        setTaskLoadError(blockerMessage || "Daily Cleaning tasks could not be loaded. Please contact manager.");
+      if (taskJson.ok && loadedTasks.length === 0) {
+        setTaskLoadError("No cleaning tasks have been configured. Please contact an administrator.");
+      } else if (!taskJson.ok) {
+        const hasInfrastructureBlocker = Array.isArray(taskJson.blockers) && taskJson.blockers.some((blocker: any) => blocker?.code === "DAILY_CLEANING_INFRASTRUCTURE_MISSING");
+        setTaskLoadError(hasInfrastructureBlocker
+          ? "Daily Cleaning infrastructure is not available. Please contact an administrator."
+          : "Daily Cleaning tasks could not be loaded. Please contact an administrator.");
       } else {
         setTaskLoadError("");
       }
@@ -79,7 +83,7 @@ export default function DailyCleaning() {
       setLoading(false);
     }
     load().catch(() => {
-      setTaskLoadError("Daily Cleaning tasks could not be loaded. Please contact manager.");
+      setTaskLoadError("Daily Cleaning tasks could not be loaded. Please contact an administrator.");
       setMessage("Unable to load cleaning form.");
       setLoading(false);
     });
@@ -147,7 +151,7 @@ export default function DailyCleaning() {
     setMessage("");
     setCompletion(null);
     if (tasks.length === 0) {
-      setMessage("Daily Cleaning tasks could not be loaded. Please contact manager.");
+      setMessage("No cleaning tasks have been configured. Please contact an administrator.");
       return;
     }
     if (missing.length > 0) {
