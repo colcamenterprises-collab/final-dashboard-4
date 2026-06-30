@@ -154,7 +154,7 @@ export default function DailyCleaning() {
     update(taskId, { file, previewUrl: file ? URL.createObjectURL(file) : undefined, imagePath: file ? undefined : current?.imagePath });
   }
 
-  async function saveTask(task: CleaningTask) {
+  async function saveTask(task: CleaningTask, options: { showSuccess?: boolean } = { showSuccess: true }) {
     const row = state[task.taskId];
     const validationError = validateTaskForSave(task, row);
     if (validationError) {
@@ -191,7 +191,7 @@ export default function DailyCleaning() {
         return false;
       }
       setState((prev) => ({ ...prev, [task.taskId]: { ...prev[task.taskId], saved: true, imagePath: data.record.imagePath, error: undefined } }));
-      showMessage("Task saved.");
+      if (options.showSuccess !== false) showMessage("Task saved.");
       return true;
     } catch {
       const text = "This task could not be saved. Please try again or contact an administrator.";
@@ -219,7 +219,7 @@ export default function DailyCleaning() {
       return;
     }
     for (const task of tasks) {
-      const saved = await saveTask(task);
+      const saved = await saveTask(task, { showSuccess: false });
       if (!saved) { setSubmitting(false); return; }
     }
     try {
@@ -230,6 +230,7 @@ export default function DailyCleaning() {
         return;
       }
       setCompletion({ completedAt: data.completedAt, manager: data.manager || manager, tasksCompleted: data.tasksCompleted, overallStatus: data.overallStatus, cleaningScore: data.cleaningScore });
+      showMessage("Daily Cleaning submitted.");
       setTimeout(() => navigate(`/operations/daily-stock?shift=${shiftId}`), 500);
     } catch {
       showMessage("Daily Cleaning could not be submitted. Please try again or contact an administrator.");

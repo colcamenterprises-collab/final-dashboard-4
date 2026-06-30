@@ -2,6 +2,15 @@ import { Prisma } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../lib/prisma';
 
+
+const APPROVED_DAILY_CLEANING_TASK_IDS = [
+  'floors-under-benches',
+  'grill-extraction-system',
+  'benches-food-prep-areas',
+  'outside-wash-area',
+  'kitchen-ready-for-tomorrow',
+] as const;
+
 export interface DailyCleaningTaskDefinition {
   id: string;
   taskId: string;
@@ -115,6 +124,8 @@ export async function readActiveCleaningTasks(): Promise<DailyCleaningTaskDefini
     return await db().$queryRaw<DailyCleaningTaskDefinition[]>`
       ${taskSelectSql()}
       WHERE active = TRUE
+        AND module_type = 'daily_cleaning'
+        AND task_id IN (${Prisma.join(APPROVED_DAILY_CLEANING_TASK_IDS)})
       ORDER BY sort_order ASC, task_name ASC
     `;
   } catch (error) {
@@ -130,7 +141,10 @@ export async function readActiveCleaningTask(taskId: string): Promise<DailyClean
   try {
     const rows = await db().$queryRaw<DailyCleaningTaskDefinition[]>`
       ${taskSelectSql()}
-      WHERE active = TRUE AND task_id = ${taskId}
+      WHERE active = TRUE
+        AND module_type = 'daily_cleaning'
+        AND task_id IN (${Prisma.join(APPROVED_DAILY_CLEANING_TASK_IDS)})
+        AND task_id = ${taskId}
       LIMIT 1
     `;
     return rows[0] ?? null;
