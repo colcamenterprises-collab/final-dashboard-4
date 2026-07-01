@@ -1,157 +1,77 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Lock, Menu as MenuIcon, ShoppingBag, Star } from "lucide-react";
+import { Lock, MapPin, Menu as MenuIcon, ShoppingBag, Star } from "lucide-react";
+import { motion } from "framer-motion";
 import "./styles.css";
 
-const STAFF_LOGIN_URL = "https://app.smashbrosburgers.com";
+const STAFF_LOGIN_URL = "https://app.smashbrothersburgers.com";
 const ORDER_URL = "/order-now";
-
 const navItems = ["Menu", "About", "Membership", "Contact"];
-const placeholders = {
-  feature: ["Placeholder feature", "Placeholder story"],
-  promos: ["Placeholder promo one", "Placeholder promo two"],
-  burgers: ["Placeholder burger one", "Placeholder burger two", "Placeholder burger three"],
-  reasons: ["Placeholder reason one", "Placeholder reason two", "Placeholder reason three"],
-  gallery: ["Placeholder image one", "Placeholder image two", "Placeholder image three", "Placeholder image four"],
-  testimonials: ["Placeholder quote one", "Placeholder quote two", "Placeholder quote three"],
-};
+const ingredientLayers = ["Top Bun", "Cheese", "Tomato", "Onion", "Bacon", "Patty", "Lettuce", "Bottom Bun"];
 
-type ButtonProps = {
-  children: React.ReactNode;
-  href: string;
-  variant?: "primary" | "secondary";
-  icon?: React.ReactNode;
-};
-
-function Button({ children, href, variant = "primary", icon }: ButtonProps) {
-  return (
-    <a className={`button button--${variant}`} href={href}>
-      {icon}
-      <span>{children}</span>
-    </a>
-  );
+function Button({ children, href, variant = "primary", icon }: { children: React.ReactNode; href: string; variant?: "primary" | "outline" | "dark"; icon?: React.ReactNode }) {
+  return <motion.a whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }} className={`button button--${variant}`} href={href}>{icon}<span>{children}</span></motion.a>;
 }
 
-function Container({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`container ${className}`}>{children}</div>;
+function Logo() {
+  return <span className="logo"><span className="logo__mark"><MenuIcon size={23} strokeWidth={3.5} /></span><span className="logo__text">Smash<br />Brothers<br />Burgers</span></span>;
 }
 
-function Section({ id, tone = "dark", children, className = "" }: { id?: string; tone?: "dark" | "light" | "yellow" | "black"; children: React.ReactNode; className?: string }) {
-  return <section id={id} className={`section section--${tone} ${className}`}>{children}</section>;
+function BurgerArt({ className = "", compact = false }: { className?: string; compact?: boolean }) {
+  return <div className={`burger-art ${compact ? "burger-art--compact" : ""} ${className}`} aria-hidden="true">
+    <span className="bun bun--top" /><span className="lettuce" /><span className="tomato" /><span className="bacon" /><span className="cheese" /><span className="patty" /><span className="sauce" /><span className="onion" /><span className="bun bun--bottom" />
+  </div>;
 }
 
-function Heading({ eyebrow, title, align = "left" }: { eyebrow?: string; title: string; align?: "left" | "center" }) {
-  return (
-    <div className={`heading heading--${align}`}>
-      {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-      <h2>{title}</h2>
-    </div>
-  );
-}
-
-function Grid({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <div className={`grid ${className}`}>{children}</div>;
-}
-
-function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <article className={`card ${className}`}>{children}</article>;
-}
-
-function Badge({ children }: { children: React.ReactNode }) {
-  return <div className="badge"><Star aria-hidden="true" size={18} fill="currentColor" />{children}</div>;
-}
-
-function Tag({ children }: { children: React.ReactNode }) {
-  return <span className="tag">{children}</span>;
+function AngusBadge() {
+  return <div className="angus" aria-label="100 percent Angus beef"><Star size={14} fill="currentColor" /><strong>100%</strong><span>Angus</span><span>Beef</span></div>;
 }
 
 function Navigation() {
-  return (
-    <header className="navigation">
-      <Container className="navigation__inner">
-        <a className="brand" href="#home" aria-label="Smash Brothers Burgers home">
-          <span className="brand__mark"><MenuIcon size={24} aria-hidden="true" /></span>
-          <span>Smash<br />Brothers<br />Burgers</span>
-        </a>
-        <nav className="navigation__links" aria-label="Public website navigation">
-          {navItems.map((item) => <a key={item} href={`#${item.toLowerCase()}`}>{item}</a>)}
-          <Button href={ORDER_URL} icon={<ShoppingBag size={16} aria-hidden="true" />}>Order Now</Button>
-          <Button href={STAFF_LOGIN_URL} variant="secondary" icon={<Lock size={16} aria-hidden="true" />}>Staff Login</Button>
-        </nav>
-      </Container>
-    </header>
-  );
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 18);
+    onScroll(); window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  return <header className={`navigation ${scrolled ? "navigation--solid" : ""}`}><div className="nav-shell">
+    <a className="brand" href="#home" aria-label="Smash Brothers Burgers home"><Logo /></a>
+    <nav className="nav-links" aria-label="Website navigation">{navItems.map((item) => <a key={item} href={`#${item.toLowerCase()}`}>{item}</a>)}<Button href={ORDER_URL} icon={<ShoppingBag size={14} />}>Order Now</Button><Button href={STAFF_LOGIN_URL} variant="outline" icon={<Lock size={14} />}>Staff Login</Button></nav>
+  </div></header>;
 }
 
 function Hero() {
-  return (
-    <section id="home" className="hero">
-      <Container className="hero__grid">
-        <div className="hero__copy">
-          <Tag>Placeholder badge</Tag>
-          <h1>Smash Brothers Burgers</h1>
-          <p>Placeholder customer-facing copy for a premium public website framework.</p>
-          <div className="hero__actions">
-            <Button href={ORDER_URL} icon={<ShoppingBag size={16} aria-hidden="true" />}>Order Now</Button>
-            <Button href="#menu" variant="secondary" icon={<MenuIcon size={16} aria-hidden="true" />}>Menu</Button>
-          </div>
-        </div>
-        <div className="hero__visual" aria-label="Burger placeholder">
-          <div className="burger-placeholder" />
-          <Badge>100% placeholder</Badge>
-        </div>
-      </Container>
-    </section>
-  );
+  return <section id="home" className="hero"><div className="hero__inner">
+    <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }} className="hero__type" aria-hidden="true"><span>SMOKY</span><span>CHEESY</span><span>BURGERS</span></motion.div>
+    <motion.div className="hero__burger" animate={{ y: [0, -22, 0] }} transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}><BurgerArt /><AngusBadge /></motion.div>
+    <motion.div initial={{ opacity: 0, y: 22 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="hero__actions"><Button href={ORDER_URL} icon={<ShoppingBag size={15} />}>Order Now</Button><Button href="#menu" variant="dark" icon={<MenuIcon size={16} />}>View Menu</Button></motion.div>
+  </div></section>;
 }
 
-function Feature() {
-  return (
-    <Section id="feature" tone="yellow">
-      <Container>
-        <Grid className="feature-grid">
-          <Card className="feature-card feature-card--wide"><Tag>Feature</Tag><h3>Placeholder feature block</h3><p>Short placeholder copy.</p></Card>
-          {placeholders.feature.map((item) => <Card className="feature-card" key={item}><h3>{item}</h3><p>Placeholder copy.</p></Card>)}
-        </Grid>
-      </Container>
-    </Section>
-  );
+function Flavor() {
+  return <section id="about" className="section section--black"><motion.article initial={{ opacity: 0, y: 30 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flavor-card card-yellow"><BurgerArt compact /><div><h2>FLAVOUR THAT MAKES HISTORY</h2><p>Every bite is bold, smoky, and unforgettable. Built hot, pressed hard, and served with Smash Brothers confidence.</p></div></motion.article></section>;
 }
 
 function Promotions() {
-  return <Section id="promotions"><Container><Heading eyebrow="Promotions" title="Placeholder promotion system" /><Grid className="two-card-grid">{placeholders.promos.map((item) => <Card className="promo-card" key={item}><Tag>Promo</Tag><h3>{item}</h3></Card>)}</Grid></Container></Section>;
+  return <section id="menu" className="section section--black promo-grid"><motion.article whileInView={{ opacity: 1, y: 0 }} initial={{ opacity: 0, y: 28 }} viewport={{ once: true }} className="promo-card promo-card--dark"><h3>FREE FRIES<br />WITH EVERY<br />BURGER</h3><div className="burst">HOT</div><div className="fries" aria-hidden="true"><i /><i /><i /><i /><i /><b /></div></motion.article><motion.article whileInView={{ opacity: 1, y: 0 }} initial={{ opacity: 0, y: 28 }} viewport={{ once: true }} className="promo-card card-yellow"><h3>REAL<br />SMASH<br />BURGERS</h3><BurgerArt compact /></motion.article></section>;
 }
 
-function About() {
-  return <Section id="about"><Container><Grid className="split-grid"><Heading eyebrow="About" title="Placeholder brand story layout" /><Card className="text-card"><p>Short placeholder paragraph reserved for future Smash Brothers Burgers content.</p></Card></Grid></Container></Section>;
-}
-
-function SignatureBurgers() {
-  return <Section id="menu" tone="light"><Container><Heading eyebrow="Signature Burgers" title="Reusable burger card grid" /><Grid className="card-grid">{placeholders.burgers.map((item) => <Card className="burger-card" key={item}><div className="image-placeholder" /><h3>{item}</h3><p>Placeholder description.</p></Card>)}</Grid></Container></Section>;
-}
-
-function WhyChooseUs() {
-  return <Section id="membership"><Container><Heading eyebrow="Why Choose Us" title="Placeholder reasons to believe" /><Grid className="card-grid">{placeholders.reasons.map((item, index) => <Card className="reason-card" key={item}><Badge>0{index + 1}</Badge><h3>{item}</h3><p>Placeholder support copy.</p></Card>)}</Grid></Container></Section>;
-}
-
-function Gallery() {
-  return <Section id="gallery" tone="yellow"><Container><Heading eyebrow="Gallery" title="Placeholder gallery framework" /><Grid className="gallery-grid">{placeholders.gallery.map((item) => <Card className="gallery-card" key={item}><div className="image-placeholder" /><h3>{item}</h3></Card>)}</Grid></Container></Section>;
+function IngredientStack() {
+  return <section className="ingredient-section"><div className="stack-type" aria-hidden="true">THE BEST<br />SMASH<br />BURGER<br />IN<br />PHUKET</div><div className="ingredient-stack" aria-label="Exploded burger ingredients">{ingredientLayers.map((layer, index) => <motion.div key={layer} className={`layer layer--${index + 1}`} animate={{ y: [0, index % 2 ? 16 : -16, 0] }} transition={{ duration: 4 + index * .18, repeat: Infinity, ease: "easeInOut" }}><span>{layer}</span></motion.div>)}</div></section>;
 }
 
 function Testimonials() {
-  return <Section id="testimonials"><Container><Heading eyebrow="Testimonials" title="Placeholder quote carousel" /><Grid className="card-grid">{placeholders.testimonials.map((item) => <Card className="testimonial-card" key={item}><p>“{item} reserved for future customer proof.”</p><Tag>Placeholder name</Tag></Card>)}</Grid></Container></Section>;
+  return <section className="section section--black"><article className="testimonial card-yellow"><div className="customer" aria-label="Customer enjoying a burger" /><div className="quote"><div className="stars">★★★★★</div><p>“Hands down, the best burger I’ve ever had! Perfectly grilled and bursting with flavor.”</p><strong>– Kristen Stewart</strong><div className="dots"><span /><span /><span /><span /></div></div><b>1/5</b></article></section>;
 }
 
-function OrderCta() {
-  return <Section id="contact" tone="black"><Container><Card className="cta-banner"><Heading eyebrow="Order CTA" title="Placeholder final conversion banner" align="center" /><div className="hero__actions"><Button href={ORDER_URL}>Order Now</Button><Button href="#menu" variant="secondary">View Menu</Button></div></Card></Container></Section>;
+function Gallery() {
+  return <section id="membership" className="gallery section--black"><h2>Crispy golden<br />fries included<br />always.</h2><div className="gallery__masonry"><div><BurgerArt compact /></div><div className="photo photo--tall" /><div className="photo photo--wide" /><div className="photo photo--small" /></div><div className="gallery__actions"><Button href="#menu" variant="dark" icon={<MenuIcon size={15} />}>Menu</Button><Button href={ORDER_URL} icon={<ShoppingBag size={15} />}>Order Now</Button></div></section>;
 }
 
 function Footer() {
-  return <footer className="footer"><Container><Grid className="footer__grid">{["Brand", "Menu", "Membership", "Contact"].map((item) => <div key={item}><h3>{item}</h3><p>Placeholder footer content.</p></div>)}</Grid></Container></footer>;
+  return <footer id="contact" className="footer"><div className="footer__grid"><div><Logo /></div><div><h3>Quick Links</h3><a href="#home">Home</a><a href="#menu">Menu</a><a href={ORDER_URL}>Order Online</a><a href="#membership">Membership</a><a href="#contact">Contact</a></div><div><h3>Follow Us</h3><p className="social">◎ f ♪</p></div><div><h3>Hours</h3><p>Mon – Thu&nbsp;&nbsp; 11:00 – 23:00</p><p>Fri – Sat&nbsp;&nbsp; 11:00 – 01:00</p><p>Sunday&nbsp;&nbsp; 11:00 – 22:00</p></div></div><div className="footer__bar"><span>© Smash Brothers Burgers. All rights reserved.</span><span><MapPin size={14} fill="currentColor" /> Phuket, Thailand</span><Button href={ORDER_URL}>Order</Button></div></footer>;
 }
 
-function App() {
-  return <><Navigation /><main><Hero /><Feature /><Promotions /><About /><SignatureBurgers /><WhyChooseUs /><Gallery /><Testimonials /><OrderCta /></main><Footer /></>;
-}
+function App() { return <><Navigation /><main><Hero /><Flavor /><Promotions /><IngredientStack /><Testimonials /><Gallery /></main><Footer /></>; }
 
 createRoot(document.getElementById("root")!).render(<React.StrictMode><App /></React.StrictMode>);
