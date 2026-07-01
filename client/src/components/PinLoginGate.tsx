@@ -39,10 +39,6 @@ export function usePinAuth() {
 // ─── Public path bypass ───────────────────────────────────────────────────────
 
 const PUBLIC_EXACT_PATHS = new Set([
-  "/",
-  "/menu",
-  "/membership",
-  "/staff",
   "/pos-login",
 ]);
 

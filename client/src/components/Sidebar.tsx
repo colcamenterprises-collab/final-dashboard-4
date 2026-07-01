@@ -66,13 +66,6 @@ const groups: Group[] = [
     ],
   },
   {
-    title: "Membership",
-    items: [
-      { to: "/membership/dashboard", label: "Member Dashboard" },
-      { to: "/membership/register", label: "Registration Form" },
-    ],
-  },
-  {
     title: "Customer Ordering",
     items: [
       { to: "/order", label: "Online Ordering" },
