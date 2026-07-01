@@ -1,0 +1,16 @@
+<svg width="900" height="560" viewBox="0 0 900 560" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Smash Brothers Burgers meal illustration">
+  <rect width="900" height="560" rx="42" fill="#17120B"/>
+  <circle cx="690" cy="130" r="86" fill="#F7B500" opacity=".95"/>
+  <path d="M196 350c-12-132 52-214 206-214s228 82 216 214H196Z" fill="#F2A11F"/>
+  <path d="M212 244c38-64 100-96 190-96 88 0 150 32 188 96H212Z" fill="#F7D17C"/>
+  <path d="M176 340h468c25 0 45 20 45 45s-20 45-45 45H176c-25 0-45-20-45-45s20-45 45-45Z" fill="#FFD166"/>
+  <path d="M185 292h452c24 0 43 19 43 43 0 23-19 42-43 42H185c-24 0-43-19-43-42 0-24 19-43 43-43Z" fill="#5B2A12"/>
+  <path d="M184 263h454c22 0 40 18 40 40H144c0-22 18-40 40-40Z" fill="#FFE27A"/>
+  <path d="M176 410h468c17 0 31 14 31 31s-14 31-31 31H176c-17 0-31-14-31-31s14-31 31-31Z" fill="#C96B1C"/>
+  <path d="M226 179c0 10-8 18-18 18s-18-8-18-18 8-18 18-18 18 8 18 18Zm110-28c0 9-7 16-16 16s-16-7-16-16 7-16 16-16 16 7 16 16Zm174 8c0 10-8 18-18 18s-18-8-18-18 8-18 18-18 18 8 18 18Z" fill="#7A3E14"/>
+  <rect x="640" y="292" width="48" height="172" rx="12" fill="#F7B500" transform="rotate(9 640 292)"/>
+  <rect x="704" y="276" width="48" height="188" rx="12" fill="#FFD166" transform="rotate(15 704 276)"/>
+  <rect x="766" y="306" width="48" height="154" rx="12" fill="#F7B500" transform="rotate(4 766 306)"/>
+  <text x="88" y="88" fill="#F7B500" font-family="Arial Black, Arial, sans-serif" font-size="54">SMASH</text>
+  <text x="88" y="140" fill="#FFFFFF" font-family="Arial Black, Arial, sans-serif" font-size="42">BROTHERS BURGERS</text>
+</svg>

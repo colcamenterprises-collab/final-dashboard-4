@@ -9,8 +9,6 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import PinLoginGate, { usePinAuth } from "./components/PinLoginGate";
 import PageShell from "./layouts/PageShell";
 import Home from "./pages/Home";
-import { StaffEntry } from "./pages/PublicWebsite";
-import { SBBHome, SBBMenu, SBBMembership } from "./pages/public/SBBHome";
 import NotFound from "./pages/NotFound";
 
 import DailySalesForm from "./pages/operations/daily-sales/Form";
@@ -76,11 +74,8 @@ export default function App() {
             <BrowserRouter>
               <PinLoginGate>
                 <Routes>
-                  <Route path="/" element={<SBBHome />} />
+                  <Route path="/" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
                   <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/menu" element={<SBBMenu />} />
-                  <Route path="/membership" element={<SBBMembership />} />
-                  <Route path="/staff" element={<StaffEntry />} />
                   <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
                   <Route path="/order" element={<OrderPage />} />
                   <Route path="/order/:venueCode" element={<OrderPage />} />
