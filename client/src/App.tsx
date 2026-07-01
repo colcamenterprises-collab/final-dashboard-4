@@ -74,8 +74,11 @@ export default function App() {
             <BrowserRouter>
               <PinLoginGate>
                 <Routes>
-                  <Route path="/" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/staff" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/menu" element={<Navigate to="/menu/items" replace />} />
+                  <Route path="/membership" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
                   <Route path="/order" element={<OrderPage />} />
                   <Route path="/order/:venueCode" element={<OrderPage />} />
