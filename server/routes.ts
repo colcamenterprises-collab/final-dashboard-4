@@ -968,6 +968,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  app.get("/api/analysis/inventory-reconciliation", async (req, res) => {
+    try {
+      const date = typeof req.query.date === "string" ? req.query.date : "";
+      const { getInventoryReconciliationReport } = await import("./services/inventoryReconciliation.js");
+      const report = await getInventoryReconciliationReport(date);
+      res.json(report);
+    } catch (e: any) {
+      console.error("[INVENTORY_RECONCILIATION_FAIL]", e);
+      res.status(400).json({ ok: false, error: e.message || String(e) });
+    }
+  });
+
   app.get("/api/analysis/owner-stock-control", async (req, res) => {
     try {
       const { getPinSessionUser } = await import("./routes/pinAuth.js");
