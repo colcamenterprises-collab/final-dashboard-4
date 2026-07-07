@@ -371,6 +371,9 @@ async function checkSchema() {
   // Mount buns reconciliation (CORE STOCK V1 PATCH 1) — isolated from drinks and burgers
   const bunsReconciliationRouter = (await import('./routes/bunsReconciliation.js')).default;
   app.use('/api/analysis', bunsReconciliationRouter);
+  // Mount rolls reconciliation for Shift Analysis — read-only, single stock table
+  const rollsReconciliationRouter = (await import('./routes/rollsReconciliation.js')).default;
+  app.use('/api/analysis', rollsReconciliationRouter);
   // Mount meat reconciliation (CORE STOCK V2 PATCH 1) — isolated from all other sections
   const meatReconciliationRouter = (await import('./routes/meatReconciliation.js')).default;
   app.use('/api/analysis', meatReconciliationRouter);
