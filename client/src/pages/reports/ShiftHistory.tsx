@@ -3,6 +3,7 @@ import { useState } from "react";
 import { RefreshCw, ChevronDown, ChevronRight, AlertTriangle, CheckCircle, XCircle, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { PageTitle } from "@/components/ui/sbb-cards";
+import RollsReconciliationTable from "@/components/analysis/RollsReconciliationTable";
 
 interface VarianceSummary {
   posGross: number;
@@ -261,6 +262,9 @@ export default function ShiftHistory() {
 
                 {isOpen && (
                   <div className="px-5 pb-5 pt-2 bg-slate-50/60 space-y-4 border-t border-slate-100">
+
+                    {/* Stock reconciliation */}
+                    <RollsReconciliationTable date={report.shiftDate.slice(0, 10)} />
 
                     {/* POS breakdown */}
                     <div>
