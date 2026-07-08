@@ -55,6 +55,8 @@ const REVIEW_QUEUE_TABS = [
   'rejected_ignored',
   'personal_owner',
   'deposits_transfers',
+  'deleted',
+  'purged',
   'all_imported',
 ] as const;
 
@@ -71,6 +73,10 @@ const listTxnsSchema = z.object({
 });
 
 const BLOCKED_CATEGORY_SQL = sql`('Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate')`;
+const PURGED_BANK_IMPORT_NOTE = '[PURGED_BANK_IMPORT_REVIEW_ROW]';
+const isPurgedCondition = sql`${bankTxn.status} = 'deleted' AND coalesce(${bankTxn.notes}, '') like ${`%${PURGED_BANK_IMPORT_NOTE}%`}`;
+const isDeletedNotPurgedCondition = sql`${bankTxn.status} = 'deleted' AND coalesce(${bankTxn.notes}, '') not like ${`%${PURGED_BANK_IMPORT_NOTE}%`}`;
+const isInactiveDuplicateCondition = sql`${bankTxn.status} in ('deleted', 'rejected') OR ${bankTxn.category} = 'Ignore / Duplicate'`;
 
 function reviewQueueWhere(tab: ReviewQueueTab, query: { search?: string; min?: string; max?: string; month?: string }) {
   const conditions: any[] = [];
@@ -83,7 +89,13 @@ function reviewQueueWhere(tab: ReviewQueueTab, query: { search?: string; min?: s
       conditions.push(eq(bankTxn.status, 'approved'));
       break;
     case 'rejected_ignored':
-      conditions.push(sql`(${bankTxn.status} IN ('rejected', 'deleted') OR ${bankTxn.category} = 'Ignore / Duplicate')`);
+      conditions.push(sql`(${bankTxn.status} = 'rejected' OR ${bankTxn.category} = 'Ignore / Duplicate')`);
+      break;
+    case 'deleted':
+      conditions.push(isDeletedNotPurgedCondition);
+      break;
+    case 'purged':
+      conditions.push(isPurgedCondition);
       break;
     case 'personal_owner':
       conditions.push(eq(bankTxn.category, 'Personal / Owner'));
@@ -92,6 +104,7 @@ function reviewQueueWhere(tab: ReviewQueueTab, query: { search?: string; min?: s
       conditions.push(sql`(${bankTxn.category} IN ('Deposit / Inflow', 'Transfer') OR ${bankTxn.amountTHB} < 0)`);
       break;
     case 'all_imported':
+      conditions.push(sql`not (${isPurgedCondition})`);
       break;
   }
 
@@ -112,10 +125,12 @@ async function getReviewQueueCounts() {
     pendingReview: sql<number>`count(*) filter (where ${bankTxn.status} = 'pending' and (${bankTxn.category} is null or ${bankTxn.category} not in ${BLOCKED_CATEGORY_SQL}))`,
     pendingAll: sql<number>`count(*) filter (where ${bankTxn.status} = 'pending')`,
     approved: sql<number>`count(*) filter (where ${bankTxn.status} = 'approved')`,
-    rejectedIgnored: sql<number>`count(*) filter (where ${bankTxn.status} in ('rejected', 'deleted') or ${bankTxn.category} = 'Ignore / Duplicate')`,
+    rejectedIgnored: sql<number>`count(*) filter (where ${bankTxn.status} = 'rejected' or ${bankTxn.category} = 'Ignore / Duplicate')`,
+    deleted: sql<number>`count(*) filter (where ${isDeletedNotPurgedCondition})`,
+    purged: sql<number>`count(*) filter (where ${isPurgedCondition})`,
     personalOwner: sql<number>`count(*) filter (where ${bankTxn.category} = 'Personal / Owner')`,
     depositsTransfers: sql<number>`count(*) filter (where ${bankTxn.category} in ('Deposit / Inflow', 'Transfer') or ${bankTxn.amountTHB} < 0)`,
-    allImported: sql<number>`count(*)`,
+    allImported: sql<number>`count(*) filter (where not (${isPurgedCondition}))`,
   }).from(bankTxn);
 
   return {
@@ -123,6 +138,8 @@ async function getReviewQueueCounts() {
     pending_all: Number(row?.pendingAll || 0),
     approved: Number(row?.approved || 0),
     rejected_ignored: Number(row?.rejectedIgnored || 0),
+    deleted: Number(row?.deleted || 0),
+    purged: Number(row?.purged || 0),
     personal_owner: Number(row?.personalOwner || 0),
     deposits_transfers: Number(row?.depositsTransfers || 0),
     all_imported: Number(row?.allImported || 0),
@@ -583,27 +600,59 @@ async function handleCsvUpload(req: any, res: any) {
       dedupeKey: generateDedupeKey(source, txn.postedAt, txn.amountTHB, txn.description),
     }));
 
-    // Duplicate detection is done once per upload instead of as one failed insert per duplicate.
-    // The unique bank_txn.dedupe_key constraint remains the source of truth and protects races.
+    // Duplicate detection only blocks active review rows. Historical deleted/rejected/ignored
+    // rows are reactivated for the new batch so the bank_txn.dedupe_key unique constraint can
+    // remain unchanged while still allowing a clean CSV to be re-imported after cleanup.
     const duplicateStartedAt = process.hrtime.bigint();
-    const existingDedupeKeys = new Set<string>();
+    const activeDuplicateKeys = new Set<string>();
+    const reusableHistoricalByKey = new Map<string, string>();
     for (let i = 0; i < candidateRows.length; i += BANK_IMPORT_INSERT_CHUNK_SIZE) {
       const chunk = candidateRows.slice(i, i + BANK_IMPORT_INSERT_CHUNK_SIZE);
       if (chunk.length === 0) continue;
-      const existingRows = await db.select({ dedupeKey: bankTxn.dedupeKey })
+      const existingRows = await db.select({ id: bankTxn.id, dedupeKey: bankTxn.dedupeKey, status: bankTxn.status, category: bankTxn.category })
         .from(bankTxn)
         .where(inArray(bankTxn.dedupeKey, chunk.map((row) => row.dedupeKey)));
-      for (const row of existingRows) existingDedupeKeys.add(row.dedupeKey);
+      for (const row of existingRows) {
+        if (row.status === 'deleted' || row.status === 'rejected' || row.category === 'Ignore / Duplicate') {
+          if (!reusableHistoricalByKey.has(row.dedupeKey)) reusableHistoricalByKey.set(row.dedupeKey, row.id);
+        } else {
+          activeDuplicateKeys.add(row.dedupeKey);
+        }
+      }
     }
-    const rowsToInsert = candidateRows.filter((row) => !existingDedupeKeys.has(row.dedupeKey));
+    const reusableRows = candidateRows.filter((row) => !activeDuplicateKeys.has(row.dedupeKey) && reusableHistoricalByKey.has(row.dedupeKey));
+    const rowsToInsert = candidateRows.filter((row) => !activeDuplicateKeys.has(row.dedupeKey) && !reusableHistoricalByKey.has(row.dedupeKey));
     logCsvUploadTiming('Duplicate check', duplicateStartedAt, {
       ...timingContext,
       candidates: candidateRows.length,
-      existingDuplicates: existingDedupeKeys.size,
+      activeDuplicates: activeDuplicateKeys.size,
+      reusableHistoricalDuplicates: reusableRows.length,
       rowsToInsert: rowsToInsert.length,
     });
 
     let inserted = 0;
+    let reimportedHistorical = 0;
+    for (const row of reusableRows) {
+      const reusableId = reusableHistoricalByKey.get(row.dedupeKey);
+      if (!reusableId) continue;
+      const [updatedRow] = await db.update(bankTxn)
+        .set({
+          batchId: row.batchId,
+          postedAt: row.postedAt,
+          description: row.description,
+          amountTHB: row.amountTHB,
+          ref: row.ref,
+          raw: row.raw,
+          category: row.category,
+          supplier: row.supplier,
+          status: 'pending',
+          notes: null,
+          expenseId: null,
+        })
+        .where(and(eq(bankTxn.id, reusableId), isInactiveDuplicateCondition))
+        .returning({ id: bankTxn.id });
+      if (updatedRow) reimportedHistorical += 1;
+    }
     for (let i = 0; i < rowsToInsert.length; i += BANK_IMPORT_INSERT_CHUNK_SIZE) {
       const chunk = rowsToInsert.slice(i, i + BANK_IMPORT_INSERT_CHUNK_SIZE);
       if (chunk.length === 0) continue;
@@ -613,7 +662,8 @@ async function handleCsvUpload(req: any, res: any) {
         .returning({ id: bankTxn.id });
       inserted += insertedRows.length;
     }
-    const skippedDupes = candidateRows.length - inserted;
+    inserted += reimportedHistorical;
+    const skippedDupes = activeDuplicateKeys.size;
     logCsvUploadTiming('Database insert', insertStartedAt, {
       ...timingContext,
       batchId: batch.id,
@@ -627,6 +677,9 @@ async function handleCsvUpload(req: any, res: any) {
       batchId: batch.id,
       inserted,
       skippedDupes,
+      duplicateSkipReason: skippedDupes > 0 ? 'active_duplicate_exists' : null,
+      activeDuplicateSkips: skippedDupes,
+      reimportedHistoricalDuplicates: reimportedHistorical,
       format,
       source,
     };
@@ -1029,6 +1082,39 @@ router.patch("/txns/:id", async (req, res) => {
   } catch (error) {
     console.error('Edit txn error:', error);
     res.status(500).json({ error: "Failed to update transaction" });
+  }
+});
+
+
+// POST /api/bank-imports/purge - Soft-purge all imported bank transaction review rows.
+// This touches only bank_txn review rows; approved Business Expenses, Shift Expenses, and daily sales/stock tables are not modified.
+router.post("/purge", async (_req, res) => {
+  try {
+    const purgedAt = new Date().toISOString();
+    const purgedTxns = await db.update(bankTxn)
+      .set({
+        status: 'deleted',
+        notes: sql`trim(both from concat(coalesce(${bankTxn.notes}, ''), ' ', ${PURGED_BANK_IMPORT_NOTE}, ' ', ${purgedAt}))`,
+      })
+      .where(sql`not (${isPurgedCondition})`)
+      .returning({ id: bankTxn.id, batchId: bankTxn.batchId, expenseId: bankTxn.expenseId });
+
+    res.json({
+      ok: true,
+      purged: purgedTxns.length,
+      scope: 'bank_txn_review_rows_only',
+      preserved: {
+        approvedBusinessExpenses: true,
+        shiftExpenses: true,
+        dailySalesAndStockData: true,
+      },
+    });
+  } catch (error: any) {
+    console.error('Purge bank imports error:', error);
+    res.status(500).json({
+      error: "Failed to purge imported bank transactions",
+      reason: error?.message || String(error),
+    });
   }
 });
 
