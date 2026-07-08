@@ -21,7 +21,7 @@ const ALL_FIELDS = ["grossSales", "netSales", "cash", "qr", "grab", "other", "re
 const LABELS: Record<string, string> = { grossSales: "Gross Sales", netSales: "Net Sales", cash: "Cash", qr: "QR", grab: "Grab", other: "Other", receiptCount: "Receipt Count" };
 
 function fmtDate(d?: string) { if (!d) return "—"; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
-function fmtIssueDate(d?: string) { if (!d) return "—"; return new Date(`${d}T00:00:00Z`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" }); }
+function fmtIssueDate(d?: string) { return fmtDate(d); }
 function fmtMoney(n: number | null | undefined) { if (n == null) return "—"; return `฿${Number(n).toLocaleString("en-US", { maximumFractionDigits: 0 })}`; }
 function fmtCount(n: number | null | undefined) { return n == null ? "—" : Number(n).toLocaleString("en-US"); }
 function fmtVal(field: string, n: number | null | undefined) { return field === "receiptCount" ? fmtCount(n) : fmtMoney(n); }
