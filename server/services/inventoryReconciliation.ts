@@ -31,6 +31,7 @@ export type InventoryReconciliationRow = {
 export type InventoryReconciliationReport = {
   ok: true;
   source: string[];
+  missingSources: string[];
   scope: { date: string };
   status: 'complete' | 'partial';
   data: InventoryReconciliationRow[];
@@ -48,12 +49,22 @@ type InventoryItemConfig = {
 };
 
 const SOURCES = {
-  dailySalesV2: 'daily_sales_v2.payload',
+  dailySalesV2: 'Daily Sales & Stock V2',
   purchaseTally: 'purchase_tally',
   purchaseTallyDrinks: 'purchase_tally + purchase_tally_drink',
   receiptTruth: 'receipt_truth_daily_usage',
   recipeMapping: 'recipe mapping',
 };
+
+const DAILY_SALES_DATE_EXPR = `COALESCE(
+  NULLIF("shiftDate", '')::date,
+  shift_date,
+  "createdAt"::date
+)`;
+
+const DAILY_SALES_CURRENT_WHERE = `${DAILY_SALES_DATE_EXPR} = $1::date`;
+const DAILY_SALES_PREVIOUS_WHERE = `${DAILY_SALES_DATE_EXPR} < $1::date`;
+const DAILY_SALES_ORDER = `${DAILY_SALES_DATE_EXPR} DESC, "createdAt" DESC`;
 
 const BURGER_CATEGORIES = [
   'Burgers',
@@ -89,9 +100,9 @@ async function currentPayloadValue(date: string, paths: string[][], where: strin
   const res = await pool.query(
     `SELECT ${textExpressions.map((expr, index) => `${expr} AS v${index}`).join(', ')}
      FROM daily_sales_v2
-     WHERE COALESCE("shiftDate", shift_date::text) = $1
+     WHERE ${DAILY_SALES_CURRENT_WHERE}
        AND "deletedAt" IS NULL
-     ORDER BY "createdAt" DESC
+     ORDER BY ${DAILY_SALES_ORDER}
      LIMIT 1`,
     [date],
   );
@@ -107,10 +118,10 @@ async function previousPayloadValue(date: string, paths: string[][], where: stri
   const res = await pool.query(
     `SELECT ${textExpressions.map((expr, index) => `${expr} AS v${index}`).join(', ')}
      FROM daily_sales_v2
-     WHERE COALESCE("shiftDate", shift_date::text) < $1
+     WHERE ${DAILY_SALES_PREVIOUS_WHERE}
        AND "deletedAt" IS NULL
        AND (${nonNull})
-     ORDER BY COALESCE("shiftDate", shift_date::text) DESC, "createdAt" DESC
+     ORDER BY ${DAILY_SALES_ORDER}
      LIMIT 1`,
     [date],
   );
@@ -125,9 +136,9 @@ async function currentPayloadJsonObjectSum(date: string, paths: string[][], wher
   const res = await pool.query(
     `SELECT ${textExpressions.map((expr, index) => `${expr} AS v${index}`).join(', ')}
      FROM daily_sales_v2
-     WHERE COALESCE("shiftDate", shift_date::text) = $1
+     WHERE ${DAILY_SALES_CURRENT_WHERE}
        AND "deletedAt" IS NULL
-     ORDER BY "createdAt" DESC
+     ORDER BY ${DAILY_SALES_ORDER}
      LIMIT 1`,
     [date],
   );
@@ -135,8 +146,12 @@ async function currentPayloadJsonObjectSum(date: string, paths: string[][], wher
   if (!row) return sourceValue(null, SOURCES.dailySalesV2, where, label);
   for (const [index] of paths.entries()) {
     const value = row[`v${index}`];
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      const total = Object.values(value).reduce((sum, current) => sum + (numeric(current) ?? 0), 0);
+    if (Array.isArray(value)) {
+      const total = value.reduce((sum, current) => sum + (numeric(current?.quantity ?? current?.qty ?? current) ?? 0), 0);
+      return sourceValue(total, SOURCES.dailySalesV2, where, label);
+    }
+    if (value && typeof value === 'object') {
+      const total = Object.values(value).reduce((sum, current: any) => sum + (numeric(current?.quantity ?? current?.qty ?? current) ?? 0), 0);
       return sourceValue(total, SOURCES.dailySalesV2, where, label);
     }
   }
@@ -145,14 +160,14 @@ async function currentPayloadJsonObjectSum(date: string, paths: string[][], wher
 
 async function previousPayloadJsonObjectSum(date: string, paths: string[][], where: string, label: string): Promise<SourceValue> {
   const textExpressions = paths.map((path) => `payload${path.map((part) => `->'${part}'`).join('')}`);
-  const hasObject = textExpressions.map((expr) => `jsonb_typeof(${expr}) = 'object'`).join(' OR ');
+  const hasObject = textExpressions.map((expr) => `jsonb_typeof(${expr}) IN ('object', 'array')`).join(' OR ');
   const res = await pool.query(
     `SELECT ${textExpressions.map((expr, index) => `${expr} AS v${index}`).join(', ')}
      FROM daily_sales_v2
-     WHERE COALESCE("shiftDate", shift_date::text) < $1
+     WHERE ${DAILY_SALES_PREVIOUS_WHERE}
        AND "deletedAt" IS NULL
        AND (${hasObject})
-     ORDER BY COALESCE("shiftDate", shift_date::text) DESC, "createdAt" DESC
+     ORDER BY ${DAILY_SALES_ORDER}
      LIMIT 1`,
     [date],
   );
@@ -160,8 +175,12 @@ async function previousPayloadJsonObjectSum(date: string, paths: string[][], whe
   if (!row) return sourceValue(null, SOURCES.dailySalesV2, where, label);
   for (const [index] of paths.entries()) {
     const value = row[`v${index}`];
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      const total = Object.values(value).reduce((sum, current) => sum + (numeric(current) ?? 0), 0);
+    if (Array.isArray(value)) {
+      const total = value.reduce((sum, current) => sum + (numeric(current?.quantity ?? current?.qty ?? current) ?? 0), 0);
+      return sourceValue(total, SOURCES.dailySalesV2, where, label);
+    }
+    if (value && typeof value === 'object') {
+      const total = Object.values(value).reduce((sum, current: any) => sum + (numeric(current?.quantity ?? current?.qty ?? current) ?? 0), 0);
       return sourceValue(total, SOURCES.dailySalesV2, where, label);
     }
   }
@@ -169,8 +188,10 @@ async function previousPayloadJsonObjectSum(date: string, paths: string[][], whe
 }
 
 async function purchaseTallySum(date: string, column: string, label: string): Promise<SourceValue> {
-  const res = await pool.query(`SELECT COALESCE(SUM(${column}), 0) AS total FROM purchase_tally WHERE date = $1`, [date]);
-  return sourceValue(res.rows[0]?.total, SOURCES.purchaseTally, `purchase_tally.${column}`, label);
+  const res = await pool.query(`SELECT COALESCE(SUM(${column}), 0) AS total, COUNT(*)::int AS row_count FROM purchase_tally WHERE date = $1`, [date]);
+  return Number(res.rows[0]?.row_count ?? 0) > 0
+    ? sourceValue(res.rows[0]?.total, SOURCES.purchaseTally, `purchase_tally.${column}`, label)
+    : sourceValue(null, SOURCES.purchaseTally, `purchase_tally.${column}`, label);
 }
 
 async function rollsUsed(date: string): Promise<SourceValue> {
@@ -215,37 +236,39 @@ const itemConfigs: InventoryItemConfig[] = [
   },
   {
     label: 'Meat',
-    previous: (date) => previousPayloadValue(date, [['meatEndGrams'], ['meatWeightG']], 'previous completed Daily Sales & Stock V2 closing meat grams', 'Previous meat'),
+    previous: (date) => previousPayloadValue(date, [['meatEndGrams'], ['meatWeightG'], ['meatEnd']], 'previous completed Daily Sales & Stock V2 closing meat grams', 'Previous meat'),
     purchased: (date) => currentPayloadValue(date, [['shiftPurchases', 'meatGrams'] ], 'current Daily Sales & Stock V2 purchases meat grams', 'Purchased meat'),
     used: (date) => receiptUsageSum(date, 'COALESCE(SUM(beef_grams_used), 0)', 'receipt_truth_daily_usage.beef_grams_used', 'Meat used'),
-    actual: (date) => currentPayloadValue(date, [['meatEndGrams'], ['meatWeightG']], 'current Daily Sales & Stock V2 closing meat grams', 'Actual meat'),
+    actual: (date) => currentPayloadValue(date, [['meatEndGrams'], ['meatWeightG'], ['meatEnd']], 'current Daily Sales & Stock V2 closing meat grams', 'Actual meat'),
   },
   {
     label: 'Drinks',
     previous: (date) => previousPayloadValue(date, [['drinksTotal'], ['drinkStockTotal']], 'previous completed Daily Sales & Stock V2 closing drinks total', 'Previous drinks').then((value) => value.value === null ? previousPayloadJsonObjectSum(date, [['drinkStock'], ['drinksJson']], 'previous completed Daily Sales & Stock V2 closing drinks object', 'Previous drinks') : value),
     purchased: (date) => pool.query(
-      `SELECT COALESCE(SUM(ptd.qty), 0) AS total
+      `SELECT COALESCE(SUM(ptd.qty), 0) AS total, COUNT(*)::int AS row_count
        FROM purchase_tally pt
        JOIN purchase_tally_drink ptd ON ptd.tally_id = pt.id
        WHERE pt.date = $1`,
       [date],
-    ).then((res) => sourceValue(res.rows[0]?.total, SOURCES.purchaseTallyDrinks, 'purchase_tally_drink.qty', 'Purchased drinks')),
+    ).then((res) => Number(res.rows[0]?.row_count ?? 0) > 0
+      ? sourceValue(res.rows[0]?.total, SOURCES.purchaseTallyDrinks, 'purchase_tally_drink.qty', 'Purchased drinks')
+      : sourceValue(null, SOURCES.purchaseTallyDrinks, 'purchase_tally_drink.qty', 'Purchased drinks')),
     used: (date) => receiptUsageSum(date, 'COALESCE(SUM(COALESCE(coke_used,0)+COALESCE(coke_zero_used,0)+COALESCE(sprite_used,0)+COALESCE(water_used,0)+COALESCE(fanta_orange_used,0)+COALESCE(fanta_strawberry_used,0)+COALESCE(schweppes_manao_used,0)), 0)', 'receipt_truth_daily_usage drink usage columns', 'Drinks used'),
     actual: (date) => currentPayloadValue(date, [['drinksTotal'], ['drinkStockTotal']], 'current Daily Sales & Stock V2 closing drinks total', 'Actual drinks').then((value) => value.value === null ? currentPayloadJsonObjectSum(date, [['drinkStock'], ['drinksJson']], 'current Daily Sales & Stock V2 closing drinks object', 'Actual drinks') : value),
   },
   {
     label: 'French Fries',
-    previous: (date) => previousPayloadValue(date, [['friesEndGrams']], 'previous completed Daily Sales & Stock V2 closing fries grams', 'Previous fries'),
+    previous: (date) => previousPayloadValue(date, [['friesEndGrams'], ['friesEnd']], 'previous completed Daily Sales & Stock V2 closing fries grams', 'Previous fries'),
     purchased: (date) => purchaseTallySum(date, 'fries_grams', 'Purchased fries'),
     used: missingRecipeMappedUsage('French Fries'),
-    actual: (date) => currentPayloadValue(date, [['friesEndGrams']], 'current Daily Sales & Stock V2 closing fries grams', 'Actual fries'),
+    actual: (date) => currentPayloadValue(date, [['friesEndGrams'], ['friesEnd']], 'current Daily Sales & Stock V2 closing fries grams', 'Actual fries'),
   },
   {
     label: 'Sweet Potato Fries',
-    previous: (date) => previousPayloadValue(date, [['sweetPotatoEndGrams']], 'previous completed Daily Sales & Stock V2 closing sweet potato fries grams', 'Previous sweet potato fries'),
+    previous: (date) => previousPayloadValue(date, [['sweetPotatoEndGrams'], ['sweetPotatoEnd']], 'previous completed Daily Sales & Stock V2 closing sweet potato fries grams', 'Previous sweet potato fries'),
     purchased: (date) => purchaseTallySum(date, 'sweet_potato_grams', 'Purchased sweet potato fries'),
     used: missingRecipeMappedUsage('Sweet Potato Fries'),
-    actual: (date) => currentPayloadValue(date, [['sweetPotatoEndGrams']], 'current Daily Sales & Stock V2 closing sweet potato fries grams', 'Actual sweet potato fries'),
+    actual: (date) => currentPayloadValue(date, [['sweetPotatoEndGrams'], ['sweetPotatoEnd']], 'current Daily Sales & Stock V2 closing sweet potato fries grams', 'Actual sweet potato fries'),
   },
   {
     label: 'Bacon',
@@ -256,12 +279,24 @@ const itemConfigs: InventoryItemConfig[] = [
   },
 ];
 
+async function safeRead(read: (date: string) => Promise<SourceValue>, date: string, where: string, label: string): Promise<SourceValue> {
+  try {
+    return await read(date);
+  } catch (error: any) {
+    return {
+      value: null,
+      source: 'inventory reconciliation source',
+      blockers: [blocker('SOURCE_READ_FAILED', `${label} could not be read: ${error?.message || String(error)}`, where, 'inventory reconciliation source')],
+    };
+  }
+}
+
 async function buildItemRow(config: InventoryItemConfig, date: string): Promise<InventoryReconciliationRow> {
   const [previous, purchased, used, actual] = await Promise.all([
-    config.previous(date),
-    config.purchased(date),
-    config.used(date),
-    config.actual(date),
+    safeRead(config.previous, date, config.label, 'Previous'),
+    safeRead(config.purchased, date, config.label, 'Purchased'),
+    safeRead(config.used, date, config.label, 'Used'),
+    safeRead(config.actual, date, config.label, 'Actual'),
   ]);
   const blockers = [...previous.blockers, ...purchased.blockers, ...used.blockers, ...actual.blockers];
   const complete = blockers.length === 0;
@@ -290,6 +325,7 @@ export async function getInventoryReconciliationReport(date: string): Promise<In
   return {
     ok: true,
     source: Array.from(new Set(Object.values(SOURCES))),
+    missingSources: Array.from(new Set(blockers.map((entry) => entry.canonical_source))),
     scope: { date },
     status: blockers.length === 0 ? 'complete' : 'partial',
     data,

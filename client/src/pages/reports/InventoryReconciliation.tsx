@@ -26,6 +26,7 @@ type Row = {
 type Response = {
   ok: boolean;
   source: string[];
+  missingSources?: string[];
   scope: { date: string };
   status: 'complete' | 'partial';
   data: Row[];
@@ -40,7 +41,13 @@ function todayISO() {
 }
 
 function formatCell(value: number | null) {
-  return value === null ? 'Missing Data' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+  return value === null ? 'Missing data' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+}
+
+function formatDisplayDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const [year, month, day] = value.split('-');
+  return `${day}/${month}/${year}`;
 }
 
 function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
@@ -91,7 +98,9 @@ export default function InventoryReconciliation() {
         <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
           <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-3">
             <div className="text-sm font-semibold text-slate-800">Tracked inventory items</div>
+            <div className="text-xs text-slate-500">Shift date: {formatDisplayDate(data.scope.date)}</div>
             <div className="text-xs text-slate-500">Sources: {data.source.join(', ')}</div>
+            {(data.missingSources?.length ?? 0) > 0 && <div className="text-xs text-amber-700">Missing sources: {data.missingSources?.join(', ')}</div>}
             <div className="text-xs text-slate-500">Last updated: {new Date(data.last_updated).toLocaleString()}</div>
           </div>
           <div className="overflow-x-auto">
