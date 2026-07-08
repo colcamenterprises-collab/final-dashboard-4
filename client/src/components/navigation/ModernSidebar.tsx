@@ -16,6 +16,7 @@ import {
   List,
   ShieldCheck,
   AlertTriangle,
+  ClipboardList,
   BookOpen,
   Wallet,
   Users,
@@ -65,7 +66,8 @@ const navigationGroups: NavGroup[] = [
     defaultOpen: false,
     items: [
       { to: "/reports/receipts-analysis", label: "Receipt Analytics",             icon: BarChart3, testId: "nav-receipt-analytics" },
-      { to: "/reports/shift-reports",     label: "Shift Verification & History", icon: FileText,  testId: "nav-shift-reports" },
+      { to: "/reports/shift-reports",     label: "Shift Verification & History", icon: FileText,      testId: "nav-shift-reports" },
+      { to: "/reports/inventory-reconciliation", label: "Inventory Reconciliation", icon: ClipboardList, testId: "nav-inventory-reconciliation" },
     ],
   },
   {

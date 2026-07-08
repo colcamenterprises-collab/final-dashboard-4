@@ -489,8 +489,14 @@ router.get("/daily-stock-analysis", async (_req, res) => {
 
 const OWNER_DASHBOARD_SEVEN_DAY_SQL = `
   WITH shift_dates AS (
-    SELECT TO_CHAR(shift_date, 'YYYY-MM-DD') AS shift_date
-    FROM (SELECT DISTINCT shift_date FROM loyverse_shifts ORDER BY shift_date DESC LIMIT 7) sub
+    SELECT shift_date
+    FROM (
+      SELECT DISTINCT TO_CHAR(COALESCE("shiftDate"::date, shift_date::date, "createdAt"::date), 'YYYY-MM-DD') AS shift_date
+      FROM daily_sales_v2
+      WHERE "deletedAt" IS NULL
+      ORDER BY shift_date DESC
+      LIMIT 7
+    ) sub
   )
   SELECT
     sd.shift_date,
@@ -547,9 +553,10 @@ router.get("/owner-dashboard", async (_req, res) => {
 
   const sevenDayRows = sevenDayResult.rows;
   const latestShiftRow: any = sevenDayRows[0] ?? null;
-  const latestShiftDate: string | null = latestShiftRow?.shift_date ?? null;
 
   const latestSales = normalizeSales(salesResult.rows[0]);
+  const latestDailySalesDate = latestSales?.date ? String(latestSales.date).slice(0, 10) : null;
+  const latestShiftDate: string | null = latestDailySalesDate ?? latestShiftRow?.shift_date ?? null;
   const stockResult = await getLatestStock(latestSales?.id ?? null);
   const latestStock = normalizeStock(stockResult.rows[0]);
   blockers.push(...stockResult.blockers);
@@ -633,7 +640,7 @@ router.get("/owner-dashboard", async (_req, res) => {
 
   const actionRequired: { severity: string; title: string; message: string }[] = [];
 
-  const salesMatchesLatestShift = latestSales !== null && latestSales.date === latestShiftDate;
+  const salesMatchesLatestShift = latestSales !== null && latestDailySalesDate === latestShiftDate;
   if (!latestSales || !salesMatchesLatestShift) {
     actionRequired.push({
       severity: "high",
@@ -669,6 +676,8 @@ router.get("/owner-dashboard", async (_req, res) => {
   res.json({
     ok: blockers.length === 0 && actionRequired.filter(a => a.severity === "high").length === 0,
     latestShift,
+    latestDailySalesDate,
+    dashboardSource: "daily_sales_v2 latest completed shifts joined to lv_receipt payments",
     staffComparison,
     stockStatus,
     lastSevenShifts,

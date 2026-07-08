@@ -129,6 +129,7 @@ export default function Home() {
   const seven    = data?.lastSevenShifts ?? [];
   const mix      = data?.salesMix        ?? {};
   const health   = data?.syncHealth      ?? {};
+  const latestDailySalesDate = data?.latestDailySalesDate ?? shift?.date ?? null;
 
   const highCount = actions.filter((a: any) => a.severity === "high").length;
 
@@ -205,6 +206,8 @@ export default function Home() {
             Latest completed shift:{" "}
             <span className="font-semibold text-slate-600">{fmtDate(shift?.date)}</span>
             <span className="ml-2">· 18:00–03:00 Asia/Bangkok</span>
+            <span className="ml-2">· Daily Sales & Stock V2: </span>
+            <span className="font-semibold text-slate-600">{fmtDate(latestDailySalesDate)}</span>
           </p>
         </div>
         {highCount > 0 && (

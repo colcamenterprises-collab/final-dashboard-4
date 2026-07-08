@@ -60,7 +60,7 @@ const groups: Group[] = [
     ],
   },
   {
-    title: "Analysis",
+    title: "Reports",
     items: [
       { to: "/analysis/daily-review", label: "Sales & Shift Analysis" },
       { to: "/reports/inventory-reconciliation", label: "Inventory Reconciliation" },
