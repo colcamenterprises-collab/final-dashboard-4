@@ -474,14 +474,30 @@ const csvUploadFields = upload.fields([
   { name: 'file', maxCount: 1 },
 ]);
 
+const BANK_IMPORT_INSERT_CHUNK_SIZE = 500;
+
+function elapsedMs(startedAt: bigint): number {
+  return Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+}
+
+function logCsvUploadTiming(label: string, startedAt: bigint, context: Record<string, unknown>) {
+  console.log(`[BANK_IMPORT_UPLOAD_TIMING] ${label}: ${elapsedMs(startedAt).toFixed(1)}ms`, context);
+}
+
 // POST /api/bank-imports - Upload and parse CSV
 async function handleCsvUpload(req: any, res: any) {
+  const requestStartedAt = process.hrtime.bigint();
+  const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const timingContext: Record<string, unknown> = { uploadId };
   try {
     const uploadedFile = getUploadedCsvFile(req);
     if (!uploadedFile) {
       return res.status(400).json({ error: "No CSV file uploaded" });
     }
+    timingContext.filename = uploadedFile.originalname || 'upload.csv';
+    timingContext.bytes = uploadedFile.size;
 
+    const parseStartedAt = process.hrtime.bigint();
     const csvContent = uploadedFile.buffer.toString('utf-8');
     let records: string[][];
     try {
@@ -526,6 +542,9 @@ async function handleCsvUpload(req: any, res: any) {
         { format, headers, rowErrors }
       );
     }
+    timingContext.format = format;
+    timingContext.parsedRows = rawTxns.length;
+    logCsvUploadTiming('CSV parsed', parseStartedAt, timingContext);
 
     if (!db) {
       return res.status(503).json({
@@ -536,52 +555,89 @@ async function handleCsvUpload(req: any, res: any) {
     }
 
     // Apply vendor rules for smart suggestions
+    const supplierMatchingStartedAt = process.hrtime.bigint();
     const enhancedTxns = await applyVendorRules(rawTxns);
+    logCsvUploadTiming('Supplier matching', supplierMatchingStartedAt, {
+      ...timingContext,
+      rows: enhancedTxns.length,
+    });
 
     // Create batch
+    const insertStartedAt = process.hrtime.bigint();
     const [batch] = await db.insert(bankImportBatch).values({
       source,
       filename: uploadedFile.originalname || 'upload.csv',
       status: 'pending',
     }).returning();
 
-    // Insert transactions with deduplication
-    let inserted = 0;
-    let skippedDupes = 0;
+    const candidateRows = enhancedTxns.map((txn) => ({
+      batchId: batch.id,
+      postedAt: txn.postedAt,
+      description: txn.description,
+      amountTHB: txn.amountTHB.toString(),
+      ref: txn.ref,
+      raw: txn.raw,
+      category: txn.category,
+      supplier: txn.supplier,
+      status: 'pending' as const,
+      dedupeKey: generateDedupeKey(source, txn.postedAt, txn.amountTHB, txn.description),
+    }));
 
-    for (const txn of enhancedTxns) {
-      const dedupeKey = generateDedupeKey(source, txn.postedAt, txn.amountTHB, txn.description);
-      
-      try {
-        await db.insert(bankTxn).values({
-          batchId: batch.id,
-          postedAt: txn.postedAt,
-          description: txn.description,
-          amountTHB: txn.amountTHB.toString(),
-          ref: txn.ref,
-          raw: txn.raw,
-          category: txn.category,
-          supplier: txn.supplier,
-          status: 'pending',
-          dedupeKey,
-        });
-        inserted++;
-      } catch (error: any) {
-        if (error.code === '23505') { // Unique constraint violation
-          skippedDupes++;
-        } else {
-          throw error;
-        }
-      }
+    // Duplicate detection is done once per upload instead of as one failed insert per duplicate.
+    // The unique bank_txn.dedupe_key constraint remains the source of truth and protects races.
+    const duplicateStartedAt = process.hrtime.bigint();
+    const existingDedupeKeys = new Set<string>();
+    for (let i = 0; i < candidateRows.length; i += BANK_IMPORT_INSERT_CHUNK_SIZE) {
+      const chunk = candidateRows.slice(i, i + BANK_IMPORT_INSERT_CHUNK_SIZE);
+      if (chunk.length === 0) continue;
+      const existingRows = await db.select({ dedupeKey: bankTxn.dedupeKey })
+        .from(bankTxn)
+        .where(inArray(bankTxn.dedupeKey, chunk.map((row) => row.dedupeKey)));
+      for (const row of existingRows) existingDedupeKeys.add(row.dedupeKey);
     }
+    const rowsToInsert = candidateRows.filter((row) => !existingDedupeKeys.has(row.dedupeKey));
+    logCsvUploadTiming('Duplicate check', duplicateStartedAt, {
+      ...timingContext,
+      candidates: candidateRows.length,
+      existingDuplicates: existingDedupeKeys.size,
+      rowsToInsert: rowsToInsert.length,
+    });
 
-    res.json({
+    let inserted = 0;
+    for (let i = 0; i < rowsToInsert.length; i += BANK_IMPORT_INSERT_CHUNK_SIZE) {
+      const chunk = rowsToInsert.slice(i, i + BANK_IMPORT_INSERT_CHUNK_SIZE);
+      if (chunk.length === 0) continue;
+      const insertedRows = await db.insert(bankTxn)
+        .values(chunk)
+        .onConflictDoNothing({ target: bankTxn.dedupeKey })
+        .returning({ id: bankTxn.id });
+      inserted += insertedRows.length;
+    }
+    const skippedDupes = candidateRows.length - inserted;
+    logCsvUploadTiming('Database insert', insertStartedAt, {
+      ...timingContext,
+      batchId: batch.id,
+      inserted,
+      skippedDupes,
+      chunks: Math.ceil(rowsToInsert.length / BANK_IMPORT_INSERT_CHUNK_SIZE),
+    });
+
+    const responseBody = {
       ok: true,
       batchId: batch.id,
       inserted,
       skippedDupes,
       format,
       source,
+    };
+
+    res.json(responseBody);
+    logCsvUploadTiming('Response sent', requestStartedAt, {
+      ...timingContext,
+      batchId: batch.id,
+      inserted,
+      skippedDupes,
+      totalMs: elapsedMs(requestStartedAt).toFixed(1),
     });
 
   } catch (error: any) {
