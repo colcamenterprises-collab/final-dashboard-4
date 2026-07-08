@@ -54,6 +54,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
     notes: '',
   });
   const [deleteConfirm, setDeleteConfirm] = useState<null | { scope: 'selected' | 'all_pending'; count: number }>(null);
+  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -209,6 +210,29 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
     },
   });
 
+  const purgeMutation = useMutation({
+    mutationFn: async () => apiRequest('/api/bank-imports/purge', { method: 'POST' }),
+    onSuccess: (data) => {
+      toast({
+        title: 'Imported bank transactions purged',
+        description: `${data.purged || 0} imported bank transaction review row(s) purged. Approved Business Expenses and Shift Expenses were not changed.`,
+      });
+      setSelectedIds([]);
+      setPurgeConfirmOpen(false);
+      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
+      onApproved?.();
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Purge failed',
+        description: error.message || 'Failed to purge imported bank transactions',
+        variant: 'destructive',
+      });
+      setPurgeConfirmOpen(false);
+    },
+  });
+
   const handleSelectTransaction = (id: string) => {
     setSelectedIds(prev => 
       prev.includes(id) 
@@ -266,10 +290,12 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
       case 'approved': return 'Approved';
       case 'rejected': return 'Rejected';
       case 'deleted': return 'Deleted';
+      case 'purged': return 'Purged';
       case 'hold': return 'Hold';
       default: return 'Pending';
     }
   };
+
 
   const handleReject = (id: string) => {
     editMutation.mutate({ id, updates: { status: 'rejected' } });
@@ -318,9 +344,10 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
             {[
               ['pending_review', 'Pending Review', queueData?.counts?.pending_review ?? 0],
               ['approved', 'Approved', queueData?.counts?.approved ?? 0],
+              ['personal_owner', 'Personal', queueData?.counts?.personal_owner ?? 0],
               ['rejected_ignored', 'Rejected/Ignored', queueData?.counts?.rejected_ignored ?? 0],
-              ['personal_owner', 'Personal/Owner', queueData?.counts?.personal_owner ?? 0],
-              ['deposits_transfers', 'Deposits/Transfers', queueData?.counts?.deposits_transfers ?? 0],
+              ['deleted', 'Deleted', queueData?.counts?.deleted ?? 0],
+              ['purged', 'Purged', queueData?.counts?.purged ?? 0],
               ['all_imported', 'All Imported', queueData?.counts?.all_imported ?? 0],
             ].map(([value, label, count]) => (
               <Button
@@ -368,9 +395,10 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                   {aggregateQueue ? (<>
                     <SelectItem value="pending_review">Pending Review ({queueData?.counts?.pending_review ?? 0})</SelectItem>
                     <SelectItem value="approved">Approved ({queueData?.counts?.approved ?? 0})</SelectItem>
+                    <SelectItem value="personal_owner">Personal ({queueData?.counts?.personal_owner ?? 0})</SelectItem>
                     <SelectItem value="rejected_ignored">Rejected/Ignored ({queueData?.counts?.rejected_ignored ?? 0})</SelectItem>
-                    <SelectItem value="personal_owner">Personal/Owner ({queueData?.counts?.personal_owner ?? 0})</SelectItem>
-                    <SelectItem value="deposits_transfers">Deposits/Transfers ({queueData?.counts?.deposits_transfers ?? 0})</SelectItem>
+                    <SelectItem value="deleted">Deleted ({queueData?.counts?.deleted ?? 0})</SelectItem>
+                    <SelectItem value="purged">Purged ({queueData?.counts?.purged ?? 0})</SelectItem>
                     <SelectItem value="all_imported">All Imported ({queueData?.counts?.all_imported ?? 0})</SelectItem>
                   </>) : (<>
                     <SelectItem value="__all__">All statuses</SelectItem>
@@ -426,6 +454,10 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
             <Button size="sm" variant="outline" onClick={() => setDeleteConfirm({ scope: 'all_pending', count: queueData?.counts?.pending_all ?? visiblePendingTransactions.length })} disabled={(queueData?.counts?.pending_all ?? visiblePendingTransactions.length) === 0 || bulkDeleteMutation.isPending}>
               <Trash2 className="h-3 w-3 mr-1" />
               Delete All Pending Imported Transactions
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setPurgeConfirmOpen(true)} disabled={purgeMutation.isPending}>
+              <Trash2 className="h-3 w-3 mr-1" />
+              Purge All Imported Bank Transactions
             </Button>
           </div>
         </CardContent>
@@ -629,6 +661,23 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
             <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmBulkDelete} disabled={bulkDeleteMutation.isPending}>
               {bulkDeleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={purgeConfirmOpen} onOpenChange={setPurgeConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Purge All Imported Bank Transactions</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will soft-purge imported bank transaction review rows only. Approved Business Expenses, Shift Expenses, and Daily Sales & Stock data will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={purgeMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => purgeMutation.mutate()} disabled={purgeMutation.isPending}>
+              {purgeMutation.isPending ? 'Purging...' : 'Confirm Purge'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
