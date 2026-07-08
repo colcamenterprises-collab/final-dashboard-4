@@ -37,6 +37,11 @@ export default function BankUploadCard({ onImported }: Props) {
       });
 
       if (!res.ok) {
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const error = await res.json().catch(() => ({}));
+          throw new Error(error.reason || error.error || error.message || `Upload failed: ${res.status}`);
+        }
         const text = await res.text();
         throw new Error(text || `Upload failed: ${res.status}`);
       }

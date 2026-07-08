@@ -110,6 +110,7 @@ function reviewQueueWhere(tab: ReviewQueueTab, query: { search?: string; min?: s
 async function getReviewQueueCounts() {
   const [row] = await db.select({
     pendingReview: sql<number>`count(*) filter (where ${bankTxn.status} = 'pending' and (${bankTxn.category} is null or ${bankTxn.category} not in ${BLOCKED_CATEGORY_SQL}))`,
+    pendingAll: sql<number>`count(*) filter (where ${bankTxn.status} = 'pending')`,
     approved: sql<number>`count(*) filter (where ${bankTxn.status} = 'approved')`,
     rejectedIgnored: sql<number>`count(*) filter (where ${bankTxn.status} in ('rejected', 'deleted') or ${bankTxn.category} = 'Ignore / Duplicate')`,
     personalOwner: sql<number>`count(*) filter (where ${bankTxn.category} = 'Personal / Owner')`,
@@ -119,6 +120,7 @@ async function getReviewQueueCounts() {
 
   return {
     pending_review: Number(row?.pendingReview || 0),
+    pending_all: Number(row?.pendingAll || 0),
     approved: Number(row?.approved || 0),
     rejected_ignored: Number(row?.rejectedIgnored || 0),
     personal_owner: Number(row?.personalOwner || 0),
@@ -914,17 +916,58 @@ router.patch("/txns/:id", async (req, res) => {
 });
 
 // DELETE /api/bank-imports/txns/:id - Delete/reject transaction
+const bulkDeletePendingSchema = z.object({
+  ids: z.array(z.string()).optional(),
+  scope: z.enum(['selected', 'all_pending']).default('selected'),
+});
+
+// POST /api/bank-imports/pending/delete - Mark pending imported bank transactions as deleted.
+// This only touches bank_txn rows with status=pending; approved expenses and shift expenses are not modified.
+router.post("/pending/delete", async (req, res) => {
+  try {
+    const { ids = [], scope } = bulkDeletePendingSchema.parse(req.body || {});
+
+    if (scope === 'selected' && ids.length === 0) {
+      return res.status(400).json({ error: "No pending transaction IDs provided" });
+    }
+
+    const whereClause = scope === 'all_pending'
+      ? eq(bankTxn.status, 'pending')
+      : and(eq(bankTxn.status, 'pending'), inArray(bankTxn.id, ids));
+
+    const deletedTxns = await db.update(bankTxn)
+      .set({ status: 'deleted' })
+      .where(whereClause)
+      .returning({ id: bankTxn.id, batchId: bankTxn.batchId });
+
+    res.json({
+      ok: true,
+      scope,
+      requested: scope === 'all_pending' ? null : ids.length,
+      deleted: deletedTxns.length,
+      txns: deletedTxns,
+    });
+  } catch (error: any) {
+    console.error('Bulk delete pending bank txns error:', error);
+    res.status(500).json({
+      error: "Failed to delete pending imported bank transactions",
+      reason: error?.message || String(error),
+    });
+  }
+});
+
+// DELETE /api/bank-imports/txns/:id - Delete/reject one pending imported transaction
 router.delete("/txns/:id", async (req, res) => {
   try {
     const { id } = req.params;
 
     const [deletedTxn] = await db.update(bankTxn)
       .set({ status: 'deleted' })
-      .where(eq(bankTxn.id, id))
+      .where(and(eq(bankTxn.id, id), eq(bankTxn.status, 'pending')))
       .returning();
 
     if (!deletedTxn) {
-      return res.status(404).json({ error: "Transaction not found" });
+      return res.status(404).json({ error: "Pending transaction not found" });
     }
 
     res.json({
@@ -934,7 +977,7 @@ router.delete("/txns/:id", async (req, res) => {
 
   } catch (error) {
     console.error('Delete txn error:', error);
-    res.status(500).json({ error: "Failed to delete transaction" });
+    res.status(500).json({ error: "Failed to delete pending transaction" });
   }
 });
 

@@ -22,6 +22,19 @@ interface BankStatementUploadProps {
   onUploadComplete?: (result: UploadResult) => void;
 }
 
+async function readUploadError(response: Response): Promise<string> {
+  const contentType = response.headers.get('content-type') || '';
+  if (contentType.includes('application/json')) {
+    const error = await response.json().catch(() => ({}));
+    const primary = error.reason || error.error || error.message;
+    const detailLines = error.details?.rowErrors?.length ? ` Details: ${error.details.rowErrors.join(' ')}` : '';
+    return `${primary || `Upload failed with status ${response.status}`}${detailLines}`;
+  }
+
+  const text = await response.text().catch(() => '');
+  return text || `Upload failed with status ${response.status}`;
+}
+
 export function BankStatementUpload({ onUploadComplete }: BankStatementUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [source, setSource] = useState("CSV");
@@ -62,9 +75,7 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
       setProgress(80);
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        const detailLines = error.details?.rowErrors?.length ? ` Details: ${error.details.rowErrors.join(' ')}` : '';
-        throw new Error(`${error.reason || error.error || 'Upload failed'}${detailLines}`);
+        throw new Error(await readUploadError(response));
       }
 
       const uploadResult: UploadResult = await response.json();
