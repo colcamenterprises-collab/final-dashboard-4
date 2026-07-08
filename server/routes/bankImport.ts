@@ -213,6 +213,10 @@ function detectBankFormat(headers: string[]): BankFormat {
     return 'scb';
   }
 
+  if (compact.some(h => h.includes('debitcredit') || h.includes('ลูกหนี้เจ้าหนี้'))) {
+    return 'scb';
+  }
+
   if (headerStr.includes('debit') || headerStr.includes('credit')) {
     return 'bangkok_bank';
   }
@@ -308,13 +312,20 @@ function parseCSVRow(row: string[], format: BankFormat, headers: string[], rowNu
   let ref: string | undefined;
 
   if (format === 'scb') {
+    const singleDebitCreditCol = findColumn(headers, ['debit/credit', 'debit credit', 'ลูกหนี้/เจ้าหนี้', 'ลูกหนี้ เจ้าหนี้']);
     const withdrawalCol = findColumn(headers, ['withdrawal', 'debit', 'paid out', 'ถอน']);
     const depositCol = findColumn(headers, ['deposit', 'credit', 'paid in', 'ฝาก']);
     postedAt = parseDate(valueAt(row, dateCol >= 0 ? dateCol : 0));
     description = valueAt(row, descCol >= 0 ? descCol : 1);
-    const withdrawal = parseAmount(valueAt(row, withdrawalCol));
-    const deposit = parseAmount(valueAt(row, depositCol));
-    amountTHB = withdrawal > 0 ? withdrawal : -deposit;
+    if (singleDebitCreditCol >= 0 && (withdrawalCol === singleDebitCreditCol || depositCol === singleDebitCreditCol || depositCol < 0)) {
+      // SCB translated exports can provide one signed Debit/Credit column.
+      // This review ledger stores outflows as positive and inflows as negative.
+      amountTHB = -parseAmount(valueAt(row, singleDebitCreditCol));
+    } else {
+      const withdrawal = parseAmount(valueAt(row, withdrawalCol));
+      const deposit = parseAmount(valueAt(row, depositCol));
+      amountTHB = withdrawal > 0 ? withdrawal : -deposit;
+    }
   } else if (format === 'bangkok_bank' || format === 'krungsri') {
     const debitCol = findColumn(headers, ['debit', 'withdrawal', 'paid out', 'ถอน']);
     const creditCol = findColumn(headers, ['credit', 'deposit', 'paid in', 'ฝาก']);

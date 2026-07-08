@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Pencil, Trash2, Upload } from "lucide-react";
+import { BankStatementUpload as BankStatementUploadComponent } from "@/components/BankStatementUpload";
+import { BankTransactionReview } from "@/components/BankTransactionReview";
 
 type DashboardResponse = {
   ok: boolean;
@@ -50,6 +52,7 @@ function DataTable({ title, children }: { title: string; children: React.ReactNo
 export default function Expenses() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [showImport, setShowImport] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -85,11 +88,20 @@ export default function Expenses() {
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Finance / Expenses</h1>
           <p className="text-xs text-slate-500">Expenses are separated to prevent double counting.</p>
         </div>
-        <Button size="sm" onClick={() => navigate("/finance/expenses-import")}>
+        <Button size="sm" onClick={() => setShowImport((value) => !value)}>
           <Upload className="mr-2 h-4 w-4" />
           Import Bank Statement
         </Button>
       </div>
+
+      {showImport && (
+        <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+          <BankStatementUploadComponent onUploadComplete={() => {
+            queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
+            queryClient.invalidateQueries({ queryKey: ["/api/bank-imports", "review-queue"] });
+          }} />
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
         <SummaryBox label="Current Month Business Expenses" value={summary.current_month_business_expenses} />
@@ -128,6 +140,22 @@ export default function Expenses() {
             <tbody>
               {businessExpenses.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-400">No business expenses found.</td></tr>}
               {businessExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.date)}</td><td className="px-3 py-2">{row.supplier || "—"}</td><td className="px-3 py-2">{row.category || "UNMAPPED"}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(row.amount)}</td><td className="px-3 py-2">{row.payment_method || "—"}</td><td className="px-3 py-2">Recorded</td><td className="px-3 py-2">{formatDate(row.created_at)}</td><td className="px-3 py-2"><div className="flex justify-end gap-1"><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate(`/expenses?edit=${encodeURIComponent(row.id)}`)}><Pencil className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => deleteBusinessExpense.mutate(row.id)} disabled={deleteBusinessExpense.isPending}><Trash2 className="h-3 w-3" /></Button></div></td></tr>)}
+            </tbody>
+          </DataTable>
+
+          <DataTable title="Table 3 — Pending Imported Bank Transactions">
+            <tbody>
+              <tr>
+                <td className="p-0">
+                  <BankTransactionReview
+                    key={`${dateFrom}:${dateTo}`}
+                    aggregateQueue
+                    onApproved={() => {
+                      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
+                    }}
+                  />
+                </td>
+              </tr>
             </tbody>
           </DataTable>
         </>
