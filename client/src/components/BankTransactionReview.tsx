@@ -134,6 +134,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
         description: "Transaction details updated successfully",
       });
       queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
     },
   });
 
@@ -148,6 +149,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
         description: "Transaction deleted successfully",
       });
       queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
     },
   });
 
@@ -226,6 +228,10 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
 
   const handleReject = (id: string) => {
     editMutation.mutate({ id, updates: { status: 'rejected' } });
+  };
+
+  const handleMarkPersonal = (id: string) => {
+    editMutation.mutate({ id, updates: { category: 'Personal / Owner' } });
   };
 
   const getAmountTone = (txn: BankTransaction) => {
@@ -511,6 +517,15 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                                 title="Approve business expense"
                               >
                                 <Check className="h-3 w-3 text-green-600 mr-1" />Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleMarkPersonal(txn.id)}
+                                disabled={editMutation.isPending}
+                                title="Mark personal / owner"
+                              >
+                                Personal
                               </Button>
                               <Button
                                 size="sm"
