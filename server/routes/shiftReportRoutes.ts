@@ -30,7 +30,7 @@ const SOURCE_MAPPING = {
   dailySalesV2: {
     table: "daily_sales_v2",
     shiftDateField: "COALESCE(shift_date, shiftDate::date)",
-    fields: ["totalSales", "cashSales", "qrSales", "grabSales", "aroiSales", "cash_receipt_count", "qr_receipt_count", "grab_receipt_count"],
+    fields: ["payload.totalSales", "payload.cashSales", "payload.qrSales", "payload.grabSales", "payload.otherSales", "payload.cashReceiptCount", "payload.qrReceiptCount", "payload.grabReceiptCount", "stored column fallback"],
   },
 };
 
@@ -119,10 +119,38 @@ async function buildShiftRows(limitOrDate: number | string) {
   const isDate = typeof limitOrDate === "string";
 
   const { rows } = await db.execute(sql`
-    WITH selected_shifts AS (
-      SELECT shift_date::date AS shift_date, data
-      FROM loyverse_shifts
-      ${isDate ? sql`WHERE shift_date = ${limitOrDate}::date` : sql`ORDER BY shift_date DESC LIMIT ${sql.raw(String(limitOrDate))}`}
+    WITH forms AS (
+      SELECT DISTINCT ON (COALESCE(shift_date, NULLIF("shiftDate", '')::date, "createdAt"::date))
+        COALESCE(shift_date, NULLIF("shiftDate", '')::date, "createdAt"::date) AS shift_date,
+        id AS form_id,
+        COALESCE(NULLIF(payload->>'totalSales', '')::numeric, "totalSales"::numeric) AS staff_gross,
+        COALESCE(NULLIF(payload->>'cashSales', '')::numeric, "cashSales"::numeric) AS staff_cash,
+        COALESCE(NULLIF(payload->>'qrSales', '')::numeric, "qrSales"::numeric) AS staff_qr,
+        COALESCE(NULLIF(payload->>'grabSales', '')::numeric, "grabSales"::numeric) AS staff_grab,
+        COALESCE(NULLIF(payload->>'otherSales', '')::numeric, "aroiSales"::numeric) AS staff_other,
+        (
+          COALESCE(NULLIF(payload->>'cashReceiptCount', '')::numeric, "cash_receipt_count"::numeric, 0) +
+          COALESCE(NULLIF(payload->>'qrReceiptCount', '')::numeric, "qr_receipt_count"::numeric, 0) +
+          COALESCE(NULLIF(payload->>'grabReceiptCount', '')::numeric, "grab_receipt_count"::numeric, 0)
+        )::numeric AS staff_receipts
+      FROM daily_sales_v2
+      WHERE "deletedAt" IS NULL
+      ORDER BY COALESCE(shift_date, NULLIF("shiftDate", '')::date, "createdAt"::date), "createdAt" DESC
+    ),
+    selected_dates AS (
+      SELECT shift_date
+      FROM (
+        SELECT shift_date::date AS shift_date FROM loyverse_shifts
+        UNION
+        SELECT shift_date FROM forms
+      ) all_dates
+      WHERE shift_date IS NOT NULL
+      ${isDate ? sql`AND shift_date = ${limitOrDate}::date` : sql`ORDER BY shift_date DESC LIMIT ${sql.raw(String(limitOrDate))}`}
+    ),
+    selected_shifts AS (
+      SELECT sd.shift_date, ls.data
+      FROM selected_dates sd
+      LEFT JOIN loyverse_shifts ls ON ls.shift_date::date = sd.shift_date
     ),
     shift_reports AS (
       SELECT
@@ -158,20 +186,6 @@ async function buildShiftRows(limitOrDate: number | string) {
       ) pay
       WHERE EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= 18 OR EXTRACT(HOUR FROM datetime_bkk AT TIME ZONE 'Asia/Bangkok') < 3
       GROUP BY 1
-    ),
-    forms AS (
-      SELECT DISTINCT ON (COALESCE(shift_date, "shiftDate"::date))
-        COALESCE(shift_date, "shiftDate"::date) AS shift_date,
-        id AS form_id,
-        "totalSales"::numeric AS staff_gross,
-        "cashSales"::numeric AS staff_cash,
-        "qrSales"::numeric AS staff_qr,
-        "grabSales"::numeric AS staff_grab,
-        "aroiSales"::numeric AS staff_other,
-        (COALESCE("cash_receipt_count", 0) + COALESCE("qr_receipt_count", 0) + COALESCE("grab_receipt_count", 0))::numeric AS staff_receipts
-      FROM daily_sales_v2
-      WHERE "deletedAt" IS NULL
-      ORDER BY COALESCE(shift_date, "shiftDate"::date), "createdAt" DESC
     )
     SELECT s.shift_date, r.receipt_count, r.receipt_gross, NULL::numeric AS receipt_net, r.receipt_cash, r.receipt_qr, r.receipt_grab, r.receipt_other,
            s.shift_gross, s.shift_net, s.shift_cash, s.shift_qr, s.shift_grab,
