@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Filter, Check, X, Trash2, ChevronLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -52,6 +53,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
     supplier: '',
     notes: '',
   });
+  const [deleteConfirm, setDeleteConfirm] = useState<null | { scope: 'selected' | 'all_pending'; count: number }>(null);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -155,6 +157,8 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
 
   const queueData = txnsData as any;
   const transactions: BankTransaction[] = queueData?.txns || [];
+  const visiblePendingTransactions = useMemo(() => transactions.filter((txn) => txn.status === 'pending'), [transactions]);
+  const visiblePendingIds = useMemo(() => visiblePendingTransactions.map((txn) => txn.id), [visiblePendingTransactions]);
   const businessCategories = queueData?.allowedBusinessCategories || [
     'Food & Beverage',
     'Kitchen Supplies & Packaging',
@@ -177,6 +181,34 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
     visibleCount: transactions.length,
   };
 
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async ({ scope, ids }: { scope: 'selected' | 'all_pending'; ids?: string[] }) => {
+      return apiRequest('/api/bank-imports/pending/delete', {
+        method: 'POST',
+        body: JSON.stringify({ scope, ids }),
+      });
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Pending imports deleted",
+        description: `${data.deleted || 0} pending imported bank transactions deleted`,
+      });
+      setSelectedIds([]);
+      setDeleteConfirm(null);
+      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
+      onApproved?.();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Bulk delete failed",
+        description: error.message || "Failed to delete pending imported bank transactions",
+        variant: "destructive",
+      });
+      setDeleteConfirm(null);
+    },
+  });
+
   const handleSelectTransaction = (id: string) => {
     setSelectedIds(prev => 
       prev.includes(id) 
@@ -196,14 +228,27 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
     });
   };
 
+  const selectAllVisible = () => {
+    setSelectedIds(visiblePendingIds);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds([]);
+  };
+
   const handleBulkDelete = () => {
-    if (selectedIds.length === 0) return;
-    
-    Promise.all(
-      selectedIds.map(id => deleteMutation.mutateAsync(id))
-    ).then(() => {
-      setSelectedIds([]);
-    });
+    const pendingSelectedCount = selectedIds.filter((id) => visiblePendingIds.includes(id)).length;
+    if (pendingSelectedCount === 0) return;
+    setDeleteConfirm({ scope: 'selected', count: pendingSelectedCount });
+  };
+
+  const confirmBulkDelete = () => {
+    if (!deleteConfirm) return;
+    if (deleteConfirm.scope === 'all_pending') {
+      bulkDeleteMutation.mutate({ scope: 'all_pending' });
+      return;
+    }
+    bulkDeleteMutation.mutate({ scope: 'selected', ids: selectedIds.filter((id) => visiblePendingIds.includes(id)) });
   };
 
   const getStatusColor = (status: string) => {
@@ -366,6 +411,26 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
       </Card>
 
       {/* Bulk Actions */}
+      <Card className="border-blue-200 bg-blue-50">
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="mr-auto text-sm">
+              <span className="font-medium">{selectedIds.length}</span> selected · <span className="font-medium">{visiblePendingTransactions.length}</span> visible pending
+            </div>
+            <Button size="sm" variant="outline" onClick={selectAllVisible} disabled={visiblePendingTransactions.length === 0}>Select All Visible</Button>
+            <Button size="sm" variant="outline" onClick={clearSelection} disabled={selectedIds.length === 0}>Clear Selection</Button>
+            <Button size="sm" variant="outline" onClick={handleBulkDelete} disabled={selectedIds.length === 0 || bulkDeleteMutation.isPending}>
+              <Trash2 className="h-3 w-3 mr-1" />
+              Delete Selected
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => setDeleteConfirm({ scope: 'all_pending', count: queueData?.counts?.pending_all ?? visiblePendingTransactions.length })} disabled={(queueData?.counts?.pending_all ?? visiblePendingTransactions.length) === 0 || bulkDeleteMutation.isPending}>
+              <Trash2 className="h-3 w-3 mr-1" />
+              Delete All Pending Imported Transactions
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {selectedIds.length > 0 && (
         <Card className="border-blue-200 bg-blue-50">
           <CardContent className="pt-4">
@@ -411,10 +476,10 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                     size="sm"
                     variant="outline"
                     onClick={handleBulkDelete}
-                    disabled={deleteMutation.isPending}
+                    disabled={bulkDeleteMutation.isPending}
                   >
                     <Trash2 className="h-3 w-3 mr-1" />
-                    Delete All
+                    Delete Selected
                   </Button>
                 </div>
               </div>
@@ -437,11 +502,13 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
               {transactions.map((txn: BankTransaction) => (
                 <div key={txn.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
                   <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={selectedIds.includes(txn.id)}
-                      onCheckedChange={() => handleSelectTransaction(txn.id)}
-                      className="mt-1"
-                    />
+                    <label className="mt-1 flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
+                      <Checkbox
+                        checked={selectedIds.includes(txn.id)}
+                        onCheckedChange={() => handleSelectTransaction(txn.id)}
+                      />
+                      <span>Select</span>
+                    </label>
                     <div className="min-w-0 flex-1 space-y-3">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
@@ -556,6 +623,25 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={deleteConfirm !== null} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm pending bank import deletion</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm?.scope === 'all_pending'
+                ? `This will mark ${deleteConfirm?.count || 0} pending imported bank transaction(s) as deleted. Approved Business Expenses and Shift Expenses will not be changed.`
+                : `This will mark ${deleteConfirm?.count || 0} selected pending imported bank transaction(s) as deleted. Approved Business Expenses and Shift Expenses will not be changed.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBulkDelete} disabled={bulkDeleteMutation.isPending}>
+              {bulkDeleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
