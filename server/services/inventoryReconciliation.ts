@@ -1,4 +1,5 @@
 import { pool } from '../db';
+import { shiftWindow } from './time/shiftWindow.js';
 
 export type ReconciliationStatus = 'OK' | 'FLAG' | 'Missing Data';
 
@@ -52,7 +53,7 @@ const SOURCES = {
   dailySalesV2: 'Daily Sales & Stock V2',
   purchaseTally: 'purchase_tally',
   purchaseTallyDrinks: 'purchase_tally + purchase_tally_drink',
-  receiptTruth: 'receipt_truth_daily_usage',
+  posReceipts: 'lv_receipt + lv_line_item',
   recipeMapping: 'recipe mapping',
 };
 
@@ -66,15 +67,38 @@ const DAILY_SALES_CURRENT_WHERE = `${DAILY_SALES_DATE_EXPR} = $1::date`;
 const DAILY_SALES_PREVIOUS_WHERE = `${DAILY_SALES_DATE_EXPR} < $1::date`;
 const DAILY_SALES_ORDER = `${DAILY_SALES_DATE_EXPR} DESC, "createdAt" DESC`;
 
-const BURGER_CATEGORIES = [
-  'Burgers',
-  'Smash Burgers',
-  'Burger Sets',
-  'Burger Sets (Meal Deals)',
-  'Smash Burger Sets (Meal Deals)',
-  'Kids',
-  'Kids Will Love This',
-];
+const POS_USAGE_ITEM_RULES: Record<string, { rolls: number; meatGrams: number }> = {
+  'single burger': { rolls: 1, meatGrams: 90 },
+  'single smash burger': { rolls: 1, meatGrams: 90 },
+  'double burger': { rolls: 1, meatGrams: 180 },
+  'ultimate double': { rolls: 1, meatGrams: 180 },
+  'triple burger': { rolls: 1, meatGrams: 270 },
+  'super double bacon and cheese': { rolls: 1, meatGrams: 180 },
+  'super double bacon and cheese set': { rolls: 1, meatGrams: 180 },
+  'single set': { rolls: 1, meatGrams: 90 },
+  'single meal set': { rolls: 1, meatGrams: 90 },
+  'double set': { rolls: 1, meatGrams: 180 },
+  'double meal set': { rolls: 1, meatGrams: 180 },
+  'triple set': { rolls: 1, meatGrams: 270 },
+  'triple meal set': { rolls: 1, meatGrams: 270 },
+};
+
+const TRACKED_DRINK_NAMES = new Set([
+  'bottled water',
+  'bottle water',
+  'coke',
+  'coke can',
+  'coke zero',
+  'fanta orange',
+  'fanta strawberry',
+  'kids juice apple',
+  'kids juice orange',
+  'schweppes manow',
+  'schweppes manao',
+  'schweppes lime',
+  'soda water',
+  'sprite',
+]);
 
 function blocker(code: string, message: string, where: string, canonical_source: string): Blocker {
   return { code, message, where, canonical_source, auto_build_attempted: false };
@@ -194,28 +218,58 @@ async function purchaseTallySum(date: string, column: string, label: string): Pr
     : sourceValue(null, SOURCES.purchaseTally, `purchase_tally.${column}`, label);
 }
 
-async function rollsUsed(date: string): Promise<SourceValue> {
-  const res = await pool.query(
-    `SELECT COALESCE(SUM(quantity_sold), 0) AS total, COUNT(*)::int AS row_count
-     FROM receipt_truth_daily_usage
-     WHERE business_date = $1
-       AND category_name = ANY($2::text[])
-       AND item_name NOT LIKE 'Add-ons%'`,
-    [date, BURGER_CATEGORIES],
-  );
-  return Number(res.rows[0]?.row_count ?? 0) > 0
-    ? sourceValue(res.rows[0]?.total, SOURCES.receiptTruth, 'receipt_truth_daily_usage.quantity_sold', 'Rolls used')
-    : sourceValue(null, SOURCES.receiptTruth, 'receipt_truth_daily_usage burger/set rows', 'Rolls used');
+function normalizePosItemName(name: unknown): string {
+  return String(name ?? '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/&/g, 'and')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
 }
 
-async function receiptUsageSum(date: string, expression: string, where: string, label: string): Promise<SourceValue> {
+async function receiptLineItemsForShift(date: string): Promise<Array<{ name: string; qty: number }>> {
+  const { fromISO, toISO } = shiftWindow(date);
   const res = await pool.query(
-    `SELECT ${expression} AS total, COUNT(*)::int AS row_count FROM receipt_truth_daily_usage WHERE business_date = $1`,
-    [date],
+    `SELECT li.name, SUM(li.qty)::numeric AS qty
+     FROM lv_line_item li
+     JOIN lv_receipt r ON r.receipt_id = li.receipt_id
+     WHERE r.datetime_bkk >= $1::timestamptz
+       AND r.datetime_bkk < $2::timestamptz
+       AND COALESCE(r.raw_json->>'receipt_type', '') <> 'REFUND'
+     GROUP BY li.name`,
+    [fromISO, toISO],
   );
-  return Number(res.rows[0]?.row_count ?? 0) > 0
-    ? sourceValue(res.rows[0]?.total, SOURCES.receiptTruth, where, label)
-    : sourceValue(null, SOURCES.receiptTruth, 'receipt_truth_daily_usage rows', label);
+  return res.rows.map((row) => ({ name: String(row.name ?? ''), qty: numeric(row.qty) ?? 0 }));
+}
+
+async function mappedReceiptUsage(date: string, usage: 'rolls' | 'meat' | 'drinks'): Promise<SourceValue> {
+  const rows = await receiptLineItemsForShift(date);
+  let total = 0;
+
+  for (const row of rows) {
+    const normalizedName = normalizePosItemName(row.name);
+    const qty = row.qty;
+    const burgerRule = POS_USAGE_ITEM_RULES[normalizedName];
+
+    if (usage === 'rolls' && burgerRule) total += qty * burgerRule.rolls;
+    if (usage === 'meat' && burgerRule) total += qty * burgerRule.meatGrams;
+    if (usage === 'drinks' && TRACKED_DRINK_NAMES.has(normalizedName)) total += qty;
+  }
+
+  if (rows.length === 0) {
+    return sourceValue(null, SOURCES.posReceipts, 'lv_receipt/lv_line_item shift window', usage === 'rolls' ? 'Rolls used' : usage === 'meat' ? 'Meat used' : 'Drinks used');
+  }
+
+  return sourceValue(
+    total,
+    SOURCES.posReceipts,
+    usage === 'rolls'
+      ? 'lv_line_item.name hard-coded burger/set mapping'
+      : usage === 'meat'
+        ? 'lv_line_item.name hard-coded 90g patty mapping'
+        : 'lv_line_item.name hard-coded tracked drinks mapping',
+    usage === 'rolls' ? 'Rolls used' : usage === 'meat' ? 'Meat used' : 'Drinks used',
+  );
 }
 
 function missingRecipeMappedUsage(item: string): () => Promise<SourceValue> {
@@ -231,14 +285,14 @@ const itemConfigs: InventoryItemConfig[] = [
     label: 'Burger Buns / Rolls',
     previous: (date) => previousPayloadValue(date, [['rollsEnd'], ['burgerBunsStock']], 'previous completed Daily Sales & Stock V2 closing rolls', 'Previous rolls'),
     purchased: (date) => currentPayloadValue(date, [['shiftPurchases', 'rollsPcs'], ['rollsOrderedCount']], 'current Daily Sales & Stock V2 purchases rolls', 'Purchased rolls'),
-    used: rollsUsed,
+    used: (date) => mappedReceiptUsage(date, 'rolls'),
     actual: (date) => currentPayloadValue(date, [['rollsEnd'], ['burgerBunsStock']], 'current Daily Sales & Stock V2 closing rolls', 'Actual rolls'),
   },
   {
     label: 'Meat',
     previous: (date) => previousPayloadValue(date, [['meatEndGrams'], ['meatWeightG'], ['meatEnd']], 'previous completed Daily Sales & Stock V2 closing meat grams', 'Previous meat'),
     purchased: (date) => currentPayloadValue(date, [['shiftPurchases', 'meatGrams'] ], 'current Daily Sales & Stock V2 purchases meat grams', 'Purchased meat'),
-    used: (date) => receiptUsageSum(date, 'COALESCE(SUM(beef_grams_used), 0)', 'receipt_truth_daily_usage.beef_grams_used', 'Meat used'),
+    used: (date) => mappedReceiptUsage(date, 'meat'),
     actual: (date) => currentPayloadValue(date, [['meatEndGrams'], ['meatWeightG'], ['meatEnd']], 'current Daily Sales & Stock V2 closing meat grams', 'Actual meat'),
   },
   {
@@ -253,7 +307,7 @@ const itemConfigs: InventoryItemConfig[] = [
     ).then((res) => Number(res.rows[0]?.row_count ?? 0) > 0
       ? sourceValue(res.rows[0]?.total, SOURCES.purchaseTallyDrinks, 'purchase_tally_drink.qty', 'Purchased drinks')
       : sourceValue(null, SOURCES.purchaseTallyDrinks, 'purchase_tally_drink.qty', 'Purchased drinks')),
-    used: (date) => receiptUsageSum(date, 'COALESCE(SUM(COALESCE(coke_used,0)+COALESCE(coke_zero_used,0)+COALESCE(sprite_used,0)+COALESCE(water_used,0)+COALESCE(fanta_orange_used,0)+COALESCE(fanta_strawberry_used,0)+COALESCE(schweppes_manao_used,0)), 0)', 'receipt_truth_daily_usage drink usage columns', 'Drinks used'),
+    used: (date) => mappedReceiptUsage(date, 'drinks'),
     actual: (date) => currentPayloadValue(date, [['drinksTotal'], ['drinkStockTotal']], 'current Daily Sales & Stock V2 closing drinks total', 'Actual drinks').then((value) => value.value === null ? currentPayloadJsonObjectSum(date, [['drinkStock'], ['drinksJson']], 'current Daily Sales & Stock V2 closing drinks object', 'Actual drinks') : value),
   },
   {
