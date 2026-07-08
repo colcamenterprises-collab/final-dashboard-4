@@ -389,6 +389,42 @@ function logMissingVendorRuleWarning(where: string, error: any) {
   });
 }
 
+
+async function resolveBusinessExpenseRestaurantId(req: any): Promise<{ restaurantId?: string; error?: any }> {
+  const requestedRestaurantId = typeof req.headers['x-restaurant-id'] === 'string'
+    ? req.headers['x-restaurant-id'].trim()
+    : '';
+
+  if (requestedRestaurantId) {
+    const { rows } = await db.execute(sql`
+      SELECT id FROM restaurants WHERE id = ${requestedRestaurantId} LIMIT 1
+    `);
+    if (rows?.[0]?.id) return { restaurantId: String(rows[0].id) };
+  }
+
+  const { rows: existingBusinessRows } = await db.execute(sql`
+    SELECT e."restaurantId" AS id
+    FROM expenses e
+    JOIN restaurants r ON r.id = e."restaurantId"
+    WHERE COALESCE(e.source, 'DIRECT') NOT IN ('SHIFT_FORM', 'STOCK_LODGMENT')
+    ORDER BY e."createdAt" DESC NULLS LAST
+    LIMIT 1
+  `);
+  if (existingBusinessRows?.[0]?.id) {
+    return { restaurantId: String(existingBusinessRows[0].id) };
+  }
+
+  return {
+    error: {
+      code: 'BANK_IMPORT_RESTAURANT_CONTEXT_MISSING',
+      message: 'Cannot approve bank transactions because no valid restaurant context is available for business expenses.',
+      where: 'bank_import_approval.restaurantId',
+      canonical_source: 'expenses.restaurantId / restaurants.id',
+      auto_build_attempted: false,
+    },
+  };
+}
+
 function missingVendorRuleWarning(where: string) {
   return {
     code: 'VENDOR_RULE_TABLE_MISSING',
@@ -722,6 +758,16 @@ router.post("/:batchId/approve", async (req, res) => {
       return res.status(400).json({ error: "No transactions found to approve" });
     }
 
+    const restaurantContext = await resolveBusinessExpenseRestaurantId(req);
+    if (!restaurantContext.restaurantId) {
+      return res.status(400).json({
+        ok: false,
+        error: restaurantContext.error?.message || "Restaurant context is required for approval",
+        blockers: [restaurantContext.error],
+      });
+    }
+    const restaurantId = restaurantContext.restaurantId;
+
     const approvedTxns: any[] = [];
     const blockers: any[] = [];
 
@@ -792,7 +838,7 @@ router.post("/:batchId/approve", async (req, res) => {
         INSERT INTO expenses (id, "restaurantId", "shiftDate", supplier, "costCents", item, "expenseType", meta, source, "createdAt")
         VALUES (
           ${expenseId},
-          ${req.headers['x-restaurant-id'] || 'sbb'},
+          ${restaurantId},
           ${txn.postedAt},
           ${supplier},
           ${expenseAmountTHB},
