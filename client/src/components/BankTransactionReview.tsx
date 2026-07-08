@@ -104,7 +104,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
       toast({
         title: data.blockers?.length ? "Approval completed with blockers" : "Transactions approved",
         description: data.blockers?.length
-          ? `${data.approved} approved; ${data.blockers.length} blocked. Supplier and category are required.`
+          ? `${data.approved} approved; ${data.blockers.length} blocked. Classification/category is required for business expenses.`
           : `${data.approved} transactions approved successfully`,
         variant: data.blockers?.length ? "destructive" : undefined,
       });
@@ -454,7 +454,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                   </Select>
                   
                   <Input
-                    placeholder="Set supplier"
+                    placeholder="Set supplier/description"
                     className="w-32"
                     value={bulkDefaults.supplier}
                     onChange={(e) => setBulkDefaults(prev => ({ ...prev, supplier: e.target.value }))}
@@ -544,26 +544,17 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                         </div>
 
                         <div className="space-y-1">
-                          <Label className="text-[11px]">Supplier</Label>
+                          <Label className="text-[11px]">Supplier / Description</Label>
                           <Input
-                            key={`${txn.id}:${txn.supplier || ''}`}
-                            defaultValue={txn.supplier || ''}
-                            placeholder={txn.merchantSuggestion || 'Required for business expenses'}
+                            key={`${txn.id}:${txn.supplier || txn.merchantSuggestion || txn.description || ''}`}
+                            defaultValue={txn.supplier || txn.merchantSuggestion || txn.description || ''}
+                            placeholder="Optional supplier/description"
                             onBlur={(e) => editMutation.mutate({ id: txn.id, updates: { supplier: e.target.value } })}
                             disabled={txn.status !== 'pending' || editMutation.isPending}
                             className="h-9 w-full"
+                            aria-label="Supplier / Description"
                           />
-                          {txn.merchantSuggestion && !txn.supplier && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              className="h-auto px-0 py-1 text-left text-xs"
-                              onClick={() => editMutation.mutate({ id: txn.id, updates: { supplier: txn.merchantSuggestion } })}
-                            >
-                              Use suggestion: {txn.merchantSuggestion}
-                            </Button>
-                          )}
+                          <p className="text-[10px] text-slate-500">Defaults to imported bank statement text; edit only if needed.</p>
                         </div>
                       </div>
 

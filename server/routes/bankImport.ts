@@ -142,7 +142,7 @@ function inferTransactionType(amountTHB: number, description: string, category?:
 function readableActionFor(type: TransactionType): string {
   switch (type) {
     case 'business_expense':
-      return 'Can approve after supplier and category are confirmed.';
+      return 'Can approve after classification/category is confirmed; supplier/description defaults to the bank statement text.';
     case 'personal':
       return 'Blocked: Personal / Owner rows cannot create business expenses.';
     case 'deposit':
@@ -803,10 +803,25 @@ router.post("/:batchId/approve", async (req, res) => {
         continue;
       }
 
-      const supplier = defaults?.supplier || txn.supplier;
-      const category = defaults?.category || txn.category;
+      const statementSupplierText = String(txn.supplier || txn.description || '').trim();
+      const supplier = String(defaults?.supplier || statementSupplierText).trim();
+      const category = String(defaults?.category || txn.category || '').trim();
 
-      const transactionType = inferTransactionType(amountTHB, txn.description, category);
+      const postedAt = txn.postedAt instanceof Date ? txn.postedAt : new Date(txn.postedAt);
+      const description = String(txn.description || '').trim();
+
+      if (!description || Number.isNaN(postedAt.getTime())) {
+        blockers.push({
+          code: 'BANK_TXN_TRANSACTION_DATA_INVALID',
+          message: 'Transaction date and description are required before approval can create an expense.',
+          where: `bank_txn:${txn.id}`,
+          canonical_source: 'bank_txn',
+          auto_build_attempted: false,
+        });
+        continue;
+      }
+
+      const transactionType = inferTransactionType(amountTHB, description, category);
 
       if (transactionType !== 'business_expense') {
         blockers.push({
@@ -819,10 +834,10 @@ router.post("/:batchId/approve", async (req, res) => {
         continue;
       }
 
-      if (!supplier || !category) {
+      if (!category) {
         blockers.push({
-          code: 'BANK_TXN_EXPENSE_MAPPING_INCOMPLETE',
-          message: 'Supplier and category are required before approval can create an expense.',
+          code: 'BANK_TXN_CLASSIFICATION_REQUIRED',
+          message: 'Classification/category is required before approval can create an expense.',
           where: `bank_txn:${txn.id}`,
           canonical_source: 'bank_txn',
           auto_build_attempted: false,
@@ -841,10 +856,10 @@ router.post("/:batchId/approve", async (req, res) => {
         VALUES (
           ${expenseId},
           ${restaurantId},
-          ${txn.postedAt},
+          ${postedAt},
           ${supplier},
           ${expenseAmountTHB},
-          ${txn.description},
+          ${description},
           ${category},
           ${JSON.stringify({
             source: 'bank_import',
