@@ -29,7 +29,7 @@ import MenuWorkspace from "./pages/menu/MenuWorkspace";
 
 import FinanceHub from "./pages/finance/FinanceHub";
 import ProfitLoss from "./pages/finance/ProfitLoss";
-import Expenses from "./pages/finance/Expenses";
+import Expenses from "./pages/finance/ExpensesPersonal";
 import ExpensesImport from "./pages/finance/ExpensesImport";
 
 import ShiftReports from "./pages/reports/ShiftReports";
@@ -88,7 +88,6 @@ export default function App() {
                   <Route path="/ordering/tablet" element={<OrderPage tablet />} />
                   <Route path="/kitchen/display" element={<KitchenDisplay />} />
                   <Route element={<PageShell />}>
-                    {/* Core */}
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
@@ -100,14 +99,10 @@ export default function App() {
                     <Route path="/operations/daily-sales-library" element={<Navigate to="/operations/daily-sales-v2/library" replace />} />
                     <Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} />
                     <Route path="/operations/purchase-lodgement" element={<ProtectedRoute><PurchaseLodgement /></ProtectedRoute>} />
-
-                    {/* Operations Tools */}
                     <Route path="/operations/shopping-list" element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />
                     <Route path="/operations/issue-register" element={<ProtectedRoute><IssueRegister /></ProtectedRoute>} />
                     <Route path="/operations/manager-checklist" element={<ProtectedRoute><ManagerChecklist /></ProtectedRoute>} />
                     <Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
-
-                    {/* Menu */}
                     <Route path="/menu/items" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/recipes" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/recipes/new" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
@@ -116,26 +111,18 @@ export default function App() {
                     <Route path="/menu/categories" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/ingredients" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/cost-calculator" element={<ProtectedRoute><Navigate to="/menu/recipes" replace /></ProtectedRoute>} />
-
-                    {/* Finance */}
                     <Route path="/finance" element={<ProtectedRoute><FinanceHub /></ProtectedRoute>} />
                     <Route path="/finance/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
                     <Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                     <Route path="/finance/expenses-import" element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
-
-                    {/* Reports */}
                     <Route path="/reports/shift-reports" element={<ProtectedRoute><ShiftReports /></ProtectedRoute>} />
                     <Route path="/reports/shift-history" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
                     <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
                     <Route path="/reports/receipts-analysis" element={<ProtectedRoute><ReceiptAnalytics /></ProtectedRoute>} />
                     <Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><InventoryReconciliation /></ProtectedRoute>} />
-
-                    {/* Online Ordering (customer-facing) */}
                     <Route path="/online-ordering" element={<OnlineOrdering />} />
                     <Route path="/online-ordering/checkout" element={<Checkout />} />
                     <Route path="/online-ordering/confirmation" element={<Confirmation />} />
-
-                    {/* Admin Ordering */}
                     <Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
                     <Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
                     <Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
@@ -143,15 +130,12 @@ export default function App() {
                     <Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
                     <Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
                     <Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
-
-                    {/* Staff Operations */}
                     <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
                     <Route path="/staff/members" element={<ProtectedRoute><StaffMembers /></ProtectedRoute>} />
                     <Route path="/staff/roster" element={<ProtectedRoute><StaffRoster /></ProtectedRoute>} />
                     <Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} />
                     <Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} />
                     <Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} />
-
                     <Route path="*" element={<NotFound />} />
                   </Route>
                 </Routes>
