@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Pencil, Trash2, Upload } from "lucide-react";
+import { Download, Pencil, Trash2, Upload } from "lucide-react";
 import { BankStatementUpload as BankStatementUploadComponent } from "@/components/BankStatementUpload";
 import { BankTransactionReview } from "@/components/BankTransactionReview";
 
@@ -15,6 +15,16 @@ type DashboardResponse = {
     businessExpenses: any[];
     bankReviewQueue: any[];
   };
+};
+
+type PersonalTransaction = {
+  id: string;
+  batchId?: string;
+  postedAt: string;
+  description: string;
+  amountTHB: string | number;
+  ref?: string;
+  supplier?: string;
 };
 
 function formatDate(value: string) {
@@ -29,6 +39,11 @@ function money(value: number | string | null | undefined) {
   return `฿${amount.toLocaleString("en-TH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
+function csvCell(value: unknown) {
+  const text = value == null ? "" : String(value);
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
 function SummaryBox({ label, value }: { label: string; value: number | string | null | undefined }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -38,10 +53,13 @@ function SummaryBox({ label, value }: { label: string; value: number | string | 
   );
 }
 
-function DataTable({ title, children }: { title: string; children: React.ReactNode }) {
+function DataTable({ title, actions, children }: { title: string; actions?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h2>
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h2>
+        {actions}
+      </div>
       <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
         <table className="w-full min-w-[760px] text-xs">{children}</table>
       </div>
@@ -55,6 +73,7 @@ export default function Expenses() {
   const [showImport, setShowImport] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [exportedPersonalIds, setExportedPersonalIds] = useState<string[]>([]);
 
   const query = new URLSearchParams();
   if (dateFrom) query.set("dateFrom", dateFrom);
@@ -69,9 +88,27 @@ export default function Expenses() {
     },
   });
 
+  const personalQuery = useQuery<any>({
+    queryKey: ["/api/bank-imports/review-queue", "personal", dateFrom, dateTo],
+    queryFn: async () => {
+      const response = await fetch("/api/bank-imports/review-queue?tab=personal&limit=1000");
+      if (!response.ok) throw new Error("Failed to load personal expenses");
+      return response.json();
+    },
+  });
+
   const summary = data?.data?.summary || {};
   const inShiftExpenses = data?.data?.inShiftExpenses || [];
   const businessExpenses = data?.data?.businessExpenses || [];
+  const allPersonalTransactions: PersonalTransaction[] = personalQuery.data?.txns || [];
+
+  const personalTransactions = useMemo(() => allPersonalTransactions.filter((row) => {
+    const date = row.postedAt?.slice(0, 10);
+    if (dateFrom && date < dateFrom) return false;
+    if (dateTo && date > dateTo) return false;
+    return true;
+  }), [allPersonalTransactions, dateFrom, dateTo]);
+
   const deleteBusinessExpense = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/expensesV2/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -80,6 +117,53 @@ export default function Expenses() {
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] }),
   });
+
+  const deleteExportedPersonal = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        const response = await fetch(`/api/bank-imports/txns/${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (!response.ok) throw new Error("Failed to delete exported personal transaction");
+      }
+      return { deleted: ids.length };
+    },
+    onSuccess: () => {
+      setExportedPersonalIds([]);
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
+    },
+  });
+
+  const exportPersonalCsv = () => {
+    if (personalTransactions.length === 0) return;
+    const rows = [
+      ["Date", "Description", "Amount THB", "Reference", "Supplier", "Batch ID"],
+      ...personalTransactions.map((row) => [
+        row.postedAt?.slice(0, 10) || "",
+        row.description,
+        Math.abs(Number(row.amountTHB || 0)).toFixed(2),
+        row.ref || "",
+        row.supplier || "",
+        row.batchId || "",
+      ]),
+    ];
+    const csv = rows.map((row) => row.map(csvCell).join(",")).join("\n");
+    const blob = new Blob(["\uFEFF", csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `personal-expenses-${dateFrom || "all"}-to-${dateTo || "all"}.csv`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setExportedPersonalIds(personalTransactions.map((row) => row.id));
+  };
+
+  const confirmDeleteExported = () => {
+    if (exportedPersonalIds.length === 0) return;
+    const confirmed = window.confirm(`Delete ${exportedPersonalIds.length} exported personal transaction(s)? This will not affect Business Expenses or Shift Expenses.`);
+    if (confirmed) deleteExportedPersonal.mutate(exportedPersonalIds);
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
@@ -144,18 +228,18 @@ export default function Expenses() {
           </DataTable>
 
           <DataTable title="Table 3 — Pending Imported Bank Transactions">
+            <tbody><tr><td className="p-0"><BankTransactionReview key={`${dateFrom}:${dateTo}`} aggregateQueue onApproved={() => {
+              queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
+              queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal"] });
+            }} /></td></tr></tbody>
+          </DataTable>
+
+          <DataTable title="Table 4 — Personal Expenses" actions={<div className="flex gap-2"><Button size="sm" variant="outline" onClick={exportPersonalCsv} disabled={personalTransactions.length === 0 || personalQuery.isLoading}><Download className="mr-2 h-4 w-4" />Export CSV</Button><Button size="sm" variant="outline" onClick={confirmDeleteExported} disabled={exportedPersonalIds.length === 0 || deleteExportedPersonal.isPending}><Trash2 className="mr-2 h-4 w-4" />Delete Exported</Button></div>}>
+            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Batch</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Export Status</th></tr></thead>
             <tbody>
-              <tr>
-                <td className="p-0">
-                  <BankTransactionReview
-                    key={`${dateFrom}:${dateTo}`}
-                    aggregateQueue
-                    onApproved={() => {
-                      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
-                    }}
-                  />
-                </td>
-              </tr>
+              {personalQuery.isLoading && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400">Loading personal expenses...</td></tr>}
+              {!personalQuery.isLoading && personalTransactions.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400">No personal expenses found for this date range.</td></tr>}
+              {personalTransactions.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.postedAt)}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2">{row.ref || "—"}</td><td className="px-3 py-2 font-mono text-[10px]">{row.batchId || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(Math.abs(Number(row.amountTHB || 0)))}</td><td className="px-3 py-2">{exportedPersonalIds.includes(row.id) ? "Exported" : "Ready"}</td></tr>)}
             </tbody>
           </DataTable>
         </>
