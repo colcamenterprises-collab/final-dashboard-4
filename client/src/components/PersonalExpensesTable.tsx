@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type PersonalTransaction = {
   id: string;
@@ -25,12 +26,14 @@ function csvCell(value: unknown) {
   return `"${String(value ?? "").replace(/"/g, '""')}"`;
 }
 
-export function PersonalExpensesTable({ dateFrom, dateTo }: { dateFrom: string; dateTo: string }) {
+export function PersonalExpensesTable({ dateFrom = "", dateTo = "" }: { dateFrom?: string; dateTo?: string }) {
   const queryClient = useQueryClient();
+  const [filterFrom, setFilterFrom] = useState(dateFrom);
+  const [filterTo, setFilterTo] = useState(dateTo);
   const [exportedIds, setExportedIds] = useState<string[]>([]);
 
   const { data, isLoading } = useQuery<any>({
-    queryKey: ["/api/bank-imports/review-queue", "personal", dateFrom, dateTo],
+    queryKey: ["/api/bank-imports/review-queue", "personal"],
     queryFn: async () => {
       const response = await fetch("/api/bank-imports/review-queue?tab=personal&limit=1000");
       if (!response.ok) throw new Error("Failed to load personal expenses");
@@ -42,11 +45,11 @@ export function PersonalExpensesTable({ dateFrom, dateTo }: { dateFrom: string; 
     const all: PersonalTransaction[] = data?.txns || [];
     return all.filter((row) => {
       const date = row.postedAt?.slice(0, 10) || "";
-      if (dateFrom && date < dateFrom) return false;
-      if (dateTo && date > dateTo) return false;
+      if (filterFrom && date < filterFrom) return false;
+      if (filterTo && date > filterTo) return false;
       return true;
     });
-  }, [data, dateFrom, dateTo]);
+  }, [data, filterFrom, filterTo]);
 
   const deleteExported = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -73,7 +76,7 @@ export function PersonalExpensesTable({ dateFrom, dateTo }: { dateFrom: string; 
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `personal-expenses-${dateFrom || "all"}-to-${dateTo || "all"}.csv`;
+    link.download = `personal-expenses-${filterFrom || "all"}-to-${filterTo || "all"}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -83,15 +86,21 @@ export function PersonalExpensesTable({ dateFrom, dateTo }: { dateFrom: string; 
 
   const removeExported = () => {
     if (!exportedIds.length) return;
-    if (window.confirm(`Delete ${exportedIds.length} exported personal transaction(s)?`)) {
+    if (window.confirm(`Delete ${exportedIds.length} exported personal transaction(s)? This will not affect Business Expenses or Shift Expenses.`)) {
       deleteExported.mutate(exportedIds);
     }
   };
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Table 4 — Personal Expenses</h2>
+      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Table 4 — Personal Expenses</h2>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Input type="date" value={filterFrom} onChange={(event) => setFilterFrom(event.target.value)} className="h-8 w-40 text-xs" aria-label="Personal expenses start date" />
+            <Input type="date" value={filterTo} onChange={(event) => setFilterTo(event.target.value)} className="h-8 w-40 text-xs" aria-label="Personal expenses end date" />
+          </div>
+        </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={exportCsv} disabled={!rows.length || isLoading}>
             <Download className="mr-2 h-4 w-4" />Export CSV
