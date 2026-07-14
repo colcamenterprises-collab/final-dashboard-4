@@ -25,6 +25,7 @@ import {
   Settings,
   QrCode,
   Monitor,
+  CookingPot,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
@@ -78,6 +79,15 @@ const navigationGroups: NavGroup[] = [
       { to: "/menu/recipes",     label: "Recipes & Costing",   icon: BookOpen,        testId: "nav-recipes" },
       { to: "/menu/modifiers",   label: "Modifiers",           icon: List,            testId: "nav-modifiers" },
       { to: "/menu/categories",  label: "Categories",          icon: List,            testId: "nav-menu-categories" },
+    ],
+  },
+  {
+    title: "POS",
+    defaultOpen: true,
+    items: [
+      { to: "/pos",         label: "Register POS",          icon: ShoppingBag,    testId: "nav-pos-register" },
+      { to: "/pos/kitchen", label: "Kitchen Tickets",       icon: CookingPot,     testId: "nav-pos-kitchen" },
+      { to: "/pos/display", label: "Customer Ticket Display", icon: Monitor,      testId: "nav-pos-display" },
     ],
   },
   {
