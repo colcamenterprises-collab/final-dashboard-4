@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { pool } from "../db";
+import { attachSessionUser } from "../middleware/sessionAuth";
 
 const router = Router();
 const fail = (res: Response, message: string, status = 400) => res.status(status).json({ ok: false, source: "sbb_pos_core", error: message });
@@ -7,6 +8,7 @@ const db = () => { if (!pool) throw new Error("POS database is unavailable"); re
 const value = (input: unknown) => { const n = Number(input); return Number.isFinite(n) ? n : 0; };
 function staffDevice(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV !== "production") return next();
+  if (attachSessionUser(req)) return next();
   if (!process.env.POS_DEVICE_TOKEN || req.header("x-pos-device-token") !== process.env.POS_DEVICE_TOKEN) return fail(res, "Registered POS device required", 401);
   next();
 }
