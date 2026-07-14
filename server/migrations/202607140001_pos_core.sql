@@ -1,0 +1,15 @@
+-- POS Core: live order/ticket workflow only. Dashboard remains owner of reporting, inventory and finance.
+ALTER TABLE ordering_menu_items ADD COLUMN IF NOT EXISTS source_sku TEXT, ADD COLUMN IF NOT EXISTS direct_price NUMERIC(10,2), ADD COLUMN IF NOT EXISTS grab_price NUMERIC(10,2), ADD COLUMN IF NOT EXISTS pos_enabled BOOLEAN NOT NULL DEFAULT TRUE, ADD COLUMN IF NOT EXISTS set_upgrade_eligible BOOLEAN NOT NULL DEFAULT FALSE;
+UPDATE ordering_menu_items SET direct_price = price WHERE direct_price IS NULL;
+ALTER TABLE ordering_orders ADD COLUMN IF NOT EXISTS order_mode TEXT NOT NULL DEFAULT 'direct', ADD COLUMN IF NOT EXISTS dining_type TEXT, ADD COLUMN IF NOT EXISTS ticket_number TEXT;
+ALTER TABLE ordering_order_items ADD COLUMN IF NOT EXISTS source_sku TEXT, ADD COLUMN IF NOT EXISTS price_mode TEXT, ADD COLUMN IF NOT EXISTS is_set_component BOOLEAN NOT NULL DEFAULT FALSE, ADD COLUMN IF NOT EXISTS parent_order_item_id UUID REFERENCES ordering_order_items(id) ON DELETE SET NULL;
+DO $$ DECLARE n TEXT; BEGIN FOR n IN SELECT conname FROM pg_constraint WHERE conrelid='ordering_orders'::regclass AND contype='c' AND pg_get_constraintdef(oid) ILIKE '%channel%' LOOP EXECUTE format('ALTER TABLE ordering_orders DROP CONSTRAINT %I',n); END LOOP; END $$;
+ALTER TABLE ordering_orders ADD CONSTRAINT ordering_orders_channel_check CHECK (channel IN ('online','qr_table','tablet_counter','kiosk','ai_voice','pos_direct','grab'));
+DO $$ DECLARE n TEXT; BEGIN FOR n IN SELECT conname FROM pg_constraint WHERE conrelid='ordering_orders'::regclass AND contype='c' AND pg_get_constraintdef(oid) ILIKE '%payment_method%' LOOP EXECUTE format('ALTER TABLE ordering_orders DROP CONSTRAINT %I',n); END LOOP; END $$;
+ALTER TABLE ordering_orders ADD CONSTRAINT ordering_orders_payment_method_check CHECK (payment_method IN ('pay_at_counter','cash','manual_qr_transfer','grab','card','other'));
+DO $$ DECLARE n TEXT; BEGIN FOR n IN SELECT conname FROM pg_constraint WHERE conrelid='ordering_payments'::regclass AND contype='c' AND pg_get_constraintdef(oid) ILIKE '%method%' LOOP EXECUTE format('ALTER TABLE ordering_payments DROP CONSTRAINT %I',n); END LOOP; END $$;
+ALTER TABLE ordering_payments ADD CONSTRAINT ordering_payments_method_check CHECK (method IN ('pay_at_counter','cash','manual_qr_transfer','grab','card','other'));
+CREATE UNIQUE INDEX IF NOT EXISTS ordering_menu_items_source_sku_unique ON ordering_menu_items(source_sku) WHERE source_sku IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS ordering_orders_ticket_number_unique ON ordering_orders(ticket_number) WHERE ticket_number IS NOT NULL;
+CREATE TABLE IF NOT EXISTS pos_order_events (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), order_id UUID NOT NULL REFERENCES ordering_orders(id) ON DELETE CASCADE, event_type TEXT NOT NULL, payload JSONB NOT NULL DEFAULT '{}'::jsonb, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+INSERT INTO ordering_settings(key,value) VALUES ('pos_set_upgrade_amount','80'::jsonb),('pos_set_fries_name','"French Fries"'::jsonb) ON CONFLICT(key) DO NOTHING;
