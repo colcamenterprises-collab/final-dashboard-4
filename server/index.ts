@@ -33,6 +33,7 @@ import exportRoutes from "./routes/exportRoutes";
 import primeCostRouter from "./routes/primeCost";
 import operationsReadRouter from "./routes/operationsRead";
 import orderingRouter from "./routes/ordering";
+import posRouter from "./routes/pos";
 
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
@@ -414,6 +415,7 @@ async function checkSchema() {
   // Read-only operational UI summaries for owner review pages.
   app.use("/api/operations-read", operationsReadRouter);
   app.use("/api/ordering", orderingRouter);
+  app.use("/api/pos", posRouter);
 
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);
@@ -784,20 +786,25 @@ async function checkSchema() {
           await TenantScoped.ensureRestaurantExists();
           console.log("🏢 SaaS tenant layer initialized");
           
-          // PATCH O14 Chunk 2 — Seed default admin user
-          const { db } = await import('./lib/prisma');
-          const prisma = db();
-          const existingAdmin = await prisma.saas_tenant_users.findFirst({
-            where: { email: "admin@sbb.com" }
-          });
-          if (!existingAdmin) {
-            await AuthService.register({
-              email: "admin@sbb.com",
-              password: "sbb123",
-              role: "owner",
-              tenantId: 1
+          // Optional first-owner bootstrap. Credentials must be supplied via
+          // environment variables and are never committed to source control.
+          const bootstrapEmail = process.env.BOOTSTRAP_OWNER_EMAIL;
+          const bootstrapPassword = process.env.BOOTSTRAP_OWNER_PASSWORD;
+          if (bootstrapEmail && bootstrapPassword) {
+            const { db } = await import('./lib/prisma');
+            const prisma = db();
+            const existingAdmin = await prisma.saas_tenant_users.findFirst({
+              where: { email: bootstrapEmail }
             });
-            console.log("👤 Default admin created: admin@sbb.com (password: sbb123)");
+            if (!existingAdmin) {
+              await AuthService.register({
+                email: bootstrapEmail,
+                password: bootstrapPassword,
+                role: "owner",
+                tenantId: 1
+              });
+              console.log("👤 Bootstrap owner created");
+            }
           }
           
 

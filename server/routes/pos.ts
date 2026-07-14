@@ -1,0 +1,38 @@
+import { Router, type NextFunction, type Request, type Response } from "express";
+import { pool } from "../db";
+import { attachSessionUser } from "../middleware/sessionAuth";
+
+const router = Router();
+const fail = (res: Response, message: string, status = 400) => res.status(status).json({ ok: false, source: "sbb_pos_core", error: message });
+const db = () => { if (!pool) throw new Error("POS database is unavailable"); return pool; };
+const value = (input: unknown) => { const n = Number(input); return Number.isFinite(n) ? n : 0; };
+function staffDevice(req: Request, res: Response, next: NextFunction) {
+  if (process.env.NODE_ENV !== "production") return next();
+  if (attachSessionUser(req)) return next();
+  if (!process.env.POS_DEVICE_TOKEN || req.header("x-pos-device-token") !== process.env.POS_DEVICE_TOKEN) return fail(res, "Registered POS device required", 401);
+  next();
+}
+router.get("/menu", async (req, res) => {
+  try { const mode = req.query.price_mode === "grab" ? "grab" : "direct"; const price = mode === "grab" ? "grab_price" : "direct_price";
+    const rows = await db().query(`SELECT i.*, c.name_en category_name, COALESCE(i.${price},i.direct_price,i.price) active_price FROM ordering_menu_items i JOIN ordering_menu_categories c ON c.id=i.category_id WHERE c.is_active AND i.is_active AND i.pos_enabled AND NOT i.is_sold_out ORDER BY c.sort_order,i.sort_order`);
+    res.json({ ok: true, source: "sbb_pos_core", price_mode: mode, data: rows.rows });
+  } catch (e:any) { fail(res,e.message,500); }
+});
+router.post("/orders", staffDevice, async (req, res) => {
+  const input=req.body, mode=input.order_mode === "grab" ? "grab" : input.order_mode === "direct" ? "direct" : null;
+  if (!mode || !Array.isArray(input.items) || !input.items.length) return fail(res,"order_mode and items are required");
+  if (mode === "grab" && input.payment_method !== "grab") return fail(res,"Grab orders must use Grab payment");
+  const client=await db().connect();
+  try { await client.query("BEGIN"); const order=(await client.query(`INSERT INTO ordering_orders(channel,order_mode,dining_type,order_notes,status,payment_status,payment_method) VALUES($1,$2,$3,$4,'submitted',$5,$6) RETURNING *`,[mode === "grab" ? "grab" : "pos_direct",mode,input.dining_type||null,input.order_notes||null,mode === "grab" ? "paid" : "unpaid",input.payment_method])).rows[0];
+    const ticket=`SBB-${String(order.order_number).padStart(4,"0")}`; await client.query(`UPDATE ordering_orders SET ticket_number=$2 WHERE id=$1`,[order.id,ticket]); let total=0, sort=0;
+    for(const line of input.items){ const item=(await client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled AND NOT is_sold_out`,[line.menu_item_id])).rows[0]; if(!item) throw new Error("POS item unavailable"); const qty=Math.max(1,Math.trunc(value(line.quantity)||1)); const unit=value(mode === "grab" ? item.grab_price : item.direct_price ?? item.price); if(!unit) throw new Error(`${item.name_en} has no ${mode} price`); if(mode === "direct" && item.set_upgrade_eligible && line.set_upgrade === undefined) throw new Error(`Set decision required for ${item.name_en}`); if(mode === "grab" && line.set_upgrade) throw new Error("Grab orders cannot use staff upsells");
+      const parent=(await client.query(`INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,notes,sort_order,source_sku,price_mode) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,[order.id,item.id,item.name_en,item.name_th,unit,qty,unit*qty,line.notes||null,sort++,item.source_sku||null,mode])).rows[0]; total+=unit*qty;
+      if(mode === "direct" && line.set_upgrade){ if(!line.set_drink_menu_item_id) throw new Error("Set drink selection is required"); const [friesResult,drinkResult,setting]=await Promise.all([client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active AND pos_enabled LIMIT 1`),client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled`,[line.set_drink_menu_item_id]),client.query(`SELECT value FROM ordering_settings WHERE key='pos_set_upgrade_amount'`)]); const fries=friesResult.rows[0], drink=drinkResult.rows[0], upgrade=value(setting.rows[0]?.value||80); if(!fries||!drink) throw new Error("Set fries or drink is not configured"); await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`,[parent.id,upgrade*qty]); await client.query(`INSERT INTO ordering_order_item_modifiers(order_item_id,modifier_group_name_en,modifier_name_en,price_delta,quantity) VALUES($1,'Set upgrade','Make it a set',$2,$3)`,[parent.id,upgrade,qty]); for(const component of [fries,drink]) await client.query(`INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,sort_order,source_sku,price_mode,is_set_component,parent_order_item_id) VALUES($1,$2,$3,$4,0,$5,0,$6,$7,$8,true,$9)`,[order.id,component.id,component.name_en,component.name_th,qty,sort++,component.source_sku||null,mode,parent.id]); total+=upgrade*qty; }
+    }
+    await client.query(`UPDATE ordering_orders SET subtotal=$2,total=$2 WHERE id=$1`,[order.id,total]); await client.query(`INSERT INTO ordering_payments(order_id,method,status,amount) VALUES($1,$2,$3,$4)`,[order.id,input.payment_method,mode === "grab" ? "confirmed" : "pending",total]); await client.query(`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,'order_created',$2)`,[order.id,JSON.stringify({ticket_number:ticket})]); await client.query("COMMIT"); res.status(201).json({ok:true,source:"sbb_pos_core",data:{id:order.id,ticket_number:ticket,total}});
+  } catch(e:any){await client.query("ROLLBACK"); fail(res,e.message);} finally {client.release();}
+});
+router.get("/kitchen/orders", staffDevice, async (_req,res)=>{try{const result=await db().query(`SELECT o.*,json_agg(i ORDER BY i.sort_order) items FROM ordering_orders o JOIN ordering_order_items i ON i.order_id=o.id WHERE o.channel IN ('pos_direct','grab') AND o.status IN ('submitted','accepted','in_kitchen','ready') GROUP BY o.id ORDER BY o.created_at`);res.json({ok:true,source:"sbb_pos_core",data:result.rows});}catch(e:any){fail(res,e.message,500);}});
+router.get("/display/orders", async (_req,res)=>{try{const result=await db().query(`SELECT ticket_number,status,updated_at FROM ordering_orders WHERE channel IN ('pos_direct','grab') AND status='ready' ORDER BY updated_at DESC LIMIT 20`);res.json({ok:true,source:"sbb_pos_core",data:result.rows});}catch(e:any){fail(res,e.message,500);}});
+router.patch("/orders/:id/status",staffDevice,async(req,res)=>{const allowed=["accepted","in_kitchen","ready","completed","cancelled"];if(!allowed.includes(req.body.status))return fail(res,"Unsupported ticket status");try{const row=(await db().query(`UPDATE ordering_orders SET status=$2,updated_at=NOW() WHERE id=$1 RETURNING *`,[req.params.id,req.body.status])).rows[0];if(!row)return fail(res,"Order not found",404);await db().query(`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,$2,$3)`,[row.id,row.status === "ready" ? "ticket_ready" : "order_updated",JSON.stringify({ticket_number:row.ticket_number,status:row.status})]);res.json({ok:true,source:"sbb_pos_core",data:row});}catch(e:any){fail(res,e.message,500);}});
+export default router;

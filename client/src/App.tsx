@@ -50,6 +50,7 @@ import AdminMenu from "./pages/admin/ordering/AdminMenu";
 import AdminOrders from "./pages/admin/ordering/AdminOrders";
 import AdminSettings from "./pages/admin/ordering/AdminSettings";
 import AdminQrCodes from "./pages/admin/ordering/AdminQrCodes";
+import PosRegister from "./pages/pos/PosRegister";
 
 import StaffDashboard from "./pages/staff/Dashboard";
 import StaffMembers from "./pages/staff/Members";
@@ -87,6 +88,7 @@ export default function App() {
                   <Route path="/order/status/:orderId" element={<OrderStatus />} />
                   <Route path="/ordering/tablet" element={<OrderPage tablet />} />
                   <Route path="/kitchen/display" element={<KitchenDisplay />} />
+                  <Route path="/pos" element={<PosRegister />} />
                   <Route element={<PageShell />}>
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
