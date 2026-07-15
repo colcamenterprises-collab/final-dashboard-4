@@ -1,6 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { pool } from "../db";
 import { attachSessionUser } from "../middleware/sessionAuth";
+import { getPinSessionUser } from "./pinAuth";
 
 const router = Router();
 const fail = (res: Response, message: string, status = 400) => res.status(status).json({ ok: false, source: "sbb_pos_core", error: message });
@@ -9,13 +10,25 @@ const value = (input: unknown) => { const n = Number(input); return Number.isFin
 function staffDevice(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV !== "production") return next();
   if (attachSessionUser(req)) return next();
+  const pinUser = getPinSessionUser(req);
+  if (pinUser && (["owner","manager","cashier","kitchen_staff"].includes(pinUser.role) || pinUser.permissions?.["pos.view"] === true)) {
+    (req as any).user = pinUser;
+    return next();
+  }
   if (!process.env.POS_DEVICE_TOKEN || req.header("x-pos-device-token") !== process.env.POS_DEVICE_TOKEN) return fail(res, "Registered POS device required", 401);
   next();
 }
 router.get("/menu", async (req, res) => {
   try { const mode = req.query.price_mode === "grab" ? "grab" : "direct"; const price = mode === "grab" ? "grab_price" : "direct_price";
-    const rows = await db().query(`SELECT i.*, c.name_en category_name, COALESCE(i.${price},i.direct_price,i.price) active_price FROM ordering_menu_items i JOIN ordering_menu_categories c ON c.id=i.category_id WHERE c.is_active AND i.is_active AND i.pos_enabled AND NOT i.is_sold_out ORDER BY c.sort_order,i.sort_order`);
+    const rows = await db().query(`SELECT i.*, c.name_en category_name, COALESCE(i.${price},i.direct_price,i.price) active_price FROM ordering_menu_items i JOIN ordering_menu_categories c ON c.id=i.category_id WHERE c.is_active AND lower(c.name_en) <> lower('Phase 1 Test Menu') AND i.is_active AND i.pos_enabled AND NOT i.is_sold_out ORDER BY c.sort_order,i.sort_order`);
     res.json({ ok: true, source: "sbb_pos_core", price_mode: mode, data: rows.rows });
+  } catch (e:any) { fail(res,e.message,500); }
+});
+router.get("/orders/next-ticket", staffDevice, async (_req,res) => {
+  try {
+    const result = await db().query(`SELECT COALESCE(MAX(order_number),0)+1 AS next_order_number FROM ordering_orders`);
+    const next = Number(result.rows[0]?.next_order_number || 1);
+    res.json({ok:true,source:"sbb_pos_core",data:{ticket_number:`SBB-${String(next).padStart(4,"0")}`}});
   } catch (e:any) { fail(res,e.message,500); }
 });
 router.get("/menu/:menuItemId/modifiers", staffDevice, async (req,res) => {
