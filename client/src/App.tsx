@@ -90,10 +90,10 @@ export default function App() {
                   <Route path="/order/status/:orderId" element={<OrderStatus />} />
                   <Route path="/ordering/tablet" element={<OrderPage tablet />} />
                   <Route path="/kitchen/display" element={<KitchenDisplay />} />
+                  <Route path="/pos" element={<ProtectedRoute><PosRegister /></ProtectedRoute>} />
+                  <Route path="/pos/kitchen" element={<ProtectedRoute><PosKitchen /></ProtectedRoute>} />
+                  <Route path="/pos/display" element={<PosDisplay />} />
                   <Route element={<PageShell />}>
-                    <Route path="/pos" element={<ProtectedRoute><PosRegister /></ProtectedRoute>} />
-                    <Route path="/pos/kitchen" element={<ProtectedRoute><PosKitchen /></ProtectedRoute>} />
-                    <Route path="/pos/display" element={<PosDisplay />} />
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
