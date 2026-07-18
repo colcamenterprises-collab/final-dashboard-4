@@ -111,7 +111,7 @@ router.post("/orders", staffDevice, async (req, res) => {
   if (!mode || !Array.isArray(input.items) || !input.items.length) return fail(res, "order_mode and items are required");
   if (mode === "grab" && input.payment_method !== "grab") return fail(res, "Grab orders must use Grab payment");
 
-  const grabOrderDigits = text(input.grab_order_number, 20).replace(/\D/g, "").slice(0, 6);
+  const grabOrderDigits = text(input.grab_order_number, 64).replace(/\D/g, "");
   const grabOrderNumber = mode === "grab" && grabOrderDigits ? `GF-${grabOrderDigits}` : "";
   const customerName = text(input.customer_name, 120);
   const customerMobile = text(input.customer_mobile, 30);
@@ -127,12 +127,9 @@ router.post("/orders", staffDevice, async (req, res) => {
   const marketingEmail = text(marketing.email, 160).toLowerCase();
   const marketingConsent = marketing.consent === true;
   const marketingSkipReason = text(marketing.skip_reason, 80);
-  if (mode !== "grab" && marketingConsent) {
-    if (!marketingFirstName || (!marketingMobile && !marketingEmail)) return fail(res, "Marketing consent needs a first name and a mobile number or email");
-    if (marketingEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(marketingEmail)) return fail(res, "Enter a valid email address");
-  } else if (mode !== "grab" && !SKIP_REASONS.includes(marketingSkipReason as typeof SKIP_REASONS[number])) {
-    return fail(res, "Select a reason when the customer does not join");
-  }
+  const validMarketingEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(marketingEmail) ? marketingEmail : "";
+  const saveMarketingCapture = mode !== "grab" && marketingConsent && !!marketingFirstName && !!(marketingMobile || validMarketingEmail);
+  const savedSkipReason = mode !== "grab" && SKIP_REASONS.includes(marketingSkipReason as typeof SKIP_REASONS[number]) ? marketingSkipReason : null;
 
   const client = await db().connect();
   try {
@@ -144,8 +141,8 @@ router.post("/orders", staffDevice, async (req, res) => {
     ) VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`, [
       mode === "grab" ? "grab" : "pos_direct", mode, input.dining_type || null, input.order_notes || null,
       input.payment_method, mode === "grab" ? grabOrderNumber : null, mode === "grab" ? customerName : null,
-      mode === "grab" ? customerMobile : null, marketingConsent ? marketingFirstName : null,
-      marketingConsent ? marketingEmail : null, marketingConsent, marketingConsent ? null : marketingSkipReason,
+      mode === "grab" ? customerMobile : null, saveMarketingCapture ? marketingFirstName : null,
+      saveMarketingCapture ? validMarketingEmail || null : null, saveMarketingCapture, saveMarketingCapture ? null : savedSkipReason,
     ])).rows[0];
 
     const ticket = `SBB-${String(order.order_number).padStart(4, "0")}`;
@@ -220,9 +217,9 @@ router.post("/orders", staffDevice, async (req, res) => {
     await client.query(`UPDATE ordering_orders SET subtotal=$2,total=$3,discount_code=$4,discount_name=$5,discount_amount=$6 WHERE id=$1`,
       [order.id, subtotal, total, discount?.code || null, discount?.name || null, discountAmount]);
     await client.query(`INSERT INTO ordering_payments(order_id,method,status,amount) VALUES($1,$2,'confirmed',$3)`, [order.id, input.payment_method, total]);
-    if (marketingConsent) {
+    if (saveMarketingCapture) {
       await client.query(`INSERT INTO pos_customer_marketing_captures(order_id,first_name,mobile_number,email,consent)
-        VALUES($1,$2,$3,$4,true)`, [order.id, marketingFirstName, marketingMobile || null, marketingEmail || null]);
+        VALUES($1,$2,$3,$4,true)`, [order.id, marketingFirstName, marketingMobile || null, validMarketingEmail || null]);
     }
     await client.query(`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,'order_created',$2)`,
       [order.id, JSON.stringify({ ticket_number: ticket, mode, grab_order_number: mode === "grab" ? grabOrderNumber : undefined, discount_code: discount?.code || undefined, discount_amount: discountAmount })]);
