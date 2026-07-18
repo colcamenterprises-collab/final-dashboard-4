@@ -1,3 +1,6 @@
+// Load the production .env before this module reads DATABASE_URL. Prisma loads
+// environment files itself, but the Drizzle/Pool client below does not.
+import "dotenv/config";
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
