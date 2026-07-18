@@ -1,18 +1,27 @@
 // Load the production .env before this module reads DATABASE_URL. Prisma loads
 // environment files itself, but the Drizzle/Pool client below does not.
 import "dotenv/config";
-import { Pool, neonConfig } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-serverless';
-import ws from "ws";
+import { Pool } from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../shared/schema";
-
-neonConfig.webSocketConstructor = ws;
 
 export const databaseAvailable = Boolean(process.env.DATABASE_URL);
 
-// Enhanced pool configuration with better error handling
+const connectionString = process.env.DATABASE_URL;
+let localDatabase = false;
+try {
+  const host = connectionString ? new URL(connectionString).hostname : "";
+  localDatabase = host === "127.0.0.1" || host === "localhost" || host === "::1";
+} catch {
+  // Pool construction retains its normal connection-string validation behaviour.
+}
+
+// Use the standard PostgreSQL driver for VPS-hosted PostgreSQL. The former
+// Neon serverless driver forces a TLS/WebSocket path that is not valid locally.
+// Remote deployments retain the connection string's own TLS policy.
 const poolConfig = {
-  connectionString: process.env.DATABASE_URL,
+  connectionString,
+  ssl: localDatabase ? false : undefined,
   max: 10, // Maximum number of connections
   maxUses: 7500, // Maximum uses per connection before recycling
   allowExitOnIdle: false,
