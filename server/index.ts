@@ -34,6 +34,7 @@ import primeCostRouter from "./routes/primeCost";
 import operationsReadRouter from "./routes/operationsRead";
 import orderingRouter from "./routes/ordering";
 import posRouter from "./routes/pos";
+import posShiftRouter from "./routes/posShifts";
 
 import systemHealthRoutes from "./routes/systemHealth";
 import { registerDailyReportCron } from "./cron/dailyReportCron";
@@ -415,7 +416,8 @@ async function checkSchema() {
   // Read-only operational UI summaries for owner review pages.
   app.use("/api/operations-read", operationsReadRouter);
   app.use("/api/ordering", orderingRouter);
-  app.use("/api/pos", posRouter);
+  app.use("/api/pos/shifts", posShiftRouter);
+app.use("/api/pos", posRouter);
 
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);
