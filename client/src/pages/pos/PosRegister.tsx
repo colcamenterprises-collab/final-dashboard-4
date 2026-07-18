@@ -161,20 +161,21 @@ export default function PosRegister() {
   const startCheckout = () => {
     if (!cart.length) return;
     if (mode === "grab") {
-      if (!/^GF-[A-Z0-9]{5,7}$/.test(grabOrderNumber.trim().toUpperCase())) return setNotice("Enter the Grab order number as GF- followed by 5–7 letters or numbers");
+      if (!grabOrderNumber.trim()) return setNotice("Enter the Grab order number");
       if (!grabCustomerName.trim() || !grabCustomerMobile.trim()) return setNotice("Grab customer name and mobile number are required");
-      if (!marketingFirstName) setMarketingFirstName(grabCustomerName.trim().split(/\s+/)[0] || "");
-      if (!marketingMobile) setMarketingMobile(grabCustomerMobile.trim());
+      setCheckoutError("");
+      void charge(true);
+      return;
     }
     setCheckoutError("");
     setMarketingOpen(true);
   };
 
-  const charge = async () => {
-    if (marketingConsent && (!marketingFirstName.trim() || (!marketingMobile.trim() && !marketingEmail.trim()))) {
+  const charge = async (skipMarketing = false) => {
+    if (!skipMarketing && marketingConsent && (!marketingFirstName.trim() || (!marketingMobile.trim() && !marketingEmail.trim()))) {
       return setCheckoutError("For membership, enter a first name and either a mobile number or email");
     }
-    if (!marketingConsent && !marketingSkipReason) return setCheckoutError("Select why the customer did not join");
+    if (!skipMarketing && !marketingConsent && !marketingSkipReason) return setCheckoutError("Select why the customer did not join");
     setCheckoutError("");
     try {
       const response = await fetch("/api/pos/orders",{
@@ -182,11 +183,11 @@ export default function PosRegister() {
         body:JSON.stringify({
           order_mode:mode,
           payment_method:mode === "grab" ? "grab" : payment,
-          grab_order_number:mode === "grab" ? grabOrderNumber.trim().toUpperCase() : undefined,
+          grab_order_number:mode === "grab" ? grabOrderNumber.trim() : undefined,
           customer_name:mode === "grab" ? grabCustomerName.trim() : undefined,
           customer_mobile:mode === "grab" ? grabCustomerMobile.trim() : undefined,
           discount_code:selectedDiscount || undefined,
-          marketing:{
+          marketing:skipMarketing ? undefined : {
             consent:marketingConsent,
             first_name:marketingConsent ? marketingFirstName.trim() : undefined,
             mobile_number:marketingConsent ? marketingMobile.trim() : undefined,
@@ -264,10 +265,10 @@ export default function PosRegister() {
     {notice && <button type="button" onClick={()=>setNotice("")} className="absolute left-1/2 top-20 z-30 -translate-x-1/2 rounded-2xl bg-[#171717] px-5 py-3 text-sm font-semibold text-white shadow-2xl">{notice} · Close</button>}
     <div className="relative grid h-[calc(100dvh-70px)] grid-cols-[minmax(0,1fr)_348px] overflow-hidden">
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[92px] bg-[#ffd400]"/>
-      <section className="relative z-10 min-w-0 overflow-y-auto px-5 pb-10 pt-4">
-        <div className="sticky top-0 z-10 -mx-5 mb-7 px-5 py-4"><div className="flex gap-3 overflow-x-auto pb-1">{categories.map(category => <button type="button" onClick={()=>{setActiveCategory(category.name_en);document.getElementById(category.name_en.replaceAll(" ","-"))?.scrollIntoView({behavior:"smooth",block:"start"});}} key={category.name_en} className={`shrink-0 rounded-2xl border px-5 py-3 text-sm font-bold shadow-[0_4px_14px_rgba(30,26,13,0.06)] transition ${activeCategory === category.name_en ? "border-black bg-black text-white" : "border-[#e8c72a] bg-white text-black hover:border-black"}`}>{categoryLabel(category)}</button>)}</div></div>
-        <div className="mb-7"><p className="text-[11px] font-black tracking-[0.1em] text-[#15945c]">{mode === "grab" ? "GRAB" : ui.direct}</p></div>
-        {categories.map((category,categoryIndex) => <section id={category.name_en.replaceAll(" ","-")} data-category={category.name_en} key={category.name_en} className={`mb-12 scroll-mt-28 rounded-[28px] p-5 ${categoryIndex % 2 === 0 ? "bg-[#fff9e8]" : "bg-[#f7f5ee]"}`}><div className="mb-5 flex items-center gap-3"><h2 className="text-xl font-black">{categoryLabel(category)}</h2><span className="h-px flex-1 bg-[#ded8c7]"/></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">{items.filter(x => x.category_name === category.name_en).map(item => <button key={item.id} onClick={()=>startItem(item)} className="group relative min-h-[190px] overflow-hidden rounded-[22px] border border-[#eee9d9] bg-white p-3 text-left shadow-[0_7px_22px_rgba(38,31,7,0.055)] transition hover:-translate-y-1 hover:border-[#ffd400] hover:shadow-[0_13px_28px_rgba(38,31,7,0.11)]"><div className="flex h-[84px] items-center justify-center">{isBurger(item) && <img src={burgerImage} alt="" className="h-[80px] w-[112px] object-contain drop-shadow-[0_9px_8px_rgba(39,27,8,0.2)]"/>}</div><p className="mt-1 line-clamp-2 min-h-10 text-[13px] font-extrabold leading-5">{label(item)}</p><p className="mt-2 text-base font-black">{thb(item.active_price)}</p><span className="mt-2 grid h-8 w-full place-items-center rounded-full bg-[#ffd400] text-lg font-black leading-none text-black transition group-hover:bg-black group-hover:text-white">+</span></button>)}</div></section>)}
+      <section className="relative z-10 min-w-0 overflow-y-auto pb-10">
+        <div className="sticky top-0 z-30 mb-7 bg-[#ffd400] px-5 py-4 shadow-[0_7px_14px_rgba(107,83,0,0.18)]"><div className="flex gap-3 overflow-x-auto pb-1">{categories.map(category => <button type="button" onClick={()=>{setActiveCategory(category.name_en);document.getElementById(category.name_en.replaceAll(" ","-"))?.scrollIntoView({behavior:"smooth",block:"start"});}} key={category.name_en} className={`shrink-0 rounded-2xl border px-5 py-3 text-sm font-bold shadow-[0_4px_14px_rgba(30,26,13,0.06)] transition ${activeCategory === category.name_en ? "border-black bg-black text-white" : "border-[#e8c72a] bg-white text-black hover:border-black"}`}>{categoryLabel(category)}</button>)}</div></div>
+        <div className="px-5"><div className="mb-7"><p className="text-[11px] font-black tracking-[0.1em] text-[#15945c]">{mode === "grab" ? "GRAB" : ui.direct}</p></div>
+        {categories.map((category,categoryIndex) => <section id={category.name_en.replaceAll(" ","-")} data-category={category.name_en} key={category.name_en} className={`mb-12 scroll-mt-28 rounded-[28px] p-5 ${categoryIndex % 2 === 0 ? "bg-[#fff9e8]" : "bg-[#f7f5ee]"}`}><div className="mb-5 flex items-center gap-3"><h2 className="text-xl font-black">{categoryLabel(category)}</h2><span className="h-px flex-1 bg-[#ded8c7]"/></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">{items.filter(x => x.category_name === category.name_en).map(item => <button key={item.id} onClick={()=>startItem(item)} className="group relative min-h-[190px] overflow-hidden rounded-[22px] border border-[#eee9d9] bg-white p-3 text-left shadow-[0_7px_22px_rgba(38,31,7,0.055)] transition hover:-translate-y-1 hover:border-[#ffd400] hover:shadow-[0_13px_28px_rgba(38,31,7,0.11)]"><div className="flex h-[84px] items-center justify-center">{isBurger(item) && <img src={burgerImage} alt="" className="h-[80px] w-[112px] object-contain drop-shadow-[0_9px_8px_rgba(39,27,8,0.2)]"/>}</div><p className="mt-1 line-clamp-2 min-h-10 text-[13px] font-extrabold leading-5">{label(item)}</p><p className="mt-2 text-base font-black">{thb(item.active_price)}</p><span className="mt-2 grid h-8 w-full place-items-center rounded-full bg-[#ffd400] text-lg font-black leading-none text-black transition group-hover:bg-black group-hover:text-white">+</span></button>)}</div></section>)}</div>
       </section>
       <aside className="relative z-20 m-3 ml-0 min-h-0 min-w-0 overflow-y-auto rounded-[26px] border border-[#eee9d9] bg-white shadow-[0_10px_30px_rgba(38,31,7,0.08)]">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#eee9d9] bg-white px-5 py-4"><div><h2 className="text-xl font-black">{language === "th" ? "ออเดอร์ปัจจุบัน" : "Current order"}</h2><p className="mt-1 text-xs font-bold text-zinc-400">{language === "th" ? "ออเดอร์" : "Order"} · {orderNumber}</p></div><button onClick={()=>setCart([])} className="rounded-xl px-2 py-1 text-sm font-semibold text-red-600 hover:bg-red-50">{ui.clear}</button></div>
@@ -277,7 +278,7 @@ export default function PosRegister() {
           <div className="flex items-end justify-between"><span className="text-lg font-black">{ui.total}</span><span className="text-3xl font-black">{thb(total)}</span></div>
           {selectedDiscountData && <div className="mt-1 flex justify-between text-xs font-bold text-[#15945c]"><span>{selectedDiscountData.code} — {selectedDiscountData.name}</span><span>-{thb(discountPreview)}</span></div>}
           <label className="mt-3 block text-xs font-black text-zinc-600">{ui.discount}<select value={selectedDiscount} onChange={event=>setSelectedDiscount(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9e4d5] bg-white px-3 py-3 text-sm outline-none focus:border-[#ffd400]"><option value="">{ui.noDiscount}</option>{discounts.filter(discount=>discount.code !== "OWNER100").map(discount => <option key={discount.id} value={discount.code}>{discount.name}</option>)}{discounts.some(discount=>discount.code === "OWNER100") && <option disabled>────────────────</option>}{discounts.filter(discount=>discount.code === "OWNER100").map(discount => <option key={discount.id} value={discount.code}>{discount.name}</option>)}</select></label>
-          {mode === "grab" && <div className="mt-4 space-y-2 rounded-2xl border border-[#ffd400] bg-[#fff9d9] p-3"><p className="text-xs font-black text-[#856a00]">{ui.grabDetails}</p><label className="block text-xs font-bold">{ui.grabOrder}<input value={grabOrderNumber} onChange={event=>setGrabOrderNumber(event.target.value.toUpperCase())} placeholder="GF-ABCDE" className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label><label className="block text-xs font-bold">{ui.customerName}<input value={grabCustomerName} onChange={event=>setGrabCustomerName(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label><label className="block text-xs font-bold">{ui.mobile}<input inputMode="tel" value={grabCustomerMobile} onChange={event=>setGrabCustomerMobile(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label></div>}
+          {mode === "grab" && <div className="mt-4 space-y-2 rounded-2xl border border-[#ffd400] bg-[#fff9d9] p-3"><p className="text-xs font-black text-[#856a00]">{ui.grabDetails}</p><label className="block text-xs font-bold">{ui.grabOrder}<input inputMode="numeric" value={grabOrderNumber} onChange={event=>setGrabOrderNumber(event.target.value.replace(/\D/g,"").slice(0,6))} placeholder="123456" className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label><label className="block text-xs font-bold">{ui.customerName}<input value={grabCustomerName} onChange={event=>setGrabCustomerName(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label><label className="block text-xs font-bold">{ui.mobile}<input inputMode="tel" value={grabCustomerMobile} onChange={event=>setGrabCustomerMobile(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label></div>}
           {mode === "direct" && payment === "cash" && <><input inputMode="decimal" value={cash} onChange={event=>setCash(event.target.value)} placeholder={ui.cash} className="mt-3 w-full rounded-xl border border-[#e9e4d5] bg-white px-3 py-3 text-sm outline-none focus:border-[#ffd400]"/><div className="mt-2 flex justify-between text-sm font-bold"><span>{ui.change}</span><span>{thb(change)}</span></div></>}
           <div className="mt-4 grid grid-cols-3 gap-2">{["cash","manual_qr_transfer","grab"].map(method => <button key={method} disabled={mode === "grab" && method !== "grab"} onClick={()=>setPayment(method)} className={`rounded-xl py-3 text-xs font-black transition ${payment === method ? "bg-[#171717] text-white" : "bg-[#f4f2eb] text-zinc-600 hover:bg-[#ebe7d8]"}`}>{method === "manual_qr_transfer" ? "QR" : method}</button>)}</div>
           <button disabled={!cart.length} onClick={startCheckout} className="mt-3 w-full rounded-xl bg-[#ffd400] py-4 text-base font-black text-black shadow-[0_7px_0_#d7ae00] transition hover:bg-[#ffe042] active:translate-y-0.5 active:shadow-[0_4px_0_#d7ae00] disabled:cursor-not-allowed disabled:opacity-40">{ui.continue} {thb(total)}</button>
