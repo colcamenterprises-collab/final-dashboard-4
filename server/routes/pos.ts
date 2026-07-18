@@ -111,11 +111,12 @@ router.post("/orders", staffDevice, async (req, res) => {
   if (!mode || !Array.isArray(input.items) || !input.items.length) return fail(res, "order_mode and items are required");
   if (mode === "grab" && input.payment_method !== "grab") return fail(res, "Grab orders must use Grab payment");
 
-  const grabOrderNumber = text(input.grab_order_number, 12).toUpperCase();
+  const grabOrderDigits = text(input.grab_order_number, 20).replace(/\D/g, "").slice(0, 6);
+  const grabOrderNumber = mode === "grab" && grabOrderDigits ? `GF-${grabOrderDigits}` : "";
   const customerName = text(input.customer_name, 120);
   const customerMobile = text(input.customer_mobile, 30);
   if (mode === "grab") {
-    if (!/^GF-[A-Z0-9]{5,7}$/.test(grabOrderNumber)) return fail(res, "Grab order number must be GF- followed by 5–7 letters or numbers");
+    if (!grabOrderDigits) return fail(res, "Enter the Grab order number");
     if (!customerName) return fail(res, "Grab customer name is required");
     if (!/^[+0-9][0-9 ()-]{5,29}$/.test(customerMobile)) return fail(res, "Enter the Grab customer mobile number");
   }
@@ -126,10 +127,10 @@ router.post("/orders", staffDevice, async (req, res) => {
   const marketingEmail = text(marketing.email, 160).toLowerCase();
   const marketingConsent = marketing.consent === true;
   const marketingSkipReason = text(marketing.skip_reason, 80);
-  if (marketingConsent) {
+  if (mode !== "grab" && marketingConsent) {
     if (!marketingFirstName || (!marketingMobile && !marketingEmail)) return fail(res, "Marketing consent needs a first name and a mobile number or email");
     if (marketingEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(marketingEmail)) return fail(res, "Enter a valid email address");
-  } else if (!SKIP_REASONS.includes(marketingSkipReason as typeof SKIP_REASONS[number])) {
+  } else if (mode !== "grab" && !SKIP_REASONS.includes(marketingSkipReason as typeof SKIP_REASONS[number])) {
     return fail(res, "Select a reason when the customer does not join");
   }
 
