@@ -60,6 +60,7 @@ import StaffRoster from "./pages/staff/Roster";
 import StaffCleaning from "./pages/staff/Cleaning";
 import StaffAttendance from "./pages/staff/Attendance";
 import StaffSettings from "./pages/staff/Settings";
+import StaffAccess from "./pages/settings/StaffAccess";
 
 function OwnerRoute({ children }: { children: JSX.Element }) {
   const { currentUser } = usePinAuth();
@@ -80,6 +81,7 @@ export default function App() {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/pos-login" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/staff" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/menu" element={<Navigate to="/menu/items" replace />} />
                   <Route path="/membership" element={<Navigate to="/dashboard" replace />} />
@@ -142,6 +144,7 @@ export default function App() {
                     <Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} />
                     <Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} />
                     <Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} />
+                    <Route path="/settings/staff-access" element={<ProtectedRoute><OwnerRoute><StaffAccess /></OwnerRoute></ProtectedRoute>} />
                     <Route path="*" element={<NotFound />} />
                   </Route>
                 </Routes>
