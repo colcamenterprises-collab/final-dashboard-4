@@ -22,10 +22,11 @@ const thaiMenuNames: Record<string, string> = {
   "Dirty Fries":"เดอร์ตี้ฟรายส์", "Coleslaw with Bacon":"โคลสลอว์เบคอน", "French Fries":"เฟรนช์ฟรายส์", "Cheesy Bacon Fries":"ชีสซี่เบคอนฟรายส์", "Loaded Fries":"โหลดेडฟรายส์", "Sweet Potato Fries":"มันหวานทอด", "Chicken Nuggets (6)":"นักเก็ตไก่ (6 ชิ้น)",
   "Coke":"โค้ก", "Coke No Sugar":"โค้กไม่มีน้ำตาล", "Schweppes Manao":"ชเวปส์มะนาว", "Fanta Orange":"แฟนต้าน้ำส้ม", "Fanta Strawberry":"แฟนต้าสตอเบอร์รี่", "Soda Water":"โซดา", "Drinking Water":"น้ำดื่ม",
 };
-const speakTicket = (ticket:string, language:"en"|"th") => {
-  if (!("speechSynthesis" in window)) return;
+const speakKitchenOrder = (items:string[], language:"en"|"th") => {
+  if (!("speechSynthesis" in window) || !items.length) return;
   window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(language === "th" ? `ออเดอร์ ${ticket} ส่งเข้าครัวแล้ว` : `Order ${ticket} sent to kitchen`);
+  const prefix = language === "th" ? "ออเดอร์ใหม่:" : "New order:";
+  const utterance = new SpeechSynthesisUtterance(`${prefix} ${items.join(", ")}`);
   utterance.lang = language === "th" ? "th-TH" : "en-US";
   window.speechSynthesis.speak(utterance);
 };
@@ -96,6 +97,17 @@ export default function PosRegister() {
   const categories = useMemo(() => [...new Map(items.map(item => [item.category_name,{name_en:item.category_name,name_th:item.category_name_th || item.category_name}])).values()],[items]);
   const drinks = useMemo(() => items.filter(x => x.category_name === "Drinks"),[items]);
   const label = (x:{name_en:string;name_th?:string}) => language === "th" ? x.name_th || thaiMenuNames[x.name_en] || x.name_en : x.name_en;
+  const kitchenCalloutItems = () => cart.flatMap(line => {
+    const parts = [`${line.quantity} ${label(line)}`];
+    (line.modifiers || []).forEach(modifier => parts.push(label(modifier)));
+    if (line.set_upgrade || line.meal_deal) {
+      parts.push(ui.fries);
+      const drink = drinks.find(item => item.id === line.set_drink_menu_item_id);
+      if (drink) parts.push(label(drink));
+    }
+    if (line.notes?.trim()) parts.push(line.notes.trim());
+    return parts;
+  });
   const categoryLabel = (category:{name_en:string;name_th?:string}) => language === "th" ? category.name_th || thaiCategoryNames[category.name_en] || category.name_en : category.name_en;
   const ui = language === "th" ? {
     pos:"ขายหน้าร้าน", kitchen:"ครัว", display:"หน้าจอคิว", shift:"กะงาน", discounts:"ส่วนลด", counter:"เคาน์เตอร์", direct:"ออเดอร์หน้าร้าน",
@@ -204,7 +216,7 @@ export default function PosRegister() {
       if (!response.ok) throw new Error(body.error || "Could not create order");
       setMarketingOpen(false);
       setNotice(`${body.data.ticket_number} sent to kitchen`);
-      speakTicket(body.data.ticket_number,language);
+      speakKitchenOrder(kitchenCalloutItems(),language);
       setCart([]); setCash(""); setSelectedDiscount(""); setGrabOrderNumber(""); setGrabCustomerName(""); setGrabCustomerMobile("");
       setMarketingConsent(false); setMarketingFirstName(""); setMarketingMobile(""); setMarketingEmail(""); setMarketingSkipReason(""); setCheckoutError("");
       refreshOrderNumber(); window.setTimeout(()=>setNotice(""),4000);
