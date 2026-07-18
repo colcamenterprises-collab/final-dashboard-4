@@ -262,7 +262,7 @@ export default function PosRegister() {
     <header className="flex h-[70px] items-center justify-between bg-[#111111] px-5 text-white shadow-lg">
       <div className="flex items-center gap-4">
         <img src="/smash-brothers-logo.png" alt="Smash Brothers Burgers" className="h-12 w-12 rounded-xl object-contain"/>
-        <nav className="hidden gap-1 lg:flex"><span className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold">{ui.pos}</span><a href="/pos/kitchen" className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-white/10">{ui.kitchen}</a><a href="/pos/display" className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-white/10">{ui.display}</a><a href="/pos/shifts" className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-white/10">{ui.shift}</a></nav>
+        <nav className="hidden gap-1 lg:flex"><span className="rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold">{ui.pos}</span><a href="/pos/kitchen" className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-white/10">{ui.kitchen}</a><a href="/pos/collection" className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-white/10">Collection</a><a href="/pos/shifts" className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-white/10">{ui.shift}</a><a href="/pos/display" className="rounded-xl px-4 py-2 text-sm text-zinc-300 hover:bg-white/10">{ui.display}</a></nav>
       </div>
       <div className="flex items-center gap-2">
         <button className="hidden rounded-xl bg-white/10 px-3 py-2 text-xs font-semibold sm:block" onClick={openDiscountManager}>{ui.discounts}</button>
