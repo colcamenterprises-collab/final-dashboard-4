@@ -163,12 +163,11 @@ export default function PosRegister() {
     if (mode === "grab") {
       if (!grabOrderNumber.trim()) return setNotice("Enter the Grab order number");
       if (!grabCustomerName.trim() || !grabCustomerMobile.trim()) return setNotice("Grab customer name and mobile number are required");
-      setCheckoutError("");
-      void charge(true);
-      return;
     }
+    // Membership/marketing capture is temporarily disabled in production.
+    // Checkout must never be delayed or blocked before kitchen dispatch.
     setCheckoutError("");
-    setMarketingOpen(true);
+    void charge(true);
   };
 
   const charge = async (skipMarketing = false) => {
