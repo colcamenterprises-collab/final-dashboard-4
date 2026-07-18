@@ -7,7 +7,7 @@ export default function ProtectedRoute({ children }: { children: JSX.Element }) 
   const location = useLocation();
 
   if (!currentUser) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/pos-login" replace state={{ from: location.pathname }} />;
   }
 
   return children;
