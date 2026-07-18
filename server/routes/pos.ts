@@ -134,15 +134,20 @@ router.post("/orders", staffDevice, async (req, res) => {
   const client = await db().connect();
   try {
     await client.query("BEGIN");
+    // Receipts are linked to the active register shift when one is open.
+    // During rollout, unassigned receipts remain auditable rather than blocked.
+    const activeShift = (await client.query(`SELECT id FROM pos_register_shifts
+      WHERE register_code='main' AND status='open' ORDER BY opened_at DESC LIMIT 1`)).rows[0];
     const order = (await client.query(`INSERT INTO ordering_orders(
       channel,order_mode,dining_type,order_notes,status,payment_status,payment_method,
       grab_order_number,customer_name,customer_mobile,customer_first_name,customer_email,
-      marketing_consent,marketing_skip_reason
-    ) VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`, [
+      marketing_consent,marketing_skip_reason,shift_id
+    ) VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *`, [
       mode === "grab" ? "grab" : "pos_direct", mode, input.dining_type || null, input.order_notes || null,
       input.payment_method, mode === "grab" ? grabOrderNumber : null, mode === "grab" ? customerName : null,
       mode === "grab" ? customerMobile : null, saveMarketingCapture ? marketingFirstName : null,
       saveMarketingCapture ? validMarketingEmail || null : null, saveMarketingCapture, saveMarketingCapture ? null : savedSkipReason,
+      activeShift?.id || null,
     ])).rows[0];
 
     const ticket = `SBB-${String(order.order_number).padStart(4, "0")}`;
@@ -224,7 +229,7 @@ router.post("/orders", staffDevice, async (req, res) => {
     await client.query(`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,'order_created',$2)`,
       [order.id, JSON.stringify({ ticket_number: ticket, mode, grab_order_number: mode === "grab" ? grabOrderNumber : undefined, discount_code: discount?.code || undefined, discount_amount: discountAmount })]);
     await client.query("COMMIT");
-    res.status(201).json({ ok: true, source: "sbb_pos_core", data: { id: order.id, ticket_number: ticket, subtotal, discount_amount: discountAmount, total } });
+    res.status(201).json({ ok: true, source: "sbb_pos_core", data: { id: order.id, ticket_number: ticket, subtotal, discount_amount: discountAmount, total, shift_assigned: !!activeShift?.id } });
   } catch (e: any) {
     await client.query("ROLLBACK");
     fail(res, e.message);
@@ -250,6 +255,25 @@ router.patch("/orders/:id/status", staffDevice, async (req, res) => {
     const row = (await db().query(`UPDATE ordering_orders SET status=$2,updated_at=NOW() WHERE id=$1 AND status NOT IN ('completed','cancelled') RETURNING *`, [req.params.id, req.body.status])).rows[0];
     if (!row) return fail(res, "Order not found or already finalised", 409);
     await db().query(`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,$2,$3)`, [row.id, row.status === "ready" ? "ticket_ready" : "order_updated", JSON.stringify({ ticket_number: row.ticket_number, status: row.status })]);
+    res.json({ ok: true, source: "sbb_pos_core", data: row });
+  } catch (e: any) { fail(res, e.message, 500); }
+});
+
+// Collection is a recorded hand-over, never a deletion. Completed tickets leave
+// the public ready display but remain in receipts and their shift register.
+router.post("/orders/:id/collect", staffDevice, async (req, res) => {
+  const user = (req as any).user;
+  try {
+    const row = (await db().query(`UPDATE ordering_orders
+      SET status='completed',collected_at=NOW(),collected_by_user_id=$2,collected_by_name=$3,updated_at=NOW()
+      WHERE id=$1 AND status='ready' RETURNING *`, [
+        req.params.id,
+        typeof user?.id === "number" ? user.id : null,
+        text(user?.name, 120) || "POS device",
+      ])).rows[0];
+    if (!row) return fail(res, "Ready ticket not found or already collected", 409);
+    await db().query(`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,'order_collected',$2)`,
+      [row.id, JSON.stringify({ ticket_number: row.ticket_number, collected_by: text(user?.name, 120) || "POS device" })]);
     res.json({ ok: true, source: "sbb_pos_core", data: row });
   } catch (e: any) { fail(res, e.message, 500); }
 });
