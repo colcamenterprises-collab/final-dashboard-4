@@ -23,9 +23,11 @@ const BCRYPT_ROUNDS = 10;
 const ROLE_DEFAULTS: Record<string, StaffPermissions> = {
   owner: OWNER_PERMISSIONS,
   manager: MANAGER_PERMISSIONS,
+  staff: STAFF_PERMISSIONS,
   cashier: CASHIER_PERMISSIONS,
   kitchen_staff: KITCHEN_STAFF_PERMISSIONS,
 };
+const VALID_ROLES = Object.keys(ROLE_DEFAULTS);
 
 // ─── Username helpers ────────────────────────────────────────────────────────
 
@@ -57,7 +59,9 @@ async function uniqueUsername(base: string, excludeId?: number): Promise<string>
 // ─── Cookie signing ──────────────────────────────────────────────────────────
 
 function getSigningKey(): string {
-  return process.env.INTERNAL_APP_PASSWORD || "sbb-pin-default-key-change-in-prod";
+  const key = process.env.INTERNAL_APP_PASSWORD;
+  if (!key) throw new Error("INTERNAL_APP_PASSWORD must be configured for staff sessions");
+  return key;
 }
 
 function signPayload(payload: object): string {
@@ -72,7 +76,9 @@ function verifyAndParseToken(token: string): Record<string, unknown> | null {
     const [b64, sig] = token.split(".");
     if (!b64 || !sig) return null;
     const expected = crypto.createHmac("sha256", getSigningKey()).update(b64).digest("hex");
-    if (sig !== expected) return null;
+    const supplied = Buffer.from(sig, "hex");
+    const wanted = Buffer.from(expected, "hex");
+    if (supplied.length !== wanted.length || !crypto.timingSafeEqual(supplied, wanted)) return null;
     const payload = JSON.parse(Buffer.from(b64, "base64url").toString("utf8"));
     if (payload.exp && Date.now() > payload.exp) return null;
     return payload;
@@ -147,8 +153,8 @@ router.post("/login", async (req: Request, res: Response) => {
   const { email, username, name, userId, pin, passcode } = req.body as { email?: string; username?: string; name?: string; userId?: number; pin?: string; passcode?: string };
   const submittedPin = pin || passcode;
   const loginName = (username || name || email || "").trim();
-  if (!submittedPin) {
-    return res.status(400).json({ error: "PIN/passcode is required" });
+  if (!submittedPin || !/^\d{4}$/.test(String(submittedPin))) {
+    return res.status(400).json({ error: "Enter your four-digit PIN" });
   }
   if (!loginName && !userId) {
     return res.status(400).json({ error: "username or name is required" });
@@ -231,22 +237,35 @@ router.post("/login", async (req: Request, res: Response) => {
 
 // ─── GET /me — check current session ────────────────────────────────────────
 
-router.get("/me", (req: Request, res: Response) => {
+router.get("/me", async (req: Request, res: Response) => {
   const sessionUser = getPinSessionUser(req);
   if (!sessionUser) {
     return res.json({ authenticated: false });
   }
-  res.json({ authenticated: true, user: sessionUser });
+  try {
+    const [user] = await db.select({
+      id: internalUsers.id, name: internalUsers.name, role: internalUsers.role,
+      active: internalUsers.active,
+    }).from(internalUsers).where(eq(internalUsers.id, sessionUser.id)).limit(1);
+    if (!user || !user.active) {
+      res.clearCookie(COOKIE_NAME, { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production" });
+      return res.json({ authenticated: false });
+    }
+    const permissions = await resolvePermissions(user.role);
+    res.json({ authenticated: true, user: { id: user.id, name: user.name, role: user.role, permissions } });
+  } catch {
+    res.status(500).json({ error: "Unable to verify staff session" });
+  }
 });
 
 // ─── GET /me/profile ─────────────────────────────────────────────────────────
 
 router.get("/me/profile", async (req: Request, res: Response) => {
   const sessionUser = getPinSessionUser(req);
-  if (!sessionUser && process.env.NODE_ENV !== "development") {
+  if (!sessionUser) {
     return res.status(401).json({ error: "Not authenticated" });
   }
-  const userId = sessionUser?.id ?? 1;
+  const userId = sessionUser.id;
   try {
     const [user] = await db
       .select({
@@ -272,10 +291,10 @@ router.get("/me/profile", async (req: Request, res: Response) => {
 
 router.patch("/me/profile", async (req: Request, res: Response) => {
   const sessionUser = getPinSessionUser(req);
-  if (!sessionUser && process.env.NODE_ENV !== "development") {
+  if (!sessionUser) {
     return res.status(401).json({ error: "Not authenticated" });
   }
-  const userId = sessionUser?.id ?? 1;
+  const userId = sessionUser.id;
   const { avatarUrl } = req.body as { avatarUrl?: string | null };
   try {
     const [updated] = await db
@@ -299,8 +318,8 @@ router.patch("/me/pin", async (req: Request, res: Response) => {
   if (!currentPin || !newPin) {
     return res.status(400).json({ error: "currentPin and newPin are required" });
   }
-  if (String(newPin).length < 4 || String(newPin).length > 8) {
-    return res.status(400).json({ error: "New PIN must be 4–8 digits" });
+  if (!/^\d{4}$/.test(String(newPin))) {
+    return res.status(400).json({ error: "New PIN must be exactly four digits" });
   }
   try {
     const [user] = await db.select().from(internalUsers).where(eq(internalUsers.id, sessionUser.id)).limit(1);
@@ -324,10 +343,15 @@ router.post("/logout", (_req: Request, res: Response) => {
 
 // ─── Auth guard — owner only ─────────────────────────────────────────────────
 
-function requireOwner(req: Request, res: Response): boolean {
-  if (process.env.NODE_ENV === "development") return true;
+async function requireOwner(req: Request, res: Response): Promise<boolean> {
   const user = getPinSessionUser(req);
   if (!user || !isOwner(user.role)) {
+    res.status(403).json({ error: "Owner access required" });
+    return false;
+  }
+  const [account] = await db.select({ active: internalUsers.active, role: internalUsers.role })
+    .from(internalUsers).where(eq(internalUsers.id, user.id)).limit(1);
+  if (!account?.active || !isOwner(account.role)) {
     res.status(403).json({ error: "Owner access required" });
     return false;
   }
@@ -337,7 +361,7 @@ function requireOwner(req: Request, res: Response): boolean {
 // ─── GET /staff — full staff list (owner only) ───────────────────────────────
 
 router.get("/staff", async (req: Request, res: Response) => {
-  if (!requireOwner(req, res)) return;
+  if (!await requireOwner(req, res)) return;
   try {
     const rows = await db
       .select({
@@ -363,7 +387,7 @@ router.get("/staff", async (req: Request, res: Response) => {
 // ─── POST /staff — create staff (owner only) ────────────────────────────────
 
 router.post("/staff", async (req: Request, res: Response) => {
-  if (!requireOwner(req, res)) return;
+  if (!await requireOwner(req, res)) return;
   const { name, role, email, contactNumber, pin, avatarUrl, username: requestedUsername } = req.body as {
     name?: string; role?: string; email?: string; contactNumber?: string;
     pin?: string; avatarUrl?: string; username?: string;
@@ -371,9 +395,10 @@ router.post("/staff", async (req: Request, res: Response) => {
   if (!name || !role || !pin) {
     return res.status(400).json({ error: "name, role, and pin are required" });
   }
-  if (String(pin).length < 4 || String(pin).length > 8) {
-    return res.status(400).json({ error: "PIN must be 4–8 digits" });
+  if (!/^\d{4}$/.test(String(pin))) {
+    return res.status(400).json({ error: "PIN must be exactly four digits" });
   }
+  if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: "Invalid staff role" });
   if (email) {
     const [existing] = await db.select({ id: internalUsers.id }).from(internalUsers).where(ilike(internalUsers.email, email.trim())).limit(1);
     if (existing) return res.status(400).json({ error: "A staff member with that email already exists" });
@@ -405,7 +430,7 @@ router.post("/staff", async (req: Request, res: Response) => {
 // ─── PUT /staff/:id — update staff (owner only) ──────────────────────────────
 
 router.put("/staff/:id", async (req: Request, res: Response) => {
-  if (!requireOwner(req, res)) return;
+  if (!await requireOwner(req, res)) return;
   const id = Number(req.params.id);
   const { name, role, email, contactNumber, active, avatarUrl, username: requestedUsername } = req.body as {
     name?: string; role?: string; email?: string; contactNumber?: string;
@@ -415,6 +440,7 @@ router.put("/staff/:id", async (req: Request, res: Response) => {
     const updates: Partial<typeof internalUsers.$inferInsert> = {};
     if (name !== undefined) updates.name = String(name).trim();
     if (role !== undefined) {
+      if (!VALID_ROLES.includes(role)) return res.status(400).json({ error: "Invalid staff role" });
       updates.role = role;
       updates.permissions = await resolvePermissions(role);
     }
@@ -438,11 +464,11 @@ router.put("/staff/:id", async (req: Request, res: Response) => {
 // ─── PATCH /staff/:id/pin — reset a staff PIN (owner only) ──────────────────
 
 router.patch("/staff/:id/pin", async (req: Request, res: Response) => {
-  if (!requireOwner(req, res)) return;
+  if (!await requireOwner(req, res)) return;
   const id = Number(req.params.id);
   const { pin } = req.body as { pin?: string };
-  if (!pin || String(pin).length < 4) {
-    return res.status(400).json({ error: "PIN must be at least 4 digits" });
+  if (!pin || !/^\d{4}$/.test(String(pin))) {
+    return res.status(400).json({ error: "PIN must be exactly four digits" });
   }
   try {
     const pinHash = await bcrypt.hash(String(pin), BCRYPT_ROUNDS);
@@ -457,11 +483,11 @@ router.patch("/staff/:id/pin", async (req: Request, res: Response) => {
 // ─── GET /role-permissions — list permissions per role (owner only) ──────────
 
 router.get("/role-permissions", async (req: Request, res: Response) => {
-  if (!requireOwner(req, res)) return;
+  if (!await requireOwner(req, res)) return;
   try {
     const rows = await db.select().from(rolePermissions).orderBy(rolePermissions.role);
     // Ensure all 4 roles exist in response
-    const roles = ["owner", "manager", "cashier", "kitchen_staff"];
+    const roles = VALID_ROLES;
     const map = Object.fromEntries(rows.map((r) => [r.role, r]));
     const result = roles.map((role) => map[role] ?? { id: null, role, permissions: ROLE_DEFAULTS[role] ?? {}, updatedAt: null });
     res.json({ rolePermissions: result });
@@ -473,10 +499,9 @@ router.get("/role-permissions", async (req: Request, res: Response) => {
 // ─── PUT /role-permissions/:role — update permissions for a role (owner only) ─
 
 router.put("/role-permissions/:role", async (req: Request, res: Response) => {
-  if (!requireOwner(req, res)) return;
+  if (!await requireOwner(req, res)) return;
   const { role } = req.params;
-  const validRoles = ["owner", "manager", "cashier", "kitchen_staff"];
-  if (!validRoles.includes(role)) {
+  if (!VALID_ROLES.includes(role)) {
     return res.status(400).json({ error: "Invalid role" });
   }
   const { permissions } = req.body as { permissions?: StaffPermissions };
