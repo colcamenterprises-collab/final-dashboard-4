@@ -61,5 +61,6 @@ BEGIN
     GRANT SELECT, INSERT, UPDATE ON pos_register_cash_movements TO sbb_prod_app;
     GRANT SELECT, UPDATE (shift_id, collected_at, collected_by_user_id, collected_by_name)
       ON ordering_orders TO sbb_prod_app;
+    GRANT INSERT ON pos_order_events TO sbb_prod_app;
   END IF;
 END $$;
