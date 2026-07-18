@@ -150,16 +150,11 @@ export function ModernHeader({ onMenuToggle }: ModernHeaderProps) {
           </ModernButton>
 
           {/* Settings */}
-          <Link to="/settings/staff-access">
-            <ModernButton
-              variant="ghost"
-              size="sm"
-              data-testid="button-settings"
-              aria-label="Settings"
-            >
+          {currentUser?.role === "owner" && <Link to="/settings/staff-access">
+            <ModernButton variant="ghost" size="sm" data-testid="button-settings" aria-label="Staff access">
               <Settings className="h-4 w-4" />
             </ModernButton>
-          </Link>
+          </Link>}
 
           {/* Divider */}
           <div className="mx-1 h-5 w-px bg-slate-200 dark:bg-slate-700" />
@@ -193,7 +188,7 @@ export function ModernHeader({ onMenuToggle }: ModernHeaderProps) {
                     <User className="h-3.5 w-3.5" />
                     My Profile
                   </Link>
-                  {(currentUser?.role === "owner" || currentUser?.role === "manager") && (
+                  {currentUser?.role === "owner" && (
                     <Link
                       to="/settings/staff-access"
                       onClick={() => setShowUserMenu(false)}
