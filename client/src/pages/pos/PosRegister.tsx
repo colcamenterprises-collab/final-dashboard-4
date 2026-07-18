@@ -135,11 +135,9 @@ export default function PosRegister() {
     });
   };
   const startItem = async (item:Item) => {
-    if (isMealDeal(item)) {
-      setPending({item,modifiers:[]}); setModifierOptions([]); setFlow("meal-deal"); setSelectedDrink(""); setSetUpgrade(false);
-      return;
-    }
-    if (mode === "grab" || !isBurger(item)) return commitLine({...item,quantity:1});
+    // Every burger and every meal deal gets the same Make it Better step,
+    // regardless of whether the customer is ordering at the counter or via Grab.
+    if (!isBurger(item) && !isMealDeal(item)) return commitLine({...item,quantity:1});
     try {
       const response = await fetch(`/api/pos/menu/${item.id}/modifiers`,{credentials:"include"});
       if (response.status === 401) { window.location.assign("/pos?lock=1"); return; }
