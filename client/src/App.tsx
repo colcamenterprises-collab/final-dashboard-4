@@ -12,7 +12,7 @@ import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
 
 import DailySalesForm from "./pages/operations/daily-sales/Form";
-import DailyCleaning from "./pages/operations/DailyCleaning";
+import DailyCleaning from "./pages/operations/DailyCleaningV2";
 import DailyStock from "./pages/operations/DailyStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
 import LoyverseMirror from "./pages/operations/LoyverseMirror";
