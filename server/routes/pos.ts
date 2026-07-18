@@ -244,7 +244,7 @@ router.get("/kitchen/orders", staffDevice, async (_req, res) => {
 });
 router.get("/display/orders", async (_req, res) => {
   try {
-    const result = await db().query(`SELECT ticket_number,status,updated_at FROM ordering_orders WHERE channel IN ('pos_direct','grab') AND status='ready' ORDER BY updated_at DESC LIMIT 20`);
+    const result = await db().query(`SELECT id,ticket_number,status,updated_at FROM ordering_orders WHERE channel IN ('pos_direct','grab') AND status='ready' ORDER BY updated_at DESC LIMIT 20`);
     res.json({ ok: true, source: "sbb_pos_core", data: result.rows });
   } catch (e: any) { fail(res, e.message, 500); }
 });
