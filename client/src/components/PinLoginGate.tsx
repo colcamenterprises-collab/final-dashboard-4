@@ -38,9 +38,7 @@ export function usePinAuth() {
 
 // ─── Public path bypass ───────────────────────────────────────────────────────
 
-const PUBLIC_EXACT_PATHS = new Set([
-  "/pos-login",
-]);
+const PUBLIC_EXACT_PATHS = new Set<string>();
 
 const PUBLIC_PATH_PREFIXES = [
   "/order",
@@ -56,33 +54,6 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
-function workflowUserFromDailySalesContext(pathname: string, search: string): PinUser | null {
-  if (pathname !== "/operations/daily-cleaning" && pathname !== "/operations/daily-stock") return null;
-  const shiftId = new URLSearchParams(search).get("shift");
-  if (!shiftId) return null;
-  try {
-    const rawContext = window.localStorage.getItem("daily_shift_workflow_context");
-    const context = rawContext ? JSON.parse(rawContext) : null;
-    const contextShiftId = String(context?.shiftId || context?.salesId || "");
-    const savedAt = Date.parse(String(context?.savedAt || ""));
-    const isFresh = Number.isFinite(savedAt) && Date.now() - savedAt <= 12 * 60 * 60 * 1000;
-    if (!contextShiftId || contextShiftId !== shiftId || !isFresh) return null;
-    return {
-      id: 0,
-      name: String(context?.staffName || "Daily Sales Staff"),
-      role: "staff",
-      permissions: {
-        "dashboard.view": true,
-        "operations.view": true,
-        "forms.daily_sales": true,
-        "forms.daily_stock": true,
-      } as StaffPermissions,
-    };
-  } catch {
-    return null;
-  }
-}
-
 // ─── Main gate component ─────────────────────────────────────────────────────
 
 export default function PinLoginGate({ children }: { children: ReactNode }) {
@@ -94,9 +65,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 
   const checkSession = useCallback(async () => {
     if (isPublic) { setGateState("unlocked"); return; }
-    const forcePin = new URLSearchParams(window.location.search).get("lock") === "1";
-
-    // Always check the real session first — so logged-in users see their actual name
     try {
       const res = await fetch("/api/pin-auth/me", { credentials: "include" });
       const data = await res.json();
@@ -107,37 +75,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    const storedUser = !forcePin ? readStoredPinUser() : null;
-    if (storedUser) {
-      setCurrentUser(storedUser);
-      setGateState("unlocked");
-      return;
-    }
-
-    // Dev bypass — only when no real session exists and not force-locked
-    if (process.env.NODE_ENV === "development" && !forcePin) {
-      setCurrentUser({
-        id: 1,
-        name: "Cam",
-        role: "owner",
-        permissions: Object.fromEntries(
-          ["dashboard.view","operations.view","purchasing.view","analysis.view",
-           "finance.view","menu.view","pos.view","membership.view","forms.daily_sales",
-           "forms.daily_stock","expenses.view","settings.view","staff_access.manage",
-           "website_admin.view","online_ordering_admin.view"].map((k) => [k, true])
-        ) as StaffPermissions,
-      });
-      setGateState("unlocked");
-      return;
-    }
-
-    const workflowUser = workflowUserFromDailySalesContext(location.pathname, location.search);
-    if (workflowUser) {
-      setCurrentUser(workflowUser);
-      setGateState("unlocked");
-      return;
-    }
-
     setCurrentUser(null);
     setGateState("locked");
   }, [isPublic, location.pathname, location.search]);
@@ -146,7 +83,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await fetch("/api/pin-auth/logout", { method: "POST", credentials: "include" });
-    clearStoredPinUser();
     setCurrentUser(null);
     setGateState("locked");
   }, []);
@@ -175,7 +111,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       <PinAuthContext.Provider value={contextValue}>
         <PinLoginScreen
           onLogin={(user) => {
-            storePinUser(user);
             setCurrentUser(user);
             setGateState("unlocked");
           }}
@@ -192,33 +127,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 }
 
 // ─── PIN Login Screen ────────────────────────────────────────────────────────
-
-const PIN_SESSION_STORAGE_KEY = "sbb_pin_session_user";
-const PIN_SESSION_MAX_AGE = 12 * 60 * 60 * 1000;
-
-function readStoredPinUser(): PinUser | null {
-  try {
-    const raw = window.localStorage.getItem(PIN_SESSION_STORAGE_KEY);
-    const stored = raw ? JSON.parse(raw) : null;
-    const savedAt = Date.parse(String(stored?.savedAt || ""));
-    if (!stored?.user || !Number.isFinite(savedAt) || Date.now() - savedAt > PIN_SESSION_MAX_AGE) {
-      window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
-      return null;
-    }
-    return stored.user as PinUser;
-  } catch {
-    window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
-    return null;
-  }
-}
-
-function storePinUser(user: PinUser) {
-  window.localStorage.setItem(PIN_SESSION_STORAGE_KEY, JSON.stringify({ user, savedAt: new Date().toISOString() }));
-}
-
-function clearStoredPinUser() {
-  window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
-}
 
 const PIN_LENGTH = 4;
 
