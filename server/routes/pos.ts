@@ -172,7 +172,6 @@ router.post("/orders", staffDevice, async (req, res) => {
       subtotal += unit * qty;
 
       const modifierIds = Array.isArray(line.modifier_ids) ? [...new Set(line.modifier_ids.filter((id: any) => typeof id === "string"))] : [];
-      if (mode === "grab" && modifierIds.length) throw new Error("Grab orders cannot use staff modifiers");
       if (modifierIds.length) {
         const result = await client.query(`SELECT m.*,g.name_en AS modifier_group_name_en FROM ordering_item_modifiers m
           JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id WHERE m.id=ANY($1::uuid[]) AND g.menu_item_id=$2 AND m.is_active`, [modifierIds, item.id]);
