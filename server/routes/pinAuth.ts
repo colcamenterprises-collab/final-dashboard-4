@@ -59,8 +59,11 @@ async function uniqueUsername(base: string, excludeId?: number): Promise<string>
 // ─── Cookie signing ──────────────────────────────────────────────────────────
 
 function getSigningKey(): string {
-  const key = process.env.INTERNAL_APP_PASSWORD;
-  if (!key) throw new Error("INTERNAL_APP_PASSWORD must be configured for staff sessions");
+  // Existing production installs already carry SESSION_SECRET. Prefer the
+  // dedicated internal key when present, but keep authentication operable
+  // during a controlled migration from the legacy configuration.
+  const key = process.env.INTERNAL_APP_PASSWORD || process.env.SESSION_SECRET;
+  if (!key) throw new Error("A session signing secret must be configured");
   return key;
 }
 
