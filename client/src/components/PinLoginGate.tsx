@@ -47,6 +47,10 @@ const PUBLIC_PATH_PREFIXES = [
   "/kitchen/display",
 ];
 
+// Temporary operational recovery switch. It is only enabled when the VPS .env
+// explicitly sets VITE_EMERGENCY_ACCESS=true and must be removed after repair.
+const EMERGENCY_ACCESS = import.meta.env.VITE_EMERGENCY_ACCESS === "true";
+
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_EXACT_PATHS.has(pathname)) return true;
   return PUBLIC_PATH_PREFIXES.some(
@@ -65,6 +69,11 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 
   const checkSession = useCallback(async () => {
     if (isPublic) { setGateState("unlocked"); return; }
+    if (EMERGENCY_ACCESS) {
+      setCurrentUser({ id: 0, name: "Emergency owner", role: "owner", permissions: {} as StaffPermissions });
+      setGateState("unlocked");
+      return;
+    }
     try {
       const res = await fetch("/api/pin-auth/me", { credentials: "include" });
       const data = await res.json();
