@@ -25,7 +25,7 @@ router.get("/menu", async (req, res) => {
   try {
     const mode = req.query.price_mode === "grab" ? "grab" : "direct";
     const price = mode === "grab" ? "grab_price" : "direct_price";
-    const rows = await db().query(`SELECT i.*, c.name_en category_name, COALESCE(i.${price},i.direct_price,i.price) active_price
+    const rows = await db().query(`SELECT i.*, c.name_en category_name, c.name_th category_name_th, COALESCE(i.${price},i.direct_price,i.price) active_price
       FROM ordering_menu_items i JOIN ordering_menu_categories c ON c.id=i.category_id
       WHERE c.is_active AND lower(c.name_en) <> lower('Phase 1 Test Menu') AND i.is_active AND i.pos_enabled AND NOT i.is_sold_out
       ORDER BY c.sort_order,i.sort_order`);
@@ -153,13 +153,17 @@ router.post("/orders", staffDevice, async (req, res) => {
     let sort = 0;
 
     for (const line of input.items) {
-      const item = (await client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled AND NOT is_sold_out`, [line.menu_item_id])).rows[0];
+      const item = (await client.query(`SELECT i.*, c.name_en AS category_name FROM ordering_menu_items i
+        JOIN ordering_menu_categories c ON c.id=i.category_id
+        WHERE i.id=$1 AND c.is_active AND i.is_active AND i.pos_enabled AND NOT i.is_sold_out`, [line.menu_item_id])).rows[0];
       if (!item) throw new Error("POS item unavailable");
       const qty = Math.max(1, Math.trunc(value(line.quantity) || 1));
       const unit = value(mode === "grab" ? item.grab_price : item.direct_price ?? item.price);
       if (!unit) throw new Error(`${item.name_en} has no ${mode} price`);
+      const mealDeal = /meal deals?/i.test(String(item.category_name || ""));
       if (mode === "direct" && item.set_upgrade_eligible && line.set_upgrade === undefined) throw new Error(`Set decision required for ${item.name_en}`);
       if (mode === "grab" && line.set_upgrade) throw new Error("Grab orders cannot use staff upsells");
+      if (mealDeal && !line.meal_deal) throw new Error(`Meal deal drink selection is required for ${item.name_en}`);
 
       const parent = (await client.query(`INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,notes,sort_order,source_sku,price_mode)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`, [
@@ -182,18 +186,18 @@ router.post("/orders", staffDevice, async (req, res) => {
         }
       }
 
-      if (mode === "direct" && line.set_upgrade) {
+      if (line.set_upgrade || mealDeal) {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
           client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active AND pos_enabled LIMIT 1`),
           client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled`, [line.set_drink_menu_item_id]),
           client.query(`SELECT value FROM ordering_settings WHERE key='pos_set_upgrade_amount'`),
         ]);
-        const fries = friesResult.rows[0], drink = drinkResult.rows[0], upgrade = value(setting.rows[0]?.value || 80);
+        const fries = friesResult.rows[0], drink = drinkResult.rows[0], upgrade = line.set_upgrade ? value(setting.rows[0]?.value || 80) : 0;
         if (!fries || !drink) throw new Error("Set fries or drink is not configured");
-        await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, upgrade * qty]);
+        if (upgrade) await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, upgrade * qty]);
         await client.query(`INSERT INTO ordering_order_item_modifiers(order_item_id,modifier_group_name_en,modifier_name_en,price_delta,quantity)
-          VALUES($1,'SET UPGRADE','Burger + French Fries + Drink',$2,$3)`, [parent.id, upgrade, qty]);
+          VALUES($1,$2,$3,$4,$5)`, [parent.id, line.set_upgrade ? "SET UPGRADE" : "MEAL DEAL", line.set_upgrade ? "Burger + French Fries + Drink" : "Includes French Fries + Drink", upgrade, qty]);
         for (const component of [fries, drink]) await client.query(`INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,sort_order,source_sku,price_mode,is_set_component,parent_order_item_id)
           VALUES($1,$2,$3,$4,0,$5,0,$6,$7,$8,true,$9)`, [order.id, component.id, component.name_en, component.name_th, qty, sort++, component.source_sku || null, mode, parent.id]);
         subtotal += upgrade * qty;
