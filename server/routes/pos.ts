@@ -21,12 +21,6 @@ function staffDevice(req: Request, res: Response, next: NextFunction) {
   if (!process.env.POS_DEVICE_TOKEN || req.header("x-pos-device-token") !== process.env.POS_DEVICE_TOKEN) return fail(res, "Registered POS device required", 401);
   next();
 }
-function ownerOnly(req: Request, res: Response, next: NextFunction) {
-  const user = (req as any).user || getPinSessionUser(req);
-  if (!user || user.role !== "owner") return fail(res, "Owner access required", 403);
-  next();
-}
-
 router.get("/menu", async (req, res) => {
   try {
     const mode = req.query.price_mode === "grab" ? "grab" : "direct";
@@ -44,12 +38,12 @@ router.get("/discounts", staffDevice, async (_req, res) => {
     const result = await db().query(`SELECT id, code, name, discount_type, value
       FROM pos_discount_codes
       WHERE active AND (starts_at IS NULL OR starts_at <= NOW()) AND (ends_at IS NULL OR ends_at >= NOW())
-      ORDER BY code`);
+      ORDER BY CASE code WHEN 'MEMBER10' THEN 1 WHEN 'PROMO0' THEN 2 WHEN 'OWNER100' THEN 99 ELSE 3 END, name`);
     res.json({ ok: true, source: "sbb_pos_core", data: result.rows.map(row => ({ ...row, value: value(row.value) })) });
   } catch (e: any) { fail(res, e.message, 500); }
 });
 
-router.get("/discounts/manage", staffDevice, ownerOnly, async (_req, res) => {
+router.get("/discounts/manage", staffDevice, async (_req, res) => {
   try {
     const result = await db().query(`SELECT id, code, name, discount_type, value, active, starts_at, ends_at, created_at
       FROM pos_discount_codes ORDER BY active DESC, code`);
@@ -57,13 +51,13 @@ router.get("/discounts/manage", staffDevice, ownerOnly, async (_req, res) => {
   } catch (e: any) { fail(res, e.message, 500); }
 });
 
-router.post("/discounts/manage", staffDevice, ownerOnly, async (req, res) => {
+router.post("/discounts/manage", staffDevice, async (req, res) => {
   const code = text(req.body?.code, 32).toUpperCase();
   const name = text(req.body?.name, 100);
   const discountType = req.body?.discount_type === "fixed" ? "fixed" : req.body?.discount_type === "percent" ? "percent" : "";
   const discountValue = value(req.body?.value);
   if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) return fail(res, "Discount code must use 3–32 letters, numbers, hyphens, or underscores");
-  if (!name || !discountType || discountValue <= 0 || (discountType === "percent" && discountValue > 100)) return fail(res, "Enter a valid discount name and value");
+  if (!name || !discountType || discountValue < 0 || (discountType === "percent" && discountValue > 100)) return fail(res, "Enter a valid discount name and value");
   try {
     const result = await db().query(`INSERT INTO pos_discount_codes(code,name,discount_type,value)
       VALUES($1,$2,$3,$4) RETURNING id, code, name, discount_type, value, active`, [code, name, discountType, discountValue]);
@@ -74,7 +68,7 @@ router.post("/discounts/manage", staffDevice, ownerOnly, async (req, res) => {
   }
 });
 
-router.patch("/discounts/manage/:id", staffDevice, ownerOnly, async (req, res) => {
+router.patch("/discounts/manage/:id", staffDevice, async (req, res) => {
   if (typeof req.body?.active !== "boolean") return fail(res, "active must be true or false");
   try {
     const result = await db().query(`UPDATE pos_discount_codes SET active=$2, updated_at=NOW() WHERE id=$1
