@@ -1,64 +1,54 @@
 const imageByItem: Array<[string, string]> = [
-  ["french fries", "/images/menu/french-fries.webp"],
-  ["cajun shaker fries", "/images/menu/cajun-fries.webp"],
-  ["cajun fries", "/images/menu/cajun-fries.webp"],
-  ["cheesy bacon fries", "/images/menu/cheesy-bacon-fries.webp"],
-  ["loaded fries", "/images/menu/loaded-fries.webp"],
-  ["dirty fries", "/images/menu/loaded-fries.webp"],
-  ["chicken nuggets (6)", "/images/menu/chicken-nuggets.webp"],
-  ["chicken nuggets", "/images/menu/chicken-nuggets.webp"],
-  ["coleslaw with bacon", "/images/menu/coleslaw.webp"],
-  ["coleslaw", "/images/menu/coleslaw.webp"],
+  ["french fries", "/images/menu/french-fries.webp?v=267"],
+  ["cajun shaker fries", "/images/menu/cajun-fries.webp?v=267"],
+  ["cajun fries", "/images/menu/cajun-fries.webp?v=267"],
+  ["cheesy bacon fries", "/images/menu/cheesy-bacon-fries.webp?v=267"],
+  ["loaded fries", "/images/menu/loaded-fries.webp?v=267"],
+  ["dirty fries", "/images/menu/loaded-fries.webp?v=267"],
+  ["chicken nuggets (6)", "/images/menu/chicken-nuggets.webp?v=267"],
+  ["chicken nuggets", "/images/menu/chicken-nuggets.webp?v=267"],
+  ["coleslaw with bacon", "/images/menu/coleslaw.webp?v=267"],
+  ["coleslaw", "/images/menu/coleslaw.webp?v=267"],
 ];
 
 const normalise = (value: unknown) =>
   String(value || "")
     .toLowerCase()
-    .replace(/฿[\d,.]+/g, " ")
-    .replace(/\+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
-function applyPosImages() {
-  if (!window.location.pathname.startsWith("/pos")) return;
+const resolvePosImage = (item: any) => {
+  const text = normalise(`${item?.name_en || ""} ${item?.name_th || ""}`);
+  const match = imageByItem.find(([name]) => text.includes(name));
+  return match?.[1] || item?.image_url;
+};
 
-  document.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
-    const text = normalise(button.textContent);
-    const match = imageByItem.find(([name]) => text.includes(name));
-    if (!match) return;
+// Attach committed images before the React POS receives the menu response.
+// This avoids reliance on the disabled database endpoint and avoids fragile DOM mutation.
+const nativeFetch = window.fetch.bind(window);
+window.fetch = async (...args: Parameters<typeof fetch>) => {
+  const response = await nativeFetch(...args);
+  const target = typeof args[0] === "string" ? args[0] : args[0]?.url || "";
 
-    const expected = `${match[1]}?v=266`;
-    let image = button.querySelector<HTMLImageElement>("img");
-    let imageHost = image?.parentElement || button.querySelector<HTMLDivElement>("div");
+  if (!target.includes("/api/pos/menu") || target.includes("/modifiers")) {
+    return response;
+  }
 
-    if (!image && imageHost) {
-      image = document.createElement("img");
-      imageHost.prepend(image);
-    }
-    if (!image) return;
+  try {
+    const body = await response.clone().json();
+    if (!Array.isArray(body?.data)) return response;
 
-    image.src = expected;
-    image.alt = match[0];
-    image.style.setProperty("display", "block", "important");
-    image.style.setProperty("width", "100%", "important");
-    image.style.setProperty("height", "68px", "important");
-    image.style.setProperty("max-height", "68px", "important");
-    image.style.setProperty("object-fit", "contain", "important");
-    image.style.setProperty("opacity", "1", "important");
-    image.style.setProperty("visibility", "visible", "important");
-    image.style.setProperty("background", "transparent", "important");
-  });
-}
+    body.data = body.data.map((item: any) => ({
+      ...item,
+      image_url: resolvePosImage(item),
+    }));
 
-const observer = new MutationObserver(applyPosImages);
-observer.observe(document.documentElement, {
-  childList: true,
-  subtree: true,
-  characterData: true,
-});
-
-window.addEventListener("load", applyPosImages);
-window.addEventListener("pageshow", applyPosImages);
-window.addEventListener("popstate", applyPosImages);
-window.setInterval(applyPosImages, 750);
-applyPosImages();
+    return new Response(JSON.stringify(body), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
+  } catch {
+    return response;
+  }
+};
