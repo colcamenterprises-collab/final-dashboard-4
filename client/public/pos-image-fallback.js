@@ -1,38 +1,65 @@
 (() => {
   const imageByItem = [
-    [/^French Fries$/i, "/images/menu/french-fries.webp"],
-    [/^Cajun (Shaker )?Fries$/i, "/images/menu/cajun-fries.webp"],
-    [/^Cheesy Bacon Fries$/i, "/images/menu/cheesy-bacon-fries.webp"],
-    [/^Loaded Fries$/i, "/images/menu/loaded-fries.webp"],
-    [/^Dirty Fries$/i, "/images/menu/loaded-fries.webp"],
-    [/^Chicken Nuggets(?:\s*\(6\))?$/i, "/images/menu/chicken-nuggets.webp"],
-    [/^Coleslaw(?: with Bacon)?$/i, "/images/menu/coleslaw.webp"],
+    ["french fries", "/images/menu/french-fries.webp"],
+    ["cajun shaker fries", "/images/menu/cajun-fries.webp"],
+    ["cajun fries", "/images/menu/cajun-fries.webp"],
+    ["cheesy bacon fries", "/images/menu/cheesy-bacon-fries.webp"],
+    ["loaded fries", "/images/menu/loaded-fries.webp"],
+    ["dirty fries", "/images/menu/loaded-fries.webp"],
+    ["chicken nuggets (6)", "/images/menu/chicken-nuggets.webp"],
+    ["chicken nuggets", "/images/menu/chicken-nuggets.webp"],
+    ["coleslaw with bacon", "/images/menu/coleslaw.webp"],
+    ["coleslaw", "/images/menu/coleslaw.webp"],
   ];
+
+  const normalise = (value) =>
+    String(value || "")
+      .toLowerCase()
+      .replace(/฿[\d,.]+/g, " ")
+      .replace(/\+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
   function applyImages() {
     if (!location.pathname.startsWith("/pos")) return;
 
     document.querySelectorAll("button").forEach((button) => {
-      const text = (button.textContent || "").replace(/฿[\d,.]+/g, "").replace(/\+/g, "").trim();
-      const match = imageByItem.find(([pattern]) => pattern.test(text));
+      const text = normalise(button.textContent);
+      const match = imageByItem.find(([name]) => text.includes(name));
       if (!match) return;
 
-      const image = button.querySelector("img");
+      const expected = match[1];
+      let image = button.querySelector("img");
+      const imageHost = button.querySelector("div");
+
+      if (!image && imageHost) {
+        image = document.createElement("img");
+        imageHost.prepend(image);
+      }
       if (!image) return;
 
-      const expected = match[1];
-      if (image.getAttribute("src") !== expected) {
-        image.setAttribute("src", expected);
-        image.setAttribute("alt", text);
-        image.style.objectFit = "contain";
-        image.style.background = "transparent";
-      }
+      image.setAttribute("src", `${expected}?v=265`);
+      image.setAttribute("alt", match[0]);
+      image.style.display = "block";
+      image.style.width = "100%";
+      image.style.height = "68px";
+      image.style.maxHeight = "68px";
+      image.style.objectFit = "contain";
+      image.style.opacity = "1";
+      image.style.visibility = "visible";
+      image.style.background = "transparent";
     });
   }
 
   const observer = new MutationObserver(applyImages);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  observer.observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
   window.addEventListener("load", applyImages);
+  window.addEventListener("pageshow", applyImages);
   window.addEventListener("popstate", applyImages);
+  window.setInterval(applyImages, 1000);
   applyImages();
 })();
