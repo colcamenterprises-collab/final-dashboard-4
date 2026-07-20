@@ -69,6 +69,78 @@ router.get("/menu", async (req, res) => {
   }
 });
 
+// Publish one Dashboard Menu V3 item to the live SBB POS catalogue.  The
+// dashboard remains the editor; this endpoint makes the POS copy match it.
+router.post("/menu-items/:menuItemId/publish", staffDevice, async (req, res) => {
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const source = await client.query(
+      `SELECT i.id, i.name, i.description, i."basePrice", i."imageUrl",
+              i."posEnabled", i."isActive", i."sortOrder", c.name AS category_name
+       FROM menu_items_v3 i
+       JOIN menu_categories_v3 c ON c.id = i."categoryId"
+       WHERE i.id = $1`,
+      [req.params.menuItemId],
+    );
+    const item = source.rows[0];
+    if (!item) return fail(res, "Dashboard menu item was not found", 404);
+    if (!item.posEnabled) return fail(res, "Enable this item for POS before publishing", 409);
+
+    const category = await client.query(
+      `SELECT id FROM ordering_menu_categories WHERE lower(name_en) = lower($1) LIMIT 1`,
+      [item.category_name],
+    );
+    let categoryId = category.rows[0]?.id;
+    if (!categoryId) {
+      const inserted = await client.query(
+        `INSERT INTO ordering_menu_categories(name_en, sort_order, is_active)
+         VALUES($1, 0, true) RETURNING id`,
+        [item.category_name],
+      );
+      categoryId = inserted.rows[0].id;
+    }
+
+    const sourceSku = `dashboard-menu-v3:${item.id}`;
+    const published = await client.query(
+      `INSERT INTO ordering_menu_items(
+         category_id, name_en, description_en, price, direct_price, grab_price,
+         image_url, is_active, is_sold_out, sort_order, source_sku, pos_enabled
+       ) VALUES($1,$2,$3,$4,$4,$4,$5,$6,false,$7,$8,true)
+       ON CONFLICT (source_sku) WHERE source_sku IS NOT NULL DO UPDATE SET
+         category_id = EXCLUDED.category_id,
+         name_en = EXCLUDED.name_en,
+         description_en = EXCLUDED.description_en,
+         price = EXCLUDED.price,
+         direct_price = EXCLUDED.direct_price,
+         grab_price = EXCLUDED.grab_price,
+         image_url = EXCLUDED.image_url,
+         is_active = EXCLUDED.is_active,
+         sort_order = EXCLUDED.sort_order,
+         pos_enabled = EXCLUDED.pos_enabled,
+         updated_at = NOW()
+       RETURNING *`,
+      [
+        categoryId,
+        item.name,
+        item.description || null,
+        Number(item.basePrice),
+        item.imageUrl || null,
+        item.isActive !== false,
+        Number(item.sortOrder || 0),
+        sourceSku,
+      ],
+    );
+    await client.query("COMMIT");
+    res.json({ ok: true, source: "dashboard_menu_v3", action: "published", item: published.rows[0] });
+  } catch (e: any) {
+    await client.query("ROLLBACK");
+    fail(res, e.message || "Could not publish menu item", 500);
+  } finally {
+    client.release();
+  }
+});
+
 router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
   try {
     const result = await db().query(
