@@ -69,75 +69,53 @@ router.get("/menu", async (req, res) => {
   }
 });
 
-// Publish one Dashboard Menu V3 item to the live SBB POS catalogue.  The
-// dashboard remains the editor; this endpoint makes the POS copy match it.
-router.post("/menu-items/:menuItemId/publish", staffDevice, async (req, res) => {
-  const client = await db().connect();
+// The POS catalogue is the current menu source of truth.  It intentionally
+// reads/writes ordering_* tables and does not depend on the unfinished Menu V3.
+router.get("/catalog", staffDevice, async (_req, res) => {
   try {
-    await client.query("BEGIN");
-    const source = await client.query(
-      `SELECT i.id, i.name, i.description, i."basePrice", i."imageUrl",
-              i."posEnabled", i."isActive", i."sortOrder", c.name AS category_name
-       FROM menu_items_v3 i
-       JOIN menu_categories_v3 c ON c.id = i."categoryId"
-       WHERE i.id = $1`,
-      [req.params.menuItemId],
-    );
-    const item = source.rows[0];
-    if (!item) return fail(res, "Dashboard menu item was not found", 404);
-    if (!item.posEnabled) return fail(res, "Enable this item for POS before publishing", 409);
-
-    const category = await client.query(
-      `SELECT id FROM ordering_menu_categories WHERE lower(name_en) = lower($1) LIMIT 1`,
-      [item.category_name],
-    );
-    let categoryId = category.rows[0]?.id;
-    if (!categoryId) {
-      const inserted = await client.query(
-        `INSERT INTO ordering_menu_categories(name_en, sort_order, is_active)
-         VALUES($1, 0, true) RETURNING id`,
-        [item.category_name],
-      );
-      categoryId = inserted.rows[0].id;
-    }
-
-    const sourceSku = `dashboard-menu-v3:${item.id}`;
-    const published = await client.query(
-      `INSERT INTO ordering_menu_items(
-         category_id, name_en, description_en, price, direct_price, grab_price,
-         image_url, is_active, is_sold_out, sort_order, source_sku, pos_enabled
-       ) VALUES($1,$2,$3,$4,$4,$4,$5,$6,false,$7,$8,true)
-       ON CONFLICT (source_sku) WHERE source_sku IS NOT NULL DO UPDATE SET
-         category_id = EXCLUDED.category_id,
-         name_en = EXCLUDED.name_en,
-         description_en = EXCLUDED.description_en,
-         price = EXCLUDED.price,
-         direct_price = EXCLUDED.direct_price,
-         grab_price = EXCLUDED.grab_price,
-         image_url = EXCLUDED.image_url,
-         is_active = EXCLUDED.is_active,
-         sort_order = EXCLUDED.sort_order,
-         pos_enabled = EXCLUDED.pos_enabled,
-         updated_at = NOW()
-       RETURNING *`,
-      [
-        categoryId,
-        item.name,
-        item.description || null,
-        Number(item.basePrice),
-        item.imageUrl || null,
-        item.isActive !== false,
-        Number(item.sortOrder || 0),
-        sourceSku,
-      ],
-    );
-    await client.query("COMMIT");
-    res.json({ ok: true, source: "dashboard_menu_v3", action: "published", item: published.rows[0] });
+    const [categories, items] = await Promise.all([
+      db().query(`SELECT id, name_en, name_th, sort_order, is_active FROM ordering_menu_categories ORDER BY sort_order, name_en`),
+      db().query(`SELECT i.*, c.name_en AS category_name FROM ordering_menu_items i JOIN ordering_menu_categories c ON c.id = i.category_id ORDER BY c.sort_order, i.sort_order, i.name_en`),
+    ]);
+    res.json({ ok: true, source: "sbb_pos_core", categories: categories.rows, items: items.rows });
   } catch (e: any) {
-    await client.query("ROLLBACK");
-    fail(res, e.message || "Could not publish menu item", 500);
-  } finally {
-    client.release();
+    fail(res, e.message, 500);
+  }
+});
+
+router.post("/catalog/items", staffDevice, async (req, res) => {
+  const { category_id, name_en, description_en, price, direct_price, grab_price, image_url, sort_order } = req.body || {};
+  if (!category_id || !String(name_en || "").trim()) return fail(res, "Category and item name are required");
+  const amount = Number(price ?? direct_price ?? 0);
+  if (!Number.isFinite(amount) || amount < 0) return fail(res, "A valid price is required");
+  try {
+    const created = await db().query(
+      `INSERT INTO ordering_menu_items(category_id, name_en, description_en, price, direct_price, grab_price, image_url, is_active, is_sold_out, pos_enabled, sort_order)
+       VALUES($1,$2,$3,$4,$5,$6,$7,true,false,true,$8) RETURNING *`,
+      [category_id, String(name_en).trim(), description_en || null, amount, Number(direct_price ?? amount), Number(grab_price ?? amount), image_url || null, Number(sort_order ?? 0)],
+    );
+    res.status(201).json({ ok: true, item: created.rows[0] });
+  } catch (e: any) {
+    fail(res, e.message, 500);
+  }
+});
+
+router.patch("/catalog/items/:id", staffDevice, async (req, res) => {
+  const { category_id, name_en, description_en, price, direct_price, grab_price, image_url, is_active, is_sold_out, pos_enabled, sort_order } = req.body || {};
+  try {
+    const updated = await db().query(
+      `UPDATE ordering_menu_items SET
+        category_id=COALESCE($2, category_id), name_en=COALESCE($3, name_en), description_en=$4,
+        price=COALESCE($5, price), direct_price=COALESCE($6, direct_price), grab_price=COALESCE($7, grab_price),
+        image_url=$8, is_active=COALESCE($9, is_active), is_sold_out=COALESCE($10, is_sold_out),
+        pos_enabled=COALESCE($11, pos_enabled), sort_order=COALESCE($12, sort_order), updated_at=NOW()
+       WHERE id=$1 RETURNING *`,
+      [req.params.id, category_id || null, name_en?.trim() || null, description_en || null, price === undefined ? null : Number(price), direct_price === undefined ? null : Number(direct_price), grab_price === undefined ? null : Number(grab_price), image_url || null, typeof is_active === "boolean" ? is_active : null, typeof is_sold_out === "boolean" ? is_sold_out : null, typeof pos_enabled === "boolean" ? pos_enabled : null, sort_order === undefined ? null : Number(sort_order)],
+    );
+    if (!updated.rowCount) return fail(res, "POS item was not found", 404);
+    res.json({ ok: true, item: updated.rows[0] });
+  } catch (e: any) {
+    fail(res, e.message, 500);
   }
 });
 
