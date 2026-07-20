@@ -26,10 +26,11 @@ import ManagerChecklist from "./pages/operations/ManagerChecklist";
 import HealthSafety from "./pages/operations/HealthSafety";
 
 import MenuWorkspace from "./pages/menu/MenuWorkspace";
+import StandaloneRecipeStudio from "./pages/menu/StandaloneRecipeStudio";
 
 import FinanceHub from "./pages/finance/FinanceHub";
 import ProfitLoss from "./pages/finance/ProfitLoss";
-import Expenses from "./pages/finance/ExpensesPersonal";
+import Expenses from "./pages/finance/Expenses";
 import ExpensesImport from "./pages/finance/ExpensesImport";
 
 import ShiftReports from "./pages/reports/ShiftReports";
@@ -63,9 +64,7 @@ import StaffSettings from "./pages/staff/Settings";
 
 function OwnerRoute({ children }: { children: JSX.Element }) {
   const { currentUser } = usePinAuth();
-  if (currentUser?.role !== "owner") {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (currentUser?.role !== "owner") return <Navigate to="/dashboard" replace />;
   return children;
 }
 
@@ -110,9 +109,9 @@ export default function App() {
                     <Route path="/operations/manager-checklist" element={<ProtectedRoute><ManagerChecklist /></ProtectedRoute>} />
                     <Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
                     <Route path="/menu/items" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/recipes" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/recipes/new" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/recipes/:recipeId/edit" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
+                    <Route path="/menu/recipes" element={<ProtectedRoute><StandaloneRecipeStudio /></ProtectedRoute>} />
+                    <Route path="/menu/recipes/new" element={<ProtectedRoute><StandaloneRecipeStudio /></ProtectedRoute>} />
+                    <Route path="/menu/recipes/:recipeId/edit" element={<ProtectedRoute><StandaloneRecipeStudio /></ProtectedRoute>} />
                     <Route path="/menu/modifiers" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/categories" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
                     <Route path="/menu/ingredients" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
