@@ -24,7 +24,9 @@ export default function PosCatalog() {
     const form = new FormData();
     form.append("image", file);
     const response = await fetch("/api/upload/menu-item-image", { method: "POST", body: form });
-    const result = await response.json();
+    const raw = await response.text();
+    let result: any = {};
+    try { result = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`Upload failed (${response.status}). The server returned an invalid response.`); }
     if (!response.ok) throw new Error(result.error || "Image upload failed");
     setDraft({ image_url: result.imageUrl });
   }
