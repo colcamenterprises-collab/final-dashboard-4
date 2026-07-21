@@ -37,6 +37,7 @@ import ShiftHistory from "./pages/reports/ShiftHistory";
 import Export from "./pages/reports/Export";
 import ReceiptAnalytics from "./pages/reports/ReceiptAnalytics";
 import InventoryReconciliation from "./pages/reports/InventoryReconciliation";
+import HistoricalReports from "./pages/reports/HistoricalReports";
 
 import Orders from "./pages/ordering/Orders";
 import Catalog from "./pages/ordering/Catalog";
@@ -124,10 +125,10 @@ export default function App() {
                     <Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                     <Route path="/finance/expenses-import" element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
                     <Route path="/reports/sales-summary" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><ShiftReports /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/shift-report" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
                     <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
                     <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} />
