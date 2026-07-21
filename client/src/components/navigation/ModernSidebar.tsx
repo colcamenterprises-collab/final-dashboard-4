@@ -66,9 +66,12 @@ const navigationGroups: NavGroup[] = [
     title: "Reporting",
     defaultOpen: false,
     items: [
-      { to: "/reports/receipts-analysis", label: "Receipt Analytics",             icon: BarChart3, testId: "nav-receipt-analytics" },
-      { to: "/reports/shift-reports",     label: "Shift Verification & History", icon: FileText,      testId: "nav-shift-reports" },
-      { to: "/reports/inventory-reconciliation", label: "Inventory Reconciliation", icon: ClipboardList, testId: "nav-inventory-reconciliation" },
+      { to: "/reports/sales-summary",       label: "Sales Summary",          icon: TrendingUp,    testId: "nav-sales-summary", ownerOnly: true },
+      { to: "/reports/shift-summary",       label: "Shift Summary",          icon: FileText,      testId: "nav-shift-summary", ownerOnly: true },
+      { to: "/reports/payment-types",       label: "Sales by Payment Type",  icon: Wallet,        testId: "nav-payment-types", ownerOnly: true },
+      { to: "/reports/receipts",            label: "Receipts",               icon: Receipt,       testId: "nav-receipts", ownerOnly: true },
+      { to: "/reports/sales-by-item",       label: "Sales by Item",          icon: BarChart3,     testId: "nav-sales-by-item", ownerOnly: true },
+      { to: "/reports/shift-report",        label: "Shift Report",           icon: ClipboardList, testId: "nav-shift-report" },
     ],
   },
   {
