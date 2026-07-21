@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from "express";
 import { AuthService } from "../services/auth/authService";
+import { getPinSessionUser } from "../routes/pinAuth";
 
 const AUTH_COOKIE_NAME = "sbb_session";
 
@@ -40,12 +41,23 @@ export function attachSessionUser(req: Request): boolean {
 }
 
 export function requireSessionAuth(req: Request, res: Response, next: NextFunction) {
-  if (!attachSessionUser(req)) {
-    // AUTH BYPASSED — temporary, inject guest session
-    (req as any).user = { uid: 1, tenantId: 1, role: "admin" };
+  if (attachSessionUser(req)) return next();
+
+  const pinUser = getPinSessionUser(req);
+  if (pinUser) {
+    (req as any).user = {
+      uid: pinUser.id,
+      id: pinUser.id,
+      tenantId: 1,
+      name: pinUser.name,
+      role: pinUser.role,
+      permissions: pinUser.permissions,
+    };
     (req as any).tenantId = 1;
+    return next();
   }
-  return next();
+
+  return res.status(401).json({ error: "AUTHENTICATION_REQUIRED" });
 }
 
 export { AUTH_COOKIE_NAME };
