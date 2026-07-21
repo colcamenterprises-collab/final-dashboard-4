@@ -56,33 +56,6 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
-function workflowUserFromDailySalesContext(pathname: string, search: string): PinUser | null {
-  if (pathname !== "/operations/daily-cleaning" && pathname !== "/operations/daily-stock") return null;
-  const shiftId = new URLSearchParams(search).get("shift");
-  if (!shiftId) return null;
-  try {
-    const rawContext = window.localStorage.getItem("daily_shift_workflow_context");
-    const context = rawContext ? JSON.parse(rawContext) : null;
-    const contextShiftId = String(context?.shiftId || context?.salesId || "");
-    const savedAt = Date.parse(String(context?.savedAt || ""));
-    const isFresh = Number.isFinite(savedAt) && Date.now() - savedAt <= 12 * 60 * 60 * 1000;
-    if (!contextShiftId || contextShiftId !== shiftId || !isFresh) return null;
-    return {
-      id: 0,
-      name: String(context?.staffName || "Daily Sales Staff"),
-      role: "staff",
-      permissions: {
-        "dashboard.view": true,
-        "operations.view": true,
-        "forms.daily_sales": true,
-        "forms.daily_stock": true,
-      } as StaffPermissions,
-    };
-  } catch {
-    return null;
-  }
-}
-
 // ─── Main gate component ─────────────────────────────────────────────────────
 
 export default function PinLoginGate({ children }: { children: ReactNode }) {
@@ -107,13 +80,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       }
     } catch {}
 
-    const storedUser = !forcePin ? readStoredPinUser() : null;
-    if (storedUser) {
-      setCurrentUser(storedUser);
-      setGateState("unlocked");
-      return;
-    }
-
     // Dev bypass — only when no real session exists and not force-locked
     if (process.env.NODE_ENV === "development" && !forcePin) {
       setCurrentUser({
@@ -131,22 +97,14 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       return;
     }
 
-    const workflowUser = workflowUserFromDailySalesContext(location.pathname, location.search);
-    if (workflowUser) {
-      setCurrentUser(workflowUser);
-      setGateState("unlocked");
-      return;
-    }
-
     setCurrentUser(null);
     setGateState("locked");
-  }, [isPublic, location.pathname, location.search]);
+  }, [isPublic]);
 
   useEffect(() => { checkSession(); }, [checkSession]);
 
   const logout = useCallback(async () => {
     await fetch("/api/pin-auth/logout", { method: "POST", credentials: "include" });
-    clearStoredPinUser();
     setCurrentUser(null);
     setGateState("locked");
   }, []);
@@ -175,7 +133,6 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
       <PinAuthContext.Provider value={contextValue}>
         <PinLoginScreen
           onLogin={(user) => {
-            storePinUser(user);
             setCurrentUser(user);
             setGateState("unlocked");
           }}
@@ -193,34 +150,9 @@ export default function PinLoginGate({ children }: { children: ReactNode }) {
 
 // ─── PIN Login Screen ────────────────────────────────────────────────────────
 
-const PIN_SESSION_STORAGE_KEY = "sbb_pin_session_user";
-const PIN_SESSION_MAX_AGE = 12 * 60 * 60 * 1000;
-
-function readStoredPinUser(): PinUser | null {
-  try {
-    const raw = window.localStorage.getItem(PIN_SESSION_STORAGE_KEY);
-    const stored = raw ? JSON.parse(raw) : null;
-    const savedAt = Date.parse(String(stored?.savedAt || ""));
-    if (!stored?.user || !Number.isFinite(savedAt) || Date.now() - savedAt > PIN_SESSION_MAX_AGE) {
-      window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
-      return null;
-    }
-    return stored.user as PinUser;
-  } catch {
-    window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
-    return null;
-  }
-}
-
-function storePinUser(user: PinUser) {
-  window.localStorage.setItem(PIN_SESSION_STORAGE_KEY, JSON.stringify({ user, savedAt: new Date().toISOString() }));
-}
-
-function clearStoredPinUser() {
-  window.localStorage.removeItem(PIN_SESSION_STORAGE_KEY);
-}
-
-const PIN_LENGTH = 4;
+const MIN_CREDENTIAL_LENGTH = 4;
+const MAX_CREDENTIAL_LENGTH = 72;
+const PIN_DOT_COUNT = 4;
 
 const KEYPAD_ROWS = [
   ["1", "2", "3"],
@@ -249,7 +181,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
   });
 
   function appendDigit(d: string) {
-    if (pin.length >= PIN_LENGTH) return;
+    if (pin.length >= MAX_CREDENTIAL_LENGTH) return;
     setStatus("idle");
     setErrorMsg("");
     setPin((p) => p + d);
@@ -263,7 +195,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
 
   async function submitLogin(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!username.trim() || pin.length < PIN_LENGTH || status === "loading") return;
+    if (!username.trim() || pin.length < MIN_CREDENTIAL_LENGTH || status === "loading") return;
     setStatus("loading");
     try {
       const res = await fetch("/api/pin-auth/login", {
@@ -277,7 +209,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
         onLogin(data.user);
       } else {
         setStatus("error");
-        setErrorMsg(data.error || "Incorrect PIN");
+        setErrorMsg(data.error || "Incorrect password / PIN");
         setPin("");
         setShake(true);
         setTimeout(() => setShake(false), 500);
@@ -308,7 +240,7 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
               Staff Sign In
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              Enter your username/name and PIN
+              Enter your username/name and password or PIN
             </p>
           </div>
 
@@ -329,11 +261,29 @@ function PinLoginScreen({ onLogin }: { onLogin: (user: PinUser) => void }) {
             </div>
 
             <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                Password / PIN
+              </label>
+              <input
+                type="password"
+                autoComplete="current-password"
+                value={pin}
+                onChange={(e) => {
+                  setPin(e.target.value.slice(0, MAX_CREDENTIAL_LENGTH));
+                  setStatus("idle");
+                  setErrorMsg("");
+                }}
+                placeholder="Enter password or use keypad"
+                className="w-full h-11 rounded-lg border border-gray-200 px-4 text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all"
+              />
+            </div>
+
+            <div>
               <label className="block text-xs font-semibold text-gray-600 mb-3 text-center">
-                PIN / passcode
+                Password / PIN
               </label>
               <div className={`flex items-center justify-center gap-4 mb-2 ${shake ? "animate-shake" : ""}`}>
-                {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+                {Array.from({ length: PIN_DOT_COUNT }).map((_, i) => (
                   <div
                     key={i}
                     className="rounded-full transition-all duration-150"
