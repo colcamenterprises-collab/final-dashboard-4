@@ -119,7 +119,8 @@ const navigationGroups: NavGroup[] = [
       { to: "/staff/members",    label: "Staff List",   icon: UserCheck,    testId: "nav-staff-members" },
       { to: "/staff/roster",     label: "Staff Roster", icon: CalendarDays, testId: "nav-staff-roster" },
       { to: "/staff/attendance", label: "Attendance",   icon: Receipt,      testId: "nav-staff-attendance" },
-      { to: "/staff/settings",   label: "HR Settings",  icon: Settings,     testId: "nav-staff-settings" },
+      { to: "/staff/settings",         label: "HR Settings",   icon: Settings,    testId: "nav-staff-settings" },
+      { to: "/settings/staff-access", label: "Staff Access",  icon: UserCheck,   testId: "nav-staff-access", ownerOnly: true },
     ],
   },
 ];
