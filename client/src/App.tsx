@@ -123,11 +123,17 @@ export default function App() {
                     <Route path="/finance/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
                     <Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                     <Route path="/finance/expenses-import" element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
-                    <Route path="/reports/shift-reports" element={<ProtectedRoute><ShiftReports /></ProtectedRoute>} />
-                    <Route path="/reports/shift-history" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
+                    <Route path="/reports/sales-summary" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><ShiftReports /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/shift-report" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
+                    <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
+                    <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} />
                     <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
-                    <Route path="/reports/receipts-analysis" element={<ProtectedRoute><ReceiptAnalytics /></ProtectedRoute>} />
-                    <Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><InventoryReconciliation /></ProtectedRoute>} />
+                    <Route path="/reports/receipts-analysis" element={<Navigate to="/reports/sales-summary" replace />} />
+                    <Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/online-ordering" element={<OnlineOrdering />} />
                     <Route path="/online-ordering/checkout" element={<Checkout />} />
                     <Route path="/online-ordering/confirmation" element={<Confirmation />} />
@@ -144,6 +150,7 @@ export default function App() {
                     <Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} />
                     <Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} />
                     <Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} />
+                    <Route path="/settings/staff-access" element={<Navigate to="/staff/settings" replace />} />
                     <Route path="*" element={<NotFound />} />
                   </Route>
                 </Routes>
