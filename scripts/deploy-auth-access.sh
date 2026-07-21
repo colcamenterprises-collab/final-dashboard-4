@@ -23,6 +23,7 @@ const values = {
   DASHBOARD_OWNER_USERNAME: process.env.OWNER_USERNAME,
   DASHBOARD_OWNER_NAME: process.env.OWNER_NAME,
   DASHBOARD_OWNER_PASSWORD: process.env.OWNER_PASSWORD,
+  DASHBOARD_OWNER_FORCE_SYNC: "true",
 };
 if (!/^INTERNAL_APP_PASSWORD=/m.test(existing)) {
   values.INTERNAL_APP_PASSWORD = crypto.randomBytes(48).toString("hex");
@@ -49,5 +50,23 @@ DASHBOARD_OWNER_USERNAME="$OWNER_USERNAME" \
 DASHBOARD_OWNER_PASSWORD="$OWNER_PASSWORD" \
 node scripts/verify-production-access.mjs
 
+node <<'NODE'
+const fs = require("fs");
+const path = ".env";
+const input = fs.readFileSync(path, "utf8");
+const line = 'DASHBOARD_OWNER_FORCE_SYNC="false"';
+const output = /^DASHBOARD_OWNER_FORCE_SYNC=.*$/m.test(input)
+  ? input.replace(/^DASHBOARD_OWNER_FORCE_SYNC=.*$/m, line)
+  : `${input.replace(/\s*$/, "")}\n${line}\n`;
+fs.writeFileSync(path, output, { mode: 0o600 });
+NODE
+systemctl restart sbb-production
+sleep 5
+systemctl is-active --quiet sbb-production
+DASHBOARD_BASE_URL=http://127.0.0.1:8081 \
+DASHBOARD_OWNER_USERNAME="$OWNER_USERNAME" \
+DASHBOARD_OWNER_PASSWORD="$OWNER_PASSWORD" \
+node scripts/verify-production-access.mjs
+
 unset OWNER_USERNAME OWNER_NAME OWNER_PASSWORD
-echo "Production access release verified."
+echo "Production access release verified and owner credential management unlocked."
