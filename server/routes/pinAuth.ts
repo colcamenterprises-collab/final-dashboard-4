@@ -611,6 +611,12 @@ export async function ensureProductionOwner(): Promise<void> {
     if (!normalizedUsername) throw new Error("DASHBOARD_OWNER_USERNAME is invalid");
 
     const existing = owners[0];
+    const forceSync = process.env.DASHBOARD_OWNER_FORCE_SYNC === "true";
+    if (existing?.active && !forceSync) {
+      console.log("[pinAuth] Active production owner retained; credential sync is disabled");
+      return;
+    }
+
     const username = await uniqueUsername(normalizedUsername, existing?.id);
     const pinHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
