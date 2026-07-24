@@ -47,7 +47,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB max file size
+    fileSize: 15 * 1024 * 1024, // 15MB for modern phone images
   },
 });
 
@@ -104,6 +104,14 @@ router.delete("/upload/menu-item-image", async (req, res) => {
     console.error("Error deleting image:", error);
     res.status(500).json({ error: "Failed to delete image" });
   }
+});
+
+// Always return JSON for Multer/file-processing failures so dashboard clients can show a useful message.
+router.use((error: any, _req: any, res: any, _next: any) => {
+  const message = error?.code === "LIMIT_FILE_SIZE"
+    ? "Image is larger than the 15MB upload limit"
+    : error?.message || "Image upload failed";
+  res.status(400).json({ error: message });
 });
 
 export default router;

@@ -66,9 +66,12 @@ const navigationGroups: NavGroup[] = [
     title: "Reporting",
     defaultOpen: false,
     items: [
-      { to: "/reports/receipts-analysis", label: "Receipt Analytics",             icon: BarChart3, testId: "nav-receipt-analytics" },
-      { to: "/reports/shift-reports",     label: "Shift Verification & History", icon: FileText,      testId: "nav-shift-reports" },
-      { to: "/reports/inventory-reconciliation", label: "Inventory Reconciliation", icon: ClipboardList, testId: "nav-inventory-reconciliation" },
+      { to: "/reports/sales-summary",       label: "Sales Summary",          icon: TrendingUp,    testId: "nav-sales-summary", ownerOnly: true },
+      { to: "/reports/shift-summary",       label: "Shift Summary",          icon: FileText,      testId: "nav-shift-summary", ownerOnly: true },
+      { to: "/reports/payment-types",       label: "Sales by Payment Type",  icon: Wallet,        testId: "nav-payment-types", ownerOnly: true },
+      { to: "/reports/receipts",            label: "Receipts",               icon: Receipt,       testId: "nav-receipts", ownerOnly: true },
+      { to: "/reports/sales-by-item",       label: "Sales by Item",          icon: BarChart3,     testId: "nav-sales-by-item", ownerOnly: true },
+      { to: "/reports/shift-report",        label: "Shift Report",           icon: ClipboardList, testId: "nav-shift-report" },
     ],
   },
   {
@@ -85,6 +88,7 @@ const navigationGroups: NavGroup[] = [
     title: "POS",
     defaultOpen: true,
     items: [
+      { to: "/pos/catalog", label: "POS Catalogue",         icon: UtensilsCrossed, testId: "nav-pos-catalog" },
       { to: "/pos",         label: "Register POS",          icon: ShoppingBag,    testId: "nav-pos-register" },
       { to: "/pos/kitchen", label: "Kitchen Tickets",       icon: CookingPot,     testId: "nav-pos-kitchen" },
       { to: "/pos/display", label: "Customer Ticket Display", icon: Monitor,      testId: "nav-pos-display" },
@@ -96,7 +100,6 @@ const navigationGroups: NavGroup[] = [
     items: [
       { to: "/admin/ordering/orders",    label: "Orders",             icon: ShoppingBag,     testId: "nav-ordering-orders" },
       { to: "/admin/ordering/qr-codes",  label: "QR Codes & Settings", icon: QrCode,          testId: "nav-ordering-qr" },
-      { to: "/kitchen/display",          label: "Kitchen Display",    icon: Monitor,         testId: "nav-kitchen-display" },
     ],
   },
   {
@@ -116,7 +119,8 @@ const navigationGroups: NavGroup[] = [
       { to: "/staff/members",    label: "Staff List",   icon: UserCheck,    testId: "nav-staff-members" },
       { to: "/staff/roster",     label: "Staff Roster", icon: CalendarDays, testId: "nav-staff-roster" },
       { to: "/staff/attendance", label: "Attendance",   icon: Receipt,      testId: "nav-staff-attendance" },
-      { to: "/staff/settings",   label: "HR Settings",  icon: Settings,     testId: "nav-staff-settings" },
+      { to: "/staff/settings",         label: "HR Settings",   icon: Settings,    testId: "nav-staff-settings" },
+      { to: "/settings/staff-access", label: "Staff Access",  icon: UserCheck,   testId: "nav-staff-access", ownerOnly: true },
     ],
   },
 ];

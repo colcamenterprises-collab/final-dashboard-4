@@ -15,6 +15,8 @@ const value = (input: unknown) => {
   const n = Number(input);
   return Number.isFinite(n) ? n : 0;
 };
+const text = (input: unknown, max = 200) =>
+  typeof input === "string" ? input.trim().slice(0, max) : "";
 
 function shiftDateFor(date = DateTime.now().setZone("Asia/Bangkok")) {
   return (date.hour < 3 ? date.minus({ days: 1 }) : date).toFormat("yyyyLLdd");
@@ -28,6 +30,7 @@ function receiptNumber(orderNumber: number, createdAt?: string | Date) {
 }
 
 function staffDevice(req: Request, res: Response, next: NextFunction) {
+  if (process.env.EMERGENCY_STAFF_ACCESS === "true") return next();
   if (process.env.NODE_ENV !== "production") return next();
   if (attachSessionUser(req)) return next();
   const pinUser = getPinSessionUser(req);
@@ -64,6 +67,111 @@ router.get("/menu", async (req, res) => {
        ORDER BY c.sort_order, i.sort_order`,
     );
     res.json({ ok: true, source: "sbb_pos_core", price_mode: mode, data: rows.rows });
+  } catch (e: any) {
+    fail(res, e.message, 500);
+  }
+});
+
+// The POS catalogue is the current menu source of truth.  It intentionally
+// reads/writes ordering_* tables and does not depend on the unfinished Menu V3.
+router.get("/discounts", staffDevice, async (_req, res) => {
+  try {
+    const result = await db().query(`SELECT id, code, name, discount_type, value
+      FROM pos_discount_codes
+      WHERE active AND (starts_at IS NULL OR starts_at <= NOW()) AND (ends_at IS NULL OR ends_at >= NOW())
+      ORDER BY CASE code WHEN 'MEMBER10' THEN 1 WHEN 'PROMO0' THEN 2 WHEN 'OWNER100' THEN 99 ELSE 3 END, name`);
+    res.json({ ok: true, source: "sbb_pos_core", data: result.rows.map(row => ({ ...row, value: value(row.value) })) });
+  } catch (e: any) { fail(res, e.message, 500); }
+});
+
+router.get("/discounts/manage", staffDevice, async (_req, res) => {
+  try {
+    const result = await db().query(`SELECT id, code, name, discount_type, value, active, starts_at, ends_at, created_at
+      FROM pos_discount_codes ORDER BY active DESC, code`);
+    res.json({ ok: true, source: "sbb_pos_core", data: result.rows.map(row => ({ ...row, value: value(row.value) })) });
+  } catch (e: any) { fail(res, e.message, 500); }
+});
+
+router.post("/discounts/manage", staffDevice, async (req, res) => {
+  const code = text(req.body?.code, 32).toUpperCase();
+  const name = text(req.body?.name, 100);
+  const discountType = req.body?.discount_type === "fixed" ? "fixed" : req.body?.discount_type === "percent" ? "percent" : "";
+  const discountValue = value(req.body?.value);
+  if (!/^[A-Z0-9][A-Z0-9_-]{2,31}$/.test(code)) return fail(res, "Discount code must use 3–32 letters, numbers, hyphens, or underscores");
+  if (!name || !discountType || discountValue < 0 || (discountType === "percent" && discountValue > 100)) return fail(res, "Enter a valid discount name and value");
+  try {
+    const result = await db().query(`INSERT INTO pos_discount_codes(code,name,discount_type,value)
+      VALUES($1,$2,$3,$4) RETURNING id, code, name, discount_type, value, active`, [code, name, discountType, discountValue]);
+    res.status(201).json({ ok: true, source: "sbb_pos_core", data: { ...result.rows[0], value: value(result.rows[0].value) } });
+  } catch (e: any) {
+    if (e.code === "23505") return fail(res, "That discount code already exists", 409);
+    fail(res, e.message, 500);
+  }
+});
+
+router.patch("/discounts/manage/:id", staffDevice, async (req, res) => {
+  if (typeof req.body?.active !== "boolean") return fail(res, "active must be true or false");
+  try {
+    const result = await db().query(`UPDATE pos_discount_codes SET active=$2, updated_at=NOW() WHERE id=$1
+      RETURNING id, code, name, discount_type, value, active`, [req.params.id, req.body.active]);
+    if (!result.rows[0]) return fail(res, "Discount code not found", 404);
+    res.json({ ok: true, source: "sbb_pos_core", data: { ...result.rows[0], value: value(result.rows[0].value) } });
+  } catch (e: any) { fail(res, e.message, 500); }
+});
+
+router.get("/marketing-prompt", staffDevice, async (_req, res) => {
+  const fallback = "Are you a member? If you join you get 10% off every meal, starting with your next order";
+  try {
+    const result = await db().query(`SELECT value FROM ordering_settings WHERE key='pos_marketing_prompt' LIMIT 1`);
+    const stored = result.rows[0]?.value;
+    const prompt = typeof stored === "string" ? stored : typeof stored?.text === "string" ? stored.text : fallback;
+    res.json({ ok: true, source: "sbb_pos_core", data: { prompt } });
+  } catch (e: any) { fail(res, e.message, 500); }
+});
+
+router.get("/catalog", staffDevice, async (_req, res) => {
+  try {
+    const [categories, items] = await Promise.all([
+      db().query(`SELECT id, name_en, name_th, sort_order, is_active FROM ordering_menu_categories ORDER BY sort_order, name_en`),
+      db().query(`SELECT i.*, c.name_en AS category_name FROM ordering_menu_items i JOIN ordering_menu_categories c ON c.id = i.category_id ORDER BY c.sort_order, i.sort_order, i.name_en`),
+    ]);
+    res.json({ ok: true, source: "sbb_pos_core", categories: categories.rows, items: items.rows });
+  } catch (e: any) {
+    fail(res, e.message, 500);
+  }
+});
+
+router.post("/catalog/items", staffDevice, async (req, res) => {
+  const { category_id, name_en, description_en, price, direct_price, grab_price, image_url, sort_order } = req.body || {};
+  if (!category_id || !String(name_en || "").trim()) return fail(res, "Category and item name are required");
+  const amount = Number(price ?? direct_price ?? 0);
+  if (!Number.isFinite(amount) || amount < 0) return fail(res, "A valid price is required");
+  try {
+    const created = await db().query(
+      `INSERT INTO ordering_menu_items(category_id, name_en, description_en, price, direct_price, grab_price, image_url, is_active, is_sold_out, pos_enabled, sort_order)
+       VALUES($1,$2,$3,$4,$5,$6,$7,true,false,true,$8) RETURNING *`,
+      [category_id, String(name_en).trim(), description_en || null, amount, Number(direct_price ?? amount), Number(grab_price ?? amount), image_url || null, Number(sort_order ?? 0)],
+    );
+    res.status(201).json({ ok: true, item: created.rows[0] });
+  } catch (e: any) {
+    fail(res, e.message, 500);
+  }
+});
+
+router.patch("/catalog/items/:id", staffDevice, async (req, res) => {
+  const { category_id, name_en, description_en, price, direct_price, grab_price, image_url, is_active, is_sold_out, pos_enabled, sort_order } = req.body || {};
+  try {
+    const updated = await db().query(
+      `UPDATE ordering_menu_items SET
+        category_id=COALESCE($2, category_id), name_en=COALESCE($3, name_en), description_en=$4,
+        price=COALESCE($5, price), direct_price=COALESCE($6, direct_price), grab_price=COALESCE($7, grab_price),
+        image_url=$8, is_active=COALESCE($9, is_active), is_sold_out=COALESCE($10, is_sold_out),
+        pos_enabled=COALESCE($11, pos_enabled), sort_order=COALESCE($12, sort_order), updated_at=NOW()
+       WHERE id=$1 RETURNING *`,
+      [req.params.id, category_id || null, name_en?.trim() || null, description_en || null, price === undefined ? null : Number(price), direct_price === undefined ? null : Number(direct_price), grab_price === undefined ? null : Number(grab_price), image_url || null, typeof is_active === "boolean" ? is_active : null, typeof is_sold_out === "boolean" ? is_sold_out : null, typeof pos_enabled === "boolean" ? pos_enabled : null, sort_order === undefined ? null : Number(sort_order)],
+    );
+    if (!updated.rowCount) return fail(res, "POS item was not found", 404);
+    res.json({ ok: true, item: updated.rows[0] });
   } catch (e: any) {
     fail(res, e.message, 500);
   }
@@ -115,6 +223,17 @@ router.post("/orders", staffDevice, async (req, res) => {
   if (mode === "grab" && input.payment_method !== "grab")
     return fail(res, "Grab orders must use Grab payment");
 
+  const grabOrderDigits = String(input.grab_order_number || "").slice(0, 64).replace(/\D/g, "");
+  const grabOrderNumber = mode === "grab" && grabOrderDigits ? `GF-${grabOrderDigits}` : "";
+  const customerName = String(input.customer_name || "").trim().slice(0, 120);
+  const customerMobile = String(input.customer_mobile || "").trim().slice(0, 30);
+  if (mode === "grab") {
+    if (!grabOrderDigits) return fail(res, "Enter the Grab order number");
+    if (!customerName) return fail(res, "Grab customer name is required");
+    if (!/^[+0-9][0-9 ()-]{5,29}$/.test(customerMobile))
+      return fail(res, "Enter the Grab customer mobile number");
+  }
+
   const client = await db().connect();
   try {
     await client.query("BEGIN");
@@ -122,8 +241,9 @@ router.post("/orders", staffDevice, async (req, res) => {
       await client.query(
         `INSERT INTO ordering_orders(
            channel, order_mode, dining_type, order_notes,
-           status, payment_status, payment_method
-         ) VALUES($1,$2,$3,$4,'submitted','paid',$5)
+           status, payment_status, payment_method,
+           grab_order_number, customer_name, customer_mobile
+         ) VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8)
          RETURNING *`,
         [
           mode === "grab" ? "grab" : "pos_direct",
@@ -131,6 +251,9 @@ router.post("/orders", staffDevice, async (req, res) => {
           input.dining_type || null,
           input.order_notes || null,
           input.payment_method,
+          mode === "grab" ? grabOrderNumber : null,
+          mode === "grab" ? customerName : null,
+          mode === "grab" ? customerMobile : null,
         ],
       )
     ).rows[0];
@@ -293,10 +416,45 @@ router.post("/orders", staffDevice, async (req, res) => {
       }
     }
 
-    await client.query(`UPDATE ordering_orders SET subtotal = $2, total = $2 WHERE id = $1`, [
-      order.id,
-      total,
-    ]);
+    const subtotal = total;
+    let discountAmount = 0;
+    let discount: any = null;
+    const requestedDiscount = text(input.discount_code, 32).toUpperCase();
+    if (requestedDiscount) {
+      const result = await client.query(
+        `SELECT code, name, discount_type, value
+         FROM pos_discount_codes
+         WHERE upper(code) = upper($1)
+           AND active
+           AND (starts_at IS NULL OR starts_at <= NOW())
+           AND (ends_at IS NULL OR ends_at >= NOW())
+         LIMIT 1`,
+        [requestedDiscount],
+      );
+      discount = result.rows[0];
+      if (!discount) throw new Error("Selected discount code is unavailable");
+      const rawDiscount =
+        discount.discount_type === "percent"
+          ? (subtotal * value(discount.value)) / 100
+          : value(discount.value);
+      discountAmount = Math.min(subtotal, Math.round(rawDiscount * 100) / 100);
+      total = Math.max(0, subtotal - discountAmount);
+    }
+
+    await client.query(
+      `UPDATE ordering_orders
+       SET subtotal = $2, total = $3, discount_code = $4,
+           discount_name = $5, discount_amount = $6
+       WHERE id = $1`,
+      [
+        order.id,
+        subtotal,
+        total,
+        discount?.code || null,
+        discount?.name || null,
+        discountAmount,
+      ],
+    );
     await client.query(
       `INSERT INTO ordering_payments(order_id, method, status, amount)
        VALUES($1,$2,'confirmed',$3)`,
@@ -305,7 +463,15 @@ router.post("/orders", staffDevice, async (req, res) => {
     await client.query(
       `INSERT INTO pos_order_events(order_id, event_type, payload)
        VALUES($1,'order_created',$2)`,
-      [order.id, JSON.stringify({ ticket_number: ticket, receipt_number: ticket })],
+      [
+        order.id,
+        JSON.stringify({
+          ticket_number: ticket,
+          receipt_number: ticket,
+          discount_code: discount?.code || undefined,
+          discount_amount: discountAmount,
+        }),
+      ],
     );
     await client.query("COMMIT");
 
@@ -316,6 +482,8 @@ router.post("/orders", staffDevice, async (req, res) => {
         id: order.id,
         ticket_number: ticket,
         receipt_number: ticket,
+        subtotal,
+        discount_amount: discountAmount,
         total,
         created_at: order.created_at,
       },

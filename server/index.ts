@@ -632,8 +632,9 @@ async function checkSchema() {
   const { ensureDailySalesAuditTable, ensureInternalUsersTable } = await import('./db');
   await ensureDailySalesAuditTable();
   await ensureInternalUsersTable();
-  // Backfill usernames for existing staff (safe no-op if already set)
-  const { backfillUsernames } = await import('./routes/pinAuth');
+  // Guarantee at least one recoverable production owner, then backfill staff usernames.
+  const { ensureProductionOwner, backfillUsernames } = await import('./routes/pinAuth');
+  await ensureProductionOwner();
   await backfillUsernames();
 
   // Ingredient Master route (PACK F)

@@ -37,6 +37,7 @@ import ShiftHistory from "./pages/reports/ShiftHistory";
 import Export from "./pages/reports/Export";
 import ReceiptAnalytics from "./pages/reports/ReceiptAnalytics";
 import InventoryReconciliation from "./pages/reports/InventoryReconciliation";
+import HistoricalReports from "./pages/reports/HistoricalReports";
 
 import Orders from "./pages/ordering/Orders";
 import Catalog from "./pages/ordering/Catalog";
@@ -53,6 +54,7 @@ import AdminQrCodes from "./pages/admin/ordering/AdminQrCodes";
 import PosRegister from "./pages/pos/PosRegister";
 import PosKitchen from "./pages/pos/PosKitchen";
 import PosDisplay from "./pages/pos/PosDisplay";
+import PosCatalog from "./pages/pos/PosCatalog";
 
 import StaffDashboard from "./pages/staff/Dashboard";
 import StaffMembers from "./pages/staff/Members";
@@ -60,6 +62,7 @@ import StaffRoster from "./pages/staff/Roster";
 import StaffCleaning from "./pages/staff/Cleaning";
 import StaffAttendance from "./pages/staff/Attendance";
 import StaffSettings from "./pages/staff/Settings";
+import StaffAccess from "./pages/settings/StaffAccess";
 
 function OwnerRoute({ children }: { children: JSX.Element }) {
   const { currentUser } = usePinAuth();
@@ -94,6 +97,7 @@ export default function App() {
                   <Route path="/pos/kitchen" element={<ProtectedRoute><PosKitchen /></ProtectedRoute>} />
                   <Route path="/pos/display" element={<PosDisplay />} />
                   <Route element={<PageShell />}>
+                    <Route path="/pos/catalog" element={<ProtectedRoute><PosCatalog /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
@@ -121,11 +125,17 @@ export default function App() {
                     <Route path="/finance/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
                     <Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
                     <Route path="/finance/expenses-import" element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
-                    <Route path="/reports/shift-reports" element={<ProtectedRoute><ShiftReports /></ProtectedRoute>} />
-                    <Route path="/reports/shift-history" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
+                    <Route path="/reports/sales-summary" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/shift-report" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
+                    <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
+                    <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} />
                     <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
-                    <Route path="/reports/receipts-analysis" element={<ProtectedRoute><ReceiptAnalytics /></ProtectedRoute>} />
-                    <Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><InventoryReconciliation /></ProtectedRoute>} />
+                    <Route path="/reports/receipts-analysis" element={<Navigate to="/reports/sales-summary" replace />} />
+                    <Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/online-ordering" element={<OnlineOrdering />} />
                     <Route path="/online-ordering/checkout" element={<Checkout />} />
                     <Route path="/online-ordering/confirmation" element={<Confirmation />} />
@@ -142,6 +152,7 @@ export default function App() {
                     <Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} />
                     <Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} />
                     <Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} />
+                    <Route path="/settings/staff-access" element={<ProtectedRoute><OwnerRoute><StaffAccess /></OwnerRoute></ProtectedRoute>} />
                     <Route path="*" element={<NotFound />} />
                   </Route>
                 </Routes>

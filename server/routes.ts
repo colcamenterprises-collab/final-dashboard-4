@@ -86,6 +86,7 @@ import { registerOnlineOrderRoutes } from "./routes/onlineOrders";
 import imageUploadRouter from "./routes/imageUpload";
 import shiftReportRoutes from "./routes/shiftReportRoutes";
 import receiptAnalyticsRouter from "./routes/receiptAnalytics";
+import historicalLoyverseRouter from "./routes/historicalLoyverse";
 import recipesRouter from "./routes/recipes";
 import staffOpsRouter from "./routes/staffOps";
 
@@ -1188,6 +1189,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Receipt Analytics — read-only POS item/modifier analysis
   app.use("/api/reports/receipt-analytics", receiptAnalyticsRouter);
+  app.use("/api/reports/historical-loyverse", historicalLoyverseRouter);
 
 
   // Purchases import

@@ -72,7 +72,9 @@ function verifyAndParseToken(token: string): Record<string, unknown> | null {
     const [b64, sig] = token.split(".");
     if (!b64 || !sig) return null;
     const expected = crypto.createHmac("sha256", getSigningKey()).update(b64).digest("hex");
-    if (sig !== expected) return null;
+    const providedBuffer = Buffer.from(sig, "hex");
+    const expectedBuffer = Buffer.from(expected, "hex");
+    if (providedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(providedBuffer, expectedBuffer)) return null;
     const payload = JSON.parse(Buffer.from(b64, "base64url").toString("utf8"));
     if (payload.exp && Date.now() > payload.exp) return null;
     return payload;
@@ -108,6 +110,12 @@ export function getPinSessionUser(req: Request): {
 
 function isOwner(role: string): boolean {
   return role === "owner";
+}
+
+function credentialError(value: unknown, label = "Password / PIN"): string | null {
+  const length = String(value ?? "").length;
+  if (length < 4 || length > 72) return `${label} must be 4–72 characters`;
+  return null;
 }
 
 // Resolve effective permissions: role-level table first, fallback to user-stored
@@ -239,6 +247,27 @@ router.get("/me", (req: Request, res: Response) => {
   res.json({ authenticated: true, user: sessionUser });
 });
 
+// Public, non-sensitive readiness probe used by production deployment smoke tests.
+router.get("/status", async (_req: Request, res: Response) => {
+  try {
+    const users = await db
+      .select({ role: internalUsers.role, active: internalUsers.active })
+      .from(internalUsers);
+    const activeOwners = users.filter((user) => user.role === "owner" && user.active).length;
+    res.json({
+      ok: activeOwners > 0,
+      accounts: users.length,
+      activeOwners,
+      ownerBootstrapConfigured: Boolean(
+        process.env.DASHBOARD_OWNER_USERNAME && process.env.DASHBOARD_OWNER_PASSWORD
+      ),
+    });
+  } catch (err) {
+    console.error("[pinAuth] GET /status error:", err);
+    res.status(503).json({ ok: false, error: "Staff access database is not ready" });
+  }
+});
+
 // ─── GET /me/profile ─────────────────────────────────────────────────────────
 
 router.get("/me/profile", async (req: Request, res: Response) => {
@@ -299,8 +328,9 @@ router.patch("/me/pin", async (req: Request, res: Response) => {
   if (!currentPin || !newPin) {
     return res.status(400).json({ error: "currentPin and newPin are required" });
   }
-  if (String(newPin).length < 4 || String(newPin).length > 8) {
-    return res.status(400).json({ error: "New PIN must be 4–8 digits" });
+  const newCredentialError = credentialError(newPin, "New password / PIN");
+  if (newCredentialError) {
+    return res.status(400).json({ error: newCredentialError });
   }
   try {
     const [user] = await db.select().from(internalUsers).where(eq(internalUsers.id, sessionUser.id)).limit(1);
@@ -371,8 +401,9 @@ router.post("/staff", async (req: Request, res: Response) => {
   if (!name || !role || !pin) {
     return res.status(400).json({ error: "name, role, and pin are required" });
   }
-  if (String(pin).length < 4 || String(pin).length > 8) {
-    return res.status(400).json({ error: "PIN must be 4–8 digits" });
+  const createCredentialError = credentialError(pin);
+  if (createCredentialError) {
+    return res.status(400).json({ error: createCredentialError });
   }
   if (email) {
     const [existing] = await db.select({ id: internalUsers.id }).from(internalUsers).where(ilike(internalUsers.email, email.trim())).limit(1);
@@ -412,6 +443,30 @@ router.put("/staff/:id", async (req: Request, res: Response) => {
     active?: boolean; avatarUrl?: string | null; username?: string;
   };
   try {
+    const [target] = await db
+      .select({ id: internalUsers.id, role: internalUsers.role, active: internalUsers.active })
+      .from(internalUsers)
+      .where(eq(internalUsers.id, id))
+      .limit(1);
+    if (!target) return res.status(404).json({ error: "User not found" });
+
+    const removesActiveOwner =
+      target.role === "owner" &&
+      target.active &&
+      (active === false || (role !== undefined && role !== "owner"));
+    if (removesActiveOwner) {
+      const activeOwners = await db
+        .select({ id: internalUsers.id })
+        .from(internalUsers)
+        .where(eq(internalUsers.role, "owner"));
+      const activeOwnerCount = (
+        await db.select({ id: internalUsers.id, active: internalUsers.active }).from(internalUsers)
+      ).filter((user) => user.active && activeOwners.some((owner) => owner.id === user.id)).length;
+      if (activeOwnerCount <= 1) {
+        return res.status(409).json({ error: "The final active owner account cannot be disabled or downgraded" });
+      }
+    }
+
     const updates: Partial<typeof internalUsers.$inferInsert> = {};
     if (name !== undefined) updates.name = String(name).trim();
     if (role !== undefined) {
@@ -441,8 +496,9 @@ router.patch("/staff/:id/pin", async (req: Request, res: Response) => {
   if (!requireOwner(req, res)) return;
   const id = Number(req.params.id);
   const { pin } = req.body as { pin?: string };
-  if (!pin || String(pin).length < 4) {
-    return res.status(400).json({ error: "PIN must be at least 4 digits" });
+  const resetCredentialError = credentialError(pin);
+  if (resetCredentialError) {
+    return res.status(400).json({ error: resetCredentialError });
   }
   try {
     const pinHash = await bcrypt.hash(String(pin), BCRYPT_ROUNDS);
@@ -524,6 +580,75 @@ router.post("/seed-owner", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Seed failed" });
   }
 });
+
+// ─── Startup: guarantee a recoverable production owner ───────────────────────
+
+export async function ensureProductionOwner(): Promise<void> {
+  const requestedUsername = String(process.env.DASHBOARD_OWNER_USERNAME || "").trim().toLowerCase();
+  const password = String(process.env.DASHBOARD_OWNER_PASSWORD || "");
+  const displayName = String(process.env.DASHBOARD_OWNER_NAME || "Dashboard Owner").trim();
+
+  try {
+    const owners = await db
+      .select()
+      .from(internalUsers)
+      .where(eq(internalUsers.role, "owner"));
+
+    if (!requestedUsername || !password) {
+      const activeOwnerCount = owners.filter((owner) => owner.active).length;
+      if (activeOwnerCount === 0) {
+        console.error("[pinAuth] No active owner. Set DASHBOARD_OWNER_USERNAME and DASHBOARD_OWNER_PASSWORD, then restart.");
+      } else {
+        console.log(`[pinAuth] Active owner check passed (${activeOwnerCount})`);
+      }
+      return;
+    }
+
+    const bootstrapCredentialError = credentialError(password, "DASHBOARD_OWNER_PASSWORD");
+    if (bootstrapCredentialError) throw new Error(bootstrapCredentialError);
+
+    const normalizedUsername = requestedUsername.replace(/[^a-z0-9._-]/g, "");
+    if (!normalizedUsername) throw new Error("DASHBOARD_OWNER_USERNAME is invalid");
+
+    const existing = owners[0];
+    const forceSync = process.env.DASHBOARD_OWNER_FORCE_SYNC === "true";
+    if (existing?.active && !forceSync) {
+      console.log("[pinAuth] Active production owner retained; credential sync is disabled");
+      return;
+    }
+
+    const username = await uniqueUsername(normalizedUsername, existing?.id);
+    const pinHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+
+    if (existing) {
+      await db
+        .update(internalUsers)
+        .set({
+          name: displayName || existing.name,
+          username,
+          pinHash,
+          role: "owner",
+          active: true,
+          permissions: OWNER_PERMISSIONS,
+        })
+        .where(eq(internalUsers.id, existing.id));
+      console.log(`[pinAuth] Production owner restored: ${username}`);
+    } else {
+      await db.insert(internalUsers).values({
+        name: displayName || "Dashboard Owner",
+        username,
+        pinHash,
+        role: "owner",
+        active: true,
+        permissions: OWNER_PERMISSIONS,
+      });
+      console.log(`[pinAuth] Production owner created: ${username}`);
+    }
+  } catch (err) {
+    console.error("[pinAuth] Production owner bootstrap failed:", err);
+    throw err;
+  }
+}
 
 // ─── Startup: backfill usernames for existing staff ──────────────────────────
 
