@@ -21,6 +21,8 @@ export type RecipeWorkflowCalculation = {
   blockers: Array<{ code: string; message: string; where: string; canonical_source: string; auto_build_attempted: false }>;
 };
 
+export type RecipeLifecycleStatus = 'Draft' | 'Tested' | 'Approved' | 'Archived';
+
 export function decimalOrNull(value: unknown): string | null {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
@@ -41,9 +43,8 @@ export function calculateRecipeWorkflow(input: { ingredients?: RecipeWorkflowIng
     const manualCost = numberOrNull(ingredient.manualOverrideUnitCost);
     const autoCost = numberOrNull(ingredient.autoUnitCost);
     const unitCost = manualCost ?? autoCost;
-    const isMapped = ingredient.sourceType === 'purchasing' && numberOrNull(ingredient.purchasingItemId) !== null;
-    if (!ingredient.name || qty === null || unitCost === null || !isMapped) {
-      blockers.push({ code: 'INSUFFICIENT_INGREDIENT_DATA', message: `Ingredient row ${index + 1} is missing mapped purchasing item, quantity, or unit cost.`, where: `recipeIngredients[${index}]`, canonical_source: 'purchasing_items', auto_build_attempted: false });
+    if (!ingredient.name || qty === null || unitCost === null || !ingredient.unitUsed) {
+      blockers.push({ code: 'INSUFFICIENT_INGREDIENT_DATA', message: `Ingredient row ${index + 1} requires a name, quantity, unit, and unit cost.`, where: `recipeIngredients[${index}]`, canonical_source: 'recipes.ingredients', auto_build_attempted: false });
       return null;
     }
     return qty * unitCost;
@@ -59,14 +60,15 @@ export function calculateRecipeWorkflow(input: { ingredients?: RecipeWorkflowIng
     hasValidCostData,
     totalCost: total === null ? null : total.toFixed(2),
     costPerServing: costPerServing === null ? null : costPerServing.toFixed(2),
-    directMarginPercent: directPrice !== null && costPerServing !== null ? (((directPrice - costPerServing) / directPrice) * 100).toFixed(2) : null,
-    deliveryPartnerMarginPercent: deliveryPrice !== null && costPerServing !== null ? (((deliveryPrice - costPerServing) / deliveryPrice) * 100).toFixed(2) : null,
+    directMarginPercent: directPrice !== null && directPrice > 0 && costPerServing !== null ? (((directPrice - costPerServing) / directPrice) * 100).toFixed(2) : null,
+    deliveryPartnerMarginPercent: deliveryPrice !== null && deliveryPrice > 0 && costPerServing !== null ? (((deliveryPrice - costPerServing) / deliveryPrice) * 100).toFixed(2) : null,
     blockers,
   };
 }
 
-export function recipeStatusFromBody(body: any): 'Draft' | 'Live' | 'Archived' {
-  if (body?.status === 'Live' || body?.status === 'Archived') return body.status;
-  if (body?.isActive === true) return 'Live';
+export function recipeStatusFromBody(body: any): RecipeLifecycleStatus {
+  const status = String(body?.status ?? '').trim();
+  if (status === 'Tested' || status === 'Approved' || status === 'Archived') return status;
+  if (status === 'Live') return 'Approved';
   return 'Draft';
 }
