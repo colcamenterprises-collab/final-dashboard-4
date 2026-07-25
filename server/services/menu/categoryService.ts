@@ -1,34 +1,90 @@
-import { db } from "../../lib/prisma";
+import { pool } from "../../db";
+
+const db = () => {
+  if (!pool) throw new Error("Menu database is unavailable");
+  return pool;
+};
+
+const mapCategory = (row: any) => ({
+  id: String(row.id),
+  name: row.name_en,
+  name_en: row.name_en,
+  name_th: row.name_th ?? null,
+  sortOrder: Number(row.sort_order ?? 0),
+  displayOrder: Number(row.sort_order ?? 0),
+  isActive: row.is_active !== false,
+  onlineEnabled: row.is_active !== false,
+  visibleOnline: row.is_active !== false,
+});
 
 export async function getAllCategories() {
-  return await db().menu_categories_v3.findMany({
-    orderBy: { sortOrder: "asc" }
-  });
+  const result = await db().query(
+    `SELECT id, name_en, name_th, sort_order, is_active
+       FROM ordering_menu_categories
+      ORDER BY sort_order, name_en`,
+  );
+  return result.rows.map(mapCategory);
 }
 
 export async function createCategory(data: any) {
-  return await db().menu_categories_v3.create({ data });
+  const name = String(data?.name ?? data?.name_en ?? "").trim();
+  if (!name) throw new Error("Category name is required");
+  const result = await db().query(
+    `INSERT INTO ordering_menu_categories(name_en, name_th, sort_order, is_active)
+     VALUES($1,$2,$3,$4)
+     RETURNING id, name_en, name_th, sort_order, is_active`,
+    [name, data?.name_th || null, Number(data?.sortOrder ?? data?.displayOrder ?? 0), data?.isActive !== false],
+  );
+  return mapCategory(result.rows[0]);
 }
 
 export async function updateCategory(id: string, data: any) {
-  return await db().menu_categories_v3.update({
-    where: { id },
-    data
-  });
+  const result = await db().query(
+    `UPDATE ordering_menu_categories SET
+       name_en=COALESCE($2,name_en),
+       name_th=COALESCE($3,name_th),
+       sort_order=COALESCE($4,sort_order),
+       is_active=COALESCE($5,is_active),
+       updated_at=NOW()
+     WHERE id=$1
+     RETURNING id, name_en, name_th, sort_order, is_active`,
+    [
+      id,
+      String(data?.name ?? data?.name_en ?? "").trim() || null,
+      data?.name_th || null,
+      data?.sortOrder === undefined && data?.displayOrder === undefined ? null : Number(data?.sortOrder ?? data?.displayOrder),
+      typeof data?.isActive === "boolean" ? data.isActive : null,
+    ],
+  );
+  if (!result.rows[0]) throw new Error("Category not found");
+  return mapCategory(result.rows[0]);
 }
 
 export async function reorderCategories(orderList: string[]) {
-  for (let i = 0; i < orderList.length; i++) {
-    await db().menu_categories_v3.update({
-      where: { id: orderList[i] },
-      data: { sortOrder: i }
-    });
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    for (let index = 0; index < orderList.length; index += 1) {
+      await client.query(
+        `UPDATE ordering_menu_categories SET sort_order=$2, updated_at=NOW() WHERE id=$1`,
+        [orderList[index], index],
+      );
+    }
+    await client.query("COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
   }
 }
 
 export async function deleteCategory(id: string) {
-  return await db().menu_categories_v3.update({
-    where: { id },
-    data: { isActive: false }
-  });
+  const result = await db().query(
+    `UPDATE ordering_menu_categories SET is_active=false, updated_at=NOW()
+     WHERE id=$1 RETURNING id, name_en, name_th, sort_order, is_active`,
+    [id],
+  );
+  if (!result.rows[0]) throw new Error("Category not found");
+  return mapCategory(result.rows[0]);
 }
