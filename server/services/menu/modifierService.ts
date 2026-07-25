@@ -14,36 +14,54 @@ const mapOption = (row: any) => ({
   active: row.is_active !== false,
   isActive: row.is_active !== false,
   sortOrder: Number(row.sort_order ?? 0),
+  recipeId: row.recipe_id ?? null,
+  addedMenuItemId: row.added_menu_item_id ? String(row.added_menu_item_id) : null,
+  requiresGroupId: row.requires_group_id ? String(row.requires_group_id) : null,
 });
 
 export async function getModifierGroups() {
-  const [groups, options] = await Promise.all([
-    db().query(
-      `SELECT g.id, g.name_en, g.name_th, g.menu_item_id, g.sort_order, g.is_active,
-              i.name_en AS menu_item_name
-         FROM ordering_modifier_groups g
-         LEFT JOIN ordering_menu_items i ON i.id=g.menu_item_id
-        ORDER BY g.sort_order, g.name_en`,
-    ),
-    db().query(
-      `SELECT id, modifier_group_id, name_en, name_th, price_delta, sort_order, is_active
-         FROM ordering_item_modifiers
-        ORDER BY sort_order, name_en`,
-    ),
+  const [groups, options, assignments] = await Promise.all([
+    db().query(`SELECT id,name_en,name_th,sort_order,is_active,
+      COALESCE(group_type,'modifier') AS group_type,
+      COALESCE(selection_mode,'multiple') AS selection_mode,
+      COALESCE(min_selections,0) AS min_selections,
+      max_selections,prompt_text
+      FROM ordering_modifier_groups ORDER BY sort_order,name_en`),
+    db().query(`SELECT id,modifier_group_id,name_en,name_th,price_delta,sort_order,is_active,
+      recipe_id,added_menu_item_id,requires_group_id
+      FROM ordering_item_modifiers ORDER BY sort_order,name_en`),
+    db().query(`SELECT a.modifier_group_id,a.menu_item_id,i.name_en AS menu_item_name
+      FROM ordering_modifier_group_items a
+      JOIN ordering_menu_items i ON i.id=a.menu_item_id
+      ORDER BY a.sort_order,i.name_en`),
   ]);
+
   const optionsByGroup = new Map<string, any[]>();
   for (const option of options.rows) {
     const key = String(option.modifier_group_id);
     optionsByGroup.set(key, [...(optionsByGroup.get(key) || []), mapOption(option)]);
   }
+  const itemIdsByGroup = new Map<string, string[]>();
+  const itemNamesByGroup = new Map<string, string[]>();
+  for (const assignment of assignments.rows) {
+    const key = String(assignment.modifier_group_id);
+    itemIdsByGroup.set(key, [...(itemIdsByGroup.get(key) || []), String(assignment.menu_item_id)]);
+    itemNamesByGroup.set(key, [...(itemNamesByGroup.get(key) || []), assignment.menu_item_name]);
+  }
+
   return groups.rows.map((row) => ({
     id: String(row.id),
     name: row.name_en,
     name_en: row.name_en,
     name_th: row.name_th ?? null,
-    menuItemId: row.menu_item_id ? String(row.menu_item_id) : "",
-    linkedMenuItemIds: row.menu_item_id ? [String(row.menu_item_id)] : [],
-    linkedMenuItemNames: row.menu_item_name ? [row.menu_item_name] : [],
+    type: row.group_type,
+    groupType: row.group_type,
+    selectionMode: row.selection_mode,
+    minSelections: Number(row.min_selections ?? 0),
+    maxSelections: row.max_selections === null ? null : Number(row.max_selections),
+    promptText: row.prompt_text ?? null,
+    linkedMenuItemIds: itemIdsByGroup.get(String(row.id)) || [],
+    linkedMenuItemNames: itemNamesByGroup.get(String(row.id)) || [],
     options: optionsByGroup.get(String(row.id)) || [],
     modifiers: optionsByGroup.get(String(row.id)) || [],
     isActive: row.is_active !== false,
@@ -53,53 +71,76 @@ export async function getModifierGroups() {
 
 export async function createModifierGroup(data: any) {
   const name = String(data?.name ?? data?.name_en ?? "").trim();
-  const menuItemId = data?.menuItemId ?? data?.menu_item_id;
-  if (!name || !menuItemId) throw new Error("Modifier group name and linked menu item are required");
-  const result = await db().query(
-    `INSERT INTO ordering_modifier_groups(name_en,name_th,menu_item_id,sort_order,is_active)
-     VALUES($1,$2,$3,$4,$5)
-     RETURNING id,name_en,name_th,menu_item_id,sort_order,is_active`,
-    [name, data?.name_th || null, menuItemId, Number(data?.sortOrder ?? 0), data?.isActive !== false],
-  );
-  return {
-    id: String(result.rows[0].id),
-    name: result.rows[0].name_en,
-    menuItemId: String(result.rows[0].menu_item_id),
-    linkedMenuItemIds: [String(result.rows[0].menu_item_id)],
-    options: [],
-    modifiers: [],
-    isActive: result.rows[0].is_active !== false,
-  };
+  if (!name) throw new Error("Modifier group name is required");
+  const groupType = ["modifier", "upsell", "choice"].includes(data?.groupType ?? data?.type)
+    ? (data?.groupType ?? data?.type)
+    : "modifier";
+  const selectionMode = data?.selectionMode === "single" ? "single" : "multiple";
+  const result = await db().query(`INSERT INTO ordering_modifier_groups(
+      name_en,name_th,menu_item_id,sort_order,is_active,group_type,selection_mode,
+      min_selections,max_selections,prompt_text)
+    VALUES($1,$2,NULL,$3,$4,$5,$6,$7,$8,$9)
+    RETURNING *`, [
+    name,
+    data?.name_th || null,
+    Number(data?.sortOrder ?? 0),
+    data?.isActive !== false,
+    groupType,
+    selectionMode,
+    Number(data?.minSelections ?? 0),
+    data?.maxSelections === "" || data?.maxSelections == null ? null : Number(data.maxSelections),
+    data?.promptText || null,
+  ]);
+  return { id: String(result.rows[0].id), name, groupType, selectionMode, linkedMenuItemIds: [], options: [], isActive: true };
 }
 
 export async function updateModifierGroup(id: string, data: any) {
-  const result = await db().query(
-    `UPDATE ordering_modifier_groups SET
-       name_en=COALESCE($2,name_en),
-       name_th=COALESCE($3,name_th),
-       menu_item_id=COALESCE($4,menu_item_id),
-       sort_order=COALESCE($5,sort_order),
-       is_active=COALESCE($6,is_active),
-       updated_at=NOW()
-     WHERE id=$1
-     RETURNING id,name_en,name_th,menu_item_id,sort_order,is_active`,
-    [
-      id,
-      String(data?.name ?? data?.name_en ?? "").trim() || null,
-      data?.name_th || null,
-      data?.menuItemId ?? data?.menu_item_id ?? null,
-      data?.sortOrder === undefined ? null : Number(data.sortOrder),
-      typeof data?.isActive === "boolean" ? data.isActive : null,
-    ],
-  );
+  const result = await db().query(`UPDATE ordering_modifier_groups SET
+      name_en=COALESCE($2,name_en),name_th=COALESCE($3,name_th),
+      sort_order=COALESCE($4,sort_order),is_active=COALESCE($5,is_active),
+      group_type=COALESCE($6,group_type),selection_mode=COALESCE($7,selection_mode),
+      min_selections=COALESCE($8,min_selections),max_selections=$9,
+      prompt_text=$10,updated_at=NOW()
+    WHERE id=$1 RETURNING *`, [
+    id,
+    String(data?.name ?? data?.name_en ?? "").trim() || null,
+    data?.name_th || null,
+    data?.sortOrder === undefined ? null : Number(data.sortOrder),
+    typeof data?.isActive === "boolean" ? data.isActive : null,
+    data?.groupType ?? data?.type ?? null,
+    data?.selectionMode ?? null,
+    data?.minSelections === undefined ? null : Number(data.minSelections),
+    data?.maxSelections === "" || data?.maxSelections == null ? null : Number(data.maxSelections),
+    data?.promptText ?? null,
+  ]);
   if (!result.rows[0]) throw new Error("Modifier group not found");
   return result.rows[0];
+}
+
+export async function setGroupAssignments(groupId: string, itemIds: string[]) {
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query(`DELETE FROM ordering_modifier_group_items WHERE modifier_group_id=$1`, [groupId]);
+    for (let i = 0; i < itemIds.length; i++) {
+      await client.query(`INSERT INTO ordering_modifier_group_items(modifier_group_id,menu_item_id,sort_order)
+        VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, [groupId, itemIds[i], i]);
+    }
+    await client.query("COMMIT");
+    return { groupId, itemIds };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function deleteModifierGroup(id: string) {
   const client = await db().connect();
   try {
     await client.query("BEGIN");
+    await client.query(`DELETE FROM ordering_modifier_group_items WHERE modifier_group_id=$1`, [id]);
     await client.query(`DELETE FROM ordering_item_modifiers WHERE modifier_group_id=$1`, [id]);
     const result = await client.query(`DELETE FROM ordering_modifier_groups WHERE id=$1 RETURNING id`, [id]);
     await client.query("COMMIT");
@@ -116,35 +157,40 @@ export async function deleteModifierGroup(id: string) {
 export async function createModifier(groupId: string, data: any) {
   const name = String(data?.name ?? data?.name_en ?? "").trim();
   if (!name) throw new Error("Modifier option name is required");
-  const result = await db().query(
-    `INSERT INTO ordering_item_modifiers(modifier_group_id,name_en,name_th,price_delta,sort_order,is_active)
-     VALUES($1,$2,$3,$4,$5,$6)
-     RETURNING id,modifier_group_id,name_en,name_th,price_delta,sort_order,is_active`,
-    [groupId, name, data?.thaiName ?? data?.name_th ?? null, Number(data?.priceDelta ?? data?.price ?? 0), Number(data?.sortOrder ?? 0), data?.isActive !== false],
-  );
+  const result = await db().query(`INSERT INTO ordering_item_modifiers(
+      modifier_group_id,name_en,name_th,price_delta,sort_order,is_active,
+      recipe_id,added_menu_item_id,requires_group_id)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`, [
+    groupId,
+    name,
+    data?.thaiName ?? data?.name_th ?? null,
+    Number(data?.priceDelta ?? data?.price ?? 0),
+    Number(data?.sortOrder ?? 0),
+    data?.isActive !== false,
+    data?.recipeId || null,
+    data?.addedMenuItemId || null,
+    data?.requiresGroupId || null,
+  ]);
   return mapOption(result.rows[0]);
 }
 
 export async function updateModifier(id: string, data: any) {
-  const result = await db().query(
-    `UPDATE ordering_item_modifiers SET
-       name_en=COALESCE($2,name_en),
-       name_th=COALESCE($3,name_th),
-       price_delta=COALESCE($4,price_delta),
-       sort_order=COALESCE($5,sort_order),
-       is_active=COALESCE($6,is_active),
-       updated_at=NOW()
-     WHERE id=$1
-     RETURNING id,modifier_group_id,name_en,name_th,price_delta,sort_order,is_active`,
-    [
-      id,
-      String(data?.name ?? data?.name_en ?? "").trim() || null,
-      data?.thaiName ?? data?.name_th ?? null,
-      data?.priceDelta === undefined && data?.price === undefined ? null : Number(data?.priceDelta ?? data?.price),
-      data?.sortOrder === undefined ? null : Number(data.sortOrder),
-      typeof (data?.isActive ?? data?.active) === "boolean" ? Boolean(data?.isActive ?? data?.active) : null,
-    ],
-  );
+  const result = await db().query(`UPDATE ordering_item_modifiers SET
+      name_en=COALESCE($2,name_en),name_th=COALESCE($3,name_th),
+      price_delta=COALESCE($4,price_delta),sort_order=COALESCE($5,sort_order),
+      is_active=COALESCE($6,is_active),recipe_id=$7,added_menu_item_id=$8,
+      requires_group_id=$9,updated_at=NOW()
+    WHERE id=$1 RETURNING *`, [
+    id,
+    String(data?.name ?? data?.name_en ?? "").trim() || null,
+    data?.thaiName ?? data?.name_th ?? null,
+    data?.priceDelta === undefined && data?.price === undefined ? null : Number(data?.priceDelta ?? data?.price),
+    data?.sortOrder === undefined ? null : Number(data.sortOrder),
+    typeof (data?.isActive ?? data?.active) === "boolean" ? Boolean(data?.isActive ?? data?.active) : null,
+    data?.recipeId || null,
+    data?.addedMenuItemId || null,
+    data?.requiresGroupId || null,
+  ]);
   if (!result.rows[0]) throw new Error("Modifier option not found");
   return mapOption(result.rows[0]);
 }
@@ -156,10 +202,7 @@ export async function deleteModifier(id: string) {
 }
 
 export async function applyGroupToItem(groupId: string, itemId: string) {
-  const result = await db().query(
-    `UPDATE ordering_modifier_groups SET menu_item_id=$2, updated_at=NOW() WHERE id=$1 RETURNING *`,
-    [groupId, itemId],
-  );
-  if (!result.rows[0]) throw new Error("Modifier group not found");
-  return result.rows[0];
+  const current = await db().query(`SELECT menu_item_id FROM ordering_modifier_group_items WHERE modifier_group_id=$1`, [groupId]);
+  const ids = Array.from(new Set([...current.rows.map((row) => String(row.menu_item_id)), String(itemId)]));
+  return setGroupAssignments(groupId, ids);
 }
