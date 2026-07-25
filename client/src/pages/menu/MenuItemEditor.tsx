@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
- type Recipe = { id: number; name: string };
+type Recipe = { id: number; name: string };
 type ModifierGroup = { id?: string; name: string; menuItemId?: string; linkedMenuItemIds?: string[]; options?: unknown[]; modifiers?: unknown[] };
 type MenuCategory = { id: string; name: string };
 type MenuItem = { id: string; categoryId?: string; category?: string | { name?: string }; name: string; description?: string | null; basePrice?: number | string; price?: number | string; imageUrl?: string | null; isActive?: boolean; soldOut?: boolean; posEnabled?: boolean; onlineEnabled?: boolean; isOnlineEnabled?: boolean; recipeId?: number | null; displayOrder?: number | string | null; sortOrder?: number | string | null };
@@ -17,6 +17,7 @@ type Props = {
 };
 
 export default function MenuItemEditor({ item, categories, recipes, modifierGroups, onClose }: Props) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const initiallyLinked = useMemo(() => modifierGroups.filter((group) => group.menuItemId === item.id || group.linkedMenuItemIds?.includes(item.id)).map((group) => String(group.id)), [item.id, modifierGroups]);
   const [draft, setDraft] = useState({
     name: item.name || "",
@@ -30,21 +31,28 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
     displayOrder: String(item.displayOrder ?? item.sortOrder ?? 0),
     isActive: item.isActive !== false,
   });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
 
-  const uploadImage = async (file: File) => {
+  const uploadImage = async () => {
+    if (!selectedFile) {
+      setUploadError("Choose an image before uploading.");
+      return;
+    }
     setUploading(true);
     setUploadError("");
     try {
       const formData = new FormData();
-      formData.append("image", file);
+      formData.append("image", selectedFile);
       const response = await fetch("/api/upload/menu-item-image", { method: "POST", body: formData });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result?.error || "Image upload failed");
       const imageUrl = result.imageUrl || result.url;
       if (!imageUrl) throw new Error("Upload completed without an image URL");
       setDraft((current) => ({ ...current, imageUrl, clearImage: false }));
+      setSelectedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : "Image upload failed");
     } finally {
@@ -54,6 +62,8 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
 
   const removeImage = () => {
     setUploadError("");
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setDraft((current) => ({ ...current, imageUrl: "", clearImage: true }));
   };
 
@@ -97,14 +107,14 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
         <label className="block text-xs font-medium">Category<select value={draft.categoryId} onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })} className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="">Select category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
 
         <section className="rounded-xl border p-3">
-          <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-medium">Menu item image</p><p className="text-[11px] text-slate-500">This image feeds the POS catalogue and live POS.</p></div>{draft.imageUrl && <button type="button" onClick={removeImage} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700">Delete image</button>}</div>
+          <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-medium">Menu item image</p><p className="text-[11px] text-slate-500">This image feeds the POS catalogue and live POS.</p></div>{draft.imageUrl && <button type="button" onClick={removeImage} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700">Remove image</button>}</div>
           <div className="mt-3 flex items-start gap-3">
             <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-slate-100 text-xs text-slate-500">{draft.imageUrl ? <img src={draft.imageUrl} alt={draft.name} className="h-full w-full object-contain" /> : "No image"}</div>
             <div className="min-w-0 flex-1 space-y-2">
-              <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadImage(file); event.currentTarget.value = ""; }} className="w-full rounded-md border border-slate-200 px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
-              <Input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value, clearImage: false })} placeholder="Image URL" />
-              <p className="text-[11px] text-slate-500">Upload a 600 × 600 PNG, JPG or WebP. Uploading replaces the current image.</p>
-              {uploading && <p className="text-xs text-slate-600">Uploading image…</p>}
+              <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => { setUploadError(""); setSelectedFile(event.target.files?.[0] ?? null); }} className="w-full rounded-md border border-slate-200 px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
+              {selectedFile && <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs"><strong>Selected:</strong> {selectedFile.name}</div>}
+              <button type="button" disabled={!selectedFile || uploading} onClick={() => void uploadImage()} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold disabled:opacity-40">{uploading ? "Uploading image…" : "Upload selected image"}</button>
+              <p className="text-[11px] text-slate-500">Use a 600 × 600 PNG, JPG or WebP. Uploading replaces the current image.</p>
               {uploadError && <p className="text-xs text-red-700">{uploadError}</p>}
             </div>
           </div>
