@@ -53,8 +53,7 @@ async function saveRecipeLink(client: any, itemId: string, recipeId: number | nu
   await client.query(`DELETE FROM menu_item_recipes_v3 WHERE "itemId"::text=$1::text`, [itemId]);
   if (recipeId === null) return;
   const columns = await client.query(
-    `SELECT column_name, is_nullable, column_default
-       FROM information_schema.columns
+    `SELECT column_name FROM information_schema.columns
       WHERE table_schema='public' AND table_name='menu_item_recipes_v3'`,
   );
   const names = new Set(columns.rows.map((row: any) => row.column_name));
@@ -71,9 +70,16 @@ async function saveRecipeLink(client: any, itemId: string, recipeId: number | nu
 
 async function saveModifierLinks(client: any, itemId: string, modifierGroupIds: string[] | undefined) {
   if (!Array.isArray(modifierGroupIds)) return;
-  await client.query(`UPDATE ordering_modifier_groups SET menu_item_id=NULL, updated_at=NOW() WHERE menu_item_id=$1`, [itemId]);
+  await client.query(`DELETE FROM ordering_modifier_group_items WHERE menu_item_id=$1`, [itemId]);
   if (modifierGroupIds.length) {
-    await client.query(`UPDATE ordering_modifier_groups SET menu_item_id=$1, updated_at=NOW() WHERE id = ANY($2::uuid[])`, [itemId, modifierGroupIds]);
+    await client.query(
+      `INSERT INTO ordering_modifier_group_items(modifier_group_id, menu_item_id, sort_order)
+       SELECT id, $1::uuid, COALESCE(sort_order, 0)
+         FROM ordering_modifier_groups
+        WHERE id = ANY($2::uuid[])
+       ON CONFLICT (modifier_group_id, menu_item_id) DO NOTHING`,
+      [itemId, modifierGroupIds],
+    );
   }
 }
 
