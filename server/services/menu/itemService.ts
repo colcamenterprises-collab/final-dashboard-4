@@ -48,81 +48,99 @@ export async function getAllItems() {
   return result.rows.map(mapItem);
 }
 
+async function saveRecipeLink(client: any, itemId: string, recipeId: number | null | undefined) {
+  if (recipeId === undefined) return;
+  await client.query(`DELETE FROM menu_item_recipes_v3 WHERE "itemId"::text=$1::text`, [itemId]);
+  if (recipeId === null) return;
+  const columns = await client.query(
+    `SELECT column_name, is_nullable, column_default
+       FROM information_schema.columns
+      WHERE table_schema='public' AND table_name='menu_item_recipes_v3'`,
+  );
+  const names = new Set(columns.rows.map((row: any) => row.column_name));
+  if (!names.has("itemId") || !names.has("recipe_id")) throw new Error("Recipe link table is not ready");
+  const insertColumns = ['"itemId"', 'recipe_id'];
+  const values: any[] = [itemId, recipeId];
+  if (names.has("recipe")) {
+    insertColumns.push('recipe');
+    values.push({});
+  }
+  const placeholders = values.map((_, index) => `$${index + 1}`);
+  await client.query(`INSERT INTO menu_item_recipes_v3(${insertColumns.join(",")}) VALUES(${placeholders.join(",")})`, values);
+}
+
+async function saveModifierLinks(client: any, itemId: string, modifierGroupIds: string[] | undefined) {
+  if (!Array.isArray(modifierGroupIds)) return;
+  await client.query(`UPDATE ordering_modifier_groups SET menu_item_id=NULL, updated_at=NOW() WHERE menu_item_id=$1`, [itemId]);
+  if (modifierGroupIds.length) {
+    await client.query(`UPDATE ordering_modifier_groups SET menu_item_id=$1, updated_at=NOW() WHERE id = ANY($2::uuid[])`, [itemId, modifierGroupIds]);
+  }
+}
+
 export async function createItem(data: any) {
   const name = String(data?.name ?? data?.name_en ?? "").trim();
   const categoryId = data?.categoryId ?? data?.category_id;
   if (!name || !categoryId) throw new Error("Item name and category are required");
   const directPrice = Number(data?.directPrice ?? data?.basePrice ?? data?.price ?? 0);
   const grabPrice = Number(data?.grabPrice ?? data?.deliveryPartnerPrice ?? directPrice);
-  const result = await db().query(
-    `INSERT INTO ordering_menu_items(
-       category_id,name_en,description_en,price,direct_price,grab_price,image_url,
-       is_active,is_sold_out,pos_enabled,sort_order
-     ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-     RETURNING *`,
-    [
-      categoryId,
-      name,
-      data?.description ?? data?.description_en ?? null,
-      directPrice,
-      directPrice,
-      grabPrice,
-      data?.imageUrl ?? data?.image_url ?? null,
-      data?.isActive !== false,
-      data?.soldOut === true,
-      (data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled ?? true) !== false,
-      Number(data?.displayOrder ?? data?.sortOrder ?? 0),
-    ],
-  );
-  const category = await db().query(`SELECT name_en FROM ordering_menu_categories WHERE id=$1`, [categoryId]);
-  return mapItem({ ...result.rows[0], category_name: category.rows[0]?.name_en });
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `INSERT INTO ordering_menu_items(
+         category_id,name_en,description_en,price,direct_price,grab_price,image_url,
+         is_active,is_sold_out,pos_enabled,sort_order
+       ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       RETURNING *`,
+      [categoryId, name, data?.description ?? data?.description_en ?? null, directPrice, directPrice, grabPrice, data?.imageUrl ?? data?.image_url ?? null, data?.isActive !== false, data?.soldOut === true, (data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled ?? true) !== false, Number(data?.displayOrder ?? data?.sortOrder ?? 0)],
+    );
+    const itemId = String(result.rows[0].id);
+    await saveRecipeLink(client, itemId, data?.recipeId === undefined ? undefined : data.recipeId === null ? null : Number(data.recipeId));
+    await saveModifierLinks(client, itemId, data?.modifierGroupIds);
+    await client.query("COMMIT");
+    const category = await db().query(`SELECT name_en FROM ordering_menu_categories WHERE id=$1`, [categoryId]);
+    return mapItem({ ...result.rows[0], category_name: category.rows[0]?.name_en, recipe_id: data?.recipeId ?? null });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateItem(id: string, data: any) {
   const directPriceInput = data?.directPrice ?? data?.basePrice ?? data?.price;
   const grabPriceInput = data?.grabPrice ?? data?.deliveryPartnerPrice;
-  const result = await db().query(
-    `UPDATE ordering_menu_items SET
-       category_id=COALESCE($2,category_id),
-       name_en=COALESCE($3,name_en),
-       description_en=COALESCE($4,description_en),
-       price=COALESCE($5,price),
-       direct_price=COALESCE($5,direct_price),
-       grab_price=COALESCE($6,grab_price),
-       image_url=COALESCE($7,image_url),
-       is_active=COALESCE($8,is_active),
-       is_sold_out=COALESCE($9,is_sold_out),
-       pos_enabled=COALESCE($10,pos_enabled),
-       sort_order=COALESCE($11,sort_order),
-       updated_at=NOW()
-     WHERE id=$1
-     RETURNING *`,
-    [
-      id,
-      data?.categoryId ?? data?.category_id ?? null,
-      String(data?.name ?? data?.name_en ?? "").trim() || null,
-      data?.description ?? data?.description_en ?? null,
-      directPriceInput === undefined ? null : Number(directPriceInput),
-      grabPriceInput === undefined ? null : Number(grabPriceInput),
-      data?.imageUrl ?? data?.image_url ?? null,
-      typeof data?.isActive === "boolean" ? data.isActive : null,
-      typeof data?.soldOut === "boolean" ? data.soldOut : null,
-      typeof (data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled) === "boolean"
-        ? Boolean(data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled)
-        : null,
-      data?.displayOrder === undefined && data?.sortOrder === undefined ? null : Number(data?.displayOrder ?? data?.sortOrder),
-    ],
-  );
-  if (!result.rows[0]) throw new Error("Menu item not found");
-  const category = await db().query(`SELECT name_en FROM ordering_menu_categories WHERE id=$1`, [result.rows[0].category_id]);
-  return mapItem({ ...result.rows[0], category_name: category.rows[0]?.name_en });
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `UPDATE ordering_menu_items SET
+         category_id=COALESCE($2,category_id), name_en=COALESCE($3,name_en),
+         description_en=COALESCE($4,description_en), price=COALESCE($5,price),
+         direct_price=COALESCE($5,direct_price), grab_price=COALESCE($6,grab_price),
+         image_url=COALESCE($7,image_url), is_active=COALESCE($8,is_active),
+         is_sold_out=COALESCE($9,is_sold_out), pos_enabled=COALESCE($10,pos_enabled),
+         sort_order=COALESCE($11,sort_order), updated_at=NOW()
+       WHERE id=$1 RETURNING *`,
+      [id, data?.categoryId ?? data?.category_id ?? null, String(data?.name ?? data?.name_en ?? "").trim() || null, data?.description ?? data?.description_en ?? null, directPriceInput === undefined ? null : Number(directPriceInput), grabPriceInput === undefined ? null : Number(grabPriceInput), data?.imageUrl ?? data?.image_url ?? null, typeof data?.isActive === "boolean" ? data.isActive : null, typeof data?.soldOut === "boolean" ? data.soldOut : null, typeof (data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled) === "boolean" ? Boolean(data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled) : null, data?.displayOrder === undefined && data?.sortOrder === undefined ? null : Number(data?.displayOrder ?? data?.sortOrder)],
+    );
+    if (!result.rows[0]) throw new Error("Menu item not found");
+    await saveRecipeLink(client, id, data?.recipeId === undefined ? undefined : data.recipeId === null ? null : Number(data.recipeId));
+    await saveModifierLinks(client, id, data?.modifierGroupIds);
+    await client.query("COMMIT");
+    const category = await db().query(`SELECT name_en FROM ordering_menu_categories WHERE id=$1`, [result.rows[0].category_id]);
+    return mapItem({ ...result.rows[0], category_name: category.rows[0]?.name_en, recipe_id: data?.recipeId ?? null });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 export async function toggleItem(id: string, isActive: boolean) {
-  const result = await db().query(
-    `UPDATE ordering_menu_items SET is_active=$2, updated_at=NOW() WHERE id=$1 RETURNING *`,
-    [id, isActive],
-  );
+  const result = await db().query(`UPDATE ordering_menu_items SET is_active=$2, updated_at=NOW() WHERE id=$1 RETURNING *`, [id, isActive]);
   if (!result.rows[0]) throw new Error("Menu item not found");
   return mapItem(result.rows[0]);
 }
