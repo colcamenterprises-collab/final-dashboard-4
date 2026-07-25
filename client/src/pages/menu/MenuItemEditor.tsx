@@ -19,9 +19,11 @@ type Props = {
 export default function MenuItemEditor({ item, categories, recipes, modifierGroups, onClose }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const initiallyLinked = useMemo(() => modifierGroups.filter((group) => group.menuItemId === item.id || group.linkedMenuItemIds?.includes(item.id)).map((group) => String(group.id)), [item.id, modifierGroups]);
+  const categoryName = typeof item.category === "string" ? item.category : item.category?.name;
+  const resolvedCategoryId = item.categoryId || categories.find((category) => category.name.trim().toLowerCase() === String(categoryName || "").trim().toLowerCase())?.id || "";
   const [draft, setDraft] = useState({
     name: item.name || "",
-    categoryId: item.categoryId || "",
+    categoryId: resolvedCategoryId,
     description: item.description || "",
     imageUrl: item.imageUrl || "",
     clearImage: false,
@@ -98,6 +100,7 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
   });
 
   const toggleModifier = (id: string) => setDraft((current) => ({ ...current, modifierGroupIds: current.modifierGroupIds.includes(id) ? current.modifierGroupIds.filter((value) => value !== id) : [...current.modifierGroupIds, id] }));
+  const saveBlockedReason = !draft.name.trim() ? "Enter an item name before saving." : !draft.categoryId ? "Select a category before saving." : uploading ? "Wait for the image upload to finish." : "";
 
   return <div className="fixed inset-0 z-50 flex justify-end bg-black/30" onClick={onClose}>
     <aside className="h-full w-full max-w-xl overflow-y-auto bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
@@ -126,8 +129,9 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
         <section className="rounded-xl border p-3"><p className="text-xs font-medium text-slate-500">Modifiers / POS upsell groups</p><div className="mt-3 space-y-2">{modifierGroups.length === 0 ? <p className="text-sm text-slate-500">No modifier groups available.</p> : modifierGroups.map((group) => { const id = String(group.id || ""); const optionCount = (group.options || group.modifiers || []).length; return <label key={id || group.name} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"><span><strong className="text-sm">{group.name}</strong><span className="ml-2 text-xs text-slate-500">{optionCount} option{optionCount === 1 ? "" : "s"}</span></span><input type="checkbox" checked={draft.modifierGroupIds.includes(id)} onChange={() => toggleModifier(id)} /></label>; })}</div></section>
         <label className="block text-xs font-medium">Display order<Input type="number" value={draft.displayOrder} onChange={(event) => setDraft({ ...draft, displayOrder: event.target.value })} className="mt-1" /></label>
         <label className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>Available/customer-visible</span><input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} /></label>
+        {saveBlockedReason && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{saveBlockedReason}</p>}
         {save.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{(save.error as Error)?.message || "Could not save menu item"}</p>}
-        <button disabled={!draft.name || !draft.categoryId || save.isPending || uploading} onClick={() => save.mutate()} className="w-full rounded-lg bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{save.isPending ? "Saving…" : "Save menu item"}</button>
+        <button disabled={Boolean(saveBlockedReason) || save.isPending} onClick={() => save.mutate()} className="w-full rounded-lg bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{save.isPending ? "Saving…" : "Save menu item"}</button>
       </div>
     </aside>
   </div>;
