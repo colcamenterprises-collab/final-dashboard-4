@@ -111,6 +111,7 @@ export async function createItem(data: any) {
 export async function updateItem(id: string, data: any) {
   const directPriceInput = data?.directPrice ?? data?.basePrice ?? data?.price;
   const grabPriceInput = data?.grabPrice ?? data?.deliveryPartnerPrice;
+  const clearImage = data?.clearImage === true;
   const client = await db().connect();
   try {
     await client.query("BEGIN");
@@ -119,11 +120,12 @@ export async function updateItem(id: string, data: any) {
          category_id=COALESCE($2,category_id), name_en=COALESCE($3,name_en),
          description_en=COALESCE($4,description_en), price=COALESCE($5,price),
          direct_price=COALESCE($5,direct_price), grab_price=COALESCE($6,grab_price),
-         image_url=COALESCE($7,image_url), is_active=COALESCE($8,is_active),
-         is_sold_out=COALESCE($9,is_sold_out), pos_enabled=COALESCE($10,pos_enabled),
-         sort_order=COALESCE($11,sort_order), updated_at=NOW()
+         image_url=CASE WHEN $12::boolean THEN NULL ELSE COALESCE($7,image_url) END,
+         is_active=COALESCE($8,is_active), is_sold_out=COALESCE($9,is_sold_out),
+         pos_enabled=COALESCE($10,pos_enabled), sort_order=COALESCE($11,sort_order),
+         updated_at=NOW()
        WHERE id=$1 RETURNING *`,
-      [id, data?.categoryId ?? data?.category_id ?? null, String(data?.name ?? data?.name_en ?? "").trim() || null, data?.description ?? data?.description_en ?? null, directPriceInput === undefined ? null : Number(directPriceInput), grabPriceInput === undefined ? null : Number(grabPriceInput), data?.imageUrl ?? data?.image_url ?? null, typeof data?.isActive === "boolean" ? data.isActive : null, typeof data?.soldOut === "boolean" ? data.soldOut : null, typeof (data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled) === "boolean" ? Boolean(data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled) : null, data?.displayOrder === undefined && data?.sortOrder === undefined ? null : Number(data?.displayOrder ?? data?.sortOrder)],
+      [id, data?.categoryId ?? data?.category_id ?? null, String(data?.name ?? data?.name_en ?? "").trim() || null, data?.description ?? data?.description_en ?? null, directPriceInput === undefined ? null : Number(directPriceInput), grabPriceInput === undefined ? null : Number(grabPriceInput), data?.imageUrl ?? data?.image_url ?? null, typeof data?.isActive === "boolean" ? data.isActive : null, typeof data?.soldOut === "boolean" ? data.soldOut : null, typeof (data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled) === "boolean" ? Boolean(data?.posEnabled ?? data?.onlineEnabled ?? data?.isOnlineEnabled) : null, data?.displayOrder === undefined && data?.sortOrder === undefined ? null : Number(data?.displayOrder ?? data?.sortOrder), clearImage],
     );
     if (!result.rows[0]) throw new Error("Menu item not found");
     await saveRecipeLink(client, id, data?.recipeId === undefined ? undefined : data.recipeId === null ? null : Number(data.recipeId));
