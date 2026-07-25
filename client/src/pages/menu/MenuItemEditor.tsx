@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
-type Recipe = { id: number; name: string };
+ type Recipe = { id: number; name: string };
 type ModifierGroup = { id?: string; name: string; menuItemId?: string; linkedMenuItemIds?: string[]; options?: unknown[]; modifiers?: unknown[] };
 type MenuCategory = { id: string; name: string };
 type MenuItem = { id: string; categoryId?: string; category?: string | { name?: string }; name: string; description?: string | null; basePrice?: number | string; price?: number | string; imageUrl?: string | null; isActive?: boolean; soldOut?: boolean; posEnabled?: boolean; onlineEnabled?: boolean; isOnlineEnabled?: boolean; recipeId?: number | null; displayOrder?: number | string | null; sortOrder?: number | string | null };
@@ -23,12 +23,39 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
     categoryId: item.categoryId || "",
     description: item.description || "",
     imageUrl: item.imageUrl || "",
+    clearImage: false,
     price: String(item.basePrice ?? item.price ?? 0),
     recipeId: item.recipeId ? String(item.recipeId) : "",
     modifierGroupIds: initiallyLinked,
     displayOrder: String(item.displayOrder ?? item.sortOrder ?? 0),
     isActive: item.isActive !== false,
   });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  const uploadImage = async (file: File) => {
+    setUploading(true);
+    setUploadError("");
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await fetch("/api/upload/menu-item-image", { method: "POST", body: formData });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.error || "Image upload failed");
+      const imageUrl = result.imageUrl || result.url;
+      if (!imageUrl) throw new Error("Upload completed without an image URL");
+      setDraft((current) => ({ ...current, imageUrl, clearImage: false }));
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : "Image upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const removeImage = () => {
+    setUploadError("");
+    setDraft((current) => ({ ...current, imageUrl: "", clearImage: true }));
+  };
 
   const save = useMutation({
     mutationFn: () => apiRequest("/api/menu-v3/items/update", {
@@ -39,6 +66,7 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
         categoryId: draft.categoryId,
         description: draft.description,
         imageUrl: draft.imageUrl || null,
+        clearImage: draft.clearImage,
         price: Number(draft.price || 0),
         recipeId: draft.recipeId ? Number(draft.recipeId) : null,
         modifierGroupIds: draft.modifierGroupIds,
@@ -53,6 +81,7 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
         queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/items"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/modifiers/groups"] }),
         queryClient.invalidateQueries({ queryKey: ["/api/pos/catalog"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/pos/menu"] }),
       ]);
       onClose();
     },
@@ -66,8 +95,21 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
       <div className="space-y-4">
         <label className="block text-xs font-medium">Item name<Input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className="mt-1" /></label>
         <label className="block text-xs font-medium">Category<select value={draft.categoryId} onChange={(event) => setDraft({ ...draft, categoryId: event.target.value })} className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="">Select category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-        <label className="block text-xs font-medium">Image URL<Input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value })} className="mt-1" /></label>
-        {draft.imageUrl && <div className="h-28 w-28 overflow-hidden rounded-xl border bg-slate-100"><img src={draft.imageUrl} alt={draft.name} className="h-full w-full object-contain" /></div>}
+
+        <section className="rounded-xl border p-3">
+          <div className="flex items-center justify-between gap-3"><div><p className="text-xs font-medium">Menu item image</p><p className="text-[11px] text-slate-500">This image feeds the POS catalogue and live POS.</p></div>{draft.imageUrl && <button type="button" onClick={removeImage} className="rounded-lg border border-red-300 px-3 py-1.5 text-xs text-red-700">Delete image</button>}</div>
+          <div className="mt-3 flex items-start gap-3">
+            <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border bg-slate-100 text-xs text-slate-500">{draft.imageUrl ? <img src={draft.imageUrl} alt={draft.name} className="h-full w-full object-contain" /> : "No image"}</div>
+            <div className="min-w-0 flex-1 space-y-2">
+              <input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadImage(file); event.currentTarget.value = ""; }} className="w-full rounded-md border border-slate-200 px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs" />
+              <Input value={draft.imageUrl} onChange={(event) => setDraft({ ...draft, imageUrl: event.target.value, clearImage: false })} placeholder="Image URL" />
+              <p className="text-[11px] text-slate-500">Upload a 600 × 600 PNG, JPG or WebP. Uploading replaces the current image.</p>
+              {uploading && <p className="text-xs text-slate-600">Uploading image…</p>}
+              {uploadError && <p className="text-xs text-red-700">{uploadError}</p>}
+            </div>
+          </div>
+        </section>
+
         <label className="block text-xs font-medium">Description<textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} className="mt-1 min-h-24 w-full rounded-md border px-3 py-2 text-sm" /></label>
         <label className="block text-xs font-medium">RRP / customer price<Input type="number" min="0" value={draft.price} onChange={(event) => setDraft({ ...draft, price: event.target.value })} className="mt-1" /></label>
         <label className="block text-xs font-medium">Linked recipe<select value={draft.recipeId} onChange={(event) => setDraft({ ...draft, recipeId: event.target.value })} className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="">No recipe linked</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}</select><span className="mt-1 block text-[11px] text-slate-500">Linking does not automatically publish or overwrite the recipe.</span></label>
@@ -75,7 +117,7 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
         <label className="block text-xs font-medium">Display order<Input type="number" value={draft.displayOrder} onChange={(event) => setDraft({ ...draft, displayOrder: event.target.value })} className="mt-1" /></label>
         <label className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>Available/customer-visible</span><input type="checkbox" checked={draft.isActive} onChange={(event) => setDraft({ ...draft, isActive: event.target.checked })} /></label>
         {save.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{(save.error as Error)?.message || "Could not save menu item"}</p>}
-        <button disabled={!draft.name || !draft.categoryId || save.isPending} onClick={() => save.mutate()} className="w-full rounded-lg bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{save.isPending ? "Saving…" : "Save menu item"}</button>
+        <button disabled={!draft.name || !draft.categoryId || save.isPending || uploading} onClick={() => save.mutate()} className="w-full rounded-lg bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{save.isPending ? "Saving…" : "Save menu item"}</button>
       </div>
     </aside>
   </div>;
