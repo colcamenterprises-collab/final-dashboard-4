@@ -1,71 +1,104 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ImagePlus, Plus, Search } from "lucide-react";
-import { queryClient } from "@/lib/queryClient";
+import { ChevronDown, ChevronUp, Search } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { asArray, normalizeMenuCategories, normalizeMenuItems } from "@/lib/menuData";
 
-type Category = { id: string; name_en: string; sort_order: number; is_active: boolean };
-type Item = { id: string; category_id: string; category_name: string; name_en: string; description_en?: string | null; price: number | string; direct_price?: number | string | null; grab_price?: number | string | null; image_url?: string | null; is_active: boolean; is_sold_out: boolean; pos_enabled: boolean; sort_order: number };
-type Catalog = { categories: Category[]; items: Item[] };
-const money = (value: number | string | null | undefined) => `฿${Number(value || 0).toFixed(0)}`;
-const posFallbackImage = "/burger-placeholder.png";
+type Category = { id: string; name: string; sortOrder?: number; displayOrder?: number; isActive?: boolean };
+type ModifierOption = { id?: string; name: string; price?: number | string; priceDelta?: number | string; active?: boolean; isActive?: boolean };
+type ModifierGroup = { id?: string; name: string; menuItemId?: string; linkedMenuItemIds?: string[]; options?: ModifierOption[]; modifiers?: ModifierOption[]; isActive?: boolean };
+type Item = { id: string; categoryId?: string; category?: string | { name?: string }; name: string; description?: string | null; basePrice?: number | string; price?: number | string; directPrice?: number | string; grabPrice?: number | string; imageUrl?: string | null; isActive?: boolean; soldOut?: boolean; posEnabled?: boolean; onlineEnabled?: boolean; isOnlineEnabled?: boolean; displayOrder?: number | string; sortOrder?: number | string };
+
+const money = (value: unknown) => `฿${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+const fallbackImage = "/burger-placeholder.png";
+const itemCategory = (item: Item, categoryMap: Record<string, string>) => typeof item.category === "string" ? item.category : categoryMap[item.categoryId || ""] || item.category?.name || "Uncategorised";
 
 export default function PosCatalog() {
   const [search, setSearch] = useState("");
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [editing, setEditing] = useState<Item | null>(null);
-  const [creating, setCreating] = useState(false);
-  const [newItem, setNewItem] = useState<Item | null>(null);
-  const [saveState, setSaveState] = useState<{ kind: "idle" | "saving" | "success" | "error"; message?: string }>({ kind: "idle" });
-  const { data, isLoading, error } = useQuery<Catalog>({ queryKey: ["/api/pos/catalog"] });
-  const categories = data?.categories || [];
-  const items = data?.items || [];
-  const filtered = useMemo(() => items.filter((item) => [item.name_en, item.category_name].join(" ").toLowerCase().includes(search.toLowerCase())), [items, search]);
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ["/api/pos/catalog"] });
+  const [saveMessage, setSaveMessage] = useState("");
 
-  async function upload(file: File) {
-    const form = new FormData();
-    form.append("image", file);
-    const response = await fetch("/api/upload/menu-item-image", { method: "POST", body: form });
-    const raw = await response.text();
-    let result: any = {};
-    try { result = raw ? JSON.parse(raw) : {}; } catch { throw new Error(`Upload failed (${response.status}). The server returned an invalid response.`); }
-    if (!response.ok) throw new Error(result.error || "Image upload failed");
-    setDraft({ image_url: result.imageUrl });
-  }
+  const { data: rawItems, isLoading: itemsLoading, error: itemsError } = useQuery<unknown>({ queryKey: ["/api/menu-v3/items"] });
+  const { data: rawCategories, isLoading: categoriesLoading } = useQuery<unknown>({ queryKey: ["/api/menu-v3/categories"] });
+  const { data: modifierData, isLoading: modifiersLoading } = useQuery<{ groups?: ModifierGroup[] } | ModifierGroup[]>({ queryKey: ["/api/menu-v3/modifiers/groups"] });
 
-  const draft: Item | null = editing || newItem;
-  const setDraft = (patch: Partial<Item>) => {
-    if (creating) setNewItem((item) => item ? { ...item, ...patch } : item);
-    else setEditing((item) => item ? { ...item, ...patch } : item);
+  const items = asArray<Item>(normalizeMenuItems<Item>(rawItems).items);
+  const categories = asArray<Category>(normalizeMenuCategories<Category>(rawCategories).items);
+  const modifierGroups = Array.isArray(modifierData) ? modifierData : asArray<ModifierGroup>(modifierData?.groups);
+  const categoryMap = useMemo(() => categories.reduce<Record<string, string>>((map, category) => { map[category.id] = category.name; return map; }, {}), [categories]);
+
+  const groups = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    const filtered = items.filter((item) => !term || [item.name, item.description, itemCategory(item, categoryMap)].some((value) => String(value || "").toLowerCase().includes(term)));
+    const grouped = new Map<string, Item[]>();
+    for (const item of filtered) {
+      const categoryName = itemCategory(item, categoryMap);
+      grouped.set(categoryName, [...(grouped.get(categoryName) || []), item]);
+    }
+    return Array.from(grouped.entries()).sort(([nameA], [nameB]) => {
+      const categoryA = categories.find((category) => category.name === nameA);
+      const categoryB = categories.find((category) => category.name === nameB);
+      const orderA = Number(categoryA?.sortOrder ?? categoryA?.displayOrder ?? 9999);
+      const orderB = Number(categoryB?.sortOrder ?? categoryB?.displayOrder ?? 9999);
+      return orderA === orderB ? nameA.localeCompare(nameB) : orderA - orderB;
+    }).map(([categoryName, categoryItems]) => [categoryName, [...categoryItems].sort((a, b) => Number(a.displayOrder ?? a.sortOrder ?? 0) - Number(b.displayOrder ?? b.sortOrder ?? 0))] as const);
+  }, [items, categories, categoryMap, search]);
+
+  const modifiersFor = (itemId: string) => modifierGroups.filter((group) => group.isActive !== false && (group.menuItemId === itemId || group.linkedMenuItemIds?.includes(itemId)));
+
+  const saveItem = async () => {
+    if (!editing) return;
+    setSaveMessage("Saving…");
+    try {
+      await apiRequest("/api/menu-v3/items/update", {
+        method: "POST",
+        body: JSON.stringify({
+          id: editing.id,
+          name: editing.name,
+          categoryId: editing.categoryId,
+          description: editing.description,
+          price: editing.directPrice ?? editing.basePrice ?? editing.price,
+          directPrice: editing.directPrice ?? editing.basePrice ?? editing.price,
+          grabPrice: editing.grabPrice,
+          imageUrl: editing.imageUrl,
+          isActive: editing.isActive !== false,
+          soldOut: editing.soldOut === true,
+          posEnabled: editing.posEnabled !== false,
+          onlineEnabled: editing.onlineEnabled ?? editing.isOnlineEnabled ?? true,
+          displayOrder: editing.displayOrder ?? editing.sortOrder ?? 0,
+        }),
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/items"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/pos/menu"] }),
+      ]);
+      setSaveMessage("Live catalogue updated.");
+      window.setTimeout(() => { setEditing(null); setSaveMessage(""); }, 700);
+    } catch (error: any) {
+      setSaveMessage(error?.message || "Could not update catalogue item.");
+    }
   };
 
-  async function persistDraft() {
-    if (!draft || !draft.name_en.trim() || !draft.category_id) return;
-    setSaveState({ kind: "saving" });
-    try {
-      const response = await fetch(creating ? "/api/pos/catalog/items" : `/api/pos/catalog/items/${draft.id}`, {
-        method: creating ? "POST" : "PATCH",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      });
-      const raw = await response.text();
-      let result: any = {};
-      try { result = raw ? JSON.parse(raw) : {}; } catch { throw new Error("The server returned an invalid save response."); }
-      if (!response.ok) throw new Error(result.error || `Could not save item (${response.status}).`);
-      invalidate();
-      setSaveState({ kind: "success", message: "POS item saved." });
-      window.setTimeout(() => { setEditing(null); setNewItem(null); setCreating(false); setSaveState({ kind: "idle" }); }, 700);
-    } catch (error: any) {
-      setSaveState({ kind: "error", message: error?.message || "Could not save this POS item." });
-    }
-  }
+  const isLoading = itemsLoading || categoriesLoading || modifiersLoading;
 
-  return <div className="mx-auto max-w-6xl space-y-5 p-4">
-    <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-950">POS Catalogue</h1><p className="mt-1 text-sm text-slate-500">Live POS items and images. This is separate from the unfinished Menu section.</p></div><button onClick={() => { setEditing(null); setNewItem({ id: "", category_id: categories[0]?.id || "", category_name: "", name_en: "", price: 0, direct_price: 0, grab_price: 0, image_url: null, is_active: true, is_sold_out: false, pos_enabled: true, sort_order: items.length }); setCreating(true); }} className="inline-flex items-center gap-2 rounded-lg bg-yellow-400 px-4 py-2 text-sm font-semibold text-black"><Plus className="h-4 w-4" />Add POS item</button></div>
-    <div className="relative max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search POS items" className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm" /></div>
-    {isLoading && <p className="py-16 text-center text-sm text-slate-500">Loading POS catalogue…</p>}
-    {error && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Could not load the POS catalogue.</p>}
-    {!isLoading && !error && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{filtered.map((item) => <button key={item.id} onClick={() => { setCreating(false); setEditing({ ...item }); }} className="flex min-h-28 gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-yellow-400"><div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100 text-slate-400"><img src={item.image_url || posFallbackImage} alt={item.name_en} className="h-full w-full object-contain" /></div><div className="min-w-0"><p className="font-semibold text-slate-900">{item.name_en}</p><p className="mt-1 text-xs text-slate-500">{item.category_name}</p><p className="mt-2 font-mono text-sm text-slate-800">Direct {money(item.direct_price ?? item.price)} · Grab {money(item.grab_price ?? item.price)}</p><p className={`mt-1 text-xs ${item.is_active && !item.is_sold_out ? "text-emerald-700" : "text-slate-400"}`}>{item.is_active && !item.is_sold_out ? "Available" : "Unavailable"}</p></div></button>)}</div>}
-    {draft && <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => { setEditing(null); setCreating(false); }}><aside className="h-full w-full max-w-xl overflow-y-auto bg-white p-5 shadow-2xl" onClick={(e) => e.stopPropagation()}><div className="mb-5 flex items-start justify-between"><div><p className="text-xs text-slate-500">{creating ? "New POS item" : "Edit POS item"}</p><h2 className="text-xl font-bold">{draft.name_en || "Untitled item"}</h2></div><button onClick={() => { setEditing(null); setCreating(false); }} className="rounded-lg border px-3 py-1.5 text-sm">Close</button></div><div className="space-y-4"><label className="block text-sm font-medium">Name<input value={draft.name_en} onChange={(e) => setDraft({ name_en: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><label className="block text-sm font-medium">Category<select value={draft.category_id} onChange={(e) => setDraft({ category_id: e.target.value })} className="mt-1 w-full rounded-lg border p-2">{categories.map((category) => <option key={category.id} value={category.id}>{category.name_en}</option>)}</select></label><label className="block text-sm font-medium">Description<textarea value={draft.description_en || ""} onChange={(e) => setDraft({ description_en: e.target.value })} className="mt-1 min-h-24 w-full rounded-lg border p-2" /></label><div className="grid grid-cols-3 gap-3"><label className="text-sm font-medium">Base<input type="number" value={draft.price} onChange={(e) => setDraft({ price: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><label className="text-sm font-medium">Direct<input type="number" value={draft.direct_price ?? draft.price} onChange={(e) => setDraft({ direct_price: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><label className="text-sm font-medium">Grab<input type="number" value={draft.grab_price ?? draft.price} onChange={(e) => setDraft({ grab_price: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label></div><div><p className="text-sm font-medium">Image</p><div className="mt-1 flex gap-3"><div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100"><img src={draft.image_url || posFallbackImage} alt="Preview" className="h-full w-full object-contain" /></div><div className="flex-1"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => { const file = e.target.files?.[0]; if (file) upload(file).catch((err) => window.alert(err.message)); }} className="w-full text-sm" /><input value={draft.image_url || ""} onChange={(e) => setDraft({ image_url: e.target.value })} placeholder="Or image URL" className="mt-3 w-full rounded-lg border p-2 text-sm" /></div></div></div><div className="grid grid-cols-3 gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={draft.is_active} onChange={(e) => setDraft({ is_active: e.target.checked })} />Active</label><label className="flex items-center gap-2"><input type="checkbox" checked={draft.is_sold_out} onChange={(e) => setDraft({ is_sold_out: e.target.checked })} />Sold out</label><label className="flex items-center gap-2"><input type="checkbox" checked={draft.pos_enabled} onChange={(e) => setDraft({ pos_enabled: e.target.checked })} />Visible in POS</label></div><div className="space-y-2"><button type="button" disabled={saveState.kind === "saving" || !draft.name_en || !draft.category_id} onClick={persistDraft} className="w-full rounded-lg bg-yellow-400 px-4 py-3 font-semibold text-black disabled:opacity-50">{saveState.kind === "saving" ? "Saving…" : creating ? "Create POS item" : "Save POS item"}</button>{saveState.kind !== "idle" && <p role="status" className={`text-center text-sm ${saveState.kind === "error" ? "text-red-600" : "text-emerald-700"}`}>{saveState.message || "Saving…"}</p>}</div></div></aside></div>}
+  return <div className="mx-auto max-w-7xl space-y-5 p-4">
+    <div><h1 className="text-2xl font-bold text-slate-950">POS / Online Ordering Catalogue</h1><p className="mt-1 text-sm text-slate-500">Operational view of published Menu Items, Categories and Modifiers. Changes made here update the same live records used by the POS.</p></div>
+    <div className="relative max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search published items" className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm" /></div>
+    {isLoading && <p className="py-16 text-center text-sm text-slate-500">Loading live catalogue…</p>}
+    {itemsError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">Could not load the live catalogue.</p>}
+    {!isLoading && !itemsError && groups.length === 0 && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">No published menu items matched this search.</p>}
+    {!isLoading && !itemsError && <div className="space-y-6">{groups.map(([categoryName, categoryItems]) => {
+      const isCollapsed = collapsed[categoryName] === true;
+      return <section key={categoryName} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <button type="button" onClick={() => setCollapsed((current) => ({ ...current, [categoryName]: !isCollapsed }))} className="flex w-full items-center justify-between text-left"><div><h2 className="text-xl font-bold text-slate-950">{categoryName}</h2><p className="text-xs text-slate-500">{categoryItems.length} item{categoryItems.length === 1 ? "" : "s"}</p></div><span className="grid h-9 w-9 place-items-center rounded-full bg-slate-100">{isCollapsed ? <ChevronDown className="h-5 w-5" /> : <ChevronUp className="h-5 w-5" />}</span></button>
+        {!isCollapsed && <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{categoryItems.map((item) => {
+          const attached = modifiersFor(item.id);
+          const available = item.isActive !== false && item.soldOut !== true && item.posEnabled !== false;
+          return <button key={item.id} onClick={() => setEditing({ ...item })} className="flex min-h-36 gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-yellow-400 hover:shadow-sm"><div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-100"><img src={item.imageUrl || fallbackImage} alt={item.name} className="h-full w-full object-contain" /></div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><p className="font-semibold text-slate-900">{item.name}</p><span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${available ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-500"}`}>{available ? "Live" : item.soldOut ? "Sold out" : "Hidden"}</span></div><p className="mt-1 line-clamp-2 text-xs text-slate-500">{item.description || "No description"}</p><p className="mt-2 font-mono text-xs text-slate-800">Direct {money(item.directPrice ?? item.basePrice ?? item.price)} · Grab {money(item.grabPrice ?? item.directPrice ?? item.price)}</p><div className="mt-2 flex flex-wrap gap-1">{attached.length ? attached.map((group) => <span key={group.id || group.name} className="rounded-full bg-yellow-100 px-2 py-1 text-[10px] font-semibold text-yellow-900">{group.name} · {(group.options || group.modifiers || []).filter((option) => option.isActive !== false && option.active !== false).length} options</span>) : <span className="text-[10px] text-slate-400">No modifiers attached</span>}</div></div></button>;
+        })}</div>}
+      </section>;
+    })}</div>}
+    {editing && <div className="fixed inset-0 z-50 flex justify-end bg-black/40" onClick={() => setEditing(null)}><aside className="h-full w-full max-w-xl overflow-y-auto bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className="mb-5 flex items-start justify-between"><div><p className="text-xs text-slate-500">Published menu item</p><h2 className="text-xl font-bold">{editing.name}</h2></div><button onClick={() => setEditing(null)} className="rounded-lg border px-3 py-1.5 text-sm">Close</button></div><div className="space-y-4"><label className="block text-sm font-medium">Name<input value={editing.name} onChange={(event) => setEditing({ ...editing, name: event.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><label className="block text-sm font-medium">Category<select value={editing.categoryId || ""} onChange={(event) => setEditing({ ...editing, categoryId: event.target.value })} className="mt-1 w-full rounded-lg border p-2">{categories.filter((category) => category.isActive !== false).map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label className="block text-sm font-medium">Description<textarea value={editing.description || ""} onChange={(event) => setEditing({ ...editing, description: event.target.value })} className="mt-1 min-h-24 w-full rounded-lg border p-2" /></label><div className="grid grid-cols-2 gap-3"><label className="text-sm font-medium">Direct price<input type="number" value={editing.directPrice ?? editing.basePrice ?? editing.price ?? 0} onChange={(event) => setEditing({ ...editing, directPrice: event.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><label className="text-sm font-medium">Grab price<input type="number" value={editing.grabPrice ?? editing.directPrice ?? editing.price ?? 0} onChange={(event) => setEditing({ ...editing, grabPrice: event.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label></div><label className="block text-sm font-medium">Image URL<input value={editing.imageUrl || ""} onChange={(event) => setEditing({ ...editing, imageUrl: event.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><div className="grid grid-cols-3 gap-3 text-sm"><label className="flex items-center gap-2"><input type="checkbox" checked={editing.isActive !== false} onChange={(event) => setEditing({ ...editing, isActive: event.target.checked })} />Active</label><label className="flex items-center gap-2"><input type="checkbox" checked={editing.soldOut === true} onChange={(event) => setEditing({ ...editing, soldOut: event.target.checked })} />Sold out</label><label className="flex items-center gap-2"><input type="checkbox" checked={editing.posEnabled !== false} onChange={(event) => setEditing({ ...editing, posEnabled: event.target.checked })} />POS visible</label></div><div className="rounded-lg border bg-slate-50 p-3"><p className="text-sm font-semibold">Attached modifiers</p><div className="mt-2 space-y-2">{modifiersFor(editing.id).length ? modifiersFor(editing.id).map((group) => <div key={group.id || group.name}><p className="text-xs font-semibold">{group.name}</p><p className="text-xs text-slate-500">{(group.options || group.modifiers || []).filter((option) => option.isActive !== false && option.active !== false).map((option) => `${option.name} (+${money(option.priceDelta ?? option.price)})`).join(" · ") || "No active options"}</p></div>) : <p className="text-xs text-slate-500">No modifiers attached. Attach them from Menu → Modifiers.</p>}</div></div><button type="button" onClick={saveItem} className="w-full rounded-lg bg-yellow-400 px-4 py-3 font-semibold text-black">Save to live catalogue</button>{saveMessage && <p className="text-center text-sm text-slate-600">{saveMessage}</p>}</div></aside></div>}
   </div>;
 }
