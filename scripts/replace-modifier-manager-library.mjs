@@ -1,0 +1,319 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const target = path.resolve("client/src/pages/menu/ModifierManager.tsx");
+if (!fs.existsSync(target)) throw new Error(`ModifierManager not found at ${target}`);
+
+const backup = `${target}.before-modifier-library`;
+if (!fs.existsSync(backup)) fs.copyFileSync(target, backup);
+
+const component = `import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { Input } from "@/components/ui/input";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+
+type ModifierOption = {
+  id: string;
+  name: string;
+  thaiName?: string | null;
+  price?: number;
+  priceDelta?: number;
+  sortOrder?: number;
+  active?: boolean;
+  isActive?: boolean;
+};
+
+type ModifierGroup = {
+  id: string;
+  name: string;
+  name_th?: string | null;
+  groupType?: string;
+  selectionMode?: "single" | "multiple";
+  minSelections?: number;
+  maxSelections?: number | null;
+  promptText?: string | null;
+  sortOrder?: number;
+  isActive?: boolean;
+  linkedMenuItemIds?: string[];
+  linkedMenuItemNames?: string[];
+  options?: ModifierOption[];
+  modifiers?: ModifierOption[];
+};
+
+const emptyGroup = {
+  name: "",
+  name_th: "",
+  groupType: "modifier",
+  selectionMode: "multiple" as "single" | "multiple",
+  minSelections: "0",
+  maxSelections: "",
+  promptText: "",
+  sortOrder: "0",
+  isActive: true,
+};
+
+const emptyOption = {
+  id: "",
+  name: "",
+  thaiName: "",
+  price: "0",
+  sortOrder: "0",
+  isActive: true,
+};
+
+const money = (value: unknown) => Number(value || 0).toLocaleString("en-AU", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+async function loadGroups(): Promise<ModifierGroup[]> {
+  const response = await fetch("/api/menu-v3/modifiers/groups", { credentials: "include" });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(payload?.error || "Could not load modifier groups");
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.groups)) return payload.groups;
+  if (payload?.ok === false) throw new Error(payload?.blockers?.[0]?.message || "Could not load modifier groups");
+  return [];
+}
+
+export default function ModifierManager() {
+  const { data: groups = [], isLoading, error } = useQuery({
+    queryKey: ["/api/menu-v3/modifiers/groups"],
+    queryFn: loadGroups,
+  });
+
+  const [selectedGroupId, setSelectedGroupId] = useState("");
+  const [groupDraft, setGroupDraft] = useState(emptyGroup);
+  const [optionDraft, setOptionDraft] = useState(emptyOption);
+  const [message, setMessage] = useState("");
+
+  const selectedGroup = useMemo(
+    () => groups.find((group) => group.id === selectedGroupId) || null,
+    [groups, selectedGroupId],
+  );
+
+  const options = selectedGroup?.options || selectedGroup?.modifiers || [];
+
+  useEffect(() => {
+    if (!selectedGroupId && groups.length) setSelectedGroupId(groups[0].id);
+    if (selectedGroupId && !groups.some((group) => group.id === selectedGroupId)) {
+      setSelectedGroupId(groups[0]?.id || "");
+    }
+  }, [groups, selectedGroupId]);
+
+  useEffect(() => {
+    if (!selectedGroup) {
+      setGroupDraft(emptyGroup);
+      return;
+    }
+    setGroupDraft({
+      name: selectedGroup.name || "",
+      name_th: selectedGroup.name_th || "",
+      groupType: selectedGroup.groupType || "modifier",
+      selectionMode: selectedGroup.selectionMode === "single" ? "single" : "multiple",
+      minSelections: String(selectedGroup.minSelections ?? 0),
+      maxSelections: selectedGroup.maxSelections == null ? "" : String(selectedGroup.maxSelections),
+      promptText: selectedGroup.promptText || "",
+      sortOrder: String(selectedGroup.sortOrder ?? 0),
+      isActive: selectedGroup.isActive !== false,
+    });
+    setOptionDraft(emptyOption);
+    setMessage("");
+  }, [selectedGroup]);
+
+  const refresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/modifiers/groups"] });
+    await queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/items"] });
+  };
+
+  const createGroup = useMutation({
+    mutationFn: () => apiRequest("/api/menu-v3/modifiers/groups/create", {
+      method: "POST",
+      body: JSON.stringify({
+        name: groupDraft.name,
+        name_th: groupDraft.name_th || null,
+        groupType: groupDraft.groupType,
+        selectionMode: groupDraft.selectionMode,
+        minSelections: Number(groupDraft.minSelections || 0),
+        maxSelections: groupDraft.maxSelections === "" ? null : Number(groupDraft.maxSelections),
+        promptText: groupDraft.promptText || null,
+        sortOrder: Number(groupDraft.sortOrder || 0),
+        isActive: groupDraft.isActive,
+      }),
+    }),
+    onSuccess: async (created: any) => {
+      await refresh();
+      if (created?.id) setSelectedGroupId(String(created.id));
+      setMessage("Modifier group created.");
+    },
+  });
+
+  const updateGroup = useMutation({
+    mutationFn: () => apiRequest("/api/menu-v3/modifiers/groups/update", {
+      method: "POST",
+      body: JSON.stringify({
+        id: selectedGroupId,
+        name: groupDraft.name,
+        name_th: groupDraft.name_th || null,
+        groupType: groupDraft.groupType,
+        selectionMode: groupDraft.selectionMode,
+        minSelections: Number(groupDraft.minSelections || 0),
+        maxSelections: groupDraft.maxSelections === "" ? null : Number(groupDraft.maxSelections),
+        promptText: groupDraft.promptText || null,
+        sortOrder: Number(groupDraft.sortOrder || 0),
+        isActive: groupDraft.isActive,
+      }),
+    }),
+    onSuccess: async () => {
+      await refresh();
+      setMessage("Modifier group saved.");
+    },
+  });
+
+  const deleteGroup = useMutation({
+    mutationFn: (id: string) => apiRequest("/api/menu-v3/modifiers/groups/delete", {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    }),
+    onSuccess: async () => {
+      setSelectedGroupId("");
+      await refresh();
+      setMessage("Modifier group deleted.");
+    },
+  });
+
+  const saveOption = useMutation({
+    mutationFn: () => apiRequest(optionDraft.id ? "/api/menu-v3/modifiers/update" : "/api/menu-v3/modifiers/create", {
+      method: "POST",
+      body: JSON.stringify(optionDraft.id ? {
+        id: optionDraft.id,
+        name: optionDraft.name,
+        thaiName: optionDraft.thaiName || null,
+        priceDelta: Number(optionDraft.price || 0),
+        sortOrder: Number(optionDraft.sortOrder || 0),
+        isActive: optionDraft.isActive,
+      } : {
+        groupId: selectedGroupId,
+        name: optionDraft.name,
+        thaiName: optionDraft.thaiName || null,
+        priceDelta: Number(optionDraft.price || 0),
+        sortOrder: Number(optionDraft.sortOrder || 0),
+        isActive: optionDraft.isActive,
+      }),
+    }),
+    onSuccess: async () => {
+      await refresh();
+      setOptionDraft(emptyOption);
+      setMessage("Modifier option saved.");
+    },
+  });
+
+  const deleteOption = useMutation({
+    mutationFn: (id: string) => apiRequest("/api/menu-v3/modifiers/delete", {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    }),
+    onSuccess: async () => {
+      await refresh();
+      setOptionDraft(emptyOption);
+      setMessage("Modifier option deleted.");
+    },
+  });
+
+  const startNewGroup = () => {
+    setSelectedGroupId("");
+    setGroupDraft(emptyGroup);
+    setOptionDraft(emptyOption);
+    setMessage("");
+  };
+
+  const editOption = (option: ModifierOption) => setOptionDraft({
+    id: option.id,
+    name: option.name || "",
+    thaiName: option.thaiName || "",
+    price: String(option.priceDelta ?? option.price ?? 0),
+    sortOrder: String(option.sortOrder ?? 0),
+    isActive: option.isActive ?? option.active ?? true,
+  });
+
+  const busy = createGroup.isPending || updateGroup.isPending || deleteGroup.isPending || saveOption.isPending || deleteOption.isPending;
+  const mutationError = createGroup.error || updateGroup.error || deleteGroup.error || saveOption.error || deleteOption.error;
+
+  return <div className="space-y-5">
+    <div>
+      <h1 className="text-2xl font-bold text-slate-950">Modifier Library</h1>
+      <p className="mt-1 text-sm text-slate-500">Create each reusable modifier group once. Assign groups to products from the Product Editor.</p>
+    </div>
+
+    {error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{(error as Error).message}</div>}
+    {mutationError && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{(mutationError as Error).message}</div>}
+    {message && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</div>}
+
+    <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside className="rounded-2xl border bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div><h2 className="font-semibold">Modifier groups</h2><p className="text-xs text-slate-500">{groups.length} group{groups.length === 1 ? "" : "s"}</p></div>
+          <button type="button" onClick={startNewGroup} className="rounded-lg bg-black px-3 py-2 text-xs font-semibold text-white">New group</button>
+        </div>
+        <div className="mt-4 space-y-2">
+          {isLoading && <p className="py-8 text-center text-sm text-slate-400">Loading modifier groups…</p>}
+          {!isLoading && groups.length === 0 && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">No modifier groups yet.</p>}
+          {groups.map((group) => {
+            const count = (group.options || group.modifiers || []).length;
+            return <button key={group.id} type="button" onClick={() => setSelectedGroupId(group.id)} className={"w-full rounded-xl border p-3 text-left transition " + (selectedGroupId === group.id ? "border-black bg-slate-50" : "border-slate-200 hover:border-slate-400")}>
+              <div className="flex items-start justify-between gap-3"><strong className="text-sm text-slate-950">{group.name}</strong><span className={"rounded-full px-2 py-0.5 text-[10px] " + (group.isActive === false ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-700")}>{group.isActive === false ? "Inactive" : "Active"}</span></div>
+              <p className="mt-1 text-xs text-slate-500">{count} option{count === 1 ? "" : "s"} · {group.selectionMode === "single" ? "Single choice" : "Multiple choice"}</p>
+              {(group.linkedMenuItemNames?.length || 0) > 0 && <p className="mt-1 line-clamp-2 text-[11px] text-slate-400">Used by {group.linkedMenuItemNames?.length} product{group.linkedMenuItemNames?.length === 1 ? "" : "s"}</p>}
+            </button>;
+          })}
+        </div>
+      </aside>
+
+      <main className="space-y-5">
+        <section className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className="text-lg font-semibold">{selectedGroup ? "Edit modifier group" : "Create modifier group"}</h2><p className="text-xs text-slate-500">Groups are created independently from products.</p></div>
+            {selectedGroup && <button type="button" disabled={busy} onClick={() => { if (window.confirm('Delete modifier group "' + selectedGroup.name + '" and all its options?')) deleteGroup.mutate(selectedGroup.id); }} className="rounded-lg border border-red-200 px-3 py-2 text-xs font-semibold text-red-700 disabled:opacity-40">Delete group</button>}
+          </div>
+
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            <label className="text-xs font-medium">Group name<Input value={groupDraft.name} onChange={(event) => setGroupDraft({ ...groupDraft, name: event.target.value })} className="mt-1" placeholder="Make it Better" /></label>
+            <label className="text-xs font-medium">Thai name<Input value={groupDraft.name_th} onChange={(event) => setGroupDraft({ ...groupDraft, name_th: event.target.value })} className="mt-1" placeholder="Optional" /></label>
+            <label className="text-xs font-medium">Selection type<select value={groupDraft.selectionMode} onChange={(event) => setGroupDraft({ ...groupDraft, selectionMode: event.target.value as "single" | "multiple" })} className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="multiple">Multiple choice</option><option value="single">Single choice</option></select></label>
+            <label className="text-xs font-medium">Group type<select value={groupDraft.groupType} onChange={(event) => setGroupDraft({ ...groupDraft, groupType: event.target.value })} className="mt-1 w-full rounded-md border px-3 py-2 text-sm"><option value="modifier">Modifier</option><option value="upsell">Upsell</option><option value="choice">Required choice</option></select></label>
+            <label className="text-xs font-medium">Minimum selections<Input type="number" min="0" value={groupDraft.minSelections} onChange={(event) => setGroupDraft({ ...groupDraft, minSelections: event.target.value })} className="mt-1" /></label>
+            <label className="text-xs font-medium">Maximum selections<Input type="number" min="0" value={groupDraft.maxSelections} onChange={(event) => setGroupDraft({ ...groupDraft, maxSelections: event.target.value })} className="mt-1" placeholder="No maximum" /></label>
+            <label className="text-xs font-medium">Display order<Input type="number" value={groupDraft.sortOrder} onChange={(event) => setGroupDraft({ ...groupDraft, sortOrder: event.target.value })} className="mt-1" /></label>
+            <label className="flex items-center justify-between rounded-lg border p-3 text-sm"><span>Active</span><input type="checkbox" checked={groupDraft.isActive} onChange={(event) => setGroupDraft({ ...groupDraft, isActive: event.target.checked })} /></label>
+            <label className="text-xs font-medium md:col-span-2">Prompt text<Input value={groupDraft.promptText} onChange={(event) => setGroupDraft({ ...groupDraft, promptText: event.target.value })} className="mt-1" placeholder="Would you like to make it better?" /></label>
+          </div>
+          <button type="button" disabled={busy || !groupDraft.name.trim()} onClick={() => selectedGroup ? updateGroup.mutate() : createGroup.mutate()} className="mt-5 w-full rounded-lg bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-40">{busy ? "Saving…" : selectedGroup ? "Save modifier group" : "Create modifier group"}</button>
+        </section>
+
+        {selectedGroup && <section className="rounded-2xl border bg-white p-5 shadow-sm">
+          <div><h2 className="text-lg font-semibold">Options — {selectedGroup.name}</h2><p className="text-xs text-slate-500">Each option has its own price and display order.</p></div>
+
+          <div className="mt-4 overflow-x-auto rounded-xl border">
+            <table className="w-full min-w-[680px] text-sm">
+              <thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="p-3 text-left">Option</th><th className="p-3 text-left">Thai name</th><th className="p-3 text-right">Price</th><th className="p-3 text-right">Order</th><th className="p-3 text-center">Status</th><th className="p-3 text-right">Actions</th></tr></thead>
+              <tbody>{options.map((option) => <tr key={option.id} className="border-t"><td className="p-3 font-medium">{option.name}</td><td className="p-3 text-slate-500">{option.thaiName || "—"}</td><td className="p-3 text-right">{money(option.priceDelta ?? option.price)} THB</td><td className="p-3 text-right">{option.sortOrder ?? 0}</td><td className="p-3 text-center">{(option.isActive ?? option.active ?? true) ? "Active" : "Inactive"}</td><td className="p-3 text-right"><div className="flex justify-end gap-2"><button type="button" onClick={() => editOption(option)} className="rounded-lg border px-3 py-1.5 text-xs">Edit</button><button type="button" onClick={() => { if (window.confirm('Delete option "' + option.name + '"?')) deleteOption.mutate(option.id); }} className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-700">Delete</button></div></td></tr>)}{options.length === 0 && <tr><td colSpan={6} className="p-8 text-center text-sm text-slate-400">No options in this group.</td></tr>}</tbody>
+            </table>
+          </div>
+
+          <div className="mt-5 rounded-xl bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold">{optionDraft.id ? "Edit option" : "Add option"}</h3>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+              <label className="text-xs font-medium lg:col-span-2">Option name<Input value={optionDraft.name} onChange={(event) => setOptionDraft({ ...optionDraft, name: event.target.value })} className="mt-1" placeholder="Extra Bacon" /></label>
+              <label className="text-xs font-medium">Thai name<Input value={optionDraft.thaiName} onChange={(event) => setOptionDraft({ ...optionDraft, thaiName: event.target.value })} className="mt-1" placeholder="Optional" /></label>
+              <label className="text-xs font-medium">Price (THB)<Input type="number" min="0" value={optionDraft.price} onChange={(event) => setOptionDraft({ ...optionDraft, price: event.target.value })} className="mt-1" /></label>
+              <label className="text-xs font-medium">Display order<Input type="number" value={optionDraft.sortOrder} onChange={(event) => setOptionDraft({ ...optionDraft, sortOrder: event.target.value })} className="mt-1" /></label>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={optionDraft.isActive} onChange={(event) => setOptionDraft({ ...optionDraft, isActive: event.target.checked })} /> Active</label><div className="flex gap-2">{optionDraft.id && <button type="button" onClick={() => setOptionDraft(emptyOption)} className="rounded-lg border px-4 py-2 text-xs">Cancel edit</button>}<button type="button" disabled={busy || !optionDraft.name.trim()} onClick={() => saveOption.mutate()} className="rounded-lg bg-black px-4 py-2 text-xs font-semibold text-white disabled:opacity-40">{saveOption.isPending ? "Saving…" : optionDraft.id ? "Save option" : "Add option"}</button></div></div>
+          </div>
+        </section>}
+      </main>
+    </div>
+  </div>;
+}
+`;
+
+fs.writeFileSync(target, component, "utf8");
+console.log(`Replaced ${target} with reusable Modifier Library UI.`);
+console.log(`Backup: ${backup}`);
