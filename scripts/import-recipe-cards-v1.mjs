@@ -1,15 +1,39 @@
 #!/usr/bin/env node
+import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import pg from 'pg';
 
 function loadDatabaseUrl() {
   if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  const raw = execFileSync('systemctl', ['show', 'sbb-production.service', '-p', 'Environment', '--value'], { encoding: 'utf8' });
-  const match = raw.match(/(?:^|\s)DATABASE_URL=("(?:[^"\\]|\\.)*"|'[^']*'|\S+)/);
-  if (!match) throw new Error('DATABASE_URL was not found in sbb-production.service');
-  let value = match[1];
-  if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
-  return value.replace(/\\x20/g, ' ');
+
+  // The production service may receive DATABASE_URL through a systemd drop-in,
+  // EnvironmentFile, or another generated environment source. Reading the
+  // running process environment is the most reliable representation of the
+  // actual connection used by the live application.
+  try {
+    const pid = execFileSync(
+      'systemctl',
+      ['show', 'sbb-production.service', '-p', 'MainPID', '--value'],
+      { encoding: 'utf8' },
+    ).trim();
+    if (pid && pid !== '0') {
+      const entries = fs.readFileSync(`/proc/${pid}/environ`).toString('utf8').split('\0');
+      const assignment = entries.find((entry) => entry.startsWith('DATABASE_URL='));
+      if (assignment) return assignment.slice('DATABASE_URL='.length);
+    }
+  } catch (_) {
+    // Fall through to the systemd configuration parser below.
+  }
+
+  try {
+    const raw = execFileSync('systemctl', ['cat', 'sbb-production.service'], { encoding: 'utf8' });
+    const match = raw.match(/(?:^|\n)\s*Environment\s*=\s*["']?DATABASE_URL=([^"'\n]+)["']?/m);
+    if (match?.[1]) return match[1].trim();
+  } catch (_) {
+    // Final error below gives the operator a clear failure reason.
+  }
+
+  throw new Error('DATABASE_URL was not found in the running sbb-production.service environment');
 }
 
 const ingredient = (name, quantityUsed, unitUsed, notes = null) => ({
