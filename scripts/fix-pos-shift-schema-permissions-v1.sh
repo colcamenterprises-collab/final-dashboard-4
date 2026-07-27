@@ -3,18 +3,39 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if [[ ! -f /etc/systemd/system/sbb-production.service.d/environment.conf ]]; then
+ENV_FILE=/etc/systemd/system/sbb-production.service.d/environment.conf
+if [[ ! -f "$ENV_FILE" ]]; then
   echo "Missing production environment file" >&2
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1091
-source /etc/systemd/system/sbb-production.service.d/environment.conf
-set +a
+# systemd drop-ins are not shell scripts. Extract DATABASE_URL from Environment=
+# directives without sourcing the file (which fails on the [Service] header).
+DATABASE_URL=$(python3 - "$ENV_FILE" <<'PY'
+import shlex, sys
+path = sys.argv[1]
+value = ""
+with open(path, encoding="utf-8") as handle:
+    for raw in handle:
+        line = raw.strip()
+        if not line.startswith("Environment="):
+            continue
+        payload = line[len("Environment="):]
+        try:
+            assignments = shlex.split(payload)
+        except ValueError:
+            assignments = [payload.strip('"')]
+        for assignment in assignments:
+            if assignment.startswith("DATABASE_URL="):
+                value = assignment.split("=", 1)[1]
+if value:
+    print(value)
+PY
+)
+export DATABASE_URL
 
 if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL is not configured" >&2
+  echo "DATABASE_URL is not configured in $ENV_FILE" >&2
   exit 1
 fi
 
@@ -66,7 +87,6 @@ SQL
 
 node - <<'NODE'
 import pg from 'pg';
-import 'dotenv/config';
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 try {
   const result = await pool.query("SELECT to_regclass('public.pos_shifts') shifts, to_regclass('public.pos_shift_movements') movements");
