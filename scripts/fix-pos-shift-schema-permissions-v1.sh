@@ -3,19 +3,59 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-ENV_FILE=/etc/systemd/system/sbb-production.service.d/environment.conf
-if [[ ! -f "$ENV_FILE" ]]; then
-  echo "Missing production environment file" >&2
-  exit 1
+# Resolve DATABASE_URL from the effective systemd service environment first.
+# Fall back to common app env files and finally the systemd drop-in itself.
+DATABASE_URL="${DATABASE_URL:-}"
+
+if [[ -z "$DATABASE_URL" ]]; then
+  SYSTEMD_ENV=$(systemctl show sbb-production.service --property=Environment --value 2>/dev/null || true)
+  if [[ -n "$SYSTEMD_ENV" ]]; then
+    DATABASE_URL=$(python3 - "$SYSTEMD_ENV" <<'PY'
+import shlex, sys
+value = ""
+try:
+    words = shlex.split(sys.argv[1])
+except ValueError:
+    words = sys.argv[1].split()
+for word in words:
+    if word.startswith("DATABASE_URL="):
+        value = word.split("=", 1)[1]
+        break
+print(value)
+PY
+    )
+  fi
 fi
 
-# systemd drop-ins are not shell scripts. Extract DATABASE_URL from Environment=
-# directives without sourcing the file (which fails on the [Service] header).
-DATABASE_URL=$(python3 - "$ENV_FILE" <<'PY'
-import shlex, sys
-path = sys.argv[1]
+if [[ -z "$DATABASE_URL" ]]; then
+  for candidate in .env .env.production /opt/apps/sbb-app-production/.env /opt/apps/sbb-app-production/.env.production; do
+    [[ -f "$candidate" ]] || continue
+    DATABASE_URL=$(python3 - "$candidate" <<'PY'
+import sys
 value = ""
-with open(path, encoding="utf-8") as handle:
+with open(sys.argv[1], encoding="utf-8") as handle:
+    for raw in handle:
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        if key.strip() == "DATABASE_URL":
+            value = val.strip().strip('"').strip("'")
+            break
+print(value)
+PY
+    )
+    [[ -n "$DATABASE_URL" ]] && break
+  done
+fi
+
+if [[ -z "$DATABASE_URL" ]]; then
+  ENV_FILE=/etc/systemd/system/sbb-production.service.d/environment.conf
+  if [[ -f "$ENV_FILE" ]]; then
+    DATABASE_URL=$(python3 - "$ENV_FILE" <<'PY'
+import shlex, sys
+value = ""
+with open(sys.argv[1], encoding="utf-8") as handle:
     for raw in handle:
         line = raw.strip()
         if not line.startswith("Environment="):
@@ -28,14 +68,17 @@ with open(path, encoding="utf-8") as handle:
         for assignment in assignments:
             if assignment.startswith("DATABASE_URL="):
                 value = assignment.split("=", 1)[1]
-if value:
-    print(value)
+                break
+print(value)
 PY
-)
-export DATABASE_URL
+    )
+  fi
+fi
 
-if [[ -z "${DATABASE_URL:-}" ]]; then
-  echo "DATABASE_URL is not configured in $ENV_FILE" >&2
+export DATABASE_URL
+if [[ -z "$DATABASE_URL" ]]; then
+  echo "DATABASE_URL could not be resolved from the running service or production env files" >&2
+  echo "systemd EnvironmentFiles: $(systemctl show sbb-production.service --property=EnvironmentFiles --value 2>/dev/null || true)" >&2
   exit 1
 fi
 
@@ -49,7 +92,7 @@ if [[ "$DB_HOST" != "localhost" && "$DB_HOST" != "127.0.0.1" && "$DB_HOST" != ":
 fi
 
 sudo -u postgres psql -v ON_ERROR_STOP=1 -d "$DB_NAME" <<SQL
-GRANT USAGE, CREATE ON SCHEMA public TO "$APP_ROLE";
+GRANT USAGE ON SCHEMA public TO "$APP_ROLE";
 
 CREATE TABLE IF NOT EXISTS public.pos_shifts (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
