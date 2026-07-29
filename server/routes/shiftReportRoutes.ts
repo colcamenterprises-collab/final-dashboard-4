@@ -1,12 +1,28 @@
 // SHIFT VERIFICATION ROUTES
 // Read-only reconciliation from canonical sources: loyverse_shifts, lv_receipt, daily_sales_v2.
 
-import { Router } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
+import { attachSessionUser } from "../middleware/sessionAuth";
+import { getPinSessionUser } from "./pinAuth";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { getUsageReconciliation } from "./analysis/usageReconciliation";
 
 const router = Router();
+
+function ownerOnly(req: Request, res: Response, next: NextFunction) {
+  attachSessionUser(req);
+  const sessionUser = (req as any).user;
+  const pinUser = getPinSessionUser(req);
+  const user = sessionUser || pinUser;
+  if (!user || user.role !== "owner") {
+    return res.status(403).json({ error: "Owner access required" });
+  }
+  (req as any).user = user;
+  next();
+}
+
+router.use(ownerOnly);
 
 type Amount = number | null;
 type CompareStatus = "MATCH" | "DIFFERENCE" | "NOT_AVAILABLE";
@@ -137,12 +153,49 @@ async function buildShiftRows(limitOrDate: number | string) {
       WHERE "deletedAt" IS NULL
       ORDER BY COALESCE(shift_date, NULLIF("shiftDate", '')::date, "createdAt"::date), "createdAt" DESC
     ),
+    pos_register AS (
+      SELECT DISTINCT ON (shift_date)
+        shift_date,
+        p.id AS pos_shift_id,
+        p.staff_name AS cashier_name,
+        p.opened_at,
+        p.closed_at,
+        p.starting_float,
+        p.closing_cash,
+        p.cash_banked,
+        p.expected_cash,
+        p.variance AS register_variance,
+        p.status AS pos_shift_status,
+        COALESCE(m.money_in, 0)::numeric AS money_in,
+        COALESCE(m.money_out, 0)::numeric AS money_out,
+        COALESCE(m.net_movement, 0)::numeric AS net_movement
+      FROM (
+        SELECT ps.*,
+          CASE
+            WHEN EXTRACT(HOUR FROM ps.opened_at AT TIME ZONE 'Asia/Bangkok') < 3
+              THEN ((ps.opened_at AT TIME ZONE 'Asia/Bangkok')::date - INTERVAL '1 day')::date
+            ELSE (ps.opened_at AT TIME ZONE 'Asia/Bangkok')::date
+          END AS shift_date
+        FROM pos_shifts ps
+      ) p
+      LEFT JOIN LATERAL (
+        SELECT
+          COALESCE(SUM(CASE WHEN movement_type='cash_in' THEN amount ELSE 0 END),0) AS money_in,
+          COALESCE(SUM(CASE WHEN movement_type='cash_out' THEN amount ELSE 0 END),0) AS money_out,
+          COALESCE(SUM(CASE WHEN movement_type='cash_in' THEN amount ELSE -amount END),0) AS net_movement
+        FROM pos_shift_movements
+        WHERE shift_id = p.id
+      ) m ON true
+      ORDER BY shift_date, p.opened_at DESC
+    ),
     selected_dates AS (
       SELECT shift_date
       FROM (
         SELECT shift_date::date AS shift_date FROM loyverse_shifts
         UNION
         SELECT shift_date FROM forms
+        UNION
+        SELECT shift_date FROM pos_register
       ) all_dates
       WHERE shift_date IS NOT NULL
       ${isDate ? sql`AND shift_date = ${limitOrDate}::date` : sql`ORDER BY shift_date DESC LIMIT ${sql.raw(String(limitOrDate))}`}
@@ -190,10 +243,14 @@ async function buildShiftRows(limitOrDate: number | string) {
     SELECT s.shift_date, r.receipt_count, r.receipt_gross, NULL::numeric AS receipt_net, r.receipt_cash, r.receipt_qr, r.receipt_grab, r.receipt_other,
            s.shift_gross, s.shift_net, s.shift_cash, s.shift_qr, s.shift_grab,
            (s.shift_gross - COALESCE(s.shift_cash,0) - COALESCE(s.shift_qr,0) - COALESCE(s.shift_grab,0))::numeric AS shift_other,
-           s.shift_receipts, f.form_id, f.staff_gross, f.staff_cash, f.staff_qr, f.staff_grab, f.staff_other, f.staff_receipts
+           s.shift_receipts, f.form_id, f.staff_gross, f.staff_cash, f.staff_qr, f.staff_grab, f.staff_other, f.staff_receipts,
+           p.pos_shift_id, p.cashier_name, p.opened_at, p.closed_at, p.starting_float,
+           p.closing_cash, p.cash_banked, p.expected_cash, p.register_variance,
+           p.pos_shift_status, p.money_in, p.money_out, p.net_movement
     FROM shift_reports s
     LEFT JOIN receipts r ON r.shift_date = s.shift_date
     LEFT JOIN forms f ON f.shift_date = s.shift_date
+    LEFT JOIN pos_register p ON p.shift_date = s.shift_date
     ${isDate ? sql`` : sql`ORDER BY s.shift_date DESC`}
   `);
 
@@ -201,6 +258,21 @@ async function buildShiftRows(limitOrDate: number | string) {
     const receipts = { grossSales: toNumber(row.receipt_gross), netSales: toNumber(row.receipt_net), cash: toNumber(row.receipt_cash), qr: toNumber(row.receipt_qr), grab: toNumber(row.receipt_grab), other: toNumber(row.receipt_other), receiptCount: toNumber(row.receipt_count) };
     const shiftReport = { grossSales: toNumber(row.shift_gross), netSales: toNumber(row.shift_net), cash: toNumber(row.shift_cash), qr: toNumber(row.shift_qr), grab: toNumber(row.shift_grab), other: toNumber(row.shift_other), receiptCount: toNumber(row.shift_receipts) };
     const dailySalesV2 = row.form_id ? { grossSales: toNumber(row.staff_gross), cash: toNumber(row.staff_cash), qr: toNumber(row.staff_qr), grab: toNumber(row.staff_grab), other: toNumber(row.staff_other), receiptCount: toNumber(row.staff_receipts) } : { grossSales: null, cash: null, qr: null, grab: null, other: null, receiptCount: null };
+    const posShift = row.pos_shift_id ? {
+      id: row.pos_shift_id,
+      cashierName: row.cashier_name,
+      openedAt: row.opened_at,
+      closedAt: row.closed_at,
+      startingFloat: toNumber(row.starting_float),
+      moneyIn: toNumber(row.money_in) ?? 0,
+      moneyOut: toNumber(row.money_out) ?? 0,
+      netMovement: toNumber(row.net_movement) ?? 0,
+      physicalClosingCash: toNumber(row.closing_cash),
+      cashBanked: toNumber(row.cash_banked),
+      expectedCash: toNumber(row.expected_cash),
+      registerVariance: toNumber(row.register_variance),
+      status: row.pos_shift_status,
+    } : null;
 
     const posFields = {
       grossSales: compare(receipts.grossSales, shiftReport.grossSales), netSales: compare(receipts.netSales, shiftReport.netSales), cash: compare(receipts.cash, shiftReport.cash), qr: compare(receipts.qr, shiftReport.qr), grab: compare(receipts.grab, shiftReport.grab), other: compare(receipts.other, shiftReport.other), receiptCount: compare(receipts.receiptCount, shiftReport.receiptCount),
@@ -243,7 +315,7 @@ async function buildShiftRows(limitOrDate: number | string) {
     return {
       id: `sr-${String(row.shift_date).slice(0, 10)}`,
       shiftDate: String(row.shift_date).slice(0, 10),
-      receipts, shiftReport, dailySalesV2,
+      receipts, shiftReport, dailySalesV2, posShift,
       posIntegrityStatus, staffVerificationStatus, overallStatus,
       comparisons: { posIntegrity: posFields, staffVerification: staffFields },
       issueExplanation: explanations.length ? explanations.join(" ") : "Receipts match the Loyverse shift report and Daily Sales V2 matches the Loyverse shift report.",
@@ -260,7 +332,7 @@ router.get("/history", async (_req, res) => {
     return res.json({ reports, sourceMapping: SOURCE_MAPPING, statusRules: { posIntegrityStatus: ["VERIFIED", "ISSUE", "MISSING_RECEIPTS", "MISSING_SHIFT_REPORT"], staffVerificationStatus: ["VERIFIED", "ISSUE", "MISSING_FORM"], overallStatus: "VERIFIED only if both POS integrity and staff verification are verified; POS ISSUE if receipts vs shift report fails; STAFF ISSUE if staff vs shift report fails; MISSING FORM if Daily Sales V2 missing." }, blockers: [] });
   } catch (err: any) {
     console.error("[shift-report/history]", err?.message);
-    return res.json({ reports: [], sourceMapping: SOURCE_MAPPING, blockers: [{ code: "HISTORY_QUERY_FAILED", message: err?.message ?? "Query failed", where: "/api/shift-report/history", canonical_source: "loyverse_shifts,lv_receipt,daily_sales_v2", auto_build_attempted: false }] });
+    return res.json({ reports: [], sourceMapping: SOURCE_MAPPING, blockers: [{ code: "HISTORY_QUERY_FAILED", message: err?.message ?? "Query failed", where: "/api/shift-report/history", canonical_source: "loyverse_shifts,lv_receipt,daily_sales_v2,pos_shifts,pos_shift_movements", auto_build_attempted: false }] });
   }
 });
 

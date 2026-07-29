@@ -7,7 +7,7 @@ import {
 } from "../../services/menu/itemService";
 import {
   getModifierGroups, createModifierGroup, updateModifierGroup, deleteModifierGroup,
-  createModifier, updateModifier, deleteModifier, applyGroupToItem, setGroupAssignments
+  createModifier, updateModifier, deleteModifier, applyGroupToItem, setGroupAssignments, mergeModifierGroups
 } from "../../services/menu/modifierService";
 import {
   setRecipe, getRecipe
@@ -48,6 +48,10 @@ router.get("/modifiers/groups", async (_req, res) => {
 router.post("/modifiers/groups/create", async (req, res) => res.json(await createModifierGroup(req.body)));
 router.post("/modifiers/groups/update", async (req, res) => res.json(await updateModifierGroup(req.body.id, req.body)));
 router.post("/modifiers/groups/delete", async (req, res) => res.json(await deleteModifierGroup(req.body.id)));
+router.post("/modifiers/groups/merge", async (req, res) => {
+  const sourceGroupIds = Array.isArray(req.body?.sourceGroupIds) ? req.body.sourceGroupIds.map(String) : [];
+  return res.json(await mergeModifierGroups(String(req.body?.targetGroupId || ""), sourceGroupIds, req.body?.mergeUniqueOptions !== false));
+});
 router.post("/modifiers/groups/assign", async (req, res) => {
   const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds.map(String) : [];
   return res.json(await setGroupAssignments(String(req.body.groupId), itemIds));

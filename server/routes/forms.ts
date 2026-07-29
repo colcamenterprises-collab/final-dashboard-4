@@ -10,6 +10,80 @@ import crypto from "crypto"; // MEGA PATCH V3: For UUID generation
 
 const router = Router();
 
+function bangkokShiftDate(now = new Date()) {
+  const formatter = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
+  const parts = formatter.formatToParts(now);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value || "";
+  const date = `${get("year")}-${get("month")}-${get("day")}`;
+  if (Number(get("hour")) >= 3) return date;
+  const previous = new Date(`${date}T00:00:00+07:00`);
+  previous.setDate(previous.getDate() - 1);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(previous);
+}
+
+router.get("/active-shift", async (_req, res) => {
+  try {
+    const shiftDate = bangkokShiftDate();
+    const result: any = await drizzleDb.execute(sql`
+      SELECT id, "shiftDate", "completedBy", "startingCash", "createdAt", payload
+      FROM daily_sales_v2
+      WHERE COALESCE("shiftDate"::date, shift_date::date) = ${shiftDate}::date
+        AND "deletedAt" IS NULL
+        AND COALESCE(payload->>'shiftStatus', payload->>'status', '') = 'OPEN'
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `);
+    const row = ((result as any).rows || result)?.[0] || null;
+    res.json({ ok: true, shift: row ? { id: row.id, shiftDate: row.shiftDate, completedBy: row.completedBy, startingCash: row.startingCash, createdAt: row.createdAt } : null });
+  } catch (error) {
+    console.error('[active-shift] failed', error);
+    res.status(500).json({ ok: false, error: 'Failed to check active shift' });
+  }
+});
+
+router.post("/open-shift", async (req, res) => {
+  try {
+    const completedBy = String(req.body?.completedBy || '').trim();
+    const startingCash = Number(req.body?.startingCash);
+    if (!completedBy) return res.status(400).json({ ok: false, error: 'Opened by is required' });
+    if (!Number.isFinite(startingCash) || startingCash < 0) return res.status(400).json({ ok: false, error: 'Starting cash must be non-negative' });
+
+    const shiftDate = bangkokShiftDate();
+    const existing: any = await drizzleDb.execute(sql`
+      SELECT id, "shiftDate", "completedBy", "startingCash", "createdAt"
+      FROM daily_sales_v2
+      WHERE COALESCE("shiftDate"::date, shift_date::date) = ${shiftDate}::date
+        AND "deletedAt" IS NULL
+        AND COALESCE(payload->>'shiftStatus', payload->>'status', '') = 'OPEN'
+      ORDER BY "createdAt" DESC
+      LIMIT 1
+    `);
+    const existingRow = ((existing as any).rows || existing)?.[0];
+    if (existingRow) return res.status(409).json({ ok: false, error: 'A shift is already open', shift: existingRow });
+
+    const id = crypto.randomUUID();
+    const now = new Date();
+    const payload = { shiftStatus: 'OPEN', status: 'OPEN', openedAt: now.toISOString(), openedBy: completedBy, startingCash };
+    await drizzleDb.execute(sql`
+      INSERT INTO daily_sales_v2 (
+        id, "shiftDate", shift_date, "completedBy", "createdAt", "submittedAtISO",
+        "startingCash", "endingCash", "cashBanked", "cashSales", "qrSales", "grabSales", "aroiSales",
+        "totalSales", "shoppingTotal", "wagesTotal", "othersTotal", "totalExpenses", "qrTransfer",
+        "grab_receipt_count", "cash_receipt_count", "qr_receipt_count", payload
+      ) VALUES (
+        ${id}, ${shiftDate}, ${shiftDate}::date, ${completedBy}, ${now}, ${now},
+        ${Math.round(startingCash)}, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0,
+        0, 0, 0, ${JSON.stringify(payload)}::jsonb
+      )
+    `);
+    res.status(201).json({ ok: true, shift: { id, shiftDate, completedBy, startingCash: Math.round(startingCash), status: 'OPEN' } });
+  } catch (error) {
+    console.error('[open-shift] failed', error);
+    res.status(500).json({ ok: false, error: 'Failed to open shift' });
+  }
+});
+
 // GET /api/forms - List all submitted forms for the library
 router.get("/", async (req, res) => {
   try {

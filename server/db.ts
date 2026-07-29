@@ -1,3 +1,4 @@
+import { Pool as NodePgPool } from "pg";
 import { Pool, neonConfig } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import ws from "ws";
@@ -17,7 +18,9 @@ const poolConfig = {
   idleTimeoutMillis: 30000, // 30 seconds idle timeout
 };
 
-export const pool = databaseAvailable ? new Pool(poolConfig) : null;
+const databaseHost = databaseAvailable ? new URL(process.env.DATABASE_URL!).hostname : "";
+const usesLocalPostgres = databaseHost === "127.0.0.1" || databaseHost === "localhost";
+export const pool = databaseAvailable ? (usesLocalPostgres ? new NodePgPool(poolConfig) : new Pool(poolConfig)) : null;
 
 if (!databaseAvailable) {
   console.warn("[db] DATABASE_URL missing. Server running in no-database mode.");

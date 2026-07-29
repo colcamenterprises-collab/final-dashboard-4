@@ -30,6 +30,21 @@ interface ShiftReport {
   staffTotal: number | null;
   staffExpenses: number | null;
   source: string;
+  posShift?: {
+    id: string;
+    cashierName: string | null;
+    openedAt: string | null;
+    closedAt: string | null;
+    startingFloat: number | null;
+    moneyIn: number;
+    moneyOut: number;
+    netMovement: number;
+    physicalClosingCash: number | null;
+    cashBanked: number | null;
+    expectedCash: number | null;
+    registerVariance: number | null;
+    status: string;
+  } | null;
 }
 
 interface HistoryResponse {
@@ -111,8 +126,8 @@ export default function ShiftHistory() {
 
       {/* Header */}
       <PageTitle
-        title="Shift History"
-        meta={reports.length > 0 ? `${reports.length} shifts` : "Expandable shift detail view"}
+        title="Owner Shift Report"
+        meta={reports.length > 0 ? `${reports.length} private financial reports` : "Owner-only shift reconciliation"}
         right={
           <button
             onClick={() => refetch()}
@@ -262,6 +277,36 @@ export default function ShiftHistory() {
 
                 {isOpen && (
                   <div className="px-5 pb-5 pt-2 bg-slate-50/60 space-y-4 border-t border-slate-100">
+
+                    {/* Private POS register reconciliation — owner only */}
+                    {report.posShift && (
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 mb-2">Cash register reconciliation</p>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+                            <span><strong>Cashier:</strong> {report.posShift.cashierName || "—"}</span>
+                            <span><strong>Status:</strong> {report.posShift.status?.toUpperCase() || "—"}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            {[
+                              { label: "Starting float", value: fmt(report.posShift.startingFloat) },
+                              { label: "Money in", value: fmt(report.posShift.moneyIn) },
+                              { label: "Money out", value: fmt(report.posShift.moneyOut) },
+                              { label: "Cash banked", value: fmt(report.posShift.cashBanked) },
+                              { label: "Physical close", value: fmt(report.posShift.physicalClosingCash) },
+                              { label: "Expected cash", value: fmt(report.posShift.expectedCash) },
+                              { label: "Register variance", value: fmt(report.posShift.registerVariance) },
+                              { label: "Net movement", value: fmt(report.posShift.netMovement) },
+                            ].map((row) => (
+                              <div key={row.label} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center">
+                                <p className="text-sm font-bold text-slate-900">{row.value}</p>
+                                <p className="mt-0.5 text-[10px] text-slate-500">{row.label}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Stock reconciliation */}
                     <RollsReconciliationTable date={report.shiftDate.slice(0, 10)} />

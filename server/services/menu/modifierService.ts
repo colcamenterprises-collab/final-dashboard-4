@@ -206,3 +206,73 @@ export async function applyGroupToItem(groupId: string, itemId: string) {
   const ids = Array.from(new Set([...current.rows.map((row) => String(row.menu_item_id)), String(itemId)]));
   return setGroupAssignments(groupId, ids);
 }
+
+export async function mergeModifierGroups(targetGroupId: string, sourceGroupIds: string[], mergeUniqueOptions = true) {
+  const targetId = String(targetGroupId || "").trim();
+  const sourceIds = Array.from(new Set((sourceGroupIds || []).map(String).filter((id) => id && id !== targetId)));
+  if (!targetId) throw new Error("Canonical modifier group is required");
+  if (!sourceIds.length) throw new Error("Select at least one duplicate modifier group");
+
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+
+    const existing = await client.query(
+      'SELECT id,name_en,is_active FROM ordering_modifier_groups WHERE id = ANY($1::uuid[])',
+      [[targetId, ...sourceIds]],
+    );
+    const existingIds = new Set(existing.rows.map((row) => String(row.id)));
+    if (!existingIds.has(targetId)) throw new Error("Canonical modifier group was not found");
+    const missing = sourceIds.filter((id) => !existingIds.has(id));
+    if (missing.length) throw new Error('Duplicate modifier group not found: ' + missing.join(', '));
+
+    const targetOptions = await client.query(
+      'SELECT id,LOWER(TRIM(name_en)) AS normalized_name FROM ordering_item_modifiers WHERE modifier_group_id=$1',
+      [targetId],
+    );
+    const optionNames = new Set(targetOptions.rows.map((row) => String(row.normalized_name || "")));
+
+    let assignmentsMoved = 0;
+    let optionsMoved = 0;
+    let duplicateOptionsArchived = 0;
+
+    for (const sourceId of sourceIds) {
+      const assignmentResult = await client.query(
+        'INSERT INTO ordering_modifier_group_items(modifier_group_id,menu_item_id,sort_order) SELECT $1,menu_item_id,sort_order FROM ordering_modifier_group_items WHERE modifier_group_id=$2 ON CONFLICT DO NOTHING',
+        [targetId, sourceId],
+      );
+      assignmentsMoved += assignmentResult.rowCount || 0;
+
+      if (mergeUniqueOptions) {
+        const sourceOptions = await client.query(
+          'SELECT id,name_en,LOWER(TRIM(name_en)) AS normalized_name FROM ordering_item_modifiers WHERE modifier_group_id=$1 ORDER BY sort_order,name_en',
+          [sourceId],
+        );
+        for (const option of sourceOptions.rows) {
+          const normalized = String(option.normalized_name || "");
+          if (normalized && !optionNames.has(normalized)) {
+            await client.query('UPDATE ordering_item_modifiers SET modifier_group_id=$2,updated_at=NOW() WHERE id=$1', [option.id, targetId]);
+            optionNames.add(normalized);
+            optionsMoved += 1;
+          } else {
+            await client.query('UPDATE ordering_item_modifiers SET is_active=false,updated_at=NOW() WHERE id=$1', [option.id]);
+            duplicateOptionsArchived += 1;
+          }
+        }
+      }
+
+      await client.query('DELETE FROM ordering_modifier_group_items WHERE modifier_group_id=$1', [sourceId]);
+      await client.query('UPDATE ordering_modifier_groups SET is_active=false,updated_at=NOW() WHERE id=$1', [sourceId]);
+    }
+
+    await client.query('UPDATE ordering_modifier_groups SET is_active=true,updated_at=NOW() WHERE id=$1', [targetId]);
+    await client.query("COMMIT");
+
+    return { ok: true, targetGroupId: targetId, archivedGroupIds: sourceIds, assignmentsMoved, optionsMoved, duplicateOptionsArchived };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}

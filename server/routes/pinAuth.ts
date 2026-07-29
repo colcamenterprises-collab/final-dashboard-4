@@ -119,7 +119,7 @@ function credentialError(value: unknown, label = "Password / PIN"): string | nul
 }
 
 // Resolve effective permissions: role-level table first, fallback to user-stored
-async function resolvePermissions(role: string): Promise<StaffPermissions> {
+async function resolvePermissions(role: string, userPermissions?: StaffPermissions | null): Promise<StaffPermissions> {
   try {
     const [row] = await db
       .select({ permissions: rolePermissions.permissions })
@@ -127,10 +127,10 @@ async function resolvePermissions(role: string): Promise<StaffPermissions> {
       .where(eq(rolePermissions.role, role))
       .limit(1);
     if (row?.permissions && Object.keys(row.permissions).length > 0) {
-      return row.permissions;
+      return { ...row.permissions, ...(userPermissions ?? {}) };
     }
   } catch {}
-  return ROLE_DEFAULTS[role] ?? STAFF_PERMISSIONS;
+  return { ...(ROLE_DEFAULTS[role] ?? STAFF_PERMISSIONS), ...(userPermissions ?? {}) };
 }
 
 // ─── GET /users — list active users for login screen (legacy, kept for compat) ─
@@ -210,7 +210,7 @@ router.post("/login", async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Incorrect PIN" });
     }
 
-    const permissions = await resolvePermissions(userRow.role);
+    const permissions = await resolvePermissions(userRow.role, userRow.permissions);
 
     const token = signPayload({
       id: userRow.id,
@@ -394,9 +394,9 @@ router.get("/staff", async (req: Request, res: Response) => {
 
 router.post("/staff", async (req: Request, res: Response) => {
   if (!requireOwner(req, res)) return;
-  const { name, role, email, contactNumber, pin, avatarUrl, username: requestedUsername } = req.body as {
+  const { name, role, email, contactNumber, pin, avatarUrl, username: requestedUsername, permissions: requestedPermissions } = req.body as {
     name?: string; role?: string; email?: string; contactNumber?: string;
-    pin?: string; avatarUrl?: string; username?: string;
+    pin?: string; avatarUrl?: string; username?: string; permissions?: StaffPermissions;
   };
   if (!name || !role || !pin) {
     return res.status(400).json({ error: "name, role, and pin are required" });
@@ -410,7 +410,7 @@ router.post("/staff", async (req: Request, res: Response) => {
     if (existing) return res.status(400).json({ error: "A staff member with that email already exists" });
   }
 
-  const permissions = await resolvePermissions(role);
+  const permissions = requestedPermissions ?? await resolvePermissions(role);
   const base = requestedUsername ? requestedUsername.trim().toLowerCase().replace(/[^a-z0-9]/g, "") : deriveUsername(String(name));
   const username = await uniqueUsername(base);
 
@@ -438,9 +438,9 @@ router.post("/staff", async (req: Request, res: Response) => {
 router.put("/staff/:id", async (req: Request, res: Response) => {
   if (!requireOwner(req, res)) return;
   const id = Number(req.params.id);
-  const { name, role, email, contactNumber, active, avatarUrl, username: requestedUsername } = req.body as {
+  const { name, role, email, contactNumber, active, avatarUrl, username: requestedUsername, permissions } = req.body as {
     name?: string; role?: string; email?: string; contactNumber?: string;
-    active?: boolean; avatarUrl?: string | null; username?: string;
+    active?: boolean; avatarUrl?: string | null; username?: string; permissions?: StaffPermissions;
   };
   try {
     const [target] = await db
@@ -477,6 +477,7 @@ router.put("/staff/:id", async (req: Request, res: Response) => {
     if (contactNumber !== undefined) updates.contactNumber = contactNumber?.trim() || null;
     if (active !== undefined) updates.active = Boolean(active);
     if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+    if (permissions !== undefined) updates.permissions = permissions;
     if (requestedUsername !== undefined) {
       const base = requestedUsername.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
       updates.username = base ? await uniqueUsername(base, id) : null;

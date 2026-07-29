@@ -2569,6 +2569,7 @@ export type StaffPermissions = {
   "pos.view"?: boolean;
   "membership.view"?: boolean;
   "forms.daily_sales"?: boolean;
+  "forms.daily_cleaning"?: boolean;
   "forms.daily_stock"?: boolean;
   "expenses.view"?: boolean;
   "settings.view"?: boolean;
@@ -2587,6 +2588,7 @@ export const ALL_PERMISSIONS: (keyof StaffPermissions)[] = [
   "pos.view",
   "membership.view",
   "forms.daily_sales",
+  "forms.daily_cleaning",
   "forms.daily_stock",
   "expenses.view",
   "settings.view",
@@ -2609,6 +2611,7 @@ export const MANAGER_PERMISSIONS: StaffPermissions = {
   "pos.view": true,
   "membership.view": true,
   "forms.daily_sales": true,
+  "forms.daily_cleaning": true,
   "forms.daily_stock": true,
   "expenses.view": true,
   "settings.view": false,
@@ -2627,6 +2630,7 @@ export const STAFF_PERMISSIONS: StaffPermissions = {
   "pos.view": true,
   "membership.view": false,
   "forms.daily_sales": true,
+  "forms.daily_cleaning": true,
   "forms.daily_stock": true,
   "expenses.view": false,
   "settings.view": false,
@@ -2645,7 +2649,8 @@ export const CASHIER_PERMISSIONS: StaffPermissions = {
   "pos.view": true,
   "membership.view": true,
   "forms.daily_sales": true,
-  "forms.daily_stock": false,
+  "forms.daily_cleaning": true,
+  "forms.daily_stock": true,
   "expenses.view": false,
   "settings.view": false,
   "staff_access.manage": false,
@@ -2663,6 +2668,7 @@ export const KITCHEN_STAFF_PERMISSIONS: StaffPermissions = {
   "pos.view": true,
   "membership.view": false,
   "forms.daily_sales": false,
+  "forms.daily_cleaning": false,
   "forms.daily_stock": false,
   "expenses.view": false,
   "settings.view": false,

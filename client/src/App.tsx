@@ -56,6 +56,7 @@ import PosKitchen from "./pages/pos/PosKitchen";
 import PosDisplay from "./pages/pos/PosDisplay";
 import PrinterSettings from "./pages/pos/PrinterSettings";
 import PosCatalog from "./pages/pos/PosCatalog";
+import PosShifts from "./pages/pos/PosShifts";
 
 import StaffDashboard from "./pages/staff/Dashboard";
 import StaffMembers from "./pages/staff/Members";
@@ -97,6 +98,7 @@ export default function App() {
                   <Route path="/pos" element={<ProtectedRoute><PosRegister /></ProtectedRoute>} />
                   <Route path="/pos/kitchen" element={<ProtectedRoute><PosKitchen /></ProtectedRoute>} />
                   <Route path="/pos/display" element={<PosDisplay />} />
+                  <Route path="/pos/shifts" element={<ProtectedRoute><PosShifts /></ProtectedRoute>} />
                   <Route element={<PageShell />}>
                     <Route path="/pos/catalog" element={<ProtectedRoute><PosCatalog /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
@@ -134,7 +136,7 @@ export default function App() {
                     <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/shift-report" element={<ProtectedRoute><ShiftHistory /></ProtectedRoute>} />
+                    <Route path="/reports/shift-report" element={<ProtectedRoute><OwnerRoute><ShiftHistory /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
                     <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} />
                     <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
