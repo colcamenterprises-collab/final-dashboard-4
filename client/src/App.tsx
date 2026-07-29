@@ -55,7 +55,6 @@ import PosRegister from "./pages/pos/PosRegister";
 import PosKitchen from "./pages/pos/PosKitchen";
 import PosDisplay from "./pages/pos/PosDisplay";
 import PrinterSettings from "./pages/pos/PrinterSettings";
-import PosCatalog from "./pages/pos/PosCatalog";
 import PosShifts from "./pages/pos/PosShifts";
 
 import StaffDashboard from "./pages/staff/Dashboard";
@@ -99,8 +98,8 @@ export default function App() {
                   <Route path="/pos/kitchen" element={<ProtectedRoute><PosKitchen /></ProtectedRoute>} />
                   <Route path="/pos/display" element={<PosDisplay />} />
                   <Route path="/pos/shifts" element={<ProtectedRoute><PosShifts /></ProtectedRoute>} />
+                  <Route path="/pos/catalog" element={<Navigate to="/menu/items" replace />} />
                   <Route element={<PageShell />}>
-                    <Route path="/pos/catalog" element={<ProtectedRoute><PosCatalog /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
                     <Route path="/pos/printer-settings" element={<ProtectedRoute><PrinterSettings /></ProtectedRoute>} />
                     <Route path="/settings/printers" element={<Navigate to="/pos/printer-settings" replace />} />
