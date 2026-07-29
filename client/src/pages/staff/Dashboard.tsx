@@ -48,6 +48,12 @@ export default function StaffDashboard() {
   const blockers = data?.blockers ?? [];
 
   const navItems = [
+    { label: "Register POS", description: "Take and complete customer orders", to: "/pos" },
+    { label: "Kitchen Tickets", description: "Manage the active kitchen queue", to: "/pos/kitchen" },
+    { label: "Customer Ticket Display", description: "Show ready order numbers", to: "/pos/display" },
+    { label: "Shift Report", description: "Review the current and recent shifts", to: "/reports/shift-reports" },
+    { label: "Printer Settings", description: "Set up and test the receipt printer", to: "/pos/printer-settings" },
+    { label: "Daily Sales & Stock Forms", description: "Complete the nightly shift forms", to: "/operations/daily-sales" },
     { label: "Staff Members", description: "Manage your team", to: "/staff/members" },
     { label: "Weekly Roster", description: "View and edit rosters", to: "/staff/roster" },
     { label: "Cleaning Tasks", description: "Task templates and assignments", to: "/staff/cleaning" },

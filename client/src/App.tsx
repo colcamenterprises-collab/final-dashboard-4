@@ -54,6 +54,7 @@ import AdminQrCodes from "./pages/admin/ordering/AdminQrCodes";
 import PosRegister from "./pages/pos/PosRegister";
 import PosKitchen from "./pages/pos/PosKitchen";
 import PosDisplay from "./pages/pos/PosDisplay";
+import PrinterSettings from "./pages/pos/PrinterSettings";
 import PosCatalog from "./pages/pos/PosCatalog";
 
 import StaffDashboard from "./pages/staff/Dashboard";
@@ -99,6 +100,9 @@ export default function App() {
                   <Route element={<PageShell />}>
                     <Route path="/pos/catalog" element={<ProtectedRoute><PosCatalog /></ProtectedRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
+                    <Route path="/pos/printer-settings" element={<ProtectedRoute><PrinterSettings /></ProtectedRoute>} />
+                    <Route path="/settings/printers" element={<Navigate to="/pos/printer-settings" replace />} />
+                    <Route path="/printer-settings" element={<Navigate to="/pos/printer-settings" replace />} />
                     <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-cleaning" element={<ProtectedRoute><DailyCleaning /></ProtectedRoute>} />
