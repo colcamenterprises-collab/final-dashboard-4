@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import { db } from '../db';
 import {
   staffMembers,
@@ -11,9 +11,79 @@ import {
   staffUnavailability,
 } from '../../shared/schema';
 import { eq, asc, desc, and, gte, lte } from 'drizzle-orm';
+import { pool } from '../db';
+import { getPinSessionUser } from './pinAuth';
+import { selectDailyFormsResumeState, type DailyFormsCandidate } from '../../shared/dailyFormsWorkflow';
 
 const router = Router();
 const LOC = 1;
+
+function requirePinSession(req: Request, res: Response) {
+  const user = getPinSessionUser(req);
+  if (!user) {
+    res.status(401).json({ ok: false, error: 'Your staff session has expired. Sign in again, then select Resume Forms.' });
+    return null;
+  }
+  return user;
+}
+
+async function readDailyFormsCandidates(): Promise<DailyFormsCandidate[]> {
+  const result = await pool.query(`
+    SELECT
+      d.id,
+      COALESCE(d."shiftDate", d.shift_date::text, d."createdAt"::date::text) AS "shiftDate",
+      COALESCE(d."completedBy", d.staff, '') AS "completedBy",
+      EXISTS (SELECT 1 FROM daily_stock_v2 s WHERE s."salesId" = d.id) AS "stockComplete",
+      CASE
+        WHEN (SELECT COUNT(*) FROM daily_cleaning_task_definitions t WHERE t.active = TRUE AND t.module_type = 'daily_cleaning') = 0 THEN FALSE
+        ELSE NOT EXISTS (
+          SELECT 1 FROM daily_cleaning_task_definitions t
+          WHERE t.active = TRUE AND t.module_type = 'daily_cleaning'
+            AND NOT EXISTS (
+              SELECT 1 FROM daily_cleaning_records c
+              WHERE c.sales_id = d.id AND c.task_id = t.task_id
+                AND c.status IN ('Pass', 'Requires Attention')
+                AND COALESCE(c.image_path, '') <> ''
+            )
+        )
+      END AS "cleaningComplete"
+    FROM daily_sales_v2 d
+    WHERE d."deletedAt" IS NULL
+    ORDER BY COALESCE(d."shiftDate"::timestamp, d."createdAt") DESC
+    LIMIT 100
+  `);
+  return result.rows.map((row) => ({
+    id: String(row.id),
+    shiftDate: String(row.shiftDate || ''),
+    completedBy: String(row.completedBy || ''),
+    cleaningComplete: row.cleaningComplete === true,
+    stockComplete: row.stockComplete === true,
+  }));
+}
+
+router.get('/daily-forms/resume', async (req, res) => {
+  if (!requirePinSession(req, res)) return;
+  try {
+    const workflow = selectDailyFormsResumeState(await readDailyFormsCandidates());
+    res.json({ ok: true, workflow });
+  } catch (error: any) {
+    console.error('[staff daily forms resume] lookup failed:', error);
+    res.status(503).json({ ok: false, error: 'The unfinished daily forms could not be checked. Your saved forms were not changed. Please try again or contact an administrator.' });
+  }
+});
+
+router.get('/daily-forms/:id/context', async (req, res) => {
+  if (!requirePinSession(req, res)) return;
+  try {
+    const candidates = await readDailyFormsCandidates();
+    const candidate = candidates.find((item) => item.id === req.params.id);
+    if (!candidate) return res.status(404).json({ ok: false, error: 'The saved Form 1 shift could not be found. Return to Staff Dashboard and select Resume Forms.' });
+    res.json({ ok: true, record: { id: candidate.id, date: candidate.shiftDate, staff: candidate.completedBy }, workflow: selectDailyFormsResumeState([candidate]) });
+  } catch (error: any) {
+    console.error('[staff daily forms context] lookup failed:', error);
+    res.status(503).json({ ok: false, error: 'The saved shift context could not be recovered. Your saved forms were not changed. Return to Staff Dashboard and try Resume Forms.' });
+  }
+});
 
 // ─── Staff Members ────────────────────────────────────────────────────────────
 

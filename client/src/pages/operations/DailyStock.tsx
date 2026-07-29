@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { AlertTriangle } from "lucide-react";
+import DailyFormsProgress from "@/components/DailyFormsProgress";
 
 // Server ingredient catalog from CSV import
 type IngredientItem = {
@@ -100,9 +101,9 @@ const labels = {
     spLockedMsg: '⬆ Complete Purchases This Shift above to unlock stock count entry.',
     spRequiredError: 'Required — enter 0 if none',
     recoveryTitle: 'Daily Stock requires a linked Daily Sales record',
-    recoveryMessage: 'Open Daily Stock from a completed Daily Sales form or from the Daily Form Library recovery action so stock attaches to the correct sales record.',
+    recoveryMessage: 'Return to Staff Dashboard and use Resume Forms so stock attaches to the correct saved shift.',
     startSales: 'Start Daily Sales & Stock Form',
-    openLibrary: 'Open Daily Form Library',
+    openLibrary: 'Return to Staff Dashboard',
     completionTitle: 'Shift-close workflow complete',
     completionMessage: 'Daily Sales, Daily Cleaning, and Daily Stock have been saved for this shift.',
     cleaningIncomplete: 'Daily Cleaning must be completed before Daily Stock.',
@@ -163,9 +164,9 @@ const labels = {
     spLockedMsg: '⬆ กรอก "การซื้อในกะนี้" ด้านบนเพื่อปลดล็อกการกรอกจำนวนสต๊อก',
     spRequiredError: 'จำเป็น — ใส่ 0 ถ้าไม่มี',
     recoveryTitle: 'แบบฟอร์มสต๊อกต้องเชื่อมกับยอดขายประจำวัน',
-    recoveryMessage: 'เปิดสต๊อกจากแบบฟอร์มยอดขายที่บันทึกแล้ว หรือจาก Daily Form Library เพื่อให้สต๊อกผูกกับรายการยอดขายที่ถูกต้อง',
+    recoveryMessage: 'กลับไปที่ Staff Dashboard และใช้ Resume Forms เพื่อเชื่อมสต๊อกกับกะที่บันทึกไว้อย่างถูกต้อง',
     startSales: 'เริ่ม Daily Sales & Stock Form',
-    openLibrary: 'เปิด Daily Form Library',
+    openLibrary: 'กลับไปที่ Staff Dashboard',
     completionTitle: 'ขั้นตอนปิดกะเสร็จสมบูรณ์',
     completionMessage: 'บันทึกยอดขาย การทำความสะอาด และสต๊อกประจำวันสำหรับกะนี้แล้ว',
     cleaningIncomplete: 'ต้องทำ Daily Cleaning ให้เสร็จก่อน Daily Stock',
@@ -704,6 +705,8 @@ const DailyStock: React.FC = () => {
 
       // Invalidate finance cache to refresh home page data
       queryClient.invalidateQueries({ queryKey: ['/api/finance/summary/today'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/staff/daily-forms/resume'] });
+      localStorage.removeItem("daily_shift_workflow_context");
       
       setStockCompleted(true);
       setMessage({ type: "success", text: L.stockSaved });
@@ -731,7 +734,7 @@ const DailyStock: React.FC = () => {
             <a className="rounded-[4px] bg-emerald-600 px-4 py-2 text-center text-xs font-medium text-white hover:bg-emerald-700" href="/operations/daily-sales">
               {L.startSales}
             </a>
-            <a className="rounded-[4px] border border-slate-300 bg-white px-4 py-2 text-center text-xs font-medium text-slate-700 hover:bg-slate-50" href="/operations/daily-sales-v2/library">
+            <a className="rounded-[4px] border border-slate-300 bg-white px-4 py-2 text-center text-xs font-medium text-slate-700 hover:bg-slate-50" href="/staff/dashboard">
               {L.openLibrary}
             </a>
           </div>
@@ -747,7 +750,8 @@ const DailyStock: React.FC = () => {
           <h1 className="text-lg font-semibold">{L.completionTitle}</h1>
           <p className="mt-2 text-sm">{L.completionMessage}</p>
           <p className="mt-2 text-xs">{L.linkedToShift}: <span className="font-semibold">{shiftId}</span></p>
-          <a className="mt-4 inline-flex rounded-[4px] bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700" href="/operations/daily-sales-v2/library">
+          <div className="mt-4"><DailyFormsProgress progress={{ form1: "complete", form2: "complete", form3: "complete" }} /></div>
+          <a className="mt-4 inline-flex rounded-[4px] bg-emerald-600 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-700" href="/staff/dashboard">
             {L.openLibrary}
           </a>
         </div>
@@ -757,6 +761,7 @@ const DailyStock: React.FC = () => {
 
   return (
     <div className="p-4 space-y-4 text-xs">
+      <DailyFormsProgress progress={{ form1: "complete", form2: "complete", form3: "available" }} />
       {/* Validation Warning Dialog */}
       <AlertDialog open={showValidationDialog} onOpenChange={setShowValidationDialog}>
         <AlertDialogContent className="max-w-md">
