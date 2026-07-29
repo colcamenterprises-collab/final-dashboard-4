@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { readPosPrinterSettings } from "@/lib/posPrinterSettings";
 
 type Item = {
   id: string;
@@ -237,6 +238,7 @@ export default function PosRegister() {
     }).catch(() => undefined);
 
   const print58mm = (receipt: Receipt, reprint = false) => {
+    const printerSettings = readPosPrinterSettings();
     const printable = { ...receipt, reprint };
     setPrintReceipt(printable);
     setLastReceipt(printable);
@@ -245,6 +247,10 @@ export default function PosRegister() {
       reprint ? "reprint_requested" : "print_requested",
     );
     window.setTimeout(() => {
+      if (!printerSettings.autoPrint && !reprint) {
+        setNotice("Order saved. Automatic receipt printing is switched off.");
+        return;
+      }
       try {
         window.print();
       } catch (error: any) {
@@ -307,8 +313,8 @@ export default function PosRegister() {
       <style>{`
         .sbb-print-receipt { display: none; }
         @media print {
-          @page { size: 58mm auto; margin: 0; }
-          html, body { width: 58mm; margin: 0 !important; padding: 0 !important; background: white !important; }
+          @page { size: ${readPosPrinterSettings().paperWidth}mm auto; margin: 0; }
+          html, body { width: ${readPosPrinterSettings().paperWidth}mm; margin: 0 !important; padding: 0 !important; background: white !important; }
           body * { visibility: hidden !important; }
           .sbb-print-receipt, .sbb-print-receipt * { visibility: visible !important; }
           .sbb-print-receipt {

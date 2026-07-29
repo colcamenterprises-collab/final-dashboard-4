@@ -88,6 +88,7 @@ const navigationGroups: NavGroup[] = [
       { to: "/pos",         label: "Register POS",          icon: ShoppingBag,    testId: "nav-pos-register" },
       { to: "/pos/kitchen", label: "Kitchen Tickets",       icon: CookingPot,     testId: "nav-pos-kitchen" },
       { to: "/pos/display", label: "Customer Ticket Display", icon: Monitor,      testId: "nav-pos-display" },
+      { to: "/pos/printer-settings", label: "Printer Settings", icon: Settings, testId: "nav-printer-settings" },
     ],
   },
   {
