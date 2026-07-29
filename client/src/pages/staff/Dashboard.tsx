@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { Users, CalendarDays, ClipboardList, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
+import DailyFormsProgress from "@/components/DailyFormsProgress";
+import type { DailyFormsResumeState } from "../../../../shared/dailyFormsWorkflow";
 
 interface Blocker {
   code: string;
@@ -44,6 +46,10 @@ export default function StaffDashboard() {
   const { data, isLoading, isError } = useQuery<DashboardData>({
     queryKey: ["/api/staff/dashboard"],
   });
+  const workflowQuery = useQuery<{ ok: boolean; workflow: DailyFormsResumeState | null; error?: string }>({
+    queryKey: ["/api/staff/daily-forms/resume"],
+    retry: false,
+  });
 
   const blockers = data?.blockers ?? [];
 
@@ -78,6 +84,29 @@ export default function StaffDashboard() {
       )}
 
       {isLoading && <div className="text-center py-8 text-slate-400 text-xs">Loading...</div>}
+
+      {workflowQuery.isError && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+          The unfinished daily forms could not be checked. Your saved forms were not changed. Refresh this page or sign in again.
+        </div>
+      )}
+
+      {workflowQuery.data?.workflow && (
+        <section className="space-y-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4" aria-label="Unfinished daily forms">
+          <div>
+            <h2 className="text-base font-bold text-amber-950">Daily forms are unfinished</h2>
+            <p className="mt-1 text-xs text-amber-900">Shift {workflowQuery.data.workflow.shiftDate} must remain open until Form 3 saves successfully.</p>
+          </div>
+          <DailyFormsProgress progress={workflowQuery.data.workflow.progress} />
+          <button
+            type="button"
+            onClick={() => navigate(workflowQuery.data!.workflow!.nextPath!)}
+            className="w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white hover:bg-emerald-800"
+          >
+            Resume Forms
+          </button>
+        </section>
+      )}
 
       {!isLoading && !isError && blockers.length > 0 && (
         <div className="border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 rounded-lg">

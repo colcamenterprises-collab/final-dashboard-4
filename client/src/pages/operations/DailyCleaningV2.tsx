@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import DailyFormsProgress from "@/components/DailyFormsProgress";
 
 type CleaningTask = {
   taskId: string;
@@ -47,14 +48,14 @@ export default function DailyCleaningV2() {
       setLoading(true);
       setError("");
       if (!shiftId) {
-        setError("Form 1 record is missing. Open Form 2 from the Daily Sales Library.");
+        setError("Form 1 record is missing. Return to Staff Dashboard and select Resume Forms.");
         setLoading(false);
         return;
       }
 
       try {
         const [salesResponse, taskResponse, savedResponse] = await Promise.all([
-          fetch(`/api/forms/daily-sales/v2/${encodeURIComponent(shiftId)}`, { credentials: "include" }),
+          fetch(`/api/staff/daily-forms/${encodeURIComponent(shiftId)}/context`, { credentials: "include" }),
           fetch("/api/daily-cleaning/tasks", { credentials: "include" }),
           fetch(`/api/daily-cleaning?salesId=${encodeURIComponent(shiftId)}`, { credentials: "include" }),
         ]);
@@ -211,6 +212,7 @@ export default function DailyCleaningV2() {
           <span><strong>Progress:</strong> {completed}/{tasks.length}</span>
           <span><strong>Score:</strong> {score}%</span>
         </div>
+        <div className="mt-4"><DailyFormsProgress progress={{ form1: "complete", form2: "incomplete", form3: "locked" }} /></div>
       </div>
 
       {error && <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm text-red-800">{error}</div>}
@@ -248,7 +250,7 @@ export default function DailyCleaningV2() {
       }) : null}
 
       <div className="sticky bottom-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-        <button type="button" onClick={() => navigate("/operations/daily-sales-v2/library")} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">Back to Library</button>
+        <button type="button" onClick={() => navigate("/staff/dashboard")} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">Back to Staff Dashboard</button>
         <button type="button" disabled={submitting || tasks.length === 0} onClick={submit} className="rounded-lg bg-emerald-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400">{submitting ? "Saving…" : "Save Form 2 & Continue to Form 3"}</button>
       </div>
     </div>
