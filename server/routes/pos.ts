@@ -22,11 +22,16 @@ function shiftDateFor(date = DateTime.now().setZone("Asia/Bangkok")) {
   return (date.hour < 3 ? date.minus({ days: 1 }) : date).toFormat("yyyyLLdd");
 }
 
-function receiptNumber(orderNumber: number, createdAt?: string | Date) {
-  const date = createdAt
-    ? DateTime.fromJSDate(new Date(createdAt)).setZone("Asia/Bangkok")
-    : DateTime.now().setZone("Asia/Bangkok");
-  return `SBB-${shiftDateFor(date)}-${String(orderNumber).padStart(4, "0")}`;
+function ticketNumber(sequence: number) {
+  return String(sequence).padStart(3, "0");
+}
+
+function shiftBounds(date = DateTime.now().setZone("Asia/Bangkok")) {
+  const shiftDate = shiftDateFor(date);
+  return {
+    start: DateTime.fromFormat(shiftDate, "yyyyLLdd", { zone: "Asia/Bangkok" }).set({ hour: 17 }),
+    end: DateTime.fromFormat(shiftDate, "yyyyLLdd", { zone: "Asia/Bangkok" }).plus({ days: 1 }).set({ hour: 3 }),
+  };
 }
 
 function staffDevice(req: Request, res: Response, next: NextFunction) {
@@ -179,14 +184,19 @@ router.patch("/catalog/items/:id", staffDevice, async (req, res) => {
 
 router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
   try {
+    const bounds = shiftBounds();
     const result = await db().query(
-      `SELECT COALESCE(MAX(order_number), 0) + 1 AS next_order_number FROM ordering_orders`,
+      `SELECT COUNT(*) + 1 AS next_ticket
+       FROM ordering_orders
+       WHERE channel IN ('pos_direct','grab')
+         AND created_at >= $1 AND created_at < $2`,
+      [bounds.start.toJSDate(), bounds.end.toJSDate()],
     );
-    const next = Number(result.rows[0]?.next_order_number || 1);
+    const next = Number(result.rows[0]?.next_ticket || 1);
     res.json({
       ok: true,
       source: "sbb_pos_core",
-      data: { ticket_number: receiptNumber(next) },
+      data: { ticket_number: ticketNumber(next) },
     });
   } catch (e: any) {
     fail(res, e.message, 500);
@@ -237,6 +247,16 @@ router.post("/orders", staffDevice, async (req, res) => {
   const client = await db().connect();
   try {
     await client.query("BEGIN");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('sbb-pos-ticket-number'))");
+    const bounds = shiftBounds();
+    const ticketSequenceResult = await client.query(
+      `SELECT COUNT(*) + 1 AS next_ticket
+       FROM ordering_orders
+       WHERE channel IN ('pos_direct','grab')
+         AND created_at >= $1 AND created_at < $2`,
+      [bounds.start.toJSDate(), bounds.end.toJSDate()],
+    );
+    const ticket = ticketNumber(Number(ticketSequenceResult.rows[0]?.next_ticket || 1));
     const order = (
       await client.query(
         `INSERT INTO ordering_orders(
@@ -258,7 +278,6 @@ router.post("/orders", staffDevice, async (req, res) => {
       )
     ).rows[0];
 
-    const ticket = receiptNumber(Number(order.order_number), order.created_at);
     await client.query(`UPDATE ordering_orders SET ticket_number = $2 WHERE id = $1`, [
       order.id,
       ticket,
@@ -578,7 +597,7 @@ router.get("/receipts/reconciliation", staffDevice, async (req, res) => {
     const missing: string[] = [];
     if (first !== null && last !== null) {
       for (let n = first; n <= last; n += 1) {
-        if (!present.has(n)) missing.push(receiptNumber(n, `${shiftDate}T17:00:00+07:00`));
+        if (!present.has(n)) missing.push(String(n));
       }
     }
     res.json({
@@ -622,7 +641,7 @@ router.get("/kitchen/orders", staffDevice, async (_req, res) => {
        FROM ordering_orders o
        JOIN ordering_order_items i ON i.order_id = o.id
        WHERE o.channel IN ('pos_direct','grab')
-         AND o.status IN ('submitted','accepted','in_kitchen')
+         AND o.status IN ('submitted','accepted','in_kitchen','ready')
        GROUP BY o.id
        ORDER BY o.created_at`,
     );
@@ -634,13 +653,40 @@ router.get("/kitchen/orders", staffDevice, async (_req, res) => {
 
 router.get("/display/orders", async (_req, res) => {
   try {
+    const bounds = shiftBounds();
+    await db().query(
+      `UPDATE ordering_orders
+       SET status='completed', updated_at=NOW()
+       WHERE channel IN ('pos_direct','grab') AND status='ready'
+         AND (updated_at < NOW() - INTERVAL '15 minutes'
+              OR created_at < $1 OR created_at >= $2)`,
+      [bounds.start.toJSDate(), bounds.end.toJSDate()],
+    );
     const result = await db().query(
-      `SELECT ticket_number, status, updated_at
+      `SELECT id, ticket_number, status, updated_at
        FROM ordering_orders
        WHERE channel IN ('pos_direct','grab') AND status = 'ready'
+         AND created_at >= $1 AND created_at < $2
        ORDER BY updated_at DESC LIMIT 20`,
+      [bounds.start.toJSDate(), bounds.end.toJSDate()],
     );
     res.json({ ok: true, source: "sbb_pos_core", data: result.rows });
+  } catch (e: any) {
+    fail(res, e.message, 500);
+  }
+});
+
+router.post("/display/clear-ready", staffDevice, async (req, res) => {
+  const user = (req as any).user;
+  if (!user || !["owner", "manager"].includes(user.role))
+    return fail(res, "Owner or supervisor access required", 403);
+  try {
+    const result = await db().query(
+      `UPDATE ordering_orders SET status='completed', updated_at=NOW()
+       WHERE channel IN ('pos_direct','grab') AND status='ready'
+       RETURNING id`,
+    );
+    res.json({ ok: true, source: "sbb_pos_core", data: { cleared: result.rowCount || 0 } });
   } catch (e: any) {
     fail(res, e.message, 500);
   }
