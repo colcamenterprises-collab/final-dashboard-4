@@ -4738,13 +4738,16 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
     }
   });
 
-  // Owner-only protection for Form Library read endpoints
-  // All GET requests to /api/forms/daily-sales/v2* are library-read only (owners)
-  // Staff submit via POST/PATCH — those are not blocked here
+  // Owner-only protection for Form Library reads. Staff-safe operational
+  // reads must remain available so Forms 2 and 3 can load.
   // Guard: only block if a PIN session IS active and the role is NOT owner
   // (No session = default Cam/owner context — allowed through)
   app.use("/api/forms/daily-sales/v2", async (req: Request, res: Response, next: NextFunction) => {
-    if (req.method === "GET") {
+    const staffSafeOperationalRead =
+      req.method === "GET" &&
+      (/^\/[^/]+\/workflow-context\/?$/.test(req.path) ||
+       /^\/[^/]+\/roll-order\/?$/.test(req.path));
+    if (req.method === "GET" && !staffSafeOperationalRead) {
       const { getPinSessionUser } = await import("./routes/pinAuth.js");
       const sessionUser = getPinSessionUser(req);
       if (sessionUser && sessionUser.role !== "owner") {
