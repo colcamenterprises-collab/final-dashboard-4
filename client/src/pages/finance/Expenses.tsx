@@ -14,6 +14,7 @@ type DashboardResponse = {
     inShiftExpenses: any[];
     businessExpenses: any[];
     bankReviewQueue: any[];
+    deposits: any[];
   };
 };
 
@@ -89,9 +90,9 @@ export default function Expenses() {
   });
 
   const personalQuery = useQuery<any>({
-    queryKey: ["/api/bank-imports/review-queue", "personal", dateFrom, dateTo],
+    queryKey: ["/api/bank-imports/review-queue", "personal_owner", dateFrom, dateTo],
     queryFn: async () => {
-      const response = await fetch("/api/bank-imports/review-queue?tab=personal&limit=1000");
+      const response = await fetch("/api/bank-imports/review-queue?tab=personal_owner&limit=1000");
       if (!response.ok) throw new Error("Failed to load personal expenses");
       return response.json();
     },
@@ -100,6 +101,7 @@ export default function Expenses() {
   const summary = data?.data?.summary || {};
   const inShiftExpenses = data?.data?.inShiftExpenses || [];
   const businessExpenses = data?.data?.businessExpenses || [];
+  const deposits = data?.data?.deposits || [];
   const allPersonalTransactions: PersonalTransaction[] = personalQuery.data?.txns || [];
 
   const personalTransactions = useMemo(() => allPersonalTransactions.filter((row) => {
@@ -128,7 +130,7 @@ export default function Expenses() {
     },
     onSuccess: () => {
       setExportedPersonalIds([]);
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
     },
   });
@@ -187,12 +189,13 @@ export default function Expenses() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
         <SummaryBox label="Current Month Business Expenses" value={summary.current_month_business_expenses} />
         <SummaryBox label="Current Month In-Shift Expenses" value={summary.current_month_in_shift_expenses} />
         <SummaryBox label="Pending Bank Statement Review" value={summary.pending_bank_statement_review} />
         <SummaryBox label="Personal Expenses This Month" value={summary.personal_expenses_this_month} />
         <SummaryBox label="Declined Transactions This Month" value={summary.declined_transactions_this_month} />
+        <SummaryBox label="Bank Statement Income This Month" value={summary.current_month_bank_deposits} />
       </div>
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -227,14 +230,22 @@ export default function Expenses() {
             </tbody>
           </DataTable>
 
-          <DataTable title="Table 3 — Pending Imported Bank Transactions">
+          <DataTable title="Table 3 — Bank Statement Income (Reconciliation Only)">
+            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Bank Source</th><th className="px-3 py-2">Classification</th><th className="px-3 py-2 text-right">Amount</th></tr></thead>
+            <tbody>
+              {deposits.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400">No bank deposits found for this date range.</td></tr>}
+              {deposits.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.date)}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2">{row.ref || "—"}</td><td className="px-3 py-2">{row.source || "—"}</td><td className="px-3 py-2">{row.classification || "Unclassified Deposit"}</td><td className="px-3 py-2 text-right font-mono text-green-700">{money(row.amount)}</td></tr>)}
+            </tbody>
+          </DataTable>
+
+          <DataTable title="Table 4 — Pending Imported Bank Transactions">
             <tbody><tr><td className="p-0"><BankTransactionReview key={`${dateFrom}:${dateTo}`} aggregateQueue onApproved={() => {
               queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
-              queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
             }} /></td></tr></tbody>
           </DataTable>
 
-          <DataTable title="Table 4 — Personal Expenses" actions={<div className="flex gap-2"><Button size="sm" variant="outline" onClick={exportPersonalCsv} disabled={personalTransactions.length === 0 || personalQuery.isLoading}><Download className="mr-2 h-4 w-4" />Export CSV</Button><Button size="sm" variant="outline" onClick={confirmDeleteExported} disabled={exportedPersonalIds.length === 0 || deleteExportedPersonal.isPending}><Trash2 className="mr-2 h-4 w-4" />Delete Exported</Button></div>}>
+          <DataTable title="Table 5 — Personal Expenses" actions={<div className="flex gap-2"><Button size="sm" variant="outline" onClick={exportPersonalCsv} disabled={personalTransactions.length === 0 || personalQuery.isLoading}><Download className="mr-2 h-4 w-4" />Export CSV</Button><Button size="sm" variant="outline" onClick={confirmDeleteExported} disabled={exportedPersonalIds.length === 0 || deleteExportedPersonal.isPending}><Trash2 className="mr-2 h-4 w-4" />Delete Exported</Button></div>}>
             <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Batch</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Export Status</th></tr></thead>
             <tbody>
               {personalQuery.isLoading && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400">Loading personal expenses...</td></tr>}
