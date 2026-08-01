@@ -582,6 +582,29 @@ export async function getDailySalesV2ById(req: Request, res: Response) {
   }
 }
 
+export async function getDailySalesV2WorkflowContext(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(
+      `SELECT id, "shiftDate", "completedBy" FROM daily_sales_v2
+       WHERE id = $1 AND "deletedAt" IS NULL`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ ok: false, error: "Record not found" });
+    }
+    const row = result.rows[0];
+    return res.json({ ok: true, context: {
+      id: row.id,
+      date: row.shiftDate?.split('T')[0] || '',
+      staff: row.completedBy || '',
+    }});
+  } catch (err) {
+    console.error("Error fetching daily sales V2 workflow context:", err);
+    return res.status(500).json({ ok: false, error: "Database error" });
+  }
+}
+
 export async function updateDailySalesV2Form1(req: Request, res: Response) {
   try {
     const { id } = req.params;
@@ -1415,7 +1438,7 @@ export const dailySalesV2Router = express.Router();
 dailySalesV2Router.post("/daily-sales/v2", createDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2", getDailySalesV2);
 dailySalesV2Router.get("/daily-sales-v2/latest-proof", getDailySalesV2LatestProof);
-dailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
+dailySalesV2Router.get("/daily-sales/v2/:id/workflow-context", getDailySalesV2WorkflowContext);\ndailySalesV2Router.get("/daily-sales/v2/:id", getDailySalesV2ById);
 dailySalesV2Router.patch("/daily-sales/v2/:id", updateDailySalesV2Form1);
 dailySalesV2Router.delete("/daily-sales/v2/:id", deleteDailySalesV2);
 dailySalesV2Router.get("/daily-sales/v2/:id/print", printDailySalesV2);
