@@ -7,6 +7,20 @@ interface Blocker {
   message: string;
 }
 
+type DailyFormsProgress = {
+  form1: "complete";
+  form2: "incomplete" | "complete";
+  form3: "locked" | "available";
+};
+
+interface DailyFormsResumeState {
+  id: string;
+  shiftDate: string;
+  completedBy: string;
+  nextPath: string;
+  progress: DailyFormsProgress;
+}
+
 interface DashboardData {
   activeStaff?: number;
   recentRosters?: number;
@@ -43,6 +57,10 @@ export default function StaffDashboard() {
 
   const { data, isLoading, isError } = useQuery<DashboardData>({
     queryKey: ["/api/staff/dashboard"],
+  });
+  const workflowQuery = useQuery<{ ok: boolean; workflow: DailyFormsResumeState | null; error?: string }>({
+    queryKey: ["/api/staff/daily-forms/resume"],
+    retry: false,
   });
 
   const blockers = data?.blockers ?? [];
@@ -84,6 +102,39 @@ export default function StaffDashboard() {
       )}
 
       {isLoading && <div className="text-center py-8 text-slate-400 text-xs">Loading...</div>}
+
+      {workflowQuery.isError && (
+        <div className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm text-red-800">
+          The unfinished daily forms could not be checked. Your saved forms were not changed. Refresh this page or sign in again.
+        </div>
+      )}
+
+      {workflowQuery.data?.workflow && (
+        <section className="space-y-3 rounded-xl border-2 border-[#FFD400] bg-[#FFF8CC] p-4" aria-label="Unfinished daily forms">
+          <div>
+            <h2 className="text-base font-bold text-slate-950">Daily forms are unfinished</h2>
+            <p className="mt-1 text-xs text-slate-700">
+              Shift {workflowQuery.data.workflow.shiftDate} — continue from the last completed form.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-[10px]">
+            <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2 font-semibold text-emerald-800">Form 1<br />Complete</div>
+            <div className={`rounded-lg border p-2 font-semibold ${workflowQuery.data.workflow.progress.form2 === "complete" ? "border-emerald-300 bg-emerald-50 text-emerald-800" : "border-amber-300 bg-white text-amber-900"}`}>
+              Form 2<br />{workflowQuery.data.workflow.progress.form2 === "complete" ? "Complete" : "Resume"}
+            </div>
+            <div className={`rounded-lg border p-2 font-semibold ${workflowQuery.data.workflow.progress.form3 === "available" ? "border-amber-300 bg-white text-amber-900" : "border-slate-300 bg-slate-50 text-slate-500"}`}>
+              Form 3<br />{workflowQuery.data.workflow.progress.form3 === "available" ? "Resume" : "Locked"}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate(workflowQuery.data!.workflow!.nextPath)}
+            className="w-full rounded-lg bg-[#111111] px-4 py-3 text-sm font-bold text-[#FFD400] hover:bg-black"
+          >
+            Resume Forms
+          </button>
+        </section>
+      )}
 
       {!isLoading && !isError && blockers.length > 0 && (
         <div className="border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 rounded-lg">

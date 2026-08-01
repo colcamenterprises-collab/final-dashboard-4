@@ -1,5 +1,5 @@
-import { Router } from 'express';
-import { db } from '../db';
+import { Router, type Request, type Response } from 'express';
+import { db, pool } from '../db';
 import {
   staffMembers,
   workAreas,
@@ -11,9 +11,118 @@ import {
   staffUnavailability,
 } from '../../shared/schema';
 import { eq, asc, desc, and, gte, lte } from 'drizzle-orm';
+import { getPinSessionUser } from './pinAuth';
 
 const router = Router();
 const LOC = 1;
+
+
+type DailyFormsProgress = {
+  form1: "complete";
+  form2: "incomplete" | "complete";
+  form3: "locked" | "available";
+};
+
+type DailyFormsResumeState = {
+  id: string;
+  shiftDate: string;
+  completedBy: string;
+  nextPath: string;
+  progress: DailyFormsProgress;
+};
+
+function getDailyFormsUser(req: Request, res: Response) {
+  const user = getPinSessionUser(req);
+  if (!user) {
+    res.status(401).json({
+      ok: false,
+      error: 'Your staff session has expired. Sign in again, then select Resume Forms.',
+    });
+    return null;
+  }
+  return user;
+}
+
+router.get('/daily-forms/resume', async (req, res) => {
+  const user = getDailyFormsUser(req, res);
+  if (!user) return;
+
+  const canUseDailyForms =
+    user.role === 'owner' ||
+    user.permissions?.['forms.daily_sales'] === true ||
+    user.permissions?.['forms.daily_cleaning'] === true ||
+    user.permissions?.['forms.daily_stock'] === true;
+
+  if (!canUseDailyForms) {
+    return res.json({ ok: true, workflow: null });
+  }
+
+  try {
+    const result = await pool.query(`
+      SELECT
+        d.id,
+        COALESCE(NULLIF(d."shiftDate", ''), d.shift_date::text, d."createdAt"::date::text) AS "shiftDate",
+        COALESCE(NULLIF(d."completedBy", ''), d.staff, '') AS "completedBy",
+        CASE
+          WHEN (
+            SELECT COUNT(*)
+            FROM daily_cleaning_task_definitions t
+            WHERE t.active = TRUE AND t.module_type = 'daily_cleaning'
+          ) = 0 THEN FALSE
+          ELSE NOT EXISTS (
+            SELECT 1
+            FROM daily_cleaning_task_definitions t
+            WHERE t.active = TRUE
+              AND t.module_type = 'daily_cleaning'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM daily_cleaning_records c
+                WHERE c.sales_id = d.id
+                  AND c.task_id = t.task_id
+                  AND c.status IN ('Pass', 'Requires Attention')
+                  AND (t.photo_required = FALSE OR COALESCE(c.image_path, '') <> '')
+                  AND (c.status <> 'Requires Attention' OR COALESCE(c.comments, '') <> '')
+              )
+          )
+        END AS "cleaningComplete"
+      FROM daily_sales_v2 d
+      WHERE d."deletedAt" IS NULL
+        AND COALESCE(NULLIF(d."shiftDate", '')::date, d.shift_date, d."createdAt"::date)
+            >= CURRENT_DATE - INTERVAL '7 days'
+        AND NOT EXISTS (
+          SELECT 1 FROM daily_stock_v2 s WHERE s."salesId" = d.id
+        )
+      ORDER BY COALESCE(NULLIF(d."shiftDate", '')::timestamp, d.shift_date::timestamp, d."createdAt") DESC
+      LIMIT 1
+    `);
+
+    if (result.rows.length === 0) {
+      return res.json({ ok: true, workflow: null });
+    }
+
+    const row = result.rows[0];
+    const cleaningComplete = row.cleaningComplete === true;
+    const workflow: DailyFormsResumeState = {
+      id: String(row.id),
+      shiftDate: String(row.shiftDate || ''),
+      completedBy: String(row.completedBy || ''),
+      nextPath: cleaningComplete
+        ? `/operations/daily-stock?shift=${encodeURIComponent(String(row.id))}`
+        : `/operations/daily-cleaning?shift=${encodeURIComponent(String(row.id))}`,
+      progress: cleaningComplete
+        ? { form1: 'complete', form2: 'complete', form3: 'available' }
+        : { form1: 'complete', form2: 'incomplete', form3: 'locked' },
+    };
+
+    return res.json({ ok: true, workflow });
+  } catch (error: any) {
+    console.error('[staff daily forms resume] lookup failed:', error);
+    return res.status(503).json({
+      ok: false,
+      error: 'The unfinished daily forms could not be checked. Your saved forms were not changed.',
+    });
+  }
+});
 
 // ─── Staff Members ────────────────────────────────────────────────────────────
 
