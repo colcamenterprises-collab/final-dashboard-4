@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Download, Pencil, Trash2, Upload } from "lucide-react";
+import { Download, Pencil, Save, Trash2, Upload } from "lucide-react";
 import { BankStatementUpload as BankStatementUploadComponent } from "@/components/BankStatementUpload";
 import { BankTransactionReview } from "@/components/BankTransactionReview";
+import { usePinAuth } from "@/components/PinLoginGate";
 
 type DashboardResponse = {
   ok: boolean;
@@ -26,6 +26,14 @@ type PersonalTransaction = {
   amountTHB: string | number;
   ref?: string;
   supplier?: string;
+};
+
+type ExpenseDraft = {
+  date: string;
+  supplier: string;
+  category: string;
+  description: string;
+  amount: string;
 };
 
 function formatDate(value: string) {
@@ -69,12 +77,15 @@ function DataTable({ title, actions, children }: { title: string; actions?: Reac
 }
 
 export default function Expenses() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { currentUser } = usePinAuth();
+  const isOwner = currentUser?.role === "owner";
   const [showImport, setShowImport] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [exportedPersonalIds, setExportedPersonalIds] = useState<string[]>([]);
+  const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+  const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft | null>(null);
 
   const query = new URLSearchParams();
   if (dateFrom) query.set("dateFrom", dateFrom);
@@ -111,13 +122,44 @@ export default function Expenses() {
     return true;
   }), [allPersonalTransactions, dateFrom, dateTo]);
 
+  const updateBusinessExpense = useMutation({
+    mutationFn: async ({ id, draft }: { id: string; draft: ExpenseDraft }) => {
+      const response = await fetch(`/api/expensesV2/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date: draft.date,
+          supplier: draft.supplier.trim(),
+          category: draft.category.trim(),
+          description: draft.description.trim(),
+          amount: Number(draft.amount),
+        }),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || "Failed to save business expense");
+      return payload;
+    },
+    onSuccess: () => {
+      setEditingExpenseId(null);
+      setExpenseDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
+    },
+    onError: (error: Error) => window.alert(error.message),
+  });
+
   const deleteBusinessExpense = useMutation({
     mutationFn: async (id: string) => {
       const response = await fetch(`/api/expensesV2/${encodeURIComponent(id)}`, { method: "DELETE" });
-      if (!response.ok) throw new Error("Failed to delete business expense");
-      return response.json();
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.error || "Failed to delete business expense");
+      return payload;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] }),
+    onSuccess: () => {
+      setEditingExpenseId(null);
+      setExpenseDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
+    },
+    onError: (error: Error) => window.alert(error.message),
   });
 
   const deleteExportedPersonal = useMutation({
@@ -165,6 +207,40 @@ export default function Expenses() {
     if (exportedPersonalIds.length === 0) return;
     const confirmed = window.confirm(`Delete ${exportedPersonalIds.length} exported personal transaction(s)? This will not affect Business Expenses or Shift Expenses.`);
     if (confirmed) deleteExportedPersonal.mutate(exportedPersonalIds);
+  };
+
+  const beginExpenseEdit = (row: any) => {
+    if (!isOwner) return;
+    setEditingExpenseId(String(row.id));
+    setExpenseDraft({
+      date: String(row.date || "").slice(0, 10),
+      supplier: String(row.supplier || ""),
+      category: String(row.category || ""),
+      description: String(row.description || ""),
+      amount: String(Number(row.amount || 0)),
+    });
+  };
+
+  const saveExpense = () => {
+    if (!isOwner || !editingExpenseId || !expenseDraft) return;
+    if (!expenseDraft.date || !expenseDraft.supplier.trim() || !expenseDraft.category.trim()) {
+      window.alert("Date, supplier and category are required.");
+      return;
+    }
+    const amount = Number(expenseDraft.amount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      window.alert("Amount must be greater than zero.");
+      return;
+    }
+    updateBusinessExpense.mutate({ id: editingExpenseId, draft: expenseDraft });
+  };
+
+  const confirmDeleteExpense = (row: any) => {
+    if (!isOwner) return;
+    const label = row.description || row.supplier || "this expense";
+    if (window.confirm(`Delete ${label}? This cannot be undone.`)) {
+      deleteBusinessExpense.mutate(String(row.id));
+    }
   };
 
   return (
@@ -223,10 +299,132 @@ export default function Expenses() {
           </DataTable>
 
           <DataTable title="Table 2 — Business Expenses Outside Shift">
-            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Supplier/Payee</th><th className="px-3 py-2">Category</th><th className="px-3 py-2">Description</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Payment Source</th><th className="px-3 py-2">Status</th><th className="px-3 py-2">Created</th><th className="px-3 py-2 text-right">Actions</th></tr></thead>
+            <thead>
+              <tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800">
+                <th className="px-2 py-1.5">Date</th>
+                <th className="px-2 py-1.5">Supplier/Payee</th>
+                <th className="px-2 py-1.5">Category</th>
+                <th className="px-2 py-1.5">Description</th>
+                <th className="px-2 py-1.5 text-right">Amount</th>
+                <th className="px-2 py-1.5">Payment Source</th>
+                <th className="px-2 py-1.5">Status</th>
+                <th className="px-2 py-1.5">Created</th>
+                {isOwner && <th className="w-[92px] min-w-[92px] px-1 py-1.5 text-right">Actions</th>}
+              </tr>
+            </thead>
             <tbody>
-              {businessExpenses.length === 0 && <tr><td colSpan={9} className="px-3 py-8 text-center text-slate-400">No business expenses found.</td></tr>}
-              {businessExpenses.map((row) => <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800"><td className="px-3 py-2">{formatDate(row.date)}</td><td className="px-3 py-2">{row.supplier || "—"}</td><td className="px-3 py-2">{row.category || "UNMAPPED"}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(row.amount)}</td><td className="px-3 py-2">{row.payment_method || "—"}</td><td className="px-3 py-2">Recorded</td><td className="px-3 py-2">{formatDate(row.created_at)}</td><td className="px-3 py-2"><div className="flex justify-end gap-1"><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => navigate(`/expenses?edit=${encodeURIComponent(row.id)}`)}><Pencil className="h-3 w-3" /></Button><Button size="sm" variant="outline" className="h-7 px-2" onClick={() => deleteBusinessExpense.mutate(row.id)} disabled={deleteBusinessExpense.isPending}><Trash2 className="h-3 w-3" /></Button></div></td></tr>)}
+              {businessExpenses.length === 0 && (
+                <tr>
+                  <td colSpan={isOwner ? 9 : 8} className="px-3 py-8 text-center text-slate-400">
+                    No business expenses found.
+                  </td>
+                </tr>
+              )}
+              {businessExpenses.map((row) => {
+                const rowDraft = editingExpenseId === String(row.id) ? expenseDraft : null;
+                return (
+                  <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
+                    <td className="px-2 py-1">
+                      {rowDraft ? (
+                        <Input
+                          type="date"
+                          value={rowDraft.date}
+                          onChange={(event) => setExpenseDraft({ ...rowDraft, date: event.target.value })}
+                          className="h-7 min-w-[126px] px-2 text-xs"
+                          aria-label="Expense date"
+                        />
+                      ) : formatDate(row.date)}
+                    </td>
+                    <td className="px-2 py-1">
+                      {rowDraft ? (
+                        <Input
+                          value={rowDraft.supplier}
+                          onChange={(event) => setExpenseDraft({ ...rowDraft, supplier: event.target.value })}
+                          className="h-7 min-w-[120px] px-2 text-xs"
+                          aria-label="Expense supplier"
+                        />
+                      ) : row.supplier || "—"}
+                    </td>
+                    <td className="px-2 py-1">
+                      {rowDraft ? (
+                        <Input
+                          value={rowDraft.category}
+                          onChange={(event) => setExpenseDraft({ ...rowDraft, category: event.target.value })}
+                          className="h-7 min-w-[120px] px-2 text-xs"
+                          aria-label="Expense category"
+                        />
+                      ) : row.category || "UNMAPPED"}
+                    </td>
+                    <td className="px-2 py-1">
+                      {rowDraft ? (
+                        <Input
+                          value={rowDraft.description}
+                          onChange={(event) => setExpenseDraft({ ...rowDraft, description: event.target.value })}
+                          className="h-7 min-w-[150px] px-2 text-xs"
+                          aria-label="Expense description"
+                        />
+                      ) : row.description || "—"}
+                    </td>
+                    <td className="px-2 py-1 text-right font-mono">
+                      {rowDraft ? (
+                        <Input
+                          type="number"
+                          min="0.01"
+                          step="0.01"
+                          value={rowDraft.amount}
+                          onChange={(event) => setExpenseDraft({ ...rowDraft, amount: event.target.value })}
+                          className="ml-auto h-7 w-24 px-2 text-right text-xs"
+                          aria-label="Expense amount"
+                        />
+                      ) : money(row.amount)}
+                    </td>
+                    <td className="px-2 py-1">{row.payment_method || "—"}</td>
+                    <td className="px-2 py-1">Recorded</td>
+                    <td className="px-2 py-1">{formatDate(row.created_at)}</td>
+                    {isOwner && (
+                      <td className="w-[92px] min-w-[92px] px-1 py-1">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => beginExpenseEdit(row)}
+                            aria-label="Edit expense"
+                            title="Edit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={saveExpense}
+                            disabled={!rowDraft || updateBusinessExpense.isPending}
+                            aria-label="Save expense"
+                            title="Save"
+                          >
+                            <Save className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-red-600 hover:text-red-700"
+                            onClick={() => confirmDeleteExpense(row)}
+                            disabled={deleteBusinessExpense.isPending}
+                            aria-label="Delete expense"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </DataTable>
 
