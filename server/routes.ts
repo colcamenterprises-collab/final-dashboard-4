@@ -4743,8 +4743,8 @@ Write a 80-100 word description that sounds appetizing and professional for a bu
   app.use("/api/forms/daily-sales/v2", async (req: Request, res: Response, next: NextFunction) => {
     const staffSafeOperationalRead =
       req.method === "GET" &&
-      (/^\\/[^/]+\\/workflow-context\\/?$/.test(req.path) ||
-       /^\\/[^/]+\\/roll-order\\/?$/.test(req.path));
+      (/^\/[^/]+\/workflow-context\/?$/.test(req.path) ||
+       /^\/[^/]+\/roll-order\/?$/.test(req.path));
     if (req.method === "GET" && !staffSafeOperationalRead) {
       const { getPinSessionUser } = await import("./routes/pinAuth.js");
       const sessionUser = getPinSessionUser(req);
