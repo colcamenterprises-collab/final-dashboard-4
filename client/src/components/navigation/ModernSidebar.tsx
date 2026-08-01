@@ -75,6 +75,15 @@ const navigationGroups: NavGroup[] = [
     ],
   },
   {
+    title: "Finance",
+    defaultOpen: false,
+    items: [
+      { to: "/finance",             label: "Finance Hub",     icon: Wallet,     testId: "nav-finance-hub" },
+      { to: "/finance/profit-loss", label: "Profit and Loss", icon: TrendingUp, testId: "nav-profit-loss" },
+      { to: "/finance/expenses",    label: "Expenses",        icon: DollarSign, testId: "nav-expenses" },
+    ],
+  },
+  {
     title: "Menu",
     defaultOpen: false,
     items: [
@@ -100,15 +109,6 @@ const navigationGroups: NavGroup[] = [
     items: [
       { to: "/admin/ordering/orders",    label: "Orders",             icon: ShoppingBag,     testId: "nav-ordering-orders" },
       { to: "/admin/ordering/qr-codes",  label: "QR Codes & Settings", icon: QrCode,          testId: "nav-ordering-qr" },
-    ],
-  },
-  {
-    title: "Finance",
-    defaultOpen: false,
-    items: [
-      { to: "/finance",             label: "Finance Hub",     icon: Wallet,     testId: "nav-finance-hub" },
-      { to: "/finance/profit-loss", label: "Profit and Loss", icon: TrendingUp, testId: "nav-profit-loss" },
-      { to: "/finance/expenses",    label: "Expenses",        icon: DollarSign, testId: "nav-expenses" },
     ],
   },
   {
