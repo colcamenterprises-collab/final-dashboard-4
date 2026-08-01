@@ -35,6 +35,7 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   testId: string;
   ownerOnly?: boolean;
+  subItem?: boolean;
 };
 
 type NavGroup = {
@@ -56,7 +57,8 @@ const navigationGroups: NavGroup[] = [
     defaultOpen: true,
     items: [
       { to: "/operations/daily-sales",             label: "Daily Sales & Stock Form", icon: Receipt,       testId: "nav-daily-sales" },
-      { to: "/operations/daily-sales-v2/library",  label: "Daily Form Library",       icon: BarChart3,     testId: "nav-library", ownerOnly: true },
+      { to: "/operations/daily-forms/resume",        label: "Resume Forms",             icon: ClipboardList, testId: "nav-resume-forms", subItem: true },
+      { to: "/operations/daily-sales-v2/library",    label: "Daily Form Library",       icon: BarChart3,     testId: "nav-library", ownerOnly: true, subItem: true },
       { to: "/operations/purchasing",              label: "Purchasing",               icon: ShoppingCart,  testId: "nav-purchasing" },
       { to: "/operations/shopping-list",           label: "Shopping List",            icon: ShoppingCart,  testId: "nav-shopping-list" },
       { to: "/operations/health-safety",           label: "Health & Safety",          icon: ShieldCheck,   testId: "nav-health-safety" },
@@ -323,6 +325,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
                         className={cn(
                           "flex items-center gap-2.5 px-2.5 py-2 text-xs font-medium rounded-lg transition-all duration-150",
                           isCollapsed && "lg:justify-center lg:px-2",
+                          item.subItem && !isCollapsed && "ml-5 w-[calc(100%-1.25rem)] border-l border-neutral-700/60 pl-3 text-[11px]",
                           active
                             ? "bg-[#FFD400] text-[#111111]"
                             : "text-neutral-400 hover:text-neutral-100 hover:bg-neutral-800"

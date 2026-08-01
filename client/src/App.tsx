@@ -12,6 +12,7 @@ import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
 
 import DailySalesForm from "./pages/operations/daily-sales/Form";
+import DailyFormsResume from "./pages/operations/DailyFormsResume";
 import DailyCleaning from "./pages/operations/DailyCleaningV2";
 import DailyStock from "./pages/operations/DailyStock";
 import DailySalesV2Library from "./pages/operations/daily-sales-v2/Library";
@@ -106,6 +107,7 @@ export default function App() {
                     <Route path="/printer-settings" element={<Navigate to="/pos/printer-settings" replace />} />
                     <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
+                    <Route path="/operations/daily-forms/resume" element={<ProtectedRoute><DailyFormsResume /></ProtectedRoute>} />
                     <Route path="/operations/daily-cleaning" element={<ProtectedRoute><DailyCleaning /></ProtectedRoute>} />
                     <Route path="/operations/daily-stock" element={<ProtectedRoute><DailyStock /></ProtectedRoute>} />
                     <Route path="/operations/daily-sales-v2/library" element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} />
