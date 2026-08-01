@@ -47,14 +47,14 @@ export default function DailyCleaningV2() {
       setLoading(true);
       setError("");
       if (!shiftId) {
-        setError("Form 1 record is missing. Open Form 2 from the Daily Sales Library.");
+        setError("Form 1 record is missing. Return to Staff Dashboard and select Resume Forms.");
         setLoading(false);
         return;
       }
 
       try {
         const [salesResponse, taskResponse, savedResponse] = await Promise.all([
-          fetch(`/api/forms/daily-sales/v2/${encodeURIComponent(shiftId)}`, { credentials: "include" }),
+          fetch(`/api/forms/daily-sales/v2/${encodeURIComponent(shiftId)}/workflow-context`, { credentials: "include" }),
           fetch("/api/daily-cleaning/tasks", { credentials: "include" }),
           fetch(`/api/daily-cleaning?salesId=${encodeURIComponent(shiftId)}`, { credentials: "include" }),
         ]);
@@ -65,7 +65,7 @@ export default function DailyCleaningV2() {
         ]);
         if (cancelled) return;
 
-        if (!salesResponse.ok || !salesData?.ok || !salesData?.record) {
+        if (!salesResponse.ok || !salesData?.ok || !salesData?.context) {
           throw new Error(salesData?.error || "Form 1 could not be loaded for this shift.");
         }
         if (!taskResponse.ok || !taskData?.ok) {
@@ -73,10 +73,9 @@ export default function DailyCleaningV2() {
           throw new Error(blocker || taskData?.error || "Daily cleaning tasks could not be loaded.");
         }
 
-        const record = salesData.record;
-        const payload = record.payload || {};
-        setShiftDate(record.date || payload.shiftDate || new Date().toISOString().slice(0, 10));
-        setManager(record.staff || payload.completedBy || "");
+        const context = salesData.context;
+        setShiftDate(context.date || new Date().toISOString().slice(0, 10));
+        setManager(context.staff || "");
 
         const loadedTasks: CleaningTask[] = Array.isArray(taskData.data)
           ? taskData.data.map((task: any) => ({
@@ -248,7 +247,7 @@ export default function DailyCleaningV2() {
       }) : null}
 
       <div className="sticky bottom-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-        <button type="button" onClick={() => navigate("/operations/daily-sales-v2/library")} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">Back to Library</button>
+        <button type="button" onClick={() => navigate("/staff/dashboard")} className="rounded-lg border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700">Back to Staff Dashboard</button>
         <button type="button" disabled={submitting || tasks.length === 0} onClick={submit} className="rounded-lg bg-emerald-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400">{submitting ? "Saving…" : "Save Form 2 & Continue to Form 3"}</button>
       </div>
     </div>
