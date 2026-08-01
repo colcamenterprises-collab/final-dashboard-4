@@ -100,7 +100,7 @@ export default function DailyCleaning() {
       setLoading(true);
       const [taskRes, salesRes, cleaningRes] = await Promise.all([
         fetch("/api/daily-cleaning/tasks"),
-        shiftId ? fetch(`/api/forms/daily-sales/v2/${shiftId}`) : Promise.resolve(null),
+        shiftId ? fetch(`/api/forms/daily-sales/v2/${shiftId}/workflow-context`) : Promise.resolve(null),
         shiftId ? fetch(`/api/daily-cleaning?salesId=${encodeURIComponent(shiftId)}`) : Promise.resolve(null),
       ]);
       const taskJson = await taskRes.json();
@@ -111,8 +111,8 @@ export default function DailyCleaning() {
       const hasCompletedSales = Boolean(shiftId && (salesJson?.ok || workflowContext?.shiftId === shiftId || workflowContext?.salesId === shiftId));
       setAllowed(hasCompletedSales);
       if (salesJson?.ok) {
-        setShiftDate(salesJson.record?.date || workflowContext?.shiftDate || new Date().toISOString().slice(0, 10));
-        setManager(salesJson.record?.staff || workflowContext?.staffName || "");
+        setShiftDate(salesJson.context?.date || workflowContext?.shiftDate || new Date().toISOString().slice(0, 10));
+        setManager(salesJson.context?.staff || workflowContext?.staffName || "");
       } else if (hasCompletedSales) {
         setShiftDate(workflowContext?.shiftDate || new Date().toISOString().slice(0, 10));
         setManager(workflowContext?.staffName || "");
