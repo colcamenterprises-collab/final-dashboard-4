@@ -1,78 +1,42 @@
-import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import OrderingCart from "@/components/ordering/OrderingCart";
-import OrderingMenu from "@/components/ordering/OrderingMenu";
-import { fetchOrderingMenu, submitOrderingOrder, type CartItem, type OrderingLanguage } from "@/components/ordering/orderingApi";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { fetchOrderingMenu, submitOrderingOrder, type CartItem } from "@/components/ordering/orderingApi";
+import { MapPin, Search, ShoppingBag, X, Minus, Plus, ChevronRight } from "lucide-react";
 import "./OrderPage.css";
 
-export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
-  const { tableCode } = useParams();
-  const navigate = useNavigate();
-  const [language, setLanguage] = useState<OrderingLanguage>("en");
-  const [menu, setMenu] = useState<any[]>([]);
-  const [cart, setCart] = useState<CartItem[]>(() => JSON.parse(localStorage.getItem(tablet ? "sbb_tablet_cart" : "sbb_order_cart") || "[]"));
-  const [paymentMethod, setPaymentMethod] = useState("pay_at_counter");
-  const [orderNotes, setOrderNotes] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+const fallbacks=["/images/menu/super-double-set.jpg","/images/menu/double-set.jpg","/images/menu/single-smash-set.jpg","/images/menu/triple-smash-set.jpg","/images/menu/karaage-chicken-burger-meal-deal.jpg"];
+const imageFor=(item:any,index=0)=>item.image_url||item.imageUrl||fallbacks[index%fallbacks.length];
+const baht=(n:number|string)=>`฿${Number(n).toLocaleString("en-TH",{maximumFractionDigits:0})}`;
 
-  useEffect(() => { fetchOrderingMenu().then((data) => setMenu(data.categories ?? [])).catch((err) => setError(err.message)); }, []);
-  useEffect(() => { localStorage.setItem(tablet ? "sbb_tablet_cart" : "sbb_order_cart", JSON.stringify(cart)); }, [cart, tablet]);
-
-  function add(item: CartItem) { setCart((prev) => [...prev, item]); }
-  function qty(index: number, quantity: number) { setCart((prev) => quantity <= 0 ? prev.filter((_, i) => i !== index) : prev.map((item, i) => i === index ? { ...item, quantity } : item)); }
-  function remove(index: number) { setCart((prev) => prev.filter((_, i) => i !== index)); }
-
-  async function submit() {
-    setError("");
-    setLoading(true);
-    try {
-      const res = await submitOrderingOrder({
-        channel: tablet ? "tablet_counter" : tableCode ? "qr_table" : "online",
-        table_code: tableCode || null,
-        customer_name: customerName || null,
-        customer_phone: customerPhone || null,
-        order_notes: orderNotes || null,
-        payment_method: paymentMethod,
-        items: cart.map((item) => ({ menu_item_id: item.menu_item_id, quantity: item.quantity, notes: item.notes, modifiers: item.modifiers.map((modifier) => ({ item_modifier_id: modifier.item_modifier_id, quantity: modifier.quantity })) })),
-      });
-      const orderId = res.data.id;
-      setCart([]);
-      localStorage.removeItem(tablet ? "sbb_tablet_cart" : "sbb_order_cart");
-      navigate(`/order/status/${orderId}`);
-    } catch (err: any) {
-      setError("Unable to submit order. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <main className={`sbo-page ${tablet ? "is-tablet" : ""}`}>
-      <header className="sbo-header">
-        <div>
-          <p>Smash Brothers Burgers</p>
-          <h1>Build Your Smash</h1>
-          <span>{tablet ? "Tablet-first customer ordering" : tableCode ? `Table ${tableCode}` : "Choose a category, add your burger, and keep your cart in view."}</span>
-        </div>
-        <div className="sbo-language" aria-label="Language selection"><button className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>English</button><button className={language === "th" ? "active" : ""} onClick={() => setLanguage("th")}>ไทย</button></div>
-      </header>
-      {error && <div className="sbo-error">{error}</div>}
-      <div className="sbo-layout">
-        <OrderingMenu categories={menu} language={language} large={tablet} onAdd={add} />
-        <div className="sbo-sidebar">
-          <OrderingCart cart={cart} language={language} onQty={qty} onRemove={remove} />
-          <section className="sbo-panel">
-            <h2>Checkout</h2>
-            {!tablet && <><input placeholder="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} /><input placeholder="Phone" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} /></>}
-            <textarea placeholder="Order notes" value={orderNotes} onChange={(e) => setOrderNotes(e.target.value)} />
-            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)}><option value="pay_at_counter">Pay at counter</option><option value="cash">Cash</option><option value="manual_qr_transfer">QR</option></select>
-            <button disabled={!cart.length || loading} onClick={submit}>{loading ? "Submitting..." : "Place Order"}</button>
-          </section>
-        </div>
-      </div>
-    </main>
-  );
+export default function OrderPage({tablet=false}:{tablet?:boolean}){
+  const {tableCode,venueCode}=useParams(); const [query]=useSearchParams(); const navigate=useNavigate();
+  const venue=query.get("venue")||venueCode||""; const table=query.get("table")||tableCode||"";
+  const mode=tablet?"kiosk":venue||table?"venue":"delivery";
+  const storageKey=tablet?"sbb_tablet_cart":"sbb_order_cart";
+  const [categories,setCategories]=useState<any[]>([]),[active,setActive]=useState(""),[selected,setSelected]=useState<any|null>(null);
+  const [selectedMods,setSelectedMods]=useState<Record<string,string[]>>({}),[notes,setNotes]=useState("");
+  const [cart,setCart]=useState<CartItem[]>(()=>JSON.parse(localStorage.getItem(storageKey)||"[]"));
+  const [cartOpen,setCartOpen]=useState(false),[checkout,setCheckout]=useState(false),[loading,setLoading]=useState(true),[submitting,setSubmitting]=useState(false),[error,setError]=useState("");
+  const [name,setName]=useState(""),[phone,setPhone]=useState(""),[address,setAddress]=useState(""),[payment,setPayment]=useState(tablet?"pay_at_counter":"manual_qr_transfer");
+  useEffect(()=>{fetchOrderingMenu().then(r=>{const c=r.categories||[];setCategories(c);setActive(c[0]?.id||"")}).catch(e=>setError(e.message)).finally(()=>setLoading(false))},[]);
+  useEffect(()=>localStorage.setItem(storageKey,JSON.stringify(cart)),[cart,storageKey]);
+  const items=useMemo(()=>categories.flatMap(c=>(c.items||[]).map((x:any,i:number)=>({...x,_category:c,_image:imageFor(x,i)}))),[categories]);
+  const visible=items.filter(x=>x.category_id===active); const count=cart.reduce((s,x)=>s+x.quantity,0);
+  const total=cart.reduce((s,x)=>s+(Number(x.price)+x.modifiers.reduce((a,m)=>a+Number(m.price_delta)*m.quantity,0))*x.quantity,0);
+  function toggle(group:any,id:string){setSelectedMods(prev=>{const existing=prev[group.id]||[];const next=existing.includes(id)?existing.filter(x=>x!==id):group.max_select===1?[id]:[...existing,id].slice(-group.max_select);return {...prev,[group.id]:next}})}
+  function addSelected(){if(!selected)return;const missing=(selected.modifier_groups||[]).find((g:any)=>g.is_required&&(selectedMods[g.id]||[]).length<g.min_select);if(missing){setError(`Please choose ${missing.name_en}.`);return}const mods=(selected.modifier_groups||[]).flatMap((g:any)=>(g.modifiers||[]).filter((m:any)=>(selectedMods[g.id]||[]).includes(m.id)).map((m:any)=>({item_modifier_id:m.id,name_en:m.name_en,name_th:m.name_th,price_delta:m.price_delta,quantity:1})));setCart(x=>[...x,{menu_item_id:selected.id,name_en:selected.name_en,name_th:selected.name_th,price:selected.direct_price||selected.price,quantity:1,notes,modifiers:mods}]);setSelected(null);setSelectedMods({});setNotes("");setError("")}
+  function quantity(i:number,delta:number){setCart(c=>c.map((x,n)=>n===i?{...x,quantity:x.quantity+delta}:x).filter(x=>x.quantity>0))}
+  async function placeOrder(){if(!cart.length)return;if(!name.trim()||(!tablet&&!phone.trim())||(mode==="delivery"&&!address.trim())){setError("Please complete the required order details.");return}setSubmitting(true);setError("");try{const context=[venue&&`Venue: ${venue.replaceAll("-"," ")}`,table&&`Table: ${table}`,address&&`Delivery: ${address}`].filter(Boolean).join(" | ");const r=await submitOrderingOrder({channel:tablet?"tablet_counter":venue||table?"qr_table":"online",table_code:table||null,customer_name:name,customer_phone:phone||null,order_notes:context||null,payment_method:payment,items:cart.map(x=>({menu_item_id:x.menu_item_id,quantity:x.quantity,notes:x.notes,modifiers:x.modifiers.map(m=>({item_modifier_id:m.item_modifier_id,quantity:m.quantity}))}))});setCart([]);localStorage.removeItem(storageKey);navigate(`/order/status/${r.data.id}`)}catch(e:any){setError(e?.message||"Unable to submit order. Please try again.")}finally{setSubmitting(false)}}
+  const locationLabel=tablet?"In-store kiosk":venue?`${venue.replaceAll("-"," ")}${table?` · Table ${table}`:""}`:"Enter delivery address at checkout";
+  return <main className="sbb-order"><div className="sbb-app">
+    <header className="sbb-top"><button className="sbb-logo" aria-label="Smash Brothers home"><b>SMASH</b><b>BROTHERS</b><small>BURGERS · RAWAI</small></button><button className="sbb-icon" aria-label="Search menu"><Search/></button></header>
+    <button className="sbb-location"><MapPin/><span><small>ORDER TO</small><b>{locationLabel}</b></span><ChevronRight/></button>
+    <section className="sbb-hero"><div><small>SMASHED FRESH IN RAWAI</small><h1>BIG BURGERS.<br/>ZERO SHORTCUTS.</h1><p>Hot, fresh and made to order.</p><button onClick={()=>document.getElementById("sbb-menu")?.scrollIntoView({behavior:"smooth"})}>Order now <ChevronRight/></button></div><img src="/images/menu/double-set.jpg" alt="Smash Brothers burger"/></section>
+    <nav id="sbb-menu" className="sbb-cats" aria-label="Menu categories">{categories.map((c:any)=><button key={c.id} className={active===c.id?"active":""} onClick={()=>setActive(c.id)}><span>{c.name_en?.toLowerCase().includes("fr")?"🍟":c.name_en?.toLowerCase().includes("drink")?"🥤":"🍔"}</span><b>{c.name_en}</b></button>)}</nav>
+    <div className="sbb-section-title"><div><small>FRESHLY SMASHED</small><h2>{categories.find(c=>c.id===active)?.name_en||"Menu"}</h2></div><span>{visible.length} items</span></div>
+    {loading?<div className="sbb-message">Loading the live SBB menu…</div>:error&&!categories.length?<div className="sbb-message error">{error}</div>:<section className="sbb-grid">{visible.map((item:any)=><article key={item.id} className="sbb-card"><button className="sbb-photo" onClick={()=>setSelected(item)}><img src={item._image} alt={item.name_en}/>{item.is_sold_out&&<i>Sold out</i>}</button><button className="sbb-copy" onClick={()=>setSelected(item)}><b>{item.name_en}</b><small>{item.description_en}</small></button><footer><strong>{baht(item.direct_price||item.price)}</strong><button disabled={item.is_sold_out} onClick={()=>setSelected(item)} aria-label={`Add ${item.name_en}`}><Plus/></button></footer></article>)}</section>}
+    <button className="sbb-cartbar" onClick={()=>setCartOpen(true)} disabled={!count}><span><ShoppingBag/><i>{count}</i></span><b>View order</b><strong>{baht(total)}</strong></button>
+    {selected&&<div className="sbb-overlay" onClick={()=>setSelected(null)}><section className="sbb-sheet" onClick={e=>e.stopPropagation()}><button className="sbb-close" onClick={()=>setSelected(null)}><X/></button><img src={selected._image} alt={selected.name_en}/><div className="sbb-sheet-body"><small>{selected._category.name_en}</small><h2>{selected.name_en}</h2><p>{selected.description_en}</p>{(selected.modifier_groups||[]).map((g:any)=><fieldset key={g.id}><legend>{g.name_en} {g.is_required&&<i>Required</i>}</legend>{(g.modifiers||[]).map((m:any)=><label key={m.id}><input type={g.max_select===1?"radio":"checkbox"} name={g.id} checked={(selectedMods[g.id]||[]).includes(m.id)} onChange={()=>toggle(g,m.id)}/><span>{m.name_en}</span><b>{Number(m.price_delta)>0?`+${baht(m.price_delta)}`:"Included"}</b></label>)}</fieldset>)}<textarea placeholder="Special instructions" value={notes} onChange={e=>setNotes(e.target.value)}/>{error&&<p className="sbb-inline-error">{error}</p>}<button className="sbb-primary" onClick={addSelected}>Add to order · {baht(Number(selected.direct_price||selected.price))}</button></div></section></div>}
+    {cartOpen&&<div className="sbb-overlay" onClick={()=>setCartOpen(false)}><section className="sbb-sheet cart" onClick={e=>e.stopPropagation()}><button className="sbb-close" onClick={()=>setCartOpen(false)}><X/></button><div className="sbb-sheet-body"><small>YOUR ORDER</small><h2>{checkout?"Confirm details":"Ready to smash?"}</h2>{!checkout&&cart.map((x,i)=><div className="sbb-line" key={`${x.menu_item_id}-${i}`}><div><b>{x.name_en}</b>{x.modifiers.map(m=><small key={m.item_modifier_id}>+ {m.name_en}</small>)}</div><div><button onClick={()=>quantity(i,-1)}><Minus/></button><b>{x.quantity}</b><button onClick={()=>quantity(i,1)}><Plus/></button></div></div>)}{checkout&&<div className="sbb-form"><label>Name<input value={name} onChange={e=>setName(e.target.value)} /></label>{!tablet&&<label>Phone<input inputMode="tel" value={phone} onChange={e=>setPhone(e.target.value)} /></label>}{mode==="delivery"&&<label>Delivery address<textarea value={address} onChange={e=>setAddress(e.target.value)} /></label>}<label>Payment<select value={payment} onChange={e=>setPayment(e.target.value)}><option value="manual_qr_transfer">QR transfer</option><option value="cash">Cash</option>{tablet&&<option value="pay_at_counter">Pay at counter</option>}</select></label></div>}{error&&<p className="sbb-inline-error">{error}</p>}<div className="sbb-total"><span>Total</span><b>{baht(total)}</b></div><button className="sbb-primary" onClick={()=>checkout?placeOrder():setCheckout(true)} disabled={submitting}>{submitting?"Sending order…":checkout?"Confirm and place order":"Confirm details"}</button>{checkout&&<button className="sbb-back" onClick={()=>setCheckout(false)}>Back to order</button>}</div></section></div>}
+  </div></main>
 }
