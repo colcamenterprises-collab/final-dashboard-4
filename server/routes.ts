@@ -3038,17 +3038,35 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Update expense
   app.put("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || user.role !== "owner") {
+        return res.status(403).json({ error: "Owner access required" });
+      }
+
       const id = req.params.id;
       const { date, supplier, category, description, amount } = req.body;
+      const normalizedDate = typeof date === "string" ? date.slice(0, 10) : "";
+      const normalizedSupplier = typeof supplier === "string" ? supplier.trim() : "";
+      const normalizedCategory = typeof category === "string" ? category.trim() : "";
+      const normalizedDescription = typeof description === "string" ? description.trim() : null;
+      const normalizedAmount = Number(amount);
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate) || !normalizedSupplier || !normalizedCategory) {
+        return res.status(400).json({ error: "Date, supplier and category are required" });
+      }
+      if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+        return res.status(400).json({ error: "Amount must be greater than zero" });
+      }
 
       const updatedExpense = await db.execute(sql`
         UPDATE expenses
         SET
-          "shiftDate" = ${date},
-          supplier = ${supplier},
-          "expenseType" = ${category},
-          item = ${description},
-          "costCents" = ${parseFloat(amount)}
+          "shiftDate" = ${normalizedDate},
+          supplier = ${normalizedSupplier},
+          "expenseType" = ${normalizedCategory},
+          item = ${normalizedDescription},
+          "costCents" = ${normalizedAmount}
         WHERE id = ${id}
         RETURNING *
       `);
@@ -3067,6 +3085,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Delete expense
   app.delete("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || user.role !== "owner") {
+        return res.status(403).json({ error: "Owner access required" });
+      }
+
       const id = req.params.id; // Keep as string UUID
       const success = await storage.deleteExpense(id);
       if (success) {
