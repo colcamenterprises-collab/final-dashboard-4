@@ -2,25 +2,60 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { AlertTriangle, ReceiptText } from "lucide-react";
 
-type ShiftMonth = {month:string;shifts:number;cashPayments:number;cashRefunds:number;paidIn:number;paidOut:number;difference:number};
+type ShiftMonth = {
+  month:string;
+  shifts:number;
+  startingCash:number;
+  cashPayments:number;
+  cashRefunds:number;
+  paidIn:number;
+  paidOut:number;
+  expected:number;
+  actual:number;
+  difference:number;
+};
+
+type ShiftRow = {
+  number:number;
+  store:string;
+  pos:string;
+  opened:string;
+  openedRaw:string;
+  openedBy:string;
+  closed:string;
+  closedRaw:string;
+  closedBy:string;
+  reportDate:string;
+  startingCash:number;
+  cash:number;
+  cashRefunds:number;
+  paidIn:number;
+  paidOut:number;
+  expected:number;
+  actual:number;
+  difference:number;
+};
 
 type Data = {
   source: string;
   period: { from: string; to: string; timezone: string };
+  shiftSource?: string;
+  shiftPeriod?: { from: string; to: string; timezone: string };
   reconciliation: { difference: number; warning: string };
   totals: Record<string, number>;
   paymentTypes: Array<{name:string;transactions:number;gross:number;refundTransactions:number;refunds:number;net:number}>;
   discounts: Array<{name:string;applied:number;amount:number}>;
   topModifiers: Array<{group:string;option:string;sold:number;refunded:number;gross:number;refunds:number;net:number}>;
   shiftMonths: ShiftMonth[];
-  recentShifts: Array<{number:number;opened:string;closed:string;cash:number;paidOut:number;expected:number;actual:number;difference:number}>;
-  completeness: {modifierRows:number;shiftRows:number;missingShiftNumbers:number[]};
+  recentShifts: ShiftRow[];
+  completeness: {modifierRows:number;shiftRows:number;missingShiftNumbers:number[];shiftNumberRange?:{from:number;to:number}};
 };
 
 const money = (value: number) => new Intl.NumberFormat("en-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 }).format(value);
 const number = (value: number) => new Intl.NumberFormat("en-TH").format(value);
 const compactNumber = (value: number) => new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 const compactMoney = (value: number) => `฿${compactNumber(value)}`;
+const periodDate = (value:string) => new Date(`${value}T00:00:00+07:00`).toLocaleDateString("en-GB", { day:"numeric", month:"short", year:"numeric", timeZone:"Asia/Bangkok" });
 
 function Card({ label, value, detail }: { label:string; value:string; detail?:string }) {
   return <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5">
@@ -48,9 +83,9 @@ function MonthCard({ label, month }: { label:string; month?:ShiftMonth }) {
   </div>;
 }
 
-function Table({ headers, rows }: { headers:string[]; rows: React.ReactNode[][] }) {
+function Table({ headers, rows, minWidth = "760px" }: { headers:string[]; rows: React.ReactNode[][]; minWidth?:string }) {
   return <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <table className="w-full min-w-[760px] table-auto text-sm">
+    <table className="w-full table-auto text-sm" style={{minWidth}}>
       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
         <tr>{headers.map((h,j)=><th key={h} className={`whitespace-nowrap px-4 py-3 font-bold ${j>0?"text-right":"text-left"}`}>{h}</th>)}</tr>
       </thead>
@@ -74,6 +109,8 @@ export default function HistoricalReports() {
 
   const mode = location.pathname.includes("payment-types") ? "payments" : location.pathname.includes("sales-by-item") ? "items" : "shifts";
   const title = mode==="payments" ? "Sales by Payment Type" : mode==="items" ? "Sales by Item" : "Shift Summary";
+  const activePeriod = mode === "shifts" && data.shiftPeriod ? data.shiftPeriod : data.period;
+  const activeSource = mode === "shifts" && data.shiftSource ? data.shiftSource : data.source;
 
   const now = new Date();
   const previousMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -84,9 +121,9 @@ export default function HistoricalReports() {
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <h1 className="text-3xl font-black tracking-tight text-slate-900">{title}</h1>
-        <p className="mt-1 text-sm text-slate-500 md:text-base">{data.source} · 1 Jan–21 Jul 2026 · Asia/Bangkok</p>
+        <p className="mt-1 text-sm text-slate-500 md:text-base">{activeSource} · {periodDate(activePeriod.from)}–{periodDate(activePeriod.to)} · {activePeriod.timezone}</p>
       </div>
-      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">Historical snapshot</span>
+      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">{mode === "shifts" ? `${number(data.completeness.shiftRows)} shifts imported` : "Historical snapshot"}</span>
     </div>
 
     {mode==="payments" && <>
@@ -117,10 +154,45 @@ export default function HistoricalReports() {
         <MonthCard label="Last month" month={previousMonth}/>
         <MonthCard label="Current month" month={currentMonth}/>
       </div>
+
+      {data.completeness.missingShiftNumbers.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+        Loyverse shift number gap: {data.completeness.missingShiftNumbers.join(", ")}. These numbers are not present in the supplied CSV; no replacement figures have been invented.
+      </div>}
+
       <h2 className="text-xl font-black text-slate-900">Monthly cash reconciliation</h2>
-      <Table headers={["Month","Shifts","Cash payments","Cash refunds","Paid in","Paid out","Difference"]} rows={data.shiftMonths.map(x=>[x.month,number(x.shifts),money(x.cashPayments),money(x.cashRefunds),money(x.paidIn),money(x.paidOut),<span className={Math.abs(x.difference)>0.01?"font-bold text-red-600":"text-emerald-700"}>{money(x.difference)}</span>])}/>
-      <h2 className="text-xl font-black text-slate-900">Latest imported shifts</h2>
-      <Table headers={["Shift","Opened","Closed","Cash payments","Paid out","Expected","Actual","Difference"]} rows={data.recentShifts.map(x=>["#"+x.number,x.opened,x.closed,money(x.cash),money(x.paidOut),money(x.expected),money(x.actual),<span className={Math.abs(x.difference)>0.01?"font-bold text-red-600":"font-bold text-emerald-700"}>{money(x.difference)}</span>])}/>
+      <Table minWidth="1280px" headers={["Month","Shifts","Starting cash","Cash payments","Cash refunds","Paid in","Paid out","Expected cash","Actual cash","Difference"]} rows={data.shiftMonths.map(x=>[
+        x.month,
+        number(x.shifts),
+        money(x.startingCash),
+        money(x.cashPayments),
+        money(x.cashRefunds),
+        money(x.paidIn),
+        money(x.paidOut),
+        money(x.expected),
+        money(x.actual),
+        <span className={Math.abs(x.difference)>0.01?"font-bold text-red-600":"text-emerald-700"}>{money(x.difference)}</span>
+      ])}/>
+
+      <div className="flex flex-wrap items-end justify-between gap-2 pt-1">
+        <div>
+          <h2 className="text-xl font-black text-slate-900">All imported shifts</h2>
+          <p className="mt-1 text-sm text-slate-500">Every row from the supplied Loyverse shift export, newest first.</p>
+        </div>
+        {data.completeness.shiftNumberRange && <span className="text-xs font-semibold text-slate-500">Shift #{data.completeness.shiftNumberRange.from}–#{data.completeness.shiftNumberRange.to}</span>}
+      </div>
+      <Table minWidth="1700px" headers={["Shift","Opened","Closed","Starting cash","Cash payments","Cash refunds","Paid in","Paid out","Expected cash","Actual cash","Difference"]} rows={data.recentShifts.map(x=>[
+        `#${x.number}`,
+        x.opened,
+        x.closed,
+        money(x.startingCash),
+        money(x.cash),
+        money(x.cashRefunds),
+        money(x.paidIn),
+        money(x.paidOut),
+        money(x.expected),
+        money(x.actual),
+        <span className={Math.abs(x.difference)>0.01?"font-bold text-red-600":"font-bold text-emerald-700"}>{money(x.difference)}</span>
+      ])}/>
     </>}
   </div>;
 }
