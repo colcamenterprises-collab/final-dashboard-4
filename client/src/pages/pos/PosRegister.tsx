@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
-type Item = { id:string; name_en:string; name_th?:string; category_name:string; category_name_th?:string; active_price:number; image_url?:string; set_upgrade_eligible:boolean };
-type Modifier = { id:string; name_en:string; name_th?:string; price_delta:number; modifier_group_name_en:string };
+type Item = { id:string; name_en:string; name_th?:string; category_name:string; category_name_th?:string; active_price:number; image_url?:string; set_upgrade_eligible:boolean; has_options?:boolean };
+type Modifier = { id:string; name_en:string; name_th?:string; price_delta:number; modifier_group_id:string; modifier_group_name_en:string; group_type?:string };
+type ModifierGroup = { id:string; name_en:string; name_th?:string; group_type?:string; selection_mode:"single"|"multiple"; min_selections:number; max_selections?:number|null; prompt_text?:string|null; options:Modifier[] };
 type Line = Item & { quantity:number; set_upgrade?:boolean; meal_deal?:boolean; set_drink_menu_item_id?:string; modifiers?:Modifier[]; notes?:string };
 type Pending = { item:Item; modifiers:Modifier[] };
 type Discount = { id:string; code:string; name:string; discount_type:"percent"|"fixed"; value:number; active?:boolean };
@@ -45,8 +46,8 @@ export default function PosRegister() {
   const [language,setLanguage] = useState<"en"|"th">("en");
   const [notice,setNotice] = useState("");
   const [pending,setPending] = useState<Pending | null>(null);
-  const [modifierOptions,setModifierOptions] = useState<Modifier[]>([]);
-  const [flow,setFlow] = useState<"modifiers"|"upgrade"|"meal-deal">("modifiers");
+  const [modifierGroups,setModifierGroups] = useState<ModifierGroup[]>([]);
+  const [flow,setFlow] = useState<"options"|"upgrade"|"meal-deal">("options");
   const [selectedDrink,setSelectedDrink] = useState("");
   const [setUpgrade,setSetUpgrade] = useState(false);
   const [activeCategory,setActiveCategory] = useState("");
@@ -141,33 +142,78 @@ export default function PosRegister() {
   },[categories]);
 
   const commitLine = (line:Line) => {
-    if (isBurger(line) || line.meal_deal) return setCart(current => [...current,line]);
+    const signature = (entry:Line) => JSON.stringify({
+      id:entry.id,
+      modifiers:(entry.modifiers || []).map(modifier => modifier.id).sort(),
+      set:!!entry.set_upgrade,
+      meal:!!entry.meal_deal,
+      drink:entry.set_drink_menu_item_id || "",
+      notes:entry.notes || "",
+    });
     setCart(current => {
-      const index = current.findIndex(x => x.id === line.id && !x.set_upgrade && !(x.modifiers || []).length);
+      const lineSignature = signature(line);
+      const index = current.findIndex(entry => signature(entry) === lineSignature);
       return index < 0 ? [...current,line] : current.map((x,i) => i === index ? {...x,quantity:x.quantity + 1} : x);
     });
   };
+  const optionSelectionError = (groups:ModifierGroup[], modifiers:Modifier[]) => {
+    for (const group of groups) {
+      const count = modifiers.filter(modifier => modifier.modifier_group_id === group.id).length;
+      const minimum = Number(group.min_selections || 0);
+      const maximum = group.selection_mode === "single" ? 1 : group.max_selections == null ? null : Number(group.max_selections);
+      if (count < minimum) return `Choose ${minimum} option${minimum === 1 ? "" : "s"} from ${group.prompt_text || group.name_en}`;
+      if (maximum !== null && count > maximum) return `Choose no more than ${maximum} option${maximum === 1 ? "" : "s"} from ${group.name_en}`;
+    }
+    return "";
+  };
   const startItem = async (item:Item) => {
-    // Every burger and every meal deal gets the same Make it Better step,
-    // regardless of whether the customer is ordering at the counter or via Grab.
-    if (!isBurger(item) && !isMealDeal(item)) return commitLine({...item,quantity:1});
+    // Grab selections are handled in Grab. Staff only choose the included drink
+    // when entering an existing meal-deal order into this POS.
+    if (mode === "grab") {
+      if (!isMealDeal(item)) return commitLine({...item,quantity:1});
+      setPending({item,modifiers:[]}); setModifierGroups([]); setFlow("meal-deal"); setSetUpgrade(false); setSelectedDrink(""); return;
+    }
+    if (!item.has_options && !isBurger(item) && !isMealDeal(item)) return commitLine({...item,quantity:1});
     try {
       const response = await fetch(`/api/pos/menu/${item.id}/modifiers`,{credentials:"include"});
       if (response.status === 401) { window.location.assign("/pos?lock=1"); return; }
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not load additions");
-      setPending({item,modifiers:[]}); setModifierOptions(body.data || []); setFlow("modifiers"); setSetUpgrade(false); setSelectedDrink("");
+      const groups = (body.groups || []).map((group:ModifierGroup) => ({...group,min_selections:Number(group.min_selections || 0),max_selections:group.max_selections == null ? null : Number(group.max_selections),options:(group.options || []).map((option:Modifier) => ({...option,price_delta:Number(option.price_delta || 0)}))}));
+      if (!groups.length && !isBurger(item) && !isMealDeal(item)) return commitLine({...item,quantity:1});
+      setPending({item,modifiers:[]}); setModifierGroups(groups); setFlow(groups.length ? "options" : isMealDeal(item) ? "meal-deal" : "upgrade"); setSetUpgrade(false); setSelectedDrink(""); setNotice("");
     } catch (error:any) { setNotice(error.message); }
   };
-  const toggleModifier = (modifier:Modifier) => setPending(current => current && ({
-    ...current,
-    modifiers:current.modifiers.some(m => m.id === modifier.id) ? current.modifiers.filter(m => m.id !== modifier.id) : [...current.modifiers,modifier],
-  }));
-  const finishBurger = () => {
+  const toggleModifier = (group:ModifierGroup, modifier:Modifier) => setPending(current => {
+    if (!current) return current;
+    const alreadySelected = current.modifiers.some(entry => entry.id === modifier.id);
+    const withoutGroup = current.modifiers.filter(entry => entry.modifier_group_id !== group.id);
+    if (group.selection_mode === "single") return {...current,modifiers:[...withoutGroup,modifier]};
+    if (alreadySelected) return {...current,modifiers:current.modifiers.filter(entry => entry.id !== modifier.id)};
+    const selectedInGroup = current.modifiers.filter(entry => entry.modifier_group_id === group.id).length;
+    if (group.max_selections != null && selectedInGroup >= Number(group.max_selections)) {
+      setNotice(`Choose no more than ${group.max_selections} from ${group.name_en}`);
+      return current;
+    }
+    setNotice("");
+    return {...current,modifiers:[...current.modifiers,modifier]};
+  });
+  const advanceFromOptions = () => {
     if (!pending) return;
+    const error = optionSelectionError(modifierGroups,pending.modifiers);
+    if (error) return setNotice(error);
+    setNotice("");
+    if (isMealDeal(pending.item)) return setFlow("meal-deal");
+    if (pending.item.set_upgrade_eligible) return setFlow("upgrade");
+    finishItem();
+  };
+  const finishItem = () => {
+    if (!pending) return;
+    const optionsError = optionSelectionError(modifierGroups,pending.modifiers);
+    if (optionsError) return setNotice(optionsError);
     if ((isMealDeal(pending.item) || (pending.item.set_upgrade_eligible && setUpgrade)) && !selectedDrink) return setNotice("Select the included drink before continuing");
     commitLine({...pending.item,quantity:1,modifiers:pending.modifiers,meal_deal:isMealDeal(pending.item),set_upgrade:pending.item.set_upgrade_eligible ? setUpgrade : false,set_drink_menu_item_id:selectedDrink || undefined});
-    setPending(null);
+    setPending(null); setModifierGroups([]); setNotice("");
   };
 
   const startCheckout = () => {
@@ -258,6 +304,8 @@ export default function PosRegister() {
     } catch (error:any) { setNotice(error.message); }
   };
 
+  const pendingOptionsError = pending ? optionSelectionError(modifierGroups,pending.modifiers) : "";
+
   return <main className="h-dvh overflow-hidden bg-[#fffdf4] text-[#171717]">
     <header className="flex h-[70px] items-center justify-between bg-[#111111] px-5 text-white shadow-lg">
       <div className="flex items-center gap-4">
@@ -281,7 +329,7 @@ export default function PosRegister() {
       </section>
       <aside className="relative z-20 m-3 ml-0 min-h-0 min-w-0 overflow-y-auto rounded-[26px] border border-[#eee9d9] bg-white shadow-[0_10px_30px_rgba(38,31,7,0.08)]">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#eee9d9] bg-white px-5 py-4"><div><h2 className="text-xl font-black">{language === "th" ? "ออเดอร์ปัจจุบัน" : "Current order"}</h2><p className="mt-1 text-xs font-bold text-zinc-400">{language === "th" ? "ออเดอร์" : "Order"} · {orderNumber}</p></div><button onClick={()=>setCart([])} className="rounded-xl px-2 py-1 text-sm font-semibold text-red-600 hover:bg-red-50">{ui.clear}</button></div>
-        <div className="min-h-[220px] px-5">{cart.length === 0 ? <div className="grid min-h-[220px] place-items-center text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#fff6c9] text-xl">+</div><p className="mt-3 text-sm font-bold text-zinc-500">{ui.addItems}</p></div></div> : <div className="py-2">{cart.map((line,index) => <div key={`${line.id}-${index}`} className="border-b border-dashed border-[#d9d2c0] py-3"><div className="flex justify-between gap-2 text-sm font-bold"><span className="leading-5">{line.quantity} × {label(line)}</span><span>{thb(lineTotal(line))}</span></div>{(line.modifiers || []).map(modifier => <p key={modifier.id} className="mt-1 text-xs font-medium text-[#15945c]">+ {label(modifier)} · {thb(modifier.price_delta)}</p>)}{(line.set_upgrade || line.meal_deal) && <div className="mt-1 text-xs font-bold text-[#856a00]">{line.set_upgrade && <p>SET UPGRADE +฿80</p>}<p>1 × {ui.fries}</p><p>1 × {label(drinks.find(drink => drink.id === line.set_drink_menu_item_id) || {name_en:"Selected drink"})}</p></div>}{isBurger(line) && <input list="burger-request-suggestions" value={line.notes || ""} onChange={event=>setCart(current=>current.map((item,i)=>i === index ? {...item,notes:event.target.value} : item))} className="mt-2 w-full rounded-xl border border-[#e9e4d5] bg-[#fffdf8] px-3 py-2 text-xs outline-none focus:border-[#ffd400]" placeholder={language === "th" ? "คำขอ เช่น ไม่ใส่ชีส" : "Item request, e.g. No cheese"}/>}</div>)}</div>}</div>
+        <div className="min-h-[220px] px-5">{cart.length === 0 ? <div className="grid min-h-[220px] place-items-center text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#fff6c9] text-xl">+</div><p className="mt-3 text-sm font-bold text-zinc-500">{ui.addItems}</p></div></div> : <div className="py-2">{cart.map((line,index) => <div key={`${line.id}-${index}`} className="border-b border-dashed border-[#d9d2c0] py-3"><div className="flex justify-between gap-2 text-sm font-bold"><span className="leading-5">{line.quantity} × {label(line)}</span><span>{thb(lineTotal(line))}</span></div>{(line.modifiers || []).map(modifier => <p key={modifier.id} className="mt-1 text-xs font-medium text-[#15945c]">{modifier.group_type === "choice" ? "" : "+ "}{label(modifier)} · {modifier.group_type === "choice" ? thb(Number(line.active_price || 0) + Number(modifier.price_delta || 0)) : thb(modifier.price_delta)}</p>)}{(line.set_upgrade || line.meal_deal) && <div className="mt-1 text-xs font-bold text-[#856a00]">{line.set_upgrade && <p>SET UPGRADE +฿80</p>}<p>1 × {ui.fries}</p><p>1 × {label(drinks.find(drink => drink.id === line.set_drink_menu_item_id) || {name_en:"Selected drink"})}</p></div>}{isBurger(line) && <input list="burger-request-suggestions" value={line.notes || ""} onChange={event=>setCart(current=>current.map((item,i)=>i === index ? {...item,notes:event.target.value} : item))} className="mt-2 w-full rounded-xl border border-[#e9e4d5] bg-[#fffdf8] px-3 py-2 text-xs outline-none focus:border-[#ffd400]" placeholder={language === "th" ? "คำขอ เช่น ไม่ใส่ชีส" : "Item request, e.g. No cheese"}/>}</div>)}</div>}</div>
         <datalist id="burger-request-suggestions"><option value="No cheese"/><option value="No tomato"/><option value="No salad"/><option value="No onions"/><option value="No pickles"/><option value="No jalapenos"/><option value="No burger sauce"/><option value="No meat"/><option value="No bun"/></datalist>
         <div className="border-t border-[#eee9d9] bg-[#fffefa] p-5">
           <div className="flex items-end justify-between"><span className="text-lg font-black">{ui.total}</span><span className="text-3xl font-black">{thb(total)}</span></div>
@@ -295,9 +343,9 @@ export default function PosRegister() {
       </aside>
     </div>
 
-    {pending && <div className="fixed inset-0 z-20 grid place-items-center bg-black/50 p-4"><div className="w-full max-w-lg rounded-[26px] bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[11px] font-black tracking-[0.1em] text-[#15945c]">{flow === "modifiers" ? "STEP 1 OF 2" : "STEP 2 OF 2"}</p><h2 className="mt-1 text-2xl font-black">{flow === "modifiers" ? "Make it Better" : flow === "meal-deal" ? "Choose the included drink" : "Make it a set?"}</h2><p className="mt-1 text-sm text-zinc-600">{label(pending.item)}</p></div><button onClick={()=>setPending(null)} className="rounded-xl px-3 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-100">Close</button></div>{flow === "modifiers" ? <><p className="mt-5 text-sm text-zinc-600">Offer these additions before continuing.</p><div className="mt-3 grid grid-cols-2 gap-2">{modifierOptions.map(modifier => <button key={modifier.id} onClick={()=>toggleModifier(modifier)} className={`rounded-2xl border p-4 text-left font-bold ${pending.modifiers.some(m => m.id === modifier.id) ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200 hover:border-[#ffd400]"}`}><span className="block">{label(modifier)}</span><span className="mt-1 block text-sm text-[#15945c]">+{thb(modifier.price_delta)}</span></button>)}</div><button onClick={()=>isMealDeal(pending.item) ? setFlow("meal-deal") : pending.item.set_upgrade_eligible ? setFlow("upgrade") : finishBurger()} className="mt-5 w-full rounded-xl bg-[#ffd400] p-4 font-black">{ui.continue}</button></> : flow === "meal-deal" ? <><p className="mt-5 rounded-2xl bg-[#fff9d9] p-4 text-sm font-bold text-[#856a00]">{ui.mealIncludes}</p><select value={selectedDrink} onChange={event=>setSelectedDrink(event.target.value)} className="mt-3 w-full rounded-xl border p-3"><option value="">{ui.drink}</option>{drinks.map(drink => <option key={drink.id} value={drink.id}>{label(drink)}</option>)}</select><button onClick={finishBurger} className="mt-5 w-full rounded-xl bg-[#ffd400] p-4 font-black">{ui.add}</button></> : <><div className="mt-5 grid grid-cols-2 gap-2"><button onClick={()=>setSetUpgrade(false)} className={`rounded-2xl border p-4 font-bold ${!setUpgrade ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200"}`}>Burger only</button><button onClick={()=>setSetUpgrade(true)} className={`rounded-2xl border p-4 font-bold ${setUpgrade ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200"}`}>Set +฿80</button></div>{setUpgrade && <select value={selectedDrink} onChange={event=>setSelectedDrink(event.target.value)} className="mt-3 w-full rounded-xl border p-3"><option value="">{ui.drink}</option>{drinks.map(drink => <option key={drink.id} value={drink.id}>{label(drink)}</option>)}</select>}<button onClick={finishBurger} className="mt-5 w-full rounded-xl bg-[#ffd400] p-4 font-black">{ui.add}</button></>}</div></div>}
+    {pending && <div className="fixed inset-0 z-20 grid place-items-center bg-black/50 p-4"><div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-[26px] bg-white p-6 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[11px] font-black tracking-[0.1em] text-[#15945c]">{flow === "options" ? "ITEM OPTIONS" : flow === "meal-deal" ? "INCLUDED DRINK" : "SET UPSELL"}</p><h2 className="mt-1 text-2xl font-black">{flow === "options" ? (modifierGroups.length === 1 ? modifierGroups[0].prompt_text || modifierGroups[0].name_en : "Choose options") : flow === "meal-deal" ? "Choose the included drink" : "Make it a set?"}</h2><p className="mt-1 text-sm text-zinc-600">{label(pending.item)}</p></div><button onClick={()=>{setPending(null);setModifierGroups([]);setNotice("");}} className="rounded-xl px-3 py-2 text-sm font-semibold text-zinc-500 hover:bg-zinc-100">Close</button></div>{flow === "options" ? <><div className="mt-5 space-y-5">{modifierGroups.map(group => { const selectedCount = pending.modifiers.filter(modifier => modifier.modifier_group_id === group.id).length; const required = Number(group.min_selections || 0) > 0; return <section key={group.id}><div className="mb-2 flex items-center justify-between gap-3"><div><h3 className="font-black">{group.prompt_text || group.name_en}</h3><p className="text-xs text-zinc-500">{required ? "Required" : "Optional"}{group.selection_mode === "single" ? " · Choose one" : group.max_selections ? ` · Up to ${group.max_selections}` : ""}</p></div>{required && selectedCount < Number(group.min_selections || 0) && <span className="rounded-full bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700">REQUIRED</span>}</div><div className="grid grid-cols-2 gap-2">{group.options.map(modifier => { const selected = pending.modifiers.some(entry => entry.id === modifier.id); const isChoice = group.group_type === "choice"; return <button key={modifier.id} onClick={()=>toggleModifier(group,modifier)} className={`rounded-2xl border p-4 text-left font-bold ${selected ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200 hover:border-[#ffd400]"}`}><span className="block">{label(modifier)}</span><span className="mt-1 block text-sm text-[#15945c]">{isChoice ? thb(Number(pending.item.active_price || 0) + Number(modifier.price_delta || 0)) : `+${thb(modifier.price_delta)}`}</span></button>; })}</div></section>; })}</div>{pendingOptionsError && <p className="mt-4 rounded-xl bg-red-50 px-3 py-2 text-sm font-bold text-red-700">{pendingOptionsError}</p>}<button disabled={Boolean(pendingOptionsError)} onClick={advanceFromOptions} className="mt-5 w-full rounded-xl bg-[#ffd400] p-4 font-black disabled:cursor-not-allowed disabled:opacity-40">{ui.continue}</button></> : flow === "meal-deal" ? <><p className="mt-5 rounded-2xl bg-[#fff9d9] p-4 text-sm font-bold text-[#856a00]">{ui.mealIncludes}</p><select value={selectedDrink} onChange={event=>setSelectedDrink(event.target.value)} className="mt-3 w-full rounded-xl border p-3"><option value="">{ui.drink}</option>{drinks.map(drink => <option key={drink.id} value={drink.id}>{label(drink)}</option>)}</select><button onClick={finishItem} className="mt-5 w-full rounded-xl bg-[#ffd400] p-4 font-black">{ui.add}</button></> : <><div className="mt-5 grid grid-cols-2 gap-2"><button onClick={()=>setSetUpgrade(false)} className={`rounded-2xl border p-4 font-bold ${!setUpgrade ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200"}`}>Burger only</button><button onClick={()=>setSetUpgrade(true)} className={`rounded-2xl border p-4 font-bold ${setUpgrade ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200"}`}>Set +฿80</button></div>{setUpgrade && <select value={selectedDrink} onChange={event=>setSelectedDrink(event.target.value)} className="mt-3 w-full rounded-xl border p-3"><option value="">{ui.drink}</option>{drinks.map(drink => <option key={drink.id} value={drink.id}>{label(drink)}</option>)}</select>}<button onClick={finishItem} className="mt-5 w-full rounded-xl bg-[#ffd400] p-4 font-black">{ui.add}</button></>}</div></div>}
 
-    {marketingOpen && <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4"><div className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl"><p className="text-xs font-black tracking-[0.12em] text-[#15945c]">MEMBERSHIP & REVIEWS</p><h2 className="mt-1 text-2xl font-black">Before receipt completion</h2><p className="mt-3 rounded-2xl bg-[#fff9d9] p-4 text-base font-bold leading-6">{marketingPrompt}</p>{checkoutError && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{checkoutError}</p>}<div className="mt-5 flex items-center gap-3"><input id="marketing-consent" type="checkbox" checked={marketingConsent} onChange={event=>setMarketingConsent(event.target.checked)} className="h-5 w-5 accent-[#15945c]"/><label htmlFor="marketing-consent" className="text-sm font-bold">Customer agrees to receive promotions and a review invitation</label></div>{marketingConsent ? <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-xs font-black">First name<input value={marketingFirstName} onChange={event=>setMarketingFirstName(event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"/></label><label className="text-xs font-black">Mobile number<input inputMode="tel" value={marketingMobile} onChange={event=>setMarketingMobile(event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"/></label><label className="text-xs font-black sm:col-span-2">Email (use email or mobile)<input inputMode="email" value={marketingEmail} onChange={event=>setMarketingEmail(event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"/></label></div> : <div className="mt-4"><p className="text-sm font-bold">If they do not join, select one reason:</p><div className="mt-2 grid gap-2">{skipReasons.map(reason => <button key={reason.value} onClick={()=>setMarketingSkipReason(reason.value)} className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold ${marketingSkipReason === reason.value ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200"}`}>{reason.label}</button>)}</div></div>}<div className="mt-6 flex gap-3"><button onClick={()=>setMarketingOpen(false)} className="rounded-xl border border-zinc-200 px-4 py-3 font-bold">Back</button><button onClick={charge} className="flex-1 rounded-xl bg-[#ffd400] px-4 py-3 font-black">Complete order {thb(total)}</button></div></div></div>}
+    {marketingOpen && <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4"><div className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl"><p className="text-xs font-black tracking-[0.12em] text-[#15945c]">MEMBERSHIP & REVIEWS</p><h2 className="mt-1 text-2xl font-black">Before receipt completion</h2><p className="mt-3 rounded-2xl bg-[#fff9d9] p-4 text-base font-bold leading-6">{marketingPrompt}</p>{checkoutError && <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{checkoutError}</p>}<div className="mt-5 flex items-center gap-3"><input id="marketing-consent" type="checkbox" checked={marketingConsent} onChange={event=>setMarketingConsent(event.target.checked)} className="h-5 w-5 accent-[#15945c]"/><label htmlFor="marketing-consent" className="text-sm font-bold">Customer agrees to receive promotions and a review invitation</label></div>{marketingConsent ? <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-xs font-black">First name<input value={marketingFirstName} onChange={event=>setMarketingFirstName(event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"/></label><label className="text-xs font-black">Mobile number<input inputMode="tel" value={marketingMobile} onChange={event=>setMarketingMobile(event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"/></label><label className="text-xs font-black sm:col-span-2">Email (use email or mobile)<input inputMode="email" value={marketingEmail} onChange={event=>setMarketingEmail(event.target.value)} className="mt-1 w-full rounded-xl border px-3 py-3 text-sm"/></label></div> : <div className="mt-4"><p className="text-sm font-bold">If they do not join, select one reason:</p><div className="mt-2 grid gap-2">{skipReasons.map(reason => <button key={reason.value} onClick={()=>setMarketingSkipReason(reason.value)} className={`rounded-xl border px-4 py-3 text-left text-sm font-semibold ${marketingSkipReason === reason.value ? "border-[#ffd400] bg-[#fff9d9]" : "border-zinc-200"}`}>{reason.label}</button>)}</div></div>}<div className="mt-6 flex gap-3"><button onClick={()=>setMarketingOpen(false)} className="rounded-xl border border-zinc-200 px-4 py-3 font-bold">Back</button><button onClick={()=>void charge()} className="flex-1 rounded-xl bg-[#ffd400] px-4 py-3 font-black">Complete order {thb(total)}</button></div></div></div>}
 
     {discountManagerOpen && <div className="fixed inset-0 z-30 grid place-items-center bg-black/60 p-4"><div className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl"><div className="flex items-center justify-between"><div><p className="text-xs font-black tracking-[0.12em] text-[#15945c]">STAFF DISCOUNT MANAGEMENT</p><h2 className="mt-1 text-2xl font-black">Discount codes</h2></div><button onClick={()=>setDiscountManagerOpen(false)} className="rounded-xl px-3 py-2 font-bold">Close</button></div><div className="mt-5 grid gap-3 sm:grid-cols-2"><input value={newDiscount.code} onChange={event=>setNewDiscount(current=>({...current,code:event.target.value.toUpperCase()}))} placeholder="Code e.g. STAFF10" className="rounded-xl border px-3 py-3 text-sm font-bold"/><input value={newDiscount.name} onChange={event=>setNewDiscount(current=>({...current,name:event.target.value}))} placeholder="Name e.g. Staff launch" className="rounded-xl border px-3 py-3 text-sm"/><select value={newDiscount.discount_type} onChange={event=>setNewDiscount(current=>({...current,discount_type:event.target.value}))} className="rounded-xl border px-3 py-3 text-sm"><option value="percent">Percentage</option><option value="fixed">Fixed amount (฿)</option></select><input inputMode="decimal" value={newDiscount.value} onChange={event=>setNewDiscount(current=>({...current,value:event.target.value}))} placeholder="Value" className="rounded-xl border px-3 py-3 text-sm"/></div><button onClick={createDiscount} className="mt-3 w-full rounded-xl bg-[#ffd400] px-4 py-3 font-black">Add discount code</button><div className="mt-6 max-h-64 space-y-2 overflow-y-auto">{managedDiscounts.map(discount => <div key={discount.id} className="flex items-center justify-between rounded-xl border p-3"><div><p className="font-black">{discount.code} <span className="text-sm font-medium text-zinc-500">— {discount.name}</span></p><p className="text-xs text-zinc-500">{discount.discount_type === "percent" ? `${discount.value}%` : thb(discount.value)}</p></div><button onClick={()=>toggleDiscount(discount)} className={`rounded-lg px-3 py-2 text-xs font-black ${discount.active ? "bg-[#e6f7ee] text-[#15804f]" : "bg-zinc-100 text-zinc-500"}`}>{discount.active ? "Active" : "Inactive"}</button></div>)}</div></div></div>}
   </main>;

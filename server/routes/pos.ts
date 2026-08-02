@@ -61,7 +61,22 @@ router.get("/menu", async (req, res) => {
     const price = mode === "grab" ? "grab_price" : "direct_price";
     const rows = await db().query(
       `SELECT i.*, c.name_en category_name,
-        COALESCE(i.${price}, i.direct_price, i.price) active_price
+        COALESCE(i.${price}, i.direct_price, i.price) active_price,
+        EXISTS(
+          SELECT 1
+          FROM ordering_modifier_groups g
+          WHERE g.is_active
+            AND (
+              g.menu_item_id=i.id OR EXISTS(
+                SELECT 1 FROM ordering_modifier_group_items a
+                WHERE a.modifier_group_id=g.id AND a.menu_item_id=i.id
+              )
+            )
+            AND EXISTS(
+              SELECT 1 FROM ordering_item_modifiers m
+              WHERE m.modifier_group_id=g.id AND m.is_active
+            )
+        ) AS has_options
        FROM ordering_menu_items i
        JOIN ordering_menu_categories c ON c.id = i.category_id
        WHERE c.is_active
@@ -205,16 +220,42 @@ router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
 
 router.get("/menu/:menuItemId/modifiers", staffDevice, async (req, res) => {
   try {
-    const result = await db().query(
-      `SELECT m.*, g.name_en AS modifier_group_name_en,
-              g.name_th AS modifier_group_name_name_th
-       FROM ordering_item_modifiers m
-       JOIN ordering_modifier_groups g ON g.id = m.modifier_group_id
-       WHERE g.menu_item_id = $1 AND m.is_active
-       ORDER BY g.sort_order, m.sort_order`,
+    const groupsResult = await db().query(
+      `SELECT DISTINCT g.id,g.name_en,g.name_th,g.group_type,g.selection_mode,
+              COALESCE(g.min_selections,g.min_select,CASE WHEN g.is_required THEN 1 ELSE 0 END,0) AS min_selections,
+              COALESCE(g.max_selections,g.max_select) AS max_selections,
+              g.prompt_text,g.sort_order
+       FROM ordering_modifier_groups g
+       WHERE g.is_active
+         AND (
+           g.menu_item_id=$1 OR EXISTS(
+             SELECT 1 FROM ordering_modifier_group_items a
+             WHERE a.modifier_group_id=g.id AND a.menu_item_id=$1
+           )
+         )
+       ORDER BY g.sort_order,g.name_en`,
       [req.params.menuItemId],
     );
-    res.json({ ok: true, source: "sbb_pos_core", data: result.rows });
+    const groupIds = groupsResult.rows.map((group) => group.id);
+    const optionsResult = groupIds.length
+      ? await db().query(
+          `SELECT m.*,g.name_en AS modifier_group_name_en,g.name_th AS modifier_group_name_th,g.group_type
+           FROM ordering_item_modifiers m
+           JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id
+           WHERE m.modifier_group_id=ANY($1::uuid[]) AND m.is_active
+           ORDER BY g.sort_order,m.sort_order,m.name_en`,
+          [groupIds],
+        )
+      : { rows: [] as any[] };
+    const optionsByGroup = new Map<string, any[]>();
+    for (const option of optionsResult.rows) {
+      const key = String(option.modifier_group_id);
+      optionsByGroup.set(key, [...(optionsByGroup.get(key) || []), option]);
+    }
+    const groups = groupsResult.rows
+      .map((group) => ({ ...group, options: optionsByGroup.get(String(group.id)) || [] }))
+      .filter((group) => group.options.length > 0);
+    res.json({ ok: true, source: "sbb_pos_core", data: optionsResult.rows, groups });
   } catch (e: any) {
     fail(res, e.message, 500);
   }
@@ -309,6 +350,73 @@ router.post("/orders", staffDevice, async (req, res) => {
       if (mode === "grab" && line.set_upgrade)
         throw new Error("Grab orders cannot use staff upsells");
 
+      const modifierIds: string[] = Array.isArray(line.modifier_ids)
+        ? [...new Set<string>(line.modifier_ids.filter((id: any): id is string => typeof id === "string"))]
+        : [];
+      if (mode === "grab" && modifierIds.length)
+        throw new Error("Grab orders cannot use staff modifiers");
+
+      let selectedModifiers: any[] = [];
+      if (mode === "direct") {
+        const groupResult = await client.query(
+          `SELECT DISTINCT g.id,g.name_en,g.selection_mode,
+                  COALESCE(g.min_selections,g.min_select,CASE WHEN g.is_required THEN 1 ELSE 0 END,0) AS min_selections,
+                  COALESCE(g.max_selections,g.max_select) AS max_selections
+           FROM ordering_modifier_groups g
+           WHERE g.is_active
+             AND (
+               g.menu_item_id=$1 OR EXISTS(
+                 SELECT 1 FROM ordering_modifier_group_items a
+                 WHERE a.modifier_group_id=g.id AND a.menu_item_id=$1
+               )
+             )
+             AND EXISTS(
+               SELECT 1 FROM ordering_item_modifiers available
+               WHERE available.modifier_group_id=g.id AND available.is_active
+             )`,
+          [item.id],
+        );
+
+        if (modifierIds.length) {
+          const modifierResult = await client.query(
+            `SELECT m.*,g.name_en AS modifier_group_name_en,g.group_type
+             FROM ordering_item_modifiers m
+             JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id
+             WHERE m.id=ANY($1::uuid[])
+               AND m.is_active AND g.is_active
+               AND (
+                 g.menu_item_id=$2 OR EXISTS(
+                   SELECT 1 FROM ordering_modifier_group_items a
+                   WHERE a.modifier_group_id=g.id AND a.menu_item_id=$2
+                 )
+               )`,
+            [modifierIds, item.id],
+          );
+          selectedModifiers = modifierResult.rows;
+          if (selectedModifiers.length !== modifierIds.length) {
+            throw new Error("Invalid option for this item");
+          }
+        }
+
+        const selectionsByGroup = new Map<string, number>();
+        for (const modifier of selectedModifiers) {
+          const key = String(modifier.modifier_group_id);
+          selectionsByGroup.set(key, (selectionsByGroup.get(key) || 0) + 1);
+        }
+        for (const group of groupResult.rows) {
+          const count = selectionsByGroup.get(String(group.id)) || 0;
+          const minimum = Number(group.min_selections || 0);
+          const configuredMaximum = group.max_selections == null ? null : Number(group.max_selections);
+          const maximum = group.selection_mode === "single" ? 1 : configuredMaximum;
+          if (count < minimum) {
+            throw new Error(`Select ${minimum} option${minimum === 1 ? "" : "s"} from ${group.name_en}`);
+          }
+          if (maximum !== null && count > maximum) {
+            throw new Error(`Select no more than ${maximum} option${maximum === 1 ? "" : "s"} from ${group.name_en}`);
+          }
+        }
+      }
+
       const parent = (
         await client.query(
           `INSERT INTO ordering_order_items(
@@ -334,25 +442,8 @@ router.post("/orders", staffDevice, async (req, res) => {
       ).rows[0];
       total += unit * qty;
 
-      const modifierIds = Array.isArray(line.modifier_ids)
-        ? [...new Set(line.modifier_ids.filter((id: any) => typeof id === "string"))]
-        : [];
-      if (mode === "grab" && modifierIds.length)
-        throw new Error("Grab orders cannot use staff modifiers");
-
-      if (modifierIds.length) {
-        const result = await client.query(
-          `SELECT m.*, g.name_en AS modifier_group_name_en
-           FROM ordering_item_modifiers m
-           JOIN ordering_modifier_groups g ON g.id = m.modifier_group_id
-           WHERE m.id = ANY($1::uuid[])
-             AND g.menu_item_id = $2
-             AND m.is_active`,
-          [modifierIds, item.id],
-        );
-        if (result.rows.length !== modifierIds.length)
-          throw new Error("Invalid modifier for this item");
-        for (const modifier of result.rows) {
+      if (selectedModifiers.length) {
+        for (const modifier of selectedModifiers) {
           const delta = value(modifier.price_delta) * qty;
           await client.query(
             `INSERT INTO ordering_order_item_modifiers(

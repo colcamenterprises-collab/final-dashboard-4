@@ -24,6 +24,7 @@ type Props = {
 export default function OrderingMenu({ categories, language, large, onAdd }: Props) {
   const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
   const [modsByItem, setModsByItem] = useState<Record<string, Set<string>>>({});
+  const [optionErrors, setOptionErrors] = useState<Record<string, string>>({});
   const buttonClass = large ? "sbo-menu-add is-large" : "sbo-menu-add";
 
   const modifierLookup = useMemo(() => {
@@ -32,8 +33,26 @@ export default function OrderingMenu({ categories, language, large, onAdd }: Pro
     return lookup;
   }, [categories]);
 
+  function selectionError(item: any, selectedIds: Set<string>) {
+    if (!item) return "";
+    for (const group of item.modifier_groups ?? []) {
+      const count = (group.modifiers ?? []).filter((modifier: any) => selectedIds.has(modifier.id)).length;
+      const minimum = Number(group.min_selections ?? group.min_select ?? (group.is_required ? 1 : 0));
+      const configuredMaximum = group.max_selections ?? group.max_select;
+      const maximum = group.selection_mode === "single" ? 1 : configuredMaximum == null ? null : Number(configuredMaximum);
+      if (count < minimum) return `Choose ${minimum} option${minimum === 1 ? "" : "s"} from ${group.prompt_text || group.name_en}`;
+      if (maximum !== null && count > maximum) return `Choose no more than ${maximum} option${maximum === 1 ? "" : "s"} from ${group.name_en}`;
+    }
+    return "";
+  }
+
   function addItem(item: any) {
     const selectedIds = Array.from(modsByItem[item.id] ?? []);
+    const error = selectionError(item, new Set(selectedIds));
+    if (error) {
+      setOptionErrors((previous) => ({ ...previous, [item.id]: error }));
+      return;
+    }
     onAdd({
       menu_item_id: item.id,
       name_en: item.name_en,
@@ -45,14 +64,20 @@ export default function OrderingMenu({ categories, language, large, onAdd }: Pro
     });
     setNotesByItem((prev) => ({ ...prev, [item.id]: "" }));
     setModsByItem((prev) => ({ ...prev, [item.id]: new Set() }));
+    setOptionErrors((previous) => ({ ...previous, [item.id]: "" }));
   }
 
-  function toggleModifier(itemId: string, modifierId: string) {
-    setModsByItem((prev) => {
-      const next = new Set(prev[itemId] ?? []);
+  function toggleModifier(itemId: string, group: any, modifierId: string) {
+    const next = new Set(modsByItem[itemId] ?? []);
+    if (group.selection_mode === "single") {
+      for (const option of group.modifiers ?? []) next.delete(option.id);
+      next.add(modifierId);
+    } else {
       next.has(modifierId) ? next.delete(modifierId) : next.add(modifierId);
-      return { ...prev, [itemId]: next };
-    });
+    }
+    setModsByItem((previous) => ({ ...previous, [itemId]: next }));
+    const item = categories.flatMap((category) => category.items ?? []).find((entry) => entry.id === itemId);
+    setOptionErrors((previous) => ({ ...previous, [itemId]: selectionError(item, next) }));
   }
 
   if (!categories.length) return <div className="sbo-empty">No ordering menu items have been created yet.</div>;
@@ -78,12 +103,24 @@ export default function OrderingMenu({ categories, language, large, onAdd }: Pro
                   {soldOut && <div className="sbo-soldout">Sold out</div>}
                   {!soldOut && (item.modifier_groups ?? []).map((group: any) => (
                     <div key={group.id} className="sbo-mod-group">
-                      <div className="sbo-mod-title">{language === "th" && group.name_th ? group.name_th : group.name_en}</div>
+                      <div className="sbo-mod-title">
+                        {language === "th" && group.name_th ? group.name_th : group.prompt_text || group.name_en}
+                        {Number(group.min_selections ?? group.min_select ?? (group.is_required ? 1 : 0)) > 0 ? " · Required" : " · Optional"}
+                      </div>
                       <div className="sbo-mod-list">
                         {(group.modifiers ?? []).map((modifier: any) => (
                           <label key={modifier.id}>
-                            <input type="checkbox" checked={modsByItem[item.id]?.has(modifier.id) ?? false} onChange={() => toggleModifier(item.id, modifier.id)} />
-                            <span>{itemLabel(modifier, language)} {Number(modifier.price_delta) ? `+${money(modifier.price_delta)}` : ""}</span>
+                            <input
+                              type={group.selection_mode === "single" ? "radio" : "checkbox"}
+                              name={group.selection_mode === "single" ? `${item.id}-${group.id}` : undefined}
+                              checked={modsByItem[item.id]?.has(modifier.id) ?? false}
+                              onChange={() => toggleModifier(item.id, group, modifier.id)}
+                            />
+                            <span>
+                              {itemLabel(modifier, language)} {group.group_type === "choice"
+                                ? money(Number(item.price) + Number(modifier.price_delta || 0))
+                                : Number(modifier.price_delta) ? `+${money(modifier.price_delta)}` : ""}
+                            </span>
                           </label>
                         ))}
                       </div>
@@ -91,6 +128,7 @@ export default function OrderingMenu({ categories, language, large, onAdd }: Pro
                   ))}
                   {!soldOut && (
                     <>
+                      {optionErrors[item.id] && <div className="sbo-soldout">{optionErrors[item.id]}</div>}
                       <textarea className="sbo-item-notes" placeholder="Item notes" value={notesByItem[item.id] ?? ""} onChange={(event) => setNotesByItem((prev) => ({ ...prev, [item.id]: event.target.value }))} />
                       <button className={buttonClass} onClick={() => addItem(item)}>Add to Cart</button>
                     </>
