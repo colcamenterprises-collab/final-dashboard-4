@@ -38,9 +38,10 @@ interface ReviewPanelProps {
   onClose?: () => void;
   aggregateQueue?: boolean;
   onApproved?: () => void;
+  compact?: boolean;
 }
 
-export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQueue = false }: ReviewPanelProps) {
+export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQueue = false, compact = false }: ReviewPanelProps) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filters, setFilters] = useState({
     status: aggregateQueue ? 'pending_review' : '',
@@ -138,6 +139,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
       });
       queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
+      onApproved?.();
     },
   });
 
@@ -153,6 +155,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
       });
       queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
       queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
+      onApproved?.();
     },
   });
 
@@ -288,7 +291,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
   const getStatusLabel = (status: string) => {
     switch (status) {
       case 'approved': return 'Approved';
-      case 'rejected': return 'Rejected';
+      case 'rejected': return 'Declined';
       case 'deleted': return 'Deleted';
       case 'purged': return 'Purged';
       case 'hold': return 'Hold';
@@ -317,9 +320,9 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
   };
 
   return (
-    <div className="space-y-6">
+    <div className={compact ? "space-y-3" : "space-y-6"}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      {!compact && <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           {onClose && <Button variant="ghost" size="sm" onClick={onClose}>
             <ChevronLeft className="h-4 w-4" />
@@ -335,10 +338,10 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
             </p>
           </div>
         </div>
-      </div>
+      </div>}
 
 
-      {aggregateQueue && (
+      {aggregateQueue && !compact && (
         <Card>
           <CardContent className="flex flex-wrap gap-2 p-3 sm:p-4">
             {[
@@ -366,7 +369,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
       )}
 
       {/* Filters */}
-      <Card>
+      {!compact && <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <Filter className="h-4 w-4" />
@@ -436,7 +439,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
             </div>
           </div>
         </CardContent>
-      </Card>
+      </Card>}
 
       {/* Bulk Actions */}
       <Card className="border-blue-200 bg-blue-50">
@@ -451,14 +454,16 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
               <Trash2 className="h-3 w-3 mr-1" />
               Delete Selected
             </Button>
-            <Button size="sm" variant="outline" onClick={() => setDeleteConfirm({ scope: 'all_pending', count: queueData?.counts?.pending_all ?? visiblePendingTransactions.length })} disabled={(queueData?.counts?.pending_all ?? visiblePendingTransactions.length) === 0 || bulkDeleteMutation.isPending}>
-              <Trash2 className="h-3 w-3 mr-1" />
-              Delete All Pending Imported Transactions
-            </Button>
-            <Button size="sm" variant="destructive" onClick={() => setPurgeConfirmOpen(true)} disabled={purgeMutation.isPending}>
-              <Trash2 className="h-3 w-3 mr-1" />
-              Purge All Imported Bank Transactions
-            </Button>
+            {!compact && <>
+              <Button size="sm" variant="outline" onClick={() => setDeleteConfirm({ scope: 'all_pending', count: queueData?.counts?.pending_all ?? visiblePendingTransactions.length })} disabled={(queueData?.counts?.pending_all ?? visiblePendingTransactions.length) === 0 || bulkDeleteMutation.isPending}>
+                <Trash2 className="h-3 w-3 mr-1" />
+                Delete All Pending Imported Transactions
+              </Button>
+              <Button size="sm" variant="destructive" onClick={() => setPurgeConfirmOpen(true)} disabled={purgeMutation.isPending}>
+                <Trash2 className="h-3 w-3 mr-1" />
+                Purge All Imported Bank Transactions
+              </Button>
+            </>}
           </div>
         </CardContent>
       </Card>
@@ -553,7 +558,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                         <div className="space-y-1">
                           <Label className="text-[11px]">Classification</Label>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -576,17 +581,35 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                         </div>
 
                         <div className="space-y-1">
-                          <Label className="text-[11px]">Supplier / Description</Label>
+                          <Label className="text-[11px]">Statement Description</Label>
+                          <Input
+                            key={`${txn.id}:${txn.description}`}
+                            defaultValue={txn.description}
+                            onBlur={(e) => {
+                              const description = e.target.value.trim();
+                              if (description && description !== txn.description) {
+                                editMutation.mutate({ id: txn.id, updates: { description } });
+                              }
+                            }}
+                            disabled={txn.status !== 'pending' || editMutation.isPending}
+                            className="h-9 w-full"
+                            aria-label="Statement description"
+                          />
+                          <p className="text-[10px] text-slate-500">The original imported text remains in the audit record.</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[11px]">Purpose / Supplier</Label>
                           <Input
                             key={`${txn.id}:${txn.supplier || txn.merchantSuggestion || txn.description || ''}`}
                             defaultValue={txn.supplier || txn.merchantSuggestion || txn.description || ''}
-                            placeholder="Optional supplier/description"
+                            placeholder="Expense purpose or supplier"
                             onBlur={(e) => editMutation.mutate({ id: txn.id, updates: { supplier: e.target.value } })}
                             disabled={txn.status !== 'pending' || editMutation.isPending}
                             className="h-9 w-full"
-                            aria-label="Supplier / Description"
+                            aria-label="Purpose or supplier"
                           />
-                          <p className="text-[10px] text-slate-500">Defaults to imported bank statement text; edit only if needed.</p>
+                          <p className="text-[10px] text-slate-500">Defaults to the bank text and can be amended before approval.</p>
                         </div>
                       </div>
 
@@ -622,9 +645,9 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                                 variant="outline"
                                 onClick={() => handleReject(txn.id)}
                                 disabled={editMutation.isPending}
-                                title="Reject"
+                                title="Decline"
                               >
-                                <X className="h-3 w-3 text-red-600 mr-1" />Reject
+                                <X className="h-3 w-3 text-red-600 mr-1" />Decline
                               </Button>
                             </>
                           )}
