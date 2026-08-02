@@ -5,6 +5,10 @@ import { bankImportBatch, bankTxn, vendorRule } from "../../shared/schema";
 import { eq, desc, sql, and, gte, lte, like, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { parse as parseCsv } from "csv-parse/sync";
+import {
+  looksLikeScbFixedWidthStatement,
+  parseScbFixedWidthStatement,
+} from "../services/scbFixedWidthStatementParser";
 
 const router = Router();
 
@@ -375,11 +379,24 @@ function parseCSVRow(row: string[], format: BankFormat, headers: string[], rowNu
   };
 }
 
-function generateDedupeKey(source: string, postedAt: Date, amountTHB: number, description: string): string {
+function generateDedupeKey(
+  source: string,
+  postedAt: Date,
+  amountTHB: number,
+  description: string,
+  raw?: Record<string, unknown>
+): string {
   const dateStr = postedAt.toISOString().slice(0, 10); // YYYY-MM-DD
   const absAmount = Math.abs(amountTHB);
   const descPrefix = description.slice(0, 32).toUpperCase();
-  return `${source}|${dateStr}|${absAmount}|${descPrefix}`;
+  const statementTime = typeof raw?.time === 'string' ? raw.time.trim() : '';
+
+  // SCB's fixed-width export can contain otherwise identical transactions on the
+  // same date. Its statement time makes those rows distinct without changing the
+  // historical key format used by the existing CSV importers.
+  return statementTime
+    ? `${source}|${dateStr}|${statementTime}|${absAmount}|${descPrefix}`
+    : `${source}|${dateStr}|${absAmount}|${descPrefix}`;
 }
 
 function isMissingVendorRuleTableError(error: any): boolean {
@@ -454,6 +471,19 @@ function missingVendorRuleWarning(where: string) {
   };
 }
 
+function classifyImportedTransaction(txn: ParsedTransaction, rule?: any): EnhancedTransaction {
+  const isDeposit = txn.amountTHB < 0;
+  const suggestedBusinessCategory = BUSINESS_EXPENSE_CATEGORIES.includes(rule?.category)
+    ? rule.category
+    : 'Other Business Expense';
+
+  return decorateTransaction({
+    ...txn,
+    category: isDeposit ? 'Deposit / Inflow' : suggestedBusinessCategory,
+    supplier: rule?.supplier || extractMerchantSuggestion(txn.description),
+  });
+}
+
 async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTransaction[]> {
   let rules: any[];
   try {
@@ -461,7 +491,7 @@ async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTran
   } catch (error: any) {
     if (isMissingVendorRuleTableError(error)) {
       logMissingVendorRuleWarning('applyVendorRules', error);
-      return txns;
+      return txns.map((txn) => classifyImportedTransaction(txn));
     }
     throw error;
   }
@@ -472,11 +502,7 @@ async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTran
       txn.description.toUpperCase().includes(r.matchText.toUpperCase())
     );
     
-    return decorateTransaction({
-      ...txn,
-      category: rule?.category,
-      supplier: rule?.supplier,
-    });
+    return classifyImportedTransaction(txn, rule);
   });
 }
 
@@ -528,28 +554,31 @@ async function handleCsvUpload(req: any, res: any) {
       throw new CsvValidationError(`CSV parser error: ${error.message || 'invalid CSV file'}`);
     }
 
-    if (records.length < 2) {
+    const requestedSource = typeof req.body.source === 'string' ? req.body.source.trim() : '';
+    const isScbFixedWidth = looksLikeScbFixedWidthStatement(records);
+    if (!isScbFixedWidth && records.length < 2) {
       throw new CsvValidationError("CSV file must have at least a header and one data row");
     }
 
-    const headers = records[0].map(h => String(h || '').trim());
-    if (headers.every(h => !h)) {
+    const headers = isScbFixedWidth ? [] : records[0].map(h => String(h || '').trim());
+    if (!isScbFixedWidth && headers.every(h => !h)) {
       throw new CsvValidationError("CSV header row is empty");
     }
 
-    const requestedSource = typeof req.body.source === 'string' ? req.body.source.trim() : '';
-    const format = detectBankFormat(headers);
+    const format: BankFormat = isScbFixedWidth ? 'scb' : detectBankFormat(headers);
     const source = requestedSource && requestedSource !== 'CSV' ? requestedSource : format.toUpperCase();
     const rowErrors: string[] = [];
-    const rawTxns: ParsedTransaction[] = [];
+    const rawTxns: ParsedTransaction[] = isScbFixedWidth ? parseScbFixedWidthStatement(records) : [];
 
-    for (let i = 1; i < records.length; i++) {
-      try {
-        const parsed = parseCSVRow(records[i], format, headers, i + 1);
-        if (parsed) rawTxns.push(parsed);
-      } catch (error: any) {
-        rowErrors.push(error.message || `Row ${i + 1}: could not parse transaction.`);
-        if (rowErrors.length >= 5) break;
+    if (!isScbFixedWidth) {
+      for (let i = 1; i < records.length; i++) {
+        try {
+          const parsed = parseCSVRow(records[i], format, headers, i + 1);
+          if (parsed) rawTxns.push(parsed);
+        } catch (error: any) {
+          rowErrors.push(error.message || `Row ${i + 1}: could not parse transaction.`);
+          if (rowErrors.length >= 5) break;
+        }
       }
     }
 
@@ -560,6 +589,7 @@ async function handleCsvUpload(req: any, res: any) {
       );
     }
     timingContext.format = format;
+    timingContext.layout = isScbFixedWidth ? 'scb_fixed_width' : 'columnar_csv';
     timingContext.parsedRows = rawTxns.length;
     logCsvUploadTiming('CSV parsed', parseStartedAt, timingContext);
 
@@ -597,7 +627,7 @@ async function handleCsvUpload(req: any, res: any) {
       category: txn.category,
       supplier: txn.supplier,
       status: 'pending' as const,
-      dedupeKey: generateDedupeKey(source, txn.postedAt, txn.amountTHB, txn.description),
+      dedupeKey: generateDedupeKey(source, txn.postedAt, txn.amountTHB, txn.description, txn.raw),
     }));
 
     // Duplicate detection only blocks active review rows. Historical deleted/rejected/ignored
@@ -664,6 +694,48 @@ async function handleCsvUpload(req: any, res: any) {
     }
     inserted += reimportedHistorical;
     const skippedDupes = activeDuplicateKeys.size;
+
+    const depositCaptureResult = await db.execute(sql`
+      INSERT INTO bank_deposit (
+        bank_txn_id,
+        batch_id,
+        posted_at,
+        description,
+        amount_thb,
+        ref,
+        source,
+        classification,
+        include_in_pnl,
+        created_at,
+        updated_at
+      )
+      SELECT
+        transaction.id,
+        transaction.batch_id,
+        transaction.posted_at,
+        transaction.description,
+        ABS(transaction.amount_thb),
+        transaction.ref,
+        ${source},
+        'Unclassified Deposit',
+        false,
+        now(),
+        now()
+      FROM bank_txn transaction
+      WHERE transaction.batch_id = ${batch.id}
+        AND transaction.amount_thb < 0
+        AND transaction.status <> 'deleted'
+      ON CONFLICT (bank_txn_id) DO UPDATE SET
+        batch_id = EXCLUDED.batch_id,
+        posted_at = EXCLUDED.posted_at,
+        description = EXCLUDED.description,
+        amount_thb = EXCLUDED.amount_thb,
+        ref = EXCLUDED.ref,
+        source = EXCLUDED.source,
+        updated_at = now()
+      RETURNING id
+    `);
+    const depositsCaptured = depositCaptureResult.rows?.length || 0;
     logCsvUploadTiming('Database insert', insertStartedAt, {
       ...timingContext,
       batchId: batch.id,
@@ -682,6 +754,8 @@ async function handleCsvUpload(req: any, res: any) {
       reimportedHistoricalDuplicates: reimportedHistorical,
       format,
       source,
+      layout: isScbFixedWidth ? 'scb_fixed_width' : 'columnar_csv',
+      depositsCaptured,
     };
 
     res.json(responseBody);

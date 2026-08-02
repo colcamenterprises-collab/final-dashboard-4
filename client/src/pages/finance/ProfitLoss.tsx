@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface MonthData {
   sales: number;
+  bankDeposits: number;
   cogs: number;
   expenses: number;
   grossProfit: number;
@@ -40,20 +41,21 @@ export default function ProfitLoss() {
     (acc, m) => {
       const d = data!.monthlyData[m];
       acc.sales += d.sales || 0;
+      acc.bankDeposits += d.bankDeposits || 0;
       acc.cogs += d.cogs || 0;
       acc.expenses += d.expenses || 0;
       acc.grossProfit += d.grossProfit || 0;
       acc.netProfit += d.netProfit || 0;
       return acc;
     },
-    { sales: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 }
+    { sales: 0, bankDeposits: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 }
   );
 
   return (
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
       <div>
         <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Profit & Loss</h1>
-        <p className="text-xs text-slate-500">{data?.year ?? "—"} — Monthly breakdown</p>
+        <p className="text-xs text-slate-500">{data?.year ?? "—"} — Bank deposits / credits are shown for reconciliation and are not added to sales or profit.</p>
       </div>
 
       {isLoading && (
@@ -69,11 +71,12 @@ export default function ProfitLoss() {
 
       {months.length > 0 && (
         <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-x-auto">
-          <table className="w-full text-xs min-w-[600px]">
+          <table className="w-full text-xs min-w-[780px]">
             <thead>
               <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                 <th className="text-left px-3 py-2 font-medium text-slate-500">Month</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">Sales (฿)</th>
+                <th className="text-right px-3 py-2 font-medium text-slate-500">Bank Deposits / Credits</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">COGS (฿)</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">Expenses (฿)</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">Gross Profit</th>
@@ -94,6 +97,7 @@ export default function ProfitLoss() {
                   >
                     <td className="px-3 py-2 font-medium text-slate-700 dark:text-slate-300">{month}</td>
                     <td className="px-3 py-2 text-right font-mono text-slate-700">{fmt(d.sales)}</td>
+                    <td className="px-3 py-2 text-right font-mono text-slate-500">{fmt(d.bankDeposits)}</td>
                     <td className="px-3 py-2 text-right font-mono text-slate-500">{fmt(d.cogs)}</td>
                     <td className="px-3 py-2 text-right font-mono text-slate-500">{fmt(d.expenses)}</td>
                     <td className="px-3 py-2 text-right font-mono text-slate-700">{fmt(d.grossProfit)}</td>
@@ -112,6 +116,7 @@ export default function ProfitLoss() {
               <tr className="border-t-2 border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-800 font-semibold">
                 <td className="px-3 py-2 text-slate-700 dark:text-slate-200">Total</td>
                 <td className="px-3 py-2 text-right font-mono text-slate-800 dark:text-slate-200">{fmt(totals.sales)}</td>
+                <td className="px-3 py-2 text-right font-mono text-slate-600">{fmt(totals.bankDeposits)}</td>
                 <td className="px-3 py-2 text-right font-mono text-slate-600">{fmt(totals.cogs)}</td>
                 <td className="px-3 py-2 text-right font-mono text-slate-600">{fmt(totals.expenses)}</td>
                 <td className="px-3 py-2 text-right font-mono text-slate-800 dark:text-slate-200">{fmt(totals.grossProfit)}</td>
