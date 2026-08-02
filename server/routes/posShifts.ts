@@ -28,12 +28,28 @@ async function currentShift() {
   return result.rows[0] || null;
 }
 
+async function cashSalesSince(openedAt: Date | string) {
+  const result = await pool.query(
+    `SELECT COALESCE(SUM(p.amount),0) AS total
+       FROM public.ordering_payments p
+       JOIN public.ordering_orders o ON o.id=p.order_id
+      WHERE o.channel IN ('pos_direct','grab')
+        AND o.created_at >= $1
+        AND p.method='cash'
+        AND p.status='confirmed'
+        AND o.status <> 'cancelled'`,
+    [openedAt],
+  );
+  return numberValue(result.rows[0]?.total);
+}
+
 router.get("/current", staffDevice, async (_req, res) => {
   try {
     const shift = await currentShift();
     const movements = shift ? (await pool.query(`SELECT * FROM public.pos_shift_movements WHERE shift_id=$1 ORDER BY created_at DESC`, [shift.id])).rows : [];
     const history = (await pool.query(`SELECT * FROM public.pos_shifts ORDER BY opened_at DESC LIMIT 20`)).rows;
-    res.json({ ok: true, source: "sbb_pos_shifts", data: { shift, movements, history } });
+    const cashSales = shift ? await cashSalesSince(shift.opened_at) : 0;
+    res.json({ ok: true, source: "sbb_pos_shifts", data: { shift, movements, history, cashSales } });
   } catch (error: any) {
     fail(res, error.message, 500);
   }
@@ -86,12 +102,13 @@ router.post("/:id/close", staffDevice, async (req, res) => {
       return fail(res, "Closing cash and cash banked must be valid");
     }
     const movements = (await client.query(`SELECT COALESCE(SUM(CASE WHEN movement_type='cash_in' THEN amount ELSE -amount END),0) total FROM public.pos_shift_movements WHERE shift_id=$1`, [req.params.id])).rows[0];
-    const expected = numberValue(current.starting_float) + numberValue(movements.total) - cashBanked;
+    const cashSales = await cashSalesSince(current.opened_at);
+    const expected = numberValue(current.starting_float) + cashSales + numberValue(movements.total) - cashBanked;
     const variance = closingCash - expected;
     const actor = (req as any).user?.username || (req as any).user?.id || null;
     const closed = (await client.query(`UPDATE public.pos_shifts SET status='closed',closed_at=NOW(),closing_cash=$2,cash_banked=$3,expected_cash=$4,variance=$5,closed_by=$6,updated_at=NOW() WHERE id=$1 RETURNING *`, [req.params.id, closingCash, cashBanked, expected, variance, actor])).rows[0];
     await client.query("COMMIT");
-    res.json({ ok: true, source: "sbb_pos_shifts", data: closed });
+    res.json({ ok: true, source: "sbb_pos_shifts", data: { ...closed, cash_sales: cashSales } });
   } catch (error: any) {
     await client.query("ROLLBACK");
     fail(res, error.message, 500);
