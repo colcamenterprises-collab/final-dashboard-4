@@ -1,0 +1,83 @@
+name: Build SBB POS APK
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'client/src/pages/pos/**'
+      - 'client/src/lib/thermalPrinter.ts'
+      - 'native/android/**'
+      - 'capacitor.config.json'
+      - '.github/workflows/build-sbb-pos-apk.yml'
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Install Capacitor build tools
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Build web bundle
+        run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
+
+      - name: Generate Android project
+        run: |
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+
+      - name: Install native Bluetooth printer plugin
+        run: |
+          PKG=android/app/src/main/java/io/customli/sbbpos
+          mkdir -p "$PKG"
+          rm -f "$PKG/MainActivity.java" "$PKG/MainActivity.kt"
+          cp native/android/MainActivity.java "$PKG/MainActivity.java"
+          cp native/android/ThermalPrinterPlugin.java "$PKG/ThermalPrinterPlugin.java"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          marker = '<uses-permission android:name="android.permission.INTERNET" />'
+          perms = '''<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />'''
+          if 'android.permission.BLUETOOTH_CONNECT' not in s:
+              if marker in s:
+                  s = s.replace(marker, marker + '\n    ' + perms)
+              else:
+                  s = s.replace('<application', '    ' + perms + '\n    <application', 1)
+          p.write_text(s)
+          PY
+
+      - name: Build debug APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --stacktrace
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: smash-brothers-pos-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
