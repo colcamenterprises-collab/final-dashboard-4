@@ -558,7 +558,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
                         <div className="space-y-1">
                           <Label className="text-[11px]">Classification</Label>
                           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -581,7 +581,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                         </div>
 
                         <div className="space-y-1">
-                          <Label className="text-[11px]">Statement Description</Label>
+                          <Label className="text-[11px]">Statement Payee (DESC)</Label>
                           <Input
                             key={`${txn.id}:${txn.description}`}
                             defaultValue={txn.description}
@@ -593,7 +593,7 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                             }}
                             disabled={txn.status !== 'pending' || editMutation.isPending}
                             className="h-9 w-full"
-                            aria-label="Statement description"
+                            aria-label="Statement payee description"
                           />
                           <p className="text-[10px] text-slate-500">The original imported text remains in the audit record.</p>
                         </div>
@@ -610,6 +610,25 @@ export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQ
                             aria-label="Purpose or supplier"
                           />
                           <p className="text-[10px] text-slate-500">Defaults to the bank text and can be amended before approval.</p>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label className="text-[11px]">Reference Note (NOTE)</Label>
+                          <Input
+                            key={`${txn.id}:${txn.notes || ''}`}
+                            defaultValue={txn.notes || ''}
+                            placeholder="No reference note"
+                            onBlur={(e) => {
+                              const notes = e.target.value.trim();
+                              if (notes !== (txn.notes || '')) {
+                                editMutation.mutate({ id: txn.id, updates: { notes } });
+                              }
+                            }}
+                            disabled={txn.status !== 'pending' || editMutation.isPending}
+                            className="h-9 w-full"
+                            aria-label="Bank reference note"
+                          />
+                          <p className="text-[10px] text-slate-500">Imported separately from NOTE; a dash is treated as blank.</p>
                         </div>
                       </div>
 
