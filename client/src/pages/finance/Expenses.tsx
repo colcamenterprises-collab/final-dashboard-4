@@ -271,7 +271,7 @@ export default function Expenses() {
         <SummaryBox label="Pending Bank Statement Review" value={summary.pending_bank_statement_review} />
         <SummaryBox label="Personal Expenses This Month" value={summary.personal_expenses_this_month} />
         <SummaryBox label="Declined Transactions This Month" value={summary.declined_transactions_this_month} />
-        <SummaryBox label="Bank Statement Income This Month" value={summary.current_month_bank_deposits} />
+        <SummaryBox label="Bank Deposits / Credits This Month" value={summary.current_month_bank_deposits} />
       </div>
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
@@ -428,7 +428,7 @@ export default function Expenses() {
             </tbody>
           </DataTable>
 
-          <DataTable title="Table 3 — Bank Statement Income (Reconciliation Only)">
+          <DataTable title="Table 3 — Bank Deposits / Credits (Reconciliation Only)">
             <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Bank Source</th><th className="px-3 py-2">Classification</th><th className="px-3 py-2 text-right">Amount</th></tr></thead>
             <tbody>
               {deposits.length === 0 && <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400">No bank deposits found for this date range.</td></tr>}
