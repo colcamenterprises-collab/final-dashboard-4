@@ -50,11 +50,11 @@ function MonthCard({ label, month }: { label:string; month?:ShiftMonth }) {
 
 function Table({ headers, rows }: { headers:string[]; rows: React.ReactNode[][] }) {
   return <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
-    <table className="w-full min-w-[760px] table-fixed text-sm">
+    <table className="w-full min-w-[760px] table-auto text-sm">
       <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-        <tr>{headers.map((h,j)=><th key={h} className={`px-4 py-3 font-bold ${j>0?"text-right":"text-left"}`}>{h}</th>)}</tr>
+        <tr>{headers.map((h,j)=><th key={h} className={`whitespace-nowrap px-4 py-3 font-bold ${j>0?"text-right":"text-left"}`}>{h}</th>)}</tr>
       </thead>
-      <tbody className="divide-y divide-slate-100">{rows.map((r,i)=><tr key={i} className="hover:bg-slate-50/70">{r.map((c,j)=><td key={j} className={`px-4 py-3 align-middle tabular-nums ${j>0?"text-right":"text-left font-medium"}`}>{c}</td>)}</tr>)}</tbody>
+      <tbody className="divide-y divide-slate-100">{rows.map((r,i)=><tr key={i} className="hover:bg-slate-50/70">{r.map((c,j)=><td key={j} className={`whitespace-nowrap px-4 py-3 align-middle tabular-nums ${j>0?"text-right":"text-left font-medium"}`}>{c}</td>)}</tr>)}</tbody>
     </table>
   </div>;
 }
