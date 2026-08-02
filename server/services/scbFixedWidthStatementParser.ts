@@ -1,9 +1,15 @@
 export interface ParsedScbFixedWidthTransaction {
   postedAt: Date;
   description: string;
+  note?: string;
   amountTHB: number;
   ref?: string;
   raw: Record<string, unknown>;
+}
+
+export interface ScbStatementTextFields {
+  description: string;
+  note?: string;
 }
 
 const TRANSACTION_LINE = /^(\d{1,2}\/\d{1,2}\/\d{2,4})\s+(\d{1,2}:\d{2})\s+(X\d+)\s+(\S+)/i;
@@ -67,6 +73,57 @@ function descriptionPart(line: string): string {
   return line.trim();
 }
 
+function normalizedFieldValue(value: string): string | undefined {
+  const normalized = value.replace(/\s+/g, ' ').trim();
+  return normalized && normalized !== '-' ? normalized : undefined;
+}
+
+export function extractScbStatementTextFields(
+  statementLine: string,
+  continuationLines: string[],
+): ScbStatementTextFields {
+  const descriptionParts: string[] = [];
+  const noteParts: string[] = [];
+
+  for (const line of [statementLine, ...continuationLines]) {
+    const descriptionMarker = line.match(/DESC\s*:\s*(.*)$/i);
+    if (descriptionMarker) {
+      const value = normalizedFieldValue(descriptionMarker[1]);
+      if (value) descriptionParts.push(value);
+      continue;
+    }
+
+    const noteMarker = line.match(/NOTE\s*:\s*(.*)$/i);
+    if (noteMarker) {
+      const value = normalizedFieldValue(noteMarker[1]);
+      if (value) noteParts.push(value);
+      continue;
+    }
+
+    const value = normalizedFieldValue(line);
+    if (value) descriptionParts.push(value);
+  }
+
+  return {
+    description: descriptionParts.join(' ').trim(),
+    note: noteParts.length > 0 ? noteParts.join(' ').trim() : undefined,
+  };
+}
+
+// The initial SCB fixed-width importer combined DESC and NOTE. This helper is
+// retained only so the one-time repair can identify rows created by that exact
+// parser behavior without touching owner-edited text.
+export function legacyScbCombinedDescription(
+  statementLine: string,
+  continuationLines: string[],
+): string {
+  return [descriptionPart(statementLine), ...continuationLines.map(descriptionPart)]
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+}
+
 function extractReference(description: string): string | undefined {
   const match = description.match(/\b(?:REF|REFERENCE|เลขที่อ้างอิง)\s*[:#]?\s*([^\s,;]+)/i);
   return match?.[1]?.trim() || undefined;
@@ -122,10 +179,8 @@ export function parseScbFixedWidthStatement(records: string[][]): ParsedScbFixed
       index = continuationIndex;
     }
 
-    const descriptionParts = [descriptionPart(trimmed), ...continuationLines.map(descriptionPart)]
-      .map((part) => part.replace(/\s+/g, ' ').trim())
-      .filter(Boolean);
-    const description = descriptionParts.join(' ').trim() || `${code} ${channel}`;
+    const statementText = extractScbStatementTextFields(trimmed, continuationLines);
+    const description = statementText.description || `${code} ${channel}`;
 
     let amountTHB: number;
     if (code === 'X1') {
@@ -141,12 +196,15 @@ export function parseScbFixedWidthStatement(records: string[][]): ParsedScbFixed
     transactions.push({
       postedAt: parseStatementDate(match[1]),
       description,
+      note: statementText.note,
       amountTHB,
-      ref: extractReference(description),
+      ref: extractReference(`${description} ${statementText.note || ''}`),
       raw: {
         layout: 'scb_fixed_width',
         statementLine: trimmed,
         continuationLines,
+        descriptionRaw: description,
+        noteRaw: statementText.note || null,
         time: match[2],
         code,
         channel,

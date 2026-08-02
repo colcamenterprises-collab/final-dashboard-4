@@ -9,6 +9,10 @@ import {
   looksLikeScbFixedWidthStatement,
   parseScbFixedWidthStatement,
 } from "../services/scbFixedWidthStatementParser";
+import {
+  extractMerchantSuggestion,
+  generateBankImportDedupeKey,
+} from "../services/bankImportNormalization";
 import { getPinSessionUser } from "./pinAuth";
 
 const router = Router();
@@ -29,6 +33,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 interface ParsedTransaction {
   postedAt: Date;
   description: string;
+  note?: string;
   amountTHB: number;
   ref?: string;
   raw: any;
@@ -212,15 +217,6 @@ function decorateTransaction<T extends { amountTHB: any; description: string; ca
   };
 }
 
-function extractMerchantSuggestion(description: string): string | null {
-  const cleaned = description
-    .replace(/\b(pos|visa|mastercard|promptpay|transfer|payment|purchase|debit|card)\b/gi, ' ')
-    .replace(/[^a-z0-9ก-๙&.' -]/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleaned ? cleaned.slice(0, 80) : null;
-}
-
 // Bank format detection and parsing
 type BankFormat = 'kbank' | 'scb' | 'bangkok_bank' | 'krungsri' | 'generic';
 
@@ -387,26 +383,6 @@ function parseCSVRow(row: string[], format: BankFormat, headers: string[], rowNu
     ref,
     raw: Object.fromEntries(headers.map((h, i) => [h, row[i] ?? '']))
   };
-}
-
-function generateDedupeKey(
-  source: string,
-  postedAt: Date,
-  amountTHB: number,
-  description: string,
-  raw?: Record<string, unknown>
-): string {
-  const dateStr = postedAt.toISOString().slice(0, 10); // YYYY-MM-DD
-  const absAmount = Math.abs(amountTHB);
-  const descPrefix = description.slice(0, 32).toUpperCase();
-  const statementTime = typeof raw?.time === 'string' ? raw.time.trim() : '';
-
-  // SCB's fixed-width export can contain otherwise identical transactions on the
-  // same date. Its statement time makes those rows distinct without changing the
-  // historical key format used by the existing CSV importers.
-  return statementTime
-    ? `${source}|${dateStr}|${statementTime}|${absAmount}|${descPrefix}`
-    : `${source}|${dateStr}|${absAmount}|${descPrefix}`;
 }
 
 function isMissingVendorRuleTableError(error: any): boolean {
@@ -637,8 +613,9 @@ async function handleCsvUpload(req: any, res: any) {
       raw: txn.raw,
       category: txn.category,
       supplier: txn.supplier,
+      notes: txn.note || null,
       status: 'pending' as const,
-      dedupeKey: generateDedupeKey(source, txn.postedAt, txn.amountTHB, txn.description, txn.raw),
+      dedupeKey: generateBankImportDedupeKey(source, txn.postedAt, txn.amountTHB, txn.description, txn.raw),
     }));
 
     // Duplicate detection only blocks active review rows. Historical deleted/rejected/ignored
@@ -687,7 +664,7 @@ async function handleCsvUpload(req: any, res: any) {
           category: row.category,
           supplier: row.supplier,
           status: 'pending',
-          notes: null,
+          notes: row.notes,
           expenseId: null,
         })
         .where(and(eq(bankTxn.id, reusableId), isInactiveDuplicateCondition))
