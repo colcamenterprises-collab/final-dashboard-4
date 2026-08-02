@@ -16,6 +16,8 @@ interface UploadResult {
   skippedDupes: number;
   format: string;
   source?: string;
+  layout?: string;
+  depositsCaptured?: number;
 }
 
 interface BankStatementUploadProps {
@@ -141,6 +143,10 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
                 <span>Transactions imported:</span>
                 <span className="font-medium text-green-600">{result.inserted}</span>
               </div>
+              <div className="flex justify-between">
+                <span>Deposits captured separately:</span>
+                <span className="font-medium text-green-600">{result.depositsCaptured || 0}</span>
+              </div>
               {result.skippedDupes > 0 && (
                 <div className="flex justify-between">
                   <span>Duplicates skipped:</span>
@@ -174,7 +180,7 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
           Bank Statement Upload
         </CardTitle>
         <div className="text-sm text-muted-foreground">
-          Upload CSV bank statements to automatically create expense entries
+          Upload CSV bank statements to capture withdrawals for review and deposits separately
         </div>
       </CardHeader>
       <CardContent>

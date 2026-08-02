@@ -1289,6 +1289,26 @@ export const bankTxn = pgTable("bank_txn", {
   dedupeKey: text("dedupe_key").notNull().unique(),
 });
 
+// Bank deposits are captured separately from expense review transactions.
+// They are reconciliation evidence for P&L and never replace Loyverse sales truth.
+export const bankDeposit = pgTable("bank_deposit", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  bankTxnId: varchar("bank_txn_id").notNull().unique().references(() => bankTxn.id, { onDelete: 'cascade' }),
+  batchId: varchar("batch_id").notNull().references(() => bankImportBatch.id, { onDelete: 'cascade' }),
+  postedAt: timestamp("posted_at").notNull(),
+  description: text("description").notNull(),
+  amountTHB: decimal("amount_thb", { precision: 12, scale: 2 }).notNull(),
+  ref: text("ref"),
+  source: text("source").notNull(),
+  classification: text("classification").notNull().default('Unclassified Deposit'),
+  includeInPnl: boolean("include_in_pnl").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  postedAtIdx: index("bank_deposit_posted_at_idx").on(table.postedAt),
+  batchIdIdx: index("bank_deposit_batch_id_idx").on(table.batchId),
+}));
+
 // Vendor matching rules for smart suggestions
 export const vendorRule = pgTable("vendor_rule", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -1301,6 +1321,7 @@ export const vendorRule = pgTable("vendor_rule", {
 // Bank Import Insert Schemas
 export const insertBankImportBatchSchema = createInsertSchema(bankImportBatch);
 export const insertBankTxnSchema = createInsertSchema(bankTxn);
+export const insertBankDepositSchema = createInsertSchema(bankDeposit);
 export const insertVendorRuleSchema = createInsertSchema(vendorRule);
 
 // Bank Import Types
@@ -1308,6 +1329,8 @@ export type InsertBankImportBatch = typeof bankImportBatch.$inferInsert;
 export type SelectBankImportBatch = typeof bankImportBatch.$inferSelect;
 export type InsertBankTxn = typeof bankTxn.$inferInsert;
 export type SelectBankTxn = typeof bankTxn.$inferSelect;
+export type InsertBankDeposit = typeof bankDeposit.$inferInsert;
+export type SelectBankDeposit = typeof bankDeposit.$inferSelect;
 export type InsertVendorRule = typeof vendorRule.$inferInsert;
 export type SelectVendorRule = typeof vendorRule.$inferSelect;
 
@@ -1319,6 +1342,17 @@ export const bankImportBatchRelations = relations(bankImportBatch, ({ many }) =>
 export const bankTxnRelations = relations(bankTxn, ({ one }) => ({
   batch: one(bankImportBatch, {
     fields: [bankTxn.batchId],
+    references: [bankImportBatch.id],
+  }),
+}));
+
+export const bankDepositRelations = relations(bankDeposit, ({ one }) => ({
+  transaction: one(bankTxn, {
+    fields: [bankDeposit.bankTxnId],
+    references: [bankTxn.id],
+  }),
+  batch: one(bankImportBatch, {
+    fields: [bankDeposit.batchId],
     references: [bankImportBatch.id],
   }),
 }));
