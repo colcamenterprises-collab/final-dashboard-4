@@ -55,7 +55,7 @@ export default function ProfitLoss() {
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
       <div>
         <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Profit & Loss</h1>
-        <p className="text-xs text-slate-500">{data?.year ?? "—"} — Bank statement income is shown for reconciliation and is not added to sales or profit.</p>
+        <p className="text-xs text-slate-500">{data?.year ?? "—"} — Bank deposits / credits are shown for reconciliation and are not added to sales or profit.</p>
       </div>
 
       {isLoading && (
@@ -76,7 +76,7 @@ export default function ProfitLoss() {
               <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                 <th className="text-left px-3 py-2 font-medium text-slate-500">Month</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">Sales (฿)</th>
-                <th className="text-right px-3 py-2 font-medium text-slate-500">Bank Statement Income</th>
+                <th className="text-right px-3 py-2 font-medium text-slate-500">Bank Deposits / Credits</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">COGS (฿)</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">Expenses (฿)</th>
                 <th className="text-right px-3 py-2 font-medium text-slate-500">Gross Profit</th>
