@@ -1,0 +1,113 @@
+name: Build SBB POS Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_url:
+        description: "Production SBB dashboard URL, e.g. https://dashboard.example.com"
+        required: true
+        type: string
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dashboard dependencies
+        run: npm ci
+
+      - name: Build dashboard web assets
+        run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
+
+      - name: Install Capacitor build tools
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Create Capacitor config
+        env:
+          SBB_POS_SERVER_URL: ${{ inputs.server_url }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const url = process.env.SBB_POS_SERVER_URL;
+          if (!/^https:\/\//i.test(url || '')) throw new Error('server_url must be HTTPS');
+          fs.writeFileSync('capacitor.config.json', JSON.stringify({
+            appId: 'io.customli.sbbpos',
+            appName: 'Smash Brothers POS',
+            webDir: 'dist/public',
+            server: {
+              url,
+              cleartext: false,
+              androidScheme: 'https'
+            },
+            android: {
+              allowMixedContent: false
+            }
+          }, null, 2));
+          NODE
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Install native printer bridge
+        run: |
+          APP_DIR="android/app/src/main/java/io/customli/sbbpos"
+          mkdir -p "$APP_DIR"
+          cp native/android/MainActivity.kt "$APP_DIR/MainActivity.kt"
+          cp native/android/ThermalPrinterPlugin.kt "$APP_DIR/ThermalPrinterPlugin.kt"
+
+          python3 <<'PY'
+          from pathlib import Path
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          permissions = '''
+              <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+          '''
+          if 'android.permission.BLUETOOTH_CONNECT' not in text:
+              text = text.replace('<manifest', '<manifest', 1)
+              marker = text.find('>') + 1
+              text = text[:marker] + permissions + text[marker:]
+          manifest.write_text(text)
+          PY
+
+      - name: Verify native plugin source
+        run: |
+          grep -q 'CapacitorPlugin(name = "ThermalPrinter")' android/app/src/main/java/io/customli/sbbpos/ThermalPrinterPlugin.kt
+          grep -q 'registerPlugin(ThermalPrinterPlugin::class.java)' android/app/src/main/java/io/customli/sbbpos/MainActivity.kt
+          grep -q 'BLUETOOTH_CONNECT' android/app/src/main/AndroidManifest.xml
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Collect APK
+        run: |
+          mkdir -p apk-output
+          cp android/app/build/outputs/apk/debug/app-debug.apk apk-output/Smash-Brothers-POS-debug.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smash-Brothers-POS-Android
+          path: apk-output/Smash-Brothers-POS-debug.apk
+          retention-days: 14
