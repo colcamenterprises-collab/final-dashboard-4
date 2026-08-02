@@ -9,8 +9,18 @@ import {
   looksLikeScbFixedWidthStatement,
   parseScbFixedWidthStatement,
 } from "../services/scbFixedWidthStatementParser";
+import { getPinSessionUser } from "./pinAuth";
 
 const router = Router();
+
+function requireOwner(req: any, res: any): boolean {
+  const user = getPinSessionUser(req);
+  if (!user || user.role !== 'owner') {
+    res.status(403).json({ error: 'Owner access required' });
+    return false;
+  }
+  return true;
+}
 
 // Configure multer for CSV upload
 const upload = multer({ storage: multer.memoryStorage() });
@@ -533,6 +543,7 @@ async function handleCsvUpload(req: any, res: any) {
   const uploadId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const timingContext: Record<string, unknown> = { uploadId };
   try {
+    if (!requireOwner(req, res)) return;
     const uploadedFile = getUploadedCsvFile(req);
     if (!uploadedFile) {
       return res.status(400).json({ error: "No CSV file uploaded" });
@@ -921,6 +932,7 @@ const approveTxnsSchema = z.object({
 
 router.post("/:batchId/approve", async (req, res) => {
   try {
+    if (!requireOwner(req, res)) return;
     const { batchId } = req.params;
     const { ids, defaults } = approveTxnsSchema.parse(req.body);
 
@@ -1129,19 +1141,42 @@ router.post("/:batchId/approve", async (req, res) => {
 
 // PATCH /api/bank-imports/txns/:id - Edit transaction
 const editTxnSchema = z.object({
+  description: z.string().trim().min(1).max(500).optional(),
   category: z.string().optional(),
   supplier: z.string().optional(),
   notes: z.string().optional(),
-  status: z.enum(['pending', 'approved', 'rejected', 'deleted']).optional(),
+  status: z.enum(['pending', 'rejected', 'deleted']).optional(),
 });
 
 router.patch("/txns/:id", async (req, res) => {
   try {
+    if (!requireOwner(req, res)) return;
     const { id } = req.params;
     const updates = editTxnSchema.parse(req.body);
 
+    const [currentTxn] = await db.select().from(bankTxn).where(eq(bankTxn.id, id)).limit(1);
+    if (!currentTxn) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    const owner = getPinSessionUser(req)!;
+    const ownerEditAudit = Array.isArray((currentTxn.raw as any)?.ownerEditAudit)
+      ? (currentTxn.raw as any).ownerEditAudit
+      : [];
+    const nextRaw = {
+      ...((currentTxn.raw as any) || {}),
+      ownerEditAudit: [
+        ...ownerEditAudit,
+        {
+          at: new Date().toISOString(),
+          by: { id: owner.id, name: owner.name },
+          updates,
+        },
+      ],
+    };
+
     const [updatedTxn] = await db.update(bankTxn)
-      .set(updates)
+      .set({ ...updates, raw: nextRaw })
       .where(eq(bankTxn.id, id))
       .returning();
 
@@ -1155,6 +1190,9 @@ router.patch("/txns/:id", async (req, res) => {
     });
 
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid transaction update", details: error.issues });
+    }
     console.error('Edit txn error:', error);
     res.status(500).json({ error: "Failed to update transaction" });
   }
@@ -1165,6 +1203,7 @@ router.patch("/txns/:id", async (req, res) => {
 // This touches only bank_txn review rows; approved Business Expenses, Shift Expenses, and daily sales/stock tables are not modified.
 router.post("/purge", async (_req, res) => {
   try {
+    if (!requireOwner(_req, res)) return;
     const purgedAt = new Date().toISOString();
     const purgedTxns = await db.update(bankTxn)
       .set({
@@ -1199,10 +1238,39 @@ const bulkDeletePendingSchema = z.object({
   scope: z.enum(['selected', 'all_pending']).default('selected'),
 });
 
+const bulkDeletePersonalSchema = z.object({
+  ids: z.array(z.string()).min(1).max(1000),
+});
+
+// POST /api/bank-imports/personal/delete - Delete only owner-confirmed personal rows.
+router.post("/personal/delete", async (req, res) => {
+  try {
+    if (!requireOwner(req, res)) return;
+    const { ids } = bulkDeletePersonalSchema.parse(req.body || {});
+    const deletedTxns = await db.update(bankTxn)
+      .set({ status: 'deleted' })
+      .where(and(
+        eq(bankTxn.status, 'pending'),
+        eq(bankTxn.category, 'Personal / Owner'),
+        inArray(bankTxn.id, ids),
+      ))
+      .returning({ id: bankTxn.id });
+
+    res.json({ ok: true, requested: ids.length, deleted: deletedTxns.length });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: "Invalid personal transaction selection", details: error.issues });
+    }
+    console.error('Bulk delete personal bank txns error:', error);
+    res.status(500).json({ error: "Failed to delete personal transactions", reason: error?.message || String(error) });
+  }
+});
+
 // POST /api/bank-imports/pending/delete - Mark pending imported bank transactions as deleted.
 // This only touches bank_txn rows with status=pending; approved expenses and shift expenses are not modified.
 router.post("/pending/delete", async (req, res) => {
   try {
+    if (!requireOwner(req, res)) return;
     const { ids = [], scope } = bulkDeletePendingSchema.parse(req.body || {});
 
     if (scope === 'selected' && ids.length === 0) {
@@ -1237,6 +1305,7 @@ router.post("/pending/delete", async (req, res) => {
 // DELETE /api/bank-imports/txns/:id - Delete/reject one pending imported transaction
 router.delete("/txns/:id", async (req, res) => {
   try {
+    if (!requireOwner(req, res)) return;
     const { id } = req.params;
 
     const [deletedTxn] = await db.update(bankTxn)

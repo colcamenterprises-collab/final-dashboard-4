@@ -2359,7 +2359,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           SELECT
             concat(ds.id, ':', line.kind, ':', line.ordinality) AS id,
             COALESCE(ds.shift_date, NULLIF(left(ds."shiftDate", 10), '')::date, ds."createdAt"::date) AS date,
-            CASE WHEN line.kind IN ('wages', 'staffWages') THEN 'Wages' ELSE 'Food and Beverage' END AS category,
+            CASE WHEN line.kind IN ('wages', 'staffWages') THEN 'Wages' ELSE COALESCE(NULLIF(line.item->>'category', ''), 'Food and Beverage') END AS category,
             CASE WHEN line.kind IN ('wages', 'staffWages') THEN NULL ELSE NULLIF(line.item->>'shop', '') END AS supplier,
             CASE
               WHEN line.kind IN ('wages', 'staffWages') THEN COALESCE(NULLIF(line.item->>'person', ''), NULLIF(line.item->>'staff', ''), NULLIF(line.item->>'employee', ''), NULLIF(line.item->>'name', ''), 'UNMAPPED')
@@ -2367,7 +2367,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             END AS description,
             COALESCE(NULLIF(line.item->>'cost', '')::numeric, NULLIF(line.item->>'amount', '')::numeric, 0) AS amount,
             COALESCE(ds."completedBy", ds.staff) AS entered_by,
-            ds.id AS submission_id
+            ds.id AS submission_id,
+            line.kind,
+            line.ordinality::int AS ordinality
           FROM daily_sales_v2 ds
           CROSS JOIN LATERAL (
             SELECT 'expenses' AS kind, item, ordinality FROM jsonb_array_elements(COALESCE(ds.payload->'expenses', '[]'::jsonb)) WITH ORDINALITY AS expense_lines(item, ordinality)
@@ -2507,6 +2509,146 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       console.error("[FINANCE_EXPENSES_DASHBOARD_ERROR]", error);
       res.status(500).json({ ok: false, error: "FINANCE_EXPENSES_DASHBOARD_FAILED", message: error?.message || String(error) });
     }
+  });
+
+  const shiftExpenseKinds = ["expenses", "wages", "staffWages", "otherPayments"] as const;
+  const shiftExpenseParamsSchema = z.object({
+    submissionId: z.string().min(1),
+    kind: z.enum(shiftExpenseKinds),
+    ordinality: z.coerce.number().int().positive(),
+  });
+  const shiftExpenseUpdateSchema = z.object({
+    supplier: z.string().max(240).optional().default(""),
+    category: z.string().trim().min(1).max(120),
+    description: z.string().trim().min(1).max(500),
+    amount: z.coerce.number().positive().max(10_000_000),
+  });
+
+  async function requireFinanceOwner(req: Request, res: Response) {
+    const { getPinSessionUser } = await import("./routes/pinAuth.js");
+    const user = getPinSessionUser(req);
+    if (!user || user.role !== "owner") {
+      res.status(403).json({ error: "Owner access required" });
+      return null;
+    }
+    return user;
+  }
+
+  function expenseArray(payload: any, key: typeof shiftExpenseKinds[number]): any[] {
+    return Array.isArray(payload?.[key]) ? payload[key] : [];
+  }
+
+  function expenseAmount(item: any): number {
+    const value = Number(item?.cost ?? item?.amount ?? 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function shiftExpenseTotals(payload: any) {
+    const sum = (keys: Array<typeof shiftExpenseKinds[number]>) => keys.reduce(
+      (total, key) => total + expenseArray(payload, key).reduce((subtotal, item) => subtotal + expenseAmount(item), 0),
+      0,
+    );
+    const shoppingTotal = sum(["expenses"]);
+    const wagesTotal = sum(["wages", "staffWages"]);
+    const othersTotal = sum(["otherPayments"]);
+    return {
+      shoppingTotal: Math.round(shoppingTotal),
+      wagesTotal: Math.round(wagesTotal),
+      othersTotal: Math.round(othersTotal),
+      totalExpenses: Math.round(shoppingTotal + wagesTotal + othersTotal),
+    };
+  }
+
+  async function mutateShiftExpense(
+    req: Request,
+    res: Response,
+    action: "update" | "delete",
+  ) {
+    try {
+      const owner = await requireFinanceOwner(req, res);
+      if (!owner) return;
+      const params = shiftExpenseParamsSchema.parse(req.params);
+      const update = action === "update" ? shiftExpenseUpdateSchema.parse(req.body) : null;
+      const arrayIndex = params.ordinality - 1;
+
+      const result = await prisma.$transaction(async (transaction: any) => {
+        const rows: any[] = await transaction.$queryRawUnsafe(
+          `SELECT id, payload FROM daily_sales_v2 WHERE id = $1 FOR UPDATE`,
+          params.submissionId,
+        );
+        if (rows.length === 0) return { status: 404, error: "Daily Sales & Stock submission not found" };
+
+        const payload = rows[0].payload && typeof rows[0].payload === "object" ? rows[0].payload : {};
+        const items = [...expenseArray(payload, params.kind)];
+        const before = items[arrayIndex];
+        if (!before) return { status: 404, error: "Shift expense row not found" };
+
+        let after: any = null;
+        if (action === "delete") {
+          items.splice(arrayIndex, 1);
+        } else if (update) {
+          const isWage = params.kind === "wages" || params.kind === "staffWages";
+          after = isWage
+            ? { ...before, person: update.description, description: update.description, cost: update.amount, amount: update.amount }
+            : { ...before, shop: update.supplier, supplier: update.supplier, category: update.category, item: update.description, description: update.description, cost: update.amount, amount: update.amount };
+          items[arrayIndex] = after;
+        }
+
+        const auditEntry = {
+          action,
+          at: new Date().toISOString(),
+          by: { id: owner.id, name: owner.name },
+          kind: params.kind,
+          originalOrdinality: params.ordinality,
+          before,
+          after,
+        };
+        const nextPayload = {
+          ...payload,
+          [params.kind]: items,
+          financeExpenseAudit: [
+            ...(Array.isArray(payload.financeExpenseAudit) ? payload.financeExpenseAudit : []),
+            auditEntry,
+          ],
+        };
+        const totals = shiftExpenseTotals(nextPayload);
+
+        await transaction.$executeRawUnsafe(
+          `UPDATE daily_sales_v2
+           SET payload = $2::jsonb,
+               "shoppingTotal" = $3,
+               "wagesTotal" = $4,
+               "othersTotal" = $5,
+               "totalExpenses" = $6
+           WHERE id = $1`,
+          params.submissionId,
+          JSON.stringify(nextPayload),
+          totals.shoppingTotal,
+          totals.wagesTotal,
+          totals.othersTotal,
+          totals.totalExpenses,
+        );
+
+        return { status: 200, ok: true, action, audit: auditEntry, totals };
+      });
+
+      if (!result.ok) return res.status(result.status).json({ error: result.error });
+      return res.json(result);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid shift expense update", details: error.issues });
+      }
+      console.error("[FINANCE_SHIFT_EXPENSE_MUTATION_ERROR]", error);
+      return res.status(500).json({ error: `Failed to ${action} shift expense` });
+    }
+  }
+
+  app.put("/api/finance/shift-expenses/:submissionId/:kind/:ordinality", async (req: Request, res: Response) => {
+    await mutateShiftExpense(req, res, "update");
+  });
+
+  app.delete("/api/finance/shift-expenses/:submissionId/:kind/:ordinality", async (req: Request, res: Response) => {
+    await mutateShiftExpense(req, res, "delete");
   });
 
   // System status endpoint for lockdown monitoring
