@@ -18,10 +18,21 @@ type RepairRow = {
 
 async function main() {
   const apply = process.argv.includes('--apply');
+  const batchId = process.argv.find((argument) => argument.startsWith('--batch-id='))?.slice('--batch-id='.length) || null;
+  const expectedEligibleValue = process.argv.find((argument) => argument.startsWith('--expect-eligible='))?.slice('--expect-eligible='.length);
+  const expectedScannedValue = process.argv.find((argument) => argument.startsWith('--expect-scanned='))?.slice('--expect-scanned='.length);
+  const expectedEligible = expectedEligibleValue === undefined ? null : Number(expectedEligibleValue);
+  const expectedScanned = expectedScannedValue === undefined ? null : Number(expectedScannedValue);
   const connectionString = process.env.DATABASE_URL;
 
   if (!connectionString) {
     throw new Error('DATABASE_URL is required.');
+  }
+  if (expectedEligible !== null && (!Number.isInteger(expectedEligible) || expectedEligible < 0)) {
+    throw new Error('--expect-eligible must be a non-negative integer.');
+  }
+  if (expectedScanned !== null && (!Number.isInteger(expectedScanned) || expectedScanned < 0)) {
+    throw new Error('--expect-scanned must be a non-negative integer.');
   }
 
   const client = new pg.Client({ connectionString });
@@ -54,11 +65,22 @@ async function main() {
     FROM bank_txn transaction
     JOIN bank_import_batch batch ON batch.id = transaction.batch_id
     WHERE transaction.raw->>'layout' = 'scb_fixed_width'
+      AND ($1::text IS NULL OR transaction.batch_id = $1)
     ORDER BY transaction.posted_at, transaction.id
     FOR UPDATE OF transaction
-  `);
+  `, [batchId]);
 
   scanned = result.rows.length;
+  const repairs: Array<{
+    row: RepairRow;
+    next: {
+      description: string;
+      supplier: string | null;
+      notes: string | null;
+      dedupeKey: string;
+      raw: Record<string, unknown>;
+    };
+  }> = [];
 
   for (const row of result.rows) {
     const raw = row.raw && typeof row.raw === 'object' ? row.raw : {};
@@ -81,9 +103,20 @@ async function main() {
     if (plan.outcome !== 'repair') continue;
 
     eligible += 1;
-    if (!apply) continue;
+    repairs.push({ row, next: plan.next });
+  }
 
-    const updated = await client.query(`
+  if (expectedScanned !== null && scanned !== expectedScanned) {
+    throw new Error(`Scanned row count mismatch: expected=${expectedScanned}, actual=${scanned}.`);
+  }
+  if (expectedEligible !== null && eligible !== expectedEligible) {
+    throw new Error(`Eligible row count mismatch: expected=${expectedEligible}, actual=${eligible}.`);
+  }
+
+  if (apply) {
+    for (const { row, next } of repairs) {
+
+      const updated = await client.query(`
       UPDATE bank_txn
       SET
         description = $2,
@@ -96,26 +129,27 @@ async function main() {
         AND description = $7
     `, [
       row.id,
-      plan.next.description,
-      plan.next.supplier,
-      plan.next.notes,
-      plan.next.dedupeKey,
-      JSON.stringify(plan.next.raw),
+      next.description,
+      next.supplier,
+      next.notes,
+      next.dedupeKey,
+      JSON.stringify(next.raw),
       row.description,
     ]);
 
-    if (updated.rowCount !== 1) {
-      throw new Error(`Concurrent change prevented repair of bank_txn ${row.id}.`);
-    }
+      if (updated.rowCount !== 1) {
+        throw new Error(`Concurrent change prevented repair of bank_txn ${row.id}.`);
+      }
 
-    await client.query(`
+      await client.query(`
       UPDATE bank_deposit
       SET description = $2, updated_at = now()
       WHERE bank_txn_id = $1
         AND description = $3
-    `, [row.id, plan.next.description, row.description]);
+    `, [row.id, next.description, row.description]);
 
-    repaired += 1;
+      repaired += 1;
+    }
   }
 
   if (apply) await client.query('COMMIT');
@@ -123,6 +157,7 @@ async function main() {
 
   console.table([{
     mode: apply ? 'apply' : 'dry-run',
+    batchId: batchId || 'all',
     scanned,
     eligible,
     repaired,
