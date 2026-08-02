@@ -27,6 +27,7 @@ export default function PosShifts() {
   const [shift, setShift] = useState<Shift | null>(null);
   const [history, setHistory] = useState<Shift[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
+  const [cashSales, setCashSales] = useState(0);
   const [staffName, setStaffName] = useState("");
   const [startingFloat, setStartingFloat] = useState("2500");
   const [movementType, setMovementType] = useState<"cash_in" | "cash_out">("cash_out");
@@ -38,22 +39,28 @@ export default function PosShifts() {
   const [busy, setBusy] = useState(false);
 
   const load = async () => {
-    const response = await fetch("/api/pos-shifts/current", { credentials: "include" });
+    const response = await fetch("/api/pos-shifts/current", { credentials: "include", cache: "no-store" });
     const body = await response.json();
     if (!response.ok) throw new Error(body.error || "Could not load POS shift");
     setShift(body.data.shift || null);
     setMovements(body.data.movements || []);
     setHistory(body.data.history || []);
+    setCashSales(Number(body.data.cashSales || 0));
   };
 
   useEffect(() => {
-    load().catch((error) => setNotice(error.message));
+    void load().catch((error) => setNotice(error.message));
+    const timer = window.setInterval(() => void load().catch(() => undefined), 15000);
+    return () => window.clearInterval(timer);
   }, []);
 
   const movementTotal = useMemo(
     () => movements.reduce((sum, movement) => sum + (movement.movement_type === "cash_in" ? Number(movement.amount) : -Number(movement.amount)), 0),
     [movements],
   );
+  const expectedBeforeBanking = Number(shift?.starting_float || 0) + cashSales + movementTotal;
+  const expectedAfterBanking = expectedBeforeBanking - Number(cashBanked || 0);
+  const previewVariance = closingCash === "" ? null : Number(closingCash) - expectedAfterBanking;
 
   const run = async (request: () => Promise<Response>, success: string) => {
     setBusy(true);
@@ -134,7 +141,7 @@ export default function PosShifts() {
           <div className="rounded-3xl border bg-white p-6 shadow-sm">
             <p className="text-xs font-black tracking-widest text-red-600">REGISTER LOCKED</p>
             <h2 className="mt-2 text-3xl font-black">Open shift</h2>
-            <p className="mt-2 text-sm text-zinc-500">Open the cashier shift before taking orders.</p>
+            <p className="mt-2 text-sm text-zinc-500">Open the cashier shift before taking orders. The POS backend will reject sales until this is complete.</p>
             <label className="mt-6 block text-sm font-bold">Cashier name<input value={staffName} onChange={(event) => setStaffName(event.target.value)} className="mt-2 w-full rounded-xl border px-4 py-3" /></label>
             <label className="mt-4 block text-sm font-bold">Starting float<input type="number" min="0" value={startingFloat} onChange={(event) => setStartingFloat(event.target.value)} className="mt-2 w-full rounded-xl border px-4 py-3" /></label>
             <button disabled={busy} onClick={openShift} className="mt-6 w-full rounded-xl bg-[#ffd400] px-5 py-4 text-lg font-black disabled:opacity-50">Open shift</button>
@@ -142,19 +149,27 @@ export default function PosShifts() {
         ) : (
           <div className="space-y-5">
             <div className="rounded-3xl border bg-white p-6 shadow-sm">
-              <div className="flex justify-between gap-4"><div><p className="text-xs font-black tracking-widest text-emerald-600">SHIFT OPEN</p><h2 className="mt-1 text-2xl font-black">{shift.staff_name}</h2><p className="text-sm text-zinc-500">Opened {new Date(shift.opened_at).toLocaleString()}</p></div><div className="text-right"><p className="text-xs font-bold text-zinc-400">Starting float</p><p className="text-2xl font-black">{thb(shift.starting_float)}</p></div></div>
+              <div className="flex justify-between gap-4"><div><p className="text-xs font-black tracking-widest text-emerald-600">SHIFT OPEN — REGISTER ACTIVE</p><h2 className="mt-1 text-2xl font-black">{shift.staff_name}</h2><p className="text-sm text-zinc-500">Opened {new Date(shift.opened_at).toLocaleString()}</p></div><a href="/pos" className="h-fit rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">Go to POS</a></div>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-bold text-zinc-500">Starting float</p><p className="mt-1 text-xl font-black">{thb(shift.starting_float)}</p></div>
+                <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-bold text-zinc-500">Cash sales</p><p className="mt-1 text-xl font-black">{thb(cashSales)}</p></div>
+                <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-bold text-zinc-500">Net movements</p><p className="mt-1 text-xl font-black">{thb(movementTotal)}</p></div>
+                <div className="rounded-2xl bg-[#fff8cc] p-4"><p className="text-xs font-bold text-zinc-600">Expected cash now</p><p className="mt-1 text-xl font-black">{thb(expectedBeforeBanking)}</p></div>
+              </div>
             </div>
             <div className="rounded-3xl border bg-white p-6 shadow-sm">
               <h3 className="text-xl font-black">Money in / money out</h3>
               <div className="mt-4 grid gap-3 sm:grid-cols-3"><select value={movementType} onChange={(event) => setMovementType(event.target.value as "cash_in" | "cash_out")} className="rounded-xl border px-3 py-3"><option value="cash_out">Money out</option><option value="cash_in">Money in</option></select><input type="number" min="0" placeholder="Amount" value={movementAmount} onChange={(event) => setMovementAmount(event.target.value)} className="rounded-xl border px-3 py-3" /><input placeholder="Reason" value={movementReason} onChange={(event) => setMovementReason(event.target.value)} className="rounded-xl border px-3 py-3" /></div>
-              <button disabled={busy} onClick={addMovement} className="mt-3 rounded-xl bg-black px-5 py-3 font-black text-white">Record movement</button>
+              <button disabled={busy} onClick={addMovement} className="mt-3 rounded-xl bg-black px-5 py-3 font-black text-white disabled:opacity-50">Record movement</button>
               <div className="mt-4 divide-y">{movements.map((movement) => <div key={movement.id} className="flex justify-between py-3 text-sm"><span><b>{movement.movement_type === "cash_in" ? "Money in" : "Money out"}</b> · {movement.reason}</span><span className="font-black">{movement.movement_type === "cash_in" ? "+" : "-"}{thb(movement.amount)}</span></div>)}</div>
               <p className="mt-3 text-right text-sm font-bold">Net movement: {thb(movementTotal)}</p>
             </div>
             <div className="rounded-3xl border border-red-200 bg-white p-6 shadow-sm">
               <h3 className="text-xl font-black">Close shift</h3>
+              <p className="mt-1 text-sm text-zinc-500">Expected cash includes starting float + confirmed cash sales + cash movements − cash banked.</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold">Cash physically in register<input type="number" min="0" value={closingCash} onChange={(event) => setClosingCash(event.target.value)} className="mt-2 w-full rounded-xl border px-3 py-3" /></label><label className="text-sm font-bold">Cash banked<input type="number" min="0" value={cashBanked} onChange={(event) => setCashBanked(event.target.value)} className="mt-2 w-full rounded-xl border px-3 py-3" /></label></div>
-              <button disabled={busy} onClick={closeShift} className="mt-5 w-full rounded-xl bg-red-600 px-5 py-4 text-lg font-black text-white">Close and lock shift</button>
+              <div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl bg-zinc-50 p-3"><p className="text-xs font-bold text-zinc-500">Expected after banking</p><p className="text-lg font-black">{thb(expectedAfterBanking)}</p></div><div className={`rounded-xl p-3 ${previewVariance === null ? "bg-zinc-50" : Math.abs(previewVariance) <= 30 ? "bg-emerald-50" : "bg-red-50"}`}><p className="text-xs font-bold text-zinc-500">Preview variance</p><p className="text-lg font-black">{previewVariance === null ? "—" : thb(previewVariance)}</p></div></div>
+              <button disabled={busy} onClick={closeShift} className="mt-5 w-full rounded-xl bg-red-600 px-5 py-4 text-lg font-black text-white disabled:opacity-50">Close and lock shift</button>
             </div>
           </div>
         )}
