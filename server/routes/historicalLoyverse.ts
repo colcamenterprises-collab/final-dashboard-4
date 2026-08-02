@@ -1,5 +1,9 @@
 import { Router, Request, Response } from "express";
 import { getPinSessionUser } from "./pinAuth";
+import { shiftChunk0 } from "../data/loyverseShifts2026Chunk0";
+import { shiftChunk1 } from "../data/loyverseShifts2026Chunk1";
+import { shiftChunk2 } from "../data/loyverseShifts2026Chunk2";
+import { shiftChunk3 } from "../data/loyverseShifts2026Chunk3";
 
 const router = Router();
 
@@ -33,26 +37,71 @@ const topModifiers = [
   { group: "Drink Options (Sets)", option: "Bottle Water", sold: 244, refunded: 2, gross: 0, refunds: 0, net: 0 },
 ];
 
-const shiftMonths = [
-  { month: "Jan 2026", shifts: 32, cashPayments: 378334.90, cashRefunds: 3624, paidIn: 2176.86, paidOut: 102234.86, difference: 2658.10 },
-  { month: "Feb 2026", shifts: 30, cashPayments: 308759.20, cashRefunds: 2794, paidIn: 5114.08, paidOut: 76213.92, difference: 19562.76 },
-  { month: "Mar 2026", shifts: 33, cashPayments: 261425.10, cashRefunds: 3849, paidIn: 2000, paidOut: 69901, difference: 79130.90 },
-  { month: "Apr 2026", shifts: 31, cashPayments: 177921, cashRefunds: 449, paidIn: 5307.55, paidOut: 71071.99, difference: 476.44 },
-  { month: "May 2026", shifts: 32, cashPayments: 137925.30, cashRefunds: 240, paidIn: 1242, paidOut: 60060.16, difference: -2327.14 },
-  { month: "Jun 2026", shifts: 30, cashPayments: 90295.10, cashRefunds: 0, paidIn: 723, paidOut: 60445.50, difference: 4210.40 },
-  { month: "Jul 2026", shifts: 20, cashPayments: 56594.30, cashRefunds: 0, paidIn: 16, paidOut: 70428.08, difference: 16522.78 },
-];
+type ShiftTuple = readonly [number,string,string,string,string,number,number,number,number,number,number,number,number];
+const shiftTuples: readonly ShiftTuple[] = [
+  ...shiftChunk0,
+  ...shiftChunk1,
+  ...shiftChunk2,
+  ...shiftChunk3,
+] as readonly ShiftTuple[];
 
-const recentShifts = [
-  { number: 933, opened: "20 Jul 2026 18:58", closed: "21 Jul 2026 02:17", cash: 3542, paidOut: 5402, expected: -1860, actual: 0, difference: 1860 },
-  { number: 932, opened: "19 Jul 2026 18:15", closed: "20 Jul 2026 02:11", cash: 2013, paidOut: 1753, expected: 260, actual: 0, difference: -260 },
-  { number: 931, opened: "18 Jul 2026 18:43", closed: "19 Jul 2026 02:11", cash: 6644, paidOut: 4977, expected: 1667, actual: 1667, difference: 0 },
-  { number: 930, opened: "17 Jul 2026 18:48", closed: "18 Jul 2026 02:19", cash: 2486.10, paidOut: 2076, expected: 410.10, actual: 0, difference: -410.10 },
-  { number: 929, opened: "16 Jul 2026 19:20", closed: "17 Jul 2026 02:07", cash: 2870, paidOut: 4833, expected: -1963, actual: 0, difference: 1963 },
-  { number: 928, opened: "15 Jul 2026 18:46", closed: "16 Jul 2026 02:24", cash: 4241, paidOut: 5003, expected: -762, actual: 266, difference: 1028 },
-  { number: 927, opened: "14 Jul 2026 19:16", closed: "15 Jul 2026 02:03", cash: 1961, paidOut: 3702, expected: -1741, actual: 0, difference: 1741 },
-  { number: 926, opened: "13 Jul 2026 19:09", closed: "14 Jul 2026 01:53", cash: 3521, paidOut: 3336, expected: 185, actual: 185, difference: 0 },
-];
+function parseLoyverseDate(value: string) {
+  const [date, time] = value.trim().split(/\s+/);
+  const [day, month, year] = date.split("/").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hour, minute));
+}
+
+const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+const displayFormatter = new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "UTC" });
+
+const shiftRows = shiftTuples.map((r) => {
+  const [number, opened, openedBy, closed, closedBy, startingCash, cashPayments, cashRefunds, paidIn, paidOut, expected, actual, difference] = r;
+  const closedDate = parseLoyverseDate(closed);
+  return {
+    number,
+    store: "Smash Bros Burgers (Rawai)",
+    pos: "Smash Brothers - Rawai (Main POS)",
+    opened: displayFormatter.format(parseLoyverseDate(opened)).replace(",", ""),
+    openedRaw: opened,
+    openedBy,
+    closed: displayFormatter.format(closedDate).replace(",", ""),
+    closedRaw: closed,
+    closedBy,
+    reportDate: closedDate.toISOString().slice(0, 10),
+    month: monthFormatter.format(closedDate),
+    startingCash,
+    cash: cashPayments,
+    cashRefunds,
+    paidIn,
+    paidOut,
+    expected,
+    actual,
+    difference,
+  };
+}).sort((a, b) => b.number - a.number);
+
+const shiftMonthsMap = new Map<string, { month:string; shifts:number; startingCash:number; cashPayments:number; cashRefunds:number; paidIn:number; paidOut:number; expected:number; actual:number; difference:number; sortDate:string }>();
+for (const row of shiftRows) {
+  const current = shiftMonthsMap.get(row.month) || { month: row.month, shifts: 0, startingCash: 0, cashPayments: 0, cashRefunds: 0, paidIn: 0, paidOut: 0, expected: 0, actual: 0, difference: 0, sortDate: row.reportDate.slice(0, 7) };
+  current.shifts += 1;
+  current.startingCash += row.startingCash;
+  current.cashPayments += row.cash;
+  current.cashRefunds += row.cashRefunds;
+  current.paidIn += row.paidIn;
+  current.paidOut += row.paidOut;
+  current.expected += row.expected;
+  current.actual += row.actual;
+  current.difference += row.difference;
+  shiftMonthsMap.set(row.month, current);
+}
+const shiftMonths = [...shiftMonthsMap.values()].sort((a, b) => a.sortDate.localeCompare(b.sortDate)).map(({ sortDate, ...row }) => row);
+
+const shiftNumbers = shiftRows.map((r) => r.number);
+const minShift = Math.min(...shiftNumbers);
+const maxShift = Math.max(...shiftNumbers);
+const shiftSet = new Set(shiftNumbers);
+const missingShiftNumbers = Array.from({ length: maxShift - minShift + 1 }, (_, i) => minShift + i).filter((n) => !shiftSet.has(n));
 
 router.get("/", (req: Request, res: Response) => {
   const user = getPinSessionUser(req);
@@ -62,6 +111,8 @@ router.get("/", (req: Request, res: Response) => {
   res.json({
     source: "Loyverse direct CSV exports",
     period: { from: "2026-01-01", to: "2026-07-21", timezone: "Asia/Bangkok" },
+    shiftSource: "Loyverse shift CSV export",
+    shiftPeriod: { from: "2026-01-01", to: "2026-08-03", timezone: "Asia/Bangkok" },
     reconciliation: {
       paymentNet: 3369996,
       salesSummaryNet: 3369989,
@@ -76,7 +127,7 @@ router.get("/", (req: Request, res: Response) => {
       netPayments: 3369996,
       discountsApplied: 187,
       discounts: 17645,
-      shifts: 208,
+      shifts: shiftRows.length,
       modifierQuantity: 8648,
       modifierNetSales: 84510,
     },
@@ -84,13 +135,14 @@ router.get("/", (req: Request, res: Response) => {
     discounts,
     topModifiers,
     shiftMonths,
-    recentShifts,
+    recentShifts: shiftRows,
     completeness: {
       paymentTypes: 4,
       discounts: 5,
       modifierRows: 62,
-      shiftRows: 208,
-      missingShiftNumbers: [911, 912, 913, 914, 915, 916],
+      shiftRows: shiftRows.length,
+      missingShiftNumbers,
+      shiftNumberRange: { from: minShift, to: maxShift },
     }
   });
 });
