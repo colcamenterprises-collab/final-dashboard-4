@@ -28,8 +28,8 @@ async function currentShift() {
   return result.rows[0] || null;
 }
 
-async function cashSalesSince(openedAt: Date | string, client = pool) {
-  const result = await client.query(
+async function cashSalesSince(openedAt: Date | string) {
+  const result = await pool.query(
     `SELECT COALESCE(SUM(p.amount),0) AS total
        FROM public.ordering_payments p
        JOIN public.ordering_orders o ON o.id=p.order_id
@@ -102,7 +102,7 @@ router.post("/:id/close", staffDevice, async (req, res) => {
       return fail(res, "Closing cash and cash banked must be valid");
     }
     const movements = (await client.query(`SELECT COALESCE(SUM(CASE WHEN movement_type='cash_in' THEN amount ELSE -amount END),0) total FROM public.pos_shift_movements WHERE shift_id=$1`, [req.params.id])).rows[0];
-    const cashSales = await cashSalesSince(current.opened_at, client);
+    const cashSales = await cashSalesSince(current.opened_at);
     const expected = numberValue(current.starting_float) + cashSales + numberValue(movements.total) - cashBanked;
     const variance = closingCash - expected;
     const actor = (req as any).user?.username || (req as any).user?.id || null;
