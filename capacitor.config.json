@@ -1,0 +1,13 @@
+{
+  "appId": "io.customli.sbbpos",
+  "appName": "Smash Brothers POS",
+  "webDir": "dist/public",
+  "server": {
+    "url": "https://app.smashbrosburgers.com",
+    "cleartext": false,
+    "allowNavigation": ["app.smashbrosburgers.com"]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
