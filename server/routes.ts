@@ -431,6 +431,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       months.forEach(month => {
         monthlyData[month] = {
           sales: 0,
+          bankDeposits: 0,
           cogs: 0,
           expenses: 0,
           grossProfit: 0,
@@ -486,11 +487,45 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       // Single-tenant mode - no restaurantId filtering needed
       const expensesResult = await db.select({
         month: sql<number>`EXTRACT(MONTH FROM "shiftDate")`.as('month'),
-        totalExpenses: sql<number>`SUM("costCents"::DECIMAL / 100)`.as('totalExpenses')
+        totalExpenses: sql<number>`
+          SUM(
+            CASE
+              WHEN COALESCE(meta->>'amountUnit', '') = 'THB'
+                THEN "costCents"::DECIMAL
+              WHEN COALESCE(meta->>'amountUnit', '') = 'SATANG'
+                OR source IS NULL
+                OR UPPER(source) IN ('LEGACY_CENTS', 'SHIFT_FORM', 'STOCK_LODGMENT')
+                THEN "costCents"::DECIMAL / 100
+              ELSE "costCents"::DECIMAL
+            END
+          )
+        `.as('totalExpenses')
       })
       .from(expenses)
       .where(sql`EXTRACT(YEAR FROM "shiftDate") = ${year}`)
       .groupBy(sql`EXTRACT(MONTH FROM "shiftDate")`);
+
+      // Bank deposits are a reconciliation line only. Loyverse remains sales truth,
+      // so deposits must not be added to revenue and double-count QR/Grab receipts.
+      let depositsAvailable = true;
+      let depositsUnavailableMessage: string | null = null;
+      let depositsResult: any;
+      try {
+        depositsResult = await db.execute(sql`
+          SELECT
+            EXTRACT(MONTH FROM posted_at)::integer AS month,
+            COALESCE(SUM(amount_thb), 0) AS total_deposits,
+            COUNT(*)::integer AS deposit_count
+          FROM bank_deposit
+          WHERE EXTRACT(YEAR FROM posted_at) = ${year}
+          GROUP BY EXTRACT(MONTH FROM posted_at)
+        `);
+      } catch (error: any) {
+        depositsAvailable = false;
+        depositsUnavailableMessage = error?.message || String(error);
+        depositsResult = { rows: [] };
+        console.warn('[P&L_BANK_DEPOSIT_SOURCE_UNAVAILABLE]', depositsUnavailableMessage);
+      }
 
       // Process PRIMARY sales data from POS (loyverse_shifts)
       loyverseResult.forEach(record => {
@@ -522,6 +557,20 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         }
       });
 
+      depositsResult.rows.forEach((record: any) => {
+        const monthIndex = Number(record.month) - 1;
+        const monthName = months[monthIndex];
+        if (monthName) {
+          monthlyData[monthName].bankDeposits = Number(record.total_deposits || 0);
+        }
+      });
+
+      if (!depositsAvailable) {
+        months.forEach(month => {
+          monthlyData[month].bankDeposits = null;
+        });
+      }
+
       // Calculate COGS and profits for each month
       months.forEach(month => {
         const sales = monthlyData[month].sales;
@@ -545,12 +594,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         const data = monthlyData[month];
         return {
           sales: totals.sales + data.sales,
+          bankDeposits: totals.bankDeposits + data.bankDeposits,
           cogs: totals.cogs + data.cogs,
           expenses: totals.expenses + data.expenses,
           grossProfit: totals.grossProfit + data.grossProfit,
           netProfit: totals.netProfit + data.netProfit
         };
-      }, { sales: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 });
+      }, { sales: 0, bankDeposits: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 });
+
+      if (!depositsAvailable) {
+        ytdTotals.bankDeposits = null as any;
+      }
 
       // Return data in format expected by frontend
       res.json({
@@ -561,8 +615,18 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         dataSource: {
           salesRecords: salesResult.length,
           loyverseRecords: loyverseResult.length,
-          expenseRecords: expensesResult.length
-        }
+          expenseRecords: expensesResult.length,
+          depositMonths: depositsResult.rows.length,
+          bankDepositsStatus: depositsAvailable ? 'available' : 'unavailable',
+          depositsAreReconciliationOnly: true,
+        },
+        blockers: depositsAvailable ? [] : [{
+          code: 'BANK_DEPOSIT_SOURCE_UNAVAILABLE',
+          message: 'Bank deposit reconciliation data is unavailable. Apply the bank deposit migration before relying on this P&L view.',
+          where: 'bank_deposit',
+          canonical_source: 'bank_deposit',
+          auto_build_attempted: false,
+        }]
       });
 
     } catch (error) {
@@ -1496,7 +1560,9 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
           item: lines[0]?.name || 'Purchase',
           costCents: totalCents,
           supplier: supplier,
-          expenseType: 'PURCHASE'
+          expenseType: 'PURCHASE',
+          source: 'LEGACY_CENTS',
+          meta: { amountUnit: 'SATANG', entryPoint: 'expensesV2/legacy' }
         },
       });
 
@@ -2288,7 +2354,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const dateFrom = requestedDateFrom || currentMonthStart.toISOString().slice(0, 10);
       const dateTo = requestedDateTo || new Date(currentMonthEnd.getTime() - 1).toISOString().slice(0, 10);
 
-      const [inShiftRows, businessRows, bankRows, summaryRows] = await Promise.all([
+      const [inShiftRows, businessRows, bankRows, depositRows, summaryRows] = await Promise.all([
         prisma.$queryRawUnsafe<any[]>(`
           SELECT
             concat(ds.id, ':', line.kind, ':', line.ordinality) AS id,
@@ -2323,7 +2389,15 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             e.supplier,
             e."expenseType" AS category,
             e.item AS description,
-            COALESCE(e."costCents"::numeric, 0) AS amount,
+            CASE
+              WHEN COALESCE(e.meta->>'amountUnit', '') = 'THB'
+                THEN COALESCE(e."costCents"::numeric, 0)
+              WHEN COALESCE(e.meta->>'amountUnit', '') = 'SATANG'
+                OR e.source IS NULL
+                OR UPPER(e.source) IN ('LEGACY_CENTS', 'SHIFT_FORM', 'STOCK_LODGMENT')
+                THEN COALESCE(e."costCents"::numeric, 0) / 100
+              ELSE COALESCE(e."costCents"::numeric, 0)
+            END AS amount,
             COALESCE(e.source, 'DIRECT') AS payment_method,
             e.source AS source,
             e."createdAt" AS created_at,
@@ -2339,24 +2413,54 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         prisma.$queryRawUnsafe<any[]>(`
           SELECT
             ie.id,
-            ie.date AS transaction_date,
+            ie.posted_at AS transaction_date,
             ie.description,
-            COALESCE(ie.amount_cents::numeric / 100, 0) AS amount,
-            ie.source AS bank_source,
-            ie.import_batch_id,
+            COALESCE(ie.amount_thb::numeric, 0) AS amount,
+            batch.source AS bank_source,
+            ie.batch_id AS import_batch_id,
             ie.status,
-            ie.approved_by AS reviewed_by,
-            ie.approved_at AS reviewed_at,
-            concat('imported_expense:', ie.id) AS approved_expense_id,
-            ie.raw_data AS notes
-          FROM imported_expenses ie
-          WHERE ($1::date IS NULL OR ie.date >= $1::date)
-            AND ($2::date IS NULL OR ie.date <= $2::date)
-          ORDER BY ie.created_at DESC
+            ie.supplier,
+            ie.category,
+            ie.expense_id AS approved_expense_id,
+            ie.notes,
+            ie.raw
+          FROM bank_txn ie
+          JOIN bank_import_batch batch ON batch.id = ie.batch_id
+          WHERE ($1::date IS NULL OR ie.posted_at::date >= $1::date)
+            AND ($2::date IS NULL OR ie.posted_at::date <= $2::date)
+          ORDER BY ie.posted_at DESC
+        `, dateFrom, dateTo),
+        prisma.$queryRawUnsafe<any[]>(`
+          SELECT
+            deposit.id,
+            deposit.posted_at AS date,
+            deposit.description,
+            deposit.amount_thb AS amount,
+            deposit.ref,
+            deposit.source,
+            deposit.classification,
+            deposit.include_in_pnl,
+            deposit.batch_id,
+            batch.filename
+          FROM bank_deposit deposit
+          JOIN bank_import_batch batch ON batch.id = deposit.batch_id
+          WHERE ($1::date IS NULL OR deposit.posted_at::date >= $1::date)
+            AND ($2::date IS NULL OR deposit.posted_at::date <= $2::date)
+          ORDER BY deposit.posted_at DESC, deposit.created_at DESC
         `, dateFrom, dateTo),
         prisma.$queryRawUnsafe<any[]>(`
           WITH business AS (
-            SELECT COALESCE(SUM(e."costCents"::numeric), 0) total
+            SELECT COALESCE(SUM(
+              CASE
+                WHEN COALESCE(e.meta->>'amountUnit', '') = 'THB'
+                  THEN e."costCents"::numeric
+                WHEN COALESCE(e.meta->>'amountUnit', '') = 'SATANG'
+                  OR e.source IS NULL
+                  OR UPPER(e.source) IN ('LEGACY_CENTS', 'SHIFT_FORM', 'STOCK_LODGMENT')
+                  THEN e."costCents"::numeric / 100
+                ELSE e."costCents"::numeric
+              END
+            ), 0) total
             FROM expenses e
             WHERE COALESCE(e.source, 'DIRECT') NOT IN ('SHIFT_FORM', 'STOCK_LODGMENT')
               AND e."shiftDate" >= $1::timestamp AND e."shiftDate" < $2::timestamp
@@ -2371,26 +2475,34 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
             ) AS line(item)
             WHERE COALESCE(ds.shift_date, ds."createdAt"::date) >= $1::date AND COALESCE(ds.shift_date, ds."createdAt"::date) < $2::date
           ), pending AS (
-            SELECT COALESCE(SUM(ABS(ie.amount_cents::numeric) / 100), 0) total
-            FROM imported_expenses ie
-            WHERE UPPER(ie.status::text) IN ('PENDING', 'PENDING REVIEW')
+            SELECT COALESCE(SUM(ABS(transaction.amount_thb::numeric)), 0) total
+            FROM bank_txn transaction
+            WHERE transaction.status = 'pending'
+              AND transaction.amount_thb > 0
+              AND COALESCE(transaction.category, '') NOT IN ('Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate')
           ), personal AS (
-            SELECT COALESCE(SUM(ABS(ie.amount_cents::numeric) / 100), 0) total
-            FROM imported_expenses ie
-            WHERE UPPER(ie.status::text) IN ('PERSONAL', 'PERSONAL EXPENSE') AND ie.date >= $1::date AND ie.date < $2::date
+            SELECT COALESCE(SUM(ABS(transaction.amount_thb::numeric)), 0) total
+            FROM bank_txn transaction
+            WHERE transaction.category = 'Personal / Owner'
+              AND transaction.posted_at::date >= $1::date AND transaction.posted_at::date < $2::date
           ), declined AS (
-            SELECT COALESCE(SUM(ABS(ie.amount_cents::numeric) / 100), 0) total
-            FROM imported_expenses ie
-            WHERE UPPER(ie.status::text) IN ('DECLINED', 'REJECTED') AND ie.date >= $1::date AND ie.date < $2::date
+            SELECT COALESCE(SUM(ABS(transaction.amount_thb::numeric)), 0) total
+            FROM bank_txn transaction
+            WHERE transaction.status = 'rejected'
+              AND transaction.posted_at::date >= $1::date AND transaction.posted_at::date < $2::date
+          ), deposits AS (
+            SELECT COALESCE(SUM(deposit.amount_thb::numeric), 0) total
+            FROM bank_deposit deposit
+            WHERE deposit.posted_at::date >= $1::date AND deposit.posted_at::date < $2::date
           )
           SELECT business.total AS current_month_business_expenses, in_shift.total AS current_month_in_shift_expenses,
                  pending.total AS pending_bank_statement_review, personal.total AS personal_expenses_this_month,
-                 declined.total AS declined_transactions_this_month
-          FROM business, in_shift, pending, personal, declined
+                 declined.total AS declined_transactions_this_month, deposits.total AS current_month_bank_deposits
+          FROM business, in_shift, pending, personal, declined, deposits
         `, currentMonthStart, currentMonthEnd),
       ]);
 
-      res.json({ ok: true, source: "finance_expenses_dashboard", scope: { dateFrom, dateTo }, status: "ready", data: { summary: summaryRows[0] || {}, inShiftExpenses: inShiftRows, businessExpenses: businessRows, bankReviewQueue: bankRows }, warnings: [], blockers: [], last_updated: new Date().toISOString() });
+      res.json({ ok: true, source: "finance_expenses_dashboard", scope: { dateFrom, dateTo }, status: "ready", data: { summary: summaryRows[0] || {}, inShiftExpenses: inShiftRows, businessExpenses: businessRows, bankReviewQueue: bankRows, deposits: depositRows }, warnings: [], blockers: [], last_updated: new Date().toISOString() });
     } catch (error: any) {
       console.error("[FINANCE_EXPENSES_DASHBOARD_ERROR]", error);
       res.status(500).json({ ok: false, error: "FINANCE_EXPENSES_DASHBOARD_FAILED", message: error?.message || String(error) });
@@ -2985,17 +3097,36 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Update expense
   app.put("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || user.role !== "owner") {
+        return res.status(403).json({ error: "Owner access required" });
+      }
+
       const id = req.params.id;
       const { date, supplier, category, description, amount } = req.body;
+      const normalizedDate = typeof date === "string" ? date.slice(0, 10) : "";
+      const normalizedSupplier = typeof supplier === "string" ? supplier.trim() : "";
+      const normalizedCategory = typeof category === "string" ? category.trim() : "";
+      const normalizedDescription = typeof description === "string" ? description.trim() : null;
+      const normalizedAmount = Number(amount);
+
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate) || !normalizedSupplier || !normalizedCategory) {
+        return res.status(400).json({ error: "Date, supplier and category are required" });
+      }
+      if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+        return res.status(400).json({ error: "Amount must be greater than zero" });
+      }
 
       const updatedExpense = await db.execute(sql`
         UPDATE expenses
         SET
-          "shiftDate" = ${date},
-          supplier = ${supplier},
-          "expenseType" = ${category},
-          item = ${description},
-          "costCents" = ${parseFloat(amount)}
+          "shiftDate" = ${normalizedDate},
+          supplier = ${normalizedSupplier},
+          "expenseType" = ${normalizedCategory},
+          item = ${normalizedDescription},
+          "costCents" = ${normalizedAmount},
+          meta = jsonb_set(COALESCE(meta, '{}'::jsonb), '{amountUnit}', '"THB"'::jsonb, true)
         WHERE id = ${id}
         RETURNING *
       `);
@@ -3014,6 +3145,12 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
   // Delete expense
   app.delete("/api/expensesV2/:id", async (req: Request, res: Response) => {
     try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || user.role !== "owner") {
+        return res.status(403).json({ error: "Owner access required" });
+      }
+
       const id = req.params.id; // Keep as string UUID
       const success = await storage.deleteExpense(id);
       if (success) {
