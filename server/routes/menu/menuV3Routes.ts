@@ -7,7 +7,8 @@ import {
 } from "../../services/menu/itemService";
 import {
   getModifierGroups, createModifierGroup, updateModifierGroup, deleteModifierGroup,
-  createModifier, updateModifier, deleteModifier, applyGroupToItem, setGroupAssignments, mergeModifierGroups
+  createModifier, updateModifier, deleteModifier, applyGroupToItem, setGroupAssignments, mergeModifierGroups,
+  saveItemChoiceGroup, deleteItemChoiceGroup
 } from "../../services/menu/modifierService";
 import {
   setRecipe, getRecipe
@@ -60,6 +61,20 @@ router.post("/modifiers/create", async (req, res) => res.json(await createModifi
 router.post("/modifiers/update", async (req, res) => res.json(await updateModifier(req.body.id, req.body)));
 router.post("/modifiers/delete", async (req, res) => res.json(await deleteModifier(req.body.id)));
 router.post("/modifiers/apply", async (req, res) => res.json(await applyGroupToItem(req.body.groupId, req.body.itemId)));
+router.post("/items/options/save", async (req, res) => {
+  try {
+    return res.json(await saveItemChoiceGroup(String(req.body?.itemId || ""), req.body?.groupId ? String(req.body.groupId) : null, req.body));
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "Could not save item options" });
+  }
+});
+router.post("/items/options/delete", async (req, res) => {
+  try {
+    return res.json(await deleteItemChoiceGroup(String(req.body?.itemId || ""), String(req.body?.groupId || "")));
+  } catch (error: any) {
+    return res.status(400).json({ error: error?.message || "Could not delete item options" });
+  }
+});
 
 router.get("/recipes/:itemId", async (req, res) => {
   try { return res.json(await getRecipe(req.params.itemId)); }

@@ -207,6 +207,160 @@ export async function applyGroupToItem(groupId: string, itemId: string) {
   return setGroupAssignments(groupId, ids);
 }
 
+type ItemChoiceOptionInput = {
+  name?: unknown;
+  thaiName?: unknown;
+  name_th?: unknown;
+  finalPrice?: unknown;
+};
+
+function normalizeItemChoiceOptions(options: unknown, basePrice: number) {
+  if (!Array.isArray(options) || options.length < 2) {
+    throw new Error("Add at least two choices");
+  }
+
+  const seen = new Set<string>();
+  return options.map((raw: ItemChoiceOptionInput, index) => {
+    const name = String(raw?.name ?? "").trim();
+    const normalizedName = name.toLowerCase();
+    const finalPrice = Number(raw?.finalPrice);
+
+    if (!name) throw new Error(`Choice ${index + 1} needs a name`);
+    if (seen.has(normalizedName)) throw new Error(`Choice names must be unique: ${name}`);
+    if (!Number.isFinite(finalPrice) || finalPrice < basePrice) {
+      throw new Error(`The final price for ${name} must be at least the product base price`);
+    }
+
+    seen.add(normalizedName);
+    return {
+      name,
+      thaiName: String(raw?.thaiName ?? raw?.name_th ?? "").trim() || null,
+      finalPrice,
+      priceDelta: Number((finalPrice - basePrice).toFixed(2)),
+      sortOrder: index,
+    };
+  });
+}
+
+/**
+ * Create or update a required, single-select price choice directly from a menu item.
+ * The public editor works with final selling prices; the canonical modifier table stores
+ * only the delta from the item's direct/POS base price.
+ */
+export async function saveItemChoiceGroup(itemId: string, groupId: string | null, data: any) {
+  const name = String(data?.name ?? "").trim();
+  if (!name) throw new Error("Option group name is required");
+
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+
+    const itemResult = await client.query(
+      `SELECT id, COALESCE(direct_price, price) AS base_price
+       FROM ordering_menu_items
+       WHERE id=$1
+       FOR UPDATE`,
+      [itemId],
+    );
+    const item = itemResult.rows[0];
+    if (!item) throw new Error("Menu item not found");
+
+    const basePrice = Number(item.base_price);
+    if (!Number.isFinite(basePrice) || basePrice <= 0) {
+      throw new Error("Set the product Direct / POS base price before adding price choices");
+    }
+    const options = normalizeItemChoiceOptions(data?.options, basePrice);
+    const promptText = String(data?.promptText ?? name).trim() || name;
+
+    let savedGroupId = groupId;
+    if (savedGroupId) {
+      const ownership = await client.query(
+        `SELECT g.id
+         FROM ordering_modifier_groups g
+         JOIN ordering_modifier_group_items own
+           ON own.modifier_group_id=g.id AND own.menu_item_id=$2
+         WHERE g.id=$1
+           AND COALESCE(g.group_type,'modifier')='choice'
+           AND (SELECT COUNT(*) FROM ordering_modifier_group_items all_links WHERE all_links.modifier_group_id=g.id)=1
+         FOR UPDATE`,
+        [savedGroupId, itemId],
+      );
+      if (!ownership.rows[0]) {
+        throw new Error("Only an item-exclusive price choice can be edited here");
+      }
+      await client.query(
+        `UPDATE ordering_modifier_groups SET
+           name_en=$2, name_th=$3, group_type='choice', selection_mode='single',
+           min_select=1, max_select=1, is_required=TRUE,
+           min_selections=1, max_selections=1, prompt_text=$4,
+           is_active=TRUE, updated_at=NOW()
+         WHERE id=$1`,
+        [savedGroupId, name, String(data?.name_th ?? "").trim() || null, promptText],
+      );
+      await client.query(`DELETE FROM ordering_item_modifiers WHERE modifier_group_id=$1`, [savedGroupId]);
+    } else {
+      const created = await client.query(
+        `INSERT INTO ordering_modifier_groups(
+           name_en,name_th,menu_item_id,min_select,max_select,is_required,sort_order,
+           group_type,selection_mode,min_selections,max_selections,prompt_text,is_active)
+         VALUES($1,$2,NULL,1,1,TRUE,$3,'choice','single',1,1,$4,TRUE)
+         RETURNING id`,
+        [name, String(data?.name_th ?? "").trim() || null, Number(data?.sortOrder ?? 0), promptText],
+      );
+      savedGroupId = String(created.rows[0].id);
+      await client.query(
+        `INSERT INTO ordering_modifier_group_items(modifier_group_id,menu_item_id,sort_order)
+         VALUES($1,$2,$3)`,
+        [savedGroupId, itemId, Number(data?.sortOrder ?? 0)],
+      );
+    }
+
+    for (const option of options) {
+      await client.query(
+        `INSERT INTO ordering_item_modifiers(
+           modifier_group_id,name_en,name_th,price_delta,sort_order,is_active)
+         VALUES($1,$2,$3,$4,$5,TRUE)`,
+        [savedGroupId, option.name, option.thaiName, option.priceDelta, option.sortOrder],
+      );
+    }
+
+    await client.query("COMMIT");
+    return { id: savedGroupId, itemId, name, promptText, basePrice, options };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteItemChoiceGroup(itemId: string, groupId: string) {
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const ownership = await client.query(
+      `SELECT g.id
+       FROM ordering_modifier_groups g
+       JOIN ordering_modifier_group_items own
+         ON own.modifier_group_id=g.id AND own.menu_item_id=$2
+       WHERE g.id=$1
+         AND COALESCE(g.group_type,'modifier')='choice'
+         AND (SELECT COUNT(*) FROM ordering_modifier_group_items all_links WHERE all_links.modifier_group_id=g.id)=1
+       FOR UPDATE`,
+      [groupId, itemId],
+    );
+    if (!ownership.rows[0]) throw new Error("Item-exclusive price choice not found");
+    await client.query(`DELETE FROM ordering_modifier_groups WHERE id=$1`, [groupId]);
+    await client.query("COMMIT");
+    return { id: groupId, itemId, deleted: true };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function mergeModifierGroups(targetGroupId: string, sourceGroupIds: string[], mergeUniqueOptions = true) {
   const targetId = String(targetGroupId || "").trim();
   const sourceIds = Array.from(new Set((sourceGroupIds || []).map(String).filter((id) => id && id !== targetId)));

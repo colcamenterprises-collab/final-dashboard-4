@@ -205,11 +205,12 @@ function decorateOrder(order: any) {
 export async function getMenu(includeInactive = false) {
   const db = requireDb();
   await ensureGoLiveMenuIfEmpty();
-  const [categoryResult, itemResult, groupResult, modifierResult] = await Promise.all([
+  const [categoryResult, itemResult, groupResult, modifierResult, assignmentResult] = await Promise.all([
     db.query(`SELECT * FROM ordering_menu_categories ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
     db.query(`SELECT * FROM ordering_menu_items ${includeInactive ? "" : "WHERE is_active = TRUE AND is_sold_out = FALSE AND price > 0"} ORDER BY sort_order ASC, name_en ASC`),
-    db.query(`SELECT * FROM ordering_modifier_groups ORDER BY sort_order ASC, name_en ASC`),
+    db.query(`SELECT * FROM ordering_modifier_groups ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
     db.query(`SELECT * FROM ordering_item_modifiers ${includeInactive ? "" : "WHERE is_active = TRUE"} ORDER BY sort_order ASC, name_en ASC`),
+    db.query(`SELECT modifier_group_id,menu_item_id,sort_order FROM ordering_modifier_group_items ORDER BY sort_order ASC`),
   ]);
 
   const modifiersByGroup = new Map<string, any[]>();
@@ -219,11 +220,23 @@ export async function getMenu(includeInactive = false) {
     modifiersByGroup.set(modifier.modifier_group_id, list);
   }
 
+  const assignedItemsByGroup = new Map<string, string[]>();
+  for (const assignment of assignmentResult.rows) {
+    const key = String(assignment.modifier_group_id);
+    assignedItemsByGroup.set(key, [...(assignedItemsByGroup.get(key) || []), String(assignment.menu_item_id)]);
+  }
+
   const groupsByItem = new Map<string, any[]>();
   for (const group of groupResult.rows) {
-    const list = groupsByItem.get(group.menu_item_id) ?? [];
-    list.push({ ...group, modifiers: modifiersByGroup.get(group.id) ?? [] });
-    groupsByItem.set(group.menu_item_id, list);
+    const itemIds = new Set<string>(assignedItemsByGroup.get(String(group.id)) || []);
+    if (group.menu_item_id) itemIds.add(String(group.menu_item_id));
+    for (const itemId of itemIds) {
+      const list = groupsByItem.get(itemId) ?? [];
+      if (!list.some((existing) => String(existing.id) === String(group.id))) {
+        list.push({ ...group, modifiers: modifiersByGroup.get(group.id) ?? [] });
+      }
+      groupsByItem.set(itemId, list);
+    }
   }
 
   const itemsByCategory = new Map<string, any[]>();
@@ -421,19 +434,63 @@ export async function createOrder(input: OrderingCreateOrderInput) {
       const unitPrice = asNumber(menuItem.price);
       let modifierTotal = 0;
       const modifierRows: any[] = [];
+      const selectedModifierIds = new Set<string>();
+      const groupResult = await client.query(
+        `SELECT DISTINCT g.id,g.name_en,g.selection_mode,
+                COALESCE(g.min_selections,g.min_select,CASE WHEN g.is_required THEN 1 ELSE 0 END,0) AS min_selections,
+                COALESCE(g.max_selections,g.max_select) AS max_selections
+         FROM ordering_modifier_groups g
+         WHERE g.is_active
+           AND (
+             g.menu_item_id=$1 OR EXISTS(
+               SELECT 1 FROM ordering_modifier_group_items a
+               WHERE a.modifier_group_id=g.id AND a.menu_item_id=$1
+             )
+           )
+           AND EXISTS(
+             SELECT 1 FROM ordering_item_modifiers available
+             WHERE available.modifier_group_id=g.id AND available.is_active
+           )`,
+        [cartItem.menu_item_id],
+      );
       for (const selected of cartItem.modifiers ?? []) {
+        const selectedModifierId = String(selected.item_modifier_id || "");
+        if (!selectedModifierId || selectedModifierIds.has(selectedModifierId)) {
+          throw new Error("Each item option can be selected only once");
+        }
+        selectedModifierIds.add(selectedModifierId);
         const modifierResult = await client.query(
-          `SELECT m.*, g.name_en AS group_name_en, g.min_select, g.max_select
+          `SELECT m.*,g.name_en AS group_name_en
            FROM ordering_item_modifiers m
-           JOIN ordering_modifier_groups g ON g.id = m.modifier_group_id
-           WHERE m.id = $1 AND g.menu_item_id = $2 AND m.is_active = TRUE`,
-          [selected.item_modifier_id, cartItem.menu_item_id],
+           JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id
+           WHERE m.id=$1 AND m.is_active=TRUE AND g.is_active
+             AND (
+               g.menu_item_id=$2 OR EXISTS(
+                 SELECT 1 FROM ordering_modifier_group_items a
+                 WHERE a.modifier_group_id=g.id AND a.menu_item_id=$2
+               )
+             )`,
+          [selectedModifierId, cartItem.menu_item_id],
         );
         const modifier = modifierResult.rows[0];
-        if (!modifier) throw new Error(`Modifier not available: ${selected.item_modifier_id}`);
+        if (!modifier) throw new Error(`Modifier not available: ${selectedModifierId}`);
         const modQty = normalizeInt(selected.quantity, 1);
+        if (modQty !== 1) throw new Error("Item option quantity must be one");
         modifierTotal += asNumber(modifier.price_delta) * modQty;
         modifierRows.push({ ...modifier, quantity: modQty });
+      }
+      const selectionsByGroup = new Map<string, number>();
+      for (const modifier of modifierRows) {
+        const key = String(modifier.modifier_group_id);
+        selectionsByGroup.set(key, (selectionsByGroup.get(key) || 0) + 1);
+      }
+      for (const group of groupResult.rows) {
+        const count = selectionsByGroup.get(String(group.id)) || 0;
+        const minimum = Number(group.min_selections || 0);
+        const configuredMaximum = group.max_selections == null ? null : Number(group.max_selections);
+        const maximum = group.selection_mode === "single" ? 1 : configuredMaximum;
+        if (count < minimum) throw new Error(`Select ${minimum} option${minimum === 1 ? "" : "s"} from ${group.name_en}`);
+        if (maximum !== null && count > maximum) throw new Error(`Select no more than ${maximum} option${maximum === 1 ? "" : "s"} from ${group.name_en}`);
       }
       const lineTotal = (unitPrice + modifierTotal) * quantity;
       total += lineTotal;
