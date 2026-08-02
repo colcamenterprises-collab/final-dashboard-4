@@ -2,7 +2,6 @@ import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import * as schema from "../shared/schema";
 
-
 export const databaseAvailable = Boolean(process.env.DATABASE_URL);
 
 // Enhanced pool configuration with better error handling
