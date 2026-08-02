@@ -6,11 +6,40 @@ import {
   type PosPrinterSettings,
 } from "@/lib/posPrinterSettings";
 
+function utf8Base64(text: string) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+function buildEscPosTest(printerName: string) {
+  const ESC = "\u001b";
+  const GS = "\u001d";
+  return [
+    `${ESC}@`,
+    `${ESC}a\u0001`,
+    "SMASH BROTHERS BURGERS",
+    "58MM PRINTER TEST",
+    `${ESC}a\u0000`,
+    "--------------------------------",
+    `Printer: ${printerName || "58mm Bluetooth"}`,
+    `Time: ${new Date().toLocaleString("en-GB", { hour12: false })}`,
+    "--------------------------------",
+    "DIRECT ESC/POS TEST SUCCESSFUL",
+    "",
+    "",
+    "",
+    `${GS}V\u0000`,
+  ].join("\n");
+}
+
 export default function PrinterSettings() {
   const [settings, setSettings] = useState<PosPrinterSettings>(
     readPosPrinterSettings,
   );
   const [saved, setSaved] = useState(false);
+  const [testStatus, setTestStatus] = useState("");
 
   const update = <K extends keyof PosPrinterSettings>(
     key: K,
@@ -25,6 +54,13 @@ export default function PrinterSettings() {
     setSaved(true);
   };
 
+  const directTest = () => {
+    savePosPrinterSettings(settings);
+    const payload = utf8Base64(buildEscPosTest(settings.printerName));
+    setTestStatus("Sending direct ESC/POS test to RawBT…");
+    window.location.href = `rawbt:base64,${payload}`;
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
@@ -33,7 +69,7 @@ export default function PrinterSettings() {
           Printer Settings
         </h1>
         <p className="mt-1 text-sm text-slate-500">
-          Settings are saved on this POS tablet.
+          58mm Bluetooth ESC/POS test configuration for this POS tablet.
         </p>
       </div>
 
@@ -46,7 +82,7 @@ export default function PrinterSettings() {
             value={settings.printerName}
             onChange={(event) => update("printerName", event.target.value)}
             className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm"
-            placeholder="Receipt printer"
+            placeholder="58mm Bluetooth Receipt Printer"
           />
         </label>
 
@@ -78,7 +114,7 @@ export default function PrinterSettings() {
               Print automatically after payment
             </span>
             <span className="block text-xs text-slate-500">
-              Opens the tablet print service after a successful order.
+              Saved now; native automatic printing will use this setting when the Android bridge is installed.
             </span>
           </span>
           <input
@@ -99,10 +135,10 @@ export default function PrinterSettings() {
           </button>
           <button
             type="button"
-            onClick={() => window.print()}
+            onClick={directTest}
             className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white"
           >
-            Open test print
+            Direct 58mm Test Print
           </button>
         </div>
 
@@ -112,31 +148,18 @@ export default function PrinterSettings() {
             Printer settings saved on this tablet.
           </p>
         )}
+        {testStatus && <p className="text-sm font-semibold text-slate-700">{testStatus}</p>}
       </section>
 
       <section className="flex gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4">
         <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-        <p className="text-xs leading-5 text-amber-900">
-          Android controls the final printer connection. Pair the Bluetooth
-          printer in tablet settings and select it when the print service opens.
-          Browsers cannot silently pair or choose a system printer.
-        </p>
+        <div className="text-xs leading-5 text-amber-900">
+          <p className="font-bold">Immediate shop test</p>
+          <p>
+            Pair the printer once in Android Bluetooth settings and install/open RawBT. The test button sends raw ESC/POS data directly through RawBT and does not use Android Print Service or a print dialog. This is a temporary hardware-validation bridge; the final SBB APK will replace RawBT with the native in-app Bluetooth plugin.
+          </p>
+        </div>
       </section>
-
-      <style>{`
-        @media print {
-          @page { size: ${settings.paperWidth}mm auto; margin: 3mm; }
-          body * { visibility: hidden !important; }
-          body::after {
-            visibility: visible !important;
-            content: "SMASH BROTHERS BURGERS\\A PRINTER TEST\\A ${settings.printerName}\\A ${settings.paperWidth}mm";
-            white-space: pre;
-            display: block;
-            font: 700 14px monospace;
-            text-align: center;
-          }
-        }
-      `}</style>
     </div>
   );
 }
