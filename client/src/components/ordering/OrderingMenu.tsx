@@ -10,7 +10,7 @@ const fallbackImages = [
   "/images/menu/karaage-chicken-burger-meal-deal.jpg",
 ];
 
-function imageForItem(item: any, index: number) {
+function imageForItem(item: any, index = 0) {
   return item.image_url || item.imageUrl || item.photo_url || item.photoUrl || fallbackImages[index % fallbackImages.length];
 }
 
@@ -21,22 +21,42 @@ type Props = {
   onAdd: (item: CartItem) => void;
 };
 
-export default function OrderingMenu({ categories, language, large, onAdd }: Props) {
-  const [notesByItem, setNotesByItem] = useState<Record<string, string>>({});
-  const [modsByItem, setModsByItem] = useState<Record<string, Set<string>>>({});
-  const [optionErrors, setOptionErrors] = useState<Record<string, string>>({});
-  const buttonClass = large ? "sbo-menu-add is-large" : "sbo-menu-add";
+export default function OrderingMenu({ categories, language, onAdd }: Props) {
+  const [activeItem, setActiveItem] = useState<any | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
 
   const modifierLookup = useMemo(() => {
     const lookup: Record<string, any> = {};
-    for (const category of categories) for (const item of category.items ?? []) for (const group of item.modifier_groups ?? []) for (const modifier of group.modifiers ?? []) lookup[modifier.id] = modifier;
+    for (const category of categories) {
+      for (const item of category.items ?? []) {
+        for (const group of item.modifier_groups ?? []) {
+          for (const modifier of group.modifiers ?? []) lookup[modifier.id] = modifier;
+        }
+      }
+    }
     return lookup;
   }, [categories]);
 
-  function selectionError(item: any, selectedIds: Set<string>) {
-    if (!item) return "";
-    for (const group of item.modifier_groups ?? []) {
-      const count = (group.modifiers ?? []).filter((modifier: any) => selectedIds.has(modifier.id)).length;
+  function openItem(item: any) {
+    if (item.is_sold_out || !item.is_active) return;
+    setActiveItem(item);
+    setSelectedIds(new Set());
+    setNotes("");
+    setError("");
+  }
+
+  function closeItem() {
+    setActiveItem(null);
+    setSelectedIds(new Set());
+    setNotes("");
+    setError("");
+  }
+
+  function selectionError(item: any, selected: Set<string>) {
+    for (const group of item?.modifier_groups ?? []) {
+      const count = (group.modifiers ?? []).filter((modifier: any) => selected.has(modifier.id)).length;
       const minimum = Number(group.min_selections ?? group.min_select ?? (group.is_required ? 1 : 0));
       const configuredMaximum = group.max_selections ?? group.max_select;
       const maximum = group.selection_mode === "single" ? 1 : configuredMaximum == null ? null : Number(configuredMaximum);
@@ -46,99 +66,110 @@ export default function OrderingMenu({ categories, language, large, onAdd }: Pro
     return "";
   }
 
-  function addItem(item: any) {
-    const selectedIds = Array.from(modsByItem[item.id] ?? []);
-    const error = selectionError(item, new Set(selectedIds));
-    if (error) {
-      setOptionErrors((previous) => ({ ...previous, [item.id]: error }));
-      return;
-    }
-    onAdd({
-      menu_item_id: item.id,
-      name_en: item.name_en,
-      name_th: item.name_th,
-      price: item.price,
-      quantity: 1,
-      notes: notesByItem[item.id] ?? "",
-      modifiers: selectedIds.map((id) => ({ item_modifier_id: id, name_en: modifierLookup[id].name_en, name_th: modifierLookup[id].name_th, price_delta: modifierLookup[id].price_delta, quantity: 1 })),
-    });
-    setNotesByItem((prev) => ({ ...prev, [item.id]: "" }));
-    setModsByItem((prev) => ({ ...prev, [item.id]: new Set() }));
-    setOptionErrors((previous) => ({ ...previous, [item.id]: "" }));
-  }
-
-  function toggleModifier(itemId: string, group: any, modifierId: string) {
-    const next = new Set(modsByItem[itemId] ?? []);
+  function toggleModifier(group: any, modifierId: string) {
+    const next = new Set(selectedIds);
     if (group.selection_mode === "single") {
       for (const option of group.modifiers ?? []) next.delete(option.id);
       next.add(modifierId);
     } else {
       next.has(modifierId) ? next.delete(modifierId) : next.add(modifierId);
     }
-    setModsByItem((previous) => ({ ...previous, [itemId]: next }));
-    const item = categories.flatMap((category) => category.items ?? []).find((entry) => entry.id === itemId);
-    setOptionErrors((previous) => ({ ...previous, [itemId]: selectionError(item, next) }));
+    setSelectedIds(next);
+    setError("");
+  }
+
+  function addActiveItem() {
+    if (!activeItem) return;
+    const validationError = selectionError(activeItem, selectedIds);
+    if (validationError) return setError(validationError);
+
+    onAdd({
+      menu_item_id: activeItem.id,
+      name_en: activeItem.name_en,
+      name_th: activeItem.name_th,
+      price: activeItem.price,
+      quantity: 1,
+      notes,
+      modifiers: Array.from(selectedIds).map((id) => ({
+        item_modifier_id: id,
+        name_en: modifierLookup[id]?.name_en || "Option",
+        name_th: modifierLookup[id]?.name_th,
+        price_delta: modifierLookup[id]?.price_delta || "0",
+        quantity: 1,
+      })),
+    });
+    closeItem();
+  }
+
+  function scrollToCategory(id: string) {
+    document.getElementById(`order-category-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   if (!categories.length) return <div className="sbo-empty">No ordering menu items have been created yet.</div>;
 
   return (
-    <div className="sbo-menu">
-      {categories.map((category) => (
-        <section key={category.id} className="sbo-category">
-          <h2>{language === "th" && category.name_th ? category.name_th : category.name_en}</h2>
-          <div className="sbo-menu-grid">
-            {(category.items ?? []).map((item: any, itemIndex: number) => {
-              const soldOut = item.is_sold_out || !item.is_active;
-              return (
-                <article key={item.id} className="sbo-menu-card">
-                  <div className="sbo-menu-photo"><img src={imageForItem(item, itemIndex)} alt={itemLabel(item, language)} /></div>
-                  <header>
-                    <div>
+    <>
+      <nav className="sbo-category-nav" aria-label="Menu categories">
+        {categories.map((category) => (
+          <button key={category.id} type="button" onClick={() => scrollToCategory(category.id)}>
+            <span className="sbo-category-icon">{String(category.name_en || "M").slice(0, 1)}</span>
+            <span>{language === "th" && category.name_th ? category.name_th : category.name_en}</span>
+          </button>
+        ))}
+      </nav>
+
+      <div className="sbo-menu">
+        {categories.map((category) => (
+          <section key={category.id} id={`order-category-${category.id}`} className="sbo-category">
+            <h2>{language === "th" && category.name_th ? category.name_th : category.name_en}</h2>
+            <div className="sbo-menu-grid">
+              {(category.items ?? []).map((item: any, itemIndex: number) => {
+                const soldOut = item.is_sold_out || !item.is_active;
+                return (
+                  <article key={item.id} className={`sbo-menu-card ${soldOut ? "is-sold-out" : ""}`} onClick={() => openItem(item)}>
+                    <div className="sbo-menu-photo"><img src={imageForItem(item, itemIndex)} alt={itemLabel(item, language)} /></div>
+                    <div className="sbo-menu-card-body">
                       <h3>{itemLabel(item, language)}</h3>
-                      <p>{language === "th" && item.description_th ? item.description_th : item.description_en}</p>
-                    </div>
-                    <div className="sbo-price">{money(item.price)}</div>
-                  </header>
-                  {soldOut && <div className="sbo-soldout">Sold out</div>}
-                  {!soldOut && (item.modifier_groups ?? []).map((group: any) => (
-                    <div key={group.id} className="sbo-mod-group">
-                      <div className="sbo-mod-title">
-                        {language === "th" && group.name_th ? group.name_th : group.prompt_text || group.name_en}
-                        {Number(group.min_selections ?? group.min_select ?? (group.is_required ? 1 : 0)) > 0 ? " · Required" : " · Optional"}
-                      </div>
-                      <div className="sbo-mod-list">
-                        {(group.modifiers ?? []).map((modifier: any) => (
-                          <label key={modifier.id}>
-                            <input
-                              type={group.selection_mode === "single" ? "radio" : "checkbox"}
-                              name={group.selection_mode === "single" ? `${item.id}-${group.id}` : undefined}
-                              checked={modsByItem[item.id]?.has(modifier.id) ?? false}
-                              onChange={() => toggleModifier(item.id, group, modifier.id)}
-                            />
-                            <span>
-                              {itemLabel(modifier, language)} {group.group_type === "choice"
-                                ? money(Number(item.price) + Number(modifier.price_delta || 0))
-                                : Number(modifier.price_delta) ? `+${money(modifier.price_delta)}` : ""}
-                            </span>
-                          </label>
-                        ))}
+                      {item.description_en || item.description_th ? <p>{language === "th" && item.description_th ? item.description_th : item.description_en}</p> : null}
+                      <div className="sbo-menu-card-footer">
+                        <span className="sbo-price">{money(item.price)}</span>
+                        <button type="button" disabled={soldOut} onClick={(event) => { event.stopPropagation(); openItem(item); }} aria-label={`Add ${itemLabel(item, language)}`}>{soldOut ? "Sold out" : "+"}</button>
                       </div>
                     </div>
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {activeItem && (
+        <div className="sbo-modal-backdrop" role="presentation" onMouseDown={closeItem}>
+          <section className="sbo-product-modal" role="dialog" aria-modal="true" aria-label={itemLabel(activeItem, language)} onMouseDown={(event) => event.stopPropagation()}>
+            <button className="sbo-modal-close" type="button" onClick={closeItem}>×</button>
+            <div className="sbo-product-modal-image"><img src={imageForItem(activeItem)} alt={itemLabel(activeItem, language)} /></div>
+            <div className="sbo-product-modal-content">
+              <div className="sbo-product-modal-title"><div><h2>{itemLabel(activeItem, language)}</h2><p>{language === "th" && activeItem.description_th ? activeItem.description_th : activeItem.description_en}</p></div><strong>{money(activeItem.price)}</strong></div>
+              {(activeItem.modifier_groups ?? []).map((group: any) => {
+                const minimum = Number(group.min_selections ?? group.min_select ?? (group.is_required ? 1 : 0));
+                return <div key={group.id} className="sbo-modal-group">
+                  <div className="sbo-modal-group-head"><strong>{language === "th" && group.name_th ? group.name_th : group.prompt_text || group.name_en}</strong><span>{minimum > 0 ? "Required" : "Optional"}</span></div>
+                  {(group.modifiers ?? []).map((modifier: any) => (
+                    <label key={modifier.id} className="sbo-modal-option">
+                      <span><input type={group.selection_mode === "single" ? "radio" : "checkbox"} name={group.selection_mode === "single" ? `${activeItem.id}-${group.id}` : undefined} checked={selectedIds.has(modifier.id)} onChange={() => toggleModifier(group, modifier.id)} /> {itemLabel(modifier, language)}</span>
+                      <span>{Number(modifier.price_delta) ? `+${money(modifier.price_delta)}` : ""}</span>
+                    </label>
                   ))}
-                  {!soldOut && (
-                    <>
-                      {optionErrors[item.id] && <div className="sbo-soldout">{optionErrors[item.id]}</div>}
-                      <textarea className="sbo-item-notes" placeholder="Item notes" value={notesByItem[item.id] ?? ""} onChange={(event) => setNotesByItem((prev) => ({ ...prev, [item.id]: event.target.value }))} />
-                      <button className={buttonClass} onClick={() => addItem(item)}>Add to Cart</button>
-                    </>
-                  )}
-                </article>
-              );
-            })}
-          </div>
-        </section>
-      ))}
-    </div>
+                </div>;
+              })}
+              <label className="sbo-modal-notes">Item notes<textarea placeholder="Anything we should know about this item?" value={notes} onChange={(event) => setNotes(event.target.value)} /></label>
+              {error && <div className="sbo-modal-error">{error}</div>}
+              <button className="sbo-modal-add" type="button" onClick={addActiveItem}>Add to cart</button>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
   );
 }
