@@ -1,0 +1,163 @@
+/* Final responsive polish for the approved mobile-first ordering design. */
+
+/* Keep every product image in a category on the same visual canvas. */
+.sbo-menu-photo,
+.sbo-feature-card > div {
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--soft);
+}
+
+.sbo-menu-photo img,
+.sbo-feature-card img {
+  width: 88%;
+  height: 88%;
+  max-width: 88%;
+  max-height: 88%;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+}
+
+/* Cards in the same category line up regardless of title or source-image proportions. */
+.sbo-menu-grid {
+  align-items: stretch;
+}
+
+.sbo-menu-card {
+  height: 100%;
+}
+
+.sbo-menu-card-body {
+  min-height: 112px;
+}
+
+.sbo-menu-card h3 {
+  min-height: 2.5em;
+}
+
+/* Keep the app feeling native instead of a narrow desktop web page. */
+@media (min-width: 700px) {
+  .sbo-app-shell {
+    width: min(calc(100% - 36px), 1120px);
+  }
+
+  .sbo-bottom-nav {
+    width: min(calc(100% - 72px), 920px);
+    border-radius: 20px 20px 0 0;
+    overflow: hidden;
+  }
+
+  .sbo-menu-area {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .sbo-menu-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .sbo-featured-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .sbo-category-nav button {
+    flex-basis: 84px;
+  }
+
+  .sbo-category-icon {
+    width: 50px;
+    height: 48px;
+  }
+}
+
+/* Coarse-pointer devices are tablets even when Chrome reports a wide CSS viewport. */
+@media (pointer: coarse) and (min-width: 700px) {
+  .sbo-app-shell {
+    width: min(calc(100% - 32px), 1180px);
+  }
+
+  .sbo-menu-grid,
+  .sbo-featured-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  .sbo-menu-card h3 {
+    font-size: .86rem;
+  }
+
+  .sbo-price {
+    font-size: .76rem;
+  }
+
+  .sbo-menu-card-footer button,
+  .sbo-feature-card footer button {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Desktop progressively expands the same app design; four columns are desktop-only. */
+@media (hover: hover) and (pointer: fine) and (min-width: 1200px) {
+  .sbo-app-shell {
+    width: min(calc(100% - 64px), 1280px);
+  }
+
+  .sbo-menu-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .sbo-featured-row {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sbo-bottom-nav {
+    width: min(900px, calc(100% - 80px));
+  }
+}
+
+/* Mobile remains the primary layout. */
+@media (max-width: 699px) {
+  .sbo-app-shell {
+    width: 100%;
+  }
+
+  .sbo-topbar {
+    padding: 18px 16px 10px;
+  }
+
+  .sbo-logo {
+    width: 108px;
+    height: 62px;
+  }
+
+  .sbo-location-row,
+  .sbo-hero {
+    margin-left: 14px;
+    margin-right: 14px;
+  }
+
+  .sbo-menu-area {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .sbo-menu-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .sbo-featured-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sbo-bottom-nav {
+    width: 100%;
+  }
+}
