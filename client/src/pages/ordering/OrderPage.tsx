@@ -81,7 +81,7 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   return <main className={`sbo-page ${tablet ? "is-tablet" : ""}`}>
     <div className="sbo-app-shell">
       <header className="sbo-topbar">
-        <img className="sbo-logo" src="/images/sbb-logo.png" alt="Smash Brothers Burgers" />
+        <img className="sbo-logo" src="/smash-brothers-logo.png" alt="Smash Brothers Burgers" />
         <div className="sbo-top-actions">
           <button type="button" aria-label="Notifications"><Bell size={20}/></button>
           <button type="button" aria-label="Account"><UserRound size={21}/></button>
