@@ -19,21 +19,34 @@ async function readJsonResponse(res: Response, where: string) {
   return data;
 }
 
+async function publicFetch(path: string, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(path, {
+      credentials: "include",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+  } catch (error: any) {
+    if (error?.name === "AbortError") throw new Error(`${path} timed out. Please try again.`);
+    throw error;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export async function fetchOrderingMenu(admin = false) {
   const path = admin ? "/api/ordering/admin/menu" : "/api/ordering/menu";
-  const res = await fetch(path, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
+  const res = admin
+    ? await fetch(path, { credentials: "include", headers: { Accept: "application/json" } })
+    : await publicFetch(path, 8000);
   return readJsonResponse(res, path);
 }
 
 export async function fetchOrderingSettings() {
   const path = "/api/ordering/settings";
-  const res = await fetch(path, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
+  const res = await publicFetch(path, 4000);
   const payload = await readJsonResponse(res, path);
   const rows = payload?.data ?? [];
   const settings: Record<string, any> = {};
@@ -47,10 +60,7 @@ export async function submitOrderingOrder(input: any) {
 
 export async function fetchOrderingOrder(orderId: string) {
   const path = `/api/ordering/orders/${orderId}`;
-  const res = await fetch(path, {
-    credentials: "include",
-    headers: { Accept: "application/json" },
-  });
+  const res = await publicFetch(path, 8000);
   return readJsonResponse(res, path);
 }
 
