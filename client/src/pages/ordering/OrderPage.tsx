@@ -13,12 +13,26 @@ import "./OrderPage.css";
 
 type Fulfilment = "pickup" | "delivery";
 
+function readSavedCart(key: string): CartItem[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    localStorage.removeItem(key);
+    return [];
+  }
+}
+
 export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   const { tableCode } = useParams();
   const navigate = useNavigate();
+  const cartKey = tablet ? "sbb_tablet_cart" : "sbb_order_cart";
   const [language, setLanguage] = useState<OrderingLanguage>("en");
   const [menu, setMenu] = useState<any[]>([]);
-  const [cart, setCart] = useState<CartItem[]>(() => JSON.parse(localStorage.getItem(tablet ? "sbb_tablet_cart" : "sbb_order_cart") || "[]"));
+  const [menuLoading, setMenuLoading] = useState(true);
+  const [cart, setCart] = useState<CartItem[]>(() => readSavedCart(cartKey));
   const [paymentMethod, setPaymentMethod] = useState("pay_at_counter");
   const [orderNotes, setOrderNotes] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -30,14 +44,35 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    Promise.all([fetchOrderingMenu(), fetchOrderingSettings()])
-      .then(([menuData, settingData]) => {
-        setMenu(menuData.categories ?? []);
-        setSettings(settingData);
+    let active = true;
+    fetchOrderingMenu()
+      .then((data) => {
+        if (!active) return;
+        setMenu(data.categories ?? []);
+        setError("");
       })
-      .catch((err) => setError(err.message));
+      .catch((err) => {
+        if (active) setError(err?.message || "Could not load the menu. Please refresh and try again.");
+      })
+      .finally(() => {
+        if (active) setMenuLoading(false);
+      });
+
+    // Settings are non-blocking. The menu must render even if this optional request is slow.
+    fetchOrderingSettings()
+      .then((data) => { if (active) setSettings(data); })
+      .catch(() => { /* safe defaults keep ordering available */ });
+
+    return () => { active = false; };
   }, []);
-  useEffect(() => { localStorage.setItem(tablet ? "sbb_tablet_cart" : "sbb_order_cart", JSON.stringify(cart)); }, [cart, tablet]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(cartKey, JSON.stringify(cart));
+    } catch {
+      // Cart persistence must never block the public ordering page.
+    }
+  }, [cart, cartKey]);
 
   const orderingEnabled = settings.store_order_enabled !== false;
   const qrEnabled = settings.manual_qr_transfer_enabled !== false;
@@ -81,7 +116,7 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
       });
       const orderId = res.data.id;
       setCart([]);
-      localStorage.removeItem(tablet ? "sbb_tablet_cart" : "sbb_order_cart");
+      localStorage.removeItem(cartKey);
       navigate(`/order/status/${orderId}`);
     } catch (err: any) {
       setError(err?.message || "Unable to submit order. Please try again.");
@@ -108,7 +143,7 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
       {error && <div className="sbo-error">{error}</div>}
 
       <div className="sbo-layout">
-        <OrderingMenu categories={menu} language={language} large={tablet} onAdd={add} />
+        {menuLoading ? <div className="sbo-empty">Loading menu…</div> : <OrderingMenu categories={menu} language={language} large={tablet} onAdd={add} />}
         <div className="sbo-sidebar">
           <OrderingCart cart={cart} language={language} onQty={qty} onRemove={remove} />
           <section className="sbo-panel">
@@ -137,7 +172,7 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
             </label>
             {paymentMethod === "manual_qr_transfer" && <p className="sbo-help">QR payment will be confirmed by Smash Brothers before the order is treated as paid.</p>}
 
-            <button disabled={!cart.length || loading || !orderingEnabled} onClick={submit}>{loading ? "Sending order..." : "Place Order"}</button>
+            <button disabled={!cart.length || loading || !orderingEnabled || menuLoading} onClick={submit}>{loading ? "Sending order..." : "Place Order"}</button>
             <p className="sbo-help">Your order will go directly to the Smash Brothers kitchen after submission.</p>
           </section>
         </div>
