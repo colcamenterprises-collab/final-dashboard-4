@@ -28,6 +28,19 @@ export async function fetchOrderingMenu(admin = false) {
   return readJsonResponse(res, path);
 }
 
+export async function fetchOrderingSettings() {
+  const path = "/api/ordering/settings";
+  const res = await fetch(path, {
+    credentials: "include",
+    headers: { Accept: "application/json" },
+  });
+  const payload = await readJsonResponse(res, path);
+  const rows = payload?.data ?? [];
+  const settings: Record<string, any> = {};
+  for (const row of rows) settings[row.key] = row.value;
+  return settings;
+}
+
 export async function submitOrderingOrder(input: any) {
   return apiRequest("/api/ordering/orders", { method: "POST", body: JSON.stringify(input) });
 }
