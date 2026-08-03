@@ -5,6 +5,7 @@ import OrderingMenu from "@/components/ordering/OrderingMenu";
 import OrderingFlow from "@/components/ordering/OrderingFlow";
 import { fetchOrderingMenu, fetchOrderingSettings, submitOrderingOrder, money, type CartItem, type OrderingLanguage } from "@/components/ordering/orderingApi";
 import "./OrderPage.css";
+import "./OrderPagePolish.css";
 
 type Fulfilment = "pickup" | "delivery";
 type FlowStep = "menu" | "cart" | "checkout";
