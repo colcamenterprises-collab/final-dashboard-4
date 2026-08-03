@@ -25,9 +25,9 @@ const upload = multer({
 
 /**
  * POST /api/upload/menu-item-image
- * Normalises phone and design-export image formats into one browser-safe WebP.
- * The write is atomic, and a successful response is returned only after the stored
- * file has been read back from disk.
+ * Every managed menu image is normalised to an exact 600x600 WebP canvas.
+ * `contain` preserves the complete product image without cropping; transparent
+ * padding keeps PNG-style menu artwork consistent across POS, kiosk and web.
  */
 router.post("/upload/menu-item-image", upload.single("image"), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No image file provided" });
@@ -47,13 +47,20 @@ router.post("/upload/menu-item-image", upload.single("image"), async (req, res) 
       sequentialRead: true,
     })
       .rotate()
-      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+      .resize({
+        width: 600,
+        height: 600,
+        fit: "contain",
+        position: "centre",
+        background: { r: 0, g: 0, b: 0, alpha: 0 },
+      })
       .webp({ quality: 90, alphaQuality: 100, effort: 4 })
       .toFile(temporaryPath);
 
     await fs.rename(temporaryPath, finalPath);
     const stored = await fs.stat(finalPath);
     if (!stored.isFile() || stored.size < 1) throw new Error("Stored image verification failed");
+    if (info.width !== 600 || info.height !== 600) throw new Error("Menu image was not normalised to 600x600");
 
     return res.json({
       success: true,
