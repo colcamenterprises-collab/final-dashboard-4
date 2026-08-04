@@ -6,7 +6,8 @@ import multer from "multer";
 import sharp from "sharp";
 
 const router = Router();
-const uploadDir = path.resolve(process.cwd(), "uploads/menu-items");
+const menuUploadDir = path.resolve(process.cwd(), "uploads/menu-items");
+const avatarUploadDir = path.resolve(process.cwd(), "uploads/staff-avatars");
 const acceptedExtensions = new Set([
   ".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".heic", ".heif", ".tif", ".tiff",
 ]);
@@ -34,12 +35,12 @@ router.post("/upload/menu-item-image", upload.single("image"), async (req, res) 
 
   const id = randomUUID();
   const filename = `${id}.webp`;
-  const temporaryPath = path.join(uploadDir, `.${id}.tmp`);
-  const finalPath = path.join(uploadDir, filename);
+  const temporaryPath = path.join(menuUploadDir, `.${id}.tmp`);
+  const finalPath = path.join(menuUploadDir, filename);
 
   try {
-    await fs.mkdir(uploadDir, { recursive: true });
-    await fs.access(uploadDir, fsConstants.W_OK);
+    await fs.mkdir(menuUploadDir, { recursive: true });
+    await fs.access(menuUploadDir, fsConstants.W_OK);
 
     const info = await sharp(req.file.buffer, {
       failOn: "error",
@@ -83,6 +84,64 @@ router.post("/upload/menu-item-image", upload.single("image"), async (req, res) 
   }
 });
 
+/**
+ * POST /api/upload/staff-avatar
+ * Staff profile photos are cropped to a consistent square portrait and stored
+ * as WebP. The caller saves the returned imageUrl into internal_users.avatar_url.
+ */
+router.post("/upload/staff-avatar", upload.single("image"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: "No image file provided" });
+
+  const id = randomUUID();
+  const filename = `${id}.webp`;
+  const temporaryPath = path.join(avatarUploadDir, `.${id}.tmp`);
+  const finalPath = path.join(avatarUploadDir, filename);
+
+  try {
+    await fs.mkdir(avatarUploadDir, { recursive: true });
+    await fs.access(avatarUploadDir, fsConstants.W_OK);
+
+    const info = await sharp(req.file.buffer, {
+      failOn: "error",
+      limitInputPixels: 40_000_000,
+      sequentialRead: true,
+    })
+      .rotate()
+      .resize({
+        width: 512,
+        height: 512,
+        fit: "cover",
+        position: "attention",
+      })
+      .webp({ quality: 88, effort: 4 })
+      .toFile(temporaryPath);
+
+    await fs.rename(temporaryPath, finalPath);
+    const stored = await fs.stat(finalPath);
+    if (!stored.isFile() || stored.size < 1) throw new Error("Stored avatar verification failed");
+    if (info.width !== 512 || info.height !== 512) throw new Error("Staff avatar was not normalised to 512x512");
+
+    return res.json({
+      success: true,
+      imageUrl: `/uploads/staff-avatars/${filename}`,
+      filename,
+      size: stored.size,
+      width: info.width,
+      height: info.height,
+      format: "webp",
+    });
+  } catch (error: any) {
+    await Promise.allSettled([fs.unlink(temporaryPath), fs.unlink(finalPath)]);
+    console.error("Error uploading staff avatar:", error);
+    const unsupported = /unsupported image format|bad seek|heif|heic/i.test(String(error?.message || ""));
+    return res.status(400).json({
+      error: unsupported
+        ? "This photo could not be decoded. Export it as JPG or PNG and try again."
+        : error?.message || "Failed to upload staff photo",
+    });
+  }
+});
+
 router.delete("/upload/menu-item-image", async (req, res) => {
   try {
     const imageUrl = String(req.body?.imageUrl || "");
@@ -95,13 +154,35 @@ router.delete("/upload/menu-item-image", async (req, res) => {
       return res.status(400).json({ error: "Only managed menu item images can be deleted" });
     }
 
-    await fs.unlink(path.join(uploadDir, filename)).catch((error: NodeJS.ErrnoException) => {
+    await fs.unlink(path.join(menuUploadDir, filename)).catch((error: NodeJS.ErrnoException) => {
       if (error.code !== "ENOENT") throw error;
     });
     return res.json({ success: true, message: "Image deleted successfully" });
   } catch (error: any) {
     console.error("Error deleting menu item image:", error);
     return res.status(500).json({ error: error?.message || "Failed to delete image" });
+  }
+});
+
+router.delete("/upload/staff-avatar", async (req, res) => {
+  try {
+    const imageUrl = String(req.body?.imageUrl || "");
+    if (!imageUrl.startsWith("/uploads/staff-avatars/")) {
+      return res.status(400).json({ error: "Invalid avatar URL" });
+    }
+
+    const filename = path.basename(imageUrl);
+    if (!/^[0-9a-f-]+\.webp$/i.test(filename)) {
+      return res.status(400).json({ error: "Only managed staff avatars can be deleted" });
+    }
+
+    await fs.unlink(path.join(avatarUploadDir, filename)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
+    return res.json({ success: true, message: "Staff photo deleted successfully" });
+  } catch (error: any) {
+    console.error("Error deleting staff avatar:", error);
+    return res.status(500).json({ error: error?.message || "Failed to delete staff photo" });
   }
 });
 
