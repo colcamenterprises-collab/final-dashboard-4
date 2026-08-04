@@ -1,5 +1,7 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { attachSessionUser } from "../middleware/sessionAuth";
+import commercialRouter from "./orderingCommercial";
+import { attachCommercialAttributionToOrder, validateCommercialOrderInput } from "../services/ordering/commercialOrderAttribution";
 import {
   confirmManualPayment,
   createCategory,
@@ -24,6 +26,7 @@ import {
 } from "../services/ordering/orderingService";
 
 const router = Router();
+router.use("/commercial", commercialRouter);
 
 function sendError(res: any, error: any, where: string, status = 500) {
   const message = error?.message || "Ordering request failed";
@@ -75,8 +78,10 @@ router.get("/menu", async (_req, res) => {
 
 router.post("/orders", async (req, res) => {
   try {
+    const commercial = await validateCommercialOrderInput(req.body);
     const order = await createOrder(req.body);
-    res.status(201).json({ ok: true, source: "sbb_ordering_os_phase1", data: order, warnings: [], blockers: [], last_updated: new Date().toISOString() });
+    const attributed = await attachCommercialAttributionToOrder(order.id, commercial);
+    res.status(201).json({ ok: true, source: "sbb_ordering_os_phase1", data: { ...order, ...attributed }, warnings: [], blockers: [], last_updated: new Date().toISOString() });
   } catch (error: any) {
     sendError(res, error, "POST /api/ordering/orders", 400);
   }
@@ -151,6 +156,7 @@ router.get("/admin/menu", requireOrderingAdmin, async (_req, res) => {
     sendError(res, error, "GET /api/ordering/admin/menu");
   }
 });
+
 function adminAction(handler: (req: Request, res: Response) => Promise<void>, where: string) {
   return async (req: Request, res: Response) => {
     try {
