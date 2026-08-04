@@ -7,40 +7,31 @@ export type CartItem = { menu_item_id: string; name_en: string; name_th?: string
 async function readJsonResponse(res: Response, where: string) {
   const contentType = res.headers.get("content-type") || "";
   const bodyText = await res.text();
-
-  if (!contentType.includes("application/json")) {
-    throw new Error(`${where} returned non-JSON response (${res.status}).`);
-  }
-
+  if (!contentType.includes("application/json")) throw new Error(`${where} returned non-JSON response (${res.status}).`);
   const data = bodyText ? JSON.parse(bodyText) : null;
-  if (!res.ok) {
-    throw new Error(data?.blockers?.[0]?.message || data?.error || `${where} failed (${res.status}).`);
-  }
+  if (!res.ok) throw new Error(data?.blockers?.[0]?.message || data?.error || `${where} failed (${res.status}).`);
   return data;
 }
 
-async function publicFetch(path: string, timeoutMs = 8000) {
+async function publicFetch(path: string, timeoutMs = 8000, init?: RequestInit) {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(path, {
       credentials: "include",
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...(init?.body ? { "Content-Type": "application/json" } : {}), ...(init?.headers || {}) },
+      ...init,
       signal: controller.signal,
     });
   } catch (error: any) {
     if (error?.name === "AbortError") throw new Error(`${path} timed out. Please try again.`);
     throw error;
-  } finally {
-    window.clearTimeout(timer);
-  }
+  } finally { window.clearTimeout(timer); }
 }
 
 export async function fetchOrderingMenu(admin = false) {
   const path = admin ? "/api/ordering/admin/menu" : "/api/ordering/menu";
-  const res = admin
-    ? await fetch(path, { credentials: "include", headers: { Accept: "application/json" } })
-    : await publicFetch(path, 8000);
+  const res = admin ? await fetch(path, { credentials: "include", headers: { Accept: "application/json" } }) : await publicFetch(path, 8000);
   return readJsonResponse(res, path);
 }
 
@@ -52,6 +43,26 @@ export async function fetchOrderingSettings() {
   const settings: Record<string, any> = {};
   for (const row of rows) settings[row.key] = row.value;
   return settings;
+}
+
+export async function resolvePartnerVenueQr(token: string, sessionKey: string) {
+  const path = `/api/ordering/commercial/qr/partner/${encodeURIComponent(token)}?session=${encodeURIComponent(sessionKey)}`;
+  return readJsonResponse(await publicFetch(path, 6000), path);
+}
+
+export async function createOrFindMembership(name: string, phone: string) {
+  const path = "/api/ordering/commercial/members";
+  return readJsonResponse(await publicFetch(path, 6000, { method: "POST", body: JSON.stringify({ name, phone }) }), path);
+}
+
+export async function lookupMembership(phone: string) {
+  const path = `/api/ordering/commercial/members/lookup?phone=${encodeURIComponent(phone)}`;
+  return readJsonResponse(await publicFetch(path, 6000), path);
+}
+
+export async function resolveMembershipQr(token: string) {
+  const path = `/api/ordering/commercial/qr/member/${encodeURIComponent(token)}`;
+  return readJsonResponse(await publicFetch(path, 6000), path);
 }
 
 export async function submitOrderingOrder(input: any) {
@@ -68,10 +79,5 @@ export async function patchOrderingStatus(orderId: string, status: string, actor
   return apiRequest(`/api/ordering/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify({ status, actor }) });
 }
 
-export function money(value: string | number) {
-  return `฿${Number(value || 0).toFixed(2)}`;
-}
-
-export function itemLabel(item: any, language: OrderingLanguage) {
-  return language === "th" && item.name_th ? item.name_th : item.name_en;
-}
+export function money(value: string | number) { return `฿${Number(value || 0).toFixed(2)}`; }
+export function itemLabel(item: any, language: OrderingLanguage) { return language === "th" && item.name_th ? item.name_th : item.name_en; }
