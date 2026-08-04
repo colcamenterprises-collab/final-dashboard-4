@@ -80,11 +80,33 @@ export async function reorderCategories(orderList: string[]) {
 }
 
 export async function deleteCategory(id: string) {
-  const result = await db().query(
-    `UPDATE ordering_menu_categories SET is_active=false, updated_at=NOW()
-     WHERE id=$1 RETURNING id, name_en, name_th, sort_order, is_active`,
-    [id],
-  );
-  if (!result.rows[0]) throw new Error("Category not found");
-  return mapCategory(result.rows[0]);
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const categoryResult = await client.query(
+      `SELECT id, name_en, name_th, sort_order, is_active FROM ordering_menu_categories WHERE id=$1 FOR UPDATE`,
+      [id],
+    );
+    const category = categoryResult.rows[0];
+    if (!category) throw new Error("Category not found");
+
+    const itemResult = await client.query(
+      `DELETE FROM ordering_menu_items WHERE category_id=$1 RETURNING id, name_en`,
+      [id],
+    );
+    await client.query(`DELETE FROM ordering_menu_categories WHERE id=$1`, [id]);
+    await client.query("COMMIT");
+
+    return {
+      success: true,
+      deletedCategory: mapCategory(category),
+      deletedItemCount: itemResult.rowCount ?? itemResult.rows.length,
+      deletedItems: itemResult.rows.map((row: any) => ({ id: String(row.id), name: row.name_en })),
+    };
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
