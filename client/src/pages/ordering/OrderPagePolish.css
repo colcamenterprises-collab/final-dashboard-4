@@ -1,163 +1,43 @@
 /* Final responsive polish for the approved mobile-first ordering design. */
+.sbo-menu-photo,.sbo-feature-card>div{aspect-ratio:1/1;min-height:0;overflow:hidden;display:grid;place-items:center;background:var(--soft)}
+.sbo-menu-photo img,.sbo-feature-card img{width:88%;height:88%;max-width:88%;max-height:88%;object-fit:contain;object-position:center;display:block}
+.sbo-menu-grid{align-items:stretch}.sbo-menu-card{height:100%}.sbo-menu-card-body{min-height:104px}.sbo-menu-card h3{min-height:2.35em}.sbo-price{font-weight:800}
 
-/* Keep every product image in a category on the same visual canvas. */
-.sbo-menu-photo,
-.sbo-feature-card > div {
-  aspect-ratio: 1 / 1;
-  min-height: 0;
-  overflow: hidden;
-  display: grid;
-  place-items: center;
-  background: var(--soft);
+/* Mobile is the primary experience: compact six-category strip, smaller names, clearer prices. */
+@media(max-width:699px){
+  .sbo-app-shell{width:100%}.sbo-topbar{padding:16px 14px 8px}.sbo-logo{width:104px;height:58px}
+  .sbo-location-row,.sbo-hero{margin-left:12px;margin-right:12px}.sbo-menu-area{padding-left:12px;padding-right:12px}
+  .sbo-hero{height:215px}.sbo-hero-copy{padding:20px 0 14px 18px;width:56%}.sbo-hero h1{font-size:1.55rem}.sbo-hero p{font-size:.64rem}.sbo-hero>img{width:61%;height:88%;right:-30px}
+  .sbo-category-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:5px;overflow:visible;padding-bottom:14px}
+  .sbo-category-nav button{min-width:0;flex:none;width:100%;padding:6px 2px 6px;border-radius:13px;font-size:.48rem;line-height:1.15}
+  .sbo-category-icon{width:29px;height:28px}.sbo-category-icon img{width:100%;height:100%;object-fit:contain}
+  .sbo-menu-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.sbo-featured-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .sbo-menu-card-body{padding:8px;min-height:94px}.sbo-menu-card h3{font-size:.68rem;line-height:1.2;min-height:2.4em}.sbo-menu-card p{font-size:.55rem}
+  .sbo-price{font-size:.72rem}.sbo-menu-card-footer{padding-top:7px}.sbo-menu-card-footer button,.sbo-feature-card footer button{width:29px;height:29px}
+  .sbo-feature-card h3{font-size:.61rem;min-height:31px}.sbo-feature-card strong{font-size:.66rem}.sbo-bottom-nav{width:100%}
 }
 
-.sbo-menu-photo img,
-.sbo-feature-card img {
-  width: 88%;
-  height: 88%;
-  max-width: 88%;
-  max-height: 88%;
-  object-fit: contain;
-  object-position: center;
-  display: block;
+/* Tablet: use the screen, increase hero/category scale, and keep three product columns. */
+@media(min-width:700px){
+  .sbo-app-shell{width:min(calc(100% - 28px),1180px)}.sbo-topbar{padding-left:26px;padding-right:26px}
+  .sbo-location-row,.sbo-hero{margin-left:26px;margin-right:26px}.sbo-menu-area{padding-left:26px;padding-right:26px}
+  .sbo-hero{height:330px}.sbo-hero-copy{padding:36px 0 20px 34px;width:50%}.sbo-hero-copy>span{font-size:.72rem}.sbo-hero h1{font-size:2.75rem}.sbo-hero p{font-size:.86rem;max-width:230px}.sbo-hero button{font-size:.82rem;padding:11px 18px}.sbo-hero>img{width:58%;height:96%;right:-18px}
+  .sbo-category-nav{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;overflow:visible;padding-bottom:20px}
+  .sbo-category-nav button{width:100%;min-width:0;flex:none;padding:10px 5px 9px;font-size:.66rem}.sbo-category-icon{width:58px;height:54px}
+  .sbo-menu-grid,.sbo-featured-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.sbo-menu-card h3{font-size:.82rem}.sbo-price{font-size:.78rem}
+  .sbo-bottom-nav{width:min(calc(100% - 64px),920px);border-radius:20px 20px 0 0;overflow:hidden}
+  .sbo-product-modal,.sbo-flow-sheet{width:min(620px,calc(100% - 36px));border-radius:24px;margin-bottom:18px}.sbo-modal-backdrop,.sbo-flow-backdrop{align-items:center}
+  .sbo-floating-cart{width:min(680px,calc(100% - 44px))}
 }
 
-/* Cards in the same category line up regardless of title or source-image proportions. */
-.sbo-menu-grid {
-  align-items: stretch;
+/* Wide touch devices are still tablets, regardless of Chrome's CSS viewport width. */
+@media(pointer:coarse) and (min-width:700px){
+  .sbo-app-shell{width:min(calc(100% - 24px),1220px)}.sbo-menu-grid,.sbo-featured-row{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  .sbo-menu-card h3{font-size:.88rem}.sbo-price{font-size:.82rem}.sbo-menu-card-footer button,.sbo-feature-card footer button{width:34px;height:34px}
 }
 
-.sbo-menu-card {
-  height: 100%;
-}
-
-.sbo-menu-card-body {
-  min-height: 112px;
-}
-
-.sbo-menu-card h3 {
-  min-height: 2.5em;
-}
-
-/* Keep the app feeling native instead of a narrow desktop web page. */
-@media (min-width: 700px) {
-  .sbo-app-shell {
-    width: min(calc(100% - 36px), 1120px);
-  }
-
-  .sbo-bottom-nav {
-    width: min(calc(100% - 72px), 920px);
-    border-radius: 20px 20px 0 0;
-    overflow: hidden;
-  }
-
-  .sbo-menu-area {
-    padding-left: 24px;
-    padding-right: 24px;
-  }
-
-  .sbo-menu-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .sbo-featured-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-  }
-
-  .sbo-category-nav button {
-    flex-basis: 84px;
-  }
-
-  .sbo-category-icon {
-    width: 50px;
-    height: 48px;
-  }
-}
-
-/* Coarse-pointer devices are tablets even when Chrome reports a wide CSS viewport. */
-@media (pointer: coarse) and (min-width: 700px) {
-  .sbo-app-shell {
-    width: min(calc(100% - 32px), 1180px);
-  }
-
-  .sbo-menu-grid,
-  .sbo-featured-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-  }
-
-  .sbo-menu-card h3 {
-    font-size: .86rem;
-  }
-
-  .sbo-price {
-    font-size: .76rem;
-  }
-
-  .sbo-menu-card-footer button,
-  .sbo-feature-card footer button {
-    width: 32px;
-    height: 32px;
-  }
-}
-
-/* Desktop progressively expands the same app design; four columns are desktop-only. */
-@media (hover: hover) and (pointer: fine) and (min-width: 1200px) {
-  .sbo-app-shell {
-    width: min(calc(100% - 64px), 1280px);
-  }
-
-  .sbo-menu-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px;
-  }
-
-  .sbo-featured-row {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .sbo-bottom-nav {
-    width: min(900px, calc(100% - 80px));
-  }
-}
-
-/* Mobile remains the primary layout. */
-@media (max-width: 699px) {
-  .sbo-app-shell {
-    width: 100%;
-  }
-
-  .sbo-topbar {
-    padding: 18px 16px 10px;
-  }
-
-  .sbo-logo {
-    width: 108px;
-    height: 62px;
-  }
-
-  .sbo-location-row,
-  .sbo-hero {
-    margin-left: 14px;
-    margin-right: 14px;
-  }
-
-  .sbo-menu-area {
-    padding-left: 14px;
-    padding-right: 14px;
-  }
-
-  .sbo-menu-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-
-  .sbo-featured-row {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .sbo-bottom-nav {
-    width: 100%;
-  }
+/* True desktop progressively expands the same app design. */
+@media(hover:hover) and (pointer:fine) and (min-width:1200px){
+  .sbo-app-shell{width:min(calc(100% - 64px),1280px)}.sbo-menu-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}.sbo-featured-row{grid-template-columns:repeat(4,minmax(0,1fr))}.sbo-bottom-nav{width:min(900px,calc(100% - 80px))}
+  .sbo-hero{height:360px}.sbo-hero-copy{padding-top:42px}.sbo-hero h1{font-size:3rem}.sbo-hero>img{width:54%}
 }
