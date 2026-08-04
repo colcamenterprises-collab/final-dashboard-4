@@ -18,6 +18,8 @@ type Props = {
   error: string;
   partnerVenueName?: string | null;
   deliveryLocked?: boolean;
+  standardDeliveryFee?: number;
+  chargedDeliveryFee?: number;
   onQty: (index: number, quantity: number) => void;
   onRemove: (index: number) => void;
   onClose: () => void;
@@ -34,6 +36,8 @@ type Props = {
 };
 
 export default function OrderingFlow(props: Props) {
+  const standardFee = Number(props.standardDeliveryFee || 0);
+  const chargedFee = Number(props.chargedDeliveryFee || 0);
   return <div className="sbo-flow-backdrop" onMouseDown={props.onClose}>
     <section className="sbo-flow-sheet" onMouseDown={(event) => event.stopPropagation()}>
       <div className="sbo-flow-head">
@@ -60,9 +64,9 @@ export default function OrderingFlow(props: Props) {
           <option value="cash">Cash</option>
           {props.qrEnabled && <option value="manual_qr_transfer">QR transfer</option>}
         </select></label>
-        {props.fulfilment === "delivery" && <div className="sbo-delivery-free"><span>Delivery</span><strong>FREE</strong></div>}
+        {props.fulfilment === "delivery" && <div className="sbo-delivery-free"><span>Delivery</span><strong>{chargedFee === 0 ? <>{standardFee > 0 && <del>{money(standardFee)}</del>} <b>FREE</b></> : money(chargedFee)}</strong></div>}
         {props.error && <div className="sbo-modal-error">{props.error}</div>}
-        <button className="sbo-primary-flow-btn" disabled={!props.cart.length || props.loading || !props.orderingEnabled} onClick={props.onSubmit}>{props.loading ? "Sending order..." : `Place order · ${money(props.total)}`}</button>
+        <button className="sbo-primary-flow-btn" disabled={!props.cart.length || props.loading || !props.orderingEnabled} onClick={props.onSubmit}>{props.loading ? "Sending order..." : `Place order · ${money(props.total + (props.fulfilment === "delivery" ? chargedFee : 0))}`}</button>
       </section>}
     </section>
   </div>;
