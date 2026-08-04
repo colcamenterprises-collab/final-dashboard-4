@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
 const money = (value: unknown) => `฿${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+type VenueFormKey = "name" | "contact_name" | "phone" | "address";
+const venueFields: Array<[string, VenueFormKey, boolean]> = [
+  ["Venue name", "name", true],
+  ["Contact name", "contact_name", false],
+  ["Phone", "phone", false],
+  ["Delivery address", "address", true],
+];
 
 export default function AdminVenues() {
   const [venues, setVenues] = useState<any[]>([]);
@@ -92,15 +99,10 @@ export default function AdminVenues() {
           <h2 className="text-lg font-bold text-neutral-950">Add Partner Venue</h2>
           <p className="mt-1 text-sm text-neutral-500">The saved address becomes the locked delivery destination when this QR is scanned.</p>
           <div className="mt-5 space-y-3">
-            {[
-              ["Venue name", "name", true],
-              ["Contact name", "contact_name", false],
-              ["Phone", "phone", false],
-              ["Delivery address", "address", true],
-            ].map(([label, key, required]) => (
-              <label key={String(key)} className="block text-sm font-medium text-neutral-700">
+            {venueFields.map(([label, key, required]) => (
+              <label key={key} className="block text-sm font-medium text-neutral-700">
                 {label}
-                <input required={Boolean(required)} value={(form as any)[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2.5 outline-none focus:border-neutral-950" />
+                <input required={required} value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} className="mt-1 w-full rounded-xl border border-neutral-300 px-3 py-2.5 outline-none focus:border-neutral-950" />
               </label>
             ))}
             <label className="block text-sm font-medium text-neutral-700">Notes
