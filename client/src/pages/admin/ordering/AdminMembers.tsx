@@ -2,9 +2,26 @@ import { useEffect, useMemo, useState } from "react";
 
 const money = (value: unknown) => `฿${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
+type ImportRow = { name: string; phone: string };
+
+function parseCsv(text: string): ImportRow[] {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const rows = lines.map((line) => line.split(",").map((cell) => cell.trim().replace(/^"|"$/g, "")));
+  const header = rows[0].map((cell) => cell.toLowerCase());
+  const nameIndex = header.findIndex((cell) => ["name", "customer", "member", "full name", "fullname"].includes(cell));
+  const phoneIndex = header.findIndex((cell) => ["phone", "mobile", "mobile number", "phone number", "telephone"].includes(cell));
+  const hasHeader = nameIndex >= 0 || phoneIndex >= 0;
+  const n = nameIndex >= 0 ? nameIndex : 0;
+  const p = phoneIndex >= 0 ? phoneIndex : 1;
+  return rows.slice(hasHeader ? 1 : 0).map((row) => ({ name: String(row[n] || "").trim(), phone: String(row[p] || "").trim() })).filter((row) => row.name && row.phone);
+}
+
 export default function AdminMembers() {
   const [members, setMembers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importMessage, setImportMessage] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -26,6 +43,25 @@ export default function AdminMembers() {
     return acc;
   }, { orders: 0, sales: 0 }), [members]);
 
+  async function importCsv(file: File) {
+    setImporting(true); setImportMessage("");
+    try {
+      const rows = parseCsv(await file.text());
+      if (!rows.length) throw new Error("No valid name + mobile rows found in the CSV.");
+      let ok = 0; let failed = 0;
+      for (const row of rows) {
+        try {
+          const res = await fetch("/api/ordering/commercial/members", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(row) });
+          if (!res.ok) throw new Error("Import failed");
+          ok += 1;
+        } catch { failed += 1; }
+      }
+      setImportMessage(`Import complete: ${ok} member${ok === 1 ? "" : "s"} processed${failed ? `, ${failed} failed` : ""}. Existing mobile numbers were matched rather than duplicated.`);
+      await load();
+    } catch (error: any) { setImportMessage(error?.message || "Unable to import CSV."); }
+    finally { setImporting(false); }
+  }
+
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
       <div>
@@ -39,6 +75,14 @@ export default function AdminMembers() {
         <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm"><div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Member Orders</div><div className="mt-2 text-3xl font-bold text-neutral-950">{totals.orders}</div></div>
         <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm"><div className="text-xs font-semibold uppercase tracking-wide text-neutral-500">Member Sales</div><div className="mt-2 text-3xl font-bold text-neutral-950">{money(totals.sales)}</div></div>
       </div>
+
+      <section className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div><h2 className="font-bold text-neutral-950">Import Existing Members</h2><p className="mt-1 text-sm text-neutral-500">CSV needs only two columns: name and mobile. Duplicate mobile numbers are matched to the existing member.</p></div>
+          <label className={`inline-flex cursor-pointer items-center justify-center rounded-xl bg-[#FFD400] px-4 py-3 text-sm font-bold text-black ${importing ? "pointer-events-none opacity-60" : ""}`}>{importing ? "Importing…" : "Import CSV"}<input type="file" accept=".csv,text/csv" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) void importCsv(file); e.currentTarget.value = ""; }} /></label>
+        </div>
+        {importMessage && <div className="mt-4 rounded-xl bg-neutral-50 p-3 text-sm font-medium text-neutral-700">{importMessage}</div>}
+      </section>
 
       <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
         <div className="flex flex-col gap-2 border-b border-neutral-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
