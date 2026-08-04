@@ -1,5 +1,6 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { attachSessionUser } from "../middleware/sessionAuth";
+import commercialRouter from "./orderingCommercial";
 import {
   confirmManualPayment,
   createCategory,
@@ -24,6 +25,7 @@ import {
 } from "../services/ordering/orderingService";
 
 const router = Router();
+router.use("/commercial", commercialRouter);
 
 function sendError(res: any, error: any, where: string, status = 500) {
   const message = error?.message || "Ordering request failed";
