@@ -1,0 +1,128 @@
+import { Router, type NextFunction, type Request, type Response } from "express";
+import { attachSessionUser } from "../middleware/sessionAuth";
+import {
+  createOrFindMember,
+  createPartnerVenue,
+  getPartnerVenueQr,
+  listMembers,
+  listPartnerVenues,
+  lookupMember,
+  partnerVenueReport,
+  resolveMemberQr,
+  resolvePartnerQr,
+  updatePartnerVenue,
+} from "../services/ordering/commercialService";
+
+const router = Router();
+
+function requireAdmin(req: Request, res: Response, next: NextFunction) {
+  if (process.env.NODE_ENV !== "production") return next();
+  if (attachSessionUser(req)) return next();
+  return res.status(401).json({ ok: false, error: "Authenticated owner session required" });
+}
+
+function baseUrl(req: Request) {
+  const configured = String(process.env.PUBLIC_APP_URL || "").trim();
+  if (configured) return configured;
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+function fail(res: Response, error: any, status = 400) {
+  return res.status(status).json({ ok: false, error: error?.message || String(error) });
+}
+
+// Public QR resolution. Scanning a partner code begins a 12-hour attribution window.
+router.get("/qr/partner/:token", async (req, res) => {
+  try {
+    const data = await resolvePartnerQr(req.params.token, {
+      session_key: typeof req.query.session === "string" ? req.query.session : undefined,
+      user_agent: req.get("user-agent") || undefined,
+    });
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return fail(res, error, 404);
+  }
+});
+
+// Public member QR resolution / very lightweight sign-up and lookup.
+router.get("/qr/member/:token", async (req, res) => {
+  try {
+    const data = await resolveMemberQr(req.params.token);
+    if (!data) return res.status(404).json({ ok: false, error: "Member QR not found" });
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return fail(res, error, 404);
+  }
+});
+
+router.post("/members", async (req, res) => {
+  try {
+    const data = await createOrFindMember(req.body, baseUrl(req));
+    return res.status(201).json({ ok: true, data });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
+router.get("/members/lookup", async (req, res) => {
+  try {
+    const phone = String(req.query.phone || "").trim();
+    if (!phone) return res.status(400).json({ ok: false, error: "phone is required" });
+    const data = await lookupMember(phone, String(req.query.tenant || "sbb"), baseUrl(req));
+    if (!data) return res.status(404).json({ ok: false, error: "Member not found" });
+    return res.json({ ok: true, data });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
+// Owner/admin venue management and reporting.
+router.get("/admin/venues", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await listPartnerVenues(String(req.query.tenant || "sbb")) });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
+router.post("/admin/venues", requireAdmin, async (req, res) => {
+  try {
+    return res.status(201).json({ ok: true, data: await createPartnerVenue(req.body) });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
+router.patch("/admin/venues/:id", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await updatePartnerVenue(req.params.id, req.body) });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
+router.get("/admin/venues/:id/qr", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await getPartnerVenueQr(req.params.id, baseUrl(req)) });
+  } catch (error) {
+    return fail(res, error, 404);
+  }
+});
+
+router.get("/admin/venues/:id/report", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await partnerVenueReport(req.params.id) });
+  } catch (error) {
+    return fail(res, error, 404);
+  }
+});
+
+router.get("/admin/members", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await listMembers(String(req.query.tenant || "sbb")) });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
+export default router;
