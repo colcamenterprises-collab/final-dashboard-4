@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-04T11:36:00Z
+requested_at=2026-08-04T14:20:00Z
 requested_by=ChatGPT
 ref=main
-reason=Deploy merged online ordering commercial layer and corrected Hostinger runner verification
+reason=Deploy merged PR 302 granular staff access and permissions
