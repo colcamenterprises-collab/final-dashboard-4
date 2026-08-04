@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-05T16:05:00Z
+requested_at=2026-08-05T23:55:00Z
 requested_by=ChatGPT
 ref=main
-reason=Deploy modern dashboard shell UI commit 03e3f153819934a99714529b45cf47108ad63c12
+reason=Deploy tablet sidebar scroll flow and closed accordion defaults
