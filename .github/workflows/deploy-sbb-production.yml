@@ -126,7 +126,7 @@ jobs:
             echo "Deployment failed with exit code $exit_code."
             restore_previous_release || {
               echo "CRITICAL: automatic rollback could not be verified."
-              sudo systemctl status "$SERVICE" --no-pager -l || true
+              sudo systemctl status "$SERVICE" || true
               exit 99
             }
 
@@ -167,7 +167,7 @@ jobs:
 
           echo
           echo "==> Verify service"
-          sudo systemctl is-active --quiet "$SERVICE"
+          sudo systemctl is-active "$SERVICE" >/dev/null
 
           wait_for_url "$LOCAL_HEALTH_URL" "local app health" 30 2
           wait_for_url "$LOCAL_MENU_URL" "ordering API health" 30 2
