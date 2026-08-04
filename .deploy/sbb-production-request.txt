@@ -1,0 +1,5 @@
+SBB production deployment request
+requested_at=2026-08-04T06:15:00Z
+requested_by=ChatGPT
+ref=main
+reason=Validate self-hosted Hostinger deployment pipeline before POS shift testing
