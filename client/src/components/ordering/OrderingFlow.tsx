@@ -16,6 +16,8 @@ type Props = {
   deliveryAddress: string;
   orderNotes: string;
   error: string;
+  partnerVenueName?: string | null;
+  deliveryLocked?: boolean;
   onQty: (index: number, quantity: number) => void;
   onRemove: (index: number) => void;
   onClose: () => void;
@@ -44,13 +46,13 @@ export default function OrderingFlow(props: Props) {
         <button className="sbo-primary-flow-btn" disabled={!props.cart.length} onClick={props.onCheckout}>Continue to checkout · {money(props.total)}</button>
       </> : <section className="sbo-panel sbo-checkout-panel">
         {props.showCustomerDetails && <>
-          <div className="sbo-fulfilment">
+          {props.deliveryLocked ? <div className="sbo-partner-delivery"><small>Partner venue delivery</small><strong>{props.partnerVenueName || "Partner venue"}</strong><span>Your food will be delivered here so you can stay at the venue.</span></div> : <div className="sbo-fulfilment">
             <button type="button" className={props.fulfilment === "pickup" ? "active" : ""} onClick={() => props.onFulfilment("pickup")}>Pickup</button>
             <button type="button" className={props.fulfilment === "delivery" ? "active" : ""} onClick={() => props.onFulfilment("delivery")}>Delivery</button>
-          </div>
+          </div>}
           <label>Name<input placeholder="Your name" value={props.customerName} onChange={(e) => props.onName(e.target.value)} /></label>
           <label>Phone<input inputMode="tel" placeholder="Phone number" value={props.customerPhone} onChange={(e) => props.onPhone(e.target.value)} /></label>
-          {props.fulfilment === "delivery" && <label>Delivery details<textarea placeholder="Address, hotel or villa and unit" value={props.deliveryAddress} onChange={(e) => props.onAddress(e.target.value)} /></label>}
+          {props.fulfilment === "delivery" && <label>Delivery details<textarea readOnly={props.deliveryLocked} placeholder="Address, hotel or villa and unit" value={props.deliveryAddress} onChange={(e) => props.onAddress(e.target.value)} /></label>}
         </>}
         <label>Order notes<textarea placeholder="Anything the kitchen should know?" value={props.orderNotes} onChange={(e) => props.onNotes(e.target.value)} /></label>
         <label>Payment<select value={props.paymentMethod} onChange={(e) => props.onPayment(e.target.value)}>
@@ -58,6 +60,7 @@ export default function OrderingFlow(props: Props) {
           <option value="cash">Cash</option>
           {props.qrEnabled && <option value="manual_qr_transfer">QR transfer</option>}
         </select></label>
+        {props.fulfilment === "delivery" && <div className="sbo-delivery-free"><span>Delivery</span><strong>FREE</strong></div>}
         {props.error && <div className="sbo-modal-error">{props.error}</div>}
         <button className="sbo-primary-flow-btn" disabled={!props.cart.length || props.loading || !props.orderingEnabled} onClick={props.onSubmit}>{props.loading ? "Sending order..." : `Place order · ${money(props.total)}`}</button>
       </section>}
