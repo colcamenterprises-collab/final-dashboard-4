@@ -1,0 +1,200 @@
+name: Deploy SBB Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (branch, tag, or SHA)"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sbb-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Hostinger production
+    runs-on: [self-hosted, linux, x64, sbb-production, hostinger]
+    timeout-minutes: 20
+
+    steps:
+      - name: Deploy with health checks and automatic rollback
+        shell: bash
+        env:
+          DEPLOY_REF: ${{ inputs.ref }}
+          APP_DIR: /opt/apps/sbb-app-production
+          SERVICE: sbb-production
+          LOCAL_HEALTH_URL: http://127.0.0.1:8081/
+          LOCAL_MENU_URL: http://127.0.0.1:8081/api/ordering/menu
+          PUBLIC_HEALTH_URL: https://app.smashbrosburgers.com/
+          PUBLIC_ORDER_URL: https://app.smashbrosburgers.com/order
+        run: |
+          set -Eeuo pipefail
+
+          cd "$APP_DIR"
+
+          PREVIOUS_SHA="$(git rev-parse HEAD)"
+          TARGET_REF="${DEPLOY_REF:-main}"
+          BACKUP_DIR="$APP_DIR/.deploy-backups/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          DEPLOY_SUCCEEDED=0
+          ROLLBACK_STARTED=0
+
+          echo "Previous production SHA: $PREVIOUS_SHA"
+          echo "Requested deploy ref:     $TARGET_REF"
+          echo "Node: $(node --version)"
+          echo "npm:  $(npm --version)"
+
+          mkdir -p "$BACKUP_DIR"
+
+          if [ -d dist ]; then
+            cp -a dist "$BACKUP_DIR/dist"
+          fi
+
+          printf '%s\n' "$PREVIOUS_SHA" > "$BACKUP_DIR/previous-sha.txt"
+
+          wait_for_url() {
+            local url="$1"
+            local label="$2"
+            local attempts="${3:-30}"
+            local sleep_seconds="${4:-2}"
+
+            for ((i=1; i<=attempts; i++)); do
+              if curl --fail --silent --show-error --max-time 8 --output /dev/null "$url"; then
+                echo "$label passed on attempt $i/$attempts: $url"
+                return 0
+              fi
+              echo "$label waiting... attempt $i/$attempts"
+              sleep "$sleep_seconds"
+            done
+
+            echo "$label FAILED: $url"
+            return 1
+          }
+
+          restore_previous_release() {
+            if [ "$ROLLBACK_STARTED" -eq 1 ]; then
+              echo "Rollback already attempted; refusing recursive rollback."
+              return 1
+            fi
+            ROLLBACK_STARTED=1
+
+            echo
+            echo "========================================"
+            echo "ROLLBACK STARTED"
+            echo "Restoring: $PREVIOUS_SHA"
+            echo "========================================"
+
+            git reset --hard "$PREVIOUS_SHA"
+
+            if NODE_OPTIONS=--max-old-space-size=4096 npm run build; then
+              echo "Previous source rebuilt successfully."
+            elif [ -d "$BACKUP_DIR/dist" ]; then
+              echo "Previous rebuild failed; restoring compiled dist backup."
+              rm -rf dist
+              cp -a "$BACKUP_DIR/dist" dist
+            else
+              echo "Previous rebuild failed and no compiled dist backup exists."
+              return 1
+            fi
+
+            sudo systemctl restart "$SERVICE"
+
+            wait_for_url "$LOCAL_HEALTH_URL" "rollback local app health" 30 2
+            wait_for_url "$LOCAL_MENU_URL" "rollback ordering API health" 30 2
+            wait_for_url "$PUBLIC_HEALTH_URL" "rollback public app health" 30 2
+            wait_for_url "$PUBLIC_ORDER_URL" "rollback public order page health" 30 2
+
+            echo "Rollback verified at $(git rev-parse HEAD)"
+          }
+
+          on_failure() {
+            local exit_code=$?
+            if [ "$DEPLOY_SUCCEEDED" -eq 1 ]; then
+              exit "$exit_code"
+            fi
+
+            echo
+            echo "Deployment failed with exit code $exit_code."
+            restore_previous_release || {
+              echo "CRITICAL: automatic rollback could not be verified."
+              sudo systemctl status "$SERVICE" --no-pager -l || true
+              exit 99
+            }
+
+            echo "DEPLOYMENT FAILED — PRODUCTION ROLLED BACK SUCCESSFULLY"
+            exit "$exit_code"
+          }
+
+          trap on_failure ERR
+
+          echo
+          echo "==> Fetch target"
+          git fetch --prune origin
+          git fetch origin "$TARGET_REF"
+          TARGET_SHA="$(git rev-parse FETCH_HEAD)"
+          echo "Target SHA: $TARGET_SHA"
+
+          if [ "$TARGET_SHA" = "$PREVIOUS_SHA" ]; then
+            echo "Target is already live. Running health verification only."
+          else
+            echo
+            echo "==> Switch production checkout"
+            git reset --hard "$TARGET_SHA"
+
+            if git diff --name-only "$PREVIOUS_SHA" "$TARGET_SHA" | grep -Eq '(^|/)(package.json|package-lock.json)$'; then
+              echo
+              echo "==> Dependencies changed; running npm ci"
+              npm ci --no-audit --no-fund
+            fi
+
+            echo
+            echo "==> Build production"
+            NODE_OPTIONS=--max-old-space-size=4096 npm run build
+
+            echo
+            echo "==> Restart production"
+            sudo systemctl restart "$SERVICE"
+          fi
+
+          echo
+          echo "==> Verify service"
+          sudo systemctl is-active --quiet "$SERVICE"
+
+          wait_for_url "$LOCAL_HEALTH_URL" "local app health" 30 2
+          wait_for_url "$LOCAL_MENU_URL" "ordering API health" 30 2
+          wait_for_url "$PUBLIC_HEALTH_URL" "public app health" 30 2
+          wait_for_url "$PUBLIC_ORDER_URL" "public order page health" 30 2
+
+          LIVE_SHA="$(git rev-parse HEAD)"
+          if [ "$LIVE_SHA" != "$TARGET_SHA" ]; then
+            echo "Live checkout SHA mismatch. Expected $TARGET_SHA, found $LIVE_SHA"
+            false
+          fi
+
+          DEPLOY_SUCCEEDED=1
+          trap - ERR
+
+          echo
+          echo "========================================"
+          echo "SBB PRODUCTION DEPLOYMENT PASS"
+          echo "Previous SHA: $PREVIOUS_SHA"
+          echo "Live SHA:     $LIVE_SHA"
+          echo "Backup:       $BACKUP_DIR"
+          echo "========================================"
+
+      - name: Deployment summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## SBB Production Deployment"
+            echo
+            echo "- Result: **${{ job.status }}**"
+            echo "- Requested ref: \`${{ inputs.ref }}\`"
+            echo "- Runner: \`${{ runner.name }}\`"
+            echo "- Server: \`$(hostname)\`"
+          } >> "$GITHUB_STEP_SUMMARY"
