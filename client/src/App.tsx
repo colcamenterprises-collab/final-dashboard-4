@@ -65,6 +65,7 @@ import StaffCleaning from "./pages/staff/Cleaning";
 import StaffAttendance from "./pages/staff/Attendance";
 import StaffSettings from "./pages/staff/Settings";
 import StaffAccess from "./pages/settings/StaffAccess";
+import Profile from "./pages/settings/Profile";
 
 function OwnerRoute({ children }: { children: JSX.Element }) {
   const { currentUser } = usePinAuth();
@@ -159,6 +160,7 @@ export default function App() {
                     <Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} />
                     <Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} />
                     <Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} />
+                    <Route path="/settings/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                     <Route path="/settings/staff-access" element={<ProtectedRoute><OwnerRoute><StaffAccess /></OwnerRoute></ProtectedRoute>} />
                     <Route path="*" element={<NotFound />} />
                   </Route>

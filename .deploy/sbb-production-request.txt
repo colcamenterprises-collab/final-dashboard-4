@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-05T23:59:00Z
-requested_by=ChatGPT
+requested_at=2026-08-04T23:03:55Z
+requested_by=GitHub Actions
 ref=main
-reason=Deploy collapsed sidebar with six section icons only
+reason=Profile page, staff delete API, sidebar small fixes

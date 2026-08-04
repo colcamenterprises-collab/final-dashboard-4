@@ -281,6 +281,9 @@ router.get("/me/profile", async (req: Request, res: Response) => {
       .select({
         id: internalUsers.id,
         name: internalUsers.name,
+        username: internalUsers.username,
+        email: internalUsers.email,
+        contactNumber: internalUsers.contactNumber,
         role: internalUsers.role,
         active: internalUsers.active,
         permissions: internalUsers.permissions,
@@ -297,7 +300,7 @@ router.get("/me/profile", async (req: Request, res: Response) => {
   }
 });
 
-// ─── PATCH /me/profile — update own avatar ───────────────────────────────────
+// ─── PATCH /me/profile — update own profile ──────────────────────────────────
 
 router.patch("/me/profile", async (req: Request, res: Response) => {
   const sessionUser = getPinSessionUser(req);
@@ -305,16 +308,38 @@ router.patch("/me/profile", async (req: Request, res: Response) => {
     return res.status(401).json({ error: "Not authenticated" });
   }
   const userId = sessionUser?.id ?? 1;
-  const { avatarUrl } = req.body as { avatarUrl?: string | null };
+  const { name, username, email, contactNumber, avatarUrl } = req.body as {
+    name?: string; username?: string; email?: string; contactNumber?: string; avatarUrl?: string | null;
+  };
   try {
+    const updates: Partial<typeof internalUsers.$inferInsert> = {};
+    if (name !== undefined) {
+      const cleanName = String(name).trim();
+      if (!cleanName) return res.status(400).json({ error: "Name is required" });
+      updates.name = cleanName;
+    }
+    if (username !== undefined) {
+      const base = String(username).trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
+      if (!base) return res.status(400).json({ error: "Username is required" });
+      updates.username = await uniqueUsername(base, userId);
+    }
+    if (email !== undefined) updates.email = String(email).trim().toLowerCase() || null;
+    if (contactNumber !== undefined) updates.contactNumber = String(contactNumber).trim() || null;
+    if (avatarUrl !== undefined) updates.avatarUrl = avatarUrl;
+
     const [updated] = await db
       .update(internalUsers)
-      .set({ avatarUrl: avatarUrl ?? null })
+      .set(updates)
       .where(eq(internalUsers.id, userId))
-      .returning({ id: internalUsers.id, name: internalUsers.name, avatarUrl: internalUsers.avatarUrl });
+      .returning({
+        id: internalUsers.id, name: internalUsers.name, username: internalUsers.username,
+        email: internalUsers.email, contactNumber: internalUsers.contactNumber,
+        role: internalUsers.role, avatarUrl: internalUsers.avatarUrl, createdAt: internalUsers.createdAt,
+      });
     if (!updated) return res.status(404).json({ error: "User not found" });
     res.json({ ok: true, user: updated });
-  } catch {
+  } catch (err) {
+    console.error("[pinAuth] PATCH /me/profile error:", err);
     res.status(500).json({ error: "Failed to update profile" });
   }
 });
@@ -488,6 +513,43 @@ router.put("/staff/:id", async (req: Request, res: Response) => {
     res.json({ user: updated });
   } catch (err) {
     res.status(500).json({ error: "Failed to update user" });
+  }
+});
+
+// ─── DELETE /staff/:id — permanently remove staff login (owner only) ─────────
+
+router.delete("/staff/:id", async (req: Request, res: Response) => {
+  if (!requireOwner(req, res)) return;
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "Invalid user id" });
+
+  const sessionUser = getPinSessionUser(req);
+  if (sessionUser?.id === id) {
+    return res.status(409).json({ error: "You cannot permanently delete the account you are currently signed in with" });
+  }
+
+  try {
+    const [target] = await db
+      .select({ id: internalUsers.id, role: internalUsers.role, active: internalUsers.active })
+      .from(internalUsers)
+      .where(eq(internalUsers.id, id))
+      .limit(1);
+    if (!target) return res.status(404).json({ error: "User not found" });
+
+    if (target.role === "owner" && target.active) {
+      const owners = await db.select({ id: internalUsers.id, role: internalUsers.role, active: internalUsers.active }).from(internalUsers);
+      const activeOwnerCount = owners.filter((user) => user.role === "owner" && user.active).length;
+      if (activeOwnerCount <= 1) {
+        return res.status(409).json({ error: "The final active owner account cannot be deleted" });
+      }
+    }
+
+    const [deleted] = await db.delete(internalUsers).where(eq(internalUsers.id, id)).returning({ id: internalUsers.id });
+    if (!deleted) return res.status(404).json({ error: "User not found" });
+    res.json({ ok: true, deletedId: deleted.id });
+  } catch (err) {
+    console.error("[pinAuth] DELETE /staff/:id error:", err);
+    res.status(500).json({ error: "Failed to delete user" });
   }
 });
 
