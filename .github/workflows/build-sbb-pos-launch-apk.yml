@@ -1,0 +1,110 @@
+name: Build SBB POS Launch APK
+
+on:
+  push:
+    paths:
+      - '.deploy/apk-launch-build-request.txt'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
+
+      - name: Install Capacitor
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Create Capacitor config
+        run: |
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "io.customli.sbbpos",
+            "appName": "Smash Brothers POS",
+            "webDir": "dist/public",
+            "server": {
+              "url": "https://app.smashbrosburgers.com",
+              "cleartext": false,
+              "androidScheme": "https"
+            },
+            "android": {
+              "allowMixedContent": false
+            }
+          }
+          EOF
+
+      - name: Generate Android project
+        run: npx cap add android
+
+      - name: Install native printer bridge and permissions
+        run: |
+          APP_DIR="android/app/src/main/java/io/customli/sbbpos"
+          mkdir -p "$APP_DIR"
+          cp native/android/MainActivity.kt "$APP_DIR/MainActivity.kt"
+          cp native/android/ThermalPrinterPlugin.kt "$APP_DIR/ThermalPrinterPlugin.kt"
+
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+
+          manifest = Path('android/app/src/main/AndroidManifest.xml')
+          text = manifest.read_text()
+          opening = re.search(r'<manifest\b[^>]*>', text, flags=re.S)
+          if opening is None:
+              raise RuntimeError('Android manifest opening tag not found')
+
+          permissions = '''
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+'''
+          text = text[:opening.end()] + permissions + text[opening.end():]
+          manifest.write_text(text)
+          PY
+
+      - name: Verify Android sources
+        run: |
+          grep -q 'name = "ThermalPrinter"' android/app/src/main/java/io/customli/sbbpos/ThermalPrinterPlugin.kt
+          grep -q 'registerPlugin(ThermalPrinterPlugin::class.java)' android/app/src/main/java/io/customli/sbbpos/MainActivity.kt
+          grep -q 'BLUETOOTH_CONNECT' android/app/src/main/AndroidManifest.xml
+          grep -q 'BLUETOOTH_SCAN' android/app/src/main/AndroidManifest.xml
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p apk-output
+          cp android/app/build/outputs/apk/debug/app-debug.apk apk-output/Smash-Brothers-POS-Launch.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smash-Brothers-POS-Launch
+          path: apk-output/Smash-Brothers-POS-Launch.apk
+          retention-days: 14
