@@ -71,16 +71,22 @@ jobs:
 
           python3 <<'PY'
           from pathlib import Path
+          import re
+
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           text = manifest.read_text()
           permissions = '''
-              <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
-          '''
-          marker = text.find('>') + 1
-          text = text[:marker] + permissions + text[marker:]
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+'''
+          if 'android.permission.BLUETOOTH_CONNECT' not in text:
+              match = re.search(r'<manifest\b[^>]*>', text, flags=re.S)
+              if not match:
+                  raise RuntimeError('Could not locate <manifest> opening tag')
+              insert_at = match.end()
+              text = text[:insert_at] + permissions + text[insert_at:]
           manifest.write_text(text)
           PY
 
