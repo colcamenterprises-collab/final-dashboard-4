@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-05T04:01:00Z
+requested_at=2026-08-05T10:11:00Z
 requested_by=ChatGPT
 ref=main
-reason=Redeploy verified profile page and staff delete API fixes
+reason=Deploy POS launch checkout visibility, white UI and Bluetooth runtime permissions
