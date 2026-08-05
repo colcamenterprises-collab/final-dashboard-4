@@ -16,10 +16,15 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
+import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
 import java.io.IOException
 import java.util.UUID
 
-@CapacitorPlugin(name = "ThermalPrinter")
+@CapacitorPlugin(
+    name = "ThermalPrinter",
+    permissions = [Permission(alias = "bluetooth", strings = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])]
+)
 class ThermalPrinterPlugin : Plugin() {
     private val sppUuid: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
     private var socket: BluetoothSocket? = null
@@ -30,9 +35,11 @@ class ThermalPrinterPlugin : Plugin() {
         return manager.adapter
     }
 
-    private fun hasConnectPermission(): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+    private fun hasBluetoothPermission(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || (
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        )
     }
 
     private fun requireBluetooth(call: PluginCall): BluetoothAdapter? {
@@ -45,15 +52,28 @@ class ThermalPrinterPlugin : Plugin() {
             call.reject("Bluetooth is turned off")
             return null
         }
-        if (!hasConnectPermission()) {
-            call.reject("Bluetooth permission is required. Allow Nearby devices for Smash Brothers POS.")
-            return null
-        }
         return adapter
     }
 
     @PluginMethod
     fun listPrinters(call: PluginCall) {
+        if (!hasBluetoothPermission()) {
+            requestPermissionForAlias("bluetooth", call, "bluetoothPermissionCallback")
+            return
+        }
+        listPrintersGranted(call)
+    }
+
+    @PermissionCallback
+    private fun bluetoothPermissionCallback(call: PluginCall) {
+        if (!hasBluetoothPermission()) {
+            call.reject("Nearby devices permission was not granted")
+            return
+        }
+        if (call.methodName == "connect") connectGranted(call) else listPrintersGranted(call)
+    }
+
+    private fun listPrintersGranted(call: PluginCall) {
         val adapter = requireBluetooth(call) ?: return
         try {
             val result = JSArray()
@@ -74,6 +94,14 @@ class ThermalPrinterPlugin : Plugin() {
 
     @PluginMethod
     fun connect(call: PluginCall) {
+        if (!hasBluetoothPermission()) {
+            requestPermissionForAlias("bluetooth", call, "bluetoothPermissionCallback")
+            return
+        }
+        connectGranted(call)
+    }
+
+    private fun connectGranted(call: PluginCall) {
         val adapter = requireBluetooth(call) ?: return
         val address = call.getString("address")?.trim()
         if (address.isNullOrEmpty()) {
@@ -151,7 +179,6 @@ class ThermalPrinterPlugin : Plugin() {
 
     @PluginMethod
     fun openCashDrawer(call: PluginCall) {
-        // Standard ESC/POS drawer kick: ESC p m t1 t2
         write(call, byteArrayOf(0x1B, 0x70, 0x00, 0x32, 0xFA.toByte()))
     }
 
