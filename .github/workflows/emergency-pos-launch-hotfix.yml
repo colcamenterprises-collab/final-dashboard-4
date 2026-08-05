@@ -1,0 +1,209 @@
+name: Emergency POS Launch Hotfix
+
+on:
+  push:
+    paths:
+      - '.github/workflows/emergency-pos-launch-hotfix.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-deploy:
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout latest main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Apply launch hotfixes
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path('client/src/pages/pos/PosRegister.tsx')
+          s = p.read_text()
+
+          # Pure white overall POS background.
+          s = s.replace('return <main className="h-dvh overflow-hidden bg-[#fffdf4] text-[#171717]">',
+                        'return <main className="h-dvh overflow-hidden bg-white text-[#171717]">')
+
+          # Normalize rendered product image canvas while preserving the product-card styling.
+          old = 'className="h-[135px] w-full max-w-[220px] bg-transparent object-contain drop-shadow-[0_10px_10px_rgba(39,27,8,0.14)]"'
+          new = 'className="h-[135px] w-[135px] bg-transparent object-contain drop-shadow-[0_10px_10px_rgba(39,27,8,0.14)]"'
+          s = s.replace(old, new)
+
+          # Make checkout visibly transactional and prevent double-taps.
+          marker = 'const [checkoutError,setCheckoutError] = useState("");'
+          if marker in s and 'checkoutBusy' not in s:
+              s = s.replace(marker, marker + '\n  const [checkoutBusy,setCheckoutBusy] = useState(false);')
+
+          old_charge = 'const charge = async (skipMarketing = false) => {\n    // Marketing is an optional capture, never a checkout gate.  The prompt is\n    // useful for staff, but a completed food order must always reach kitchen.\n    setCheckoutError("");\n    try {'
+          new_charge = 'const charge = async (skipMarketing = false) => {\n    if (checkoutBusy) return;\n    // Marketing is optional and must never block kitchen dispatch.\n    setCheckoutBusy(true);\n    setCheckoutError("");\n    setNotice("Processing payment…");\n    try {'
+          s = s.replace(old_charge, new_charge)
+
+          old_catch = '} catch (error:any) { setCheckoutError(error.message || "Could not complete the order"); }\n  };'
+          new_catch = '} catch (error:any) {\n      const message = error.message || "Could not complete the order";\n      setCheckoutError(message);\n      setNotice(`PAYMENT FAILED — ${message}`);\n    } finally {\n      setCheckoutBusy(false);\n    }\n  };'
+          s = s.replace(old_catch, new_catch, 1)
+
+          old_btn = '<button disabled={!cart.length} onClick={startCheckout} className="mt-3 w-full rounded-xl bg-[#ffd400] py-4 text-base font-black text-black shadow-[0_7px_0_#d7ae00] transition hover:bg-[#ffe042] active:translate-y-0.5 active:shadow-[0_4px_0_#d7ae00] disabled:cursor-not-allowed disabled:opacity-40">{ui.continue} {thb(total)}</button>'
+          new_btn = '<button type="button" disabled={!cart.length || checkoutBusy} onClick={startCheckout} className="mt-3 w-full rounded-xl bg-[#ffd400] py-4 text-base font-black text-black shadow-[0_7px_0_#d7ae00] transition hover:bg-[#ffe042] active:translate-y-0.5 active:shadow-[0_4px_0_#d7ae00] disabled:cursor-not-allowed disabled:opacity-40">{checkoutBusy ? "PROCESSING…" : `${ui.continue} ${thb(total)}`}</button>'
+          s = s.replace(old_btn, new_btn)
+
+          p.write_text(s)
+
+          # Kotlin native printer bridge: request Android 12+ Nearby Devices permissions.
+          k = Path('native/android/ThermalPrinterPlugin.kt')
+          t = k.read_text()
+          t = t.replace('import com.getcapacitor.annotation.CapacitorPlugin\n', 'import com.getcapacitor.annotation.CapacitorPlugin\nimport com.getcapacitor.annotation.Permission\nimport com.getcapacitor.annotation.PermissionCallback\n')
+          t = t.replace('@CapacitorPlugin(name = "ThermalPrinter")', '@CapacitorPlugin(\n    name = "ThermalPrinter",\n    permissions = [\n        Permission(alias = "bluetooth", strings = [Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN])\n    ]\n)')
+          t = t.replace('private fun hasConnectPermission(): Boolean {\n        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||\n            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED\n    }',
+'''private fun hasBluetoothPermission(): Boolean {
+        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || (
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+        )
+    }''')
+          t = t.replace('        if (!hasConnectPermission()) {\n            call.reject("Bluetooth permission is required. Allow Nearby devices for Smash Brothers POS.")\n            return null\n        }\n', '')
+          t = t.replace('    @PluginMethod\n    fun listPrinters(call: PluginCall) {\n        val adapter = requireBluetooth(call) ?: return\n',
+'''    @PluginMethod
+    fun listPrinters(call: PluginCall) {
+        if (!hasBluetoothPermission()) {
+            requestPermissionForAlias("bluetooth", call, "bluetoothPermissionCallback")
+            return
+        }
+        listPrintersGranted(call)
+    }
+
+    @PermissionCallback
+    private fun bluetoothPermissionCallback(call: PluginCall) {
+        if (!hasBluetoothPermission()) {
+            call.reject("Nearby devices permission was not granted")
+            return
+        }
+        when (call.methodName) {
+            "connect" -> connectGranted(call)
+            else -> listPrintersGranted(call)
+        }
+    }
+
+    private fun listPrintersGranted(call: PluginCall) {
+        val adapter = requireBluetooth(call) ?: return
+''')
+          t = t.replace('    @PluginMethod\n    fun connect(call: PluginCall) {\n        val adapter = requireBluetooth(call) ?: return\n        val address = call.getString("address")?.trim()\n',
+'''    @PluginMethod
+    fun connect(call: PluginCall) {
+        if (!hasBluetoothPermission()) {
+            requestPermissionForAlias("bluetooth", call, "bluetoothPermissionCallback")
+            return
+        }
+        connectGranted(call)
+    }
+
+    private fun connectGranted(call: PluginCall) {
+        val adapter = requireBluetooth(call) ?: return
+        val address = call.getString("address")?.trim()
+''')
+          k.write_text(t)
+
+          # Ensure the standard APK build also carries BLUETOOTH_SCAN.
+          w = Path('.github/workflows/build-sbb-pos-android.yml')
+          if w.exists():
+              x = w.read_text()
+              x = x.replace('<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />', '<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />')
+              x = x.replace("grep -q 'BLUETOOTH_CONNECT' android/app/src/main/AndroidManifest.xml", "grep -q 'BLUETOOTH_CONNECT' android/app/src/main/AndroidManifest.xml\n          grep -q 'BLUETOOTH_SCAN' android/app/src/main/AndroidManifest.xml")
+              w.write_text(x)
+          PY
+
+          git diff --check
+          git diff -- client/src/pages/pos/PosRegister.tsx native/android/ThermalPrinterPlugin.kt .github/workflows/build-sbb-pos-android.yml
+
+      - name: Build production app
+        run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
+
+      - name: Commit hotfix
+        run: |
+          git config user.name "SBB Launch Bot"
+          git config user.email "actions@smashbrosburgers.com"
+          git add client/src/pages/pos/PosRegister.tsx native/android/ThermalPrinterPlugin.kt .github/workflows/build-sbb-pos-android.yml
+          if ! git diff --cached --quiet; then
+            git commit -m "Fix POS checkout, UI and Bluetooth permissions"
+            git push origin HEAD:main
+          fi
+
+      - name: Deploy production with health check
+        run: |
+          cd /opt/apps/sbb-app-production
+          git fetch origin main
+          git reset --hard origin/main
+          NODE_OPTIONS=--max-old-space-size=4096 npm run build
+          sudo -n systemctl restart sbb-production
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8081/ >/dev/null; then
+              echo "Production healthy on attempt $i"
+              curl -fsS -o /dev/null -w 'Public POS HTTP %{http_code} in %{time_total}s\n' https://app.smashbrosburgers.com/pos
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Production failed health check" >&2
+          exit 1
+
+  build-fixed-apk:
+    needs: patch-and-deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout patched main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: npm ci
+      - run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
+      - run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+      - name: Generate production Android wrapper
+        run: |
+          node <<'NODE'
+          const fs=require('fs');
+          fs.writeFileSync('capacitor.config.json', JSON.stringify({appId:'io.customli.sbbpos',appName:'Smash Brothers POS',webDir:'dist/public',server:{url:'https://app.smashbrosburgers.com',cleartext:false,androidScheme:'https'},android:{allowMixedContent:false}},null,2));
+          NODE
+          npx cap add android
+          APP_DIR="android/app/src/main/java/io/customli/sbbpos"
+          mkdir -p "$APP_DIR"
+          cp native/android/MainActivity.kt "$APP_DIR/MainActivity.kt"
+          cp native/android/ThermalPrinterPlugin.kt "$APP_DIR/ThermalPrinterPlugin.kt"
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('android/app/src/main/AndroidManifest.xml')
+          s=p.read_text()
+          perms='''\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n'''
+          marker=s.find('>')+1
+          s=s[:marker]+perms+s[marker:]
+          p.write_text(s)
+          PY
+          npx cap sync android
+          grep -q BLUETOOTH_SCAN android/app/src/main/AndroidManifest.xml
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Upload fixed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smash-Brothers-POS-Launch-Fixed
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
