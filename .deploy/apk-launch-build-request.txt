@@ -1,0 +1,4 @@
+SBB POS launch APK build request
+requested_at=2026-08-05T12:02:00Z
+requested_by=ChatGPT
+reason=Clean rebuild after manifest XML failure
