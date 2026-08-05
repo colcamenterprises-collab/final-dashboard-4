@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - '.deploy/apk-launch-build-request.txt'
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -62,23 +62,15 @@ jobs:
           mkdir -p "$APP_DIR"
           cp native/android/MainActivity.kt "$APP_DIR/MainActivity.kt"
           cp native/android/ThermalPrinterPlugin.kt "$APP_DIR/ThermalPrinterPlugin.kt"
-
           python3 <<'PY'
           from pathlib import Path
           import re
-
           manifest = Path('android/app/src/main/AndroidManifest.xml')
           text = manifest.read_text()
           opening = re.search(r'<manifest\b[^>]*>', text, flags=re.S)
           if opening is None:
               raise RuntimeError('Android manifest opening tag not found')
-
-          permissions = '''
-    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
-'''
+          permissions = '\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />\n'
           text = text[:opening.end()] + permissions + text[opening.end():]
           manifest.write_text(text)
           PY
