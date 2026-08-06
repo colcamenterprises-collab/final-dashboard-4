@@ -31,119 +31,38 @@ jobs:
           pos = Path('server/routes/pos.ts')
           s = pos.read_text()
 
-          old_ticket_fn = '''function ticketNumber(sequence: number) {
-  return String(sequence).padStart(3, "0");
-}
-'''
-          new_ticket_fn = '''// Customer-facing ticket numbers are deliberately short for kitchen/display/speaker use.
-// ordering_orders.id remains the permanent globally unique order identifier.
-// The display sequence cycles independently and must never be treated as a database identity.
-const DISPLAY_TICKET_MAX = 999;
-const DISPLAY_TICKET_DIGITS = 3;
-let displayTicketSchemaReady: Promise<unknown> | null = null;
-
-function ticketNumber(sequence: number) {
-  return String(sequence).padStart(DISPLAY_TICKET_DIGITS, "0");
-}
-
-function ensureDisplayTicketSchema() {
-  if (!displayTicketSchemaReady) {
-    displayTicketSchemaReady = db().query(
-      `ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_ticket_number_unique`,
-    );
-  }
-  return displayTicketSchemaReady;
-}
-'''
-          if old_ticket_fn not in s:
+          old = 'function ticketNumber(sequence: number) {\n  return String(sequence).padStart(3, "0");\n}\n'
+          new = '// Customer-facing ticket numbers are deliberately short for kitchen/display/speaker use.\n// ordering_orders.id remains the permanent globally unique order identifier.\n// Display tickets may repeat after the configured cycle and are never database identities.\nconst DISPLAY_TICKET_MAX = 999;\nconst DISPLAY_TICKET_DIGITS = 3;\nlet displayTicketSchemaReady: Promise<unknown> | null = null;\n\nfunction ticketNumber(sequence: number) {\n  return String(sequence).padStart(DISPLAY_TICKET_DIGITS, "0");\n}\n\nfunction ensureDisplayTicketSchema() {\n  if (!displayTicketSchemaReady) {\n    displayTicketSchemaReady = db().query(\n      `ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_ticket_number_unique`,\n    );\n  }\n  return displayTicketSchemaReady;\n}\n'
+          if old not in s:
               raise RuntimeError('ticketNumber block not found')
-          s = s.replace(old_ticket_fn, new_ticket_fn, 1)
+          s = s.replace(old, new, 1)
 
-          old_next = '''router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
-  try {
-    const bounds = shiftBounds();
-    const result = await db().query(
-      `SELECT COUNT(*) + 1 AS next_ticket
-       FROM ordering_orders
-       WHERE channel IN ('pos_direct','grab')
-         AND created_at >= $1 AND created_at < $2`,
-      [bounds.start.toJSDate(), bounds.end.toJSDate()],
-    );
-    const next = Number(result.rows[0]?.next_ticket || 1);
-    res.json({ ok: true, source: "sbb_pos_core", data: { ticket_number: ticketNumber(next) } });
-  } catch (e: any) {
-    fail(res, e.message, 500);
-  }
-});'''
-          new_next = '''router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
-  try {
-    await ensureDisplayTicketSchema();
-    const result = await db().query(
-      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket
-       FROM ordering_orders
-       WHERE channel IN ('pos_direct','grab')`,
-      [DISPLAY_TICKET_MAX],
-    );
-    const next = Number(result.rows[0]?.next_ticket || 1);
-    res.json({ ok: true, source: "sbb_pos_core", data: { ticket_number: ticketNumber(next) } });
-  } catch (e: any) {
-    fail(res, e.message, 500);
-  }
-});'''
-          if old_next not in s:
-              raise RuntimeError('next-ticket route block not found')
-          s = s.replace(old_next, new_next, 1)
+          old = '    const bounds = shiftBounds();\n    const result = await db().query(\n      `SELECT COUNT(*) + 1 AS next_ticket\n       FROM ordering_orders\n       WHERE channel IN (\'pos_direct\',\'grab\')\n         AND created_at >= $1 AND created_at < $2`,\n      [bounds.start.toJSDate(), bounds.end.toJSDate()],\n    );'
+          new = '    await ensureDisplayTicketSchema();\n    const result = await db().query(\n      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket\n       FROM ordering_orders\n       WHERE channel IN (\'pos_direct\',\'grab\')`,\n      [DISPLAY_TICKET_MAX],\n    );'
+          if old not in s:
+              raise RuntimeError('next ticket query not found')
+          s = s.replace(old, new, 1)
 
-          old_order_seq = '''  const client = await db().connect();
-  try {
-    await client.query("BEGIN");
-    const openShiftResult = await client.query(`SELECT id FROM public.pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`);
-    if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
-    const activeShiftId = openShiftResult.rows[0].id;
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('sbb-pos-ticket-number'))");
-    const bounds = shiftBounds();
-    const ticketSequenceResult = await client.query(
-      `SELECT COUNT(*) + 1 AS next_ticket FROM ordering_orders WHERE channel IN ('pos_direct','grab') AND created_at >= $1 AND created_at < $2`,
-      [bounds.start.toJSDate(), bounds.end.toJSDate()],
-    );
-    const ticket = ticketNumber(Number(ticketSequenceResult.rows[0]?.next_ticket || 1));'''
-          new_order_seq = '''  await ensureDisplayTicketSchema();
-  const client = await db().connect();
-  try {
-    await client.query("BEGIN");
-    const openShiftResult = await client.query(`SELECT id FROM public.pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`);
-    if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
-    const activeShiftId = openShiftResult.rows[0].id;
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('customli-pos-display-ticket'))");
-    const ticketSequenceResult = await client.query(
-      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket
-       FROM ordering_orders
-       WHERE channel IN ('pos_direct','grab')`,
-      [DISPLAY_TICKET_MAX],
-    );
-    const ticket = ticketNumber(Number(ticketSequenceResult.rows[0]?.next_ticket || 1));'''
-          if old_order_seq not in s:
-              raise RuntimeError('POS order sequence block not found')
-          s = s.replace(old_order_seq, new_order_seq, 1)
+          old = '  const client = await db().connect();\n  try {\n    await client.query("BEGIN");\n    const openShiftResult = await client.query(`SELECT id FROM public.pos_shifts WHERE status=\'open\' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`);'
+          new = '  await ensureDisplayTicketSchema();\n  const client = await db().connect();\n  try {\n    await client.query("BEGIN");\n    const openShiftResult = await client.query(`SELECT id FROM public.pos_shifts WHERE status=\'open\' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`);'
+          if old not in s:
+              raise RuntimeError('POS order transaction start not found')
+          s = s.replace(old, new, 1)
+
+          old = '    await client.query("SELECT pg_advisory_xact_lock(hashtext(\'sbb-pos-ticket-number\'))");\n    const bounds = shiftBounds();\n    const ticketSequenceResult = await client.query(\n      `SELECT COUNT(*) + 1 AS next_ticket FROM ordering_orders WHERE channel IN (\'pos_direct\',\'grab\') AND created_at >= $1 AND created_at < $2`,\n      [bounds.start.toJSDate(), bounds.end.toJSDate()],\n    );'
+          new = '    await client.query("SELECT pg_advisory_xact_lock(hashtext(\'customli-pos-display-ticket\'))");\n    const ticketSequenceResult = await client.query(\n      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket FROM ordering_orders WHERE channel IN (\'pos_direct\',\'grab\')`,\n      [DISPLAY_TICKET_MAX],\n    );'
+          if old not in s:
+              raise RuntimeError('POS order ticket sequence not found')
+          s = s.replace(old, new, 1)
           pos.write_text(s)
 
           modifier = Path('server/services/menu/modifierService.ts')
           m = modifier.read_text()
-          old_choice = '''        `INSERT INTO ordering_modifier_groups(
-           name_en,name_th,menu_item_id,min_select,max_select,is_required,sort_order,
-           group_type,selection_mode,min_selections,max_selections,prompt_text,is_active)
-         VALUES($1,$2,NULL,1,1,TRUE,$3,'choice','single',1,1,$4,TRUE)
-         RETURNING id`,
-        [name, String(data?.name_th ?? "").trim() || null, Number(data?.sortOrder ?? 0), promptText],'''
-          new_choice = '''        `INSERT INTO ordering_modifier_groups(
-           name_en,name_th,menu_item_id,min_select,max_select,is_required,sort_order,
-           group_type,selection_mode,min_selections,max_selections,prompt_text,is_active)
-         VALUES($1,$2,$3,1,1,TRUE,$4,'choice','single',1,1,$5,TRUE)
-         RETURNING id`,
-        [name, String(data?.name_th ?? "").trim() || null, itemId, Number(data?.sortOrder ?? 0), promptText],'''
-          if old_choice not in m:
-              raise RuntimeError('item choice INSERT block not found')
-          m = m.replace(old_choice, new_choice, 1)
+          old = '         VALUES($1,$2,NULL,1,1,TRUE,$3,\'choice\',\'single\',1,1,$4,TRUE)\n         RETURNING id`,\n        [name, String(data?.name_th ?? "").trim() || null, Number(data?.sortOrder ?? 0), promptText],'
+          new = '         VALUES($1,$2,$3,1,1,TRUE,$4,\'choice\',\'single\',1,1,$5,TRUE)\n         RETURNING id`,\n        [name, String(data?.name_th ?? "").trim() || null, itemId, Number(data?.sortOrder ?? 0), promptText],'
+          if old not in m:
+              raise RuntimeError('item choice insert not found')
+          m = m.replace(old, new, 1)
           modifier.write_text(m)
           PY
 
