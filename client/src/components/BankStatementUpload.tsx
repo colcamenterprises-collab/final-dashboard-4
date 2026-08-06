@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
 import { useDropzone } from "react-dropzone";
+import { useQueryClient } from "@tanstack/react-query";
 import { Upload, FileText, AlertCircle, CheckCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
@@ -18,6 +18,9 @@ interface UploadResult {
   source?: string;
   layout?: string;
   depositsCaptured?: number;
+  businessExpensesActivated?: number;
+  reportingReady?: boolean;
+  activationError?: string;
 }
 
 interface BankStatementUploadProps {
@@ -44,6 +47,44 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
   const [uploadError, setUploadError] = useState("");
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const activateForReporting = useCallback(async (uploadResult: UploadResult) => {
+    try {
+      const activation = await apiRequest(`/api/finance/bank-imports/${encodeURIComponent(uploadResult.batchId)}/finalize`, {
+        method: 'POST',
+      });
+      const readyResult: UploadResult = {
+        ...uploadResult,
+        businessExpensesActivated: Number(activation.activated || activation.created || 0),
+        reportingReady: true,
+        activationError: undefined,
+      };
+      setResult(readyResult);
+      setUploadError("");
+      setProgress(100);
+      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports"] });
+      onUploadComplete?.(readyResult);
+      return readyResult;
+    } catch (error: any) {
+      const message = error?.message || "Failed to activate imported withdrawals for reporting";
+      const partialResult: UploadResult = {
+        ...uploadResult,
+        reportingReady: false,
+        activationError: message,
+      };
+      setResult(partialResult);
+      setUploadError(`The statement was uploaded, but automatic business-expense activation failed: ${message}`);
+      setProgress(90);
+      toast({
+        title: "Statement uploaded — reporting activation needs retry",
+        description: message,
+        variant: "destructive",
+      });
+      return partialResult;
+    }
+  }, [onUploadComplete, queryClient, toast]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -82,15 +123,15 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
 
       const uploadResult: UploadResult = await response.json();
       setResult(uploadResult);
-      setProgress(100);
+      setProgress(90);
 
-      toast({
-        title: "Upload successful",
-        description: `Imported ${uploadResult.inserted} transactions, skipped ${uploadResult.skippedDupes} duplicates`,
-      });
-
-      onUploadComplete?.(uploadResult);
-
+      const activated = await activateForReporting(uploadResult);
+      if (activated.reportingReady) {
+        toast({
+          title: "Upload complete",
+          description: `${activated.businessExpensesActivated || 0} withdrawals are already in Business Expenses under Review. ${activated.depositsCaptured || 0} deposit(s) remain reconciliation-only.`,
+        });
+      }
     } catch (error: any) {
       console.error('Upload error:', error);
       setUploadError(error.message || "Failed to process CSV file");
@@ -103,7 +144,19 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
     } finally {
       setIsUploading(false);
     }
-  }, [source, toast, onUploadComplete]);
+  }, [source, toast, activateForReporting]);
+
+  const retryActivation = useCallback(async () => {
+    if (!result) return;
+    setIsUploading(true);
+    setUploadError("");
+    setProgress(90);
+    try {
+      await activateForReporting(result);
+    } finally {
+      setIsUploading(false);
+    }
+  }, [activateForReporting, result]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -116,6 +169,7 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
 
   const resetUpload = () => {
     setResult(null);
+    setUploadError("");
     setProgress(0);
   };
 
@@ -124,8 +178,8 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            Upload Complete
+            <CheckCircle className={`h-5 w-5 ${result.reportingReady ? 'text-green-600' : 'text-orange-600'}`} />
+            {result.reportingReady ? 'Upload Complete — Reporting Ready' : 'Statement Uploaded'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -144,6 +198,14 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
                 <span className="font-medium text-green-600">{result.inserted}</span>
               </div>
               <div className="flex justify-between">
+                <span>Business expenses activated:</span>
+                <span className="font-medium text-green-600">{result.businessExpensesActivated || 0}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Default category:</span>
+                <span className="font-medium">Review</span>
+              </div>
+              <div className="flex justify-between">
                 <span>Deposits captured separately:</span>
                 <span className="font-medium text-green-600">{result.depositsCaptured || 0}</span>
               </div>
@@ -154,15 +216,25 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
                 </div>
               )}
             </div>
+
+            {uploadError && (
+              <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-800">
+                <div className="font-semibold">Reporting activation incomplete</div>
+                <div className="mt-1 whitespace-pre-wrap">{uploadError}</div>
+              </div>
+            )}
             
-            <div className="flex gap-2 pt-2">
-              <Button 
-                onClick={() => onUploadComplete?.(result)}
-                className="flex-1"
-              >
-                Review Transactions
-              </Button>
-              <Button variant="outline" onClick={resetUpload}>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {result.reportingReady ? (
+                <Button onClick={() => onUploadComplete?.(result)} className="flex-1">
+                  Review / Mark Personal
+                </Button>
+              ) : (
+                <Button onClick={retryActivation} disabled={isUploading} className="flex-1">
+                  {isUploading ? 'Activating...' : 'Retry Reporting Activation'}
+                </Button>
+              )}
+              <Button variant="outline" onClick={resetUpload} disabled={isUploading}>
                 Upload Another
               </Button>
             </div>
@@ -180,12 +252,11 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
           Bank Statement Upload
         </CardTitle>
         <div className="text-sm text-muted-foreground">
-          Upload CSV bank statements to capture withdrawals for review and deposits separately
+          Upload a statement and withdrawals immediately become Business Expenses under Review. Mark only exceptions as Personal.
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* Source Selection */}
           <div className="space-y-2">
             <Label htmlFor="source">Bank Source</Label>
             <Select value={source} onValueChange={setSource}>
@@ -200,7 +271,6 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
             </Select>
           </div>
 
-          {/* File Upload Area */}
           <div
             {...getRootProps()}
             className={`
@@ -216,12 +286,8 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
                 <p className="text-blue-600">Drop the CSV file here...</p>
               ) : (
                 <div>
-                  <p className="text-gray-600">
-                    Drag & drop a CSV file here, or click to select
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Supports KBank, SCB, and generic CSV formats
-                  </p>
+                  <p className="text-gray-600">Drag & drop a CSV file here, or click to select</p>
+                  <p className="text-xs text-gray-500 mt-1">Supports KBank, SCB, and generic CSV formats</p>
                 </div>
               )}
             </div>
@@ -234,18 +300,16 @@ export function BankStatementUpload({ onUploadComplete }: BankStatementUploadPro
             </div>
           )}
 
-          {/* Upload Progress */}
           {isUploading && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
-                <span>Processing CSV...</span>
+                <span>{progress >= 80 ? 'Activating expenses for reporting...' : 'Processing CSV...'}</span>
                 <span>{progress}%</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
           )}
 
-          {/* Format Guide */}
           <div className="text-xs text-gray-500 space-y-1 pt-2 border-t">
             <div className="flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />
