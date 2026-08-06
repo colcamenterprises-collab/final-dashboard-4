@@ -1,4 +1,4 @@
 POS launch blocker patch request
-requested_at=2026-08-06T06:22:00Z
+requested_at=2026-08-06T06:31:00Z
 requested_by=ChatGPT
-reason=Fix payment ticket collision and Chicken Nuggets item choices after workflow YAML repair
+reason=Drop ticket unique index and switch ticket generation to PostgreSQL sequence
