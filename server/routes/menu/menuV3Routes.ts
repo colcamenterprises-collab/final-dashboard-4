@@ -6,10 +6,14 @@ import {
   getAllItems, createItem, updateItem, toggleItem
 } from "../../services/menu/itemService";
 import {
-  getModifierGroups, createModifierGroup, updateModifierGroup, deleteModifierGroup,
+  createModifierGroup, updateModifierGroup, deleteModifierGroup,
   createModifier, updateModifier, deleteModifier, applyGroupToItem, setGroupAssignments, mergeModifierGroups,
-  saveItemChoiceGroup, deleteItemChoiceGroup
+  deleteItemChoiceGroup
 } from "../../services/menu/modifierService";
+import {
+  getModifierGroupsWithLegacyAssignments,
+  saveItemChoiceGroupCompatible,
+} from "../../services/menu/itemOptionCompatibilityService";
 import {
   setRecipe, getRecipe
 } from "../../services/menu/recipeService";
@@ -40,7 +44,7 @@ router.post("/items/update", async (req, res) => res.json(await updateItem(req.b
 router.post("/items/toggle", async (req, res) => res.json(await toggleItem(req.body.id, req.body.isActive)));
 
 router.get("/modifiers/groups", async (_req, res) => {
-  try { return res.json(await getModifierGroups()); }
+  try { return res.json(await getModifierGroupsWithLegacyAssignments()); }
   catch (error: any) {
     console.error('[menu-v3] modifiers unavailable:', error);
     return res.status(200).json({ ok: false, groups: [], source: 'modifier_groups_v3', blockers: [{ code: 'MODIFIERS_UNAVAILABLE', message: error?.message || 'Failed to load modifier groups', where: '/api/menu-v3/modifiers/groups', canonical_source: 'modifier_groups_v3', auto_build_attempted: false }] });
@@ -63,8 +67,13 @@ router.post("/modifiers/delete", async (req, res) => res.json(await deleteModifi
 router.post("/modifiers/apply", async (req, res) => res.json(await applyGroupToItem(req.body.groupId, req.body.itemId)));
 router.post("/items/options/save", async (req, res) => {
   try {
-    return res.json(await saveItemChoiceGroup(String(req.body?.itemId || ""), req.body?.groupId ? String(req.body.groupId) : null, req.body));
+    return res.json(await saveItemChoiceGroupCompatible(String(req.body?.itemId || ""), req.body?.groupId ? String(req.body.groupId) : null, req.body));
   } catch (error: any) {
+    console.error('[menu-v3] item options save failed:', {
+      itemId: req.body?.itemId,
+      groupId: req.body?.groupId,
+      error: error?.message || String(error),
+    });
     return res.status(400).json({ error: error?.message || "Could not save item options" });
   }
 });
