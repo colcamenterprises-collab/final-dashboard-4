@@ -1,0 +1,2 @@
+trigger=2026-08-06T07:05:00Z
+reason=remove_global_ticket_unique_index
