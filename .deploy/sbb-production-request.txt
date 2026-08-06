@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-06T06:20:55Z
-requested_by=POS Launch Bot
+requested_at=2026-08-06T06:23:30Z
+requested_by=ChatGPT
 ref=main
-reason=Fix display ticket uniqueness and item choice save
+reason=Deploy verified POS ticket collision and item-choice fixes
