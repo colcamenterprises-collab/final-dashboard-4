@@ -4,9 +4,12 @@ import { pool } from "../db";
 
 const router = Router();
 const REPORT_TZ = "Asia/Bangkok";
+const SHIFT_START_TIME = "17:00";
+const SHIFT_END_TIME = "03:00";
 const toNum = (value: unknown) => Number(value ?? 0) || 0;
 const toStr = (value: unknown) => String(value ?? "");
 const validDate = (value: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(toStr(value)) ? toStr(value) : null;
+const localStamp = (value: unknown) => DateTime.fromJSDate(new Date(String(value))).setZone(REPORT_TZ).toFormat("yyyy-MM-dd HH:mm:ss");
 
 const categoryCase = `
   CASE
@@ -44,19 +47,19 @@ async function resolveShiftWindow(query: Record<string, unknown>): Promise<Shift
     if (!result.rowCount) return null;
     const row = result.rows[0];
     const localDate = DateTime.fromJSDate(new Date(row.opened_at)).setZone(REPORT_TZ).toISODate()!;
-    return { mode, shiftIds:[String(row.id)], fromDate:localDate, toDate:localDate, windowStart:new Date(row.opened_at).toISOString(), windowEnd:new Date(row.ended_at).toISOString() };
+    return { mode, shiftIds:[String(row.id)], fromDate:localDate, toDate:localDate, windowStart:localStamp(row.opened_at), windowEnd:localStamp(row.ended_at) };
   }
 
-  if (mode === "custom" || (query.shiftStartDate && query.shiftEndDate)) {
+  if (mode === "custom" || query.shiftStartDate || query.from) {
     const from = validDate(query.shiftStartDate || query.from);
-    const to = validDate(query.shiftEndDate || query.to);
-    if (!from || !to) throw new Error("Custom shift range requires shiftStartDate and shiftEndDate as YYYY-MM-DD.");
+    const to = validDate(query.shiftEndDate || query.to) || from;
+    if (!from || !to) throw new Error("Custom reporting requires a valid shift date.");
     const result = await pool.query(`SELECT id, opened_at, COALESCE(closed_at,NOW()) AS ended_at
       FROM pos_shifts
       WHERE (opened_at AT TIME ZONE 'Asia/Bangkok')::date BETWEEN $1::date AND $2::date
       ORDER BY opened_at`, [from,to]);
     if (!result.rowCount) return null;
-    return { mode:"custom_shift_range", shiftIds:result.rows.map(r=>String(r.id)), fromDate:from, toDate:to, windowStart:new Date(result.rows[0].opened_at).toISOString(), windowEnd:new Date(result.rows.at(-1).ended_at).toISOString() };
+    return { mode:from === to ? "shift_date" : "custom_shift_range", shiftIds:result.rows.map(r=>String(r.id)), fromDate:from, toDate:to, windowStart:localStamp(result.rows[0].opened_at), windowEnd:localStamp(result.rows.at(-1).ended_at) };
   }
 
   const limitRaw = query.limit ? Math.min(Math.max(parseInt(toStr(query.limit),10) || 1,1),90) : 1;
@@ -68,7 +71,7 @@ async function resolveShiftWindow(query: Record<string, unknown>): Promise<Shift
   const last = ordered.at(-1)!;
   const from = DateTime.fromJSDate(new Date(first.opened_at)).setZone(REPORT_TZ).toISODate()!;
   const to = DateTime.fromJSDate(new Date(last.opened_at)).setZone(REPORT_TZ).toISODate()!;
-  return { mode:limitRaw > 1 ? `last_${limitRaw}_shifts` : "last_completed_shift", shiftIds:ordered.map(r=>String(r.id)), fromDate:from, toDate:to, windowStart:new Date(first.opened_at).toISOString(), windowEnd:new Date(last.closed_at).toISOString() };
+  return { mode:limitRaw > 1 ? `last_${limitRaw}_shifts` : "last_completed_shift", shiftIds:ordered.map(r=>String(r.id)), fromDate:from, toDate:to, windowStart:localStamp(first.opened_at), windowEnd:localStamp(last.closed_at) };
 }
 
 router.get("/", async (req,res) => {
@@ -79,8 +82,8 @@ router.get("/", async (req,res) => {
       source:"sbb_pos_core",
       blockers:[{code:"NO_POS_SHIFTS",message:"No POS shifts found for selected shift window"}],
       summary:{grossSales:0,receiptCount:0,averageReceiptValue:0,lineItemCount:0,modifierCount:0,burgersSold:0,friesSold:0,drinksSold:0,chickenSold:0},
-      topProducts:[],topModifiers:[],categoryMix:[],dailyTrend:[],hourlySales:[],paymentMix:[],receipts:[],
-      filters:{from:"",to:"",mode:toStr(req.query.mode||"last_completed_shift"),timezone:REPORT_TZ}
+      topProducts:[],itemSales:[],topModifiers:[],categoryMix:[],dailyTrend:[],hourlySales:[],paymentMix:[],receipts:[],
+      filters:{from:"",to:"",mode:toStr(req.query.mode||"last_completed_shift"),timezone:REPORT_TZ,shiftStartTime:SHIFT_START_TIME,shiftEndTime:SHIFT_END_TIME}
     });
 
     const shiftIds = window.shiftIds;
@@ -102,7 +105,7 @@ router.get("/", async (req,res) => {
          AND o.payment_status='paid'
          AND o.status <> 'cancelled'`;
 
-    const [summaryRes, productsRes, modifiersRes, categoryRes, trendRes, hourlyRes, paymentRes, receiptRes] = await Promise.all([
+    const [summaryRes, productsRes, itemSalesRes, modifiersRes, categoryRes, trendRes, hourlyRes, paymentRes, receiptRes] = await Promise.all([
       pool.query(`WITH receipts AS (${receiptBase}), item_stats AS (
         SELECT COALESCE(SUM(i.quantity),0)::int line_item_count,
                COALESCE(SUM(CASE WHEN ${categoryCase}='Burgers' THEN i.quantity ELSE 0 END),0)::int burgers_sold,
@@ -134,6 +137,29 @@ router.get("/", async (req,res) => {
            AND ($3::text IS NULL OR ${categoryCase}=$3)
          GROUP BY i.item_name_en,i.source_sku,${categoryCase}
          ORDER BY qty_sold DESC,revenue DESC LIMIT 50`, [shiftIds,search,category]),
+
+      pool.query(`WITH receipts AS (${receiptBase}), sold AS (
+        SELECT i.item_name_en AS name,COALESCE(i.source_sku,'') AS sku,${categoryCase} AS category,
+               i.quantity,i.line_total,r.subtotal,r.discount_amount
+          FROM ordering_order_items i
+          JOIN receipts r ON r.id=i.order_id
+          LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+          LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
+         WHERE COALESCE(i.is_set_component,false)=false
+           AND ($2::text IS NULL OR lower(i.item_name_en) LIKE $2)
+           AND ($3::text IS NULL OR ${categoryCase}=$3)
+      ), allocated AS (
+        SELECT *, CASE WHEN subtotal > 0 THEN line_total * discount_amount / subtotal ELSE 0 END AS allocated_discount
+          FROM sold
+      )
+      SELECT name,sku,category,SUM(quantity)::int AS qty_sold,
+             ROUND(SUM(line_total),2)::numeric AS gross_sales,
+             ROUND(SUM(allocated_discount),2)::numeric AS discounts,
+             ROUND(SUM(line_total-allocated_discount),2)::numeric AS net_sales,
+             ROUND(SUM(line_total-allocated_discount)/NULLIF(SUM(quantity),0),2)::numeric AS avg_price
+        FROM allocated
+       GROUP BY name,sku,category
+       ORDER BY qty_sold DESC,net_sales DESC,name`, [shiftIds,search,category]),
 
       pool.query(`WITH receipts AS (${receiptBase})
         SELECT CASE WHEN m.modifier_group_name_en IS NULL OR m.modifier_group_name_en='' THEN m.modifier_name_en
@@ -192,13 +218,14 @@ router.get("/", async (req,res) => {
         burgersSold:toNum(summaryRow.burgers_sold),friesSold:toNum(summaryRow.fries_sold),drinksSold:toNum(summaryRow.drinks_sold),chickenSold:toNum(summaryRow.chicken_sold)
       },
       topProducts:productsRes.rows.map(row=>({name:row.name,sku:row.sku,category:row.category,qtySold:toNum(row.qty_sold),revenue:toNum(row.revenue),pctOfTotal:Number(((toNum(row.qty_sold)/topQty)*100).toFixed(1))})),
+      itemSales:itemSalesRes.rows.map(row=>({name:row.name,sku:row.sku,category:row.category,qtySold:toNum(row.qty_sold),grossSales:toNum(row.gross_sales),discounts:toNum(row.discounts),netSales:toNum(row.net_sales),avgPrice:toNum(row.avg_price)})),
       topModifiers:modifiersRes.rows.map(row=>({name:row.name,qtySold:toNum(row.qty_sold),pctOfTotal:Number(((toNum(row.qty_sold)/modifierQty)*100).toFixed(1))})),
       categoryMix:categoryRes.rows.map(row=>({category:row.category,qtySold:toNum(row.qty_sold),revenue:toNum(row.revenue)})),
       dailyTrend:trendRes.rows.map(row=>({bizDate:row.biz_date,grossSales:toNum(row.gross_sales),receiptCount:toNum(row.receipt_count),burgers:0,fries:0,drinks:0})),
       hourlySales:hourlyRes.rows.map(row=>({hour:toNum(row.bkk_hour),label:`${String(toNum(row.bkk_hour)).padStart(2,'0')}:00`,receiptCount:toNum(row.receipt_count),grossSales:toNum(row.gross_sales)})),
       paymentMix:paymentRes.rows.map(row=>({paymentMethod:row.payment_method,orderMode:row.order_mode,receiptCount:toNum(row.receipt_count),total:toNum(row.total)})),
       receipts:receiptRes.rows,
-      filters:{from:window.fromDate,to:window.toDate,mode:window.mode,timezone:REPORT_TZ,windowStart:window.windowStart,windowEnd:window.windowEnd,shiftStartDate:window.fromDate,shiftEndDate:window.toDate}
+      filters:{from:window.fromDate,to:window.toDate,mode:window.mode,timezone:REPORT_TZ,windowStart:window.windowStart,windowEnd:window.windowEnd,shiftStartDate:window.fromDate,shiftEndDate:window.toDate,shiftStartTime:SHIFT_START_TIME,shiftEndTime:SHIFT_END_TIME}
     });
   } catch(error:any) {
     console.error('[receipt-analytics-pos]',error);
