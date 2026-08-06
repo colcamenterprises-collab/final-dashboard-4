@@ -1,0 +1,22 @@
+name: POS Production DB Hotfix
+
+on:
+  push:
+    paths:
+      - '.deploy/pos-production-db-hotfix.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  hotfix:
+    runs-on: [self-hosted, linux, x64, sbb-production, hostinger]
+    timeout-minutes: 5
+    steps:
+      - name: Remove global ticket uniqueness
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /opt/apps/sbb-app-production
+          printf '%s\n' 'DROP INDEX IF EXISTS ordering_orders_ticket_number_unique;' | npx prisma db execute --schema schema.prisma --stdin
+          echo "POS ticket unique index removed"
