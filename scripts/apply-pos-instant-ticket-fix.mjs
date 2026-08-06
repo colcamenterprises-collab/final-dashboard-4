@@ -1,0 +1,85 @@
+import fs from 'node:fs';
+
+const path = 'server/routes/pos.ts';
+let s = fs.readFileSync(path, 'utf8');
+
+const replaceOnce = (from, to, label) => {
+  if (!s.includes(from)) throw new Error(`Patch target not found: ${label}`);
+  s = s.replace(from, to);
+};
+
+replaceOnce(`router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
+  try {
+    await ensureDisplayTicketSchema();
+    const result = await db().query(
+      \`SELECT (COUNT(*) % $1::int) + 1 AS next_ticket
+       FROM ordering_orders
+       WHERE channel IN ('pos_direct','grab')\`,
+      [DISPLAY_TICKET_MAX],
+    );
+    const next = Number(result.rows[0]?.next_ticket || 1);
+    res.json({ ok: true, source: "sbb_pos_core", data: { ticket_number: ticketNumber(next) } });
+  } catch (e: any) {
+    fail(res, e.message, 500);
+  }
+});`, `router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
+  try {
+    const result = await db().query(\`SELECT COALESCE(MAX(order_number),0) + 1 AS next_order_number FROM ordering_orders\`);
+    const nextOrderNumber = Number(result.rows[0]?.next_order_number || 1);
+    const display = ticketNumber(((nextOrderNumber - 1) % DISPLAY_TICKET_MAX) + 1);
+    res.json({ ok: true, source: "sbb_pos_core", data: { ticket_number: display } });
+  } catch (e: any) {
+    fail(res, e.message, 500);
+  }
+});`, 'next-ticket route');
+
+replaceOnce(`  await ensureDisplayTicketSchema();
+  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const openShiftResult = await client.query(\`SELECT id FROM public.pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1 FOR SHARE\`);
+    if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
+    const activeShiftId = openShiftResult.rows[0].id;
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('customli-pos-display-ticket'))");
+    const ticketSequenceResult = await client.query(
+      \`SELECT (COUNT(*) % $1::int) + 1 AS next_ticket FROM ordering_orders WHERE channel IN ('pos_direct','grab')\`,
+      [DISPLAY_TICKET_MAX],
+    );
+    const ticket = ticketNumber(Number(ticketSequenceResult.rows[0]?.next_ticket || 1));
+    const order = (await client.query(
+      \`INSERT INTO ordering_orders(channel, order_mode, dining_type, order_notes, status, payment_status, payment_method, grab_order_number, customer_name, customer_mobile)
+       VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8) RETURNING *\`,
+      [mode === "grab" ? "grab" : "pos_direct", mode, input.dining_type || null, input.order_notes || null, input.payment_method, mode === "grab" ? grabOrderNumber : null, mode === "grab" ? customerName : null, mode === "grab" ? customerMobile : null],
+    )).rows[0];
+
+    await client.query(\`UPDATE ordering_orders SET ticket_number=$2 WHERE id=$1\`, [order.id, ticket]);`, `  const client = await db().connect();
+  try {
+    await client.query("BEGIN");
+    const openShiftResult = await client.query(\`SELECT id FROM public.pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1 FOR SHARE\`);
+    if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
+    const activeShiftId = openShiftResult.rows[0].id;
+    const order = (await client.query(
+      \`INSERT INTO ordering_orders(channel, order_mode, dining_type, order_notes, status, payment_status, payment_method, grab_order_number, customer_name, customer_mobile)
+       VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8) RETURNING *\`,
+      [mode === "grab" ? "grab" : "pos_direct", mode, input.dining_type || null, input.order_notes || null, input.payment_method, mode === "grab" ? grabOrderNumber : null, mode === "grab" ? customerName : null, mode === "grab" ? customerMobile : null],
+    )).rows[0];
+    const numericOrderNumber = Number(order.order_number || 1);
+    const displayTicket = ticketNumber(((numericOrderNumber - 1) % DISPLAY_TICKET_MAX) + 1);
+    const storedTicket = \`${'${displayTicket}'}-${'${order.id}'}\`;
+    await client.query(\`UPDATE ordering_orders SET ticket_number=$2 WHERE id=$1\`, [order.id, storedTicket]);`, 'checkout ticket generation');
+
+replaceOnce('JSON.stringify({ ticket_number: ticket, receipt_number: ticket, shift_id: activeShiftId', 'JSON.stringify({ ticket_number: displayTicket, receipt_number: displayTicket, shift_id: activeShiftId', 'order event ticket');
+replaceOnce('data:{ id:order.id,ticket_number:ticket,receipt_number:ticket,shift_id:activeShiftId', 'data:{ id:order.id,ticket_number:displayTicket,receipt_number:displayTicket,shift_id:activeShiftId', 'checkout response ticket');
+replaceOnce('`SELECT o.*, COALESCE(jsonb_agg', '`SELECT o.*, LEFT(o.ticket_number,3) AS ticket_number, COALESCE(jsonb_agg', 'receipt display ticket');
+replaceOnce('`SELECT id,order_number,ticket_number,status,payment_status,payment_method,total,created_at', '`SELECT id,order_number,LEFT(ticket_number,3) AS ticket_number,status,payment_status,payment_method,total,created_at', 'reconciliation display ticket');
+replaceOnce('`SELECT o.*, json_agg', '`SELECT o.*, LEFT(o.ticket_number,3) AS ticket_number, json_agg', 'kitchen display ticket');
+replaceOnce('`SELECT id,ticket_number,status,updated_at FROM ordering_orders', '`SELECT id,LEFT(ticket_number,3) AS ticket_number,status,updated_at FROM ordering_orders', 'customer display ticket');
+replaceOnce(`    if (!row) return fail(res, "Order not found or already finalised", 409);
+    await db().query(\`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,$2,$3)\`, [row.id,row.status==="ready"?"ticket_ready":"order_updated",JSON.stringify({ticket_number:row.ticket_number,status:row.status})]);
+    res.json({ ok:true, source:"sbb_pos_core", data:row });`, `    if (!row) return fail(res, "Order not found or already finalised", 409);
+    row.ticket_number = String(row.ticket_number || "").slice(0,3);
+    await db().query(\`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,$2,$3)\`, [row.id,row.status==="ready"?"ticket_ready":"order_updated",JSON.stringify({ticket_number:row.ticket_number,status:row.status})]);
+    res.json({ ok:true, source:"sbb_pos_core", data:row });`, 'status response display ticket');
+
+fs.writeFileSync(path, s);
+console.log('Applied instant, collision-safe POS display ticket patch');
