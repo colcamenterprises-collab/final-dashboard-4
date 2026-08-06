@@ -303,9 +303,9 @@ export async function saveItemChoiceGroup(itemId: string, groupId: string | null
         `INSERT INTO ordering_modifier_groups(
            name_en,name_th,menu_item_id,min_select,max_select,is_required,sort_order,
            group_type,selection_mode,min_selections,max_selections,prompt_text,is_active)
-         VALUES($1,$2,NULL,1,1,TRUE,$3,'choice','single',1,1,$4,TRUE)
+         VALUES($1,$2,$3,1,1,TRUE,$4,'choice','single',1,1,$5,TRUE)
          RETURNING id`,
-        [name, String(data?.name_th ?? "").trim() || null, Number(data?.sortOrder ?? 0), promptText],
+        [name, String(data?.name_th ?? "").trim() || null, itemId, Number(data?.sortOrder ?? 0), promptText],
       );
       savedGroupId = String(created.rows[0].id);
       await client.query(

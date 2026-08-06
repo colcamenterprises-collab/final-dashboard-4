@@ -22,8 +22,24 @@ function shiftDateFor(date = DateTime.now().setZone("Asia/Bangkok")) {
   return (date.hour < 3 ? date.minus({ days: 1 }) : date).toFormat("yyyyLLdd");
 }
 
+// Customer-facing ticket numbers are deliberately short for kitchen/display/speaker use.
+// ordering_orders.id remains the permanent globally unique order identifier.
+// Display tickets may repeat after the configured cycle and are never database identities.
+const DISPLAY_TICKET_MAX = 999;
+const DISPLAY_TICKET_DIGITS = 3;
+let displayTicketSchemaReady: Promise<unknown> | null = null;
+
 function ticketNumber(sequence: number) {
-  return String(sequence).padStart(3, "0");
+  return String(sequence).padStart(DISPLAY_TICKET_DIGITS, "0");
+}
+
+function ensureDisplayTicketSchema() {
+  if (!displayTicketSchemaReady) {
+    displayTicketSchemaReady = db().query(
+      `ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_ticket_number_unique`,
+    );
+  }
+  return displayTicketSchemaReady;
 }
 
 function shiftBounds(date = DateTime.now().setZone("Asia/Bangkok")) {
@@ -199,13 +215,12 @@ router.patch("/catalog/items/:id", staffDevice, async (req, res) => {
 
 router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
   try {
-    const bounds = shiftBounds();
+    await ensureDisplayTicketSchema();
     const result = await db().query(
-      `SELECT COUNT(*) + 1 AS next_ticket
+      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket
        FROM ordering_orders
-       WHERE channel IN ('pos_direct','grab')
-         AND created_at >= $1 AND created_at < $2`,
-      [bounds.start.toJSDate(), bounds.end.toJSDate()],
+       WHERE channel IN ('pos_direct','grab')`,
+      [DISPLAY_TICKET_MAX],
     );
     const next = Number(result.rows[0]?.next_ticket || 1);
     res.json({ ok: true, source: "sbb_pos_core", data: { ticket_number: ticketNumber(next) } });
@@ -272,17 +287,17 @@ router.post("/orders", staffDevice, async (req, res) => {
     if (!/^[+0-9][0-9 ()-]{5,29}$/.test(customerMobile)) return fail(res, "Enter the Grab customer mobile number");
   }
 
+  await ensureDisplayTicketSchema();
   const client = await db().connect();
   try {
     await client.query("BEGIN");
     const openShiftResult = await client.query(`SELECT id FROM public.pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`);
     if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
     const activeShiftId = openShiftResult.rows[0].id;
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('sbb-pos-ticket-number'))");
-    const bounds = shiftBounds();
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('customli-pos-display-ticket'))");
     const ticketSequenceResult = await client.query(
-      `SELECT COUNT(*) + 1 AS next_ticket FROM ordering_orders WHERE channel IN ('pos_direct','grab') AND created_at >= $1 AND created_at < $2`,
-      [bounds.start.toJSDate(), bounds.end.toJSDate()],
+      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket FROM ordering_orders WHERE channel IN ('pos_direct','grab')`,
+      [DISPLAY_TICKET_MAX],
     );
     const ticket = ticketNumber(Number(ticketSequenceResult.rows[0]?.next_ticket || 1));
     const order = (await client.query(

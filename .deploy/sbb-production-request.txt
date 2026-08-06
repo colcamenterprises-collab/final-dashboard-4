@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-05T10:11:00Z
-requested_by=ChatGPT
+requested_at=2026-08-06T06:20:55Z
+requested_by=POS Launch Bot
 ref=main
-reason=Deploy POS launch checkout visibility, white UI and Bluetooth runtime permissions
+reason=Fix display ticket uniqueness and item choice save
