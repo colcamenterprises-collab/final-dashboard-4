@@ -1,14 +1,12 @@
-import { useMemo, useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Filter, Check, X, Trash2, ChevronLeft } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronLeft, Search, Trash2 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -23,14 +21,10 @@ interface BankTransaction {
   status: 'pending' | 'approved' | 'rejected' | 'deleted' | 'hold';
   category?: string;
   supplier?: string;
-  transactionType?: 'business_expense' | 'personal' | 'deposit' | 'transfer' | 'ignored_duplicate' | 'needs_review';
-  transactionTypeLabel?: string;
-  accountingAmountTHB?: number;
-  accountingDirection?: 'expense_outflow' | 'income_inflow';
-  merchantSuggestion?: string | null;
-  readableAction?: string;
   notes?: string;
   expenseId?: string;
+  accountingAmountTHB?: number;
+  accountingDirection?: 'expense_outflow' | 'income_inflow';
 }
 
 interface ReviewPanelProps {
@@ -41,690 +35,295 @@ interface ReviewPanelProps {
   compact?: boolean;
 }
 
-export function BankTransactionReview({ batchId, onClose, onApproved, aggregateQueue = false, compact = false }: ReviewPanelProps) {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [filters, setFilters] = useState({
-    status: aggregateQueue ? 'pending_review' : '',
-    search: '',
-    min: '',
-    max: '',
-  });
-  const [bulkDefaults, setBulkDefaults] = useState({
-    category: '',
-    supplier: '',
-    notes: '',
-  });
-  const [deleteConfirm, setDeleteConfirm] = useState<null | { scope: 'selected' | 'all_pending'; count: number }>(null);
-  const [purgeConfirmOpen, setPurgeConfirmOpen] = useState(false);
+type ReviewView = 'review' | 'business' | 'personal' | 'all';
 
+const BUSINESS_CATEGORIES = [
+  'Review',
+  'Food & Beverage',
+  'Kitchen Supplies & Packaging',
+  'Utilities',
+  'Rent',
+  'Staff Expenses',
+  'Repairs & Maintenance',
+  'Marketing',
+  'Administration',
+  'Software & Subscriptions',
+  'Bank Fees',
+  'Equipment',
+  'Fuel & Transport',
+  'Other Business Expense',
+];
+
+const REVIEW_CATEGORIES = [
+  ...BUSINESS_CATEGORIES,
+  'Personal / Owner',
+  'Deposit / Inflow',
+  'Transfer',
+  'Ignore / Duplicate',
+];
+
+function isBusiness(category?: string) {
+  return !!category && BUSINESS_CATEGORIES.includes(category);
+}
+
+export function BankTransactionReview({ batchId, onClose, aggregateQueue = false, compact = false }: ReviewPanelProps) {
+  const [view, setView] = useState<ReviewView>('review');
+  const [search, setSearch] = useState('');
+  const [transactions, setTransactions] = useState<BankTransaction[]>([]);
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch transactions
-  const { data: txnsData, isLoading } = useQuery({
-    queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue', filters] : ['/api/bank-imports', batchId, 'txns', filters],
-    queryFn: () => {
-      const params = new URLSearchParams();
-      Object.entries(filters).forEach(([key, value]) => {
-        if (!value) return;
-        if (aggregateQueue && key === 'status') params.append('tab', value);
-        else params.append(key, value);
-      });
-      params.set('limit', '500');
-      return apiRequest(aggregateQueue ? `/api/bank-imports/review-queue?${params}` : `/api/bank-imports/${batchId}/txns?${params}`);
-    },
+  const queryKey = aggregateQueue
+    ? ['/api/bank-imports', 'review-queue', 'fast-exception-review']
+    : ['/api/bank-imports', batchId, 'txns', 'fast-exception-review'];
+
+  const { data, isLoading, refetch } = useQuery<any>({
+    queryKey,
+    queryFn: () => apiRequest(
+      aggregateQueue
+        ? '/api/bank-imports/review-queue?tab=all_imported&limit=1000'
+        : `/api/bank-imports/${batchId}/txns?limit=1000`,
+    ),
   });
 
-  // Approve transactions mutation
-  const approveMutation = useMutation({
-    mutationFn: async ({ ids, defaults }: { ids: string[]; defaults?: any }) => {
-      if (aggregateQueue) {
-        const txnById = new Map(transactions.map((txn: BankTransaction) => [txn.id, txn]));
-        const idsByBatch = ids.reduce<Record<string, string[]>>((acc, id) => {
-          const txn = txnById.get(id);
-          if (txn?.batchId) (acc[txn.batchId] ||= []).push(id);
-          return acc;
-        }, {});
-        const results = await Promise.all(Object.entries(idsByBatch).map(([txnBatchId, txnIds]) =>
-          apiRequest(`/api/bank-imports/${txnBatchId}/approve`, {
-            method: 'POST',
-            body: JSON.stringify({ ids: txnIds, defaults }),
-          })
-        ));
-        return {
-          ok: results.every((result: any) => result.ok),
-          approved: results.reduce((sum: number, result: any) => sum + Number(result.approved || 0), 0),
-          blockers: results.flatMap((result: any) => result.blockers || []),
-        };
-      }
-      return apiRequest(`/api/bank-imports/${batchId}/approve`, {
-        method: 'POST',
-        body: JSON.stringify({ ids, defaults }),
-      });
-    },
-    onSuccess: (data) => {
-      toast({
-        title: data.blockers?.length ? "Approval completed with blockers" : "Transactions approved",
-        description: data.blockers?.length
-          ? `${data.approved} approved; ${data.blockers.length} blocked. Classification/category is required for business expenses.`
-          : `${data.approved} transactions approved successfully`,
-        variant: data.blockers?.length ? "destructive" : undefined,
-      });
-      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/expensesV2'] });
-      onApproved?.();
-      setSelectedIds([]);
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Approval failed",
-        description: error.message || "Failed to approve transactions",
-        variant: "destructive",
-      });
-    },
-  });
+  useEffect(() => {
+    setTransactions(data?.txns || []);
+  }, [data]);
 
-  // Edit transaction mutation  
-  const editMutation = useMutation({
-    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
-      return apiRequest(`/api/bank-imports/txns/${id}`, {
+  const counts = useMemo(() => ({
+    review: transactions.filter((txn) => txn.category === 'Review' && Number(txn.amountTHB) > 0 && txn.status !== 'deleted').length,
+    business: transactions.filter((txn) => isBusiness(txn.category) && txn.category !== 'Review' && txn.status !== 'deleted').length,
+    personal: transactions.filter((txn) => txn.category === 'Personal / Owner' && txn.status !== 'deleted').length,
+    all: transactions.filter((txn) => txn.status !== 'deleted').length,
+  }), [transactions]);
+
+  const visibleTransactions = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return transactions.filter((txn) => {
+      if (txn.status === 'deleted') return false;
+      if (view === 'review' && txn.category !== 'Review') return false;
+      if (view === 'business' && (!isBusiness(txn.category) || txn.category === 'Review')) return false;
+      if (view === 'personal' && txn.category !== 'Personal / Owner') return false;
+      if (needle && !`${txn.description} ${txn.supplier || ''} ${txn.ref || ''}`.toLowerCase().includes(needle)) return false;
+      return true;
+    });
+  }, [transactions, view, search]);
+
+  const updateLocal = (id: string, updates: Partial<BankTransaction>) => {
+    setTransactions((current) => current.map((txn) => txn.id === id ? { ...txn, ...updates } : txn));
+  };
+
+  const saveTransaction = async (txn: BankTransaction, updates: Record<string, unknown>) => {
+    if (savingIds.has(txn.id)) return;
+    const previous = { ...txn };
+    updateLocal(txn.id, updates as Partial<BankTransaction>);
+    setSavingIds((current) => new Set(current).add(txn.id));
+
+    try {
+      const result = await apiRequest(`/api/finance/bank-imports/txns/${encodeURIComponent(txn.id)}`, {
         method: 'PATCH',
         body: JSON.stringify(updates),
       });
-    },
-    onSuccess: () => {
-      toast({
-        title: "Transaction updated",
-        description: "Transaction details updated successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
-      onApproved?.();
-    },
-  });
+      if (result?.txn) updateLocal(txn.id, result.txn);
 
-  // Delete transaction mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest(`/api/bank-imports/txns/${id}`, { method: 'DELETE' });
-    },
-    onSuccess: () => {
+      if ('category' in updates) {
+        // Refresh reporting in the background; the row remains instantly usable.
+        queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/bank-imports/review-queue', 'personal_owner'] });
+      }
+    } catch (error: any) {
+      updateLocal(txn.id, previous);
       toast({
-        title: "Transaction deleted",
-        description: "Transaction deleted successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
-      onApproved?.();
-    },
-  });
-
-  const queueData = txnsData as any;
-  const transactions: BankTransaction[] = queueData?.txns || [];
-  const visiblePendingTransactions = useMemo(() => transactions.filter((txn) => txn.status === 'pending'), [transactions]);
-  const visiblePendingIds = useMemo(() => visiblePendingTransactions.map((txn) => txn.id), [visiblePendingTransactions]);
-  const businessCategories = queueData?.allowedBusinessCategories || [
-    'Food & Beverage',
-    'Kitchen Supplies & Packaging',
-    'Utilities',
-    'Rent',
-    'Staff Expenses',
-    'Repairs & Maintenance',
-    'Marketing',
-    'Administration',
-    'Software & Subscriptions',
-    'Bank Fees',
-    'Equipment',
-    'Fuel & Transport',
-    'Other Business Expense',
-  ];
-  const reviewCategories = [...businessCategories, 'Personal / Owner', 'Deposit / Inflow', 'Transfer', 'Ignore / Duplicate'];
-  const batchSummary = txnsData?.batch || {
-    id: batchId,
-    importedCount: queueData?.pagination?.total ?? transactions.length,
-    visibleCount: transactions.length,
-  };
-
-  const bulkDeleteMutation = useMutation({
-    mutationFn: async ({ scope, ids }: { scope: 'selected' | 'all_pending'; ids?: string[] }) => {
-      return apiRequest('/api/bank-imports/pending/delete', {
-        method: 'POST',
-        body: JSON.stringify({ scope, ids }),
-      });
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Pending imports deleted",
-        description: `${data.deleted || 0} pending imported bank transactions deleted`,
-      });
-      setSelectedIds([]);
-      setDeleteConfirm(null);
-      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
-      onApproved?.();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Bulk delete failed",
-        description: error.message || "Failed to delete pending imported bank transactions",
-        variant: "destructive",
-      });
-      setDeleteConfirm(null);
-    },
-  });
-
-  const purgeMutation = useMutation({
-    mutationFn: async () => apiRequest('/api/bank-imports/purge', { method: 'POST' }),
-    onSuccess: (data) => {
-      toast({
-        title: 'Imported bank transactions purged',
-        description: `${data.purged || 0} imported bank transaction review row(s) purged. Approved Business Expenses and Shift Expenses were not changed.`,
-      });
-      setSelectedIds([]);
-      setPurgeConfirmOpen(false);
-      queryClient.invalidateQueries({ queryKey: aggregateQueue ? ['/api/bank-imports', 'review-queue'] : ['/api/bank-imports', batchId, 'txns'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
-      onApproved?.();
-    },
-    onError: (error: any) => {
-      toast({
-        title: 'Purge failed',
-        description: error.message || 'Failed to purge imported bank transactions',
+        title: 'Could not save transaction',
+        description: error?.message || 'The change was reverted.',
         variant: 'destructive',
       });
-      setPurgeConfirmOpen(false);
-    },
-  });
-
-  const handleSelectTransaction = (id: string) => {
-    setSelectedIds(prev => 
-      prev.includes(id) 
-        ? prev.filter(i => i !== id)
-        : [...prev, id]
-    );
-  };
-
-  const handleBulkApprove = () => {
-    if (selectedIds.length === 0) return;
-    
-    approveMutation.mutate({
-      ids: selectedIds,
-      defaults: Object.fromEntries(
-        Object.entries(bulkDefaults).filter(([, v]) => v)
-      ),
-    });
-  };
-
-  const selectAllVisible = () => {
-    setSelectedIds(visiblePendingIds);
-  };
-
-  const clearSelection = () => {
-    setSelectedIds([]);
-  };
-
-  const handleBulkDelete = () => {
-    const pendingSelectedCount = selectedIds.filter((id) => visiblePendingIds.includes(id)).length;
-    if (pendingSelectedCount === 0) return;
-    setDeleteConfirm({ scope: 'selected', count: pendingSelectedCount });
-  };
-
-  const confirmBulkDelete = () => {
-    if (!deleteConfirm) return;
-    if (deleteConfirm.scope === 'all_pending') {
-      bulkDeleteMutation.mutate({ scope: 'all_pending' });
-      return;
-    }
-    bulkDeleteMutation.mutate({ scope: 'selected', ids: selectedIds.filter((id) => visiblePendingIds.includes(id)) });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      case 'deleted': return 'bg-gray-100 text-gray-800';
-      case 'hold': return 'bg-blue-100 text-blue-800';
-      default: return 'bg-yellow-100 text-yellow-800';
+    } finally {
+      setSavingIds((current) => {
+        const next = new Set(current);
+        next.delete(txn.id);
+        return next;
+      });
     }
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'approved': return 'Approved';
-      case 'rejected': return 'Declined';
-      case 'deleted': return 'Deleted';
-      case 'purged': return 'Purged';
-      case 'hold': return 'Hold';
-      default: return 'Pending';
+  const deleteTransaction = async (txn: BankTransaction) => {
+    if (savingIds.has(txn.id)) return;
+    setSavingIds((current) => new Set(current).add(txn.id));
+    try {
+      await apiRequest(`/api/finance/bank-imports/txns/${encodeURIComponent(txn.id)}`, { method: 'DELETE' });
+      setTransactions((current) => current.filter((row) => row.id !== txn.id));
+      queryClient.invalidateQueries({ queryKey: ['/api/finance/expenses-dashboard'] });
+    } catch (error: any) {
+      toast({
+        title: 'Delete failed',
+        description: error?.message || 'Failed to delete transaction',
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingIds((current) => {
+        const next = new Set(current);
+        next.delete(txn.id);
+        return next;
+      });
     }
   };
 
-
-  const handleReject = (id: string) => {
-    editMutation.mutate({ id, updates: { status: 'rejected' } });
-  };
-
-  const handleMarkPersonal = (id: string) => {
-    editMutation.mutate({ id, updates: { category: 'Personal / Owner' } });
-  };
-
-  const getAmountTone = (txn: BankTransaction) => {
-    return txn.accountingDirection === 'income_inflow' || parseFloat(txn.amountTHB) < 0 ? 'text-green-700' : 'text-red-700';
-  };
-
-  const getAmountLabel = (txn: BankTransaction) => {
-    const raw = parseFloat(txn.amountTHB);
+  const amountLabel = (txn: BankTransaction) => {
+    const raw = Number(txn.amountTHB);
     const amount = txn.accountingAmountTHB ?? Math.abs(raw);
-    const label = raw < 0 || txn.accountingDirection === 'income_inflow' ? 'Deposit / Inflow' : 'Expense / Outflow';
-    return `${label}: ${formatCurrency(amount)}`;
+    return `${raw < 0 ? 'Deposit' : 'Expense'}: ${formatCurrency(amount)}`;
   };
 
   return (
-    <div className={compact ? "space-y-3" : "space-y-6"}>
-      {/* Header */}
-      {!compact && <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {onClose && <Button variant="ghost" size="sm" onClick={onClose}>
-            <ChevronLeft className="h-4 w-4" />
-            Back
-          </Button>}
-          <div>
-            <h2 className="text-xl font-semibold">Review Bank Transactions</h2>
-            <p className="text-sm text-muted-foreground">
-              {aggregateQueue ? 'Persistent review queue across all imported batches' : 'Review and approve imported transactions'}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {aggregateQueue ? 'All batches' : `Batch ${batchSummary.id}`} · Imported {batchSummary.importedCount} · Visible {batchSummary.visibleCount}
-            </p>
-          </div>
-        </div>
-      </div>}
-
-
-      {aggregateQueue && !compact && (
-        <Card>
-          <CardContent className="flex flex-wrap gap-2 p-3 sm:p-4">
-            {[
-              ['pending_review', 'Pending Review', queueData?.counts?.pending_review ?? 0],
-              ['approved', 'Approved', queueData?.counts?.approved ?? 0],
-              ['personal_owner', 'Personal', queueData?.counts?.personal_owner ?? 0],
-              ['rejected_ignored', 'Rejected/Ignored', queueData?.counts?.rejected_ignored ?? 0],
-              ['deleted', 'Deleted', queueData?.counts?.deleted ?? 0],
-              ['purged', 'Purged', queueData?.counts?.purged ?? 0],
-              ['all_imported', 'All Imported', queueData?.counts?.all_imported ?? 0],
-            ].map(([value, label, count]) => (
-              <Button
-                key={value}
-                type="button"
-                size="sm"
-                variant={filters.status === value ? 'default' : 'outline'}
-                className="min-w-0 whitespace-normal text-left"
-                onClick={() => setFilters(prev => ({ ...prev, status: String(value) }))}
-              >
-                {label} ({count})
+    <div className={compact ? 'space-y-3' : 'space-y-5'}>
+      {!compact && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {onClose && (
+              <Button variant="ghost" size="sm" onClick={onClose}>
+                <ChevronLeft className="mr-1 h-4 w-4" /> Back
               </Button>
-            ))}
-          </CardContent>
-        </Card>
+            )}
+            <div>
+              <h2 className="text-xl font-semibold">Expense Review</h2>
+              <p className="text-sm text-muted-foreground">
+                Statement withdrawals are already Business Expenses. Categorise them or mark the exceptions Personal.
+              </p>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Refresh</Button>
+        </div>
       )}
 
-      {/* Filters */}
-      {!compact && <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div>
-              <Label htmlFor="search">Search Description</Label>
-              <Input
-                id="search"
-                placeholder="Search transactions..."
-                value={filters.search}
-                onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="status">Status</Label>
-              <Select value={filters.status || "__all__"} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === "__all__" ? "" : value }))}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  {aggregateQueue ? (<>
-                    <SelectItem value="pending_review">Pending Review ({queueData?.counts?.pending_review ?? 0})</SelectItem>
-                    <SelectItem value="approved">Approved ({queueData?.counts?.approved ?? 0})</SelectItem>
-                    <SelectItem value="personal_owner">Personal ({queueData?.counts?.personal_owner ?? 0})</SelectItem>
-                    <SelectItem value="rejected_ignored">Rejected/Ignored ({queueData?.counts?.rejected_ignored ?? 0})</SelectItem>
-                    <SelectItem value="deleted">Deleted ({queueData?.counts?.deleted ?? 0})</SelectItem>
-                    <SelectItem value="purged">Purged ({queueData?.counts?.purged ?? 0})</SelectItem>
-                    <SelectItem value="all_imported">All Imported ({queueData?.counts?.all_imported ?? 0})</SelectItem>
-                  </>) : (<>
-                    <SelectItem value="__all__">All statuses</SelectItem>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
-                    <SelectItem value="deleted">Deleted</SelectItem>
-                    <SelectItem value="hold_unavailable" disabled>Hold — unavailable</SelectItem>
-                  </>)}
-                </SelectContent>
-              </Select>
-              <p className="mt-1 text-[10px] text-slate-500">Hold unavailable: bank_txn_status schema does not support hold.</p>
-            </div>
-
-            <div>
-              <Label htmlFor="min">Min Amount</Label>
-              <Input
-                id="min"
-                type="number"
-                placeholder="฿0.00"
-                value={filters.min}
-                onChange={(e) => setFilters(prev => ({ ...prev, min: e.target.value }))}
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="max">Max Amount</Label>
-              <Input
-                id="max"
-                type="number"
-                placeholder="฿999,999"
-                value={filters.max}
-                onChange={(e) => setFilters(prev => ({ ...prev, max: e.target.value }))}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>}
-
-      {/* Bulk Actions */}
-      <Card className="border-blue-200 bg-blue-50">
-        <CardContent className="pt-4">
+      <Card className="border-slate-200">
+        <CardContent className="p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="mr-auto text-sm">
-              <span className="font-medium">{selectedIds.length}</span> selected · <span className="font-medium">{visiblePendingTransactions.length}</span> visible pending
-            </div>
-            <Button size="sm" variant="outline" onClick={selectAllVisible} disabled={visiblePendingTransactions.length === 0}>Select All Visible</Button>
-            <Button size="sm" variant="outline" onClick={clearSelection} disabled={selectedIds.length === 0}>Clear Selection</Button>
-            <Button size="sm" variant="outline" onClick={handleBulkDelete} disabled={selectedIds.length === 0 || bulkDeleteMutation.isPending}>
-              <Trash2 className="h-3 w-3 mr-1" />
-              Delete Selected
+            <Button size="sm" variant={view === 'review' ? 'default' : 'outline'} onClick={() => setView('review')}>
+              Review ({counts.review})
             </Button>
-            {!compact && <>
-              <Button size="sm" variant="outline" onClick={() => setDeleteConfirm({ scope: 'all_pending', count: queueData?.counts?.pending_all ?? visiblePendingTransactions.length })} disabled={(queueData?.counts?.pending_all ?? visiblePendingTransactions.length) === 0 || bulkDeleteMutation.isPending}>
-                <Trash2 className="h-3 w-3 mr-1" />
-                Delete All Pending Imported Transactions
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => setPurgeConfirmOpen(true)} disabled={purgeMutation.isPending}>
-                <Trash2 className="h-3 w-3 mr-1" />
-                Purge All Imported Bank Transactions
-              </Button>
-            </>}
+            <Button size="sm" variant={view === 'business' ? 'default' : 'outline'} onClick={() => setView('business')}>
+              Categorised ({counts.business})
+            </Button>
+            <Button size="sm" variant={view === 'personal' ? 'default' : 'outline'} onClick={() => setView('personal')}>
+              Personal ({counts.personal})
+            </Button>
+            <Button size="sm" variant={view === 'all' ? 'default' : 'outline'} onClick={() => setView('all')}>
+              All ({counts.all})
+            </Button>
+            <div className="relative ml-auto min-w-[220px] flex-1 sm:max-w-xs">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+              <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search statement..." className="pl-8" />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {selectedIds.length > 0 && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardContent className="pt-4">
-            <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between">
-              <div className="text-sm">
-                <span className="font-medium">{selectedIds.length}</span> transactions selected
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4">
-                {/* Bulk Defaults */}
-                <div className="flex flex-col sm:flex-row gap-2">
-                  <Select value={bulkDefaults.category} onValueChange={(value) => setBulkDefaults(prev => ({ ...prev, category: value }))}>
-                    <SelectTrigger className="w-40">
-                      <SelectValue placeholder="Set category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {reviewCategories.map((category) => (
-                        <SelectItem key={category} value={category}>{category}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  
-                  <Input
-                    placeholder="Set supplier/description"
-                    className="w-32"
-                    value={bulkDefaults.supplier}
-                    onChange={(e) => setBulkDefaults(prev => ({ ...prev, supplier: e.target.value }))}
-                  />
-                </div>
+      <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-900">
+        Reporting is not waiting for this review. Items in <strong>Review</strong> are already included as Business Expenses; marking an item <strong>Personal</strong> removes it from business reporting.
+      </div>
 
-                {/* Bulk Actions */}
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleBulkApprove}
-                    disabled={approveMutation.isPending}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    <Check className="h-3 w-3 mr-1" />
-                    Approve All
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleBulkDelete}
-                    disabled={bulkDeleteMutation.isPending}
-                  >
-                    <Trash2 className="h-3 w-3 mr-1" />
-                    Delete Selected
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {isLoading ? (
+        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">Loading transactions...</CardContent></Card>
+      ) : visibleTransactions.length === 0 ? (
+        <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">No transactions in this view.</CardContent></Card>
+      ) : (
+        <div className="space-y-2">
+          {visibleTransactions.map((txn) => {
+            const isSaving = savingIds.has(txn.id);
+            const isPersonal = txn.category === 'Personal / Owner';
+            const isDeposit = Number(txn.amountTHB) < 0;
+            return (
+              <Card key={txn.id} className={isPersonal ? 'border-orange-200' : 'border-slate-200'}>
+                <CardContent className="p-3 sm:p-4">
+                  <div className="grid gap-3 xl:grid-cols-[140px_minmax(220px,1fr)_240px_180px_auto] xl:items-center">
+                    <div>
+                      <div className="text-xs text-slate-500">{formatDate(txn.postedAt)}</div>
+                      <div className={`text-sm font-semibold ${isDeposit ? 'text-green-700' : 'text-red-700'}`}>{amountLabel(txn)}</div>
+                      {isSaving && <div className="text-[10px] text-slate-400">Saving...</div>}
+                    </div>
 
-      {/* Transactions Review */}
-      <Card>
-        <CardContent className="p-3 sm:p-4">
-          {isLoading ? (
-            <div className="p-8 text-center">Loading transactions...</div>
-          ) : transactions.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No transactions found. Adjust your filters or upload a CSV file.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {transactions.map((txn: BankTransaction) => (
-                <div key={txn.id} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                  <div className="flex items-start gap-3">
-                    <label className="mt-1 flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
-                      <Checkbox
-                        checked={selectedIds.includes(txn.id)}
-                        onCheckedChange={() => handleSelectTransaction(txn.id)}
+                    <div className="min-w-0">
+                      <Label className="text-[10px] text-slate-500">Statement Payee / Description</Label>
+                      <Input
+                        key={`${txn.id}:${txn.description}`}
+                        defaultValue={txn.description}
+                        className="h-8"
+                        onBlur={(event) => {
+                          const description = event.target.value.trim();
+                          if (description && description !== txn.description) saveTransaction(txn, { description });
+                        }}
                       />
-                      <span>Select</span>
-                    </label>
-                    <div className="min-w-0 flex-1 space-y-3">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="min-w-0">
-                          <div className="text-xs font-mono text-slate-500">{formatDate(txn.postedAt)}</div>
-                          <div className="break-words text-sm font-semibold text-slate-900 dark:text-slate-100">{txn.description}</div>
-                          {txn.ref && <div className="break-words text-[11px] text-slate-400">Ref: {txn.ref}</div>}
-                        </div>
-                        <div className={`text-sm font-semibold sm:text-right ${getAmountTone(txn)}`}>
-                          {getAmountLabel(txn)}
-                        </div>
-                      </div>
+                      {txn.ref && <div className="mt-1 truncate text-[10px] text-slate-400">Ref: {txn.ref}</div>}
+                    </div>
 
-                      <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <div className="space-y-1">
-                          <Label className="text-[11px]">Classification</Label>
-                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Badge variant="outline" className="w-fit">{txn.transactionTypeLabel || 'Needs review'}</Badge>
-                            <Select
-                              value={txn.category || ''}
-                              onValueChange={(category) => editMutation.mutate({ id: txn.id, updates: { category } })}
-                              disabled={txn.status !== 'pending' || editMutation.isPending}
-                            >
-                              <SelectTrigger className="w-full sm:w-64">
-                                <SelectValue placeholder="Classify transaction" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {reviewCategories.map((category) => (
-                                  <SelectItem key={category} value={category}>{category}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
+                    <div>
+                      <Label className="text-[10px] text-slate-500">Purpose / Supplier</Label>
+                      <Input
+                        key={`${txn.id}:${txn.supplier || ''}`}
+                        defaultValue={txn.supplier || txn.description}
+                        className="h-8"
+                        onBlur={(event) => {
+                          const supplier = event.target.value.trim();
+                          if (supplier !== (txn.supplier || txn.description)) saveTransaction(txn, { supplier });
+                        }}
+                      />
+                    </div>
 
-                        <div className="space-y-1">
-                          <Label className="text-[11px]">Statement Payee (DESC)</Label>
-                          <Input
-                            key={`${txn.id}:${txn.description}`}
-                            defaultValue={txn.description}
-                            onBlur={(e) => {
-                              const description = e.target.value.trim();
-                              if (description && description !== txn.description) {
-                                editMutation.mutate({ id: txn.id, updates: { description } });
-                              }
-                            }}
-                            disabled={txn.status !== 'pending' || editMutation.isPending}
-                            className="h-9 w-full"
-                            aria-label="Statement payee description"
-                          />
-                          <p className="text-[10px] text-slate-500">The original imported text remains in the audit record.</p>
-                        </div>
+                    <div>
+                      <Label className="text-[10px] text-slate-500">Category</Label>
+                      <Select
+                        value={txn.category || (isDeposit ? 'Deposit / Inflow' : 'Review')}
+                        onValueChange={(category) => saveTransaction(txn, { category })}
+                        disabled={isSaving}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {REVIEW_CATEGORIES.map((category) => (
+                            <SelectItem key={category} value={category}>{category}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-                        <div className="space-y-1">
-                          <Label className="text-[11px]">Purpose / Supplier</Label>
-                          <Input
-                            key={`${txn.id}:${txn.supplier || txn.merchantSuggestion || txn.description || ''}`}
-                            defaultValue={txn.supplier || txn.merchantSuggestion || txn.description || ''}
-                            placeholder="Expense purpose or supplier"
-                            onBlur={(e) => editMutation.mutate({ id: txn.id, updates: { supplier: e.target.value } })}
-                            disabled={txn.status !== 'pending' || editMutation.isPending}
-                            className="h-9 w-full"
-                            aria-label="Purpose or supplier"
-                          />
-                          <p className="text-[10px] text-slate-500">Defaults to the bank text and can be amended before approval.</p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <Label className="text-[11px]">Reference Note (NOTE)</Label>
-                          <Input
-                            key={`${txn.id}:${txn.notes || ''}`}
-                            defaultValue={txn.notes || ''}
-                            placeholder="No reference note"
-                            onBlur={(e) => {
-                              const notes = e.target.value.trim();
-                              if (notes !== (txn.notes || '')) {
-                                editMutation.mutate({ id: txn.id, updates: { notes } });
-                              }
-                            }}
-                            disabled={txn.status !== 'pending' || editMutation.isPending}
-                            className="h-9 w-full"
-                            aria-label="Bank reference note"
-                          />
-                          <p className="text-[10px] text-slate-500">Imported separately from NOTE; a dash is treated as blank.</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="space-y-1">
-                          <Badge className={getStatusColor(txn.status)}>{getStatusLabel(txn.status)}</Badge>
-                          <div className="text-xs text-muted-foreground">{txn.readableAction || 'Needs review before approval.'}</div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                          {txn.status === 'pending' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => approveMutation.mutate({ ids: [txn.id] })}
-                                disabled={approveMutation.isPending}
-                                title="Approve business expense"
-                              >
-                                <Check className="h-3 w-3 text-green-600 mr-1" />Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleMarkPersonal(txn.id)}
-                                disabled={editMutation.isPending}
-                                title="Mark personal / owner"
-                              >
-                                Personal
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleReject(txn.id)}
-                                disabled={editMutation.isPending}
-                                title="Decline"
-                              >
-                                <X className="h-3 w-3 text-red-600 mr-1" />Decline
-                              </Button>
-                            </>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteMutation.mutate(txn.id)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="h-3 w-3 text-red-600 mr-1" />Delete
-                          </Button>
-                        </div>
-                      </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Badge variant={isPersonal ? 'destructive' : txn.category === 'Review' ? 'secondary' : 'outline'}>
+                        {isPersonal ? 'Personal' : txn.category || 'Review'}
+                      </Badge>
+                      {!isDeposit && !isPersonal && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isSaving}
+                          onClick={() => saveTransaction(txn, { category: 'Personal / Owner' })}
+                        >
+                          Personal
+                        </Button>
+                      )}
+                      {isPersonal && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={isSaving}
+                          onClick={() => saveTransaction(txn, { category: 'Review' })}
+                        >
+                          Business
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" disabled={isSaving} onClick={() => deleteTransaction(txn)} title="Delete transaction">
+                        <Trash2 className="h-4 w-4 text-red-600" />
+                      </Button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <AlertDialog open={deleteConfirm !== null} onOpenChange={(open) => !open && setDeleteConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm pending bank import deletion</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteConfirm?.scope === 'all_pending'
-                ? `This will mark ${deleteConfirm?.count || 0} pending imported bank transaction(s) as deleted. Approved Business Expenses and Shift Expenses will not be changed.`
-                : `This will mark ${deleteConfirm?.count || 0} selected pending imported bank transaction(s) as deleted. Approved Business Expenses and Shift Expenses will not be changed.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkDeleteMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmBulkDelete} disabled={bulkDeleteMutation.isPending}>
-              {bulkDeleteMutation.isPending ? 'Deleting...' : 'Confirm Delete'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={purgeConfirmOpen} onOpenChange={setPurgeConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Purge All Imported Bank Transactions</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will soft-purge imported bank transaction review rows only. Approved Business Expenses, Shift Expenses, and Daily Sales & Stock data will not be deleted.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={purgeMutation.isPending}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => purgeMutation.mutate()} disabled={purgeMutation.isPending}>
-              {purgeMutation.isPending ? 'Purging...' : 'Confirm Purge'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
