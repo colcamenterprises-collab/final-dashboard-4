@@ -37,6 +37,7 @@ import ShiftReports from "./pages/reports/ShiftReports";
 import ShiftHistory from "./pages/reports/ShiftHistory";
 import Export from "./pages/reports/Export";
 import ReceiptAnalytics from "./pages/reports/ReceiptAnalytics";
+import SalesByItem from "./pages/reports/SalesByItem";
 import InventoryReconciliation from "./pages/reports/InventoryReconciliation";
 import HistoricalReports from "./pages/reports/HistoricalReports";
 
@@ -137,7 +138,7 @@ export default function App() {
                     <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
+                    <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><SalesByItem /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/shift-report" element={<ProtectedRoute><OwnerRoute><ShiftHistory /></OwnerRoute></ProtectedRoute>} />
                     <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
                     <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} />
