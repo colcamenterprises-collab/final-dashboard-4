@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-06T06:23:30Z
+requested_at=2026-08-06T07:18:00Z
 requested_by=ChatGPT
 ref=main
-reason=Deploy verified POS ticket collision and item-choice fixes
+reason=Deploy instant collision-safe POS checkout and short display tickets
