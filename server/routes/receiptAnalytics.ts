@@ -1,356 +1,208 @@
-// RECEIPT ANALYTICS — READ ONLY
-// Source: lv_receipt, lv_line_item, lv_modifier
-// Business window: 17:00–03:00 Asia/Bangkok
-
 import { Router } from "express";
-import { db } from "../db";
-import { sql } from "drizzle-orm";
 import { DateTime } from "luxon";
+import { pool } from "../db";
 
 const router = Router();
-
-// ── helpers ──────────────────────────────────────────────────────────────────
 const REPORT_TZ = "Asia/Bangkok";
-const DEFAULT_SHIFT_START_TIME = "17:00";
-const DEFAULT_SHIFT_END_TIME = "03:00";
+const toNum = (value: unknown) => Number(value ?? 0) || 0;
+const toStr = (value: unknown) => String(value ?? "");
+const validDate = (value: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(toStr(value)) ? toStr(value) : null;
 
-const toNum = (v: unknown): number => (v == null ? 0 : Number(v));
-const toStr = (v: unknown): string => (v == null ? "" : String(v));
-const validDate = (v: unknown): string | null => /^\d{4}-\d{2}-\d{2}$/.test(toStr(v)) ? toStr(v) : null;
-const validTime = (v: unknown, fallback: string): string => /^\d{2}:\d{2}$/.test(toStr(v)) ? toStr(v) : fallback;
+const categoryCase = `
+  CASE
+    WHEN lower(COALESCE(c.name_en,'')) LIKE '%chicken%' OR lower(i.item_name_en) LIKE '%chicken%'
+      OR lower(i.item_name_en) LIKE '%nugget%' OR lower(i.item_name_en) LIKE '%karaage%' THEN 'Chicken'
+    WHEN lower(COALESCE(c.name_en,'')) LIKE '%fries%' OR lower(i.item_name_en) LIKE '%fries%'
+      OR lower(i.item_name_en) LIKE '%cajun%' OR lower(i.item_name_en) LIKE '%sweet potato%'
+      OR lower(i.item_name_en) LIKE '%dirty%' OR lower(i.item_name_en) LIKE '%loaded%' THEN 'Fries'
+    WHEN lower(COALESCE(c.name_en,'')) LIKE '%drink%' OR lower(i.item_name_en) LIKE '%coke%'
+      OR lower(i.item_name_en) LIKE '%water%' OR lower(i.item_name_en) LIKE '%fanta%'
+      OR lower(i.item_name_en) LIKE '%soda%' OR lower(i.item_name_en) LIKE '%schweppes%'
+      OR lower(i.item_name_en) LIKE '%juice%' THEN 'Drinks'
+    WHEN lower(COALESCE(c.name_en,'')) LIKE '%side%' OR lower(i.item_name_en) LIKE '%coleslaw%'
+      OR lower(i.item_name_en) LIKE '%onion ring%' THEN 'Sides'
+    WHEN lower(COALESCE(c.name_en,'')) LIKE '%burger%' OR lower(i.item_name_en) LIKE '%burger%'
+      OR lower(i.item_name_en) LIKE '%smash%' THEN 'Burgers'
+    ELSE 'Other'
+  END`;
 
-function shiftEndDateFor(startDate: string, startTime: string, endTime: string): string {
-  return endTime <= startTime
-    ? DateTime.fromISO(startDate, { zone: REPORT_TZ }).plus({ days: 1 }).toISODate()!
-    : startDate;
-}
+type ShiftWindow = {
+  mode: string;
+  shiftIds: string[];
+  fromDate: string;
+  toDate: string;
+  windowStart: string;
+  windowEnd: string;
+};
 
-function shiftWindow(startDate: string, startTime: string, endTime: string) {
-  const endDate = shiftEndDateFor(startDate, startTime, endTime);
-  return {
-    startDate,
-    endDate,
-    startLocal: `${startDate} ${startTime}:00`,
-    endLocal: `${endDate} ${endTime}:00`,
-  };
-}
-
-function getCurrentShiftStart(now = DateTime.now().setZone(REPORT_TZ), startTime = DEFAULT_SHIFT_START_TIME, endTime = DEFAULT_SHIFT_END_TIME): string {
-  const [sh, sm] = startTime.split(":").map(Number);
-  const [eh, em] = endTime.split(":").map(Number);
-  const startToday = now.set({ hour: sh, minute: sm, second: 0, millisecond: 0 });
-  const endToday = now.set({ hour: eh, minute: em, second: 0, millisecond: 0 });
-  if (endTime <= startTime && now < endToday) return now.minus({ days: 1 }).toISODate()!;
-  if (now >= startToday) return now.toISODate()!;
-  return now.minus({ days: 1 }).toISODate()!;
-}
-
-function resolveWindow(query: Record<string, unknown>) {
-  const shiftStartTime = validTime(query.shiftStartTime, DEFAULT_SHIFT_START_TIME);
-  const shiftEndTime = validTime(query.shiftEndTime, DEFAULT_SHIFT_END_TIME);
+async function resolveShiftWindow(query: Record<string, unknown>): Promise<ShiftWindow | null> {
   const mode = toStr(query.mode || query.preset || "last_completed_shift");
-  const now = DateTime.now().setZone(REPORT_TZ);
-  const currentShiftStart = getCurrentShiftStart(now, shiftStartTime, shiftEndTime);
-
-  if (mode === "custom" || (query.shiftStartDate && query.shiftEndDate)) {
-    const startDate = validDate(query.shiftStartDate || query.from);
-    const endDate = validDate(query.shiftEndDate || query.to);
-    if (!startDate || !endDate) throw new Error("Custom shift range requires shiftStartDate and shiftEndDate as YYYY-MM-DD.");
-    const first = shiftWindow(startDate, shiftStartTime, shiftEndTime);
-    const last = shiftWindow(endDate, shiftStartTime, shiftEndTime);
-    return { mode: "custom_shift_range", fromDate: startDate, toDate: endDate, startLocal: first.startLocal, endLocal: last.endLocal, shiftStartTime, shiftEndTime };
-  }
 
   if (mode === "current_shift") {
-    const w = shiftWindow(currentShiftStart, shiftStartTime, shiftEndTime);
-    return { mode: "current_shift", fromDate: w.startDate, toDate: w.startDate, startLocal: w.startLocal, endLocal: w.endLocal, shiftStartTime, shiftEndTime };
+    const result = await pool.query(`SELECT id, opened_at, COALESCE(closed_at,NOW()) AS ended_at
+      FROM pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1`);
+    if (!result.rowCount) return null;
+    const row = result.rows[0];
+    const localDate = DateTime.fromJSDate(new Date(row.opened_at)).setZone(REPORT_TZ).toISODate()!;
+    return { mode, shiftIds:[String(row.id)], fromDate:localDate, toDate:localDate, windowStart:new Date(row.opened_at).toISOString(), windowEnd:new Date(row.ended_at).toISOString() };
   }
 
-  const limitRaw = query.limit ? parseInt(toStr(query.limit), 10) : null;
-  if (limitRaw && limitRaw > 1) {
-    const limitN = Math.min(Math.max(limitRaw, 1), 90);
-    const lastCompleted = DateTime.fromISO(currentShiftStart, { zone: REPORT_TZ }).minus({ days: 1 });
-    const first = lastCompleted.minus({ days: limitN - 1 }).toISODate()!;
-    const last = lastCompleted.toISODate()!;
-    return { mode: `last_${limitN}_shifts`, fromDate: first, toDate: last, startLocal: shiftWindow(first, shiftStartTime, shiftEndTime).startLocal, endLocal: shiftWindow(last, shiftStartTime, shiftEndTime).endLocal, shiftStartTime, shiftEndTime };
+  if (mode === "custom" || (query.shiftStartDate && query.shiftEndDate)) {
+    const from = validDate(query.shiftStartDate || query.from);
+    const to = validDate(query.shiftEndDate || query.to);
+    if (!from || !to) throw new Error("Custom shift range requires shiftStartDate and shiftEndDate as YYYY-MM-DD.");
+    const result = await pool.query(`SELECT id, opened_at, COALESCE(closed_at,NOW()) AS ended_at
+      FROM pos_shifts
+      WHERE (opened_at AT TIME ZONE 'Asia/Bangkok')::date BETWEEN $1::date AND $2::date
+      ORDER BY opened_at`, [from,to]);
+    if (!result.rowCount) return null;
+    return { mode:"custom_shift_range", shiftIds:result.rows.map(r=>String(r.id)), fromDate:from, toDate:to, windowStart:new Date(result.rows[0].opened_at).toISOString(), windowEnd:new Date(result.rows.at(-1).ended_at).toISOString() };
   }
 
-  const lastCompleted = DateTime.fromISO(currentShiftStart, { zone: REPORT_TZ }).minus({ days: 1 }).toISODate()!;
-  const w = shiftWindow(lastCompleted, shiftStartTime, shiftEndTime);
-  return { mode: "last_completed_shift", fromDate: w.startDate, toDate: w.startDate, startLocal: w.startLocal, endLocal: w.endLocal, shiftStartTime, shiftEndTime };
+  const limitRaw = query.limit ? Math.min(Math.max(parseInt(toStr(query.limit),10) || 1,1),90) : 1;
+  const result = await pool.query(`SELECT id, opened_at, closed_at
+    FROM pos_shifts WHERE status='closed' ORDER BY opened_at DESC LIMIT $1`, [limitRaw]);
+  if (!result.rowCount) return null;
+  const ordered = [...result.rows].reverse();
+  const first = ordered[0];
+  const last = ordered.at(-1)!;
+  const from = DateTime.fromJSDate(new Date(first.opened_at)).setZone(REPORT_TZ).toISODate()!;
+  const to = DateTime.fromJSDate(new Date(last.opened_at)).setZone(REPORT_TZ).toISODate()!;
+  return { mode:limitRaw > 1 ? `last_${limitRaw}_shifts` : "last_completed_shift", shiftIds:ordered.map(r=>String(r.id)), fromDate:from, toDate:to, windowStart:new Date(first.opened_at).toISOString(), windowEnd:new Date(last.closed_at).toISOString() };
 }
 
-const RECEIPT_WINDOW_FILTER = (startLocal: string, endLocal: string) => sql`
-  (r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= ${startLocal}::timestamp
-  AND (r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') < ${endLocal}::timestamp
-`;
-
-const RECEIPT_WINDOW_FILTER_UNALIASED = (startLocal: string, endLocal: string) => sql`
-  (datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= ${startLocal}::timestamp
-  AND (datetime_bkk AT TIME ZONE 'Asia/Bangkok') < ${endLocal}::timestamp
-`;
-
-// Category mapping — order matters (Chicken > Fries > Drinks > Sides > Burgers)
-const CAT_CASE = sql`
-  CASE
-    WHEN lower(li.name) LIKE '%chicken%' OR lower(li.name) LIKE '%rooster%'
-      OR lower(li.name) LIKE '%nugget%' OR lower(li.name) LIKE '%karaage%' THEN 'Chicken'
-    WHEN lower(li.name) LIKE '%fries%' OR lower(li.name) LIKE '%cajun%'
-      OR lower(li.name) LIKE '%sweet potato%' OR lower(li.name) LIKE '%dirty%'
-      OR lower(li.name) LIKE '%loaded%' THEN 'Fries'
-    WHEN lower(li.name) LIKE '%coke%' OR lower(li.name) LIKE '%sprite%'
-      OR lower(li.name) LIKE '%water%' OR lower(li.name) LIKE '%fanta%'
-      OR lower(li.name) LIKE '%soda%' OR lower(li.name) LIKE '%schweppes%'
-      OR lower(li.name) LIKE '%lemon%' OR lower(li.name) LIKE '%juice%'
-      OR lower(li.name) LIKE '%can%' THEN 'Drinks'
-    WHEN lower(li.name) LIKE '%onion ring%' OR lower(li.name) LIKE '%tots%'
-      OR lower(li.name) LIKE '%coleslaw%' THEN 'Sides'
-    WHEN lower(li.name) LIKE '%burger%' OR lower(li.name) LIKE '%smash%'
-      OR lower(li.name) LIKE '%single%' OR lower(li.name) LIKE '%double%'
-      OR lower(li.name) LIKE '%triple%' OR lower(li.name) LIKE '%ultimate%' THEN 'Burgers'
-    ELSE 'Other'
-  END
-`;
-
-// ── main route ────────────────────────────────────────────────────────────────
-router.get("/", async (req, res) => {
-  if (!db) return res.json({ ok: false, blockers: [{ code: "DB_UNAVAILABLE", message: "Database not available." }] });
-
+router.get("/", async (req,res) => {
   try {
-    const window = resolveWindow(req.query as Record<string, unknown>);
-    const { fromDate, toDate, startLocal, endLocal, shiftStartTime, shiftEndTime } = window;
-    const shiftStartHour = Number(shiftStartTime.slice(0, 2));
-    const hoursAfterMidnightOffset = 24 - shiftStartHour;
+    const window = await resolveShiftWindow(req.query as Record<string,unknown>);
+    if (!window) return res.json({
+      ok:false,
+      source:"sbb_pos_core",
+      blockers:[{code:"NO_POS_SHIFTS",message:"No POS shifts found for selected shift window"}],
+      summary:{grossSales:0,receiptCount:0,averageReceiptValue:0,lineItemCount:0,modifierCount:0,burgersSold:0,friesSold:0,drinksSold:0,chickenSold:0},
+      topProducts:[],topModifiers:[],categoryMix:[],dailyTrend:[],hourlySales:[],paymentMix:[],receipts:[],
+      filters:{from:"",to:"",mode:toStr(req.query.mode||"last_completed_shift"),timezone:REPORT_TZ}
+    });
 
-    const businessDates: string[] = [];
-    for (let cursor = DateTime.fromISO(fromDate, { zone: REPORT_TZ }); cursor <= DateTime.fromISO(toDate, { zone: REPORT_TZ }); cursor = cursor.plus({ days: 1 })) {
-      businessDates.push(cursor.toISODate()!);
-    }
+    const shiftIds = window.shiftIds;
+    const search = req.query.search ? `%${toStr(req.query.search).toLowerCase()}%` : null;
+    const category = req.query.category ? toStr(req.query.category) : null;
 
-    const searchFilter = req.query.search ? `%${String(req.query.search).toLowerCase()}%` : null;
-    const catFilter = req.query.category ? String(req.query.category) : null;
+    const receiptBase = `
+      SELECT o.id,o.order_number,LEFT(o.ticket_number,3) AS receipt_number,o.order_mode,o.channel,o.payment_method,
+             o.subtotal,o.discount_amount,o.total,o.created_at,s.id AS shift_id,s.staff_name,s.opened_at,s.closed_at
+        FROM ordering_orders o
+        JOIN LATERAL (
+          SELECT ps.* FROM pos_shifts ps
+           WHERE ps.id = ANY($1::uuid[])
+             AND o.created_at >= ps.opened_at
+             AND o.created_at <= COALESCE(ps.closed_at,NOW())
+           ORDER BY ps.opened_at DESC LIMIT 1
+        ) s ON true
+       WHERE o.channel IN ('pos_direct','grab')
+         AND o.payment_status='paid'
+         AND o.status <> 'cancelled'`;
 
-    // ── Run all queries in parallel ──────────────────────────────────────────
-    const [summaryRes, productsRes, modifiersRes, categoryRes, trendRes, hourlyRes] = await Promise.all([
+    const [summaryRes, productsRes, modifiersRes, categoryRes, trendRes, hourlyRes, paymentRes, receiptRes] = await Promise.all([
+      pool.query(`WITH receipts AS (${receiptBase}), item_stats AS (
+        SELECT COALESCE(SUM(i.quantity),0)::int line_item_count,
+               COALESCE(SUM(CASE WHEN ${categoryCase}='Burgers' THEN i.quantity ELSE 0 END),0)::int burgers_sold,
+               COALESCE(SUM(CASE WHEN ${categoryCase}='Fries' THEN i.quantity ELSE 0 END),0)::int fries_sold,
+               COALESCE(SUM(CASE WHEN ${categoryCase}='Drinks' THEN i.quantity ELSE 0 END),0)::int drinks_sold,
+               COALESCE(SUM(CASE WHEN ${categoryCase}='Chicken' THEN i.quantity ELSE 0 END),0)::int chicken_sold
+          FROM ordering_order_items i
+          JOIN receipts r ON r.id=i.order_id
+          LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+          LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
+      ), modifier_stats AS (
+        SELECT COALESCE(SUM(m.quantity),0)::int modifier_count
+          FROM ordering_order_item_modifiers m
+          JOIN ordering_order_items i ON i.id=m.order_item_id
+          JOIN receipts r ON r.id=i.order_id)
+      SELECT COUNT(*)::int receipt_count,COALESCE(SUM(total),0)::numeric gross_sales,
+             COALESCE(AVG(total),0)::numeric avg_receipt,
+             item_stats.line_item_count,modifier_stats.modifier_count,item_stats.burgers_sold,item_stats.fries_sold,item_stats.drinks_sold,item_stats.chicken_sold
+        FROM receipts CROSS JOIN item_stats CROSS JOIN modifier_stats
+       GROUP BY item_stats.line_item_count,modifier_stats.modifier_count,item_stats.burgers_sold,item_stats.fries_sold,item_stats.drinks_sold,item_stats.chicken_sold`, [shiftIds]),
 
-      // 1. Summary
-      db.execute(sql`
-        WITH biz AS (
-          SELECT r.receipt_id, r.total_amount
-          FROM lv_receipt r
-          WHERE ${RECEIPT_WINDOW_FILTER(startLocal, endLocal)}
-        )
-        SELECT
-          COUNT(DISTINCT b.receipt_id)::int AS receipt_count,
-          ROUND(SUM(b.total_amount), 0)::numeric AS gross_sales,
-          ROUND(AVG(b.total_amount), 0)::numeric AS avg_receipt,
-          COALESCE(SUM(li.qty), 0)::int AS line_item_count,
-          COALESCE((SELECT SUM(m.qty) FROM lv_modifier m WHERE m.receipt_id IN (SELECT receipt_id FROM biz)), 0)::int AS modifier_count,
-          COALESCE(SUM(CASE WHEN lower(li.name) LIKE '%chicken%' OR lower(li.name) LIKE '%rooster%' OR lower(li.name) LIKE '%nugget%' OR lower(li.name) LIKE '%karaage%' THEN li.qty ELSE 0 END), 0)::int AS chicken_sold,
-          COALESCE(SUM(CASE WHEN lower(li.name) LIKE '%fries%' OR lower(li.name) LIKE '%cajun%' OR lower(li.name) LIKE '%sweet potato%' OR lower(li.name) LIKE '%dirty%' OR lower(li.name) LIKE '%loaded%' THEN li.qty ELSE 0 END), 0)::int AS fries_sold,
-          COALESCE(SUM(CASE WHEN lower(li.name) LIKE '%coke%' OR lower(li.name) LIKE '%sprite%' OR lower(li.name) LIKE '%water%' OR lower(li.name) LIKE '%fanta%' OR lower(li.name) LIKE '%soda%' OR lower(li.name) LIKE '%schweppes%' OR lower(li.name) LIKE '%can%' THEN li.qty ELSE 0 END), 0)::int AS drinks_sold,
-          COALESCE(SUM(CASE
-            WHEN lower(li.name) LIKE '%chicken%' OR lower(li.name) LIKE '%rooster%' OR lower(li.name) LIKE '%nugget%' OR lower(li.name) LIKE '%karaage%' THEN 0
-            WHEN lower(li.name) LIKE '%burger%' OR lower(li.name) LIKE '%smash%' OR lower(li.name) LIKE '%single%' OR lower(li.name) LIKE '%double%' OR lower(li.name) LIKE '%triple%' OR lower(li.name) LIKE '%ultimate%' THEN li.qty
-            ELSE 0
-          END), 0)::int AS burgers_sold
-        FROM biz b
-        LEFT JOIN lv_line_item li ON li.receipt_id = b.receipt_id
-      `),
+      pool.query(`WITH receipts AS (${receiptBase})
+        SELECT i.item_name_en AS name,COALESCE(i.source_sku,'') AS sku,${categoryCase} AS category,
+               SUM(i.quantity)::int qty_sold,ROUND(SUM(i.line_total),2)::numeric revenue
+          FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id
+          LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+          LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
+         WHERE ($2::text IS NULL OR lower(i.item_name_en) LIKE $2)
+           AND ($3::text IS NULL OR ${categoryCase}=$3)
+         GROUP BY i.item_name_en,i.source_sku,${categoryCase}
+         ORDER BY qty_sold DESC,revenue DESC LIMIT 50`, [shiftIds,search,category]),
 
-      // 2. Top products
-      db.execute(sql`
-        WITH biz AS (
-          SELECT receipt_id
-          FROM lv_receipt
-          WHERE ${RECEIPT_WINDOW_FILTER_UNALIASED(startLocal, endLocal)}
-        ),
-        items AS (
-          SELECT li.name, li.sku,
-            ${CAT_CASE} AS category,
-            SUM(li.qty)::int AS qty_sold,
-            ROUND(SUM(li.qty * li.unit_price), 0)::numeric AS revenue,
-            COUNT(DISTINCT li.receipt_id)::int AS receipt_appearances
-          FROM lv_line_item li
-          WHERE li.receipt_id IN (SELECT receipt_id FROM biz)
-            ${searchFilter ? sql`AND lower(li.name) LIKE ${searchFilter}` : sql``}
-            ${catFilter ? sql`AND ${CAT_CASE} = ${catFilter}` : sql``}
-          GROUP BY li.name, li.sku
-        ),
-        total AS (SELECT SUM(qty_sold) AS total_qty FROM items)
-        SELECT i.name, i.sku, i.category, i.qty_sold, i.revenue, i.receipt_appearances,
-          ROUND(i.qty_sold * 100.0 / NULLIF(t.total_qty, 0), 1)::numeric AS pct_of_total
-        FROM items i CROSS JOIN total t
-        ORDER BY i.qty_sold DESC
-        LIMIT 50
-      `),
+      pool.query(`WITH receipts AS (${receiptBase})
+        SELECT CASE WHEN m.modifier_group_name_en IS NULL OR m.modifier_group_name_en='' THEN m.modifier_name_en
+                    ELSE m.modifier_group_name_en || ': ' || m.modifier_name_en END AS name,
+               SUM(m.quantity)::int qty_sold
+          FROM ordering_order_item_modifiers m
+          JOIN ordering_order_items i ON i.id=m.order_item_id
+          JOIN receipts r ON r.id=i.order_id
+         WHERE ($2::text IS NULL OR lower(COALESCE(m.modifier_name_en,'')) LIKE $2 OR lower(COALESCE(m.modifier_group_name_en,'')) LIKE $2)
+         GROUP BY name ORDER BY qty_sold DESC LIMIT 50`, [shiftIds,search]),
 
-      // 3. Top modifiers
-      db.execute(sql`
-        WITH biz AS (
-          SELECT receipt_id
-          FROM lv_receipt
-          WHERE ${RECEIPT_WINDOW_FILTER_UNALIASED(startLocal, endLocal)}
-        ),
-        mods AS (
-          SELECT m.name, SUM(m.qty)::int AS qty_sold
-          FROM lv_modifier m
-          WHERE m.receipt_id IN (SELECT receipt_id FROM biz)
-            ${searchFilter ? sql`AND lower(m.name) LIKE ${searchFilter}` : sql``}
-          GROUP BY m.name
-        ),
-        total AS (SELECT SUM(qty_sold) AS total_qty FROM mods)
-        SELECT md.name, md.qty_sold,
-          ROUND(md.qty_sold * 100.0 / NULLIF(t.total_qty, 0), 1)::numeric AS pct_of_total
-        FROM mods md CROSS JOIN total t
-        ORDER BY md.qty_sold DESC
-        LIMIT 50
-      `),
+      pool.query(`WITH receipts AS (${receiptBase})
+        SELECT ${categoryCase} AS category,SUM(i.quantity)::int qty_sold,ROUND(SUM(i.line_total),2)::numeric revenue
+          FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id
+          LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+          LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
+         GROUP BY ${categoryCase} ORDER BY qty_sold DESC`, [shiftIds]),
 
-      // 4. Category mix
-      db.execute(sql`
-        WITH biz AS (
-          SELECT receipt_id
-          FROM lv_receipt
-          WHERE ${RECEIPT_WINDOW_FILTER_UNALIASED(startLocal, endLocal)}
-        )
-        SELECT
-          ${CAT_CASE} AS category,
-          SUM(li.qty)::int AS qty_sold,
-          ROUND(SUM(li.qty * li.unit_price), 0)::numeric AS revenue
-        FROM lv_line_item li
-        WHERE li.receipt_id IN (SELECT receipt_id FROM biz)
-        GROUP BY ${CAT_CASE}
-        ORDER BY qty_sold DESC
-      `),
+      pool.query(`WITH receipts AS (${receiptBase})
+        SELECT (s.opened_at AT TIME ZONE 'Asia/Bangkok')::date::text biz_date,
+               ROUND(SUM(r.total),2)::numeric gross_sales,COUNT(*)::int receipt_count
+          FROM receipts r JOIN pos_shifts s ON s.id=r.shift_id
+         GROUP BY biz_date ORDER BY biz_date`, [shiftIds]),
 
-      // 5. Daily trend — JOIN approach (avoids per-receipt correlated subqueries)
-      db.execute(sql`
-        WITH biz AS (
-          SELECT r.receipt_id, r.total_amount,
-            CASE WHEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok') >= ${shiftStartHour}
-              THEN (r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date
-              ELSE ((r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::date - 1)
-            END AS biz_date
-          FROM lv_receipt r
-          WHERE ${RECEIPT_WINDOW_FILTER(startLocal, endLocal)}
-        )
-        SELECT
-          b.biz_date::text,
-          ROUND(SUM(b.total_amount), 0)::numeric AS gross_sales,
-          COUNT(DISTINCT b.receipt_id)::int AS receipt_count,
-          COALESCE(SUM(CASE
-            WHEN lower(li.name) LIKE '%chicken%' OR lower(li.name) LIKE '%rooster%' OR lower(li.name) LIKE '%nugget%' OR lower(li.name) LIKE '%karaage%' THEN 0
-            WHEN lower(li.name) LIKE '%burger%' OR lower(li.name) LIKE '%smash%' OR lower(li.name) LIKE '%single%' OR lower(li.name) LIKE '%double%' OR lower(li.name) LIKE '%triple%' OR lower(li.name) LIKE '%ultimate%' THEN li.qty
-            ELSE 0 END), 0)::int AS burgers,
-          COALESCE(SUM(CASE WHEN lower(li.name) LIKE '%fries%' OR lower(li.name) LIKE '%cajun%' OR lower(li.name) LIKE '%sweet potato%' OR lower(li.name) LIKE '%dirty%' OR lower(li.name) LIKE '%loaded%' THEN li.qty ELSE 0 END), 0)::int AS fries,
-          COALESCE(SUM(CASE WHEN lower(li.name) LIKE '%coke%' OR lower(li.name) LIKE '%sprite%' OR lower(li.name) LIKE '%water%' OR lower(li.name) LIKE '%fanta%' OR lower(li.name) LIKE '%soda%' OR lower(li.name) LIKE '%schweppes%' OR lower(li.name) LIKE '%can%' THEN li.qty ELSE 0 END), 0)::int AS drinks
-        FROM biz b
-        LEFT JOIN lv_line_item li ON li.receipt_id = b.receipt_id
-        GROUP BY b.biz_date
-        ORDER BY b.biz_date ASC
-      `),
+      pool.query(`WITH receipts AS (${receiptBase})
+        SELECT EXTRACT(HOUR FROM r.created_at AT TIME ZONE 'Asia/Bangkok')::int bkk_hour,
+               COUNT(*)::int receipt_count,ROUND(SUM(r.total),2)::numeric gross_sales
+          FROM receipts r GROUP BY bkk_hour ORDER BY bkk_hour`, [shiftIds]),
 
-      // 6. Hourly sales — full expressions in GROUP BY / ORDER BY (avoids alias issue)
-      db.execute(sql`
-        SELECT
-          EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int AS bkk_hour,
-          COUNT(DISTINCT r.receipt_id)::int AS receipt_count,
-          ROUND(SUM(r.total_amount), 0)::numeric AS gross_sales,
-          COALESCE(SUM(li.qty), 0)::int AS items_sold
-        FROM lv_receipt r
-        LEFT JOIN lv_line_item li ON li.receipt_id = r.receipt_id
-        WHERE ${RECEIPT_WINDOW_FILTER(startLocal, endLocal)}
-        GROUP BY EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int
-        ORDER BY CASE
-          WHEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int >= ${shiftStartHour}
-          THEN EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int - ${shiftStartHour}
-          ELSE EXTRACT(HOUR FROM r.datetime_bkk AT TIME ZONE 'Asia/Bangkok')::int + ${hoursAfterMidnightOffset}
-        END
-      `),
+      pool.query(`WITH receipts AS (${receiptBase})
+        SELECT payment_method,order_mode,COUNT(*)::int receipt_count,ROUND(SUM(total),2)::numeric total
+          FROM receipts GROUP BY payment_method,order_mode ORDER BY total DESC`, [shiftIds]),
+
+      pool.query(`WITH receipts AS (${receiptBase})
+        SELECT r.*,
+          COALESCE((SELECT jsonb_agg(jsonb_build_object(
+            'id',i.id,'name',i.item_name_en,'quantity',i.quantity,'unitPrice',i.unit_price,'lineTotal',i.line_total,
+            'isSetComponent',COALESCE(i.is_set_component,false),'parentOrderItemId',i.parent_order_item_id,
+            'modifiers',COALESCE((SELECT jsonb_agg(jsonb_build_object('group',m.modifier_group_name_en,'name',m.modifier_name_en,'priceDelta',m.price_delta,'quantity',m.quantity) ORDER BY m.created_at)
+              FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)
+          ) ORDER BY i.sort_order) FROM ordering_order_items i WHERE i.order_id=r.id),'[]'::jsonb) AS items
+        FROM receipts r ORDER BY r.created_at DESC LIMIT 250`, [shiftIds]),
     ]);
 
-    // ── Parse results ────────────────────────────────────────────────────────
-    const s = (summaryRes.rows as any[])[0] ?? {};
-    if (toNum(s.receipt_count) === 0) {
-      return res.json({
-        ok: false,
-        source: { receipts: "lv_receipt", lineItems: "lv_line_item", modifiers: "lv_modifier", window: `${shiftStartTime}–${shiftEndTime} ${REPORT_TZ}` },
-        filters: { from: fromDate, to: toDate, businessDates, mode: window.mode, shiftStartDate: fromDate, shiftEndDate: toDate, shiftStartTime, shiftEndTime, timezone: REPORT_TZ, windowStart: startLocal, windowEnd: endLocal },
-        blockers: [{ code: "NO_RECEIPTS", message: "No receipts found for selected shift window" }],
-      });
-    }
-    const burgersSold = toNum(s.burgers_sold);
-    const friesSold = toNum(s.fries_sold);
-    const drinksSold = toNum(s.drinks_sold);
-
-    const products = (productsRes.rows as any[]).map((r) => ({
-      name: toStr(r.name),
-      sku: toStr(r.sku),
-      category: toStr(r.category),
-      qtySold: toNum(r.qty_sold),
-      revenue: toNum(r.revenue),
-      pctOfTotal: toNum(r.pct_of_total),
-    }));
-
-    const trendRows = (trendRes.rows as any[]).map((r) => ({
-      bizDate: toStr(r.biz_date).slice(0, 10),
-      grossSales: toNum(r.gross_sales),
-      receiptCount: toNum(r.receipt_count),
-      burgers: toNum(r.burgers),
-      fries: toNum(r.fries),
-      drinks: toNum(r.drinks),
-    }));
-
-    // Hourly: fix the correlated sub-query (simplify — just return receipt+gross per hour)
-    const hourlyRows = (hourlyRes.rows as any[]).map((r) => ({
-      hour: toNum(r.bkk_hour),
-      label: `${String(toNum(r.bkk_hour)).padStart(2, "0")}:00`,
-      receiptCount: toNum(r.receipt_count),
-      grossSales: toNum(r.gross_sales),
-    }));
+    const summaryRow = summaryRes.rows[0] || {};
+    const receiptCount = toNum(summaryRow.receipt_count);
+    const topQty = productsRes.rows.reduce((sum,row)=>sum+toNum(row.qty_sold),0) || 1;
+    const modifierQty = modifiersRes.rows.reduce((sum,row)=>sum+toNum(row.qty_sold),0) || 1;
 
     return res.json({
-      ok: true,
-      source: {
-        receipts: "lv_receipt",
-        lineItems: "lv_line_item",
-        modifiers: "lv_modifier",
-        window: `${shiftStartTime}–${shiftEndTime} ${REPORT_TZ}`,
+      ok:true,
+      source:"sbb_pos_core",
+      summary:{
+        grossSales:toNum(summaryRow.gross_sales),receiptCount,averageReceiptValue:toNum(summaryRow.avg_receipt),
+        lineItemCount:toNum(summaryRow.line_item_count),modifierCount:toNum(summaryRow.modifier_count),
+        burgersSold:toNum(summaryRow.burgers_sold),friesSold:toNum(summaryRow.fries_sold),drinksSold:toNum(summaryRow.drinks_sold),chickenSold:toNum(summaryRow.chicken_sold)
       },
-      filters: { from: fromDate, to: toDate, businessDates, mode: window.mode, shiftStartDate: fromDate, shiftEndDate: toDate, shiftStartTime, shiftEndTime, timezone: REPORT_TZ, windowStart: startLocal, windowEnd: endLocal },
-      summary: {
-        grossSales: toNum(s.gross_sales),
-        receiptCount: toNum(s.receipt_count),
-        averageReceiptValue: toNum(s.avg_receipt),
-        lineItemCount: toNum(s.line_item_count),
-        modifierCount: toNum(s.modifier_count),
-        burgersSold,
-        friesSold,
-        drinksSold,
-        chickenSold: toNum(s.chicken_sold),
-      },
-      topProducts: products,
-      topModifiers: (modifiersRes.rows as any[]).map((r) => ({
-        name: toStr(r.name),
-        qtySold: toNum(r.qty_sold),
-        pctOfTotal: toNum(r.pct_of_total),
-      })),
-      categoryMix: (categoryRes.rows as any[]).map((r) => ({
-        category: toStr(r.category),
-        qtySold: toNum(r.qty_sold),
-        revenue: toNum(r.revenue),
-      })),
-      dailyTrend: trendRows,
-      hourlySales: hourlyRows,
-      blockers: [],
+      topProducts:productsRes.rows.map(row=>({name:row.name,sku:row.sku,category:row.category,qtySold:toNum(row.qty_sold),revenue:toNum(row.revenue),pctOfTotal:Number(((toNum(row.qty_sold)/topQty)*100).toFixed(1))})),
+      topModifiers:modifiersRes.rows.map(row=>({name:row.name,qtySold:toNum(row.qty_sold),pctOfTotal:Number(((toNum(row.qty_sold)/modifierQty)*100).toFixed(1))})),
+      categoryMix:categoryRes.rows.map(row=>({category:row.category,qtySold:toNum(row.qty_sold),revenue:toNum(row.revenue)})),
+      dailyTrend:trendRes.rows.map(row=>({bizDate:row.biz_date,grossSales:toNum(row.gross_sales),receiptCount:toNum(row.receipt_count),burgers:0,fries:0,drinks:0})),
+      hourlySales:hourlyRes.rows.map(row=>({hour:toNum(row.bkk_hour),label:`${String(toNum(row.bkk_hour)).padStart(2,'0')}:00`,receiptCount:toNum(row.receipt_count),grossSales:toNum(row.gross_sales)})),
+      paymentMix:paymentRes.rows.map(row=>({paymentMethod:row.payment_method,orderMode:row.order_mode,receiptCount:toNum(row.receipt_count),total:toNum(row.total)})),
+      receipts:receiptRes.rows,
+      filters:{from:window.fromDate,to:window.toDate,mode:window.mode,timezone:REPORT_TZ,windowStart:window.windowStart,windowEnd:window.windowEnd,shiftStartDate:window.fromDate,shiftEndDate:window.toDate}
     });
-  } catch (err: any) {
-    console.error("[receipt-analytics]", err?.message);
-    return res.json({
-      ok: false,
-      blockers: [{ code: "QUERY_FAILED", message: err?.message ?? "Query failed" }],
-    });
+  } catch(error:any) {
+    console.error('[receipt-analytics-pos]',error);
+    return res.status(500).json({ok:false,source:'sbb_pos_core',blockers:[{code:'POS_RECEIPT_ANALYTICS_FAILED',message:error?.message||'Could not load POS receipt analytics'}]});
   }
 });
 
