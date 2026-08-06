@@ -215,15 +215,10 @@ router.patch("/catalog/items/:id", staffDevice, async (req, res) => {
 
 router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
   try {
-    await ensureDisplayTicketSchema();
-    const result = await db().query(
-      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket
-       FROM ordering_orders
-       WHERE channel IN ('pos_direct','grab')`,
-      [DISPLAY_TICKET_MAX],
-    );
-    const next = Number(result.rows[0]?.next_ticket || 1);
-    res.json({ ok: true, source: "sbb_pos_core", data: { ticket_number: ticketNumber(next) } });
+    const result = await db().query(`SELECT COALESCE(MAX(order_number),0) + 1 AS next_order_number FROM ordering_orders`);
+    const nextOrderNumber = Number(result.rows[0]?.next_order_number || 1);
+    const display = ticketNumber(((nextOrderNumber - 1) % DISPLAY_TICKET_MAX) + 1);
+    res.json({ ok: true, source: "sbb_pos_core", data: { ticket_number: display } });
   } catch (e: any) {
     fail(res, e.message, 500);
   }
@@ -287,26 +282,21 @@ router.post("/orders", staffDevice, async (req, res) => {
     if (!/^[+0-9][0-9 ()-]{5,29}$/.test(customerMobile)) return fail(res, "Enter the Grab customer mobile number");
   }
 
-  await ensureDisplayTicketSchema();
   const client = await db().connect();
   try {
     await client.query("BEGIN");
     const openShiftResult = await client.query(`SELECT id FROM public.pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`);
     if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
     const activeShiftId = openShiftResult.rows[0].id;
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('customli-pos-display-ticket'))");
-    const ticketSequenceResult = await client.query(
-      `SELECT (COUNT(*) % $1::int) + 1 AS next_ticket FROM ordering_orders WHERE channel IN ('pos_direct','grab')`,
-      [DISPLAY_TICKET_MAX],
-    );
-    const ticket = ticketNumber(Number(ticketSequenceResult.rows[0]?.next_ticket || 1));
     const order = (await client.query(
       `INSERT INTO ordering_orders(channel, order_mode, dining_type, order_notes, status, payment_status, payment_method, grab_order_number, customer_name, customer_mobile)
        VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8) RETURNING *`,
       [mode === "grab" ? "grab" : "pos_direct", mode, input.dining_type || null, input.order_notes || null, input.payment_method, mode === "grab" ? grabOrderNumber : null, mode === "grab" ? customerName : null, mode === "grab" ? customerMobile : null],
     )).rows[0];
-
-    await client.query(`UPDATE ordering_orders SET ticket_number=$2 WHERE id=$1`, [order.id, ticket]);
+    const numericOrderNumber = Number(order.order_number || 1);
+    const displayTicket = ticketNumber(((numericOrderNumber - 1) % DISPLAY_TICKET_MAX) + 1);
+    const storedTicket = `${displayTicket}-${order.id}`;
+    await client.query(`UPDATE ordering_orders SET ticket_number=$2 WHERE id=$1`, [order.id, storedTicket]);
 
     let total = 0;
     let sort = 0;
@@ -432,11 +422,11 @@ router.post("/orders", staffDevice, async (req, res) => {
     await client.query(`INSERT INTO ordering_payments(order_id,method,status,amount) VALUES($1,$2,'confirmed',$3)`, [order.id,input.payment_method,total]);
     await client.query(
       `INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,'order_created',$2)`,
-      [order.id, JSON.stringify({ ticket_number: ticket, receipt_number: ticket, shift_id: activeShiftId, discount_code: discount?.code || undefined, discount_amount: discountAmount })],
+      [order.id, JSON.stringify({ ticket_number: displayTicket, receipt_number: displayTicket, shift_id: activeShiftId, discount_code: discount?.code || undefined, discount_amount: discountAmount })],
     );
     await client.query("COMMIT");
 
-    res.status(201).json({ ok:true, source:"sbb_pos_core", data:{ id:order.id,ticket_number:ticket,receipt_number:ticket,shift_id:activeShiftId,subtotal,discount_amount:discountAmount,total,created_at:order.created_at } });
+    res.status(201).json({ ok:true, source:"sbb_pos_core", data:{ id:order.id,ticket_number:displayTicket,receipt_number:displayTicket,shift_id:activeShiftId,subtotal,discount_amount:discountAmount,total,created_at:order.created_at } });
   } catch (e: any) {
     await client.query("ROLLBACK");
     fail(res, e.message);
@@ -448,7 +438,7 @@ router.post("/orders", staffDevice, async (req, res) => {
 router.get("/orders/:id/receipt", staffDevice, async (req, res) => {
   try {
     const result = await db().query(
-      `SELECT o.*, COALESCE(jsonb_agg(to_jsonb(i) || jsonb_build_object('modifiers', COALESCE((SELECT jsonb_agg(jsonb_build_object('name_en',m.modifier_name_en,'name_th',m.modifier_name_th,'price_delta',m.price_delta,'quantity',m.quantity) ORDER BY m.created_at) FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) FILTER (WHERE i.id IS NOT NULL),'[]'::jsonb) AS items
+      `SELECT o.*, LEFT(o.ticket_number,3) AS ticket_number, COALESCE(jsonb_agg(to_jsonb(i) || jsonb_build_object('modifiers', COALESCE((SELECT jsonb_agg(jsonb_build_object('name_en',m.modifier_name_en,'name_th',m.modifier_name_th,'price_delta',m.price_delta,'quantity',m.quantity) ORDER BY m.created_at) FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) FILTER (WHERE i.id IS NOT NULL),'[]'::jsonb) AS items
        FROM ordering_orders o LEFT JOIN ordering_order_items i ON i.order_id=o.id WHERE o.id=$1 GROUP BY o.id`,
       [req.params.id],
     );
@@ -472,7 +462,7 @@ router.get("/receipts/reconciliation", staffDevice, async (req, res) => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(shiftDate)) return fail(res, "shift_date must be YYYY-MM-DD");
   try {
     const result = await db().query(
-      `SELECT id,order_number,ticket_number,status,payment_status,payment_method,total,created_at
+      `SELECT id,order_number,LEFT(ticket_number,3) AS ticket_number,status,payment_status,payment_method,total,created_at
        FROM ordering_orders WHERE channel IN ('pos_direct','grab')
          AND created_at >= (($1::date + time '17:00') AT TIME ZONE 'Asia/Bangkok')
          AND created_at < ((($1::date + 1) + time '03:00') AT TIME ZONE 'Asia/Bangkok') ORDER BY order_number`,
@@ -492,7 +482,7 @@ router.get("/receipts/reconciliation", staffDevice, async (req, res) => {
 router.get("/kitchen/orders", staffDevice, async (_req, res) => {
   try {
     const result = await db().query(
-      `SELECT o.*, json_agg(to_jsonb(i) || jsonb_build_object('modifiers', COALESCE((SELECT jsonb_agg(jsonb_build_object('name_en',m.modifier_name_en,'price_delta',m.price_delta)) FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) items
+      `SELECT o.*, LEFT(o.ticket_number,3) AS ticket_number, json_agg(to_jsonb(i) || jsonb_build_object('modifiers', COALESCE((SELECT jsonb_agg(jsonb_build_object('name_en',m.modifier_name_en,'price_delta',m.price_delta)) FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) items
        FROM ordering_orders o JOIN ordering_order_items i ON i.order_id=o.id
        WHERE o.channel IN ('pos_direct','grab') AND o.status IN ('submitted','accepted','in_kitchen','ready') GROUP BY o.id ORDER BY o.created_at`,
     );
@@ -504,7 +494,7 @@ router.get("/display/orders", async (_req, res) => {
   try {
     const bounds = shiftBounds();
     await db().query(`UPDATE ordering_orders SET status='completed',updated_at=NOW() WHERE channel IN ('pos_direct','grab') AND status='ready' AND (updated_at < NOW() - INTERVAL '15 minutes' OR created_at < $1 OR created_at >= $2)`, [bounds.start.toJSDate(),bounds.end.toJSDate()]);
-    const result = await db().query(`SELECT id,ticket_number,status,updated_at FROM ordering_orders WHERE channel IN ('pos_direct','grab') AND status='ready' AND created_at >= $1 AND created_at < $2 ORDER BY updated_at DESC LIMIT 20`, [bounds.start.toJSDate(),bounds.end.toJSDate()]);
+    const result = await db().query(`SELECT id,LEFT(ticket_number,3) AS ticket_number,status,updated_at FROM ordering_orders WHERE channel IN ('pos_direct','grab') AND status='ready' AND created_at >= $1 AND created_at < $2 ORDER BY updated_at DESC LIMIT 20`, [bounds.start.toJSDate(),bounds.end.toJSDate()]);
     res.json({ ok:true, source:"sbb_pos_core", data:result.rows });
   } catch (e: any) { fail(res, e.message, 500); }
 });
@@ -524,6 +514,7 @@ router.patch("/orders/:id/status", staffDevice, async (req, res) => {
   try {
     const row = (await db().query(`UPDATE ordering_orders SET status=$2,updated_at=NOW() WHERE id=$1 AND status NOT IN ('completed','cancelled') RETURNING *`, [req.params.id,req.body.status])).rows[0];
     if (!row) return fail(res, "Order not found or already finalised", 409);
+    row.ticket_number = String(row.ticket_number || "").slice(0,3);
     await db().query(`INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,$2,$3)`, [row.id,row.status==="ready"?"ticket_ready":"order_updated",JSON.stringify({ticket_number:row.ticket_number,status:row.status})]);
     res.json({ ok:true, source:"sbb_pos_core", data:row });
   } catch (e: any) { fail(res, e.message, 500); }
