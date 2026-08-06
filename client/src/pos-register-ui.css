@@ -1,0 +1,154 @@
+/* POS register visual consistency pass.
+ * Keeps ordering logic untouched and only normalises product-card geometry.
+ * The existing card markup uses an absolutely-positioned image that can overlap titles;
+ * these scoped rules give every tile dedicated image, title, price and action zones.
+ */
+
+main.h-dvh section[data-category] > div.grid > button {
+  display: flex !important;
+  min-height: 264px !important;
+  margin-top: 0 !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+  padding: 12px !important;
+  border-radius: 22px !important;
+  background: #ffffff !important;
+}
+
+main.h-dvh section[data-category] > div.grid > button > div:first-child {
+  position: relative !important;
+  inset: auto !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  display: flex !important;
+  width: 100% !important;
+  height: 132px !important;
+  flex: 0 0 132px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: hidden !important;
+  background: transparent !important;
+}
+
+main.h-dvh section[data-category] > div.grid > button > div:first-child img {
+  width: 122px !important;
+  height: 122px !important;
+  max-width: 92% !important;
+  max-height: 122px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+main.h-dvh section[data-category] > div.grid > button > p:nth-of-type(1) {
+  display: flex !important;
+  min-height: 46px !important;
+  margin: 8px 2px 0 !important;
+  align-items: center !important;
+  justify-content: center !important;
+  overflow: visible !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.28 !important;
+  text-align: center !important;
+  -webkit-line-clamp: unset !important;
+}
+
+main.h-dvh section[data-category] > div.grid > button > p:nth-of-type(2) {
+  margin: 7px 0 10px !important;
+  font-size: 24px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  text-align: center !important;
+}
+
+main.h-dvh section[data-category] > div.grid > button > span:last-child {
+  display: grid !important;
+  width: 100% !important;
+  min-height: 36px !important;
+  margin-top: auto !important;
+  place-items: center !important;
+  border-radius: 9999px !important;
+  background: #ffd400 !important;
+  color: #000 !important;
+  font-size: 19px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+}
+
+main.h-dvh section[data-category] > div.grid > button:hover,
+main.h-dvh section[data-category] > div.grid > button:focus-visible {
+  border-color: #ffd400 !important;
+  box-shadow: 0 12px 30px rgba(38, 31, 7, 0.12) !important;
+}
+
+main.h-dvh section[data-category] > div.grid > button:hover > span:last-child,
+main.h-dvh section[data-category] > div.grid > button:focus-visible > span:last-child {
+  background: #111111 !important;
+  color: #ffffff !important;
+}
+
+@media (max-width: 1180px) {
+  main.h-dvh section[data-category] > div.grid > button {
+    min-height: 248px !important;
+    padding: 10px !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > div:first-child {
+    height: 116px !important;
+    flex-basis: 116px !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > div:first-child img {
+    width: 108px !important;
+    height: 108px !important;
+    max-height: 108px !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > p:nth-of-type(1) {
+    min-height: 44px !important;
+    font-size: 14px !important;
+    line-height: 1.25 !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > p:nth-of-type(2) {
+    font-size: 22px !important;
+  }
+}
+
+@media (max-width: 820px) {
+  main.h-dvh section[data-category] > div.grid > button {
+    min-height: 232px !important;
+    border-radius: 18px !important;
+    padding: 9px !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > div:first-child {
+    height: 102px !important;
+    flex-basis: 102px !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > div:first-child img {
+    width: 94px !important;
+    height: 94px !important;
+    max-height: 94px !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > p:nth-of-type(1) {
+    min-height: 42px !important;
+    margin-top: 7px !important;
+    font-size: 13.5px !important;
+    line-height: 1.22 !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > p:nth-of-type(2) {
+    margin-top: 6px !important;
+    margin-bottom: 8px !important;
+    font-size: 21px !important;
+  }
+
+  main.h-dvh section[data-category] > div.grid > button > span:last-child {
+    min-height: 34px !important;
+  }
+}
