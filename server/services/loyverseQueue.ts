@@ -1,21 +1,6 @@
-// PATCH O3 — LOYVERSE QUEUE (SAFE MODE)
-import { db } from "../lib/prisma";
-import { sendToLoyverse } from "./loyversePush";
+// Loyverse outbound queue intentionally disabled.
+// SBB POS is the live source of truth and no production order is pushed to Loyverse.
 
 export async function processLoyverseQueue() {
-  const prisma = db();
-  const pending = await prisma.orders_v2.findMany({
-    where: { loyverseStatus: "pending" },
-    include: { items: { include: { modifiers: true } } },
-    orderBy: { createdAt: "asc" },
-  });
-
-  for (const order of pending) {
-    try {
-      await sendToLoyverse(order);
-    } catch (err) {
-      // failed orders are left as "failed" until retry cycle
-      continue;
-    }
-  }
+  return { disabled: true, source: "sbb_pos_core" };
 }
