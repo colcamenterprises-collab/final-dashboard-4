@@ -61,11 +61,16 @@ function firstMenuImage(categories: any[]) {
   return "";
 }
 
+function numericSetting(value: any): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   const { tableCode } = useParams();
   const navigate = useNavigate();
   const cartKey = tablet ? "sbb_tablet_cart" : "sbb_order_cart";
-  const [language, setLanguage] = useState<OrderingLanguage>("en");
+  const [language] = useState<OrderingLanguage>("en");
   const [menu, setMenu] = useState<any[]>([]);
   const [menuLoading, setMenuLoading] = useState(true);
   const [cart, setCart] = useState<CartItem[]>(() => readSavedCart(cartKey));
@@ -77,6 +82,10 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   const [customerPhone, setCustomerPhone] = useState("");
   const [fulfilment, setFulfilment] = useState<Fulfilment>("pickup");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryLatitude, setDeliveryLatitude] = useState<number | null>(null);
+  const [deliveryLongitude, setDeliveryLongitude] = useState<number | null>(null);
+  const [deliveryDistanceKm, setDeliveryDistanceKm] = useState<number | null>(null);
+  const [deliveryInRange, setDeliveryInRange] = useState<boolean | null>(null);
   const [partnerAttribution, setPartnerAttribution] = useState<PartnerAttribution | null>(() => savedPartnerAttribution());
   const [member, setMember] = useState<MemberIdentity | null>(() => savedMember());
   const [membershipOpen, setMembershipOpen] = useState(false);
@@ -98,24 +107,28 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
     const memberToken = params.get("member");
     let active = true;
 
+    const applyPartner = (attribution: PartnerAttribution) => {
+      setPartnerAttribution(attribution);
+      setFulfilment("delivery");
+      setPaymentMethod((value) => value === "pay_at_counter" ? "cash" : value);
+      setDeliveryAddress(attribution.venue.address);
+      const lat = numericSetting(attribution.venue.latitude);
+      const lng = numericSetting(attribution.venue.longitude);
+      setDeliveryLatitude(lat);
+      setDeliveryLongitude(lng);
+      setDeliveryInRange(true);
+    };
+
     if (venueToken) {
       resolvePartnerVenueQr(venueToken, sessionKey()).then((payload) => {
         if (!active) return;
         const attribution = payload.data as PartnerAttribution;
         localStorage.setItem("sbb_partner_attribution", JSON.stringify(attribution));
-        setPartnerAttribution(attribution);
-        setFulfilment("delivery");
-        setPaymentMethod((value) => value === "pay_at_counter" ? "cash" : value);
-        setDeliveryAddress(attribution.venue.address);
+        applyPartner(attribution);
       }).catch((err) => { if (active) setError(err?.message || "This venue QR code could not be verified."); });
     } else {
       const existing = savedPartnerAttribution();
-      if (existing) {
-        setPartnerAttribution(existing);
-        setFulfilment("delivery");
-        setPaymentMethod((value) => value === "pay_at_counter" ? "cash" : value);
-        setDeliveryAddress(existing.venue.address);
-      }
+      if (existing) applyPartner(existing);
     }
 
     if (memberToken) {
@@ -139,6 +152,9 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
 
   const orderingEnabled = settings.store_order_enabled !== false;
   const qrEnabled = settings.manual_qr_transfer_enabled !== false;
+  const restaurantLatitude = numericSetting(settings.restaurant_latitude);
+  const restaurantLongitude = numericSetting(settings.restaurant_longitude);
+  const deliveryRadiusKm = Number(settings.delivery_radius_km || 0);
   const itemCount = useMemo(() => cart.reduce((sum, item) => sum + item.quantity, 0), [cart]);
   const cartTotal = useMemo(() => cart.reduce((sum, item) => sum + (Number(item.price) + item.modifiers.reduce((mods, modifier) => mods + Number(modifier.price_delta) * modifier.quantity, 0)) * item.quantity, 0), [cart]);
   const heroImage = useMemo(() => firstMenuImage(menu), [menu]);
@@ -149,7 +165,14 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
   function remove(index: number) { setCart((prev) => prev.filter((_, i) => i !== index)); }
   function chooseFulfilment(value: Fulfilment) {
     if (deliveryLocked) { setFulfilment("delivery"); setDeliveryAddress(partnerAttribution!.venue.address); return; }
-    setFulfilment(value); if (value === "pickup") setPaymentMethod("pay_at_counter"); else if (paymentMethod === "pay_at_counter") setPaymentMethod("cash");
+    setFulfilment(value);
+    if (value === "pickup") {
+      setPaymentMethod("pay_at_counter");
+      setDeliveryLatitude(null); setDeliveryLongitude(null); setDeliveryDistanceKm(null); setDeliveryInRange(null);
+    } else if (paymentMethod === "pay_at_counter") setPaymentMethod("cash");
+  }
+  function setDirectDeliveryLocation(latitude: number, longitude: number, distanceKm: number, inRange: boolean) {
+    setDeliveryLatitude(latitude); setDeliveryLongitude(longitude); setDeliveryDistanceKm(distanceKm); setDeliveryInRange(inRange);
   }
   function goToMenu() { document.querySelector(".sbo-category-nav")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
   function adoptMember(identity: MemberIdentity) { setMember(identity); setCustomerName(identity.name || ""); setCustomerPhone(identity.phone_display || ""); }
@@ -161,11 +184,17 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
     if (!tablet && !tableCode && !customerName.trim()) return setError("Please enter your name.");
     if (!tablet && !tableCode && !customerPhone.trim()) return setError("Please enter your phone number.");
     if (!tablet && !tableCode && fulfilment === "delivery" && !deliveryAddress.trim()) return setError("Please enter the delivery details.");
+    if (!tablet && !tableCode && fulfilment === "delivery" && !deliveryLocked && restaurantLatitude != null && restaurantLongitude != null && deliveryRadiusKm > 0) {
+      if (deliveryLatitude == null || deliveryLongitude == null) return setError("Please choose your delivery location on the map.");
+      if (deliveryInRange !== true) return setError(`Direct delivery is available within ${deliveryRadiusKm.toFixed(1)} km of the restaurant.`);
+    }
     setLoading(true);
     try {
       const fulfilmentNotes = tablet || tableCode ? orderNotes.trim() : [
         `FULFILMENT: ${fulfilment.toUpperCase()}`,
         fulfilment === "delivery" ? `DELIVERY DETAILS: ${deliveryAddress.trim()}` : "COLLECTION: Smash Brothers Burgers, Rawai",
+        fulfilment === "delivery" && deliveryLatitude != null && deliveryLongitude != null ? `DELIVERY PIN: ${deliveryLatitude.toFixed(6)}, ${deliveryLongitude.toFixed(6)}` : "",
+        deliveryDistanceKm != null ? `DELIVERY DISTANCE: ${deliveryDistanceKm.toFixed(2)} km` : "",
         partnerAttribution ? `PARTNER VENUE: ${partnerAttribution.venue.name} (${partnerAttribution.venue.code})` : "",
         member ? `MEMBER: ${member.member_number}` : "",
         orderNotes.trim() ? `CUSTOMER NOTE: ${orderNotes.trim()}` : "",
@@ -178,6 +207,9 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
         qr_code_id: partnerAttribution?.qr_code_id || member?.qr_code_id || null,
         attribution_started_at: partnerAttribution?.attribution_started_at || null,
         delivery_address_snapshot: fulfilment === "delivery" ? deliveryAddress.trim() : null,
+        delivery_latitude: fulfilment === "delivery" ? deliveryLatitude : null,
+        delivery_longitude: fulfilment === "delivery" ? deliveryLongitude : null,
+        delivery_distance_km: fulfilment === "delivery" ? deliveryDistanceKm : null,
         delivery_fee_standard: Number(settings.standard_delivery_fee || 0),
         delivery_fee_charged: Number(settings.delivery_fee_charged || 0),
         table_code: tableCode || null,
@@ -230,7 +262,7 @@ export default function OrderPage({ tablet = false }: { tablet?: boolean }) {
     </div>
 
     {itemCount > 0 && flowStep === "menu" && <button className="sbo-floating-cart" onClick={() => setFlowStep("cart")}><span><b>{itemCount}</b> {itemCount === 1 ? "item" : "items"}</span><span>View cart · {money(cartTotal)}</span></button>}
-    {flowStep !== "menu" && <OrderingFlow step={flowStep} cart={cart} language={language} total={cartTotal} loading={loading} orderingEnabled={orderingEnabled} qrEnabled={qrEnabled} fulfilment={fulfilment} paymentMethod={paymentMethod} customerName={customerName} customerPhone={customerPhone} deliveryAddress={deliveryAddress} orderNotes={orderNotes} error={error} partnerVenueName={partnerAttribution?.venue.name} deliveryLocked={deliveryLocked} onQty={qty} onRemove={remove} onClose={() => setFlowStep("menu")} onBack={() => flowStep === "checkout" ? setFlowStep("cart") : setFlowStep("menu")} onCheckout={() => setFlowStep("checkout")} onSubmit={submit} onFulfilment={chooseFulfilment} onPayment={setPaymentMethod} onName={setCustomerName} onPhone={setCustomerPhone} onAddress={deliveryLocked ? () => {} : setDeliveryAddress} onNotes={setOrderNotes} showCustomerDetails={!tablet && !tableCode} />}
+    {flowStep !== "menu" && <OrderingFlow step={flowStep} cart={cart} language={language} total={cartTotal} loading={loading} orderingEnabled={orderingEnabled} qrEnabled={qrEnabled} fulfilment={fulfilment} paymentMethod={paymentMethod} customerName={customerName} customerPhone={customerPhone} deliveryAddress={deliveryAddress} deliveryLatitude={deliveryLatitude} deliveryLongitude={deliveryLongitude} deliveryDistanceKm={deliveryDistanceKm} deliveryInRange={deliveryInRange} restaurantLatitude={restaurantLatitude} restaurantLongitude={restaurantLongitude} deliveryRadiusKm={deliveryRadiusKm} orderNotes={orderNotes} error={error} partnerVenueName={partnerAttribution?.venue.name} deliveryLocked={deliveryLocked} standardDeliveryFee={Number(settings.standard_delivery_fee || 0)} chargedDeliveryFee={Number(settings.delivery_fee_charged || 0)} onQty={qty} onRemove={remove} onClose={() => setFlowStep("menu")} onBack={() => flowStep === "checkout" ? setFlowStep("cart") : setFlowStep("menu")} onCheckout={() => setFlowStep("checkout")} onSubmit={submit} onFulfilment={chooseFulfilment} onPayment={setPaymentMethod} onName={setCustomerName} onPhone={setCustomerPhone} onAddress={deliveryLocked ? () => {} : setDeliveryAddress} onDeliveryLocation={setDirectDeliveryLocation} onNotes={setOrderNotes} showCustomerDetails={!tablet && !tableCode} />}
     {membershipOpen && !tablet && !tableCode && <MembershipSheet member={member} onMember={adoptMember} onClose={() => setMembershipOpen(false)} />}
   </main>;
 }
