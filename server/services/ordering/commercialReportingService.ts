@@ -7,9 +7,23 @@ function db() {
 }
 
 const activeOrderFilter = `o.status NOT IN ('cancelled','refunded')`;
+let reportingSchemaReady: Promise<void> | null = null;
+
+async function ensureReportingSchema() {
+  await ensureCommercialSchema();
+  if (!reportingSchemaReady) {
+    reportingSchemaReady = (async () => {
+      await db().query(`ALTER TABLE ordering_orders ADD COLUMN IF NOT EXISTS pos_origin_channel TEXT`);
+      await db().query(`ALTER TABLE ordering_orders ADD COLUMN IF NOT EXISTS customer_mobile TEXT`);
+      await db().query(`ALTER TABLE ordering_orders ADD COLUMN IF NOT EXISTS ticket_number TEXT`);
+      await db().query(`ALTER TABLE ordering_orders ADD COLUMN IF NOT EXISTS dining_type TEXT`);
+    })();
+  }
+  await reportingSchemaReady;
+}
 
 export async function getMemberProfile(id: string) {
-  await ensureCommercialSchema();
+  await ensureReportingSchema();
   const memberResult = await db().query(`
     SELECT m.*,q.id AS qr_code_id,q.token AS qr_token,
       COUNT(DISTINCT o.id)::int AS order_count,
@@ -47,7 +61,7 @@ export async function getMemberProfile(id: string) {
 }
 
 export async function listCustomerDirectory(tenant = "sbb") {
-  await ensureCommercialSchema();
+  await ensureReportingSchema();
   const result = await db().query(`
     WITH customer_orders AS (
       SELECT o.id,o.created_at,o.total,o.customer_name,
@@ -87,7 +101,7 @@ export async function listCustomerDirectory(tenant = "sbb") {
 }
 
 export async function commercialOverview(tenant = "sbb") {
-  await ensureCommercialSchema();
+  await ensureReportingSchema();
   const tenantKey = String(tenant || "sbb").trim().toLowerCase() || "sbb";
   const [memberResult, venueResult, orderResult] = await Promise.all([
     db().query(`SELECT COUNT(*)::int AS members FROM ordering_members WHERE tenant_key=$1 AND status='active'`,[tenantKey]),
@@ -108,7 +122,7 @@ export async function commercialOverview(tenant = "sbb") {
 }
 
 export async function detailedPartnerVenueReport(id: string) {
-  await ensureCommercialSchema();
+  await ensureReportingSchema();
   const summaryResult = await db().query(`
     WITH scans AS (
       SELECT q.partner_venue_id,COUNT(e.id)::int AS qr_scans
