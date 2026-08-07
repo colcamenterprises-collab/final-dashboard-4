@@ -36,6 +36,21 @@ const chime = () => {
   }
 };
 
+function orderSource(order: any) {
+  const origin = order.pos_origin_channel || order.channel;
+  if (order.channel_source === "partner_venue") return "PARTNER DELIVERY";
+  if (origin === "qr_table") return order.table_code ? `TABLE ${order.table_code}` : "QR TABLE";
+  if (origin === "tablet_counter") return "TABLET COUNTER";
+  if (origin === "online" && order.dining_type === "delivery") return "ONLINE DELIVERY";
+  if (origin === "online") return "ONLINE PICKUP";
+  if (origin === "grab" || order.order_mode === "grab") return "GRAB";
+  return "COUNTER";
+}
+
+function isCollectionOrder(order: any) {
+  return !["delivery", "table"].includes(String(order.dining_type || "").toLowerCase());
+}
+
 export default function PosKitchen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [error, setError] = useState("");
@@ -45,9 +60,9 @@ export default function PosKitchen() {
 
   const load = async () => {
     try {
-      const response = await fetch("/api/pos/kitchen/orders", { credentials: "include", cache: "no-store" });
+      const response = await fetch("/api/ordering/kitchen/orders", { credentials: "include", cache: "no-store" });
       const body = await response.json();
-      if (!response.ok || !body.ok) throw Error(body.error || "Could not load kitchen tickets");
+      if (!response.ok || !body.ok) throw Error(body.error || body?.blockers?.[0]?.message || "Could not load kitchen tickets");
       const next = body.data || [];
       const nextIds = new Set<string>(next.map((order: any) => String(order.id)));
       if (knownOrders.current) {
@@ -79,16 +94,16 @@ export default function PosKitchen() {
     if (next) chime();
   };
 
-  const updateStatus = async (id: string, status: "ready" | "completed") => {
+  const updateStatus = async (order: any, status: "ready" | "completed") => {
     try {
-      const response = await fetch(`/api/pos/orders/${id}/status`, {
+      const response = await fetch(`/api/ordering/orders/${order.id}/status`, {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, actor: "kitchen" }),
       });
       const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not update ticket");
+      if (!response.ok) throw new Error(body.error || body?.blockers?.[0]?.message || "Could not update ticket");
       await load();
       return true;
     } catch (cause: any) {
@@ -97,19 +112,26 @@ export default function PosKitchen() {
     }
   };
 
-  const markReady = async (id: string, ticket: string) => {
-    if (await updateStatus(id, "ready")) speakReady(ticket);
+  const markReady = async (order: any) => {
+    if (await updateStatus(order, "ready")) {
+      const ticket = order.ticket_number || String(order.order_number || "");
+      if (isCollectionOrder(order)) speakReady(ticket);
+    }
   };
 
   const clearAllReady = async () => {
-    if (!window.confirm("Clear every ready ticket from the customer display?")) return;
+    if (!window.confirm("Clear every ready ticket?")) return;
     try {
-      const response = await fetch("/api/pos/display/clear-ready", {
-        method: "POST",
-        credentials: "include",
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error || "Could not clear ready tickets");
+      for (const order of ready) {
+        const response = await fetch(`/api/ordering/orders/${order.id}/status`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "completed", actor: "kitchen_bulk_clear" }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error || body?.blockers?.[0]?.message || "Could not clear ready tickets");
+      }
       await load();
     } catch (cause: any) {
       setError(cause.message || "Could not clear ready tickets");
@@ -128,12 +150,24 @@ export default function PosKitchen() {
         : minutes >= 10
           ? "border-amber-500 bg-amber-50"
           : "border-neutral-300 bg-white";
+    const source = orderSource(order);
+    const completionLabel = order.dining_type === "delivery"
+      ? "Dispatched — clear ticket"
+      : order.dining_type === "table"
+        ? "Served — clear ticket"
+        : "Collected — clear ticket";
+    const readyLabel = order.dining_type === "delivery"
+      ? "Mark ready for delivery"
+      : order.dining_type === "table"
+        ? "Mark ready to serve"
+        : "Mark ready & call ticket";
     return (
       <article key={order.id} className={`w-[280px] shrink-0 rounded-xl border-2 p-4 shadow-sm ${urgency}`}>
-        <div className="flex justify-between">
+        <div className="flex justify-between gap-2">
           <strong className="text-3xl">{order.ticket_number || order.order_number}</strong>
-          <span className="rounded bg-yellow-100 px-2 py-1 text-xs font-bold">{order.order_mode || order.channel}</span>
+          <span className="rounded bg-yellow-100 px-2 py-1 text-right text-[10px] font-bold leading-tight">{source}</span>
         </div>
+        {order.customer_name && <p className="mt-2 text-sm font-black text-neutral-800">{order.customer_name}</p>}
         <p className="mt-2 text-sm font-black text-neutral-600">
           {minutes} min · {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
@@ -154,12 +188,12 @@ export default function PosKitchen() {
           ))}
         </ul>
         {isReady ? (
-          <button className="w-full rounded bg-neutral-900 p-3 font-bold text-white" onClick={() => updateStatus(order.id, "completed")}>
-            Collected — clear ticket
+          <button className="w-full rounded bg-neutral-900 p-3 font-bold text-white" onClick={() => updateStatus(order, "completed")}>
+            {completionLabel}
           </button>
         ) : (
-          <button className="w-full rounded bg-green-600 p-3 font-bold text-white" onClick={() => markReady(order.id, order.ticket_number || String(order.order_number || ""))}>
-            Mark ready & call ticket
+          <button className="w-full rounded bg-green-600 p-3 font-bold text-white" onClick={() => markReady(order)}>
+            {readyLabel}
           </button>
         )}
       </article>
@@ -172,7 +206,7 @@ export default function PosKitchen() {
         <div>
           <p className="font-bold text-yellow-600">SBB POS</p>
           <h1 className="text-3xl font-black">Kitchen tickets</h1>
-          <p className="mt-1 text-sm text-neutral-500">Live refresh every 3 seconds</p>
+          <p className="mt-1 text-sm text-neutral-500">Counter, Grab, online pickup, delivery and QR-table orders · live refresh every 3 seconds</p>
         </div>
         <button onClick={toggleSound} className={`rounded-xl px-4 py-3 text-sm font-black ${soundEnabled ? "bg-green-600 text-white" : "bg-white text-neutral-700"}`}>
           New-order sound: {soundEnabled ? "ON" : "OFF"}
@@ -189,8 +223,8 @@ export default function PosKitchen() {
       <section className="mt-8">
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-xl font-black">Ready for collection</h2>
-            <p className="text-sm text-neutral-500">Select Collected when the order is handed over.</p>
+            <h2 className="text-xl font-black">Ready</h2>
+            <p className="text-sm text-neutral-500">Collection, delivery and table orders stay here until handed over or dispatched.</p>
           </div>
           {ready.length > 0 && (
             <button className="rounded border border-red-300 bg-white px-4 py-2 text-sm font-bold text-red-700" onClick={clearAllReady}>
@@ -199,7 +233,7 @@ export default function PosKitchen() {
           )}
         </div>
         <div className="flex items-start gap-3 overflow-x-auto pb-5">{ready.map((order) => card(order, true))}</div>
-        {!ready.length && <p className="rounded border bg-white p-6 text-center text-neutral-500">No tickets waiting for collection.</p>}
+        {!ready.length && <p className="rounded border bg-white p-6 text-center text-neutral-500">No tickets waiting for handoff.</p>}
       </section>
     </main>
   );
