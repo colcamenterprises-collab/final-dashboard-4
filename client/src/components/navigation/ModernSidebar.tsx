@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
-import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, FileText, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode, Users } from "lucide-react";
+import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, FileText, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; testId: string; ownerOnly?: boolean; subItem?: boolean; };
