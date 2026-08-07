@@ -9,7 +9,7 @@ export default function AdminQrCodes() {
       <div className="mx-auto max-w-7xl px-4 pt-4 md:px-6 md:pt-6">
         <div className="inline-flex rounded-xl border border-neutral-200 bg-white p-1 shadow-sm">
           <button onClick={() => setTab("venues")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "venues" ? "bg-neutral-950 text-white" : "text-neutral-600"}`}>Partner Venues</button>
-          <button onClick={() => setTab("members")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "members" ? "bg-neutral-950 text-white" : "text-neutral-600"}`}>Memberships</button>
+          <button onClick={() => setTab("members")} className={`rounded-lg px-4 py-2 text-sm font-semibold ${tab === "members" ? "bg-neutral-950 text-white" : "text-neutral-600"}`}>Members & Customers</button>
         </div>
       </div>
       {tab === "venues" ? <AdminVenues /> : <AdminMembers />}
