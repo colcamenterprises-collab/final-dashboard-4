@@ -2,6 +2,11 @@ import { useEffect, useRef, useState } from "react";
 
 const ageMinutes = (createdAt: string) =>
   Math.max(0, Math.floor((Date.now() - new Date(createdAt).getTime()) / 60000));
+const displayTicket = (order: any) => {
+  const stored = String(order.ticket_number || "");
+  if (stored) return stored.slice(0, 3);
+  return String(order.order_number || "");
+};
 const spokenTicket = (ticket: string) => ticket.split("").join(" ");
 const speakReady = (ticket: string) => {
   if (!("speechSynthesis" in window)) return;
@@ -114,8 +119,7 @@ export default function PosKitchen() {
 
   const markReady = async (order: any) => {
     if (await updateStatus(order, "ready")) {
-      const ticket = order.ticket_number || String(order.order_number || "");
-      if (isCollectionOrder(order)) speakReady(ticket);
+      if (isCollectionOrder(order)) speakReady(displayTicket(order));
     }
   };
 
@@ -164,7 +168,7 @@ export default function PosKitchen() {
     return (
       <article key={order.id} className={`w-[280px] shrink-0 rounded-xl border-2 p-4 shadow-sm ${urgency}`}>
         <div className="flex justify-between gap-2">
-          <strong className="text-3xl">{order.ticket_number || order.order_number}</strong>
+          <strong className="text-3xl">{displayTicket(order)}</strong>
           <span className="rounded bg-yellow-100 px-2 py-1 text-right text-[10px] font-bold leading-tight">{source}</span>
         </div>
         {order.customer_name && <p className="mt-2 text-sm font-black text-neutral-800">{order.customer_name}</p>}
