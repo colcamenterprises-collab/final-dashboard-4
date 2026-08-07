@@ -40,8 +40,33 @@ export function attachSessionUser(req: Request): boolean {
   return true;
 }
 
+/**
+ * The legacy /api/finance router still has an old header-only auth guard.
+ * Director/beneficiary loans are implemented by the newer finance router that
+ * sits behind it. For this one route family, provide compatibility headers
+ * after the real session/PIN authentication has already succeeded so the old
+ * router passes through instead of incorrectly returning 401.
+ *
+ * These values are routing compatibility only; the loan router performs its
+ * own owner check from the PIN session and does not use them for persistence.
+ */
+function bridgeDirectorLoanLegacyFinanceGuard(req: Request) {
+  if (!req.path.startsWith("/api/finance/director-beneficiary-loans")) return;
+
+  const user = (req as any).user;
+  const userId = user?.uid ?? user?.id;
+  if (!userId) return;
+
+  req.headers["x-restaurant-id"] = req.headers["x-restaurant-id"] || "authenticated-session";
+  req.headers["x-user-id"] = req.headers["x-user-id"] || String(userId);
+  req.headers["x-user-role"] = req.headers["x-user-role"] || String(user?.role || "user");
+}
+
 export function requireSessionAuth(req: Request, res: Response, next: NextFunction) {
-  if (attachSessionUser(req)) return next();
+  if (attachSessionUser(req)) {
+    bridgeDirectorLoanLegacyFinanceGuard(req);
+    return next();
+  }
 
   const pinUser = getPinSessionUser(req);
   if (pinUser) {
@@ -54,6 +79,7 @@ export function requireSessionAuth(req: Request, res: Response, next: NextFuncti
       permissions: pinUser.permissions,
     };
     (req as any).tenantId = 1;
+    bridgeDirectorLoanLegacyFinanceGuard(req);
     return next();
   }
 
