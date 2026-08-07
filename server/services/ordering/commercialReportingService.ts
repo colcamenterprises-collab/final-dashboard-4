@@ -52,8 +52,7 @@ export async function listCustomerDirectory(tenant = "sbb") {
     WITH customer_orders AS (
       SELECT o.id,o.created_at,o.total,o.customer_name,
         COALESCE(NULLIF(o.customer_phone,''),NULLIF(o.customer_mobile,'')) AS phone,
-        o.member_id,o.partner_venue_id,COALESCE(o.pos_origin_channel,o.channel) AS origin_channel,
-        o.status
+        o.member_id,o.partner_venue_id,COALESCE(o.pos_origin_channel,o.channel) AS origin_channel
       FROM ordering_orders o
       WHERE ${activeOrderFilter}
         AND COALESCE(NULLIF(o.customer_phone,''),NULLIF(o.customer_mobile,'')) IS NOT NULL
@@ -64,9 +63,12 @@ export async function listCustomerDirectory(tenant = "sbb") {
     SELECT n.phone_normalized,
       (ARRAY_AGG(n.phone ORDER BY n.created_at DESC))[1] AS phone_display,
       (ARRAY_AGG(NULLIF(n.customer_name,'') ORDER BY n.created_at DESC) FILTER (WHERE NULLIF(n.customer_name,'') IS NOT NULL))[1] AS name,
-      COALESCE(MAX(m.id),MAX(n.member_id)) AS member_id,
-      MAX(m.member_number) AS member_number,
-      CASE WHEN COALESCE(MAX(m.id),MAX(n.member_id)) IS NULL THEN FALSE ELSE TRUE END AS is_member,
+      COALESCE(
+        (ARRAY_AGG(m.id) FILTER (WHERE m.id IS NOT NULL))[1],
+        (ARRAY_AGG(n.member_id) FILTER (WHERE n.member_id IS NOT NULL))[1]
+      ) AS member_id,
+      (ARRAY_AGG(m.member_number) FILTER (WHERE m.member_number IS NOT NULL))[1] AS member_number,
+      CASE WHEN COUNT(m.id) > 0 OR COUNT(n.member_id) > 0 THEN TRUE ELSE FALSE END AS is_member,
       COUNT(DISTINCT n.id)::int AS order_count,
       COALESCE(SUM(n.total),0)::numeric AS lifetime_spend,
       COALESCE(AVG(n.total),0)::numeric AS average_order_value,
@@ -108,20 +110,36 @@ export async function commercialOverview(tenant = "sbb") {
 export async function detailedPartnerVenueReport(id: string) {
   await ensureCommercialSchema();
   const summaryResult = await db().query(`
+    WITH scans AS (
+      SELECT q.partner_venue_id,COUNT(e.id)::int AS qr_scans
+      FROM ordering_qr_codes q
+      LEFT JOIN ordering_qr_events e ON e.qr_code_id=q.id AND e.event_type='scan'
+      WHERE q.partner_venue_id=$1 AND q.qr_type='partner_venue'
+      GROUP BY q.partner_venue_id
+    ), orders AS (
+      SELECT o.partner_venue_id,
+        COUNT(*)::int AS orders,
+        COALESCE(SUM(o.total),0)::numeric AS sales,
+        COALESCE(AVG(o.total),0)::numeric AS average_order_value,
+        COUNT(DISTINCT o.member_id)::int AS members,
+        COUNT(DISTINCT COALESCE(NULLIF(o.customer_phone,''),NULLIF(o.customer_mobile,'')))::int AS known_customers,
+        MAX(o.created_at) AS last_order_at
+      FROM ordering_orders o
+      WHERE o.partner_venue_id=$1 AND ${activeOrderFilter}
+      GROUP BY o.partner_venue_id
+    )
     SELECT v.id,v.name,v.code,v.address,v.contact_name,v.phone,v.created_at,
-      COUNT(DISTINCT e.id)::int AS qr_scans,
-      COUNT(DISTINCT o.id)::int AS orders,
-      COALESCE(SUM(DISTINCT CASE WHEN o.id IS NOT NULL THEN o.total ELSE 0 END),0)::numeric AS sales,
-      COALESCE(AVG(DISTINCT CASE WHEN o.id IS NOT NULL THEN o.total END),0)::numeric AS average_order_value,
-      COUNT(DISTINCT o.member_id)::int AS members,
-      COUNT(DISTINCT COALESCE(NULLIF(o.customer_phone,''),NULLIF(o.customer_mobile,'')))::int AS known_customers,
-      MAX(o.created_at) AS last_order_at
+      COALESCE(s.qr_scans,0)::int AS qr_scans,
+      COALESCE(r.orders,0)::int AS orders,
+      COALESCE(r.sales,0)::numeric AS sales,
+      COALESCE(r.average_order_value,0)::numeric AS average_order_value,
+      COALESCE(r.members,0)::int AS members,
+      COALESCE(r.known_customers,0)::int AS known_customers,
+      r.last_order_at
     FROM ordering_partner_venues v
-    LEFT JOIN ordering_qr_codes q ON q.partner_venue_id=v.id AND q.qr_type='partner_venue'
-    LEFT JOIN ordering_qr_events e ON e.qr_code_id=q.id AND e.event_type='scan'
-    LEFT JOIN ordering_orders o ON o.partner_venue_id=v.id AND ${activeOrderFilter}
+    LEFT JOIN scans s ON s.partner_venue_id=v.id
+    LEFT JOIN orders r ON r.partner_venue_id=v.id
     WHERE v.id=$1
-    GROUP BY v.id
   `,[id]);
   const summary = summaryResult.rows[0];
   if (!summary) throw new Error("Partner venue not found");
