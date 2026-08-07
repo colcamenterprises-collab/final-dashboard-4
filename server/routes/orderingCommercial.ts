@@ -7,11 +7,16 @@ import {
   listMembers,
   listPartnerVenues,
   lookupMember,
-  partnerVenueReport,
   resolveMemberQr,
   resolvePartnerQr,
   updatePartnerVenue,
 } from "../services/ordering/commercialService";
+import {
+  commercialOverview,
+  detailedPartnerVenueReport,
+  getMemberProfile,
+  listCustomerDirectory,
+} from "../services/ordering/commercialReportingService";
 
 const router = Router();
 
@@ -31,7 +36,6 @@ function fail(res: Response, error: any, status = 400) {
   return res.status(status).json({ ok: false, error: error?.message || String(error) });
 }
 
-// Public QR resolution. Scanning a partner code begins a 12-hour attribution window.
 router.get("/qr/partner/:token", async (req, res) => {
   try {
     const data = await resolvePartnerQr(req.params.token, {
@@ -44,7 +48,6 @@ router.get("/qr/partner/:token", async (req, res) => {
   }
 });
 
-// Public member QR resolution / very lightweight sign-up and lookup.
 router.get("/qr/member/:token", async (req, res) => {
   try {
     const data = await resolveMemberQr(req.params.token);
@@ -76,7 +79,14 @@ router.get("/members/lookup", async (req, res) => {
   }
 });
 
-// Owner/admin venue management and reporting.
+router.get("/admin/overview", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await commercialOverview(String(req.query.tenant || "sbb")) });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
 router.get("/admin/venues", requireAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await listPartnerVenues(String(req.query.tenant || "sbb")) });
@@ -111,7 +121,7 @@ router.get("/admin/venues/:id/qr", requireAdmin, async (req, res) => {
 
 router.get("/admin/venues/:id/report", requireAdmin, async (req, res) => {
   try {
-    return res.json({ ok: true, data: await partnerVenueReport(req.params.id) });
+    return res.json({ ok: true, data: await detailedPartnerVenueReport(req.params.id) });
   } catch (error) {
     return fail(res, error, 404);
   }
@@ -120,6 +130,22 @@ router.get("/admin/venues/:id/report", requireAdmin, async (req, res) => {
 router.get("/admin/members", requireAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await listMembers(String(req.query.tenant || "sbb")) });
+  } catch (error) {
+    return fail(res, error);
+  }
+});
+
+router.get("/admin/members/:id", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await getMemberProfile(req.params.id) });
+  } catch (error: any) {
+    return fail(res, error, error?.message === "Member not found" ? 404 : 400);
+  }
+});
+
+router.get("/admin/customers", requireAdmin, async (req, res) => {
+  try {
+    return res.json({ ok: true, data: await listCustomerDirectory(String(req.query.tenant || "sbb")) });
   } catch (error) {
     return fail(res, error);
   }
