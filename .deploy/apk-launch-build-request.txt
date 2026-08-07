@@ -1,4 +1,4 @@
 SBB POS launch APK build request
-requested_at=2026-08-05T12:05:00Z
+requested_at=2026-08-07T00:00:00Z
 requested_by=ChatGPT
-reason=Rebuild after workflow YAML and AndroidManifest fixes
+reason=Rebuild with complete Nearby Devices permissions and robust RFCOMM printer connection fallbacks
