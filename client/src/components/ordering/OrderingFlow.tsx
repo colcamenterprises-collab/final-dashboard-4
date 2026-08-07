@@ -1,4 +1,5 @@
 import OrderingCart from "./OrderingCart";
+import DirectDeliveryMap from "./DirectDeliveryMap";
 import { money, type CartItem, type OrderingLanguage } from "./orderingApi";
 
 type Props = {
@@ -14,6 +15,13 @@ type Props = {
   customerName: string;
   customerPhone: string;
   deliveryAddress: string;
+  deliveryLatitude: number | null;
+  deliveryLongitude: number | null;
+  deliveryDistanceKm: number | null;
+  deliveryInRange: boolean | null;
+  restaurantLatitude: number | null;
+  restaurantLongitude: number | null;
+  deliveryRadiusKm: number;
   orderNotes: string;
   error: string;
   partnerVenueName?: string | null;
@@ -31,6 +39,7 @@ type Props = {
   onName: (value: string) => void;
   onPhone: (value: string) => void;
   onAddress: (value: string) => void;
+  onDeliveryLocation: (latitude: number, longitude: number, distanceKm: number, inRange: boolean) => void;
   onNotes: (value: string) => void;
   showCustomerDetails: boolean;
 };
@@ -38,6 +47,10 @@ type Props = {
 export default function OrderingFlow(props: Props) {
   const standardFee = Number(props.standardDeliveryFee || 0);
   const chargedFee = Number(props.chargedDeliveryFee || 0);
+  const directDelivery = props.fulfilment === "delivery" && !props.deliveryLocked;
+  const deliveryLocationRequired = directDelivery && props.restaurantLatitude != null && props.restaurantLongitude != null && props.deliveryRadiusKm > 0;
+  const deliveryBlocked = deliveryLocationRequired && (props.deliveryLatitude == null || props.deliveryLongitude == null || props.deliveryInRange !== true);
+
   return <div className="sbo-flow-backdrop" onMouseDown={props.onClose}>
     <section className="sbo-flow-sheet" onMouseDown={(event) => event.stopPropagation()}>
       <div className="sbo-flow-head">
@@ -56,7 +69,9 @@ export default function OrderingFlow(props: Props) {
           </div>}
           <label>Name<input placeholder="Your name" value={props.customerName} onChange={(e) => props.onName(e.target.value)} /></label>
           <label>Phone<input inputMode="tel" placeholder="Phone number" value={props.customerPhone} onChange={(e) => props.onPhone(e.target.value)} /></label>
-          {props.fulfilment === "delivery" && <label>Delivery details<textarea readOnly={props.deliveryLocked} placeholder="Address, hotel or villa and unit" value={props.deliveryAddress} onChange={(e) => props.onAddress(e.target.value)} /></label>}
+          {directDelivery && <DirectDeliveryMap restaurantLatitude={props.restaurantLatitude} restaurantLongitude={props.restaurantLongitude} radiusKm={props.deliveryRadiusKm} latitude={props.deliveryLatitude} longitude={props.deliveryLongitude} onLocation={props.onDeliveryLocation} />}
+          {props.fulfilment === "delivery" && <label>Delivery details<textarea readOnly={props.deliveryLocked} placeholder="Villa, hotel/building name, room/unit and any driver instructions" value={props.deliveryAddress} onChange={(e) => props.onAddress(e.target.value)} /></label>}
+          {directDelivery && props.deliveryDistanceKm != null && props.deliveryInRange === true && <div className="rounded-xl bg-neutral-50 p-3 text-xs text-neutral-600">Delivery pin confirmed · approximately <strong>{props.deliveryDistanceKm.toFixed(2)} km</strong> from the restaurant.</div>}
         </>}
         <label>Order notes<textarea placeholder="Anything the kitchen should know?" value={props.orderNotes} onChange={(e) => props.onNotes(e.target.value)} /></label>
         <label>Payment<select value={props.paymentMethod} onChange={(e) => props.onPayment(e.target.value)}>
@@ -65,8 +80,9 @@ export default function OrderingFlow(props: Props) {
           {props.qrEnabled && <option value="manual_qr_transfer">QR transfer</option>}
         </select></label>
         {props.fulfilment === "delivery" && <div className="sbo-delivery-free"><span>Delivery</span><strong>{chargedFee === 0 ? <>{standardFee > 0 && <del>{money(standardFee)}</del>} <b>FREE</b></> : money(chargedFee)}</strong></div>}
+        {deliveryBlocked && <div className="sbo-modal-error">Choose a delivery pin inside the {props.deliveryRadiusKm.toFixed(1)} km delivery area before placing the order.</div>}
         {props.error && <div className="sbo-modal-error">{props.error}</div>}
-        <button className="sbo-primary-flow-btn" disabled={!props.cart.length || props.loading || !props.orderingEnabled} onClick={props.onSubmit}>{props.loading ? "Sending order..." : `Place order · ${money(props.total + (props.fulfilment === "delivery" ? chargedFee : 0))}`}</button>
+        <button className="sbo-primary-flow-btn" disabled={!props.cart.length || props.loading || !props.orderingEnabled || deliveryBlocked} onClick={props.onSubmit}>{props.loading ? "Sending order..." : `Place order · ${money(props.total + (props.fulfilment === "delivery" ? chargedFee : 0))}`}</button>
       </section>}
     </section>
   </div>;
