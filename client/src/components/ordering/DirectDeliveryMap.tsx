@@ -57,7 +57,7 @@ export default function DirectDeliveryMap(props: Props) {
   const [mapError, setMapError] = useState("");
   const [locating, setLocating] = useState(false);
 
-  const configured = Number.isFinite(props.restaurantLatitude) && Number.isFinite(props.restaurantLongitude) && props.radiusKm > 0;
+  const configured = props.restaurantLatitude != null && props.restaurantLongitude != null && Number.isFinite(props.restaurantLatitude) && Number.isFinite(props.restaurantLongitude) && props.radiusKm > 0;
   const currentDistance = useMemo(() => {
     if (!configured || props.latitude == null || props.longitude == null) return null;
     return distanceKm(props.restaurantLatitude!, props.restaurantLongitude!, props.latitude, props.longitude);
