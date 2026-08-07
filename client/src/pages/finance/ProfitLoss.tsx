@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown } from "lucide-react";
+import LoanLiabilitiesSummary from "./LoanLiabilitiesSummary";
 
 interface MonthData {
   sales: number;
@@ -75,6 +76,8 @@ export default function ProfitLoss() {
           Bank deposit reconciliation data is unavailable. Sales and profit remain separate, but deposit figures must not be treated as zero.
         </div>
       )}
+
+      <LoanLiabilitiesSummary />
 
       {!isLoading && !isError && months.length === 0 && (
         <div className="text-center py-12 text-slate-400 text-xs">No P&L data available.</div>
