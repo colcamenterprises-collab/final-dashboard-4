@@ -10,7 +10,6 @@ import PinLoginGate, { usePinAuth } from "./components/PinLoginGate";
 import PageShell from "./layouts/PageShell";
 import Home from "./pages/Home";
 import NotFound from "./pages/NotFound";
-
 import DailySalesForm from "./pages/operations/daily-sales/Form";
 import DailyFormsResume from "./pages/operations/DailyFormsResume";
 import DailyCleaning from "./pages/operations/DailyCleaningV2";
@@ -25,22 +24,19 @@ import ShoppingList from "./pages/operations/ShoppingList";
 import IssueRegister from "./pages/operations/IssueRegister";
 import ManagerChecklist from "./pages/operations/ManagerChecklist";
 import HealthSafety from "./pages/operations/HealthSafety";
-
 import MenuWorkspace from "./pages/menu/MenuWorkspace";
-
 import FinanceHub from "./pages/finance/FinanceHub";
 import ProfitLoss from "./pages/finance/ProfitLoss";
 import Expenses from "./pages/finance/ExpensesPersonal";
 import ExpensesImport from "./pages/finance/ExpensesImport";
-
-import ShiftReports from "./pages/reports/ShiftReports";
 import ShiftHistory from "./pages/reports/ShiftHistory";
 import Export from "./pages/reports/Export";
 import ReceiptAnalytics from "./pages/reports/ReceiptAnalytics";
+import ReceiptsReport from "./pages/reports/ReceiptsReport";
+import ShiftReviewReport from "./pages/reports/ShiftReviewReport";
 import SalesByItem from "./pages/reports/SalesByItem";
 import InventoryReconciliation from "./pages/reports/InventoryReconciliation";
 import HistoricalReports from "./pages/reports/HistoricalReports";
-
 import Orders from "./pages/ordering/Orders";
 import Catalog from "./pages/ordering/Catalog";
 import OnlineOrdering from "./pages/ordering/OnlineOrdering";
@@ -58,7 +54,6 @@ import PosKitchen from "./pages/pos/PosKitchen";
 import PosDisplay from "./pages/pos/PosDisplay";
 import PrinterSettings from "./pages/pos/PrinterSettings";
 import PosShifts from "./pages/pos/PosShifts";
-
 import StaffDashboard from "./pages/staff/Dashboard";
 import StaffMembers from "./pages/staff/Members";
 import StaffRoster from "./pages/staff/Roster";
@@ -70,108 +65,33 @@ import Profile from "./pages/settings/Profile";
 
 function OwnerRoute({ children }: { children: JSX.Element }) {
   const { currentUser } = usePinAuth();
-  if (currentUser?.role !== "owner") {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (currentUser?.role !== "owner") return <Navigate to="/dashboard" replace />;
   return children;
 }
 
 export default function App() {
-  return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <TooltipProvider>
-            <BrowserRouter>
-              <PinLoginGate>
-                <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/login" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/staff" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/menu" element={<Navigate to="/menu/items" replace />} />
-                  <Route path="/membership" element={<Navigate to="/dashboard" replace />} />
-                  <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
-                  <Route path="/order" element={<OrderPage />} />
-                  <Route path="/order/:venueCode" element={<OrderPage />} />
-                  <Route path="/order/table/:tableCode" element={<OrderPage />} />
-                  <Route path="/order/status/:orderId" element={<OrderStatus />} />
-                  <Route path="/ordering/tablet" element={<OrderPage tablet />} />
-                  <Route path="/kitchen/display" element={<KitchenDisplay />} />
-                  <Route path="/pos" element={<ProtectedRoute><PosRegisterGate /></ProtectedRoute>} />
-                  <Route path="/pos/kitchen" element={<ProtectedRoute><PosKitchen /></ProtectedRoute>} />
-                  <Route path="/pos/display" element={<PosDisplay />} />
-                  <Route path="/pos/shifts" element={<ProtectedRoute><PosShifts /></ProtectedRoute>} />
-                  <Route path="/pos/catalog" element={<Navigate to="/menu/items" replace />} />
-                  <Route element={<PageShell />}>
-                    <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} />
-                    <Route path="/pos/printer-settings" element={<ProtectedRoute><PrinterSettings /></ProtectedRoute>} />
-                    <Route path="/settings/printers" element={<Navigate to="/pos/printer-settings" replace />} />
-                    <Route path="/printer-settings" element={<Navigate to="/pos/printer-settings" replace />} />
-                    <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
-                    <Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} />
-                    <Route path="/operations/daily-forms/resume" element={<ProtectedRoute><DailyFormsResume /></ProtectedRoute>} />
-                    <Route path="/operations/daily-cleaning" element={<ProtectedRoute><DailyCleaning /></ProtectedRoute>} />
-                    <Route path="/operations/daily-stock" element={<ProtectedRoute><DailyStock /></ProtectedRoute>} />
-                    <Route path="/operations/daily-sales-v2/library" element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/operations/daily-sales-analysis" element={<ProtectedRoute><DailySalesAnalysis /></ProtectedRoute>} />
-                    <Route path="/operations/daily-stock-analysis" element={<ProtectedRoute><DailyStockAnalysis /></ProtectedRoute>} />
-                    <Route path="/operations/daily-sales-library" element={<Navigate to="/operations/daily-sales-v2/library" replace />} />
-                    <Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} />
-                    <Route path="/operations/purchase-lodgement" element={<ProtectedRoute><PurchaseLodgement /></ProtectedRoute>} />
-                    <Route path="/operations/shopping-list" element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} />
-                    <Route path="/operations/issue-register" element={<ProtectedRoute><IssueRegister /></ProtectedRoute>} />
-                    <Route path="/operations/manager-checklist" element={<ProtectedRoute><ManagerChecklist /></ProtectedRoute>} />
-                    <Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
-                    <Route path="/menu/items" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/recipes" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/recipes/new" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/recipes/:recipeId/edit" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/modifiers" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/categories" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/ingredients" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} />
-                    <Route path="/menu/cost-calculator" element={<ProtectedRoute><Navigate to="/menu/recipes" replace /></ProtectedRoute>} />
-                    <Route path="/finance" element={<ProtectedRoute><FinanceHub /></ProtectedRoute>} />
-                    <Route path="/finance/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} />
-                    <Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
-                    <Route path="/finance/expenses-import" element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
-                    <Route path="/reports/sales-summary" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><SalesByItem /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/shift-report" element={<ProtectedRoute><OwnerRoute><ShiftHistory /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
-                    <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} />
-                    <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
-                    <Route path="/reports/receipts-analysis" element={<Navigate to="/reports/sales-summary" replace />} />
-                    <Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="/online-ordering" element={<OnlineOrdering />} />
-                    <Route path="/online-ordering/checkout" element={<Checkout />} />
-                    <Route path="/online-ordering/confirmation" element={<Confirmation />} />
-                    <Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-                    <Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} />
-                    <Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} />
-                    <Route path="/admin/ordering/menu" element={<ProtectedRoute><AdminMenu /></ProtectedRoute>} />
-                    <Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} />
-                    <Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} />
-                    <Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
-                    <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} />
-                    <Route path="/staff/members" element={<ProtectedRoute><StaffMembers /></ProtectedRoute>} />
-                    <Route path="/staff/roster" element={<ProtectedRoute><StaffRoster /></ProtectedRoute>} />
-                    <Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} />
-                    <Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} />
-                    <Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} />
-                    <Route path="/settings/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                    <Route path="/settings/staff-access" element={<ProtectedRoute><OwnerRoute><StaffAccess /></OwnerRoute></ProtectedRoute>} />
-                    <Route path="*" element={<NotFound />} />
-                  </Route>
-                </Routes>
-                <Toaster />
-              </PinLoginGate>
-            </BrowserRouter>
-          </TooltipProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  );
+  return <ErrorBoundary><QueryClientProvider client={queryClient}><AuthProvider><TooltipProvider><BrowserRouter><PinLoginGate><Routes>
+    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+    <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+    <Route path="/staff" element={<Navigate to="/dashboard" replace />} />
+    <Route path="/menu" element={<Navigate to="/menu/items" replace />} />
+    <Route path="/membership" element={<Navigate to="/dashboard" replace />} />
+    <Route path="/operations/loyverse-mirror" element={<ProtectedRoute><OwnerRoute><LoyverseMirror /></OwnerRoute></ProtectedRoute>} />
+    <Route path="/order" element={<OrderPage />} /><Route path="/order/:venueCode" element={<OrderPage />} /><Route path="/order/table/:tableCode" element={<OrderPage />} /><Route path="/order/status/:orderId" element={<OrderStatus />} /><Route path="/ordering/tablet" element={<OrderPage tablet />} /><Route path="/kitchen/display" element={<KitchenDisplay />} />
+    <Route path="/pos" element={<ProtectedRoute><PosRegisterGate /></ProtectedRoute>} /><Route path="/pos/kitchen" element={<ProtectedRoute><PosKitchen /></ProtectedRoute>} /><Route path="/pos/display" element={<PosDisplay />} /><Route path="/pos/shifts" element={<ProtectedRoute><PosShifts /></ProtectedRoute>} /><Route path="/pos/catalog" element={<Navigate to="/menu/items" replace />} />
+    <Route element={<PageShell />}>
+      <Route path="/dashboard" element={<ProtectedRoute><Home /></ProtectedRoute>} /><Route path="/pos/printer-settings" element={<ProtectedRoute><PrinterSettings /></ProtectedRoute>} /><Route path="/settings/printers" element={<Navigate to="/pos/printer-settings" replace />} /><Route path="/printer-settings" element={<Navigate to="/pos/printer-settings" replace />} />
+      <Route path="/operations/daily-sales" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} /><Route path="/operations/daily-sales/edit/:id" element={<ProtectedRoute><DailySalesForm /></ProtectedRoute>} /><Route path="/operations/daily-forms/resume" element={<ProtectedRoute><DailyFormsResume /></ProtectedRoute>} /><Route path="/operations/daily-cleaning" element={<ProtectedRoute><DailyCleaning /></ProtectedRoute>} /><Route path="/operations/daily-stock" element={<ProtectedRoute><DailyStock /></ProtectedRoute>} /><Route path="/operations/daily-sales-v2/library" element={<ProtectedRoute><OwnerRoute><DailySalesV2Library /></OwnerRoute></ProtectedRoute>} /><Route path="/operations/daily-sales-analysis" element={<ProtectedRoute><DailySalesAnalysis /></ProtectedRoute>} /><Route path="/operations/daily-stock-analysis" element={<ProtectedRoute><DailyStockAnalysis /></ProtectedRoute>} /><Route path="/operations/daily-sales-library" element={<Navigate to="/operations/daily-sales-v2/library" replace />} /><Route path="/operations/purchasing" element={<ProtectedRoute><PurchasingPage /></ProtectedRoute>} /><Route path="/operations/purchase-lodgement" element={<ProtectedRoute><PurchaseLodgement /></ProtectedRoute>} /><Route path="/operations/shopping-list" element={<ProtectedRoute><ShoppingList /></ProtectedRoute>} /><Route path="/operations/issue-register" element={<ProtectedRoute><IssueRegister /></ProtectedRoute>} /><Route path="/operations/manager-checklist" element={<ProtectedRoute><ManagerChecklist /></ProtectedRoute>} /><Route path="/operations/health-safety" element={<ProtectedRoute><HealthSafety /></ProtectedRoute>} />
+      <Route path="/menu/items" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} /><Route path="/menu/recipes" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} /><Route path="/menu/recipes/new" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} /><Route path="/menu/recipes/:recipeId/edit" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} /><Route path="/menu/modifiers" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} /><Route path="/menu/categories" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} /><Route path="/menu/ingredients" element={<ProtectedRoute><MenuWorkspace /></ProtectedRoute>} /><Route path="/menu/cost-calculator" element={<ProtectedRoute><Navigate to="/menu/recipes" replace /></ProtectedRoute>} />
+      <Route path="/finance" element={<ProtectedRoute><FinanceHub /></ProtectedRoute>} /><Route path="/finance/profit-loss" element={<ProtectedRoute><ProfitLoss /></ProtectedRoute>} /><Route path="/finance/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} /><Route path="/finance/expenses-import" element={<ProtectedRoute><ExpensesImport /></ProtectedRoute>} />
+      <Route path="/reports/sales-summary" element={<ProtectedRoute><OwnerRoute><ReceiptAnalytics /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><ShiftReviewReport /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/payment-types" element={<ProtectedRoute><OwnerRoute><HistoricalReports /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptsReport /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><SalesByItem /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/shift-report" element={<ProtectedRoute><OwnerRoute><ShiftHistory /></OwnerRoute></ProtectedRoute>} /><Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} /><Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} /><Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} /><Route path="/reports/receipts-analysis" element={<Navigate to="/reports/sales-summary" replace />} /><Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/online-ordering" element={<OnlineOrdering />} /><Route path="/online-ordering/checkout" element={<Checkout />} /><Route path="/online-ordering/confirmation" element={<Confirmation />} /><Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} /><Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} /><Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} /><Route path="/admin/ordering/menu" element={<ProtectedRoute><AdminMenu /></ProtectedRoute>} /><Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} /><Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} /><Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
+      <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} /><Route path="/staff/members" element={<ProtectedRoute><StaffMembers /></ProtectedRoute>} /><Route path="/staff/roster" element={<ProtectedRoute><StaffRoster /></ProtectedRoute>} /><Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} /><Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} /><Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} /><Route path="/settings/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} /><Route path="/settings/staff-access" element={<ProtectedRoute><OwnerRoute><StaffAccess /></OwnerRoute></ProtectedRoute>} /><Route path="*" element={<NotFound />} />
+    </Route>
+  </Routes><Toaster /></PinLoginGate></BrowserRouter></TooltipProvider></AuthProvider></QueryClientProvider></ErrorBoundary>;
 }
