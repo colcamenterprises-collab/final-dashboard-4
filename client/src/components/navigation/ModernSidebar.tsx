@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
-import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, FileText, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown } from "lucide-react";
+import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, FileText, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; testId: string; ownerOnly?: boolean; subItem?: boolean; };
@@ -35,6 +35,12 @@ const navigationGroups: NavGroup[] = [
     { to: "/menu/recipes", label: "Recipes & Costing", icon: BookOpen, testId: "nav-recipes" },
     { to: "/menu/modifiers", label: "Modifiers", icon: List, testId: "nav-modifiers" },
     { to: "/menu/categories", label: "Categories", icon: List, testId: "nav-menu-categories" },
+  ]},
+  { title: "Online Ordering", icon: Globe2, items: [
+    { to: "/order", label: "Live Ordering Site", icon: Globe2, testId: "nav-online-ordering-live" },
+    { to: "/ordering/orders", label: "Online Orders", icon: ShoppingCart, testId: "nav-online-orders" },
+    { to: "/admin/ordering/qr-codes", label: "QR Codes & Members", icon: QrCode, testId: "nav-online-qr-members", ownerOnly: true },
+    { to: "/admin/ordering/settings", label: "Delivery & Ordering Settings", icon: Settings, testId: "nav-online-settings", ownerOnly: true },
   ]},
   { title: "POS", icon: ShoppingBag, items: [
     { to: "/pos", label: "Register POS", icon: ShoppingBag, testId: "nav-pos-register" },
