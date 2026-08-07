@@ -1,0 +1,22 @@
+name: Validate Loyverse retirement PR311
+
+on:
+  push:
+    branches:
+      - agent/disable-live-loyverse-ingestion-20260807
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
