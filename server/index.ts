@@ -777,13 +777,9 @@ async function checkSchema() {
               console.error('[SCHEDULER] Daily shift anomaly audit failed', error);
             }
           }, { timezone: 'Asia/Bangkok' });
-          
-          // PATCH O3 — LOYVERSE QUEUE SCHEDULER
-          const { processLoyverseQueue } = await import('./services/loyverseQueue.js');
-          setInterval(() => {
-            processLoyverseQueue().catch(err => console.error('Loyverse queue error:', err));
-          }, 30000); // run every 30 seconds
-          console.log("📦 Loyverse order queue scheduled every 30 seconds");
+
+          // Loyverse live ingestion is retired. Do not register queue polling.
+          console.log("📦 Loyverse live queue disabled — no polling timer registered");
 
           // PATCH O14 — Ensure default SaaS tenant exists
           await TenantScoped.ensureRestaurantExists();
