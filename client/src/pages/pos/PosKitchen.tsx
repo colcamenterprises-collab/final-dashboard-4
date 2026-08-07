@@ -56,6 +56,13 @@ function isCollectionOrder(order: any) {
   return !["delivery", "table"].includes(String(order.dining_type || "").toLowerCase());
 }
 
+function statusEndpoint(order: any) {
+  const origin = String(order.pos_origin_channel || order.channel || "");
+  return ["online", "qr_table", "tablet_counter"].includes(origin)
+    ? `/api/ordering/orders/${order.id}/status`
+    : `/api/pos/orders/${order.id}/status`;
+}
+
 export default function PosKitchen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [error, setError] = useState("");
@@ -101,7 +108,7 @@ export default function PosKitchen() {
 
   const updateStatus = async (order: any, status: "ready" | "completed") => {
     try {
-      const response = await fetch(`/api/ordering/orders/${order.id}/status`, {
+      const response = await fetch(statusEndpoint(order), {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -127,7 +134,7 @@ export default function PosKitchen() {
     if (!window.confirm("Clear every ready ticket?")) return;
     try {
       for (const order of ready) {
-        const response = await fetch(`/api/ordering/orders/${order.id}/status`, {
+        const response = await fetch(statusEndpoint(order), {
           method: "PATCH",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
