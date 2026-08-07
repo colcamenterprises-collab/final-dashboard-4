@@ -1,9 +1,20 @@
 import { Router } from "express";
 import { pool } from "../db";
+import { getPinSessionUser } from "./pinAuth";
 
 const router = Router();
 
+function requireOwner(req: any, res: any) {
+  const user = getPinSessionUser(req);
+  if (!user || user.role !== "owner") {
+    res.status(403).json({ ok: false, error: "Owner access required" });
+    return false;
+  }
+  return true;
+}
+
 async function ensureTable() {
+  await pool.query(`CREATE EXTENSION IF NOT EXISTS pgcrypto`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS director_beneficiary_loans (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -16,6 +27,11 @@ async function ensureTable() {
     )
   `);
 }
+
+router.use((req, res, next) => {
+  if (!requireOwner(req, res)) return;
+  next();
+});
 
 router.get("/", async (_req, res) => {
   try {
