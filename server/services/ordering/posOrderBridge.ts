@@ -28,6 +28,7 @@ function diningType(input: any) {
   if (["pickup", "delivery", "table", "counter"].includes(requested)) return requested;
   if (input?.table_code) return "table";
   if (input?.channel === "tablet_counter") return "counter";
+  if (String(input?.delivery_address_snapshot || "").trim()) return "delivery";
   return "pickup";
 }
 
