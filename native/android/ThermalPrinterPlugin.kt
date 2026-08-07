@@ -67,28 +67,39 @@ class ThermalPrinterPlugin : Plugin() {
     @PermissionCallback
     private fun bluetoothPermissionCallback(call: PluginCall) {
         if (!hasBluetoothPermission()) {
-            call.reject("Nearby devices permission was not granted")
+            call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.")
             return
         }
-        if (call.methodName == "connect") connectGranted(call) else listPrintersGranted(call)
+        when (call.methodName) {
+            "connect" -> connectGranted(call)
+            else -> listPrintersGranted(call)
+        }
     }
 
     private fun listPrintersGranted(call: PluginCall) {
         val adapter = requireBluetooth(call) ?: return
         try {
+            val paired = adapter.bondedDevices.sortedWith(
+                compareBy<BluetoothDevice> { it.name?.lowercase() ?: "" }.thenBy { it.address }
+            )
             val result = JSArray()
-            adapter.bondedDevices.sortedBy { it.name ?: it.address }.forEach { device ->
+            paired.forEach { device ->
                 val item = JSObject()
-                item.put("name", device.name ?: "Bluetooth printer")
+                item.put("name", device.name ?: "Bluetooth device")
                 item.put("address", device.address)
                 item.put("bonded", device.bondState == BluetoothDevice.BOND_BONDED)
+                item.put("deviceClass", device.bluetoothClass?.deviceClass ?: 0)
                 result.put(item)
             }
             val ret = JSObject()
             ret.put("printers", result)
+            ret.put("pairedCount", paired.size)
+            ret.put("permissionGranted", true)
             call.resolve(ret)
+        } catch (error: SecurityException) {
+            call.reject("Android blocked access to paired Bluetooth devices. Allow Nearby devices for Smash Brothers POS.", error)
         } catch (error: Exception) {
-            call.reject("Could not list paired Bluetooth devices", error)
+            call.reject("Could not list paired Bluetooth devices: ${error.message ?: "unknown error"}", error)
         }
     }
 
@@ -113,19 +124,63 @@ class ThermalPrinterPlugin : Plugin() {
             try {
                 disconnectInternal()
                 val device = adapter.getRemoteDevice(address)
-                adapter.cancelDiscovery()
-                val newSocket = device.createRfcommSocketToServiceRecord(sppUuid)
-                newSocket.connect()
-                socket = newSocket
+                if (device.bondState != BluetoothDevice.BOND_BONDED) {
+                    call.reject("The selected printer is not paired in Android Bluetooth settings")
+                    return@Thread
+                }
+
+                try {
+                    adapter.cancelDiscovery()
+                } catch (_: Exception) { }
+
+                val errors = mutableListOf<String>()
+                val attempts = listOf<Pair<String, () -> BluetoothSocket>>(
+                    "secure SPP" to { device.createRfcommSocketToServiceRecord(sppUuid) },
+                    "insecure SPP" to { device.createInsecureRfcommSocketToServiceRecord(sppUuid) },
+                    "RFCOMM channel 1" to {
+                        val method = device.javaClass.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                        method.isAccessible = true
+                        method.invoke(device, 1) as BluetoothSocket
+                    }
+                )
+
+                var activeSocket: BluetoothSocket? = null
+                var connectionMethod = ""
+                for ((label, factory) in attempts) {
+                    var candidate: BluetoothSocket? = null
+                    try {
+                        candidate = factory()
+                        candidate.connect()
+                        activeSocket = candidate
+                        connectionMethod = label
+                        break
+                    } catch (attemptError: Exception) {
+                        errors.add("$label: ${rootMessage(attemptError)}")
+                        try { candidate?.close() } catch (_: Exception) { }
+                        try { Thread.sleep(150) } catch (_: InterruptedException) { }
+                    }
+                }
+
+                if (activeSocket == null || !activeSocket.isConnected) {
+                    val detail = errors.joinToString(" | ")
+                    call.reject("Could not connect to Bluetooth printer. $detail")
+                    return@Thread
+                }
+
+                socket = activeSocket
                 connectedDevice = device
                 val ret = JSObject()
                 ret.put("connected", true)
                 ret.put("name", device.name ?: "Bluetooth printer")
                 ret.put("address", device.address)
+                ret.put("connectionMethod", connectionMethod)
                 call.resolve(ret)
+            } catch (error: SecurityException) {
+                disconnectInternal()
+                call.reject("Android blocked the Bluetooth connection. Allow Nearby devices for Smash Brothers POS.", error)
             } catch (error: Exception) {
                 disconnectInternal()
-                call.reject("Could not connect to Bluetooth printer: ${error.message ?: "connection failed"}", error)
+                call.reject("Could not connect to Bluetooth printer: ${rootMessage(error)}", error)
             }
         }.start()
     }
@@ -142,7 +197,15 @@ class ThermalPrinterPlugin : Plugin() {
     fun getStatus(call: PluginCall) {
         val ret = JSObject()
         val active = socket?.isConnected == true
+        val adapter = adapter()
         ret.put("connected", active)
+        ret.put("bridgeOpen", true)
+        ret.put("bluetoothSupported", adapter != null)
+        ret.put("bluetoothEnabled", adapter?.isEnabled == true)
+        ret.put("permissionGranted", hasBluetoothPermission())
+        if (hasBluetoothPermission() && adapter != null) {
+            try { ret.put("pairedCount", adapter.bondedDevices.size) } catch (_: Exception) { ret.put("pairedCount", -1) }
+        }
         if (active) {
             ret.put("name", connectedDevice?.name ?: "Bluetooth printer")
             ret.put("address", connectedDevice?.address ?: "")
@@ -203,6 +266,12 @@ class ThermalPrinterPlugin : Plugin() {
                 call.reject("Printing failed: ${error.message ?: "unknown error"}", error)
             }
         }.start()
+    }
+
+    private fun rootMessage(error: Throwable): String {
+        var current: Throwable = error
+        while (current.cause != null && current.cause !== current) current = current.cause!!
+        return current.message ?: current.javaClass.simpleName
     }
 
     private fun disconnectInternal() {
