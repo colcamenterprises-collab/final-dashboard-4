@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { Download, Pencil, Save, Trash2, Upload } from "lucide-react";
 import { BankStatementUpload as BankStatementUploadComponent } from "@/components/BankStatementUpload";
 import { usePinAuth } from "@/components/PinLoginGate";
+import DirectorBeneficiaryLoans from "./DirectorBeneficiaryLoans";
 
 type DashboardResponse = {
   ok: boolean;
@@ -451,6 +452,8 @@ export default function Expenses() {
               })}
             </tbody>
           </DataTable>
+
+          <DirectorBeneficiaryLoans isOwner={isOwner} />
 
           <DataTable title="Bank Deposits / Credits — Reconciliation Only">
             <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Bank Source</th><th className="px-3 py-2">Classification</th><th className="px-3 py-2 text-right">Amount</th></tr></thead>
