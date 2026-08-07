@@ -11,10 +11,22 @@ class MainActivity : BridgeActivity() {
         registerPlugin(ThermalPrinterPlugin::class.java)
         super.onCreate(savedInstanceState)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-        ) {
-            requestPermissions(arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1001)
+        // Android 12+ splits classic Bluetooth access into the Nearby Devices
+        // runtime permission group. The printer bridge needs both permissions:
+        // CONNECT for bonded-device details/RFCOMM and SCAN for cancelling any
+        // discovery before opening the socket. Request the complete set here so
+        // the first visit to Printer Settings is immediately usable.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val missing = mutableListOf<String>()
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                missing.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
+            if (checkSelfPermission(Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED) {
+                missing.add(Manifest.permission.BLUETOOTH_SCAN)
+            }
+            if (missing.isNotEmpty()) {
+                requestPermissions(missing.toTypedArray(), 1001)
+            }
         }
     }
 }
