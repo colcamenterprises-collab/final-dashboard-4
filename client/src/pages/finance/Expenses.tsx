@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { useMemo, useState } from "react";
 import { Download, Pencil, Save, Trash2, Upload } from "lucide-react";
 import { BankStatementUpload as BankStatementUploadComponent } from "@/components/BankStatementUpload";
-import { BankTransactionReview } from "@/components/BankTransactionReview";
 import { usePinAuth } from "@/components/PinLoginGate";
 
 type DashboardResponse = {
@@ -37,11 +36,6 @@ type ExpenseDraft = {
 };
 
 type ShiftExpenseDraft = Omit<ExpenseDraft, "date">;
-
-type PersonalExpenseDraft = {
-  description: string;
-  purpose: string;
-};
 
 function formatDate(value: string) {
   if (!value) return "—";
@@ -90,13 +84,10 @@ export default function Expenses() {
   const [showImport, setShowImport] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [exportedPersonalIds, setExportedPersonalIds] = useState<string[]>([]);
   const [editingShiftExpenseId, setEditingShiftExpenseId] = useState<string | null>(null);
   const [shiftExpenseDraft, setShiftExpenseDraft] = useState<ShiftExpenseDraft | null>(null);
   const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
   const [expenseDraft, setExpenseDraft] = useState<ExpenseDraft | null>(null);
-  const [editingPersonalExpenseId, setEditingPersonalExpenseId] = useState<string | null>(null);
-  const [personalExpenseDraft, setPersonalExpenseDraft] = useState<PersonalExpenseDraft | null>(null);
 
   const query = new URLSearchParams();
   if (dateFrom) query.set("dateFrom", dateFrom);
@@ -105,7 +96,7 @@ export default function Expenses() {
   const { data, isLoading, isError } = useQuery<DashboardResponse>({
     queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo],
     queryFn: async () => {
-      const response = await fetch(`/api/finance/expenses-dashboard?${query.toString()}`);
+      const response = await fetch(`/api/finance/expenses-dashboard?${query.toString()}`, { credentials: "include" });
       if (!response.ok) throw new Error("Failed to load finance expenses dashboard");
       return response.json();
     },
@@ -113,8 +104,9 @@ export default function Expenses() {
 
   const personalQuery = useQuery<any>({
     queryKey: ["/api/bank-imports/review-queue", "personal_owner", dateFrom, dateTo],
+    enabled: isOwner,
     queryFn: async () => {
-      const response = await fetch("/api/bank-imports/review-queue?tab=personal_owner&limit=1000");
+      const response = await fetch("/api/bank-imports/review-queue?tab=personal_owner&limit=1000", { credentials: "include" });
       if (!response.ok) throw new Error("Failed to load personal expenses");
       return response.json();
     },
@@ -138,6 +130,7 @@ export default function Expenses() {
       const response = await fetch(`/api/expensesV2/${encodeURIComponent(id)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({
           date: draft.date,
           supplier: draft.supplier.trim(),
@@ -165,6 +158,7 @@ export default function Expenses() {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({
             supplier: draft.supplier.trim(),
             category: draft.category.trim(),
@@ -189,7 +183,7 @@ export default function Expenses() {
     mutationFn: async (row: any) => {
       const response = await fetch(
         `/api/finance/shift-expenses/${encodeURIComponent(row.submission_id)}/${encodeURIComponent(row.kind)}/${encodeURIComponent(row.ordinality)}`,
-        { method: "DELETE" },
+        { method: "DELETE", credentials: "include" },
       );
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || "Failed to delete shift expense");
@@ -205,7 +199,7 @@ export default function Expenses() {
 
   const deleteBusinessExpense = useMutation({
     mutationFn: async (id: string) => {
-      const response = await fetch(`/api/expensesV2/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const response = await fetch(`/api/expensesV2/${encodeURIComponent(id)}`, { method: "DELETE", credentials: "include" });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(payload?.error || "Failed to delete business expense");
       return payload;
@@ -218,58 +212,25 @@ export default function Expenses() {
     onError: (error: Error) => window.alert(error.message),
   });
 
-  const updatePersonalExpense = useMutation({
-    mutationFn: async ({ id, draft }: { id: string; draft: PersonalExpenseDraft }) => {
-      const response = await fetch(`/api/bank-imports/txns/${encodeURIComponent(id)}`, {
+  const markBusinessExpensePersonal = useMutation({
+    mutationFn: async (row: any) => {
+      const bankTxnId = row?.meta?.bankTxnId || (String(row?.id || "").startsWith("bank_txn:") ? String(row.id).slice("bank_txn:".length) : null);
+      if (!bankTxnId) throw new Error("Only bank-statement expenses can be marked Personal from this table.");
+      const response = await fetch(`/api/finance/bank-imports/txns/${encodeURIComponent(bankTxnId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: draft.description.trim(), supplier: draft.purpose.trim() }),
+        credentials: "include",
+        body: JSON.stringify({ category: "Personal / Owner" }),
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || "Failed to save personal expense");
+      if (!response.ok) throw new Error(payload?.error || payload?.reason || "Failed to mark expense Personal");
       return payload;
     },
     onSuccess: () => {
-      setEditingPersonalExpenseId(null);
-      setPersonalExpenseDraft(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
       queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
     },
     onError: (error: Error) => window.alert(error.message),
-  });
-
-  const deletePersonalExpense = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/bank-imports/txns/${encodeURIComponent(id)}`, { method: "DELETE" });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || "Failed to delete personal expense");
-      return payload;
-    },
-    onSuccess: () => {
-      setEditingPersonalExpenseId(null);
-      setPersonalExpenseDraft(null);
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
-    },
-    onError: (error: Error) => window.alert(error.message),
-  });
-
-  const deleteExportedPersonal = useMutation({
-    mutationFn: async (ids: string[]) => {
-      const response = await fetch("/api/bank-imports/personal/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids }),
-      });
-      const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(payload?.error || "Failed to delete exported personal transactions");
-      return payload;
-    },
-    onSuccess: () => {
-      setExportedPersonalIds([]);
-      queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
-    },
   });
 
   const exportPersonalCsv = () => {
@@ -295,13 +256,6 @@ export default function Expenses() {
     anchor.click();
     anchor.remove();
     URL.revokeObjectURL(url);
-    setExportedPersonalIds(personalTransactions.map((row) => row.id));
-  };
-
-  const confirmDeleteExported = () => {
-    if (exportedPersonalIds.length === 0) return;
-    const confirmed = window.confirm(`Delete ${exportedPersonalIds.length} exported personal transaction(s)? This will not affect Business Expenses or Shift Expenses.`);
-    if (confirmed) deleteExportedPersonal.mutate(exportedPersonalIds);
   };
 
   const beginExpenseEdit = (row: any) => {
@@ -371,28 +325,11 @@ export default function Expenses() {
     }
   };
 
-  const beginPersonalExpenseEdit = (row: PersonalTransaction) => {
+  const confirmMarkPersonal = (row: any) => {
     if (!isOwner) return;
-    setEditingPersonalExpenseId(row.id);
-    setPersonalExpenseDraft({
-      description: row.description || "",
-      purpose: row.supplier || "",
-    });
-  };
-
-  const savePersonalExpense = (row: PersonalTransaction) => {
-    if (!isOwner || editingPersonalExpenseId !== row.id || !personalExpenseDraft) return;
-    if (!personalExpenseDraft.description.trim()) {
-      window.alert("Description is required.");
-      return;
-    }
-    updatePersonalExpense.mutate({ id: row.id, draft: personalExpenseDraft });
-  };
-
-  const confirmDeletePersonalExpense = (row: PersonalTransaction) => {
-    if (!isOwner) return;
-    if (window.confirm(`Delete ${row.description || "this personal expense"}?`)) {
-      deletePersonalExpense.mutate(row.id);
+    const label = row.description || row.supplier || "this transaction";
+    if (window.confirm(`Mark ${label} as Personal? It will be removed from Business Expenses and business reporting.`)) {
+      markBusinessExpensePersonal.mutate(row);
     }
   };
 
@@ -401,7 +338,7 @@ export default function Expenses() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Finance / Expenses</h1>
-          <p className="text-xs text-slate-500">Expenses are separated to prevent double counting.</p>
+          <p className="text-xs text-slate-500">Bank withdrawals are recorded directly as Business Expenses. Personal rows stay hidden from business reporting.</p>
         </div>
         {isOwner && (
           <Button size="sm" onClick={() => setShowImport((value) => !value)}>
@@ -415,15 +352,14 @@ export default function Expenses() {
         <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
           <BankStatementUploadComponent onUploadComplete={() => {
             queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
-            queryClient.invalidateQueries({ queryKey: ["/api/bank-imports", "review-queue"] });
+            queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
           }} />
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-6">
+      <div className="grid grid-cols-1 gap-2 md:grid-cols-5">
         <SummaryBox label="Current Month Business Expenses" value={summary.current_month_business_expenses} />
         <SummaryBox label="Current Month Shift Expenses" value={summary.current_month_in_shift_expenses} />
-        <SummaryBox label="Pending Bank Statement Review" value={summary.pending_bank_statement_review} />
         <SummaryBox label="Personal Expenses This Month" value={summary.personal_expenses_this_month} />
         <SummaryBox label="Declined Transactions This Month" value={summary.declined_transactions_this_month} />
         <SummaryBox label="Bank Deposits / Credits This Month" value={summary.current_month_bank_deposits} />
@@ -468,19 +404,14 @@ export default function Expenses() {
             </tbody>
           </DataTable>
 
-          <section className="space-y-3">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Business Expenses</h2>
-              <p className="text-xs text-slate-500">Bank statement withdrawals enter here as business expenses awaiting owner review.</p>
-            </div>
-            {isOwner && <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-900">
-              <p className="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Imported expenses awaiting review</p>
-              <BankTransactionReview key={`${dateFrom}:${dateTo}`} aggregateQueue compact onApproved={() => {
-                queryClient.invalidateQueries({ queryKey: ["/api/finance/expenses-dashboard", dateFrom, dateTo] });
-                queryClient.invalidateQueries({ queryKey: ["/api/bank-imports/review-queue", "personal_owner"] });
-              }} />
-            </div>}
-            <DataTable title="Approved and recorded business expenses">
+          <DataTable
+            title="Business Expenses"
+            actions={isOwner ? (
+              <Button size="sm" variant="outline" onClick={exportPersonalCsv} disabled={personalTransactions.length === 0 || personalQuery.isLoading}>
+                <Download className="mr-2 h-4 w-4" />Export Personal CSV ({personalTransactions.length})
+              </Button>
+            ) : undefined}
+          >
             <thead>
               <tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800">
                 <th className="px-2 py-1.5">Date</th>
@@ -489,146 +420,34 @@ export default function Expenses() {
                 <th className="px-2 py-1.5">Description</th>
                 <th className="px-2 py-1.5 text-right">Amount</th>
                 <th className="px-2 py-1.5">Payment Source</th>
-                <th className="px-2 py-1.5">Status</th>
                 <th className="px-2 py-1.5">Created</th>
-                {isOwner && <th className="w-[92px] min-w-[92px] px-1 py-1.5 text-right">Actions</th>}
+                {isOwner && <th className="w-[132px] min-w-[132px] px-1 py-1.5 text-right">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {businessExpenses.length === 0 && (
-                <tr>
-                  <td colSpan={isOwner ? 9 : 8} className="px-3 py-8 text-center text-slate-400">
-                    No business expenses found.
-                  </td>
-                </tr>
+                <tr><td colSpan={isOwner ? 8 : 7} className="px-3 py-8 text-center text-slate-400">No business expenses found.</td></tr>
               )}
               {businessExpenses.map((row) => {
                 const rowDraft = editingExpenseId === String(row.id) ? expenseDraft : null;
+                const canMarkPersonal = Boolean(row?.meta?.bankTxnId) || String(row.id || "").startsWith("bank_txn:");
                 return (
                   <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
-                    <td className="px-2 py-1">
-                      {rowDraft ? (
-                        <Input
-                          type="date"
-                          value={rowDraft.date}
-                          onChange={(event) => setExpenseDraft({ ...rowDraft, date: event.target.value })}
-                          className="h-7 min-w-[126px] px-2 text-xs"
-                          aria-label="Expense date"
-                        />
-                      ) : formatDate(row.date)}
-                    </td>
-                    <td className="px-2 py-1">
-                      {rowDraft ? (
-                        <Input
-                          value={rowDraft.supplier}
-                          onChange={(event) => setExpenseDraft({ ...rowDraft, supplier: event.target.value })}
-                          className="h-7 min-w-[120px] px-2 text-xs"
-                          aria-label="Expense supplier"
-                        />
-                      ) : row.supplier || "—"}
-                    </td>
-                    <td className="px-2 py-1">
-                      {rowDraft ? (
-                        <Input
-                          value={rowDraft.category}
-                          onChange={(event) => setExpenseDraft({ ...rowDraft, category: event.target.value })}
-                          className="h-7 min-w-[120px] px-2 text-xs"
-                          aria-label="Expense category"
-                        />
-                      ) : row.category || "UNMAPPED"}
-                    </td>
-                    <td className="px-2 py-1">
-                      {rowDraft ? (
-                        <Input
-                          value={rowDraft.description}
-                          onChange={(event) => setExpenseDraft({ ...rowDraft, description: event.target.value })}
-                          className="h-7 min-w-[150px] px-2 text-xs"
-                          aria-label="Expense description"
-                        />
-                      ) : row.description || "—"}
-                    </td>
-                    <td className="px-2 py-1 text-right font-mono">
-                      {rowDraft ? (
-                        <Input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={rowDraft.amount}
-                          onChange={(event) => setExpenseDraft({ ...rowDraft, amount: event.target.value })}
-                          className="ml-auto h-7 w-24 px-2 text-right text-xs"
-                          aria-label="Expense amount"
-                        />
-                      ) : money(row.amount)}
-                    </td>
+                    <td className="px-2 py-1">{rowDraft ? <Input type="date" value={rowDraft.date} onChange={(event) => setExpenseDraft({ ...rowDraft, date: event.target.value })} className="h-7 min-w-[126px] px-2 text-xs" aria-label="Expense date" /> : formatDate(row.date)}</td>
+                    <td className="px-2 py-1">{rowDraft ? <Input value={rowDraft.supplier} onChange={(event) => setExpenseDraft({ ...rowDraft, supplier: event.target.value })} className="h-7 min-w-[120px] px-2 text-xs" aria-label="Expense supplier" /> : row.supplier || "—"}</td>
+                    <td className="px-2 py-1">{rowDraft ? <Input value={rowDraft.category} onChange={(event) => setExpenseDraft({ ...rowDraft, category: event.target.value })} className="h-7 min-w-[120px] px-2 text-xs" aria-label="Expense category" /> : row.category || "UNMAPPED"}</td>
+                    <td className="px-2 py-1">{rowDraft ? <Input value={rowDraft.description} onChange={(event) => setExpenseDraft({ ...rowDraft, description: event.target.value })} className="h-7 min-w-[150px] px-2 text-xs" aria-label="Expense description" /> : row.description || "—"}</td>
+                    <td className="px-2 py-1 text-right font-mono">{rowDraft ? <Input type="number" min="0.01" step="0.01" value={rowDraft.amount} onChange={(event) => setExpenseDraft({ ...rowDraft, amount: event.target.value })} className="ml-auto h-7 w-24 px-2 text-right text-xs" aria-label="Expense amount" /> : money(row.amount)}</td>
                     <td className="px-2 py-1">{row.payment_method || "—"}</td>
-                    <td className="px-2 py-1">Recorded</td>
                     <td className="px-2 py-1">{formatDate(row.created_at)}</td>
-                    {isOwner && (
-                      <td className="w-[92px] min-w-[92px] px-1 py-1">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={() => beginExpenseEdit(row)}
-                            aria-label="Edit expense"
-                            title="Edit"
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            onClick={saveExpense}
-                            disabled={!rowDraft || updateBusinessExpense.isPending}
-                            aria-label="Save expense"
-                            title="Save"
-                          >
-                            <Save className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 text-red-600 hover:text-red-700"
-                            onClick={() => confirmDeleteExpense(row)}
-                            disabled={deleteBusinessExpense.isPending}
-                            aria-label="Delete expense"
-                            title="Delete"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </div>
-                      </td>
-                    )}
+                    {isOwner && <td className="w-[132px] min-w-[132px] px-1 py-1"><div className="flex justify-end gap-1">
+                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => beginExpenseEdit(row)} aria-label="Edit expense" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={saveExpense} disabled={!rowDraft || updateBusinessExpense.isPending} aria-label="Save expense" title="Save"><Save className="h-3.5 w-3.5" /></Button>
+                      {canMarkPersonal && <Button type="button" size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => confirmMarkPersonal(row)} disabled={markBusinessExpensePersonal.isPending}>Personal</Button>}
+                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:text-red-700" onClick={() => confirmDeleteExpense(row)} disabled={deleteBusinessExpense.isPending} aria-label="Delete expense" title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div></td>}
                   </tr>
                 );
-              })}
-            </tbody>
-            </DataTable>
-          </section>
-
-          <DataTable title="Personal Expenses" actions={isOwner ? <div className="flex gap-2"><Button size="sm" variant="outline" onClick={exportPersonalCsv} disabled={personalTransactions.length === 0 || personalQuery.isLoading}><Download className="mr-2 h-4 w-4" />Export CSV</Button><Button size="sm" variant="outline" onClick={confirmDeleteExported} disabled={exportedPersonalIds.length === 0 || deleteExportedPersonal.isPending}><Trash2 className="mr-2 h-4 w-4" />Delete Exported</Button></div> : undefined}>
-            <thead><tr className="bg-slate-50 text-left text-slate-500 dark:bg-slate-800"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Purpose</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Batch</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Export Status</th>{isOwner && <th className="w-[92px] min-w-[92px] px-1 py-1.5 text-right">Actions</th>}</tr></thead>
-            <tbody>
-              {personalQuery.isLoading && <tr><td colSpan={isOwner ? 8 : 7} className="px-3 py-8 text-center text-slate-400">Loading personal expenses...</td></tr>}
-              {!personalQuery.isLoading && personalTransactions.length === 0 && <tr><td colSpan={isOwner ? 8 : 7} className="px-3 py-8 text-center text-slate-400">No personal expenses found for this date range.</td></tr>}
-              {personalTransactions.map((row) => {
-                const rowDraft = editingPersonalExpenseId === row.id ? personalExpenseDraft : null;
-                return <tr key={row.id} className="border-t border-slate-100 dark:border-slate-800">
-                  <td className="px-3 py-2">{formatDate(row.postedAt)}</td>
-                  <td className="px-3 py-1">{rowDraft ? <Input value={rowDraft.description} onChange={(event) => setPersonalExpenseDraft({ ...rowDraft, description: event.target.value })} className="h-7 min-w-[160px] px-2 text-xs" aria-label="Personal expense description" /> : row.description || "—"}</td>
-                  <td className="px-3 py-1">{rowDraft ? <Input value={rowDraft.purpose} onChange={(event) => setPersonalExpenseDraft({ ...rowDraft, purpose: event.target.value })} className="h-7 min-w-[140px] px-2 text-xs" aria-label="Personal expense purpose" /> : row.supplier || "—"}</td>
-                  <td className="px-3 py-2">{row.ref || "—"}</td><td className="px-3 py-2 font-mono text-[10px]">{row.batchId || "—"}</td><td className="px-3 py-2 text-right font-mono">{money(Math.abs(Number(row.amountTHB || 0)))}</td><td className="px-3 py-2">{exportedPersonalIds.includes(row.id) ? "Exported" : "Ready"}</td>
-                  {isOwner && <td className="w-[92px] min-w-[92px] px-1 py-1"><div className="flex justify-end gap-1">
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => beginPersonalExpenseEdit(row)} aria-label="Edit personal expense" title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => savePersonalExpense(row)} disabled={!rowDraft || updatePersonalExpense.isPending} aria-label="Save personal expense" title="Save"><Save className="h-3.5 w-3.5" /></Button>
-                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-red-600 hover:text-red-700" onClick={() => confirmDeletePersonalExpense(row)} disabled={deletePersonalExpense.isPending} aria-label="Delete personal expense" title="Delete"><Trash2 className="h-3.5 w-3.5" /></Button>
-                  </div></td>}
-                </tr>;
               })}
             </tbody>
           </DataTable>
