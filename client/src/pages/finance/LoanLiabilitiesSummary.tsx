@@ -5,7 +5,7 @@ function fmt(value: unknown) {
 }
 
 export default function LoanLiabilitiesSummary() {
-  const { data } = useQuery<any>({
+  const { data, isLoading, isError } = useQuery<any>({
     queryKey: ["/api/finance/director-beneficiary-loans/summary"],
     queryFn: async () => {
       const response = await fetch("/api/finance/director-beneficiary-loans/summary", { credentials: "include" });
@@ -15,8 +15,8 @@ export default function LoanLiabilitiesSummary() {
     },
   });
 
-  const totalAmount = data?.data?.total_amount || 0;
-  const totalBalance = data?.data?.total_balance || 0;
+  const totalAmount = data?.data?.total_amount;
+  const totalBalance = data?.data?.total_balance;
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
@@ -27,8 +27,8 @@ export default function LoanLiabilitiesSummary() {
           <p className="mt-1 text-[11px] text-slate-500">Shown as an outstanding liability. Loan principal does not reduce operating profit.</p>
         </div>
         <div className="grid grid-cols-2 gap-4 text-right">
-          <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Original Amount</p><p className="font-mono text-sm font-semibold">฿{fmt(totalAmount)}</p></div>
-          <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Balance</p><p className="font-mono text-sm font-semibold text-red-600">฿{fmt(totalBalance)}</p></div>
+          <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Original Amount</p><p className="font-mono text-sm font-semibold">{isLoading ? "…" : isError ? "Unavailable" : `฿${fmt(totalAmount)}`}</p></div>
+          <div><p className="text-[10px] uppercase tracking-wide text-slate-500">Balance</p><p className="font-mono text-sm font-semibold text-red-600">{isLoading ? "…" : isError ? "Unavailable" : `฿${fmt(totalBalance)}`}</p></div>
         </div>
       </div>
     </section>
