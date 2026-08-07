@@ -2,6 +2,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { attachSessionUser } from "../middleware/sessionAuth";
 import commercialRouter from "./orderingCommercial";
 import { attachCommercialAttributionToOrder, validateCommercialOrderInput } from "../services/ordering/commercialOrderAttribution";
+import { finalizeOnlineOrderForPosReporting, prepareOnlineOrderForPos, releaseOnlineOrderAfterPayment } from "../services/ordering/posOrderBridge";
 import {
   confirmManualPayment,
   createCategory,
@@ -80,8 +81,10 @@ router.post("/orders", async (req, res) => {
   try {
     const commercial = await validateCommercialOrderInput(req.body);
     const order = await createOrder(req.body);
-    const attributed = await attachCommercialAttributionToOrder(order.id, commercial);
-    res.status(201).json({ ok: true, source: "sbb_ordering_os_phase1", data: { ...order, ...attributed }, warnings: [], blockers: [], last_updated: new Date().toISOString() });
+    await attachCommercialAttributionToOrder(order.id, commercial);
+    await prepareOnlineOrderForPos(order.id, req.body);
+    const routedOrder = await getOrder(order.id);
+    res.status(201).json({ ok: true, source: "sbb_ordering_os_phase1", data: routedOrder, warnings: [], blockers: [], last_updated: new Date().toISOString() });
   } catch (error: any) {
     sendError(res, error, "POST /api/ordering/orders", 400);
   }
@@ -99,7 +102,9 @@ router.get("/orders/:id", async (req, res) => {
 
 router.patch("/orders/:id/status", async (req, res) => {
   try {
-    const order = await updateOrderStatus(req.params.id, req.body.status, req.body.actor || "staff", req.body.notes || null);
+    await updateOrderStatus(req.params.id, req.body.status, req.body.actor || "staff", req.body.notes || null);
+    await finalizeOnlineOrderForPosReporting(req.params.id, req.body.status);
+    const order = await getOrder(req.params.id);
     res.json({ ok: true, source: "sbb_ordering_os_phase1", data: order, warnings: [], blockers: [], last_updated: new Date().toISOString() });
   } catch (error: any) {
     sendError(res, error, "PATCH /api/ordering/orders/:id/status", error?.message === "Order not found" ? 404 : 400);
@@ -127,6 +132,7 @@ router.get("/admin/orders", requireOrderingAdmin, async (req, res) => {
 router.post("/payments/manual-confirm", requireOrderingAdmin, async (req, res) => {
   try {
     const payments = await confirmManualPayment(req.body.order_id, req.body);
+    await releaseOnlineOrderAfterPayment(req.body.order_id);
     res.json({ ok: true, source: "sbb_ordering_os_phase1", data: payments, warnings: [], blockers: [], last_updated: new Date().toISOString() });
   } catch (error) {
     sendError(res, error, "POST /api/ordering/payments/manual-confirm", 400);
