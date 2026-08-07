@@ -8,6 +8,7 @@ import {
   AlertTriangle, CheckCircle, ArrowRight, Receipt, Package,
   ShoppingBag, FileText, Activity, TrendingUp, AlertCircle,
 } from "lucide-react";
+import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -102,9 +103,8 @@ const quickActions = [
   { to: "/operations/daily-sales",        label: "Daily Sales",        icon: Receipt,     colour: "bg-blue-50 text-blue-800 border-blue-100" },
   { to: "/operations/daily-stock",        label: "Daily Stock",        icon: Package,     colour: "bg-emerald-50 text-emerald-800 border-emerald-100" },
   { to: "/operations/purchase-lodgement", label: "Purchases",          icon: ShoppingBag, colour: "bg-amber-50 text-amber-800 border-amber-100" },
-  { to: "/reports/shift-reports",         label: "Shift Verification",      icon: FileText,    colour: "bg-purple-50 text-purple-800 border-purple-100" },
+  { to: "/reports/shift-reports",         label: "Shift Verification", icon: FileText,    colour: "bg-purple-50 text-purple-800 border-purple-100" },
   { to: "/operations/loyverse-mirror",    label: "POS Verification",   icon: Activity,    colour: "bg-slate-50 text-slate-800 border-slate-200" },
-  { to: "/finance/expenses-import",       label: "Expenses",           icon: TrendingUp,  colour: "bg-rose-50 text-rose-800 border-rose-100" },
 ];
 
 const PIE_COLORS = { Cash: "#10b981", QR: "#3b82f6", Grab: "#f97316", Other: "#94a3b8" };
@@ -197,8 +197,6 @@ export default function Home() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
-
-      {/* ── Header ───────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black tracking-tight text-slate-900">Operations Overview</h1>
@@ -210,293 +208,114 @@ export default function Home() {
             <span className="font-semibold text-slate-600">{fmtDate(latestDailySalesDate)}</span>
           </p>
         </div>
-        {highCount > 0 && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
-            <AlertTriangle className="h-3 w-3" />
-            {highCount} action{highCount > 1 ? "s" : ""} required
-          </span>
-        )}
-        {highCount === 0 && shift && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-            <CheckCircle className="h-3 w-3" />
-            All clear
-          </span>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ExpenseLodgmentModal
+            triggerText="Lodge Business Expense"
+            triggerClassName="bg-slate-900 text-white hover:bg-slate-800"
+          />
+          {highCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
+              <AlertTriangle className="h-3 w-3" />
+              {highCount} action{highCount > 1 ? "s" : ""} required
+            </span>
+          )}
+          {highCount === 0 && shift && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+              <CheckCircle className="h-3 w-3" />
+              All clear
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* ── 4 KPI cards ──────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard
-          label="Gross Sales"
-          value={fmtMoney(shift?.grossSales)}
-          sub={`${shift?.receiptCount ?? "—"} receipts`}
-          accent="border-purple-200 bg-purple-50 text-purple-900"
-        />
-        <KpiCard
-          label="Receipts"
-          value={shift?.receiptCount ?? "—"}
-          sub={`POS · ${fmtDate(shift?.date)}`}
-          accent="border-blue-200 bg-blue-50 text-blue-900"
-        />
-        <KpiCard
-          label="Cash Variance"
-          value={staff.cashVariance != null ? fmtMoney(Math.abs(staff.cashVariance)) : "—"}
-          sub={staff.cashVariance === null ? "No form data" : Math.abs(staff.cashVariance) <= 1 ? "Balanced" : "Difference detected"}
-          accent={
-            cashVarianceStatus === "ok"      ? "border-emerald-200 bg-emerald-50 text-emerald-900" :
-            cashVarianceStatus === "warn"    ? "border-amber-200 bg-amber-50 text-amber-900" :
-            cashVarianceStatus === "missing" ? "border-red-200 bg-red-50 text-red-900" :
-            "border-slate-200 bg-slate-50 text-slate-700"
-          }
-        />
-        <KpiCard
-          label="Sync Status"
-          value={health.status === "ok" ? "Healthy" : health.status === "warning" ? "Warning" : "—"}
-          sub={health.latestReceiptAt ? `Latest receipt: ${fmtDateTime(health.latestReceiptAt)}` : "No receipts yet"}
-          accent={
-            health.status === "ok"      ? "border-emerald-200 bg-emerald-50 text-emerald-900" :
-            health.status === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" :
-            "border-slate-200 bg-slate-50 text-slate-700"
-          }
-        />
+        <KpiCard label="Gross Sales" value={fmtMoney(shift?.grossSales)} sub={`${shift?.receiptCount ?? "—"} receipts`} accent="border-purple-200 bg-purple-50 text-purple-900" />
+        <KpiCard label="Receipts" value={shift?.receiptCount ?? "—"} sub={`POS · ${fmtDate(shift?.date)}`} accent="border-blue-200 bg-blue-50 text-blue-900" />
+        <KpiCard label="Cash Variance" value={staff.cashVariance != null ? fmtMoney(Math.abs(staff.cashVariance)) : "—"} sub={staff.cashVariance === null ? "No form data" : Math.abs(staff.cashVariance) <= 1 ? "Balanced" : "Difference detected"} accent={cashVarianceStatus === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : cashVarianceStatus === "warn" ? "border-amber-200 bg-amber-50 text-amber-900" : cashVarianceStatus === "missing" ? "border-red-200 bg-red-50 text-red-900" : "border-slate-200 bg-slate-50 text-slate-700"} />
+        <KpiCard label="Sync Status" value={health.status === "ok" ? "Healthy" : health.status === "warning" ? "Warning" : "—"} sub={health.latestReceiptAt ? `Latest receipt: ${fmtDateTime(health.latestReceiptAt)}` : "No receipts yet"} accent={health.status === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : health.status === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"} />
       </div>
 
-      {/* ── Main chart row (70/30) ────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-10 gap-5">
-
-        {/* Bar chart — 70% */}
         <div className="col-span-1 md:col-span-7 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            Last 7 Shifts — Gross Sales
-          </p>
-          {chartData.length === 0 ? (
-            <div className="h-52 flex items-center justify-center text-sm text-slate-400">
-              No shift data available
-            </div>
-          ) : (
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Last 7 Shifts — Gross Sales</p>
+          {chartData.length === 0 ? <div className="h-52 flex items-center justify-center text-sm text-slate-400">No shift data available</div> : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 10, fill: "#94a3b8" }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "#94a3b8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => v >= 1000 ? `฿${(v / 1000).toFixed(0)}k` : `฿${v}`}
-                  width={48}
-                />
-                <Tooltip
-                  {...CHART_TOOLTIP_STYLE}
-                  formatter={(v: any, name: string) => {
-                    const labels: Record<string, string> = { grossSales: "Gross Sales", cash: "Cash", qr: "QR", grab: "Grab" };
-                    return [fmtMoney(v), labels[name] ?? name];
-                  }}
-                />
+                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `฿${(v / 1000).toFixed(0)}k` : `฿${v}`} width={48} />
+                <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v: any, name: string) => { const labels: Record<string, string> = { grossSales: "Gross Sales", cash: "Cash", qr: "QR", grab: "Grab" }; return [fmtMoney(v), labels[name] ?? name]; }} />
                 <Bar dataKey="grossSales" fill="#8b5cf6" radius={[4,4,0,0]} name="Gross Sales" />
               </BarChart>
             </ResponsiveContainer>
           )}
-          {/* Payment breakdown mini-bars */}
           {shift && (
             <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
-              {[
-                { label: "Cash",  value: shift.cash,  colour: "bg-emerald-400" },
-                { label: "QR",    value: shift.qr,    colour: "bg-blue-400" },
-                { label: "Grab",  value: shift.grab,  colour: "bg-orange-400" },
-              ].map(({ label, value, colour }) => (
+              {[{ label: "Cash", value: shift.cash, colour: "bg-emerald-400" }, { label: "QR", value: shift.qr, colour: "bg-blue-400" }, { label: "Grab", value: shift.grab, colour: "bg-orange-400" }].map(({ label, value, colour }) => (
                 <div key={label} className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-slate-500">{label}</span>
-                    <span className="text-[10px] font-bold text-slate-700">{fmtMoney(value)}</span>
-                  </div>
-                  <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${colour}`}
-                      style={{ width: shift.grossSales > 0 ? `${Math.round((value / shift.grossSales) * 100)}%` : "0%" }}
-                    />
-                  </div>
+                  <div className="flex items-center justify-between"><span className="text-[10px] font-semibold text-slate-500">{label}</span><span className="text-[10px] font-bold text-slate-700">{fmtMoney(value)}</span></div>
+                  <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full rounded-full ${colour}`} style={{ width: shift.grossSales > 0 ? `${Math.round((value / shift.grossSales) * 100)}%` : "0%" }} /></div>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Action required — 30% */}
         <div className="col-span-1 md:col-span-3 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            Action Required
-          </p>
-          {actions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-8 text-center">
-              <CheckCircle className="h-8 w-8 text-emerald-400" />
-              <p className="text-xs font-semibold text-emerald-700">All clear</p>
-              <p className="text-[10px] text-slate-400">No actions required</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {actions.map((a: any, i: number) => (
-                <ActionBadge key={i} severity={a.severity} title={a.title} message={a.message} />
-              ))}
-            </div>
-          )}
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Action Required</p>
+          {actions.length === 0 ? <div className="flex flex-col items-center justify-center gap-3 py-8 text-center"><CheckCircle className="h-8 w-8 text-emerald-400" /><p className="text-xs font-semibold text-emerald-700">All clear</p><p className="text-[10px] text-slate-400">No actions required</p></div> : <div className="space-y-2">{actions.map((a: any, i: number) => <ActionBadge key={i} severity={a.severity} title={a.title} message={a.message} />)}</div>}
         </div>
       </div>
 
-      {/* ── Verification row ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <VerifyCard
-          label="Receipt Verification"
-          status={receiptVerifyStatus}
-          detail={
-            staff.receiptDifference === null
-              ? "No staff form data"
-              : staff.receiptDifference === 0
-              ? `POS & staff agree: ${shift?.receiptCount ?? "—"} receipts`
-              : `POS ${shift?.receiptCount ?? "—"} · Staff ${staff.staffReceiptCount ?? "—"}`
-          }
-        />
-        <VerifyCard
-          label="Sales Verification"
-          status={salesVerifyStatus}
-          detail={
-            staff.staffGrossSales === null
-              ? "No staff sales data"
-              : staff.staffGrossSales === 0
-              ? "Staff entered ฿0 — check form"
-              : `POS ${fmtMoney(shift?.grossSales)} · Staff ${fmtMoney(staff.staffGrossSales)}`
-          }
-        />
-        <VerifyCard
-          label="Payment Breakdown"
-          status={shift ? "ok" : "unknown"}
-          detail={shift ? `Cash ${fmtMoney(shift.cash)} · QR ${fmtMoney(shift.qr)} · Grab ${fmtMoney(shift.grab)}` : "No POS data"}
-        />
-        <VerifyCard
-          label="Stock Verification"
-          status={stockVerifyStatus}
-          detail={
-            stock.dailyStockSubmitted
-              ? `Rolls: ${stock.rollsStatus} · Meat: ${stock.meatStatus}`
-              : "Stock count not submitted"
-          }
-        />
+        <VerifyCard label="Receipt Verification" status={receiptVerifyStatus} detail={staff.receiptDifference === null ? "No staff form data" : staff.receiptDifference === 0 ? `POS & staff agree: ${shift?.receiptCount ?? "—"} receipts` : `POS ${shift?.receiptCount ?? "—"} · Staff ${staff.staffReceiptCount ?? "—"}`} />
+        <VerifyCard label="Sales Verification" status={salesVerifyStatus} detail={staff.staffGrossSales === null ? "No staff sales data" : staff.staffGrossSales === 0 ? "Staff entered ฿0 — check form" : `POS ${fmtMoney(shift?.grossSales)} · Staff ${fmtMoney(staff.staffGrossSales)}`} />
+        <VerifyCard label="Payment Breakdown" status={shift ? "ok" : "unknown"} detail={shift ? `Cash ${fmtMoney(shift.cash)} · QR ${fmtMoney(shift.qr)} · Grab ${fmtMoney(shift.grab)}` : "No POS data"} />
+        <VerifyCard label="Stock Verification" status={stockVerifyStatus} detail={stock.dailyStockSubmitted ? `Rolls: ${stock.rollsStatus} · Meat: ${stock.meatStatus}` : "Stock count not submitted"} />
       </div>
 
-      {/* ── Secondary charts ─────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-10 gap-5">
-
-        {/* Sales mix donut */}
         <div className="col-span-1 md:col-span-3 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            Sales Mix
-          </p>
-          {pieData.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-xs text-slate-400">No data</div>
-          ) : (
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Sales Mix</p>
+          {pieData.length === 0 ? <div className="h-40 flex items-center justify-center text-xs text-slate-400">No data</div> : (
             <div className="flex flex-col items-center gap-3">
               <PieChart width={140} height={140}>
-                <Pie
-                  data={pieData}
-                  cx={65}
-                  cy={65}
-                  innerRadius={38}
-                  outerRadius={60}
-                  paddingAngle={3}
-                  dataKey="value"
-                  stroke="none"
-                >
-                  {pieData.map((entry, i) => (
-                    <Cell key={i} fill={PIE_COLORS[entry.name as keyof typeof PIE_COLORS] ?? "#94a3b8"} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(v: any) => fmtMoney(v)}
-                  contentStyle={{ borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: "11px" }}
-                />
+                <Pie data={pieData} cx={65} cy={65} innerRadius={38} outerRadius={60} paddingAngle={3} dataKey="value" stroke="none">{pieData.map((entry, i) => <Cell key={i} fill={PIE_COLORS[entry.name as keyof typeof PIE_COLORS] ?? "#94a3b8"} />)}</Pie>
+                <Tooltip formatter={(v: any) => fmtMoney(v)} contentStyle={{ borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: "11px" }} />
               </PieChart>
-              <div className="w-full space-y-1">
-                {pieData.map(d => (
-                  <div key={d.name} className="flex items-center justify-between text-[10px]">
-                    <div className="flex items-center gap-1.5">
-                      <div
-                        className="h-2 w-2 rounded-full"
-                        style={{ backgroundColor: PIE_COLORS[d.name as keyof typeof PIE_COLORS] ?? "#94a3b8" }}
-                      />
-                      <span className="text-slate-600 font-medium">{d.name}</span>
-                    </div>
-                    <span className="font-bold text-slate-800">{fmtMoney(d.value)}</span>
-                  </div>
-                ))}
-              </div>
+              <div className="w-full space-y-1">{pieData.map(d => <div key={d.name} className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[d.name as keyof typeof PIE_COLORS] ?? "#94a3b8" }} /><span className="text-slate-600 font-medium">{d.name}</span></div><span className="font-bold text-slate-800">{fmtMoney(d.value)}</span></div>)}</div>
             </div>
           )}
         </div>
 
-        {/* 7-day trend */}
         <div className="col-span-1 md:col-span-7 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-            7-Day Trend — Gross Sales
-          </p>
-          {trendData.length === 0 ? (
-            <div className="h-40 flex items-center justify-center text-xs text-slate-400">No data</div>
-          ) : (
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">7-Day Trend — Gross Sales</p>
+          {trendData.length === 0 ? <div className="h-40 flex items-center justify-center text-xs text-slate-400">No data</div> : (
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fontSize: 10, fill: "#94a3b8" }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`}
-                  width={36}
-                />
-                <Tooltip
-                  {...CHART_TOOLTIP_STYLE}
-                  formatter={(v: any, name: string) => {
-                    if (name === "grossSales") return [fmtMoney(v), "Gross Sales"];
-                    return [v, "Receipts"];
-                  }}
-                />
-                <Bar dataKey="grossSales" fill="#6366f1" radius={[3,3,0,0]} name="grossSales" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`} width={36} /><Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v: any, name: string) => name === "grossSales" ? [fmtMoney(v), "Gross Sales"] : [v, "Receipts"]} /><Bar dataKey="grossSales" fill="#6366f1" radius={[3,3,0,0]} name="grossSales" />
               </BarChart>
             </ResponsiveContainer>
           )}
-          {/* Receipts mini row */}
-          {trendData.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto pt-1 border-t border-slate-100">
-              {trendData.map((d: any) => (
-                <div key={d.date} className="flex flex-col items-center min-w-0 flex-1">
-                  <span className="text-[9px] text-slate-400">{d.date}</span>
-                  <span className="text-[10px] font-bold text-slate-700">{d.receipts}</span>
-                  <span className="text-[8px] text-slate-400">rcpts</span>
-                </div>
-              ))}
-            </div>
-          )}
+          {trendData.length > 0 && <div className="flex items-center gap-2 overflow-x-auto pt-1 border-t border-slate-100">{trendData.map((d: any) => <div key={d.date} className="flex flex-col items-center min-w-0 flex-1"><span className="text-[9px] text-slate-400">{d.date}</span><span className="text-[10px] font-bold text-slate-700">{d.receipts}</span><span className="text-[8px] text-slate-400">rcpts</span></div>)}</div>}
         </div>
       </div>
 
-      {/* ── Quick actions ─────────────────────────────────────────────────── */}
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Quick Actions</p>
         <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
           {quickActions.map(({ to, label, icon: Icon, colour }) => (
-            <Link
-              key={to}
-              to={to}
-              className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center text-[10px] font-semibold transition-all hover:shadow-md hover:-translate-y-0.5 ${colour}`}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="leading-tight">{label}</span>
-              <ArrowRight className="h-2.5 w-2.5 opacity-40" />
+            <Link key={to} to={to} className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center text-[10px] font-semibold transition-all hover:shadow-md hover:-translate-y-0.5 ${colour}`}>
+              <Icon className="h-4 w-4" /><span className="leading-tight">{label}</span><ArrowRight className="h-2.5 w-2.5 opacity-40" />
             </Link>
           ))}
+          <div className="flex items-center justify-center rounded-xl border border-rose-100 bg-rose-50 p-1 text-rose-800">
+            <ExpenseLodgmentModal
+              triggerText="Expenses"
+              triggerIcon={<TrendingUp className="h-4 w-4" />}
+              triggerClassName="h-full w-full flex-col gap-1.5 bg-transparent p-3 text-[10px] font-semibold text-rose-800 shadow-none hover:bg-rose-100"
+            />
+          </div>
         </div>
       </div>
     </div>
