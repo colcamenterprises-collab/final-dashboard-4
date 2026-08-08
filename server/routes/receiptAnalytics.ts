@@ -137,6 +137,117 @@ router.get("/shift-review", async (req, res) => {
   }
 });
 
+router.get("/costing-coverage", async (_req, res) => {
+  try {
+    const [items, modifiers, recipes] = await Promise.all([
+      pool.query(`
+        SELECT i.id,i.name_en name,COALESCE(i.source_sku,'') sku,c.name_en category,
+               COALESCE(cfg.costing_mode,'unconfigured') costing_mode,cfg.recipe_id,cfg.direct_unit_cost,
+               r.name recipe_name,
+               NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric recipe_cost,
+               COALESCE(to_jsonb(r)->'ingredients','[]'::jsonb) recipe_ingredients,
+               suggestion.id suggested_recipe_id,suggestion.name suggested_recipe_name,
+               CASE
+                 WHEN cfg.costing_mode='direct' AND cfg.direct_unit_cost IS NOT NULL THEN 'direct'
+                 WHEN cfg.costing_mode='recipe' AND r.id IS NULL THEN 'missing'
+                 WHEN cfg.costing_mode='recipe' AND (NULLIF(to_jsonb(r)->>'cost_per_serving','') IS NULL OR jsonb_array_length(COALESCE(to_jsonb(r)->'ingredients','[]'::jsonb))=0) THEN 'partial'
+                 WHEN cfg.costing_mode='recipe' THEN 'complete'
+                 ELSE 'missing'
+               END costing_status
+        FROM ordering_menu_items i
+        JOIN ordering_menu_categories c ON c.id=i.category_id
+        LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.id
+        LEFT JOIN recipes r ON r.id=cfg.recipe_id
+        LEFT JOIN LATERAL (SELECT id,name FROM recipes rr WHERE lower(trim(rr.name))=lower(trim(i.name_en)) ORDER BY id LIMIT 1) suggestion ON TRUE
+        WHERE i.is_active AND i.pos_enabled AND lower(c.name_en)<>lower('Phase 1 Test Menu')
+        ORDER BY c.sort_order,i.sort_order,i.name_en`),
+      pool.query(`
+        SELECT m.id,m.name_en name,g.name_en group_name,
+               COALESCE(cfg.costing_mode,'unconfigured') costing_mode,cfg.recipe_id,cfg.direct_unit_cost,
+               r.name recipe_name,NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric recipe_cost,
+               CASE
+                 WHEN cfg.costing_mode='direct' AND cfg.direct_unit_cost IS NOT NULL THEN 'direct'
+                 WHEN cfg.costing_mode='recipe' AND r.id IS NULL THEN 'missing'
+                 WHEN cfg.costing_mode='recipe' AND (NULLIF(to_jsonb(r)->>'cost_per_serving','') IS NULL OR jsonb_array_length(COALESCE(to_jsonb(r)->'ingredients','[]'::jsonb))=0) THEN 'partial'
+                 WHEN cfg.costing_mode='recipe' THEN 'complete'
+                 ELSE 'missing'
+               END costing_status
+        FROM ordering_item_modifiers m
+        JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id
+        LEFT JOIN pos_modifier_costing_config cfg ON cfg.item_modifier_id=m.id
+        LEFT JOIN recipes r ON r.id=cfg.recipe_id
+        WHERE m.is_active AND g.is_active
+        ORDER BY g.sort_order,m.sort_order,m.name_en`),
+      pool.query(`SELECT id,name,NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric cost_per_serving,COALESCE(to_jsonb(r)->'ingredients','[]'::jsonb) ingredients,COALESCE((to_jsonb(r)->>'is_active')::boolean,true) is_active FROM recipes r ORDER BY name`),
+    ]);
+    const itemRows = items.rows.map((x) => ({ ...x, direct_unit_cost: x.direct_unit_cost == null ? null : n(x.direct_unit_cost), recipe_cost: x.recipe_cost == null ? null : n(x.recipe_cost) }));
+    const modifierRows = modifiers.rows.map((x) => ({ ...x, direct_unit_cost: x.direct_unit_cost == null ? null : n(x.direct_unit_cost), recipe_cost: x.recipe_cost == null ? null : n(x.recipe_cost) }));
+    const completeItems = itemRows.filter((x) => x.costing_status === "complete" || x.costing_status === "direct").length;
+    const completeModifiers = modifierRows.filter((x) => x.costing_status === "complete" || x.costing_status === "direct").length;
+    return res.json({
+      ok: true,
+      source: "sbb_pos_costing_phase2",
+      items: itemRows,
+      modifiers: modifierRows,
+      recipes: recipes.rows.map((x) => ({ ...x, cost_per_serving: x.cost_per_serving == null ? null : n(x.cost_per_serving) })),
+      summary: {
+        itemsTotal: itemRows.length,
+        itemsCosted: completeItems,
+        itemsCoveragePct: itemRows.length ? Number((completeItems / itemRows.length * 100).toFixed(1)) : 100,
+        modifiersTotal: modifierRows.length,
+        modifiersCosted: completeModifiers,
+        modifiersCoveragePct: modifierRows.length ? Number((completeModifiers / modifierRows.length * 100).toFixed(1)) : 100,
+      },
+      rules: { draftRecipeAllowedWhenCostComplete: true, missingCostNeverAssumedZero: true, changesApplyToFutureSalesOnly: true },
+    });
+  } catch (e: any) {
+    console.error("[receiptAnalytics.costingCoverage]", e);
+    return res.status(500).json({ ok: false, source: "sbb_pos_costing_phase2", error: e.message });
+  }
+});
+
+router.put("/costing-coverage/items/:id", async (req, res) => {
+  try {
+    const mode = s(req.body?.costingMode || req.body?.costing_mode);
+    if (!["recipe","direct","unconfigured"].includes(mode)) return res.status(400).json({ ok: false, error: "costingMode must be recipe, direct or unconfigured" });
+    const recipeId = mode === "recipe" ? Number(req.body?.recipeId ?? req.body?.recipe_id) : null;
+    const directCost = mode === "direct" ? Number(req.body?.directUnitCost ?? req.body?.direct_unit_cost) : null;
+    if (mode === "recipe" && !Number.isInteger(recipeId)) return res.status(400).json({ ok: false, error: "recipeId is required for recipe costing" });
+    if (mode === "direct" && (!Number.isFinite(directCost) || directCost < 0)) return res.status(400).json({ ok: false, error: "directUnitCost must be zero or greater" });
+    if (mode === "recipe") {
+      const recipe = await pool.query(`SELECT id FROM recipes WHERE id=$1`, [recipeId]);
+      if (!recipe.rowCount) return res.status(400).json({ ok: false, error: "Recipe not found" });
+    }
+    const result = await pool.query(`INSERT INTO pos_item_costing_config(menu_item_id,costing_mode,recipe_id,direct_unit_cost,notes,updated_at)
+      VALUES($1,$2,$3,$4,$5,NOW()) ON CONFLICT(menu_item_id) DO UPDATE SET costing_mode=EXCLUDED.costing_mode,recipe_id=EXCLUDED.recipe_id,direct_unit_cost=EXCLUDED.direct_unit_cost,notes=EXCLUDED.notes,updated_at=NOW() RETURNING *`,
+      [req.params.id,mode,recipeId,directCost,req.body?.notes || null]);
+    return res.json({ ok: true, data: result.rows[0], appliesToFutureSalesOnly: true });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
+router.put("/costing-coverage/modifiers/:id", async (req, res) => {
+  try {
+    const mode = s(req.body?.costingMode || req.body?.costing_mode);
+    if (!["recipe","direct","unconfigured"].includes(mode)) return res.status(400).json({ ok: false, error: "costingMode must be recipe, direct or unconfigured" });
+    const recipeId = mode === "recipe" ? Number(req.body?.recipeId ?? req.body?.recipe_id) : null;
+    const directCost = mode === "direct" ? Number(req.body?.directUnitCost ?? req.body?.direct_unit_cost) : null;
+    if (mode === "recipe" && !Number.isInteger(recipeId)) return res.status(400).json({ ok: false, error: "recipeId is required for recipe costing" });
+    if (mode === "direct" && (!Number.isFinite(directCost) || directCost < 0)) return res.status(400).json({ ok: false, error: "directUnitCost must be zero or greater" });
+    if (mode === "recipe") {
+      const recipe = await pool.query(`SELECT id FROM recipes WHERE id=$1`, [recipeId]);
+      if (!recipe.rowCount) return res.status(400).json({ ok: false, error: "Recipe not found" });
+    }
+    const result = await pool.query(`INSERT INTO pos_modifier_costing_config(item_modifier_id,costing_mode,recipe_id,direct_unit_cost,notes,updated_at)
+      VALUES($1,$2,$3,$4,$5,NOW()) ON CONFLICT(item_modifier_id) DO UPDATE SET costing_mode=EXCLUDED.costing_mode,recipe_id=EXCLUDED.recipe_id,direct_unit_cost=EXCLUDED.direct_unit_cost,notes=EXCLUDED.notes,updated_at=NOW() RETURNING *`,
+      [req.params.id,mode,recipeId,directCost,req.body?.notes || null]);
+    return res.json({ ok: true, data: result.rows[0], appliesToFutureSalesOnly: true });
+  } catch (e: any) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const w = await resolveWindow(req.query as Record<string, unknown>);
@@ -156,35 +267,73 @@ router.get("/", async (req, res) => {
 
     const [sumR, itemR, modR, compR, catR, hourR, payR, recR, historicalR] = await Promise.all([
       hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT COUNT(*)::int receipt_count,COALESCE(SUM(total),0) gross_sales,COALESCE(AVG(total),0) avg_receipt FROM receipts`, liveParams) : Promise.resolve(empty),
-      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}),mods AS(SELECT order_item_id,COALESCE(SUM(price_delta*quantity),0) mod_total FROM ordering_order_item_modifiers GROUP BY order_item_id),sold AS(SELECT i.item_name_en name,COALESCE(i.source_sku,'') sku,${categoryCase} category,i.quantity,i.line_total,COALESCE(mods.mod_total,0) mod_total,COALESCE(r.subtotal,r.total,0) receipt_subtotal,COALESCE(r.total,0) receipt_total FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN mods ON mods.order_item_id=i.id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=false) SELECT name,sku,category,SUM(quantity)::int qty_sold,ROUND(SUM(line_total),2) gross_sales,ROUND(SUM(CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) discounts,ROUND(SUM(line_total-CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) net_sales,ROUND(SUM(line_total)/NULLIF(SUM(quantity),0),2) avg_price,ROUND(SUM(line_total-mod_total),2) base_revenue FROM sold GROUP BY name,sku,category ORDER BY qty_sold DESC,net_sales DESC`, liveParams) : Promise.resolve(empty),
-      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT ${modifierTypeCase} type,COALESCE(m.modifier_group_name_en,'Modifier') group_name,m.modifier_name_en name,SUM(m.quantity)::int qty_sold,ROUND(SUM(m.price_delta*m.quantity),2) revenue FROM ordering_order_item_modifiers m JOIN ordering_order_items i ON i.id=m.order_item_id JOIN receipts r ON r.id=i.order_id GROUP BY ${modifierTypeCase},group_name,m.modifier_name_en ORDER BY qty_sold DESC,name`, liveParams) : Promise.resolve(empty),
-      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT i.item_name_en name,${categoryCase} category,SUM(i.quantity)::int qty_sold FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=true GROUP BY i.item_name_en,${categoryCase} ORDER BY qty_sold DESC`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}),mods AS(SELECT order_item_id,COALESCE(SUM(price_delta*quantity),0) mod_total FROM ordering_order_item_modifiers GROUP BY order_item_id),costs AS(
+        SELECT i.id,
+          CASE WHEN s.costing_status IN('complete','direct')
+             AND NOT EXISTS(SELECT 1 FROM ordering_order_item_modifiers m LEFT JOIN ordering_modifier_cost_snapshots ms ON ms.order_item_modifier_id=m.id WHERE m.order_item_id=i.id AND m.item_modifier_id IS NOT NULL AND COALESCE(ms.costing_status,'missing') NOT IN('complete','direct'))
+             AND NOT EXISTS(SELECT 1 FROM ordering_order_items child LEFT JOIN ordering_order_item_cost_snapshots cs ON cs.order_item_id=child.id WHERE child.parent_order_item_id=i.id AND COALESCE(cs.costing_status,'missing') NOT IN('complete','direct'))
+            THEN TRUE ELSE FALSE END costing_complete,
+          COALESCE(s.total_cost,0)
+          +COALESCE((SELECT SUM(ms.total_cost) FROM ordering_order_item_modifiers m JOIN ordering_modifier_cost_snapshots ms ON ms.order_item_modifier_id=m.id WHERE m.order_item_id=i.id AND m.item_modifier_id IS NOT NULL),0)
+          +COALESCE((SELECT SUM(cs.total_cost) FROM ordering_order_items child JOIN ordering_order_item_cost_snapshots cs ON cs.order_item_id=child.id WHERE child.parent_order_item_id=i.id),0) known_cost
+        FROM ordering_order_items i LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
+      ),sold AS(
+        SELECT i.item_name_en name,COALESCE(i.source_sku,'') sku,${categoryCase} category,i.quantity,i.line_total,COALESCE(mods.mod_total,0) mod_total,
+               COALESCE(r.subtotal,r.total,0) receipt_subtotal,COALESCE(r.total,0) receipt_total,c.costing_complete,c.known_cost
+        FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN mods ON mods.order_item_id=i.id LEFT JOIN costs c ON c.id=i.id
+        LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories ccat ON ccat.id=mi.category_id
+        LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
+        WHERE COALESCE(i.is_set_component,false)=false
+      ) SELECT name,sku,category,SUM(quantity)::int qty_sold,ROUND(SUM(line_total),2) gross_sales,
+        ROUND(SUM(CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) discounts,
+        ROUND(SUM(line_total-CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) net_sales,
+        ROUND(SUM(line_total)/NULLIF(SUM(quantity),0),2) avg_price,ROUND(SUM(line_total-mod_total),2) base_revenue,
+        BOOL_AND(COALESCE(costing_complete,false)) costing_complete,
+        SUM(CASE WHEN costing_complete THEN quantity ELSE 0 END)::int costed_qty,
+        ROUND(SUM(CASE WHEN costing_complete THEN known_cost ELSE 0 END),2) known_cogs
+        FROM sold GROUP BY name,sku,category ORDER BY qty_sold DESC,net_sales DESC`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT ${modifierTypeCase} type,COALESCE(m.modifier_group_name_en,'Modifier') group_name,m.modifier_name_en name,SUM(m.quantity)::int qty_sold,ROUND(SUM(m.price_delta*m.quantity),2) revenue,
+        BOOL_AND(CASE WHEN m.item_modifier_id IS NULL THEN TRUE ELSE COALESCE(ms.costing_status,'missing') IN('complete','direct') END) costing_complete,
+        ROUND(SUM(CASE WHEN m.item_modifier_id IS NULL THEN 0 WHEN ms.costing_status IN('complete','direct') THEN COALESCE(ms.total_cost,0) ELSE 0 END),2) known_cogs
+        FROM ordering_order_item_modifiers m JOIN ordering_order_items i ON i.id=m.order_item_id JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_modifier_cost_snapshots ms ON ms.order_item_modifier_id=m.id
+        GROUP BY ${modifierTypeCase},group_name,m.modifier_name_en ORDER BY qty_sold DESC,name`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT i.item_name_en name,${categoryCase} category,SUM(i.quantity)::int qty_sold,
+        BOOL_AND(COALESCE(cs.costing_status,'missing') IN('complete','direct')) costing_complete,ROUND(SUM(CASE WHEN cs.costing_status IN('complete','direct') THEN COALESCE(cs.total_cost,0) ELSE 0 END),2) known_cogs
+        FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_order_item_cost_snapshots cs ON cs.order_item_id=i.id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=true GROUP BY i.item_name_en,${categoryCase} ORDER BY qty_sold DESC`, liveParams) : Promise.resolve(empty),
       hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT ${categoryCase} category,SUM(i.quantity)::int qty_sold,ROUND(SUM(i.line_total),2) revenue FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=false GROUP BY ${categoryCase}`, liveParams) : Promise.resolve(empty),
       hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Bangkok')::int bkk_hour,COUNT(*)::int receipt_count,ROUND(SUM(total),2) gross_sales FROM receipts GROUP BY bkk_hour ORDER BY bkk_hour`, liveParams) : Promise.resolve(empty),
       hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT payment_method,order_mode,COUNT(*)::int receipt_count,ROUND(SUM(total),2) total FROM receipts GROUP BY payment_method,order_mode ORDER BY total DESC`, liveParams) : Promise.resolve(empty),
-      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT r.id,r.order_number,LEFT(r.ticket_number,3) receipt_number,r.order_mode,r.channel,r.payment_method,r.subtotal,GREATEST(COALESCE(r.subtotal,r.total,0)-COALESCE(r.total,0),0) discount_amount,r.total,r.created_at,(r.created_at AT TIME ZONE 'Asia/Bangkok')::timestamp bkk_created_at,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',i.id,'name',i.item_name_en,'quantity',i.quantity,'unitPrice',i.unit_price,'lineTotal',i.line_total,'isSetComponent',COALESCE(i.is_set_component,false),'modifiers',COALESCE((SELECT jsonb_agg(jsonb_build_object('group',m.modifier_group_name_en,'name',m.modifier_name_en,'priceDelta',m.price_delta,'quantity',m.quantity,'type',${modifierTypeCase})) FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) FROM ordering_order_items i WHERE i.order_id=r.id),'[]'::jsonb) items FROM receipts r ORDER BY r.created_at DESC LIMIT 1000`, liveParams) : Promise.resolve(empty),
-      fullHistoricalArchive ? pool.query(`SELECT item_name,sku,category,items_sold,gross_sales,items_refunded,refunds,discounts,net_sales,cost_of_goods,gross_profit,margin_pct,taxes,source_file_sha256 FROM historical_item_sales WHERE source='loyverse_csv' AND source_file_sha256=$1 ORDER BY items_sold DESC,net_sales DESC`, [HISTORICAL_SHA]) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT r.id,r.order_number,LEFT(r.ticket_number,3) receipt_number,r.order_mode,r.channel,r.payment_method,r.subtotal,GREATEST(COALESCE(r.subtotal,r.total,0)-COALESCE(r.total,0),0) discount_amount,r.total,r.created_at,(r.created_at AT TIME ZONE 'Asia/Bangkok')::timestamp bkk_created_at,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',i.id,'name',i.item_name_en,'quantity',i.quantity,'unitPrice',i.unit_price,'lineTotal',i.line_total,'isSetComponent',COALESCE(i.is_set_component,false),'costingStatus',cs.costing_status,'costSnapshotOrigin',cs.snapshot_origin,'unitCost',cs.unit_cost,'totalCost',cs.total_cost,'modifiers',COALESCE((SELECT jsonb_agg(jsonb_build_object('group',m.modifier_group_name_en,'name',m.modifier_name_en,'priceDelta',m.price_delta,'quantity',m.quantity,'type',${modifierTypeCase},'costingStatus',ms.costing_status,'unitCost',ms.unit_cost,'totalCost',ms.total_cost)) FROM ordering_order_item_modifiers m LEFT JOIN ordering_modifier_cost_snapshots ms ON ms.order_item_modifier_id=m.id WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) FROM ordering_order_items i LEFT JOIN ordering_order_item_cost_snapshots cs ON cs.order_item_id=i.id WHERE i.order_id=r.id),'[]'::jsonb) items FROM receipts r ORDER BY r.created_at DESC LIMIT 1000`, liveParams) : Promise.resolve(empty),
+      fullHistoricalArchive ? pool.query(`SELECT item_name,sku,category,items_sold,gross_sales,items_refunded,refunds,discounts,net_sales,taxes,source_file_sha256 FROM historical_item_sales WHERE source='loyverse_csv' AND source_file_sha256=$1 ORDER BY items_sold DESC,net_sales DESC`, [HISTORICAL_SHA]) : Promise.resolve(empty),
     ]);
 
     const sr = sumR.rows[0] || {};
-    const liveItems = itemR.rows.map((x) => ({
-      source: "SBB POS",
-      name: x.name,
-      sku: x.sku,
-      category: x.category,
-      qtySold: n(x.qty_sold),
-      grossSales: n(x.gross_sales),
-      itemsRefunded: 0,
-      refunds: 0,
-      discounts: n(x.discounts),
-      netSales: n(x.net_sales),
-      avgPrice: n(x.avg_price),
-      baseRevenue: n(x.base_revenue),
-      costOfGoods: null,
-      grossProfit: null,
-      marginPct: null,
-      taxes: 0,
-    }));
+    const liveItems = itemR.rows.map((x) => {
+      const complete = x.costing_complete === true;
+      const knownCogs = n(x.known_cogs);
+      const netSales = n(x.net_sales);
+      return {
+        source: "SBB POS",
+        name: x.name,
+        sku: x.sku,
+        category: x.category,
+        qtySold: n(x.qty_sold),
+        grossSales: n(x.gross_sales),
+        itemsRefunded: 0,
+        refunds: 0,
+        discounts: n(x.discounts),
+        netSales,
+        avgPrice: n(x.avg_price),
+        baseRevenue: n(x.base_revenue),
+        costingStatus: complete ? "Complete" : n(x.costed_qty) > 0 ? "Partial" : "Missing",
+        costedQty: n(x.costed_qty),
+        costingCoveragePct: n(x.qty_sold) ? Number((n(x.costed_qty) / n(x.qty_sold) * 100).toFixed(1)) : 100,
+        costOfGoods: complete ? knownCogs : null,
+        grossProfit: complete ? Number((netSales - knownCogs).toFixed(2)) : null,
+        marginPct: complete && netSales > 0 ? Number(((netSales - knownCogs) / netSales * 100).toFixed(2)) : null,
+        taxes: 0,
+      };
+    });
     const historicalItems = historicalR.rows.map((x) => ({
       source: "Loyverse Historical",
       name: x.item_name,
@@ -198,9 +347,12 @@ router.get("/", async (req, res) => {
       netSales: n(x.net_sales),
       avgPrice: n(x.items_sold) ? Number((n(x.gross_sales) / n(x.items_sold)).toFixed(2)) : 0,
       baseRevenue: n(x.gross_sales),
-      costOfGoods: n(x.cost_of_goods),
-      grossProfit: n(x.gross_profit),
-      marginPct: x.margin_pct == null ? null : n(x.margin_pct),
+      costingStatus: "Unavailable",
+      costedQty: 0,
+      costingCoveragePct: 0,
+      costOfGoods: null,
+      grossProfit: null,
+      marginPct: null,
       taxes: n(x.taxes),
     }));
     const items = [...historicalItems, ...liveItems];
@@ -208,14 +360,18 @@ router.get("/", async (req, res) => {
     const cats = catR.rows.map((x) => ({ category: x.category, qtySold: n(x.qty_sold), revenue: n(x.revenue) }));
     const liveItemQty = liveItems.reduce((a, x) => a + x.qtySold, 0);
     const historicalItemQty = historicalItems.reduce((a, x) => a + x.qtySold, 0);
+    const liveCostedQty = liveItems.reduce((a, x) => a + x.costedQty, 0);
     const modQty = mods.reduce((a, x) => a + n(x.qty_sold), 0);
     const historicalNet = historicalItems.reduce((a, x) => a + x.netSales, 0);
+    const liveCogsComplete = liveItems.length > 0 && liveItems.every((x) => x.costingStatus === "Complete");
+    const liveCogs = liveCogsComplete ? liveItems.reduce((a, x) => a + n(x.costOfGoods), 0) : null;
+    const liveNet = liveItems.reduce((a, x) => a + x.netSales, 0);
     const blockers = partialHistoricalOverlap ? [{ code: "HISTORICAL_AGGREGATE_PARTIAL_RANGE", message: "The Loyverse archive is a single aggregate for 1 Jan 17:00 through 8 Aug 03:00 and cannot be truthfully split into smaller historical date ranges. Select the full historical period to include it." }] : [];
 
     return res.json({
       ok: true,
       source: fullHistoricalArchive && hasLiveWindow ? "unified_item_sales" : fullHistoricalArchive ? "historical_loyverse_archive" : "sbb_pos_core",
-      schemaVersion: "item-sales-v1.2",
+      schemaVersion: "item-sales-v2.0",
       summary: {
         grossSales: n(sr.gross_sales) + historicalNet,
         receiptCount: n(sr.receipt_count),
@@ -224,10 +380,15 @@ router.get("/", async (req, res) => {
         modifierCount: modQty,
         historicalUnits: historicalItemQty,
         liveUnits: liveItemQty,
+        liveCostedUnits: liveCostedQty,
+        liveCostingCoveragePct: liveItemQty ? Number((liveCostedQty / liveItemQty * 100).toFixed(1)) : 100,
+        liveCogs,
+        liveGrossProfit: liveCogs == null ? null : Number((liveNet - liveCogs).toFixed(2)),
+        liveMarginPct: liveCogs == null || liveNet <= 0 ? null : Number(((liveNet - liveCogs) / liveNet * 100).toFixed(2)),
       },
       itemSales: items,
-      componentSales: mods.map((x) => ({ type: x.type, group: x.group_name, name: x.name, qtySold: n(x.qty_sold), revenue: n(x.revenue), source: "SBB POS" })),
-      includedComponents: compR.rows.map((x) => ({ name: x.name, category: x.category, qtySold: n(x.qty_sold), source: "SBB POS" })),
+      componentSales: mods.map((x) => ({ type: x.type, group: x.group_name, name: x.name, qtySold: n(x.qty_sold), revenue: n(x.revenue), source: "SBB POS", costingStatus: x.costing_complete ? "Complete" : "Missing", costOfGoods: x.costing_complete ? n(x.known_cogs) : null })),
+      includedComponents: compR.rows.map((x) => ({ name: x.name, category: x.category, qtySold: n(x.qty_sold), source: "SBB POS", costingStatus: x.costing_complete ? "Complete" : "Missing", costOfGoods: x.costing_complete ? n(x.known_cogs) : null })),
       categoryMix: cats,
       hourlySales: hourR.rows.map((x) => ({ hour: n(x.bkk_hour), label: `${String(n(x.bkk_hour)).padStart(2, "0")}:00`, receiptCount: n(x.receipt_count), grossSales: n(x.gross_sales) })),
       paymentMix: payR.rows.map((x) => ({ paymentMethod: x.payment_method, orderMode: x.order_mode, receiptCount: n(x.receipt_count), total: n(x.total) })),
@@ -236,6 +397,13 @@ router.get("/", async (req, res) => {
       reconciliation: {
         liveReceiptLinesMatch: liveItemQty === recR.rows.reduce((total, receipt) => total + (receipt.items || []).filter((item: any) => !item.isSetComponent).reduce((sum: number, item: any) => sum + n(item.quantity), 0), 0),
         historicalArchiveVerified: !fullHistoricalArchive || (historicalItems.length === 42 && historicalItemQty === 19377 && historicalNet === 3526909),
+      },
+      costing: {
+        historicalCostingAvailable: false,
+        historicalReason: "Loyverse ingredient costs were not maintained reliably; historical COGS, gross profit and margin are intentionally unavailable.",
+        liveCostingBasis: "immutable sale-time snapshot",
+        draftRecipeAllowedWhenCostComplete: true,
+        missingCostNeverAssumedZero: true,
       },
       historicalArchive: {
         available: true,
