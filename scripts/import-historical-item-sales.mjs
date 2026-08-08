@@ -10,7 +10,8 @@ const { Pool } = pg;
 const ROOT = process.cwd();
 const CSV = path.join(ROOT, 'server/data/historical-item-sales-2026-01-01-to-2026-08-07.csv');
 const MIGRATION = path.join(ROOT, 'server/migrations/202608080001_historical_item_sales.sql');
-const EXPECTED_SHA = '0691d0062768a4fcf3b7f530905b716d0c370cf65d6e40ac1bb7268d5bb5c854';
+const ORIGINAL_SOURCE_SHA = '0691d0062768a4fcf3b7f530905b716d0c370cf65d6e40ac1bb7268d5bb5c854';
+const REPOSITORY_FIXTURE_SHA = '8ecbf7b684a92531c09a725013935df349a79eff7177132fce0bc975e216045d';
 const SOURCE = 'loyverse_csv';
 const SOURCE_FILE = 'Item Sales 1st January to August 7th - 5pm to 3am.csv';
 const PERIOD_START = '2026-01-01T17:00:00+07:00';
@@ -30,13 +31,12 @@ const EXPECTED = {
 };
 
 function fail(message) {
-  console.error(`ERROR: ${message}`);
-  process.exit(1);
+  throw new Error(message);
 }
 
 function parseNumber(value) {
-  const n = Number(String(value ?? '').replace(/,/g, '').replace(/%/g, '').trim());
-  return Number.isFinite(n) ? n : 0;
+  const valueAsNumber = Number(String(value ?? '').replace(/,/g, '').replace(/%/g, '').trim());
+  return Number.isFinite(valueAsNumber) ? valueAsNumber : 0;
 }
 
 function parseCsv(text) {
@@ -74,8 +74,8 @@ if (!fs.existsSync(CSV)) fail(`Historical CSV missing: ${CSV}`);
 if (!fs.existsSync(MIGRATION)) fail(`Historical migration missing: ${MIGRATION}`);
 
 const csvBuffer = fs.readFileSync(CSV);
-const sha = crypto.createHash('sha256').update(csvBuffer).digest('hex');
-if (sha !== EXPECTED_SHA) fail(`CSV checksum mismatch. Expected ${EXPECTED_SHA}; received ${sha}`);
+const fixtureSha = crypto.createHash('sha256').update(csvBuffer).digest('hex');
+if (fixtureSha !== REPOSITORY_FIXTURE_SHA) fail(`Repository fixture checksum mismatch. Expected ${REPOSITORY_FIXTURE_SHA}; received ${fixtureSha}`);
 
 const rows = parseCsv(csvBuffer.toString('utf8'));
 const skus = new Set(rows.map((row) => row.sku));
@@ -127,7 +127,7 @@ try {
          margin_pct=EXCLUDED.margin_pct,
          taxes=EXCLUDED.taxes,
          imported_at=NOW()`,
-      [SOURCE,SOURCE_FILE,EXPECTED_SHA,PERIOD_START,PERIOD_END,row.itemName,row.sku,row.category,row.itemsSold,row.grossSales,row.itemsRefunded,row.refunds,row.discounts,row.netSales,row.costOfGoods,row.grossProfit,row.marginPct,row.taxes],
+      [SOURCE,SOURCE_FILE,ORIGINAL_SOURCE_SHA,PERIOD_START,PERIOD_END,row.itemName,row.sku,row.category,row.itemsSold,row.grossSales,row.itemsRefunded,row.refunds,row.discounts,row.netSales,row.costOfGoods,row.grossProfit,row.marginPct,row.taxes],
     );
   }
 
@@ -144,7 +144,7 @@ try {
             COALESCE(SUM(taxes),0)::numeric taxes
        FROM historical_item_sales
       WHERE source=$1 AND source_file_sha256=$2`,
-    [SOURCE, EXPECTED_SHA],
+    [SOURCE, ORIGINAL_SOURCE_SHA],
   );
   const db = result.rows[0];
   const dbChecks = {
@@ -174,7 +174,8 @@ try {
   console.log(`Net sales: ${dbChecks.netSales}`);
   console.log(`COGS: ${dbChecks.costOfGoods}`);
   console.log(`Gross profit: ${dbChecks.grossProfit}`);
-  console.log(`SHA-256: ${EXPECTED_SHA}`);
+  console.log(`Original source SHA-256: ${ORIGINAL_SOURCE_SHA}`);
+  console.log(`Repository fixture SHA-256: ${REPOSITORY_FIXTURE_SHA}`);
 } catch (error) {
   await client.query('ROLLBACK');
   console.error(error);
