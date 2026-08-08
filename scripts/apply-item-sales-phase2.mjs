@@ -55,7 +55,8 @@ GRANT EXECUTE ON FUNCTION capture_order_item_cost_snapshot(UUID,TEXT) TO ${role}
 GRANT EXECUTE ON FUNCTION capture_modifier_cost_snapshot(UUID,TEXT) TO ${role};
 `;
   const temp = path.join(os.tmpdir(), `sbb-phase2-${process.pid}-${Date.now()}.sql`);
-  fs.writeFileSync(temp, `BEGIN;\n${migrationSql}\n${grants}\nCOMMIT;\n`, { mode: 0o600 });
+  fs.writeFileSync(temp, `BEGIN;\n${migrationSql}\n${grants}\nCOMMIT;\n`, { mode: 0o644 });
+  fs.chmodSync(temp, 0o644);
   try {
     console.log(`Runtime role lacks schema ownership; applying Phase 2 as local postgres owner for database ${dbName}.`);
     const result = spawnSync('sudo', ['-u', 'postgres', 'psql', '-v', 'ON_ERROR_STOP=1', '-d', dbName, '-f', temp], {
