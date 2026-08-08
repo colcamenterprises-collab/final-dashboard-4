@@ -4,6 +4,11 @@ import { pool } from "../db";
 
 const router = Router();
 const TZ = "Asia/Bangkok";
+const HISTORICAL_START = DateTime.fromISO("2026-01-01T17:00:00+07:00");
+const HISTORICAL_END = DateTime.fromISO("2026-08-08T03:00:00+07:00");
+const LIVE_CUTOVER = DateTime.fromISO("2026-08-08T17:00:00+07:00");
+const HISTORICAL_SHA = "0691d0062768a4fcf3b7f530905b716d0c370cf65d6e40ac1bb7268d5bb5c854";
+
 const n = (v: unknown) => Number(v ?? 0) || 0;
 const s = (v: unknown) => String(v ?? "");
 const validDate = (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(s(v)) ? s(v) : null;
@@ -93,10 +98,6 @@ async function resolveWindow(q: Record<string, unknown>): Promise<Window | null>
   return makeWindow(limit > 1 ? `last_${limit}_shifts` : "last_completed_shift", bkk(rows[0].opened_at), bkk(rows[rows.length - 1].closed_at), rows.map((x) => String(x.id)));
 }
 
-function scope(w: Window) {
-  return { sql: `o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz`, params: [w.startUtc, w.endUtc] };
-}
-
 router.get("/shift-review", async (req, res) => {
   try {
     const w = await resolveWindow(req.query as Record<string, unknown>);
@@ -139,46 +140,120 @@ router.get("/shift-review", async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const w = await resolveWindow(req.query as Record<string, unknown>);
-    if (!w) return res.json({ ok: false, source: "sbb_pos_core", blockers: [{ code: "NO_POS_SHIFTS", message: "No POS shifts found" }], summary: { grossSales: 0, receiptCount: 0, averageReceiptValue: 0, lineItemCount: 0, modifierCount: 0, burgersSold: 0, friesSold: 0, drinksSold: 0, chickenSold: 0 }, topProducts: [], itemSales: [], topModifiers: [], componentSales: [], includedComponents: [], categoryMix: [], dailyTrend: [], hourlySales: [], paymentMix: [], receipts: [], filters: { from: "", to: "", mode: "", timezone: TZ } });
+    if (!w) return res.json({ ok: false, source: "sbb_pos_core", blockers: [{ code: "NO_POS_SHIFTS", message: "No POS shifts found" }], summary: { grossSales: 0, receiptCount: 0, averageReceiptValue: 0, lineItemCount: 0, modifierCount: 0 }, itemSales: [], componentSales: [], includedComponents: [], receipts: [], filters: { from: "", to: "", mode: "", timezone: TZ } });
 
-    const sc = scope(w);
-    const base = `SELECT o.* FROM ordering_orders o WHERE o.channel IN('pos_direct','grab') AND o.payment_status='paid' AND o.status<>'cancelled' AND ${sc.sql}`;
-    const params = sc.params;
+    const requestedStart = DateTime.fromISO(w.startUtc);
+    const requestedEnd = DateTime.fromISO(w.endUtc);
+    const fullHistoricalArchive = requestedStart <= HISTORICAL_START && requestedEnd >= HISTORICAL_END;
+    const partialHistoricalOverlap = requestedStart < HISTORICAL_END && requestedEnd > HISTORICAL_START && !fullHistoricalArchive;
+    const liveStart = requestedStart > LIVE_CUTOVER ? requestedStart : LIVE_CUTOVER;
+    const hasLiveWindow = requestedEnd > LIVE_CUTOVER && requestedEnd > liveStart;
+    const liveStartUtc = liveStart.toUTC().toISO() || w.startUtc;
 
-    const [sumR, itemR, modR, compR, catR, hourR, payR, recR] = await Promise.all([
-      pool.query(`WITH receipts AS(${base}) SELECT COUNT(*)::int receipt_count,COALESCE(SUM(total),0) gross_sales,COALESCE(AVG(total),0) avg_receipt FROM receipts`, params),
-      pool.query(`WITH receipts AS(${base}),mods AS(SELECT order_item_id,COALESCE(SUM(price_delta*quantity),0) mod_total FROM ordering_order_item_modifiers GROUP BY order_item_id),sold AS(SELECT i.item_name_en name,COALESCE(i.source_sku,'') sku,${categoryCase} category,i.quantity,i.line_total,COALESCE(mods.mod_total,0) mod_total,COALESCE(r.subtotal,r.total,0) receipt_subtotal,COALESCE(r.total,0) receipt_total FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN mods ON mods.order_item_id=i.id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=false) SELECT name,sku,category,SUM(quantity)::int qty_sold,ROUND(SUM(line_total),2) gross_sales,ROUND(SUM(CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) discounts,ROUND(SUM(line_total-CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) net_sales,ROUND(SUM(line_total)/NULLIF(SUM(quantity),0),2) avg_price,ROUND(SUM(line_total-mod_total),2) base_revenue FROM sold GROUP BY name,sku,category ORDER BY qty_sold DESC,net_sales DESC`, params),
-      pool.query(`WITH receipts AS(${base}) SELECT ${modifierTypeCase} type,COALESCE(m.modifier_group_name_en,'Modifier') group_name,m.modifier_name_en name,SUM(m.quantity)::int qty_sold,ROUND(SUM(m.price_delta*m.quantity),2) revenue FROM ordering_order_item_modifiers m JOIN ordering_order_items i ON i.id=m.order_item_id JOIN receipts r ON r.id=i.order_id GROUP BY ${modifierTypeCase},group_name,m.modifier_name_en ORDER BY qty_sold DESC,name`, params),
-      pool.query(`WITH receipts AS(${base}) SELECT i.item_name_en name,${categoryCase} category,SUM(i.quantity)::int qty_sold FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=true GROUP BY i.item_name_en,${categoryCase} ORDER BY qty_sold DESC`, params),
-      pool.query(`WITH receipts AS(${base}) SELECT ${categoryCase} category,SUM(i.quantity)::int qty_sold,ROUND(SUM(i.line_total),2) revenue FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=false GROUP BY ${categoryCase}`, params),
-      pool.query(`WITH receipts AS(${base}) SELECT EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Bangkok')::int bkk_hour,COUNT(*)::int receipt_count,ROUND(SUM(total),2) gross_sales FROM receipts GROUP BY bkk_hour ORDER BY bkk_hour`, params),
-      pool.query(`WITH receipts AS(${base}) SELECT payment_method,order_mode,COUNT(*)::int receipt_count,ROUND(SUM(total),2) total FROM receipts GROUP BY payment_method,order_mode ORDER BY total DESC`, params),
-      pool.query(`WITH receipts AS(${base}) SELECT r.id,r.order_number,LEFT(r.ticket_number,3) receipt_number,r.order_mode,r.channel,r.payment_method,r.subtotal,GREATEST(COALESCE(r.subtotal,r.total,0)-COALESCE(r.total,0),0) discount_amount,r.total,r.created_at,(r.created_at AT TIME ZONE 'Asia/Bangkok')::timestamp bkk_created_at,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',i.id,'name',i.item_name_en,'quantity',i.quantity,'unitPrice',i.unit_price,'lineTotal',i.line_total,'isSetComponent',COALESCE(i.is_set_component,false),'modifiers',COALESCE((SELECT jsonb_agg(jsonb_build_object('group',m.modifier_group_name_en,'name',m.modifier_name_en,'priceDelta',m.price_delta,'quantity',m.quantity,'type',${modifierTypeCase})) FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) FROM ordering_order_items i WHERE i.order_id=r.id),'[]'::jsonb) items FROM receipts r ORDER BY r.created_at DESC LIMIT 1000`, params),
+    const empty = { rows: [] as any[] };
+    const liveBase = `SELECT o.* FROM ordering_orders o WHERE o.channel IN('pos_direct','grab') AND o.payment_status='paid' AND o.status<>'cancelled' AND o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz`;
+    const liveParams = [liveStartUtc, w.endUtc];
+
+    const [sumR, itemR, modR, compR, catR, hourR, payR, recR, historicalR] = await Promise.all([
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT COUNT(*)::int receipt_count,COALESCE(SUM(total),0) gross_sales,COALESCE(AVG(total),0) avg_receipt FROM receipts`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}),mods AS(SELECT order_item_id,COALESCE(SUM(price_delta*quantity),0) mod_total FROM ordering_order_item_modifiers GROUP BY order_item_id),sold AS(SELECT i.item_name_en name,COALESCE(i.source_sku,'') sku,${categoryCase} category,i.quantity,i.line_total,COALESCE(mods.mod_total,0) mod_total,COALESCE(r.subtotal,r.total,0) receipt_subtotal,COALESCE(r.total,0) receipt_total FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN mods ON mods.order_item_id=i.id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=false) SELECT name,sku,category,SUM(quantity)::int qty_sold,ROUND(SUM(line_total),2) gross_sales,ROUND(SUM(CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) discounts,ROUND(SUM(line_total-CASE WHEN receipt_subtotal>0 THEN line_total*GREATEST(receipt_subtotal-receipt_total,0)/receipt_subtotal ELSE 0 END),2) net_sales,ROUND(SUM(line_total)/NULLIF(SUM(quantity),0),2) avg_price,ROUND(SUM(line_total-mod_total),2) base_revenue FROM sold GROUP BY name,sku,category ORDER BY qty_sold DESC,net_sales DESC`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT ${modifierTypeCase} type,COALESCE(m.modifier_group_name_en,'Modifier') group_name,m.modifier_name_en name,SUM(m.quantity)::int qty_sold,ROUND(SUM(m.price_delta*m.quantity),2) revenue FROM ordering_order_item_modifiers m JOIN ordering_order_items i ON i.id=m.order_item_id JOIN receipts r ON r.id=i.order_id GROUP BY ${modifierTypeCase},group_name,m.modifier_name_en ORDER BY qty_sold DESC,name`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT i.item_name_en name,${categoryCase} category,SUM(i.quantity)::int qty_sold FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=true GROUP BY i.item_name_en,${categoryCase} ORDER BY qty_sold DESC`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT ${categoryCase} category,SUM(i.quantity)::int qty_sold,ROUND(SUM(i.line_total),2) revenue FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE COALESCE(i.is_set_component,false)=false GROUP BY ${categoryCase}`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Bangkok')::int bkk_hour,COUNT(*)::int receipt_count,ROUND(SUM(total),2) gross_sales FROM receipts GROUP BY bkk_hour ORDER BY bkk_hour`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT payment_method,order_mode,COUNT(*)::int receipt_count,ROUND(SUM(total),2) total FROM receipts GROUP BY payment_method,order_mode ORDER BY total DESC`, liveParams) : Promise.resolve(empty),
+      hasLiveWindow ? pool.query(`WITH receipts AS(${liveBase}) SELECT r.id,r.order_number,LEFT(r.ticket_number,3) receipt_number,r.order_mode,r.channel,r.payment_method,r.subtotal,GREATEST(COALESCE(r.subtotal,r.total,0)-COALESCE(r.total,0),0) discount_amount,r.total,r.created_at,(r.created_at AT TIME ZONE 'Asia/Bangkok')::timestamp bkk_created_at,COALESCE((SELECT jsonb_agg(jsonb_build_object('id',i.id,'name',i.item_name_en,'quantity',i.quantity,'unitPrice',i.unit_price,'lineTotal',i.line_total,'isSetComponent',COALESCE(i.is_set_component,false),'modifiers',COALESCE((SELECT jsonb_agg(jsonb_build_object('group',m.modifier_group_name_en,'name',m.modifier_name_en,'priceDelta',m.price_delta,'quantity',m.quantity,'type',${modifierTypeCase})) FROM ordering_order_item_modifiers m WHERE m.order_item_id=i.id),'[]'::jsonb)) ORDER BY i.sort_order) FROM ordering_order_items i WHERE i.order_id=r.id),'[]'::jsonb) items FROM receipts r ORDER BY r.created_at DESC LIMIT 1000`, liveParams) : Promise.resolve(empty),
+      fullHistoricalArchive ? pool.query(`SELECT item_name,sku,category,items_sold,gross_sales,items_refunded,refunds,discounts,net_sales,cost_of_goods,gross_profit,margin_pct,taxes,source_file_sha256 FROM historical_item_sales WHERE source='loyverse_csv' AND source_file_sha256=$1 ORDER BY items_sold DESC,net_sales DESC`, [HISTORICAL_SHA]) : Promise.resolve(empty),
     ]);
 
     const sr = sumR.rows[0] || {};
-    const items = itemR.rows;
+    const liveItems = itemR.rows.map((x) => ({
+      source: "SBB POS",
+      name: x.name,
+      sku: x.sku,
+      category: x.category,
+      qtySold: n(x.qty_sold),
+      grossSales: n(x.gross_sales),
+      itemsRefunded: 0,
+      refunds: 0,
+      discounts: n(x.discounts),
+      netSales: n(x.net_sales),
+      avgPrice: n(x.avg_price),
+      baseRevenue: n(x.base_revenue),
+      costOfGoods: null,
+      grossProfit: null,
+      marginPct: null,
+      taxes: 0,
+    }));
+    const historicalItems = historicalR.rows.map((x) => ({
+      source: "Loyverse Historical",
+      name: x.item_name,
+      sku: x.sku,
+      category: x.category,
+      qtySold: n(x.items_sold),
+      grossSales: n(x.gross_sales),
+      itemsRefunded: n(x.items_refunded),
+      refunds: n(x.refunds),
+      discounts: n(x.discounts),
+      netSales: n(x.net_sales),
+      avgPrice: n(x.items_sold) ? Number((n(x.gross_sales) / n(x.items_sold)).toFixed(2)) : 0,
+      baseRevenue: n(x.gross_sales),
+      costOfGoods: n(x.cost_of_goods),
+      grossProfit: n(x.gross_profit),
+      marginPct: x.margin_pct == null ? null : n(x.margin_pct),
+      taxes: n(x.taxes),
+    }));
+    const items = [...historicalItems, ...liveItems];
     const mods = modR.rows;
     const cats = catR.rows.map((x) => ({ category: x.category, qtySold: n(x.qty_sold), revenue: n(x.revenue) }));
-    const itemQty = items.reduce((a, x) => a + n(x.qty_sold), 0);
+    const liveItemQty = liveItems.reduce((a, x) => a + x.qtySold, 0);
+    const historicalItemQty = historicalItems.reduce((a, x) => a + x.qtySold, 0);
     const modQty = mods.reduce((a, x) => a + n(x.qty_sold), 0);
-    const catQty = (name: string) => cats.find((x) => x.category === name)?.qtySold || 0;
+    const historicalNet = historicalItems.reduce((a, x) => a + x.netSales, 0);
+    const blockers = partialHistoricalOverlap ? [{ code: "HISTORICAL_AGGREGATE_PARTIAL_RANGE", message: "The Loyverse archive is a single aggregate for 1 Jan 17:00 through 8 Aug 03:00 and cannot be truthfully split into smaller historical date ranges. Select the full historical period to include it." }] : [];
 
     return res.json({
       ok: true,
-      source: "sbb_pos_core",
-      schemaVersion: "item-sales-v1.1",
-      summary: { grossSales: n(sr.gross_sales), receiptCount: n(sr.receipt_count), averageReceiptValue: n(sr.avg_receipt), lineItemCount: itemQty, modifierCount: modQty, burgersSold: catQty("Burgers"), friesSold: catQty("Fries"), drinksSold: catQty("Drinks"), chickenSold: catQty("Chicken") },
-      topProducts: items.slice(0, 50).map((x) => ({ name: x.name, sku: x.sku, category: x.category, qtySold: n(x.qty_sold), revenue: n(x.net_sales), pctOfTotal: Number((n(x.qty_sold) / Math.max(itemQty, 1) * 100).toFixed(1)) })),
-      itemSales: items.map((x) => ({ name: x.name, sku: x.sku, category: x.category, qtySold: n(x.qty_sold), grossSales: n(x.gross_sales), discounts: n(x.discounts), netSales: n(x.net_sales), avgPrice: n(x.avg_price), baseRevenue: n(x.base_revenue) })),
-      topModifiers: mods.map((x) => ({ name: `${x.group_name}: ${x.name}`, qtySold: n(x.qty_sold), pctOfTotal: Number((n(x.qty_sold) / Math.max(modQty, 1) * 100).toFixed(1)) })),
-      componentSales: mods.map((x) => ({ type: x.type, group: x.group_name, name: x.name, qtySold: n(x.qty_sold), revenue: n(x.revenue) })),
-      includedComponents: compR.rows.map((x) => ({ name: x.name, category: x.category, qtySold: n(x.qty_sold) })),
+      source: fullHistoricalArchive && hasLiveWindow ? "unified_item_sales" : fullHistoricalArchive ? "historical_loyverse_archive" : "sbb_pos_core",
+      schemaVersion: "item-sales-v1.2",
+      summary: {
+        grossSales: n(sr.gross_sales) + historicalNet,
+        receiptCount: n(sr.receipt_count),
+        averageReceiptValue: n(sr.avg_receipt),
+        lineItemCount: liveItemQty + historicalItemQty,
+        modifierCount: modQty,
+        historicalUnits: historicalItemQty,
+        liveUnits: liveItemQty,
+      },
+      itemSales: items,
+      componentSales: mods.map((x) => ({ type: x.type, group: x.group_name, name: x.name, qtySold: n(x.qty_sold), revenue: n(x.revenue), source: "SBB POS" })),
+      includedComponents: compR.rows.map((x) => ({ name: x.name, category: x.category, qtySold: n(x.qty_sold), source: "SBB POS" })),
       categoryMix: cats,
-      dailyTrend: [],
       hourlySales: hourR.rows.map((x) => ({ hour: n(x.bkk_hour), label: `${String(n(x.bkk_hour)).padStart(2, "0")}:00`, receiptCount: n(x.receipt_count), grossSales: n(x.gross_sales) })),
       paymentMix: payR.rows.map((x) => ({ paymentMethod: x.payment_method, orderMode: x.order_mode, receiptCount: n(x.receipt_count), total: n(x.total) })),
       receipts: recR.rows.map((x) => ({ ...x, total: n(x.total), subtotal: n(x.subtotal), discount_amount: n(x.discount_amount) })),
+      blockers,
+      reconciliation: {
+        liveReceiptLinesMatch: liveItemQty === recR.rows.reduce((total, receipt) => total + (receipt.items || []).filter((item: any) => !item.isSetComponent).reduce((sum: number, item: any) => sum + n(item.quantity), 0), 0),
+        historicalArchiveVerified: !fullHistoricalArchive || (historicalItems.length === 42 && historicalItemQty === 19377 && historicalNet === 3526909),
+      },
+      historicalArchive: {
+        available: true,
+        included: fullHistoricalArchive,
+        aggregateOnly: true,
+        periodStart: HISTORICAL_START.setZone(TZ).toISO(),
+        periodEnd: HISTORICAL_END.setZone(TZ).toISO(),
+        sourceFileSha256: HISTORICAL_SHA,
+        expectedRows: 42,
+        expectedItemsSold: 19377,
+        expectedNetSales: 3526909,
+      },
+      cutover: {
+        liveSource: "SBB POS",
+        liveFrom: LIVE_CUTOVER.setZone(TZ).toISO(),
+        historicalSource: "Loyverse CSV archive",
+        liveLoyverseIntegration: false,
+      },
       filters: { from: w.fromDate, to: w.toDate, mode: w.mode, timezone: TZ, windowStart: w.windowStart, windowEnd: w.windowEnd },
     });
   } catch (e: any) {
