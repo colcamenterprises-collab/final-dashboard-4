@@ -1,6 +1,6 @@
 {
-  "appId": "io.customli.sbbpos",
-  "appName": "Smash Brothers POS",
+  "appId": "io.customli.sbbpos.test",
+  "appName": "Smash Brothers POS Test",
   "webDir": "dist/public",
   "server": {
     "url": "https://app.smashbrosburgers.com",
