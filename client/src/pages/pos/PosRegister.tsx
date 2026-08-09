@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { processCreatedPosOrder } from "@/lib/posNativeCheckoutBridge";
 
 type Item = { id:string; name_en:string; name_th?:string; category_name:string; category_name_th?:string; active_price:number; image_url?:string; set_upgrade_eligible:boolean; has_options?:boolean };
 type Modifier = { id:string; name_en:string; name_th?:string; price_delta:number; modifier_group_id:string; modifier_group_name_en:string; group_type?:string };
@@ -157,6 +158,9 @@ export default function PosRegister() {
       return index < 0 ? [...current,line] : current.map((x,i) => i === index ? {...x,quantity:x.quantity + 1} : x);
     });
   };
+  const decrementCartLine = (index:number) => setCart(current => current.flatMap((line,i) => i !== index ? [line] : line.quantity > 1 ? [{...line,quantity:line.quantity - 1}] : []));
+  const removeCartLine = (index:number) => setCart(current => current.filter((_,i) => i !== index));
+
   const optionSelectionError = (groups:ModifierGroup[], modifiers:Modifier[]) => {
     for (const group of groups) {
       const count = modifiers.filter(modifier => modifier.modifier_group_id === group.id).length;
@@ -168,12 +172,6 @@ export default function PosRegister() {
     return "";
   };
   const startItem = async (item:Item) => {
-    // Grab selections are handled in Grab. Staff only choose the included drink
-    // when entering an existing meal-deal order into this POS.
-    if (mode === "grab") {
-      if (!isMealDeal(item)) return commitLine({...item,quantity:1});
-      setPending({item,modifiers:[]}); setModifierGroups([]); setFlow("meal-deal"); setSetUpgrade(false); setSelectedDrink(""); return;
-    }
     if (!item.has_options && !isBurger(item) && !isMealDeal(item)) return commitLine({...item,quantity:1});
     try {
       const response = await fetch(`/api/pos/menu/${item.id}/modifiers`,{credentials:"include"});
@@ -181,8 +179,16 @@ export default function PosRegister() {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "Could not load additions");
       const groups = (body.groups || []).map((group:ModifierGroup) => ({...group,min_selections:Number(group.min_selections || 0),max_selections:group.max_selections == null ? null : Number(group.max_selections),options:(group.options || []).map((option:Modifier) => ({...option,price_delta:Number(option.price_delta || 0)}))}));
-      if (!groups.length && !isBurger(item) && !isMealDeal(item)) return commitLine({...item,quantity:1});
-      setPending({item,modifiers:[]}); setModifierGroups(groups); setFlow(groups.length ? "options" : isMealDeal(item) ? "meal-deal" : "upgrade"); setSetUpgrade(false); setSelectedDrink(""); setNotice("");
+      if (!groups.length) {
+        if (isMealDeal(item)) {
+          setPending({item,modifiers:[]}); setModifierGroups([]); setFlow("meal-deal"); setSetUpgrade(false); setSelectedDrink(""); setNotice(""); return;
+        }
+        if (mode === "direct" && item.set_upgrade_eligible) {
+          setPending({item,modifiers:[]}); setModifierGroups([]); setFlow("upgrade"); setSetUpgrade(false); setSelectedDrink(""); setNotice(""); return;
+        }
+        return commitLine({...item,quantity:1});
+      }
+      setPending({item,modifiers:[]}); setModifierGroups(groups); setFlow("options"); setSetUpgrade(false); setSelectedDrink(""); setNotice("");
     } catch (error:any) { setNotice(error.message); }
   };
   const toggleModifier = (group:ModifierGroup, modifier:Modifier) => setPending(current => {
@@ -205,15 +211,15 @@ export default function PosRegister() {
     if (error) return setNotice(error);
     setNotice("");
     if (isMealDeal(pending.item)) return setFlow("meal-deal");
-    if (pending.item.set_upgrade_eligible) return setFlow("upgrade");
+    if (mode === "direct" && pending.item.set_upgrade_eligible) return setFlow("upgrade");
     finishItem();
   };
   const finishItem = () => {
     if (!pending) return;
     const optionsError = optionSelectionError(modifierGroups,pending.modifiers);
     if (optionsError) return setNotice(optionsError);
-    if ((isMealDeal(pending.item) || (pending.item.set_upgrade_eligible && setUpgrade)) && !selectedDrink) return setNotice("Select the included drink before continuing");
-    commitLine({...pending.item,quantity:1,modifiers:pending.modifiers,meal_deal:isMealDeal(pending.item),set_upgrade:pending.item.set_upgrade_eligible ? setUpgrade : false,set_drink_menu_item_id:selectedDrink || undefined});
+    if ((isMealDeal(pending.item) || (mode === "direct" && pending.item.set_upgrade_eligible && setUpgrade)) && !selectedDrink) return setNotice("Select the included drink before continuing");
+    commitLine({...pending.item,quantity:1,modifiers:pending.modifiers,meal_deal:isMealDeal(pending.item),set_upgrade:mode === "direct" && pending.item.set_upgrade_eligible ? setUpgrade : false,set_drink_menu_item_id:selectedDrink || undefined});
     setPending(null); setModifierGroups([]); setNotice("");
   };
 
@@ -264,6 +270,7 @@ export default function PosRegister() {
       if (!response.ok) throw new Error(body.error || "Could not create order");
       setMarketingOpen(false);
       setNotice(`${body.data.ticket_number} sent to kitchen`);
+      if (body.data?.id) void processCreatedPosOrder(String(body.data.id),String(body.data.ticket_number || ""));
       speakKitchenOrder(kitchenCalloutItems(),language);
       setCart([]); setCash(""); setSelectedDiscount(""); setGrabOrderNumber(""); setGrabCustomerName(""); setGrabCustomerMobile("");
       setMarketingConsent(false); setMarketingFirstName(""); setMarketingMobile(""); setMarketingEmail(""); setMarketingSkipReason(""); setCheckoutError("");
@@ -337,7 +344,7 @@ export default function PosRegister() {
       </section>
       <aside className="relative z-20 m-3 ml-0 min-h-0 min-w-0 overflow-y-auto rounded-[26px] border border-[#eee9d9] bg-white shadow-[0_10px_30px_rgba(38,31,7,0.08)]">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[#eee9d9] bg-white px-5 py-4"><div><h2 className="text-xl font-black">{language === "th" ? "ออเดอร์ปัจจุบัน" : "Current order"}</h2><p className="mt-1 text-xs font-bold text-zinc-400">{language === "th" ? "ออเดอร์" : "Order"} · {orderNumber}</p></div><button onClick={()=>setCart([])} className="rounded-xl px-2 py-1 text-sm font-semibold text-red-600 hover:bg-red-50">{ui.clear}</button></div>
-        <div className="min-h-[220px] px-5">{cart.length === 0 ? <div className="grid min-h-[220px] place-items-center text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#fff6c9] text-xl">+</div><p className="mt-3 text-sm font-bold text-zinc-500">{ui.addItems}</p></div></div> : <div className="py-2">{cart.map((line,index) => <div key={`${line.id}-${index}`} className="border-b border-dashed border-[#d9d2c0] py-3"><div className="flex justify-between gap-2 text-sm font-bold"><span className="leading-5">{line.quantity} × {label(line)}</span><span>{thb(lineTotal(line))}</span></div>{(line.modifiers || []).map(modifier => <p key={modifier.id} className="mt-1 text-xs font-medium text-[#15945c]">{modifier.group_type === "choice" ? "" : "+ "}{label(modifier)} · {modifier.group_type === "choice" ? thb(Number(line.active_price || 0) + Number(modifier.price_delta || 0)) : thb(modifier.price_delta)}</p>)}{(line.set_upgrade || line.meal_deal) && <div className="mt-1 text-xs font-bold text-[#856a00]">{line.set_upgrade && <p>SET UPGRADE +฿80</p>}<p>1 × {ui.fries}</p><p>1 × {label(drinks.find(drink => drink.id === line.set_drink_menu_item_id) || {name_en:"Selected drink"})}</p></div>}{isBurger(line) && <input list="burger-request-suggestions" value={line.notes || ""} onChange={event=>setCart(current=>current.map((item,i)=>i === index ? {...item,notes:event.target.value} : item))} className="mt-2 w-full rounded-xl border border-[#e9e4d5] bg-[#fffdf8] px-3 py-2 text-xs outline-none focus:border-[#ffd400]" placeholder={language === "th" ? "คำขอ เช่น ไม่ใส่ชีส" : "Item request, e.g. No cheese"}/>}</div>)}</div>}</div>
+        <div className="min-h-[220px] px-5">{cart.length === 0 ? <div className="grid min-h-[220px] place-items-center text-center"><div><div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#fff6c9] text-xl">+</div><p className="mt-3 text-sm font-bold text-zinc-500">{ui.addItems}</p></div></div> : <div className="py-2">{cart.map((line,index) => <div key={`${line.id}-${index}`} className="border-b border-dashed border-[#d9d2c0] py-3"><div className="flex items-start justify-between gap-2 text-sm font-bold"><span className="leading-5">{line.quantity} × {label(line)}</span><div className="flex items-center gap-1"><span className="mr-1">{thb(lineTotal(line))}</span><button type="button" aria-label={`Remove one ${label(line)}`} title="Remove one" onClick={()=>decrementCartLine(index)} className="grid h-7 w-7 place-items-center rounded-lg bg-zinc-100 text-base font-black text-zinc-700 hover:bg-zinc-200">−</button><button type="button" aria-label={`Remove ${label(line)} line`} title="Remove line" onClick={()=>removeCartLine(index)} className="grid h-7 w-7 place-items-center rounded-lg bg-red-50 text-xs font-black text-red-600 hover:bg-red-100">×</button></div></div>{(line.modifiers || []).map(modifier => <p key={modifier.id} className="mt-1 text-xs font-medium text-[#15945c]">{modifier.group_type === "choice" ? "" : "+ "}{label(modifier)} · {modifier.group_type === "choice" ? thb(Number(line.active_price || 0) + Number(modifier.price_delta || 0)) : thb(modifier.price_delta)}</p>)}{(line.set_upgrade || line.meal_deal) && <div className="mt-1 text-xs font-bold text-[#856a00]">{line.set_upgrade && <p>SET UPGRADE +฿80</p>}<p>1 × {ui.fries}</p><p>1 × {label(drinks.find(drink => drink.id === line.set_drink_menu_item_id) || {name_en:"Selected drink"})}</p></div>}{isBurger(line) && <input list="burger-request-suggestions" value={line.notes || ""} onChange={event=>setCart(current=>current.map((item,i)=>i === index ? {...item,notes:event.target.value} : item))} className="mt-2 w-full rounded-xl border border-[#e9e4d5] bg-[#fffdf8] px-3 py-2 text-xs outline-none focus:border-[#ffd400]" placeholder={language === "th" ? "คำขอ เช่น ไม่ใส่ชีส" : "Item request, e.g. No cheese"}/>}</div>)}</div>}</div>
         <datalist id="burger-request-suggestions"><option value="No cheese"/><option value="No tomato"/><option value="No salad"/><option value="No onions"/><option value="No pickles"/><option value="No jalapenos"/><option value="No burger sauce"/><option value="No meat"/><option value="No bun"/></datalist>
         <div className="border-t border-[#eee9d9] bg-[#fffefa] p-5">
           <div className="flex items-end justify-between"><span className="text-lg font-black">{ui.total}</span><span className="text-3xl font-black">{thb(total)}</span></div>

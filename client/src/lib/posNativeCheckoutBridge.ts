@@ -55,6 +55,7 @@ type NativeCheckoutStatus = {
 
 const STATUS_KEY = "sbb.pos.lastNativeCheckoutStatus";
 const BRIDGE_FLAG = "__sbbPosNativeCheckoutBridgeInstalled";
+const processedOrderIds = new Set<string>();
 
 function numeric(value: unknown) {
   const parsed = Number(value || 0);
@@ -209,6 +210,16 @@ async function handleCreatedOrder(
   });
 }
 
+export async function processCreatedPosOrder(orderId: string, fallbackTicket = "") {
+  if (!orderId || processedOrderIds.has(orderId)) return;
+  processedOrderIds.add(orderId);
+  try {
+    await handleCreatedOrder(window.fetch.bind(window), orderId, fallbackTicket);
+  } catch {
+    processedOrderIds.delete(orderId);
+  }
+}
+
 function requestUrl(input: RequestInfo | URL) {
   if (typeof input === "string") return input;
   if (input instanceof URL) return input.toString();
@@ -246,7 +257,7 @@ export function installPosNativeCheckoutBridge() {
         const ticket = String(body?.data?.ticket_number || "");
         if (orderId) {
           window.setTimeout(() => {
-            void handleCreatedOrder(originalFetch, orderId, ticket);
+            void processCreatedPosOrder(orderId, ticket);
           }, 0);
         }
       } catch {

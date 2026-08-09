@@ -310,10 +310,8 @@ router.post("/orders", staffDevice, async (req, res) => {
       if (mode === "grab" && line.set_upgrade) throw new Error("Grab orders cannot use staff upsells");
 
       const modifierIds: string[] = Array.isArray(line.modifier_ids) ? [...new Set<string>(line.modifier_ids.filter((id: any): id is string => typeof id === "string"))] : [];
-      if (mode === "grab" && modifierIds.length) throw new Error("Grab orders cannot use staff modifiers");
-
       let selectedModifiers: any[] = [];
-      if (mode === "direct") {
+      {
         const groupResult = await client.query(
           `SELECT DISTINCT g.id,g.name_en,g.selection_mode,
                   COALESCE(g.min_selections,g.min_select,CASE WHEN g.is_required THEN 1 ELSE 0 END,0) AS min_selections,
