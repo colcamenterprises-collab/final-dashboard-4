@@ -42,6 +42,21 @@ jobs:
 
           cd "$APP_DIR"
 
+          # Older manual/root deployments left a few deployment-managed paths owned by
+          # another OS user. Repair only Git metadata and generated build artifacts so
+          # the self-hosted deployment runner can update/rebuild without touching .env,
+          # uploads, database files, or other application data.
+          echo "==> Repair deployment-managed path ownership"
+          RUNNER_UID="$(id -u)"
+          RUNNER_GID="$(id -g)"
+          sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$APP_DIR/.git"
+          if [ -d "$APP_DIR/dist" ]; then
+            sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$APP_DIR/dist"
+          fi
+          if [ -d "$APP_DIR/node_modules/.prisma" ]; then
+            sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$APP_DIR/node_modules/.prisma"
+          fi
+
           PREVIOUS_SHA="$(git rev-parse HEAD)"
           TARGET_REF="${DEPLOY_REF:-main}"
           BACKUP_DIR="$APP_DIR/.deploy-backups/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
