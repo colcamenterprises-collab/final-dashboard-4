@@ -1,4 +1,4 @@
-package io.customli.sbbpos;
+package io.customli.sbbpos.test;
 
 import android.os.Bundle;
 import com.getcapacitor.BridgeActivity;
