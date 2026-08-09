@@ -176,11 +176,30 @@ export async function printReceiptNative(payload: ReceiptPayload, openDrawer = f
   let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
   if (!status.connected) status = await reconnectSavedPrinter();
   if (!status.connected) return { attempted: true, ok: false, message: "Printer is not connected" };
+
+  const bytes = buildReceiptEscPos(payload);
   try {
-    await printEscPosBytes(buildReceiptEscPos(payload));
-    if (openDrawer) await nativeOpenCashDrawer().catch(() => undefined);
-    return { attempted: true, ok: true, message: "Printed" };
-  } catch (error) {
-    return { attempted: true, ok: false, message: error instanceof Error ? error.message : "Printing failed" };
+    await printEscPosBytes(bytes);
+  } catch (firstError) {
+    const reconnected = await reconnectSavedPrinter();
+    if (!reconnected.connected) {
+      return {
+        attempted: true,
+        ok: false,
+        message: firstError instanceof Error ? firstError.message : "Printing failed and printer could not reconnect",
+      };
+    }
+    try {
+      await printEscPosBytes(bytes);
+    } catch (retryError) {
+      return {
+        attempted: true,
+        ok: false,
+        message: retryError instanceof Error ? retryError.message : "Printing failed after reconnect",
+      };
+    }
   }
+
+  if (openDrawer) await nativeOpenCashDrawer().catch(() => undefined);
+  return { attempted: true, ok: true, message: "Printed" };
 }
