@@ -6,12 +6,13 @@ export type NativePrinterDevice = {
 
 type NativeThermalPrinter = {
   listPrinters: () => Promise<{ printers: NativePrinterDevice[] }>;
-  connect: (options: { address: string }) => Promise<{ connected: boolean; name?: string; address?: string }>;
+  connect: (options: { address: string }) => Promise<{ connected: boolean; name?: string; address?: string; connectionMethod?: string }>;
   disconnect: () => Promise<{ connected: boolean }>;
-  getStatus: () => Promise<{ connected: boolean; name?: string; address?: string }>;
-  printRaw: (options: { base64: string }) => Promise<{ ok: boolean }>;
-  printTest: () => Promise<{ ok: boolean }>;
+  getStatus: () => Promise<{ connected: boolean; name?: string; address?: string; connectionMethod?: string }>;
+  printRaw: (options: { base64: string }) => Promise<{ ok: boolean; connectionMethod?: string }>;
+  printTest: () => Promise<{ ok: boolean; connectionMethod?: string }>;
   openCashDrawer: () => Promise<{ ok: boolean }>;
+  speak: (options: { text: string; language?: string }) => Promise<{ ok: boolean }>;
 };
 
 type CapacitorWindow = Window & {
@@ -80,6 +81,11 @@ export async function nativeTestPrint() {
 
 export async function nativeOpenCashDrawer() {
   return plugin().openCashDrawer();
+}
+
+export async function nativeSpeak(text: string, language = "en-US") {
+  if (!nativePrinterAvailable()) throw new Error("Native device bridge unavailable");
+  return plugin().speak({ text, language });
 }
 
 export async function printEscPosBytes(bytes: Uint8Array) {
