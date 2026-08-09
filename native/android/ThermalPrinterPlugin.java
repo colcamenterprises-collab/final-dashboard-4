@@ -21,7 +21,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
+import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -42,8 +44,11 @@ import java.util.UUID;
 )
 public class ThermalPrinterPlugin extends Plugin {
   private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+  private static final byte[] ESC_POS_RESET = new byte[] { 0x1B, 0x40 };
+
   private BluetoothSocket socket;
   private BluetoothDevice connectedDevice;
+  private String connectionMethod = "";
 
   private BluetoothAdapter adapter() {
     BluetoothManager manager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
@@ -86,7 +91,7 @@ public class ThermalPrinterPlugin extends Plugin {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
     if (!hasBluetoothPermission()) {
-      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.");
+      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS Test in Android Settings.");
       return;
     }
     listPrintersGranted(call, adapter);
@@ -113,7 +118,7 @@ public class ThermalPrinterPlugin extends Plugin {
       ret.put("permissionGranted", true);
       call.resolve(ret);
     } catch (SecurityException error) {
-      call.reject("Android blocked access to paired Bluetooth devices. Allow Nearby devices for Smash Brothers POS.", error);
+      call.reject("Android blocked access to paired Bluetooth devices. Allow Nearby devices for Smash Brothers POS Test.", error);
     } catch (Exception error) {
       call.reject("Could not list paired Bluetooth devices", error);
     }
@@ -135,7 +140,7 @@ public class ThermalPrinterPlugin extends Plugin {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
     if (!hasBluetoothPermission()) {
-      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.");
+      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS Test in Android Settings.");
       return;
     }
     connectGranted(call, adapter);
@@ -147,6 +152,7 @@ public class ThermalPrinterPlugin extends Plugin {
       call.reject("Printer address is required");
       return;
     }
+
     new Thread(() -> {
       try {
         disconnectInternal();
@@ -155,22 +161,68 @@ public class ThermalPrinterPlugin extends Plugin {
           call.reject("The selected printer is not paired in Android Bluetooth settings");
           return;
         }
+
         adapter.cancelDiscovery();
-        BluetoothSocket newSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
-        newSocket.connect();
-        socket = newSocket;
+
+        List<String> errors = new ArrayList<>();
+        BluetoothSocket activeSocket = null;
+        String activeMethod = "";
+
+        String[] methods = new String[] { "secure SPP", "insecure SPP", "RFCOMM channel 1" };
+        for (String methodName : methods) {
+          BluetoothSocket candidate = null;
+          try {
+            if ("secure SPP".equals(methodName)) {
+              candidate = device.createRfcommSocketToServiceRecord(SPP_UUID);
+            } else if ("insecure SPP".equals(methodName)) {
+              candidate = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
+            } else {
+              Method method = device.getClass().getMethod("createRfcommSocket", int.class);
+              method.setAccessible(true);
+              candidate = (BluetoothSocket) method.invoke(device, 1);
+            }
+
+            candidate.connect();
+
+            // Many generic 58mm printers accept a Bluetooth socket and then immediately
+            // close unsupported RFCOMM modes. Validate the socket with a harmless ESC/POS
+            // initialize command before reporting the printer as connected.
+            try { Thread.sleep(180); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            OutputStream probe = candidate.getOutputStream();
+            probe.write(ESC_POS_RESET);
+            probe.flush();
+
+            activeSocket = candidate;
+            activeMethod = methodName;
+            break;
+          } catch (Exception attemptError) {
+            errors.add(methodName + ": " + rootMessage(attemptError));
+            try { if (candidate != null) candidate.close(); } catch (Exception ignored) {}
+            try { Thread.sleep(180); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+          }
+        }
+
+        if (activeSocket == null || !activeSocket.isConnected()) {
+          call.reject("Could not establish a writable Bluetooth printer connection. " + String.join(" | ", errors));
+          return;
+        }
+
+        socket = activeSocket;
         connectedDevice = device;
+        connectionMethod = activeMethod;
+
         JSObject ret = new JSObject();
         ret.put("connected", true);
         ret.put("name", device.getName() == null ? "Bluetooth printer" : device.getName());
         ret.put("address", device.getAddress());
+        ret.put("connectionMethod", activeMethod);
         call.resolve(ret);
       } catch (SecurityException error) {
         disconnectInternal();
-        call.reject("Android blocked the Bluetooth connection. Allow Nearby devices for Smash Brothers POS.", error);
+        call.reject("Android blocked the Bluetooth connection. Allow Nearby devices for Smash Brothers POS Test.", error);
       } catch (Exception error) {
         disconnectInternal();
-        call.reject("Could not connect to Bluetooth printer: " + (error.getMessage() == null ? "connection failed" : error.getMessage()), error);
+        call.reject("Could not connect to Bluetooth printer: " + rootMessage(error), error);
       }
     }).start();
   }
@@ -196,6 +248,7 @@ public class ThermalPrinterPlugin extends Plugin {
     if (active && connectedDevice != null) {
       ret.put("name", connectedDevice.getName() == null ? "Bluetooth printer" : connectedDevice.getName());
       ret.put("address", connectedDevice.getAddress());
+      ret.put("connectionMethod", connectionMethod);
     }
     call.resolve(ret);
   }
@@ -238,18 +291,33 @@ public class ThermalPrinterPlugin extends Plugin {
         output.flush();
         JSObject ret = new JSObject();
         ret.put("ok", true);
+        ret.put("connectionMethod", connectionMethod);
         call.resolve(ret);
+      } catch (IOException error) {
+        String method = connectionMethod;
+        disconnectInternal();
+        call.reject("Printer connection was lost using " + (method.isEmpty() ? "Bluetooth" : method) + ": " + rootMessage(error), error);
       } catch (Exception error) {
         disconnectInternal();
-        call.reject("Printing failed: " + (error.getMessage() == null ? "connection lost" : error.getMessage()), error);
+        call.reject("Printing failed: " + rootMessage(error), error);
       }
     }).start();
+  }
+
+  private String rootMessage(Throwable error) {
+    Throwable current = error;
+    while (current.getCause() != null && current.getCause() != current) {
+      current = current.getCause();
+    }
+    String message = current.getMessage();
+    return message == null || message.trim().isEmpty() ? current.getClass().getSimpleName() : message;
   }
 
   private void disconnectInternal() {
     try { if (socket != null) socket.close(); } catch (Exception ignored) {}
     socket = null;
     connectedDevice = null;
+    connectionMethod = "";
   }
 
   @Override
