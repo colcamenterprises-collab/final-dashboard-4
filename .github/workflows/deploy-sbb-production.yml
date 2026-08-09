@@ -42,38 +42,21 @@ jobs:
 
           cd "$APP_DIR"
 
-          # Older manual/root deployments left a few deployment-managed paths owned by
-          # another OS user. Repair only Git metadata and generated build artifacts so
-          # the self-hosted deployment runner can update/rebuild without touching .env,
-          # uploads, database files, or other application data.
-          echo "==> Repair deployment-managed path ownership"
-          RUNNER_UID="$(id -u)"
-          RUNNER_GID="$(id -g)"
-          sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$APP_DIR/.git"
-          if [ -d "$APP_DIR/dist" ]; then
-            sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$APP_DIR/dist"
-          fi
-          if [ -d "$APP_DIR/node_modules/.prisma" ]; then
-            sudo chown -R "$RUNNER_UID:$RUNNER_GID" "$APP_DIR/node_modules/.prisma"
-          fi
-
           PREVIOUS_SHA="$(git rev-parse HEAD)"
           TARGET_REF="${DEPLOY_REF:-main}"
           BACKUP_DIR="$APP_DIR/.deploy-backups/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          BUILD_DIR="$BACKUP_DIR/source"
+          LIVE_DIST_BACKUP="$BACKUP_DIR/live-dist"
+          DIST_SWAPPED=0
           DEPLOY_SUCCEEDED=0
           ROLLBACK_STARTED=0
 
-          echo "Previous production SHA: $PREVIOUS_SHA"
+          echo "Previous source SHA:      $PREVIOUS_SHA"
           echo "Requested deploy ref:     $TARGET_REF"
           echo "Node: $(node --version)"
           echo "npm:  $(npm --version)"
 
           mkdir -p "$BACKUP_DIR"
-
-          if [ -d dist ]; then
-            cp -a dist "$BACKUP_DIR/dist"
-          fi
-
           printf '%s\n' "$PREVIOUS_SHA" > "$BACKUP_DIR/previous-sha.txt"
 
           wait_for_url() {
@@ -105,20 +88,16 @@ jobs:
             echo
             echo "========================================"
             echo "ROLLBACK STARTED"
-            echo "Restoring: $PREVIOUS_SHA"
             echo "========================================"
 
-            git reset --hard "$PREVIOUS_SHA"
-
-            if NODE_OPTIONS=--max-old-space-size=4096 npm run build; then
-              echo "Previous source rebuilt successfully."
-            elif [ -d "$BACKUP_DIR/dist" ]; then
-              echo "Previous rebuild failed; restoring compiled dist backup."
-              rm -rf dist
-              cp -a "$BACKUP_DIR/dist" dist
-            else
-              echo "Previous rebuild failed and no compiled dist backup exists."
-              return 1
+            if [ "$DIST_SWAPPED" -eq 1 ]; then
+              rm -rf "$APP_DIR/dist"
+              if [ -d "$LIVE_DIST_BACKUP" ]; then
+                mv "$LIVE_DIST_BACKUP" "$APP_DIR/dist"
+              else
+                echo "No pre-deploy dist backup is available."
+                return 1
+              fi
             fi
 
             sudo systemctl restart "$SERVICE"
@@ -128,7 +107,7 @@ jobs:
             wait_for_url "$PUBLIC_HEALTH_URL" "rollback public app health" 30 2
             wait_for_url "$PUBLIC_ORDER_URL" "rollback public order page health" 30 2
 
-            echo "Rollback verified at $(git rev-parse HEAD)"
+            echo "Rollback health verification passed."
           }
 
           on_failure() {
@@ -152,33 +131,45 @@ jobs:
           trap on_failure ERR
 
           echo
-          echo "==> Fetch target"
+          echo "==> Fetch target metadata"
           git fetch --prune origin
           git fetch origin "$TARGET_REF"
           TARGET_SHA="$(git rev-parse FETCH_HEAD)"
           echo "Target SHA: $TARGET_SHA"
 
-          if [ "$TARGET_SHA" = "$PREVIOUS_SHA" ]; then
-            echo "Target is already live. Running health verification only."
-          else
-            echo
-            echo "==> Switch production checkout"
-            git reset --hard "$TARGET_SHA"
-
-            if git diff --name-only "$PREVIOUS_SHA" "$TARGET_SHA" | grep -Eq '(^|/)(package.json|package-lock.json)$'; then
-              echo
-              echo "==> Dependencies changed; running npm ci"
-              npm ci --no-audit --no-fund
-            fi
-
-            echo
-            echo "==> Build production"
-            NODE_OPTIONS=--max-old-space-size=4096 npm run build
-
-            echo
-            echo "==> Restart production"
-            sudo systemctl restart "$SERVICE"
+          # This isolated-dist deployment deliberately reuses the production runtime's
+          # existing node_modules and Prisma client. Refuse it if either contract changed.
+          if git diff --name-only "$PREVIOUS_SHA" "$TARGET_SHA" | grep -Eq '(^|/)(package.json|package-lock.json|schema.prisma)$|^prisma/'; then
+            echo "Dependency or Prisma schema changes detected. This release requires the production checkout ownership to be repaired by a host administrator before deployment."
+            false
           fi
+
+          echo
+          echo "==> Build target in isolated runner-owned checkout"
+          ORIGIN_URL="$(git remote get-url origin)"
+          git clone --quiet "$ORIGIN_URL" "$BUILD_DIR"
+          git -C "$BUILD_DIR" checkout --quiet --detach "$TARGET_SHA"
+          if [ -f "$APP_DIR/.env" ]; then
+            ln -s "$APP_DIR/.env" "$BUILD_DIR/.env"
+          fi
+          cd "$BUILD_DIR"
+          npm ci --no-audit --no-fund
+          NODE_OPTIONS=--max-old-space-size=4096 npm run build
+          test -f "$BUILD_DIR/dist/index.js"
+          test -f "$BUILD_DIR/dist/public/index.html"
+
+          echo
+          echo "==> Atomically replace compiled production release"
+          cd "$APP_DIR"
+          if [ -d "$APP_DIR/dist" ]; then
+            mv "$APP_DIR/dist" "$LIVE_DIST_BACKUP"
+          fi
+          mv "$BUILD_DIR/dist" "$APP_DIR/dist"
+          DIST_SWAPPED=1
+
+          echo
+          echo "==> Restart production"
+          sudo systemctl restart "$SERVICE"
 
           echo
           echo "==> Verify service"
@@ -189,21 +180,16 @@ jobs:
           wait_for_url "$PUBLIC_HEALTH_URL" "public app health" 30 2
           wait_for_url "$PUBLIC_ORDER_URL" "public order page health" 30 2
 
-          LIVE_SHA="$(git rev-parse HEAD)"
-          if [ "$LIVE_SHA" != "$TARGET_SHA" ]; then
-            echo "Live checkout SHA mismatch. Expected $TARGET_SHA, found $LIVE_SHA"
-            false
-          fi
-
+          printf '%s\n' "$TARGET_SHA" > "$BACKUP_DIR/deployed-sha.txt"
           DEPLOY_SUCCEEDED=1
           trap - ERR
 
           echo
           echo "========================================"
           echo "SBB PRODUCTION DEPLOYMENT PASS"
-          echo "Previous SHA: $PREVIOUS_SHA"
-          echo "Live SHA:     $LIVE_SHA"
-          echo "Backup:       $BACKUP_DIR"
+          echo "Source checkout SHA: $PREVIOUS_SHA"
+          echo "Deployed dist SHA:   $TARGET_SHA"
+          echo "Backup:              $BACKUP_DIR"
           echo "========================================"
 
       - name: Deployment summary
