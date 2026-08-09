@@ -59,8 +59,9 @@ jobs:
           marker = '<uses-permission android:name="android.permission.INTERNET" />'
           perms = '''<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
               <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
-              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />'''
-          if 'android.permission.BLUETOOTH_CONNECT' not in s:
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />'''
+          if 'android.permission.BLUETOOTH_SCAN' not in s:
               if marker in s:
                   s = s.replace(marker, marker + '\n    ' + perms)
               else:
