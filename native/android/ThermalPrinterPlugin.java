@@ -31,7 +31,13 @@ import java.util.UUID;
 @CapacitorPlugin(
   name = "ThermalPrinter",
   permissions = {
-    @Permission(alias = "bluetooth", strings = { Manifest.permission.BLUETOOTH_CONNECT })
+    @Permission(
+      alias = "bluetooth",
+      strings = {
+        Manifest.permission.BLUETOOTH_CONNECT,
+        Manifest.permission.BLUETOOTH_SCAN
+      }
+    )
   }
 )
 public class ThermalPrinterPlugin extends Plugin {
@@ -44,9 +50,11 @@ public class ThermalPrinterPlugin extends Plugin {
     return manager == null ? null : manager.getAdapter();
   }
 
-  private boolean hasConnectPermission() {
-    return Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-      ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+  private boolean hasBluetoothPermission() {
+    return Build.VERSION.SDK_INT < Build.VERSION_CODES.S || (
+      ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED &&
+      ActivityCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN) == PackageManager.PERMISSION_GRANTED
+    );
   }
 
   private BluetoothAdapter requireBluetooth(PluginCall call) {
@@ -66,7 +74,7 @@ public class ThermalPrinterPlugin extends Plugin {
   public void listPrinters(PluginCall call) {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
-    if (!hasConnectPermission()) {
+    if (!hasBluetoothPermission()) {
       requestPermissionForAlias("bluetooth", call, "listPermissionCallback");
       return;
     }
@@ -77,8 +85,8 @@ public class ThermalPrinterPlugin extends Plugin {
   private void listPermissionCallback(PluginCall call) {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
-    if (!hasConnectPermission()) {
-      call.reject("Nearby devices permission was not granted");
+    if (!hasBluetoothPermission()) {
+      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.");
       return;
     }
     listPrintersGranted(call, adapter);
@@ -102,7 +110,10 @@ public class ThermalPrinterPlugin extends Plugin {
       }
       JSObject ret = new JSObject();
       ret.put("printers", result);
+      ret.put("permissionGranted", true);
       call.resolve(ret);
+    } catch (SecurityException error) {
+      call.reject("Android blocked access to paired Bluetooth devices. Allow Nearby devices for Smash Brothers POS.", error);
     } catch (Exception error) {
       call.reject("Could not list paired Bluetooth devices", error);
     }
@@ -112,7 +123,7 @@ public class ThermalPrinterPlugin extends Plugin {
   public void connect(PluginCall call) {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
-    if (!hasConnectPermission()) {
+    if (!hasBluetoothPermission()) {
       requestPermissionForAlias("bluetooth", call, "connectPermissionCallback");
       return;
     }
@@ -123,8 +134,8 @@ public class ThermalPrinterPlugin extends Plugin {
   private void connectPermissionCallback(PluginCall call) {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
-    if (!hasConnectPermission()) {
-      call.reject("Nearby devices permission was not granted");
+    if (!hasBluetoothPermission()) {
+      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.");
       return;
     }
     connectGranted(call, adapter);
@@ -140,6 +151,10 @@ public class ThermalPrinterPlugin extends Plugin {
       try {
         disconnectInternal();
         BluetoothDevice device = adapter.getRemoteDevice(address.trim());
+        if (device.getBondState() != BluetoothDevice.BOND_BONDED) {
+          call.reject("The selected printer is not paired in Android Bluetooth settings");
+          return;
+        }
         adapter.cancelDiscovery();
         BluetoothSocket newSocket = device.createRfcommSocketToServiceRecord(SPP_UUID);
         newSocket.connect();
@@ -150,6 +165,9 @@ public class ThermalPrinterPlugin extends Plugin {
         ret.put("name", device.getName() == null ? "Bluetooth printer" : device.getName());
         ret.put("address", device.getAddress());
         call.resolve(ret);
+      } catch (SecurityException error) {
+        disconnectInternal();
+        call.reject("Android blocked the Bluetooth connection. Allow Nearby devices for Smash Brothers POS.", error);
       } catch (Exception error) {
         disconnectInternal();
         call.reject("Could not connect to Bluetooth printer: " + (error.getMessage() == null ? "connection failed" : error.getMessage()), error);
@@ -169,7 +187,12 @@ public class ThermalPrinterPlugin extends Plugin {
   public void getStatus(PluginCall call) {
     JSObject ret = new JSObject();
     boolean active = socket != null && socket.isConnected();
+    BluetoothAdapter adapter = adapter();
     ret.put("connected", active);
+    ret.put("bridgeOpen", true);
+    ret.put("bluetoothSupported", adapter != null);
+    ret.put("bluetoothEnabled", adapter != null && adapter.isEnabled());
+    ret.put("permissionGranted", hasBluetoothPermission());
     if (active && connectedDevice != null) {
       ret.put("name", connectedDevice.getName() == null ? "Bluetooth printer" : connectedDevice.getName());
       ret.put("address", connectedDevice.getAddress());
