@@ -19,6 +19,13 @@ import {
   type NativePrinterDevice,
 } from "@/lib/thermalPrinter";
 
+type PrinterStatus = {
+  connected: boolean;
+  name?: string;
+  address?: string;
+  connectionMethod?: string;
+};
+
 function utf8Base64(text: string) {
   const bytes = new TextEncoder().encode(text);
   let binary = "";
@@ -68,7 +75,7 @@ export default function PrinterSettings() {
         const devices = await listNativePrinters();
         if (!cancelled) setPrinters(devices);
 
-        let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
+        let status: PrinterStatus = await getNativePrinterStatus().catch(() => ({ connected: false }));
         if (status.connected) {
           const activeAddress = status.address || savedAddress;
           if (activeAddress) {
@@ -167,7 +174,7 @@ export default function PrinterSettings() {
     if (native) {
       setTestStatus("Checking printer connection…");
       try {
-        let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
+        let status: PrinterStatus = await getNativePrinterStatus().catch(() => ({ connected: false }));
         if (!status.connected) status = await reconnectSavedPrinter();
         if (!status.connected) throw new Error("Saved printer could not reconnect. Tap Connect and try again.");
         setConnected(true);
