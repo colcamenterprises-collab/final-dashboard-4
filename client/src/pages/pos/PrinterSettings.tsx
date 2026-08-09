@@ -5,6 +5,7 @@ import {
   savePosPrinterSettings,
   type PosPrinterSettings,
 } from "@/lib/posPrinterSettings";
+import { readLastNativeCheckoutStatus } from "@/lib/posNativeCheckoutBridge";
 import {
   connectNativePrinter,
   disconnectNativePrinter,
@@ -13,6 +14,8 @@ import {
   nativePrinterAvailable,
   nativeTestPrint,
   readSavedPrinterAddress,
+  reconnectSavedPrinter,
+  savePrinterAddress,
   type NativePrinterDevice,
 } from "@/lib/thermalPrinter";
 
@@ -51,12 +54,59 @@ export default function PrinterSettings() {
   const [printers, setPrinters] = useState<NativePrinterDevice[]>([]);
   const [selectedAddress, setSelectedAddress] = useState(readSavedPrinterAddress());
   const [connected, setConnected] = useState(false);
+  const [lastCheckout, setLastCheckout] = useState(readLastNativeCheckoutStatus);
   const native = nativePrinterAvailable();
 
   useEffect(() => {
     if (!native) return;
-    getNativePrinterStatus().then((status) => setConnected(status.connected)).catch(() => setConnected(false));
+    let cancelled = false;
+
+    const restore = async () => {
+      const savedAddress = readSavedPrinterAddress();
+      if (savedAddress && !cancelled) setSelectedAddress(savedAddress);
+      try {
+        const devices = await listNativePrinters();
+        if (!cancelled) setPrinters(devices);
+
+        let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
+        if (status.connected) {
+          const activeAddress = status.address || savedAddress;
+          if (activeAddress) {
+            savePrinterAddress(activeAddress);
+            if (!cancelled) setSelectedAddress(activeAddress);
+          }
+          if (!cancelled) {
+            setConnected(true);
+            setTestStatus(`Connected${status.name ? ` to ${status.name}` : ""}. Printer restored automatically.`);
+          }
+          return;
+        }
+
+        if (savedAddress) {
+          status = await reconnectSavedPrinter();
+          if (!cancelled) {
+            setConnected(Boolean(status.connected));
+            setTestStatus(status.connected
+              ? `Reconnected${status.name ? ` to ${status.name}` : " to saved printer"}.`
+              : "Saved printer found but automatic reconnect failed. Tap Connect to retry.");
+          }
+        } else if (!cancelled) {
+          setTestStatus(devices.length ? "Select the 58mm printer, then Connect." : "No paired Bluetooth devices found. Pair the printer in Android settings first.");
+        }
+      } catch (error) {
+        if (!cancelled) setTestStatus(error instanceof Error ? error.message : "Could not restore Bluetooth printer");
+      }
+    };
+
+    void restore();
+    return () => { cancelled = true; };
   }, [native]);
+
+  useEffect(() => {
+    const updateLastCheckout = () => setLastCheckout(readLastNativeCheckoutStatus());
+    window.addEventListener("sbb:pos-native-checkout", updateLastCheckout);
+    return () => window.removeEventListener("sbb:pos-native-checkout", updateLastCheckout);
+  }, []);
 
   const update = <K extends keyof PosPrinterSettings>(key: K, value: PosPrinterSettings[K]) => {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -65,6 +115,7 @@ export default function PrinterSettings() {
 
   const save = () => {
     savePosPrinterSettings(settings);
+    if (selectedAddress) savePrinterAddress(selectedAddress);
     setSaved(true);
   };
 
@@ -73,7 +124,9 @@ export default function PrinterSettings() {
     try {
       const devices = await listNativePrinters();
       setPrinters(devices);
-      setTestStatus(devices.length ? "Select the 58mm printer, then Connect." : "No paired Bluetooth devices found. Pair the printer in Android settings first.");
+      const savedAddress = readSavedPrinterAddress();
+      if (savedAddress) setSelectedAddress(savedAddress);
+      setTestStatus(devices.length ? "Paired devices refreshed." : "No paired Bluetooth devices found. Pair the printer in Android settings first.");
     } catch (error) {
       setTestStatus(error instanceof Error ? error.message : "Could not read Bluetooth devices");
     }
@@ -86,8 +139,15 @@ export default function PrinterSettings() {
       const result = await connectNativePrinter(selectedAddress);
       setConnected(result.connected);
       const device = printers.find((item) => item.address === selectedAddress);
-      if (device?.name) update("printerName", device.name);
-      setTestStatus(result.connected ? `Connected directly to ${result.name || device?.name || "printer"}.` : "Printer did not connect.");
+      const printerName = result.name || device?.name || settings.printerName;
+      const nextSettings = { ...settings, printerName };
+      setSettings(nextSettings);
+      savePosPrinterSettings(nextSettings);
+      savePrinterAddress(selectedAddress);
+      setSaved(true);
+      setTestStatus(result.connected
+        ? `Connected directly to ${printerName}. Selection saved for automatic checkout printing.`
+        : "Printer did not connect.");
     } catch (error) {
       setConnected(false);
       setTestStatus(error instanceof Error ? error.message : "Printer connection failed");
@@ -98,17 +158,24 @@ export default function PrinterSettings() {
     await disconnectNativePrinter().catch(() => undefined);
     setConnected(false);
     setSelectedAddress("");
-    setTestStatus("Printer disconnected.");
+    setTestStatus("Printer disconnected and saved printer selection cleared.");
   };
 
   const directTest = async () => {
     savePosPrinterSettings(settings);
+    if (selectedAddress) savePrinterAddress(selectedAddress);
     if (native) {
-      setTestStatus("Sending native ESC/POS test…");
+      setTestStatus("Checking printer connection…");
       try {
+        let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
+        if (!status.connected) status = await reconnectSavedPrinter();
+        if (!status.connected) throw new Error("Saved printer could not reconnect. Tap Connect and try again.");
+        setConnected(true);
+        setTestStatus("Sending native ESC/POS test…");
         await nativeTestPrint();
-        setTestStatus("Native test sent successfully.");
+        setTestStatus("Native test sent successfully. This printer is ready for automatic checkout printing.");
       } catch (error) {
+        setConnected(false);
         setTestStatus(error instanceof Error ? error.message : "Native test failed");
       }
       return;
@@ -146,12 +213,12 @@ export default function PrinterSettings() {
               </div>
               <button type="button" onClick={refreshPrinters} className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-bold"><RefreshCw className="h-4 w-4" /> Scan paired</button>
             </div>
-            <select value={selectedAddress} onChange={(event) => setSelectedAddress(event.target.value)} className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm">
+            <select value={selectedAddress} onChange={(event) => { setSelectedAddress(event.target.value); setSaved(false); }} className="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm">
               <option value="">Select paired printer…</option>
               {printers.map((device) => <option key={device.address} value={device.address}>{device.name} — {device.address}</option>)}
             </select>
             <div className="grid grid-cols-2 gap-2">
-              <button type="button" onClick={connect} className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white">Connect</button>
+              <button type="button" onClick={connect} className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white">Connect & Save</button>
               <button type="button" onClick={disconnect} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-black">Disconnect</button>
             </div>
           </div>
@@ -174,7 +241,7 @@ export default function PrinterSettings() {
         <label className="flex items-center justify-between rounded-xl border border-slate-200 p-4">
           <span>
             <span className="block text-sm font-bold text-slate-900">Print automatically after payment</span>
-            <span className="block text-xs text-slate-500">When enabled in the SBB Android app, receipts print directly after checkout.</span>
+            <span className="block text-xs text-slate-500">When enabled, every successful POS sale reconnects to the saved printer if needed and prints automatically.</span>
           </span>
           <input type="checkbox" checked={settings.autoPrint} onChange={(event) => update("autoPrint", event.target.checked)} className="h-5 w-5" />
         </label>
@@ -184,8 +251,17 @@ export default function PrinterSettings() {
           <button type="button" onClick={directTest} className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white">{native ? "Native Test Print" : "RawBT Test Print"}</button>
         </div>
 
-        {saved && <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Printer settings saved on this tablet.</p>}
+        {saved && <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Printer and automatic-print settings saved on this tablet.</p>}
         {testStatus && <p className="text-sm font-semibold text-slate-700">{testStatus}</p>}
+
+        {lastCheckout && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-700">
+            <p className="font-black text-slate-900">Last POS checkout hardware result · Ticket {lastCheckout.ticketNumber || "—"}</p>
+            <p>Automatic print: <strong>{lastCheckout.printed ? "SUCCESS" : "NOT PRINTED"}</strong> — {lastCheckout.printMessage}</p>
+            <p>Order callout: <strong>{lastCheckout.callout ? "SUCCESS" : "NOT PLAYED"}</strong> — {lastCheckout.calloutMessage}</p>
+            <p className="text-slate-500">{new Date(lastCheckout.at).toLocaleString("en-GB", { hour12: false })}</p>
+          </div>
+        )}
       </section>
 
       {!native && (
