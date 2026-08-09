@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-09T05:27:00Z
+requested_at=2026-08-09T11:56:00Z
 requested_by=ChatGPT
 ref=main
-reason=Deploy POS printer persistence, automatic receipt printing and native callout using isolated build and atomic dist swap
+reason=Deploy live POS line removal, Grab modifiers without upsells, and shared Direct/Grab automatic ticket printing
