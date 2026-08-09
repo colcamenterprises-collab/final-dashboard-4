@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-09T05:20:00Z
+requested_at=2026-08-09T05:27:00Z
 requested_by=ChatGPT
 ref=main
-reason=Retry POS printer persistence and checkout hardware deployment after repairing deployment-managed path ownership
+reason=Deploy POS printer persistence, automatic receipt printing and native callout using isolated build and atomic dist swap
