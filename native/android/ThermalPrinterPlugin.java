@@ -8,6 +8,7 @@ import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.speech.tts.TextToSpeech;
 import android.util.Base64;
 
 import androidx.core.app.ActivityCompat;
@@ -27,6 +28,7 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -49,6 +51,19 @@ public class ThermalPrinterPlugin extends Plugin {
   private BluetoothSocket socket;
   private BluetoothDevice connectedDevice;
   private String connectionMethod = "";
+  private TextToSpeech textToSpeech;
+  private volatile boolean textToSpeechReady = false;
+
+  @Override
+  public void load() {
+    super.load();
+    textToSpeech = new TextToSpeech(getContext(), status -> {
+      if (status == TextToSpeech.SUCCESS) {
+        textToSpeechReady = true;
+        textToSpeech.setLanguage(Locale.US);
+      }
+    });
+  }
 
   private BluetoothAdapter adapter() {
     BluetoothManager manager = (BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
@@ -183,10 +198,6 @@ public class ThermalPrinterPlugin extends Plugin {
             }
 
             candidate.connect();
-
-            // Many generic 58mm printers accept a Bluetooth socket and then immediately
-            // close unsupported RFCOMM modes. Validate the socket with a harmless ESC/POS
-            // initialize command before reporting the printer as connected.
             try { Thread.sleep(180); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             OutputStream probe = candidate.getOutputStream();
             probe.write(ESC_POS_RESET);
@@ -245,11 +256,37 @@ public class ThermalPrinterPlugin extends Plugin {
     ret.put("bluetoothSupported", adapter != null);
     ret.put("bluetoothEnabled", adapter != null && adapter.isEnabled());
     ret.put("permissionGranted", hasBluetoothPermission());
+    ret.put("textToSpeechReady", textToSpeechReady);
     if (active && connectedDevice != null) {
       ret.put("name", connectedDevice.getName() == null ? "Bluetooth printer" : connectedDevice.getName());
       ret.put("address", connectedDevice.getAddress());
       ret.put("connectionMethod", connectionMethod);
     }
+    call.resolve(ret);
+  }
+
+  @PluginMethod
+  public void speak(PluginCall call) {
+    String text = call.getString("text");
+    String language = call.getString("language", "en-US");
+    if (text == null || text.trim().isEmpty()) {
+      call.reject("Speech text is required");
+      return;
+    }
+    if (textToSpeech == null || !textToSpeechReady) {
+      call.reject("Android text to speech is not ready");
+      return;
+    }
+
+    Locale locale = language.toLowerCase().startsWith("th") ? new Locale("th", "TH") : Locale.US;
+    textToSpeech.setLanguage(locale);
+    int result = textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, "sbb-pos-order");
+    if (result == TextToSpeech.ERROR) {
+      call.reject("Android text to speech could not start");
+      return;
+    }
+    JSObject ret = new JSObject();
+    ret.put("ok", true);
     call.resolve(ret);
   }
 
@@ -323,6 +360,12 @@ public class ThermalPrinterPlugin extends Plugin {
   @Override
   protected void handleOnDestroy() {
     disconnectInternal();
+    if (textToSpeech != null) {
+      textToSpeech.stop();
+      textToSpeech.shutdown();
+      textToSpeech = null;
+    }
+    textToSpeechReady = false;
     super.handleOnDestroy();
   }
 }
