@@ -7,6 +7,7 @@ on:
       - 'client/src/pages/pos/**'
       - 'client/src/lib/thermalPrinter.ts'
       - 'native/android/**'
+      - 'scripts/patch-pos-native-auto-print.mjs'
       - 'capacitor.config.json'
       - '.github/workflows/build-sbb-pos-apk.yml'
 
@@ -34,6 +35,9 @@ jobs:
 
       - name: Install Capacitor build tools
         run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Wire native POS auto print and callout
+        run: node scripts/patch-pos-native-auto-print.mjs
 
       - name: Build web bundle
         run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
