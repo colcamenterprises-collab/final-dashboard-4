@@ -279,8 +279,8 @@ router.get("/", async (req, res) => {
         FROM ordering_order_items i LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
       ),sold AS(
         SELECT i.item_name_en name,COALESCE(i.source_sku,'') sku,${categoryCase} category,i.quantity,i.line_total,COALESCE(mods.mod_total,0) mod_total,
-               COALESCE(r.subtotal,r.total,0) receipt_subtotal,COALESCE(r.total,0) receipt_total,c.costing_complete,c.known_cost
-        FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN mods ON mods.order_item_id=i.id LEFT JOIN costs c ON c.id=i.id
+               COALESCE(r.subtotal,r.total,0) receipt_subtotal,COALESCE(r.total,0) receipt_total,cost_calc.costing_complete,cost_calc.known_cost
+        FROM ordering_order_items i JOIN receipts r ON r.id=i.order_id LEFT JOIN mods ON mods.order_item_id=i.id LEFT JOIN costs cost_calc ON cost_calc.id=i.id
         LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id LEFT JOIN ordering_menu_categories ccat ON ccat.id=mi.category_id
         LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
         WHERE COALESCE(i.is_set_component,false)=false
