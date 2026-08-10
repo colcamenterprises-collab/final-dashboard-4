@@ -4,54 +4,17 @@ import { Search } from "lucide-react";
 import { ExactDateTimeRange, reportingRangeParams, type ExactDateTimeRangeValue } from "@/components/reports/ExactDateTimeRange";
 import { PageTitle } from "@/components/ui/sbb-cards";
 
-type Receipt = {
-  id: string;
-  occurred_at: string;
-  source_system: "loyverse" | "sbb_pos" | string;
-  receipt_number: string;
-  channel?: string;
-  order_mode?: string;
-  payment_status?: string;
-  subtotal: number;
-  discount_total: number;
-  refund_total: number;
-  net_sales: number;
-  total: number;
-  staff_name?: string;
-};
-type Data = { ok: boolean; source: string; filters: ExactDateTimeRangeValue & { fromInstant: string; toInstant: string }; receipts: Receipt[]; error?: string };
-
-const money = (value: number) => `฿${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
-const stamp = (value: string) => value ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Bangkok", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }).format(new Date(value)) : "";
-function localDate(offset = 0) { const d = new Date(); d.setDate(d.getDate() + offset); return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(d); }
-
-export default function ReceiptsReport() {
-  const [range, setRange] = useState<ExactDateTimeRangeValue>({ fromDate: localDate(-1), fromTime: "17:00", toDate: localDate(), toTime: "03:00", timezone: "Asia/Bangkok" });
-  const [search, setSearch] = useState("");
-  const params = useMemo(() => reportingRangeParams(range), [range]);
-  const query = useQuery<Data>({
-    queryKey: ["unified-receipts", params],
-    queryFn: async () => {
-      const response = await fetch(`/api/reports/unified/receipts?${params}`, { credentials: "include", cache: "no-store" });
-      const body = await response.json();
-      if (!response.ok || !body.ok) throw new Error(body.error || `HTTP ${response.status}`);
-      return body;
-    },
-  });
-  const rows = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return (query.data?.receipts || []).filter(row => !q || [row.receipt_number, row.source_system, row.channel, row.order_mode, row.payment_status, row.staff_name].some(value => String(value || "").toLowerCase().includes(q)));
-  }, [query.data, search]);
-  const summary = useMemo(() => ({ receipts: rows.length, net: rows.reduce((sum, row) => sum + Number(row.net_sales || 0), 0), refunds: rows.reduce((sum, row) => sum + Number(row.refund_total || 0), 0) }), [rows]);
-
-  return <div className="mx-auto max-w-7xl space-y-5">
-    <PageTitle title="Receipts" meta="Permanent transaction ledger · historical + live POS · Asia/Bangkok" />
-    <ExactDateTimeRange value={range} onChange={setRange} timezoneLabel="Venue time · Asia/Bangkok" />
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="relative max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search receipt, source, channel or staff…" className="w-full rounded-xl border py-2 pl-9 pr-3 text-sm"/></div></div>
-    <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl border bg-white p-4"><p className="text-[10px] font-bold uppercase text-slate-500">Receipts</p><p className="mt-1 text-xl font-black">{summary.receipts}</p></div><div className="rounded-xl border bg-white p-4"><p className="text-[10px] font-bold uppercase text-slate-500">Net sales</p><p className="mt-1 text-xl font-black">{money(summary.net)}</p></div><div className="rounded-xl border bg-white p-4"><p className="text-[10px] font-bold uppercase text-slate-500">Refunds</p><p className="mt-1 text-xl font-black">{money(summary.refunds)}</p></div></div>
-    {query.isLoading && <div className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">Loading receipts…</div>}
-    {query.isError && <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{(query.error as Error).message}</div>}
-    {!query.isLoading && !query.isError && rows.length === 0 && <div className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">No receipts found in this exact date/time range.</div>}
-    {rows.length > 0 && <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="w-full min-w-[950px] text-sm"><thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 text-left">Receipt</th><th className="px-4 py-3 text-left">Date / time</th><th className="px-4 py-3 text-left">Source</th><th className="px-4 py-3 text-left">Channel</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Discount</th><th className="px-4 py-3 text-right">Refund</th><th className="px-4 py-3 text-right">Net sales</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row => <tr key={`${row.source_system}-${row.id}`} className="hover:bg-slate-50"><td className="px-4 py-3 font-black">{row.receipt_number}</td><td className="px-4 py-3">{stamp(row.occurred_at)}</td><td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase">{row.source_system === "sbb_pos" ? "SBB POS" : row.source_system}</span></td><td className="px-4 py-3">{row.channel || row.order_mode || "—"}</td><td className="px-4 py-3">{row.payment_status || "—"}</td><td className="px-4 py-3 text-right">{money(row.discount_total)}</td><td className="px-4 py-3 text-right">{money(row.refund_total)}</td><td className="px-4 py-3 text-right font-black">{money(row.net_sales)}</td></tr>)}</tbody></table></div></div>}
-  </div>;
+type Receipt = { id:string; occurred_at:string; source_system:"loyverse"|"sbb_pos"|string; receipt_number:string; channel?:string; order_mode?:string; payment_status?:string; subtotal:number; discount_total:number; refund_total:number; net_sales:number; total:number; staff_name?:string };
+type Data = { ok:boolean; source:string; filters:ExactDateTimeRangeValue & {fromInstant:string;toInstant:string}; receipts:Receipt[]; error?:string };
+const money=(value:number)=>`฿${Number(value||0).toLocaleString("en-US",{maximumFractionDigits:2})}`;
+const stamp=(value:string)=>value?new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Bangkok",day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(new Date(value)):"";
+function localDate(offset=0){const d=new Date();d.setDate(d.getDate()+offset);return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Bangkok",year:"numeric",month:"2-digit",day:"2-digit"}).format(d);}
+export default function ReceiptsReport(){
+ const[range,setRange]=useState<ExactDateTimeRangeValue>({fromDate:localDate(-1),fromTime:"17:00",toDate:localDate(),toTime:"03:00",timezone:"Asia/Bangkok"});
+ const[search,setSearch]=useState("");
+ const params=useMemo(()=>reportingRangeParams(range),[range]);
+ const query=useQuery<Data>({queryKey:["unified-receipts",params],queryFn:async()=>{const response=await fetch(`/api/reports/receipt-analytics/unified/receipts?${params}`,{credentials:"include",cache:"no-store"});const body=await response.json();if(!response.ok||!body.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;}});
+ const rows=useMemo(()=>{const q=search.trim().toLowerCase();return(query.data?.receipts||[]).filter(row=>!q||[row.receipt_number,row.source_system,row.channel,row.order_mode,row.payment_status,row.staff_name].some(value=>String(value||"").toLowerCase().includes(q)));},[query.data,search]);
+ const summary=useMemo(()=>({receipts:rows.length,net:rows.reduce((sum,row)=>sum+Number(row.net_sales||0),0),refunds:rows.reduce((sum,row)=>sum+Number(row.refund_total||0),0)}),[rows]);
+ return <div className="mx-auto max-w-7xl space-y-5"><PageTitle title="Receipts" meta="Permanent transaction ledger · historical + live POS · Asia/Bangkok"/><ExactDateTimeRange value={range} onChange={setRange} timezoneLabel="Venue time · Asia/Bangkok"/><div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="relative max-w-md"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Search receipt, source, channel or staff…" className="w-full rounded-xl border py-2 pl-9 pr-3 text-sm"/></div></div><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-xl border bg-white p-4"><p className="text-[10px] font-bold uppercase text-slate-500">Receipts</p><p className="mt-1 text-xl font-black">{summary.receipts}</p></div><div className="rounded-xl border bg-white p-4"><p className="text-[10px] font-bold uppercase text-slate-500">Net sales</p><p className="mt-1 text-xl font-black">{money(summary.net)}</p></div><div className="rounded-xl border bg-white p-4"><p className="text-[10px] font-bold uppercase text-slate-500">Refunds</p><p className="mt-1 text-xl font-black">{money(summary.refunds)}</p></div></div>{query.isLoading&&<div className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">Loading receipts…</div>}{query.isError&&<div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{(query.error as Error).message}</div>}{!query.isLoading&&!query.isError&&rows.length===0&&<div className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">No receipts found in this exact date/time range.</div>}{rows.length>0&&<div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="overflow-x-auto"><table className="w-full min-w-[950px] text-sm"><thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500"><tr><th className="px-4 py-3 text-left">Receipt</th><th className="px-4 py-3 text-left">Date / time</th><th className="px-4 py-3 text-left">Source</th><th className="px-4 py-3 text-left">Channel</th><th className="px-4 py-3 text-left">Status</th><th className="px-4 py-3 text-right">Discount</th><th className="px-4 py-3 text-right">Refund</th><th className="px-4 py-3 text-right">Net sales</th></tr></thead><tbody className="divide-y divide-slate-100">{rows.map(row=><tr key={`${row.source_system}-${row.id}`} className="hover:bg-slate-50"><td className="px-4 py-3 font-black">{row.receipt_number}</td><td className="px-4 py-3">{stamp(row.occurred_at)}</td><td className="px-4 py-3"><span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black uppercase">{row.source_system==="sbb_pos"?"SBB POS":row.source_system}</span></td><td className="px-4 py-3">{row.channel||row.order_mode||"—"}</td><td className="px-4 py-3">{row.payment_status||"—"}</td><td className="px-4 py-3 text-right">{money(row.discount_total)}</td><td className="px-4 py-3 text-right">{money(row.refund_total)}</td><td className="px-4 py-3 text-right font-black">{money(row.net_sales)}</td></tr>)}</tbody></table></div></div>}</div>;
 }
