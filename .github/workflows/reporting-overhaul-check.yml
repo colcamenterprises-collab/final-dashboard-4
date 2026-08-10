@@ -29,7 +29,7 @@ jobs:
         run: npm ci
       - name: TypeScript check
         run: npm run check
-      - name: Reporting range and cutover tests
-        run: npx tsx --test server/reporting/unifiedLedger.test.ts
+      - name: Reporting range and import regression tests
+        run: npx tsx --test server/reporting/unifiedLedger.test.ts server/reporting/importers/loyverse.test.ts
       - name: Production build
         run: npm run build
