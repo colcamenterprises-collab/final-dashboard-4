@@ -48,24 +48,24 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
          AND COALESCE(i.is_set_component,false)=false
      )
      SELECT jsonb_build_object(
-       'daily', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.day) FROM (
-         SELECT to_char(timezone($4,occurred_at),'YYYY-MM-DD') day,
-                COUNT(*)::int orders,
-                SUM(net_sales)::numeric net_sales
+       'daily', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.report_day) FROM (
+         SELECT to_char(timezone($4,occurred_at),'YYYY-MM-DD') AS report_day,
+                COUNT(*)::int AS orders,
+                SUM(net_sales)::numeric AS net_sales
          FROM canonical_transactions GROUP BY 1
        ) x),'[]'::jsonb),
-       'hourly', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.hour) FROM (
-         SELECT extract(hour from timezone($4,occurred_at))::int hour,
-                COUNT(*)::int orders,
-                SUM(net_sales)::numeric net_sales
+       'hourly', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.report_hour) FROM (
+         SELECT extract(hour from timezone($4,occurred_at))::int AS report_hour,
+                COUNT(*)::int AS orders,
+                SUM(net_sales)::numeric AS net_sales
          FROM canonical_transactions GROUP BY 1
        ) x),'[]'::jsonb),
        'categories', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.net_sales DESC) FROM (
-         SELECT category, SUM(quantity)::numeric quantity, SUM(net_sales)::numeric net_sales
+         SELECT category, SUM(quantity)::numeric AS quantity, SUM(net_sales)::numeric AS net_sales
          FROM canonical_lines GROUP BY category
        ) x),'[]'::jsonb),
        'topProducts', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.net_sales DESC) FROM (
-         SELECT item_name, SUM(quantity)::numeric quantity, SUM(net_sales)::numeric net_sales
+         SELECT item_name, SUM(quantity)::numeric AS quantity, SUM(net_sales)::numeric AS net_sales
          FROM canonical_lines GROUP BY item_name ORDER BY SUM(net_sales) DESC LIMIT 10
        ) x),'[]'::jsonb)
      ) payload`,
@@ -73,8 +73,8 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
   );
   const payload = result.rows[0]?.payload || {};
   return {
-    daily: (payload.daily || []).map((row: any) => ({ day: row.day, orders: n(row.orders), netSales: n(row.net_sales) })),
-    hourly: (payload.hourly || []).map((row: any) => ({ hour: n(row.hour), orders: n(row.orders), netSales: n(row.net_sales) })),
+    daily: (payload.daily || []).map((row: any) => ({ day: row.report_day, orders: n(row.orders), netSales: n(row.net_sales) })),
+    hourly: (payload.hourly || []).map((row: any) => ({ hour: n(row.report_hour), orders: n(row.orders), netSales: n(row.net_sales) })),
     categories: (payload.categories || []).map((row: any) => ({ category: row.category, quantity: n(row.quantity), netSales: n(row.net_sales) })),
     topProducts: (payload.topProducts || []).map((row: any) => ({ itemName: row.item_name, quantity: n(row.quantity), netSales: n(row.net_sales) })),
   };
