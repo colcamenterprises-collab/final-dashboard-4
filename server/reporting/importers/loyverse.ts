@@ -63,10 +63,18 @@ function receiptId(row: Record<string, string>): string {
   return pick(row, "Receipt number", "Receipt", "Receipt no", "Order", "Order number").trim();
 }
 
+function receiptType(row: Record<string, string>): "sale" | "refund" {
+  return normalize(pick(row, "Receipt type", "Type")).includes("refund") ? "refund" : "sale";
+}
+
+function isCancelled(row: Record<string, string>): boolean {
+  return normalize(pick(row, "Status")) === "cancelled";
+}
+
 function identifyFiles(files: SourceFileDescriptor[]) {
   const inspected = files.map(file => ({ file, ...fileObjects(file), name: normalize(file.filename) }));
   const items = inspected.find(candidate => candidate.name.includes("by item") || (candidate.headers.includes("item name") && (candidate.headers.includes("sku") || candidate.headers.includes("category"))));
-  const receipts = inspected.find(candidate => candidate !== items && candidate.headers.some(header => header.includes("receipt")) && candidate.headers.some(header => header === "total" || header === "net sales" || header.includes("payment")))
+  const receipts = inspected.find(candidate => candidate !== items && candidate.headers.some(header => header.includes("receipt")) && candidate.headers.some(header => header === "total collected" || header === "net sales" || header.includes("payment")))
     || inspected.find(candidate => candidate !== items && candidate.name.includes("receipt"));
   return { receipts, items };
 }
@@ -91,7 +99,7 @@ function payment(row: Record<string, string>, amount: number, occurredAt: string
 }
 
 function modifiersFromRow(row: Record<string, string>, sourceLineId: string): CanonicalModifier[] {
-  const raw = pick(row, "Modifiers", "Modifier", "Modifiers applied", "Options", "Option");
+  const raw = pick(row, "Modifiers applied", "Modifiers", "Modifier", "Options", "Option");
   if (!raw.trim()) return [];
   return raw.split(/\s*[;|]\s*/).filter(Boolean).map((name, index) => ({
     sourceModifierId: `${sourceLineId}:modifier:${index + 1}`,
@@ -105,25 +113,25 @@ function modifiersFromRow(row: Record<string, string>, sourceLineId: string): Ca
 
 function itemFromRow(row: Record<string, string>, sourceLineId: string): CanonicalLineItem {
   const quantity = parseNumber(pick(row, "Quantity", "Items sold")) || 1;
-  const grossSales = parseNumber(pick(row, "Gross sales", "Gross", "Item gross"));
-  const discountTotal = Math.abs(parseNumber(pick(row, "Discounts", "Discount")));
-  const refundTotal = Math.abs(parseNumber(pick(row, "Refunds", "Refund")));
-  const netValue = pick(row, "Net sales", "Net");
-  const netSales = netValue ? parseNumber(netValue) : grossSales - discountTotal - refundTotal;
+  const rawGross = parseNumber(pick(row, "Gross sales", "Gross", "Item gross"));
+  const rawDiscount = parseNumber(pick(row, "Discounts", "Discount"));
+  const rawNetValue = pick(row, "Net sales", "Net");
+  const rawNet = rawNetValue ? parseNumber(rawNetValue) : rawGross - rawDiscount;
+  const refund = receiptType(row) === "refund";
   const costRaw = pick(row, "Cost of goods", "COGS", "Cost");
   const profitRaw = pick(row, "Gross profit", "Profit");
   return {
     sourceLineId,
     sourceItemId: pick(row, "Item id") || undefined,
-    itemName: pick(row, "Item name", "Item") || "Unknown item",
+    itemName: pick(row, "Item", "Item name") || "Unknown item",
     sku: pick(row, "SKU") || undefined,
     category: pick(row, "Category") || undefined,
     quantity,
-    unitPrice: quantity ? grossSales / quantity : undefined,
-    grossSales,
-    discountTotal,
-    refundTotal,
-    netSales,
+    unitPrice: quantity ? rawGross / quantity : undefined,
+    grossSales: refund ? 0 : rawGross,
+    discountTotal: rawDiscount,
+    refundTotal: refund ? Math.abs(rawGross) : 0,
+    netSales: rawNet,
     taxTotal: parseNumber(pick(row, "Taxes", "Tax")),
     costOfGoods: costRaw === "" ? null : parseNumber(costRaw),
     grossProfit: profitRaw === "" ? null : parseNumber(profitRaw),
@@ -133,12 +141,18 @@ function itemFromRow(row: Record<string, string>, sourceLineId: string): Canonic
 }
 
 function receiptFinancials(row: Record<string, string>) {
-  const grossSales = parseNumber(pick(row, "Gross sales", "Gross", "Subtotal"));
-  const discounts = Math.abs(parseNumber(pick(row, "Discounts", "Discount")));
-  const refunds = Math.abs(parseNumber(pick(row, "Refunds", "Refund")));
-  const netRaw = pick(row, "Net sales", "Net", "Total");
-  const netSales = netRaw ? parseNumber(netRaw) : grossSales - discounts - refunds;
-  return { grossSales: grossSales || netSales + discounts + refunds, discounts, refunds, netSales };
+  const rawGross = parseNumber(pick(row, "Gross sales", "Gross", "Subtotal"));
+  const rawDiscount = parseNumber(pick(row, "Discounts", "Discount"));
+  const netRaw = pick(row, "Net sales", "Net", "Total collected", "Total");
+  const rawNet = netRaw ? parseNumber(netRaw) : rawGross - rawDiscount;
+  const refund = receiptType(row) === "refund";
+  return {
+    grossSales: refund ? 0 : rawGross,
+    discounts: rawDiscount,
+    refunds: refund ? Math.abs(rawGross) : 0,
+    netSales: rawNet,
+    collected: parseNumber(pick(row, "Total collected")) || rawNet,
+  };
 }
 
 export const loyverseAdapter: ReportingSourceAdapter = {
@@ -156,11 +170,14 @@ export const loyverseAdapter: ReportingSourceAdapter = {
     if (!receipts) return { ok: false, warnings, errors: ["A Loyverse Receipts CSV could not be identified"] };
     if (!items) warnings.push("Receipts by Item was not supplied; historical item-level reporting will be incomplete");
 
-    const ids = receipts.rows.map(receiptId).filter(Boolean);
+    const cancelledCount = receipts.rows.filter(isCancelled).length;
+    if (cancelledCount) warnings.push(`${cancelledCount} cancelled Loyverse receipts will be excluded from canonical sales`);
+    const activeReceipts = receipts.rows.filter(row => !isCancelled(row));
+    const ids = activeReceipts.map(receiptId).filter(Boolean);
     if (!ids.length) errors.push("No receipt number column was detected in the Receipts export");
-    if (new Set(ids).size !== ids.length) errors.push("Receipts export contains duplicate receipt numbers");
-    const timestamps = receipts.rows.map(row => parseOccurredAt(row, context.timezone));
-    if (timestamps.some(value => !value)) errors.push("One or more receipt timestamps could not be parsed");
+    if (new Set(ids).size !== ids.length) errors.push("Receipts export contains duplicate active receipt numbers");
+    const timestamps = activeReceipts.map(row => parseOccurredAt(row, context.timezone));
+    if (timestamps.some(value => !value)) errors.push("One or more active receipt timestamps could not be parsed");
     if (context.cutoverAt) {
       const cutover = new Date(context.cutoverAt).getTime();
       const invalid = timestamps.filter(value => value && new Date(value).getTime() >= cutover).length;
@@ -168,16 +185,16 @@ export const loyverseAdapter: ReportingSourceAdapter = {
     }
     if (items) {
       const idSet = new Set(ids);
-      const orphanItems = items.rows.filter(row => !idSet.has(receiptId(row))).length;
-      if (orphanItems) errors.push(`${orphanItems} Receipts by Item rows do not link to a receipt in the canonical Receipts export`);
+      const orphanItems = items.rows.filter(row => !isCancelled(row) && !idSet.has(receiptId(row))).length;
+      if (orphanItems) errors.push(`${orphanItems} active Receipts by Item rows do not link to an active receipt in the canonical Receipts export`);
     }
 
-    const financials = receipts.rows.map(receiptFinancials);
+    const financials = activeReceipts.map(receiptFinancials);
     return {
       ok: errors.length === 0,
       warnings,
       errors,
-      sourceRowCount: receipts.rows.length,
+      sourceRowCount: activeReceipts.length,
       transactionCount: ids.length,
       grossSales: financials.reduce((sum, row) => sum + row.grossSales, 0),
       discounts: financials.reduce((sum, row) => sum + row.discounts, 0),
@@ -190,17 +207,20 @@ export const loyverseAdapter: ReportingSourceAdapter = {
     if (!receipts) return;
     const itemGroups = new Map<string, Record<string, string>[]>();
     for (const row of items?.rows || []) {
+      if (isCancelled(row)) continue;
       const id = receiptId(row);
       if (!itemGroups.has(id)) itemGroups.set(id, []);
       itemGroups.get(id)!.push(row);
     }
 
     for (const receiptRow of receipts.rows) {
+      if (isCancelled(receiptRow)) continue;
       const id = receiptId(receiptRow);
       const occurredAt = parseOccurredAt(receiptRow, context.timezone);
       const financials = receiptFinancials(receiptRow);
       const itemRows = itemGroups.get(id) || [];
       const canonicalItems = itemRows.map((row, index) => itemFromRow(row, `${id}:line:${index + 1}`));
+      const refund = receiptType(receiptRow) === "refund";
       yield {
         venueKey: context.venueKey,
         sourceSystem: "loyverse",
@@ -210,17 +230,17 @@ export const loyverseAdapter: ReportingSourceAdapter = {
         businessTimezone: context.timezone,
         channel: pick(receiptRow, "Dining option", "Channel", "Order type") || undefined,
         orderMode: pick(receiptRow, "Dining option", "Order type") || undefined,
-        paymentStatus: pick(receiptRow, "Status", "Payment status", "Type") || undefined,
+        paymentStatus: refund ? "refunded" : "paid",
         subtotal: financials.grossSales,
         discountTotal: financials.discounts,
         refundTotal: financials.refunds,
         taxTotal: parseNumber(pick(receiptRow, "Taxes", "Tax")),
         netSales: financials.netSales,
-        total: financials.netSales,
+        total: financials.collected,
         currency: context.currency || pick(receiptRow, "Currency") || "THB",
-        staffName: pick(receiptRow, "Employee", "Staff", "Cashier") || undefined,
+        staffName: pick(receiptRow, "Cashier name", "Employee", "Staff", "Cashier") || undefined,
         items: canonicalItems,
-        payments: payment(receiptRow, financials.netSales, occurredAt),
+        payments: payment(receiptRow, financials.collected, occurredAt),
         sourcePayload: receiptRow,
       };
     }
