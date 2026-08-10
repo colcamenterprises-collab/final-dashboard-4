@@ -30,7 +30,6 @@ import FinanceHub from "./pages/finance/FinanceHub";
 import ProfitLoss from "./pages/finance/ProfitLoss";
 import Expenses from "./pages/finance/ExpensesPersonal";
 import ExpensesImport from "./pages/finance/ExpensesImport";
-import ShiftHistory from "./pages/reports/ShiftHistory";
 import Export from "./pages/reports/Export";
 import ReportingOverview from "./pages/reports/ReportingOverview";
 import ReceiptsReport from "./pages/reports/ReceiptsReport";
@@ -88,9 +87,13 @@ export default function App() {
       <Route path="/reports/sales-summary" element={<Navigate to="/reports/overview" replace />} />
       <Route path="/reports/payment-types" element={<Navigate to="/reports/overview" replace />} />
       <Route path="/reports/shift-summary" element={<ProtectedRoute><OwnerRoute><ShiftReviewReport /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/shift-reconciliation" element={<Navigate to="/reports/shift-summary" replace />} />
       <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptsReport /></OwnerRoute></ProtectedRoute>} />
       <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><SalesByItem /></OwnerRoute></ProtectedRoute>} />
-      <Route path="/reports/shift-report" element={<ProtectedRoute><OwnerRoute><ShiftHistory /></OwnerRoute></ProtectedRoute>} /><Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} /><Route path="/reports/shift-history" element={<Navigate to="/reports/shift-report" replace />} /><Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} /><Route path="/reports/receipts-analysis" element={<Navigate to="/reports/overview" replace />} /><Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/shift-report" element={<Navigate to="/reports/shift-summary" replace />} />
+      <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
+      <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-summary" replace />} />
+      <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} /><Route path="/reports/receipts-analysis" element={<Navigate to="/reports/overview" replace />} /><Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
       <Route path="/online-ordering" element={<OnlineOrdering />} /><Route path="/online-ordering/checkout" element={<Checkout />} /><Route path="/online-ordering/confirmation" element={<Confirmation />} /><Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} /><Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} /><Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} /><Route path="/admin/ordering/menu" element={<ProtectedRoute><AdminMenu /></ProtectedRoute>} /><Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} /><Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} /><Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
       <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} /><Route path="/staff/members" element={<ProtectedRoute><StaffMembers /></ProtectedRoute>} /><Route path="/staff/roster" element={<ProtectedRoute><StaffRoster /></ProtectedRoute>} /><Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} /><Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} /><Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} /><Route path="/settings/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} /><Route path="/settings/staff-access" element={<ProtectedRoute><OwnerRoute><StaffAccess /></OwnerRoute></ProtectedRoute>} /><Route path="*" element={<NotFound />} />
     </Route>
