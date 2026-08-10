@@ -101,7 +101,7 @@ function payment(row: Record<string, string>, amount: number, occurredAt: string
 function modifiersFromRow(row: Record<string, string>, sourceLineId: string): CanonicalModifier[] {
   const raw = pick(row, "Modifiers applied", "Modifiers", "Modifier", "Options", "Option");
   if (!raw.trim()) return [];
-  return raw.split(/\s*[;|]\s*/).filter(Boolean).map((name, index) => ({
+  return raw.split(/\s*[,;|]\s*/).filter(Boolean).map((name, index) => ({
     sourceModifierId: `${sourceLineId}:modifier:${index + 1}`,
     name: name.trim(),
     quantity: 1,
