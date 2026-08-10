@@ -6,6 +6,7 @@ import {
   resolveExactReportingRange,
 } from "../reporting/unifiedLedger";
 import { queryUnifiedReceiptDetails } from "../reporting/unifiedReceiptDetails";
+import { queryUnifiedComponents } from "../reporting/unifiedComponents";
 
 const router = Router();
 
@@ -65,6 +66,16 @@ router.get("/items", async (req, res) => {
     const range = exactRange(req.query as Record<string, unknown>);
     const items = await queryUnifiedItemSales(range);
     res.json({ ok: true, source: "unified_reporting_ledger", filters: range, items });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
+  }
+});
+
+router.get("/components", async (req, res) => {
+  try {
+    const range = exactRange(req.query as Record<string, unknown>);
+    const components = await queryUnifiedComponents(range);
+    res.json({ ok: true, source: "unified_reporting_ledger", filters: range, ...components });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
   }
