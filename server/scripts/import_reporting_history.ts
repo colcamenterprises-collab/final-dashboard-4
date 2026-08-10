@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { loyverseAdapter } from "../reporting/importers/loyverse";
+import { validateLoyverseControlReports } from "../reporting/importers/loyverseControls";
 import { persistHistoricalImport } from "../reporting/importers/persistImport";
 import type { SourceFileDescriptor } from "../reporting/importers/types";
 
@@ -62,8 +63,16 @@ async function main() {
   for (const file of files) console.log(`- ${file.filename}  sha256=${file.sha256}`);
 
   const validation = await loyverseAdapter.validate(files, context);
-  console.log("Validation:", JSON.stringify(validation, null, 2));
+  console.log("Canonical validation:", JSON.stringify(validation, null, 2));
   if (!validation.ok) throw new Error(`Validation failed: ${validation.errors.join(" | ")}`);
+
+  if (supporting.length) {
+    const controls = validateLoyverseControlReports(files);
+    console.log("Control reconciliation:", JSON.stringify(controls, null, 2));
+    if (!controls.ok) throw new Error(`Control reconciliation failed: ${controls.errors.join(" | ")}`);
+  } else {
+    console.warn("No supporting control reports supplied; canonical receipt/item reconciliation only");
+  }
 
   if (has("dry-run")) {
     let transactions = 0;
