@@ -33,6 +33,16 @@ function validDate(value: string, field: string): Date {
   return date;
 }
 
+function assertSourceFiles(files: SourceFileDescriptor[]): void {
+  const hashes = new Set<string>();
+  for (const file of files) {
+    if (!file.filename.trim()) throw new Error("Every import file requires a filename");
+    if (!/^[a-f0-9]{64}$/i.test(file.sha256)) throw new Error(`${file.filename}: SHA-256 must be a 64-character hex digest`);
+    if (hashes.has(file.sha256.toLowerCase())) throw new Error(`${file.filename}: duplicate file supplied in this import batch`);
+    hashes.add(file.sha256.toLowerCase());
+  }
+}
+
 function assertCanonicalTransaction(transaction: CanonicalTransaction, context: ImportContext): void {
   if (!transaction.sourceTransactionId) throw new Error("Canonical transaction is missing sourceTransactionId");
   if (!transaction.occurredAt) throw new Error(`${transaction.sourceTransactionId}: occurredAt is required`);
@@ -174,6 +184,7 @@ export async function persistHistoricalImport(args: {
 }): Promise<PersistImportResult> {
   if (!pool) throw new Error("Database unavailable: DATABASE_URL is required for historical import");
   if (!args.files.length) throw new Error("At least one source file is required");
+  assertSourceFiles(args.files);
 
   const validation = await args.adapter.validate(args.files, args.context);
   if (!validation.ok) {
@@ -185,11 +196,21 @@ export async function persistHistoricalImport(args: {
   try {
     await client.query("BEGIN");
 
+    const hashes = args.files.map(file => file.sha256.toLowerCase());
     const duplicate = await client.query(
-      `SELECT id FROM reporting_import_batches WHERE source_file_sha256 = ANY($1::text[]) LIMIT 1`,
-      [args.files.map(file => file.sha256)],
+      `SELECT source_file, source_file_sha256
+       FROM reporting_import_files
+       WHERE lower(source_file_sha256) = ANY($1::text[])
+       UNION ALL
+       SELECT source_file, source_file_sha256
+       FROM reporting_import_batches
+       WHERE lower(source_file_sha256) = ANY($1::text[])
+       LIMIT 1`,
+      [hashes],
     );
-    if (duplicate.rowCount) throw new Error("One or more source files have already been imported");
+    if (duplicate.rowCount) {
+      throw new Error(`Source file has already been imported: ${duplicate.rows[0].source_file}`);
+    }
 
     const batch = await client.query(
       `INSERT INTO reporting_import_batches (
@@ -212,6 +233,21 @@ export async function persistHistoricalImport(args: {
       ],
     );
     const batchId = String(batch.rows[0].id);
+
+    for (const file of args.files) {
+      await client.query(
+        `INSERT INTO reporting_import_files (
+          batch_id, source_file, source_file_sha256, mime_type, role
+        ) VALUES ($1,$2,$3,$4,$5)`,
+        [
+          batchId,
+          file.filename,
+          file.sha256.toLowerCase(),
+          file.mimeType || null,
+          file === primary ? "primary" : "supporting",
+        ],
+      );
+    }
 
     let importedTransactions = 0;
     let importedItems = 0;
