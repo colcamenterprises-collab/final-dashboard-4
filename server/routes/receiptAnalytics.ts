@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "../db";
 import reportingUnifiedRouter from "./reportingUnified";
 import { resolveExactReportingRange } from "../reporting/unifiedLedger";
+import { SBB_REPORTING_CUTOVER_ISO } from "../reporting/reportingCutover";
 
 const router = Router();
 const n = (value: unknown) => Number(value ?? 0) || 0;
@@ -18,6 +19,7 @@ router.get("/shift-review", async (req, res) => {
       toTime: String(req.query.toTime || ""),
       timezone: String(req.query.timezone || "Asia/Bangkok"),
     });
+    const cutover = new Date(SBB_REPORTING_CUTOVER_ISO).toISOString();
 
     const [posResult, formResult, shiftsResult] = await Promise.all([
       pool.query(
@@ -29,11 +31,11 @@ router.get("/shift-review", async (req, res) => {
            COUNT(*)::int receipt_count,
            COALESCE(SUM(total),0) total_sales
          FROM ordering_orders
-         WHERE created_at >= $1::timestamptz
+         WHERE created_at >= GREATEST($1::timestamptz,$3::timestamptz)
            AND created_at < $2::timestamptz
            AND status <> 'cancelled'
            AND payment_status='paid'`,
-        [range.fromInstant, range.toInstant],
+        [range.fromInstant, range.toInstant, cutover],
       ),
       pool.query(
         `SELECT
@@ -52,10 +54,11 @@ router.get("/shift-review", async (req, res) => {
       pool.query(
         `SELECT id,staff_name,opened_at,closed_at,status
          FROM pos_shifts
-         WHERE opened_at < $2::timestamptz
+         WHERE opened_at >= $3::timestamptz
+           AND opened_at < $2::timestamptz
            AND COALESCE(closed_at,NOW()) > $1::timestamptz
          ORDER BY opened_at`,
-        [range.fromInstant, range.toInstant],
+        [range.fromInstant, range.toInstant, cutover],
       ),
     ]);
 
@@ -80,6 +83,7 @@ router.get("/shift-review", async (req, res) => {
       ok: true,
       source: "sbb_pos_core_vs_daily_sales_v2",
       filters: range,
+      cutover,
       shiftCount: shiftsResult.rowCount || 0,
       shifts: shiftsResult.rows,
       pos: { receiptCount: n(pos.receipt_count), totalSales: n(pos.total_sales) },
