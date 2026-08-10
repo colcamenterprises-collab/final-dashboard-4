@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
-import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, FileText, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode } from "lucide-react";
+import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; testId: string; ownerOnly?: boolean; subItem?: boolean; };
@@ -18,12 +18,10 @@ const navigationGroups: NavGroup[] = [
     { to: "/operations/health-safety", label: "Health & Safety", icon: ShieldCheck, testId: "nav-health-safety" },
   ]},
   { title: "Reporting", icon: BarChart3, items: [
-    { to: "/reports/sales-summary", label: "Sales Summary", icon: TrendingUp, testId: "nav-sales-summary", ownerOnly: true },
-    { to: "/reports/shift-summary", label: "Shift Summary", icon: FileText, testId: "nav-shift-summary", ownerOnly: true },
-    { to: "/reports/payment-types", label: "Sales by Payment Type", icon: Wallet, testId: "nav-payment-types", ownerOnly: true },
-    { to: "/reports/receipts", label: "Receipts", icon: Receipt, testId: "nav-receipts", ownerOnly: true },
+    { to: "/reports/overview", label: "Overview", icon: TrendingUp, testId: "nav-reporting-overview", ownerOnly: true },
     { to: "/reports/sales-by-item", label: "Sales by Item", icon: BarChart3, testId: "nav-sales-by-item", ownerOnly: true },
-    { to: "/reports/shift-report", label: "Shift Report", icon: ClipboardList, testId: "nav-shift-report" },
+    { to: "/reports/receipts", label: "Receipts", icon: Receipt, testId: "nav-receipts", ownerOnly: true },
+    { to: "/reports/shift-summary", label: "Shift Reconciliation", icon: ClipboardList, testId: "nav-shift-reconciliation", ownerOnly: true },
   ]},
   { title: "Finance", icon: Wallet, items: [
     { to: "/finance", label: "Finance Hub", icon: Wallet, testId: "nav-finance-hub" },

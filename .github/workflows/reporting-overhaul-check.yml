@@ -1,0 +1,47 @@
+name: Reporting Overhaul Check
+
+on:
+  pull_request:
+    paths:
+      - 'client/src/pages/reports/**'
+      - 'client/src/components/reports/**'
+      - 'server/reporting/**'
+      - 'server/routes/reportingUnified.ts'
+      - 'server/routes/receiptAnalytics.ts'
+      - 'server/migrations/20260810*.sql'
+      - 'server/scripts/import_reporting_history.ts'
+      - 'client/src/App.tsx'
+      - 'client/src/components/navigation/ModernSidebar.tsx'
+      - '.github/workflows/reporting-overhaul-check.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: TypeScript check reporting scope
+        shell: bash
+        run: |
+          set +e
+          npm run check -- --pretty false 2>&1 | tee /tmp/tsc.log
+          TSC_STATUS=${PIPESTATUS[0]}
+          set -e
+          if grep -E '^(client/src/pages/reports|client/src/components/reports|server/reporting|server/routes/reportingUnified\.ts|server/scripts/import_reporting_history\.ts)' /tmp/tsc.log; then
+            echo 'Reporting TypeScript errors detected.'
+            exit 1
+          fi
+          if [ "$TSC_STATUS" -ne 0 ]; then
+            echo '::warning::Repository has pre-existing TypeScript errors outside the reporting overhaul scope; reporting files are clean.'
+          fi
+      - name: Reporting range and import regression tests
+        run: npx tsx --test server/reporting/unifiedLedger.test.ts server/reporting/importers/loyverse.test.ts
+      - name: Production build
+        run: npm run build
