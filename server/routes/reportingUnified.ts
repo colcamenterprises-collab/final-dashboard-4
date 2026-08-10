@@ -7,6 +7,7 @@ import {
 } from "../reporting/unifiedLedger";
 import { queryUnifiedReceiptDetails } from "../reporting/unifiedReceiptDetails";
 import { queryUnifiedComponents } from "../reporting/unifiedComponents";
+import { queryUnifiedOverviewBreakdowns } from "../reporting/unifiedOverviewBreakdowns";
 
 const router = Router();
 
@@ -25,7 +26,10 @@ function exactRange(query: Record<string, unknown>) {
 router.get("/overview", async (req, res) => {
   try {
     const range = exactRange(req.query as Record<string, unknown>);
-    const overview = await queryUnifiedOverview(range);
+    const [overview, breakdowns] = await Promise.all([
+      queryUnifiedOverview(range),
+      queryUnifiedOverviewBreakdowns(range),
+    ]);
     res.json({
       ok: true,
       source: "unified_reporting_ledger",
@@ -35,6 +39,7 @@ router.get("/overview", async (req, res) => {
         ...(overview.liveReceipts ? ["sbb_pos"] : []),
       ],
       overview,
+      breakdowns,
     });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
