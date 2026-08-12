@@ -402,20 +402,31 @@ export default function PurchasingPage() {
                   const file = e.target.files?.[0];
                   if (!file) return;
                   const text = await file.text();
-                  const lines = text.split('\n');
-                  const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-                  const csvData = [];
+                  const parseCsvLine = (line: string) => {
+                    const values: string[] = []; let value = ''; let quoted = false;
+                    for (let i = 0; i < line.length; i++) {
+                      const char = line[i];
+                      if (char === '"' && line[i + 1] === '"') { value += '"'; i++; }
+                      else if (char === '"') quoted = !quoted;
+                      else if (char === ',' && !quoted) { values.push(value.trim()); value = ''; }
+                      else value += char;
+                    }
+                    values.push(value.trim()); return values;
+                  };
+                  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
+                  const headers = parseCsvLine(lines[0] || '');
+                  const csvData: Record<string, string>[] = [];
                   for (let i = 1; i < lines.length; i++) {
                     if (!lines[i].trim()) continue;
-                    const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
-                    const row: any = {};
+                    const values = parseCsvLine(lines[i]);
+                    const row: Record<string, string> = {};
                     headers.forEach((h, idx) => { row[h] = values[idx] || ''; });
                     csvData.push(row);
                   }
                   const res = await fetch('/api/purchasing-items/import/csv', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ csvData }),
+                    body: JSON.stringify({ csvData, archiveMissing: window.confirm('Make this uploaded catalogue the active list? Items no longer in it will be archived, not deleted.') }),
                   });
                   const result = await res.json();
                   if (result.ok) {
