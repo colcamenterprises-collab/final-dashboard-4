@@ -460,85 +460,50 @@ export default function PurchasingPage() {
       ) : (
         <Card className="rounded-[4px] border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="min-w-[760px]">
+            <Table className="min-w-[1100px] table-fixed">
               <TableHeader>
                 <TableRow className="border-slate-200">
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Item</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">SKU</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Supplier</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2">Size / Pack</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 text-right px-2 py-2">Cost</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 px-2 py-2 hidden md:table-cell">Category</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 w-10 text-center px-1.5 py-2">Active</TableHead>
-                  <TableHead className="text-[11px] font-medium text-slate-900 text-center px-1.5 py-2">Actions</TableHead>
+                  <TableHead className="w-[19%] text-[11px] font-medium text-slate-900 px-2 py-2">Item</TableHead>
+                  <TableHead className="w-[10%] text-[11px] font-medium text-slate-900 px-2 py-2">Supplier</TableHead>
+                  <TableHead className="w-[9%] text-[11px] font-medium text-slate-900 px-2 py-2">Brand</TableHead>
+                  <TableHead className="w-[8%] text-[11px] font-medium text-slate-900 px-2 py-2">SKU</TableHead>
+                  <TableHead className="w-[8%] text-[11px] font-medium text-slate-900 text-right px-2 py-2">Pack qty</TableHead>
+                  <TableHead className="w-[7%] text-[11px] font-medium text-slate-900 px-2 py-2">Unit</TableHead>
+                  <TableHead className="w-[10%] text-[11px] font-medium text-slate-900 text-right px-2 py-2">Purchase cost</TableHead>
+                  <TableHead className="w-[10%] text-[11px] font-medium text-slate-900 text-right px-2 py-2">Cost / unit</TableHead>
+                  <TableHead className="w-[9%] text-[11px] font-medium text-slate-900 px-2 py-2">Category</TableHead>
+                  <TableHead className="w-[5%] text-[11px] font-medium text-slate-900 text-center px-1 py-2">Active</TableHead>
+                  <TableHead className="w-[5%] text-[11px] font-medium text-slate-900 text-center px-1 py-2">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredItems.map((item) => (
-                  <TableRow 
-                    key={item.id} 
-                    className={`border-slate-200 ${!item.active ? 'opacity-50 bg-slate-50' : ''}`} 
-                    data-testid={`row-item-${item.id}`}
-                  >
-                    <TableCell className="text-[11px] text-slate-900 font-medium px-2 py-1.5">
-                      {item.item}
-                      {!item.active && (
-                        <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Inactive</Badge>
-                      )}
+                {filteredItems.map((item) => {
+                  const purchaseCost = item.purchaseCostThb ?? item.unitCost;
+                  const quantity = Number(item.purchaseQuantity);
+                  const costPerUnit = purchaseCost !== null && Number.isFinite(quantity) && quantity > 0
+                    ? Number(purchaseCost) / quantity : null;
+                  return (
+                  <TableRow key={item.id} className={`border-slate-200 ${!item.active ? 'opacity-50 bg-slate-50' : ''}`} data-testid={`row-item-${item.id}`}>
+                    <TableCell className="truncate text-[11px] text-slate-900 font-medium px-2 py-1.5" title={item.item}>
+                      {item.item}{!item.active && <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Inactive</Badge>}
                     </TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5">{displayText(item.supplierSku)}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5">{item.supplierName || <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5">{getSizePack(item)}</TableCell>
-                    <TableCell className="text-[11px] text-slate-900 font-medium text-right px-2 py-1.5">
-                      {item.unitCost !== null ? thb(item.unitCost) : <span className="text-amber-600 text-[10px]">Missing</span>}
-                    </TableCell>
-                    <TableCell className="text-[11px] text-slate-600 px-2 py-1.5 hidden md:table-cell">{item.category || '—'}</TableCell>
-                    <TableCell className="text-center px-1.5 py-1.5">
-                      <Switch
-                        data-testid={`switch-active-${item.id}`}
-                        checked={item.active}
-                        onCheckedChange={(checked) => {
-                          toggleActiveMutation.mutate({ id: item.id, active: checked });
-                        }}
-                        disabled={toggleActiveMutation.isPending}
-                        className="scale-75"
-                      />
-                    </TableCell>
-                    <TableCell className="px-1 py-1.5">
-                      <div className="flex gap-0.5 justify-center">
-                        <Button
-                          data-testid={`button-edit-${item.id}`}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditingItem(item);
-                            setCategoryError(null);
-                            setShowDialog(true);
-                          }}
-                          className="text-[11px] h-7 w-7 p-0 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                        <Button
-                          data-testid={`button-delete-${item.id}`}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDeleteId(item.id)}
-                          className="text-[11px] h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </TableCell>
+                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5" title={item.supplierName || ''}>{item.supplierName || <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
+                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5" title={item.brand || ''}>{displayText(item.brand)}</TableCell>
+                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5" title={item.supplierSku || ''}>{displayText(item.supplierSku)}</TableCell>
+                    <TableCell className="text-[11px] text-slate-900 text-right px-2 py-1.5">{item.purchaseQuantity ?? '—'}</TableCell>
+                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5">{item.baseUnit || item.orderUnit || '—'}</TableCell>
+                    <TableCell className="text-[11px] text-slate-900 font-medium text-right px-2 py-1.5">{purchaseCost !== null ? thb(purchaseCost) : <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
+                    <TableCell className="text-[11px] text-slate-600 text-right px-2 py-1.5">{costPerUnit === null ? '—' : thb(costPerUnit)}</TableCell>
+                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5">{item.category || '—'}</TableCell>
+                    <TableCell className="text-center px-1 py-1.5"><Switch data-testid={`switch-active-${item.id}`} checked={item.active} onCheckedChange={(active) => toggleActiveMutation.mutate({ id: item.id, active })} disabled={toggleActiveMutation.isPending} className="scale-75" /></TableCell>
+                    <TableCell className="px-1 py-1.5"><div className="flex gap-0.5 justify-center">
+                      <Button data-testid={`button-edit-${item.id}`} variant="outline" size="sm" onClick={() => { setEditingItem(item); setCategoryError(null); setShowDialog(true); }} className="h-7 w-7 p-0 border-emerald-200 text-emerald-600 hover:bg-emerald-50"><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button data-testid={`button-delete-${item.id}`} variant="outline" size="sm" onClick={() => setDeleteId(item.id)} className="h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></Button>
+                    </div></TableCell>
                   </TableRow>
-                ))}
-                {filteredItems.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center text-[11px] text-slate-600 py-6">
-                      No items found
-                    </TableCell>
-                  </TableRow>
-                )}
+                  );
+                })}
+                {filteredItems.length === 0 && <TableRow><TableCell colSpan={11} className="text-center text-[11px] text-slate-600 py-6">No items found</TableCell></TableRow>}
               </TableBody>
             </Table>
           </div>
