@@ -54,8 +54,8 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
                 SUM(net_sales)::numeric AS net_sales
          FROM canonical_transactions GROUP BY 1
        ) x),'[]'::jsonb),
-       'hourly', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.report_hour) FROM (
-         SELECT extract(hour from timezone($4,occurred_at))::int AS report_hour,
+       'hourly', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.bucket_start) FROM (
+         SELECT date_trunc('hour', occurred_at) AS bucket_start,
                 COUNT(*)::int AS orders,
                 SUM(net_sales)::numeric AS net_sales
          FROM canonical_transactions GROUP BY 1
@@ -74,7 +74,7 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
   const payload = result.rows[0]?.payload || {};
   return {
     daily: (payload.daily || []).map((row: any) => ({ day: row.report_day, orders: n(row.orders), netSales: n(row.net_sales) })),
-    hourly: (payload.hourly || []).map((row: any) => ({ hour: n(row.report_hour), orders: n(row.orders), netSales: n(row.net_sales) })),
+    hourly: (payload.hourly || []).map((row: any) => ({ bucketStart: row.bucket_start, orders: n(row.orders), netSales: n(row.net_sales) })),
     categories: (payload.categories || []).map((row: any) => ({ category: row.category, quantity: n(row.quantity), netSales: n(row.net_sales) })),
     topProducts: (payload.topProducts || []).map((row: any) => ({ itemName: row.item_name, quantity: n(row.quantity), netSales: n(row.net_sales) })),
   };

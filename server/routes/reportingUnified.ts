@@ -8,6 +8,7 @@ import {
 import { queryUnifiedReceiptDetails } from "../reporting/unifiedReceiptDetails";
 import { queryUnifiedComponents } from "../reporting/unifiedComponents";
 import { queryUnifiedOverviewBreakdowns } from "../reporting/unifiedOverviewBreakdowns";
+import { queryRecordedLabor } from "../reporting/unifiedLabor";
 
 const router = Router();
 
@@ -26,9 +27,10 @@ function exactRange(query: Record<string, unknown>) {
 router.get("/overview", async (req, res) => {
   try {
     const range = exactRange(req.query as Record<string, unknown>);
-    const [overview, breakdowns] = await Promise.all([
+    const [overview, breakdowns, labor] = await Promise.all([
       queryUnifiedOverview(range),
       queryUnifiedOverviewBreakdowns(range),
+      queryRecordedLabor(range),
     ]);
     res.json({
       ok: true,
@@ -40,6 +42,11 @@ router.get("/overview", async (req, res) => {
       ],
       overview,
       breakdowns,
+      labor: {
+        ...labor,
+        laborCostPct: overview.netSales > 0 ? (labor.laborCost / overview.netSales) * 100 : null,
+        source: "daily_sales_v2_recorded_wages",
+      },
     });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
