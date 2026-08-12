@@ -402,8 +402,8 @@ router.post('/sync-to-daily-stock', async (req, res) => {
         id: `purchasing-${item.id}`, // Unique ID for frontend tracking
         name: item.item || `Unnamed item #${item.id}`,
         category: normalizedCategory || item.category || 'Uncategorized',
-        unit: item.orderUnit || 'unit',
-        cost: item.unitCost ? Number(item.unitCost) : 0,
+        unit: item.baseUnit || item.orderUnit || 'unit',
+        cost: item.purchaseCostThb ? Number(item.purchaseCostThb) : (item.unitCost ? Number(item.unitCost) : 0),
         supplier: item.supplierName || 'Unknown',
         portions: 1 // Default portions for compatibility
       };
