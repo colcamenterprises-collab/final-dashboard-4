@@ -53,7 +53,7 @@ jobs:
         shell: bash
         run: |
           git fetch --no-tags --depth=1 origin "${GITHUB_BASE_REF}"
-          mapfile -t files < <(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" | grep -E '^\.github/workflows/.*\.ya?ml$' || true)
+          mapfile -t files < <(git diff --diff-filter=ACMR --name-only "origin/${GITHUB_BASE_REF}...HEAD" | grep -E '^\.github/workflows/.*\.ya?ml$' || true)
           if ((${#files[@]})); then
             npx --no-install prettier --check "${files[@]}"
           else
