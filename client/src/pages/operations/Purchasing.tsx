@@ -51,6 +51,11 @@ type PurchasingItem = {
   unitDescription: string | null;
   purchaseUnitLabel: string | null;
   unitCost: number | null;
+  catalogueCode: string | null;
+  purchaseQuantity: number | null;
+  baseUnit: string | null;
+  purchaseCostThb: number | null;
+  reviewNotes: string | null;
   lastReviewDate: string | null;
   active: boolean;
   portionUnit: string | null;
@@ -78,7 +83,7 @@ const displayText = (value: string | null | undefined): string => {
 };
 
 const getSizePack = (item: PurchasingItem): string => {
-  return displayText(item.purchaseUnitLabel || item.unitDescription || item.orderUnit);
+  return item.purchaseQuantity ? `${item.purchaseQuantity} ${item.baseUnit || item.orderUnit || ''}`.trim() : displayText(item.purchaseUnitLabel || item.unitDescription || item.orderUnit);
 };
 
 export default function PurchasingPage() {
@@ -208,7 +213,7 @@ export default function PurchasingPage() {
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const newCost = formData.get('unitCost') ? parseFloat(formData.get('unitCost') as string) : null;
+    const newCost = formData.get('purchaseCostThb') ? parseFloat(formData.get('purchaseCostThb') as string) : null;
     const selectedCategory = (formData.get('category') as string) || '';
 
     if (!isCanonicalPurchasingCategory(selectedCategory)) {
@@ -226,7 +231,11 @@ export default function PurchasingPage() {
       purchaseUnitLabel: formData.get('purchaseUnitLabel') as string || null,
       orderUnit: formData.get('orderUnit') as string || null,
       unitDescription: formData.get('unitDescription') as string || null,
+      purchaseCostThb: newCost,
       unitCost: newCost,
+      purchaseQuantity: formData.get('purchaseQuantity') ? parseFloat(formData.get('purchaseQuantity') as string) : null,
+      baseUnit: formData.get('baseUnit') as string || null,
+      reviewNotes: formData.get('reviewNotes') as string || null,
       lastReviewDate: formData.get('lastReviewDate') as string || null,
       active: (formData.get('active') as string) === 'true',
     };
@@ -600,23 +609,12 @@ export default function PurchasingPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-900 mb-1 block">Size / Pack</label>
-                <Input
-                  data-testid="input-size-pack"
-                  name="purchaseUnitLabel"
-                  placeholder="330 ml can / 24 pack"
-                  defaultValue={editingItem?.purchaseUnitLabel || editingItem?.unitDescription || editingItem?.orderUnit || ''}
-                  className="text-xs rounded-[4px] border-slate-200"
-                />
+                <label className="text-xs font-medium text-slate-900 mb-1 block">Package quantity</label>
+                <Input data-testid="input-package-quantity" name="purchaseQuantity" type="number" step="0.001" defaultValue={editingItem?.purchaseQuantity || ''} className="text-xs rounded-[4px] border-slate-200" />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-900 mb-1 block">Order Unit</label>
-                <Input
-                  data-testid="input-order-unit"
-                  name="orderUnit"
-                  defaultValue={editingItem?.orderUnit || ''}
-                  className="text-xs rounded-[4px] border-slate-200"
-                />
+                <label className="text-xs font-medium text-slate-900 mb-1 block">Base unit</label>
+                <Input data-testid="input-base-unit" name="baseUnit" placeholder="g, kg, ml, each" defaultValue={editingItem?.baseUnit || editingItem?.orderUnit || ''} className="text-xs rounded-[4px] border-slate-200" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-900 mb-1 block">Unit Description</label>
@@ -628,15 +626,8 @@ export default function PurchasingPage() {
                 />
               </div>
               <div>
-                <label className="text-xs font-medium text-slate-900 mb-1 block">Unit Cost (฿)</label>
-                <Input
-                  data-testid="input-unit-cost"
-                  name="unitCost"
-                  type="number"
-                  step="0.01"
-                  defaultValue={editingItem?.unitCost || ''}
-                  className="text-xs rounded-[4px] border-slate-200"
-                />
+                <label className="text-xs font-medium text-slate-900 mb-1 block">Purchase cost (฿)</label>
+                <Input data-testid="input-purchase-cost" name="purchaseCostThb" type="number" step="0.01" defaultValue={editingItem?.purchaseCostThb ?? editingItem?.unitCost ?? ''} className="text-xs rounded-[4px] border-slate-200" />
               </div>
               <div>
                 <label className="text-xs font-medium text-slate-900 mb-1 block">Last Review Date</label>
