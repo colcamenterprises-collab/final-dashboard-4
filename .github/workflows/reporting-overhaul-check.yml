@@ -21,27 +21,42 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: TypeScript check reporting scope
+      - name: TypeScript check changed reporting files
         shell: bash
         run: |
           set +e
           npm run check -- --pretty false 2>&1 | tee /tmp/tsc.log
           TSC_STATUS=${PIPESTATUS[0]}
           set -e
-          if grep -E '^(client/src/pages/reports|client/src/components/reports|server/reporting|server/routes/reportingUnified\.ts|server/scripts/import_reporting_history\.ts)' /tmp/tsc.log; then
-            echo 'Reporting TypeScript errors detected.'
+
+          CHANGED_ERROR=0
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --diff-filter=ACMR --name-only               "origin/${{ github.base_ref }}...HEAD" |
+              grep -E '\.(ts|tsx)$' > /tmp/changed-typescript-files.txt || true
+
+            while IFS= read -r file; do
+              if grep -F "${file}(" /tmp/tsc.log; then
+                echo "::error file=${file}::TypeScript error detected in a changed file."
+                CHANGED_ERROR=1
+              fi
+            done < /tmp/changed-typescript-files.txt
+          fi
+
+          if [ "$CHANGED_ERROR" -ne 0 ]; then
             exit 1
           fi
           if [ "$TSC_STATUS" -ne 0 ]; then
-            echo '::warning::Repository has pre-existing TypeScript errors outside the reporting overhaul scope; reporting files are clean.'
+            echo '::warning::Repository has pre-existing TypeScript errors outside files changed by this pull request.'
           fi
-      - name: Reporting range and import regression tests
-        run: npx tsx --test server/reporting/unifiedLedger.test.ts server/reporting/importers/loyverse.test.ts
+      - name: Reporting range, labor, and import regression tests
+        run: npx tsx --test server/reporting/unifiedLedger.test.ts server/reporting/unifiedLabor.test.ts server/reporting/importers/loyverse.test.ts
       - name: Production build
         run: npm run build
