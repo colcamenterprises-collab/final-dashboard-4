@@ -1723,7 +1723,13 @@ model PurchasingItem {
   supplierSku     String?
   orderUnit       String?
   unitDescription String?
+  // Canonical purchasing catalogue fields. Legacy fields above remain for audit compatibility.
   unitCost        Decimal? @db.Decimal(10, 2)
+  catalogueCode   String?  @map("catalogue_code")
+  purchaseQuantity Decimal? @map("purchase_quantity") @db.Decimal(12, 3)
+  baseUnit        String?  @map("base_unit")
+  purchaseCostThb Decimal? @map("purchase_cost_thb") @db.Decimal(12, 2)
+  reviewNotes     String?  @map("review_notes")
   lastReviewDate  String?
   active          Boolean  @default(true)
   isIngredient    Boolean  @default(false) @map("is_ingredient")
