@@ -10,13 +10,19 @@ async function refreshCatalogueCosts(ingredients: any[]): Promise<any[]> {
   const ids = [...new Set(ingredients.map((row) => Number(row?.ingredientId)).filter((id) => Number.isInteger(id) && id > 0))];
   if (!ids.length) return ingredients;
   const result = await pool!.query(
-    'SELECT id, name, base_unit, unit_cost_per_base FROM ingredients WHERE id = ANY($1::int[])',
+    'SELECT id, name, base_unit, unit_cost_per_base, yield_method FROM ingredients WHERE id = ANY($1::int[])',
     [ids]
   );
   const catalogue = new Map(result.rows.map((row: any) => [Number(row.id), row]));
   return ingredients.map((row) => {
     const item = row?.ingredientId ? catalogue.get(Number(row.ingredientId)) : null;
     if (!item) return row;
+    // Estimated catalogue prices are per portion; they cannot safely be used as
+    // a gram/ml/each unit price. Keep the recipe line blocked until a real
+    // per-base price is recorded.
+    if (item.yield_method === 'ESTIMATED' || item.unit_cost_per_base === null || item.unit_cost_per_base === undefined || item.unit_cost_per_base === '') {
+      return { ...row, autoUnitCost: null, costingStatus: 'MISSING_CATALOGUE_COST' };
+    }
     const cost = Number(item.unit_cost_per_base);
     if (!Number.isFinite(cost) || cost < 0) return { ...row, autoUnitCost: null, costingStatus: 'MISSING_CATALOGUE_COST' };
     return { ...row, name: item.name, unitUsed: item.base_unit || row.unitUsed || 'each', autoUnitCost: cost, costingStatus: 'CURRENT_CATALOGUE_PRICE' };

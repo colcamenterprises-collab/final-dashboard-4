@@ -10,6 +10,7 @@ type CatalogueIngredient = {
   baseUnit?: string | null;
   unitCostPerBase?: number | string | null;
   missingYield?: boolean;
+  yieldMethod?: "DIRECT" | "ESTIMATED" | string | null;
 };
 
 type Props = {
@@ -21,7 +22,9 @@ type Props = {
 
 export default function RecipeIngredientEditor({ rows, draft, onDraftChange, onRowsChange }: Props) {
   const { data, isLoading } = useQuery<{ items?: CatalogueIngredient[] }>({ queryKey: ["/api/ingredients/management"] });
-  const catalogue = useMemo(() => (data?.items ?? []).filter((item) => !item.missingYield && toNumber(item.unitCostPerBase) !== null), [data]);
+  // Estimated-yield catalogue prices are per portion, not per physical base unit.
+  // Do not offer them until the catalogue has a true per-base cost.
+  const catalogue = useMemo(() => (data?.items ?? []).filter((item) => item.yieldMethod !== "ESTIMATED" && !item.missingYield && toNumber(item.unitCostPerBase) !== null), [data]);
   const beginAdd = () => onDraftChange({ ...makeIngredient(), sourceType: "purchasing" });
   const selectIngredient = (id: string) => {
     const item = catalogue.find((candidate) => candidate.id === Number(id));
