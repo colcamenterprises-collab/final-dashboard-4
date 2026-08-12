@@ -1,70 +1,32 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
-import { fmtMoney, makeIngredient, toNumber, type RecipeIngredientRow } from "./recipeTypes";
+import { fmtMoney, makeIngredient, recipeIngredientCost, toNumber, type RecipeIngredientRow } from "./recipeTypes";
 
-type CatalogueIngredient = {
-  id: number;
-  name: string;
-  category?: string | null;
-  baseUnit?: string | null;
-  unitCostPerBase?: number | string | null;
-  missingYield?: boolean;
-  yieldMethod?: "DIRECT" | "ESTIMATED" | string | null;
-};
+type PurchasingIngredient = { id:number; name:string; category?:string; supplier?:string; purchaseQuantity:number; purchaseUnit:string; purchaseCostThb:number; isActive?:boolean };
+type Props = { rows:RecipeIngredientRow[]; draft:RecipeIngredientRow|null; onDraftChange:(row:RecipeIngredientRow|null)=>void; onRowsChange:(rows:RecipeIngredientRow[])=>void };
+const units=["g","kg","ml","L","each","pcs","pack","box","m"];
 
-type Props = {
-  rows: RecipeIngredientRow[];
-  draft: RecipeIngredientRow | null;
-  onDraftChange: (row: RecipeIngredientRow | null) => void;
-  onRowsChange: (rows: RecipeIngredientRow[]) => void;
-};
-
-export default function RecipeIngredientEditor({ rows, draft, onDraftChange, onRowsChange }: Props) {
-  const { data, isLoading } = useQuery<{ items?: CatalogueIngredient[] }>({ queryKey: ["/api/ingredients/management"] });
-  // Estimated-yield catalogue prices are per portion, not per physical base unit.
-  // Do not offer them until the catalogue has a true per-base cost.
-  const catalogue = useMemo(() => (data?.items ?? []).filter((item) => item.yieldMethod !== "ESTIMATED" && !item.missingYield && toNumber(item.unitCostPerBase) !== null), [data]);
-  const beginAdd = () => onDraftChange({ ...makeIngredient(), sourceType: "purchasing" });
-  const selectIngredient = (id: string) => {
-    const item = catalogue.find((candidate) => candidate.id === Number(id));
-    if (!item || !draft) return;
-    onDraftChange({
-      ...draft,
-      ingredientId: item.id,
-      name: item.name,
-      sourceType: "purchasing",
-      purchasingItemId: null,
-      purchasingItemKey: String(item.id),
-      unitUsed: item.baseUnit || "each",
-      autoUnitCost: toNumber(item.unitCostPerBase),
-      manualOverrideUnitCost: "",
-      costingStatus: "current_catalogue_price",
-    });
-  };
-  const saveDraft = () => {
-    if (!draft) return;
-    const exists = rows.some((row) => row.id === draft.id);
-    onRowsChange(exists ? rows.map((row) => row.id === draft.id ? draft : row) : [...rows, draft]);
-    onDraftChange(null);
-  };
-
-  const unitCost = draft ? (toNumber(draft.manualOverrideUnitCost) ?? toNumber(draft.autoUnitCost)) : null;
-  const quantity = draft ? toNumber(draft.quantityUsed) : null;
-  const draftLineCost = unitCost !== null && quantity !== null ? unitCost * quantity : null;
-
-  return <section className="space-y-3 rounded-lg border bg-white p-4">
-    <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Ingredients</h2><p className="mt-1 text-xs text-slate-500">Choose a catalogue ingredient, enter its recipe quantity, and the current purchasing cost calculates automatically.</p></div><button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={beginAdd}>Add Ingredient</button></div>
-    {draft && <div className="space-y-3 rounded-lg border p-3">
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        <label className="block text-xs font-medium">Catalogue ingredient<select value={draft.ingredientId ?? ""} onChange={(event) => selectIngredient(event.target.value)} className="mt-1 w-full rounded border px-2 py-2 text-xs"><option value="">{isLoading ? "Loading ingredient catalogue..." : "Select an ingredient"}</option>{catalogue.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.baseUnit || "each"} · {fmtMoney(item.unitCostPerBase)}/{item.baseUnit || "each"}</option>)}</select></label>
-        <label className="block text-xs font-medium">Quantity used<Input type="number" min="0" step="any" placeholder="e.g. 90" value={draft.quantityUsed} onChange={(event) => onDraftChange({ ...draft, quantityUsed: event.target.value })} className="mt-1" /></label>
-        <label className="block text-xs font-medium">Recipe unit<Input readOnly value={draft.unitUsed} className="mt-1 bg-slate-50" /></label>
-        <label className="block text-xs font-medium">Current catalogue cost (THB/{draft.unitUsed || "unit"})<Input readOnly value={unitCost === null ? "" : unitCost.toFixed(6)} className="mt-1 bg-slate-50" /></label>
-        <label className="block text-xs font-medium md:col-span-2">Notes<Input placeholder="Optional preparation or brand notes" value={draft.notes} onChange={(event) => onDraftChange({ ...draft, notes: event.target.value })} className="mt-1" /></label>
-      </div>
-      <div className="flex items-center justify-between gap-3"><div className="text-xs">Line cost: <span className="font-mono font-semibold">{fmtMoney(draftLineCost)}</span></div><div className="flex gap-2"><button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={() => onDraftChange(null)}>Cancel</button><button type="button" disabled={!draft.ingredientId || quantity === null || quantity <= 0 || unitCost === null || unitCost < 0} className="rounded-lg bg-black px-3 py-1.5 text-xs text-white disabled:opacity-40" onClick={saveDraft}>Save Ingredient</button></div></div>
-    </div>}
-    <div className="overflow-x-auto rounded-lg border"><table className="w-full min-w-[760px] text-xs"><thead><tr className="border-b bg-slate-50"><th className="p-2 text-left">Ingredient</th><th className="p-2 text-left">Quantity</th><th className="p-2 text-left">Unit</th><th className="p-2 text-left">Current unit cost</th><th className="p-2 text-left">Line cost</th><th className="p-2 text-left">Notes</th><th className="p-2 text-left">Actions</th></tr></thead><tbody>{rows.length === 0 ? <tr><td className="p-3" colSpan={7}>No ingredients added.</td></tr> : rows.map((row) => { const cost = toNumber(row.manualOverrideUnitCost) ?? toNumber(row.autoUnitCost); const qty = toNumber(row.quantityUsed); return <tr key={row.id} className="border-b"><td className="p-2">{row.name || "UNMAPPED"}</td><td className="p-2 font-mono">{row.quantityUsed || "UNMAPPED"}</td><td className="p-2">{row.unitUsed || "UNMAPPED"}</td><td className="p-2 font-mono">{fmtMoney(cost)}</td><td className="p-2 font-mono">{fmtMoney(cost !== null && qty !== null ? cost * qty : null)}</td><td className="p-2">{row.notes || "—"}</td><td className="p-2"><div className="flex gap-2"><button className="text-xs underline" onClick={() => onDraftChange(row)}>Edit</button><button className="text-xs text-red-700 underline" onClick={() => onRowsChange(rows.filter((candidate) => candidate.id !== row.id))}>Delete</button></div></td></tr>; })}</tbody></table></div>
-  </section>;
+export default function RecipeIngredientEditor({rows,draft,onDraftChange,onRowsChange}:Props) {
+ const {data,isLoading}=useQuery<{items?:PurchasingIngredient[]}>({queryKey:["/api/ingredient-authority"]});
+ const catalogue=useMemo(()=> (data?.items??[]).filter(item=>item.isActive!==false),[data]);
+ const beginAdd=()=>onDraftChange(makeIngredient());
+ const selectIngredient=(id:string)=>{const item=catalogue.find(x=>x.id===Number(id));if(!item||!draft)return;onDraftChange({...draft,ingredientId:item.id,purchasingItemId:item.id,purchasingItemKey:String(item.id),name:item.name,sourceType:"purchasing",purchaseCost:String(item.purchaseCostThb),packageQuantity:String(item.purchaseQuantity),purchaseUnit:item.purchaseUnit,unitUsed:item.purchaseUnit,wastePercent:"",autoUnitCost:item.purchaseQuantity>0?item.purchaseCostThb/item.purchaseQuantity:null,manualOverrideUnitCost:"",costingStatus:"current_purchasing_price"});};
+ const saveDraft=()=>{if(!draft||!draft.name.trim())return;const exists=rows.some(r=>r.id===draft.id);onRowsChange(exists?rows.map(r=>r.id===draft.id?draft:r):[...rows,draft]);onDraftChange(null);};
+ const draftCost=draft?recipeIngredientCost(draft):{baseCost:null,wasteCost:null,lineCost:null};
+ return <section className="space-y-3 rounded-lg border bg-white p-4">
+  <div className="flex items-center justify-between"><div><h2 className="text-sm font-semibold">Ingredients & Costing</h2><p className="mt-1 text-xs text-slate-500">Select a purchasing ingredient to prefill its pack data, or type a manual/special-price line. Only quantity used and waste need changing for normal items.</p></div><button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={beginAdd}>Add Ingredient</button></div>
+  {draft&&<div className="space-y-3 rounded-lg border p-3"><div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+   <label className="block text-xs font-medium">Purchasing ingredient<select value={draft.ingredientId??""} onChange={e=>selectIngredient(e.target.value)} className="mt-1 w-full rounded border px-2 py-2 text-xs"><option value="">{isLoading?"Loading purchasing catalogue…":"Select to prefill, or type below"}</option>{catalogue.map(i=><option key={i.id} value={i.id}>{i.name} · {fmtMoney(i.purchaseCostThb)} / {i.purchaseQuantity} {i.purchaseUnit}</option>)}</select></label>
+   <label className="block text-xs font-medium">Ingredient name<Input value={draft.name} onChange={e=>onDraftChange({...draft,name:e.target.value,sourceType:"manual"})} className="mt-1"/></label>
+   <label className="block text-xs font-medium">Purchase cost (THB)<Input type="number" min="0" step="any" value={draft.purchaseCost} onChange={e=>onDraftChange({...draft,purchaseCost:e.target.value,manualOverrideUnitCost:""})} className="mt-1"/></label>
+   <label className="block text-xs font-medium">Package size / purchase quantity<Input type="number" min="0" step="any" value={draft.packageQuantity} onChange={e=>onDraftChange({...draft,packageQuantity:e.target.value})} className="mt-1"/></label>
+   <label className="block text-xs font-medium">Purchase unit<select value={draft.purchaseUnit} onChange={e=>onDraftChange({...draft,purchaseUnit:e.target.value})} className="mt-1 w-full rounded border px-2 py-2 text-xs"><option value="">Select unit</option>{units.map(u=><option key={u}>{u}</option>)}</select></label>
+   <label className="block text-xs font-medium">Waste %<Input type="number" min="0" max="99" step="any" placeholder="Blank = 0%" value={draft.wastePercent} onChange={e=>onDraftChange({...draft,wastePercent:e.target.value})} className="mt-1"/></label>
+   <label className="block text-xs font-medium">Quantity used<Input type="number" min="0" step="any" value={draft.quantityUsed} onChange={e=>onDraftChange({...draft,quantityUsed:e.target.value})} className="mt-1"/></label>
+   <label className="block text-xs font-medium">Usage unit<select value={draft.unitUsed} onChange={e=>onDraftChange({...draft,unitUsed:e.target.value})} className="mt-1 w-full rounded border px-2 py-2 text-xs"><option value="">Select unit</option>{units.map(u=><option key={u}>{u}</option>)}</select></label>
+   <label className="block text-xs font-medium md:col-span-2">Notes<Input value={draft.notes} onChange={e=>onDraftChange({...draft,notes:e.target.value})} className="mt-1"/></label>
+  </div><div className="flex items-center justify-between"><span className="text-xs">Base: <b>{fmtMoney(draftCost.baseCost)}</b> · Waste: <b>{fmtMoney(draftCost.wasteCost)}</b> · Line cost: <b>{fmtMoney(draftCost.lineCost)}</b></span><div className="flex gap-2"><button type="button" className="rounded-lg border px-3 py-1.5 text-xs" onClick={()=>onDraftChange(null)}>Cancel</button><button type="button" disabled={!draft.name||draftCost.lineCost===null} className="rounded-lg bg-black px-3 py-1.5 text-xs text-white disabled:opacity-40" onClick={saveDraft}>Save Ingredient</button></div></div></div>}
+  <div className="overflow-x-auto rounded-lg border"><table className="w-full min-w-[1100px] text-xs"><thead><tr className="border-b bg-slate-50"><th className="p-2 text-left">Ingredient</th><th className="p-2 text-left">Purchase cost</th><th className="p-2 text-left">Package size</th><th className="p-2 text-left">Purchase unit</th><th className="p-2 text-left">Waste</th><th className="p-2 text-left">Quantity used</th><th className="p-2 text-left">Usage unit</th><th className="p-2 text-left">Line cost</th><th className="p-2 text-left">Actions</th></tr></thead><tbody>{rows.length===0?<tr><td className="p-3" colSpan={9}>No ingredients added.</td></tr>:rows.map(row=>{const cost=recipeIngredientCost(row);return <tr key={row.id} className="border-b"><td className="p-2 font-medium">{row.name}</td><td className="p-2">{fmtMoney(toNumber(row.manualOverrideUnitCost)??row.purchaseCost)}</td><td className="p-2">{row.packageQuantity||"—"}</td><td className="p-2">{row.purchaseUnit||"—"}</td><td className="p-2">{row.wastePercent||"0"}%</td><td className="p-2">{row.quantityUsed||"—"}</td><td className="p-2">{row.unitUsed||"—"}</td><td className="p-2 font-mono">{fmtMoney(cost.lineCost)}</td><td className="p-2"><button className="mr-2 underline" onClick={()=>onDraftChange(row)}>Edit</button><button className="text-red-700 underline" onClick={()=>onRowsChange(rows.filter(x=>x.id!==row.id))}>Delete</button></td></tr>})}</tbody></table></div>
+ </section>;
 }
