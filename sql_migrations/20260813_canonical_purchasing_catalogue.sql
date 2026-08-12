@@ -11,8 +11,8 @@ ALTER TABLE purchasing_items ADD COLUMN IF NOT EXISTS review_notes TEXT;
 -- Preserve the previously displayed cost as the initial package cost where no
 -- explicit canonical cost has yet been imported.
 UPDATE purchasing_items
-SET purchase_cost_thb = unit_cost
-WHERE purchase_cost_thb IS NULL AND unit_cost IS NOT NULL;
+SET purchase_cost_thb = "unitCost"
+WHERE purchase_cost_thb IS NULL AND "unitCost" IS NOT NULL;
 
 CREATE UNIQUE INDEX IF NOT EXISTS purchasing_items_catalogue_code_unique
   ON purchasing_items (catalogue_code)
