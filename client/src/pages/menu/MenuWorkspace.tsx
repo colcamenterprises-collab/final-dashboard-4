@@ -55,6 +55,7 @@ export default function MenuWorkspace() {
   const location = useLocation();
   const navigate = useNavigate();
   const { recipeId } = useParams<{ recipeId?: string }>();
+  const isNewRecipeRoute = location.pathname === "/menu/recipes/new";
   const activeTab: TabKey = location.pathname.includes("/menu/recipes") || location.pathname.includes("cost-calculator") ? "recipes" : location.pathname.includes("/menu/modifiers") ? "modifiers" : location.pathname.includes("/menu/categories") ? "categories" : location.pathname.includes("/menu/ingredients") ? "purchasing" : "items";
   const [selectedRecipeId, setSelectedRecipeId] = useState<number | "new">("new");
   const [recipeForm, setRecipeForm] = useState({ name: "", category: "", description: "", imageUrl: "", yieldQuantity: "1", yieldUnit: "servings", preparationInstructions: "", cookingInstructions: "", specialNotes: "", directPrice: "", deliveryPartnerPrice: "", status: "Draft" });
@@ -162,7 +163,7 @@ export default function MenuWorkspace() {
     setIngredientRows(parseCostingRows(selectedRecipe.notes) ?? []);
   }, [activeTab, recipeId, selectedRecipe, selectedRecipeId]);
 
-  if (activeTab === "recipes" && recipeId) {
+  if (activeTab === "recipes" && (recipeId || isNewRecipeRoute)) {
     return <RecipeEditorPage />;
   }
 
