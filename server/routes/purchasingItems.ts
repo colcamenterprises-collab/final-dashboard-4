@@ -316,8 +316,8 @@ router.post('/import/csv', async (req, res) => {
     }
     let archived = 0;
     if (archiveMissing) {
-      const active = await prisma.purchasingItem.findMany({ where: { active: true, catalogueCode: { not: null } }, select: { id: true, catalogueCode: true } });
-      for (const existing of active) if (existing.catalogueCode && !importedCodes.has(existing.catalogueCode)) {
+      const active = await prisma.purchasingItem.findMany({ where: { active: true }, select: { id: true, catalogueCode: true } });
+      for (const existing of active) if (!existing.catalogueCode || !importedCodes.has(existing.catalogueCode)) {
         await prisma.purchasingItem.update({ where: { id: existing.id }, data: { active: false } }); archived++;
       }
     }
