@@ -112,7 +112,7 @@ export default function PurchasingPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['purchasing-items'],
     queryFn: async () => {
-      const res = await fetch('/api/purchasing-items');
+      const res = await fetch('/api/purchasing-items', { credentials: 'include' });
       return res.json();
     },
   });
@@ -425,6 +425,7 @@ export default function PurchasingPage() {
                   }
                   const res = await fetch('/api/purchasing-items/import/csv', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ csvData, archiveMissing: window.confirm('Make this uploaded catalogue the active list? Items no longer in it will be archived, not deleted.') }),
                   });
