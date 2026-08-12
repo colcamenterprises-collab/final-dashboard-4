@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -12,8 +12,9 @@ function blockerText(message: string) { return <div className="rounded-lg border
 
 export default function RecipeEditorPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { recipeId } = useParams<{ recipeId?: string }>();
-  const isNewRecipe = recipeId === "new";
+  const isNewRecipe = recipeId === "new" || location.pathname === "/menu/recipes/new";
   const [form, setForm] = useState(emptyRecipeForm());
   const [ingredients, setIngredients] = useState<RecipeIngredientRow[]>([]);
   const [draftIngredient, setDraftIngredient] = useState<RecipeIngredientRow | null>(null);
