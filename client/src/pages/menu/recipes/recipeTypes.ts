@@ -23,4 +23,28 @@ export function parseCostingRows(recipe: Recipe | null | undefined): RecipeIngre
 export function notesWithoutWorkflowData(notes?: string | null) { return String(notes ?? "").split("\n").filter((line) => !line.startsWith(`${COSTING_NOTES_PREFIX} `) && !line.startsWith("Recipe status:")).join("\n").trim(); }
 export function splitInstructions(value?: string | null) { const instructions = String(value ?? ""); return { preparationInstructions: instructions.split("Cooking/build instructions:")[0]?.replace("Preparation instructions:", "").trim() ?? "", cookingInstructions: instructions.split("Cooking/build instructions:")[1]?.trim() ?? "" }; }
 
-export function recipeIngredientCost(row: RecipeIngredientRow) { const purchaseCost=toNumber(row.manualOverrideUnitCost) ?? toNumber(row.purchaseCost); const packQty=toNumber(row.packageQuantity); const used=toNumber(row.quantityUsed); const waste=toNumber(row.wastePercent) ?? 0; const from=normalizeUnit(row.unitUsed), to=normalizeUnit(row.purchaseUnit); const conversion=from===to||(["each","pcs"].includes(from)&&["each","pcs"].includes(to))?1:from==="g"&&to==="kg"?0.001:from==="kg"&&to==="g"?1000:from==="ml"&&to==="l"?0.001:from==="l"&&to==="ml"?1000:null; if(purchaseCost===null||packQty===null||packQty<=0||used===null||conversion===null||waste<0||waste>=100)return {baseCost:null,wasteCost:null,lineCost:null}; const baseCost=purchaseCost/packQty*(used*conversion); const lineCost=baseCost/(1-waste/100); return {baseCost,wasteCost:lineCost-baseCost,lineCost}; }
+export function recipeIngredientCost(row: RecipeIngredientRow) {
+  const used = toNumber(row.quantityUsed);
+  const waste = toNumber(row.wastePercent) ?? 0;
+  if (used === null || used <= 0 || waste < 0 || waste >= 100) return { baseCost: null, wasteCost: null, lineCost: null };
+  const purchaseCost = toNumber(row.manualOverrideUnitCost) ?? toNumber(row.purchaseCost);
+  const packQty = toNumber(row.packageQuantity);
+  // Existing recipes predate pack-cost fields. Preserve their stored per-unit cost
+  // until the operator selects a current catalogue item.
+  if (purchaseCost === null || purchaseCost < 0) {
+    const legacyUnitCost = toNumber(row.autoUnitCost);
+    if (legacyUnitCost === null || legacyUnitCost < 0) return { baseCost: null, wasteCost: null, lineCost: null };
+    const baseCost = legacyUnitCost * used;
+    const lineCost = baseCost / (1 - waste / 100);
+    return { baseCost, wasteCost: lineCost - baseCost, lineCost };
+  }
+  if (packQty === null || packQty <= 0) return { baseCost: null, wasteCost: null, lineCost: null };
+  const from = normalizeUnit(row.unitUsed), to = normalizeUnit(row.purchaseUnit);
+  const conversion = from === to || (["each", "pcs"].includes(from) && ["each", "pcs"].includes(to)) ? 1
+    : from === "g" && to === "kg" ? 0.001 : from === "kg" && to === "g" ? 1000
+    : from === "ml" && to === "l" ? 0.001 : from === "l" && to === "ml" ? 1000 : null;
+  if (conversion === null) return { baseCost: null, wasteCost: null, lineCost: null };
+  const baseCost = purchaseCost / packQty * (used * conversion);
+  const lineCost = baseCost / (1 - waste / 100);
+  return { baseCost, wasteCost: lineCost - baseCost, lineCost };
+}
