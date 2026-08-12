@@ -11,7 +11,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { PrismaClient } from '@prisma/client';
-import { foodCostings } from '../data/foodCostings';
 import {
   CANONICAL_PURCHASING_CATEGORIES,
   isCanonicalPurchasingCategory,
@@ -32,6 +31,11 @@ const purchasingItemSafeSelect = {
   unitDescription: true,
   purchaseUnitLabel: true,
   unitCost: true,
+  catalogueCode: true,
+  purchaseQuantity: true,
+  baseUnit: true,
+  purchaseCostThb: true,
+  reviewNotes: true,
   lastReviewDate: true,
   active: true,
   isIngredient: true,
@@ -52,6 +56,11 @@ const purchasingItemSchema = z.object({
   unitDescription: z.string().optional().nullable(),
   purchaseUnitLabel: z.string().optional().nullable(),
   unitCost: z.number().optional().nullable(),
+  catalogueCode: z.string().optional().nullable(),
+  purchaseQuantity: z.number().positive().optional().nullable(),
+  baseUnit: z.string().optional().nullable(),
+  purchaseCostThb: z.number().min(0).optional().nullable(),
+  reviewNotes: z.string().optional().nullable(),
   lastReviewDate: z.string().optional().nullable(),
   active: z.boolean().optional(),
   portionUnit: z.string().optional().nullable(),
@@ -239,24 +248,20 @@ router.get('/export/csv', async (req, res) => {
       ],
     });
 
-    const headers = ['id', 'item', 'category', 'supplierName', 'brand', 'supplierSku', 'purchaseUnitLabel', 'orderUnit', 'unitDescription', 'unitCost', 'lastReviewDate'];
+    const headers = ['ID', 'Item', 'Category', 'Supplier', 'Brand', 'Supplier SKU', 'Wholesale Cost (THB)', 'Unit Quantity', 'Base Unit', 'Cost per Base Unit (THB)', 'Last Review Date', 'Review Notes'];
     const csvLines = [headers.join(',')];
     
     for (const row of items) {
-      const csvRow = [
-        row.id,
-        `"${(row.item || '').replace(/"/g, '""')}"`,
-        `"${(row.category || '').replace(/"/g, '""')}"`,
-        `"${(row.supplierName || '').replace(/"/g, '""')}"`,
-        `"${(row.brand || '').replace(/"/g, '""')}"`,
-        `"${(row.supplierSku || '').replace(/"/g, '""')}"`,
-        `"${(row.purchaseUnitLabel || '').replace(/"/g, '""')}"`,
-        `"${(row.orderUnit || '').replace(/"/g, '""')}"`,
-        `"${(row.unitDescription || '').replace(/"/g, '""')}"`,
-        row.unitCost || '',
-        `"${(row.lastReviewDate || '').replace(/"/g, '""')}"`,
-      ];
-      csvLines.push(csvRow.join(','));
+      const purchaseCost = Number(row.purchaseCostThb ?? row.unitCost ?? 0);
+      const quantity = Number(row.purchaseQuantity ?? 0);
+      const costPerBase = quantity > 0 ? purchaseCost / quantity : '';
+      const value = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      csvLines.push([
+        row.catalogueCode ?? row.id, value(row.item), value(row.category), value(row.supplierName),
+        value(row.brand), value(row.supplierSku), purchaseCost || '', quantity || '',
+        value(row.baseUnit || row.orderUnit || row.unitDescription), costPerBase,
+        value(row.lastReviewDate), value(row.reviewNotes),
+      ].join(','));
     }
     
     const csvContent = csvLines.join('\n');
@@ -274,89 +279,57 @@ router.get('/export/csv', async (req, res) => {
 // POST /api/purchasing-items/import/csv - Import purchasing items from CSV (upsert by item, supplierName, brand)
 router.post('/import/csv', async (req, res) => {
   try {
-    const { csvData } = req.body;
-    
-    if (!csvData || !Array.isArray(csvData)) {
-      return res.status(400).json({ ok: false, error: 'csvData array required' });
-    }
+    const { csvData, archiveMissing = false } = req.body;
+    if (!Array.isArray(csvData)) return res.status(400).json({ ok: false, error: 'csvData array required' });
 
-    let inserted = 0;
-    let updated = 0;
-    
+    let inserted = 0, updated = 0;
+    const importedCodes = new Set<string>();
     for (const row of csvData) {
-      const item = (row.item || '').trim();
-      const supplierName = (row.supplierName || '').trim() || null;
-      const brand = (row.brand || '').trim() || null;
-      const supplierSku = (row.supplierSku || row.sku || row.SKU || '').trim() || null;
-      const purchaseUnitLabel = (
-        row.purchaseUnitLabel ||
-        row.package_size ||
-        row.pack_size ||
-        row.packageSize ||
-        row.packSize ||
-        row.sizePack ||
-        row['Size / Pack'] ||
-        row['size / pack'] ||
-        ''
-      ).trim() || null;
-      
+      const item = String(row.Item ?? row.item ?? '').trim();
       if (!item) continue;
-      
-      // Check if exists
-      const existing = await prisma.purchasingItem.findFirst({
-        where: {
-          item,
-          supplierName: supplierName || undefined,
-          brand: brand || undefined,
-        },
-      });
-      
-      const normalizedCategory = normalizePurchasingCategory(row.category || null);
-      if (!isCanonicalPurchasingCategory(normalizedCategory)) {
-        return res.status(400).json(invalidCategoryResponse);
-      }
-
-      if (existing) {
-        // Update
-        await prisma.purchasingItem.update({
-          where: { id: existing.id },
-          data: {
-            category: normalizedCategory,
-            supplierSku,
-            purchaseUnitLabel,
-            orderUnit: row.orderUnit || null,
-            unitDescription: row.unitDescription || null,
-            unitCost: row.unitCost ? parseFloat(row.unitCost) : null,
-            lastReviewDate: row.lastReviewDate || null,
-          },
-        });
-        updated++;
-      } else {
-        // Insert
-        await prisma.purchasingItem.create({
-          data: {
-            item,
-            category: normalizedCategory,
-            supplierName: supplierName,
-            brand: brand,
-            supplierSku,
-            purchaseUnitLabel,
-            orderUnit: row.orderUnit || null,
-            unitDescription: row.unitDescription || null,
-            unitCost: row.unitCost ? parseFloat(row.unitCost) : null,
-            lastReviewDate: row.lastReviewDate || null,
-          },
-        });
-        inserted++;
+      const code = String(row.ID ?? row.id ?? row.catalogueCode ?? '').trim() || null;
+      const category = normalizePurchasingCategory(row.Category ?? row.category ?? null);
+      if (!isCanonicalPurchasingCategory(category)) return res.status(400).json(invalidCategoryResponse);
+      const number = (value: unknown) => {
+        const n = Number(String(value ?? '').replace(/[^0-9.-]/g, ''));
+        return Number.isFinite(n) ? n : null;
+      };
+      const purchaseCostThb = number(row['Wholesale Cost (THB)'] ?? row.purchaseCostThb ?? row.unitCost);
+      const purchaseQuantity = number(row['Unit Quantity'] ?? row.purchaseQuantity);
+      const baseUnit = String(row['Base Unit'] ?? row.baseUnit ?? row.orderUnit ?? '').trim() || null;
+      const data = {
+        item, category, catalogueCode: code, supplierName: String(row.Supplier ?? row.supplierName ?? '').trim() || null,
+        brand: String(row.Brand ?? row.brand ?? '').trim() || null,
+        supplierSku: String(row['Supplier SKU'] ?? row.supplierSku ?? '').trim() || null,
+        purchaseCostThb, purchaseQuantity, baseUnit,
+        // Keep old consumers compatible while all new consumers use the canonical fields.
+        unitCost: purchaseCostThb, orderUnit: baseUnit, purchaseUnitLabel: purchaseQuantity && baseUnit ? `${purchaseQuantity} ${baseUnit}` : null,
+        lastReviewDate: String(row['Last Review Date'] ?? row.lastReviewDate ?? '').trim() || null,
+        reviewNotes: String(row['Review Notes'] ?? row.reviewNotes ?? '').trim() || null, active: true,
+      };
+      const existing = code
+        ? await prisma.purchasingItem.findFirst({ where: { catalogueCode: code } })
+        : await prisma.purchasingItem.findFirst({ where: { item, supplierName: data.supplierName || undefined } });
+      if (existing) { await prisma.purchasingItem.update({ where: { id: existing.id }, data }); updated++; }
+      else { await prisma.purchasingItem.create({ data }); inserted++; }
+      if (code) importedCodes.add(code);
+    }
+    let archived = 0;
+    if (archiveMissing) {
+      const active = await prisma.purchasingItem.findMany({ where: { active: true }, select: { id: true, catalogueCode: true } });
+      for (const existing of active) if (!existing.catalogueCode || !importedCodes.has(existing.catalogueCode)) {
+        await prisma.purchasingItem.update({ where: { id: existing.id }, data: { active: false } }); archived++;
       }
     }
-    
-    console.log(`[/api/purchasing-items/import/csv] Imported: ${inserted} inserted, ${updated} updated`);
-    res.json({ ok: true, inserted, updated });
-  } catch (error) {
-    console.error('Error importing purchasing items:', error);
-    res.status(500).json({ ok: false, error: 'Failed to import purchasing items' });
-  }
+    res.json({ ok: true, inserted, updated, archived, source: 'purchasing_items' });
+  } catch (error) { console.error('Canonical catalogue import failed:', error); res.status(500).json({ ok: false, error: 'Failed to import purchasing catalogue' }); }
+});
+
+// Downloadable, empty operator template. Importing is optional; direct table editing is primary.
+router.get('/template/csv', (_req, res) => {
+  res.type('text/csv').attachment('purchasing-catalogue-template.csv').send(
+    'ID,Item,Category,Supplier,Brand,Supplier SKU,Wholesale Cost (THB),Unit Quantity,Base Unit,Cost per Base Unit (THB),Last Review Date,Review Notes\n'
+  );
 });
 
 // Sync purchasing list items to Daily Stock V2 form (live from DB)
@@ -429,8 +402,8 @@ router.post('/sync-to-daily-stock', async (req, res) => {
         id: `purchasing-${item.id}`, // Unique ID for frontend tracking
         name: item.item || `Unnamed item #${item.id}`,
         category: normalizedCategory || item.category || 'Uncategorized',
-        unit: item.orderUnit || 'unit',
-        cost: item.unitCost ? Number(item.unitCost) : 0,
+        unit: item.baseUnit || item.orderUnit || 'unit',
+        cost: item.purchaseCostThb ? Number(item.purchaseCostThb) : (item.unitCost ? Number(item.unitCost) : 0),
         supplier: item.supplierName || 'Unknown',
         portions: 1 // Default portions for compatibility
       };
@@ -510,69 +483,6 @@ router.post('/sync-to-daily-stock', async (req, res) => {
  * Populates purchasing_items from foodCostings TypeScript source of truth
  * This should be run once to seed the catalog, then items managed via API
  */
-router.post('/populate-catalog', async (req, res) => {
-  try {
-    console.log('[purchasing/populate] Populating purchasing_items from foodCostings catalog...');
-    
-    let inserted = 0;
-    let updated = 0;
-    
-    for (const item of foodCostings) {
-      const normalizedCategory = normalizePurchasingCategory(item.category || null);
-      if (!isCanonicalPurchasingCategory(normalizedCategory)) {
-        continue;
-      }
-
-      // Parse cost (removes ฿ symbol and commas)
-      const costStr = (item.cost || '').replace(/[฿,]/g, '').trim();
-      const unitCost = parseFloat(costStr) || null;
-      
-      // Check if exists by item name
-      const existing = await prisma.purchasingItem.findFirst({
-        where: { item: item.item },
-      });
-      
-      if (existing) {
-        // Update existing
-        await prisma.purchasingItem.update({
-          where: { id: existing.id },
-          data: {
-            category: normalizedCategory,
-            supplierName: item.supplier || null,
-            brand: item.brand || null,
-            orderUnit: item.packagingQty || null,
-            unitDescription: item.averageMenuPortion || null,
-            unitCost: unitCost,
-            lastReviewDate: item.lastReviewDate || null,
-            active: true,
-          },
-        });
-        updated++;
-      } else {
-        // Insert new
-        await prisma.purchasingItem.create({
-          data: {
-            item: item.item,
-            category: normalizedCategory,
-            supplierName: item.supplier || null,
-            brand: item.brand || null,
-            orderUnit: item.packagingQty || null,
-            unitDescription: item.averageMenuPortion || null,
-            unitCost: unitCost,
-            lastReviewDate: item.lastReviewDate || null,
-            active: true,
-          },
-        });
-        inserted++;
-      }
-    }
-    
-    console.log(`[purchasing/populate] Catalog populated: ${inserted} inserted, ${updated} updated`);
-    res.json({ ok: true, inserted, updated, total: foodCostings.length });
-  } catch (error) {
-    console.error('[purchasing/populate] Error populating catalog:', error);
-    res.status(500).json({ ok: false, error: 'Failed to populate catalog' });
-  }
-});
+router.post('/populate-catalog', (_req, res) => res.status(410).json({ ok: false, error: 'Retired. Edit or import the Purchasing Catalogue instead.' }));
 
 export default router;
