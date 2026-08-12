@@ -1,8 +1,10 @@
 import type { NextFunction, Request, Response } from "express";
+import { createHmac, timingSafeEqual } from "crypto";
 import { AuthService } from "../services/auth/authService";
 import { getPinSessionUser } from "../routes/pinAuth";
 
 const AUTH_COOKIE_NAME = "sbb_session";
+const UI_AUTH_COOKIE_NAME = "sbb_ui_session";
 
 function readCookie(req: Request, key: string): string | null {
   const raw = req.headers.cookie;
@@ -18,6 +20,23 @@ function readCookie(req: Request, key: string): string | null {
     return decodeURIComponent(value);
   }
   return null;
+}
+
+
+// Compatibility bridge: the established internal dashboard password gate issues
+// sbb_ui_session, while API protection originally checked only JWT/PIN sessions.
+// A valid internal dashboard cookie represents the existing owner access path.
+function attachLegacyUiSessionUser(req: Request): boolean {
+  const password = process.env.INTERNAL_APP_PASSWORD;
+  const value = readCookie(req, UI_AUTH_COOKIE_NAME);
+  if (!password || !value) return false;
+  const expected = createHmac("sha256", password).update("sbb_ui_auth_v1").digest("hex");
+  const actualBuffer = Buffer.from(value);
+  const expectedBuffer = Buffer.from(expected);
+  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) return false;
+  (req as any).user = { uid: "internal-dashboard", id: "internal-dashboard", tenantId: 1, name: "Dashboard owner", role: "owner", permissions: {} };
+  (req as any).tenantId = 1;
+  return true;
 }
 
 export function getAuthTokenFromRequest(req: Request): string | null {
@@ -64,6 +83,11 @@ function bridgeDirectorLoanLegacyFinanceGuard(req: Request) {
 
 export function requireSessionAuth(req: Request, res: Response, next: NextFunction) {
   if (attachSessionUser(req)) {
+    bridgeDirectorLoanLegacyFinanceGuard(req);
+    return next();
+  }
+
+  if (attachLegacyUiSessionUser(req)) {
     bridgeDirectorLoanLegacyFinanceGuard(req);
     return next();
   }
