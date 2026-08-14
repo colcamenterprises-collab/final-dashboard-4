@@ -27,3 +27,5 @@ CREATE UNIQUE INDEX IF NOT EXISTS menu_item_recipes_v3_one_recipe_per_item
   WHERE recipe_id IS NOT NULL;
 
 COMMIT;
+
+-- Reviewed additive migration: 2026-08-14.
