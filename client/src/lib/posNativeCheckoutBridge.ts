@@ -185,7 +185,8 @@ async function handleCreatedOrder(
     const settings = readPosPrinterSettings();
     if (settings.autoPrint) {
       await recordPrintEvent(originalFetch, orderId, "print_requested");
-      const result = await printReceiptNative(receiptPayload(receipt), false);
+      const shouldOpenDrawer = String(receipt.payment_method || "").trim().toLowerCase() === "cash";
+      const result = await printReceiptNative(receiptPayload(receipt), shouldOpenDrawer);
       printed = result.ok;
       printMessage = result.message;
       await recordPrintEvent(
