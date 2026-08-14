@@ -11,6 +11,7 @@ import {
   disconnectNativePrinter,
   getNativePrinterStatus,
   listNativePrinters,
+  nativeOpenCashDrawer,
   nativePrinterAvailable,
   nativeTestPrint,
   readSavedPrinterAddress,
@@ -168,16 +169,21 @@ export default function PrinterSettings() {
     setTestStatus("Printer disconnected and saved printer selection cleared.");
   };
 
+  const ensureNativeConnection = async () => {
+    let status: PrinterStatus = await getNativePrinterStatus().catch(() => ({ connected: false }));
+    if (!status.connected) status = await reconnectSavedPrinter();
+    if (!status.connected) throw new Error("Saved printer could not reconnect. Tap Connect and try again.");
+    setConnected(true);
+    return status;
+  };
+
   const directTest = async () => {
     savePosPrinterSettings(settings);
     if (selectedAddress) savePrinterAddress(selectedAddress);
     if (native) {
       setTestStatus("Checking printer connection…");
       try {
-        let status: PrinterStatus = await getNativePrinterStatus().catch(() => ({ connected: false }));
-        if (!status.connected) status = await reconnectSavedPrinter();
-        if (!status.connected) throw new Error("Saved printer could not reconnect. Tap Connect and try again.");
-        setConnected(true);
+        await ensureNativeConnection();
         setTestStatus("Sending native ESC/POS test…");
         await nativeTestPrint();
         setTestStatus("Native test sent successfully. This printer is ready for automatic checkout printing.");
@@ -190,6 +196,22 @@ export default function PrinterSettings() {
     const payload = utf8Base64(buildEscPosTest(settings.printerName));
     setTestStatus("Native app not detected. Sending fallback ESC/POS test to RawBT…");
     window.location.href = `rawbt:base64,${payload}`;
+  };
+
+  const drawerTest = async () => {
+    if (!native) return setTestStatus("Cash drawer testing requires the SBB Android POS app.");
+    savePosPrinterSettings(settings);
+    if (selectedAddress) savePrinterAddress(selectedAddress);
+    setTestStatus("Checking printer connection for cash drawer…");
+    try {
+      await ensureNativeConnection();
+      setTestStatus("Sending cash drawer pulse…");
+      await nativeOpenCashDrawer();
+      setTestStatus("Cash drawer pulse sent successfully. The drawer should now be open.");
+    } catch (error) {
+      setConnected(false);
+      setTestStatus(error instanceof Error ? error.message : "Cash drawer test failed");
+    }
   };
 
   return (
@@ -253,9 +275,10 @@ export default function PrinterSettings() {
           <input type="checkbox" checked={settings.autoPrint} onChange={(event) => update("autoPrint", event.target.checked)} className="h-5 w-5" />
         </label>
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <button type="button" onClick={save} className="flex-1 rounded-xl bg-[#ffd400] px-4 py-3 text-sm font-black text-black">Save printer settings</button>
-          <button type="button" onClick={directTest} className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white">{native ? "Native Test Print" : "RawBT Test Print"}</button>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <button type="button" onClick={save} className="rounded-xl bg-[#ffd400] px-4 py-3 text-sm font-black text-black">Save printer settings</button>
+          <button type="button" onClick={directTest} className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-black text-white">{native ? "Native Test Print" : "RawBT Test Print"}</button>
+          <button type="button" onClick={drawerTest} disabled={!native} className="rounded-xl border border-slate-900 px-4 py-3 text-sm font-black text-slate-900 disabled:cursor-not-allowed disabled:opacity-40">Test Cash Drawer</button>
         </div>
 
         {saved && <p className="flex items-center gap-2 text-sm font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Printer and automatic-print settings saved on this tablet.</p>}
