@@ -6,12 +6,14 @@ on:
     paths:
       - 'client/src/pages/pos/**'
       - 'client/src/lib/thermalPrinter.ts'
+      - 'client/public/pos-app/**'
       - 'native/android/**'
       - 'capacitor.config.json'
       - '.github/workflows/build-sbb-pos-apk.yml'
 
 jobs:
-  build-apk:
+  validate-apk:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -54,6 +56,18 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import json, re
+
+          manifest = json.loads(Path('client/public/pos-app/latest.json').read_text())
+          version_name = str(manifest['versionName'])
+          version_code = int(manifest['versionCode'])
+
+          gradle = Path('android/app/build.gradle')
+          s = gradle.read_text()
+          s = re.sub(r'versionCode\s+\d+', f'versionCode {version_code}', s)
+          s = re.sub(r'versionName\s+"[^"]+"', f'versionName "{version_name}"', s)
+          gradle.write_text(s)
+
           p = Path('android/app/src/main/AndroidManifest.xml')
           s = p.read_text()
           marker = '<uses-permission android:name="android.permission.INTERNET" />'
@@ -69,16 +83,164 @@ jobs:
           p.write_text(s)
           PY
 
-      - name: Build debug APK
+      - name: Verify app version
+        run: |
+          grep -n 'versionCode' android/app/build.gradle
+          grep -n 'versionName' android/app/build.gradle
+
+      - name: Build unsigned validation APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
+  build-signed-release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout trusted main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Install web dependencies
+        run: npm install
+
+      - name: Install Capacitor build tools
+        run: npm install --no-save @capacitor/core@7 @capacitor/cli@7 @capacitor/android@7
+
+      - name: Build web bundle
+        run: NODE_OPTIONS=--max-old-space-size=4096 npm run build
+
+      - name: Generate Android project
+        run: |
+          rm -rf android
+          npx cap add android
+          npx cap sync android
+
+      - name: Install native Bluetooth printer plugin
+        run: |
+          PKG=android/app/src/main/java/io/customli/sbbpos
+          mkdir -p "$PKG"
+          rm -f "$PKG/MainActivity.java" "$PKG/MainActivity.kt"
+          cp native/android/MainActivity.java "$PKG/MainActivity.java"
+          cp native/android/ThermalPrinterPlugin.java "$PKG/ThermalPrinterPlugin.java"
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, re
+
+          manifest = json.loads(Path('client/public/pos-app/latest.json').read_text())
+          version_name = str(manifest['versionName'])
+          version_code = int(manifest['versionCode'])
+
+          gradle = Path('android/app/build.gradle')
+          s = gradle.read_text()
+          s = re.sub(r'versionCode\s+\d+', f'versionCode {version_code}', s)
+          s = re.sub(r'versionName\s+"[^"]+"', f'versionName "{version_name}"', s)
+          gradle.write_text(s)
+
+          p = Path('android/app/src/main/AndroidManifest.xml')
+          s = p.read_text()
+          marker = '<uses-permission android:name="android.permission.INTERNET" />'
+          perms = '''<uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />
+              <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+              <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />'''
+          if 'android.permission.BLUETOOTH_SCAN' not in s:
+              if marker in s:
+                  s = s.replace(marker, marker + '\n    ' + perms)
+              else:
+                  s = s.replace('<application', '    ' + perms + '\n    <application', 1)
+          p.write_text(s)
+          PY
+
+      - name: Verify app version
+        run: |
+          grep -n 'versionCode' android/app/build.gradle
+          grep -n 'versionName' android/app/build.gradle
+
+      - name: Require persistent release signing credentials
+        env:
+          SBB_POS_KEYSTORE_B64: ${{ secrets.SBB_POS_KEYSTORE_B64 }}
+          SBB_POS_KEYSTORE_PASSWORD: ${{ secrets.SBB_POS_KEYSTORE_PASSWORD }}
+          SBB_POS_KEY_ALIAS: ${{ secrets.SBB_POS_KEY_ALIAS }}
+          SBB_POS_KEY_PASSWORD: ${{ secrets.SBB_POS_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SBB_POS_KEYSTORE_B64" || { echo 'Missing SBB_POS_KEYSTORE_B64'; exit 1; }
+          test -n "$SBB_POS_KEYSTORE_PASSWORD" || { echo 'Missing SBB_POS_KEYSTORE_PASSWORD'; exit 1; }
+          test -n "$SBB_POS_KEY_ALIAS" || { echo 'Missing SBB_POS_KEY_ALIAS'; exit 1; }
+          test -n "$SBB_POS_KEY_PASSWORD" || { echo 'Missing SBB_POS_KEY_PASSWORD'; exit 1; }
+          printf '%s' "$SBB_POS_KEYSTORE_B64" | base64 --decode > android/app/sbb-pos-release.jks
+          test -s android/app/sbb-pos-release.jks
+
+      - name: Configure release signing
+        env:
+          SBB_POS_KEYSTORE_PASSWORD: ${{ secrets.SBB_POS_KEYSTORE_PASSWORD }}
+          SBB_POS_KEY_ALIAS: ${{ secrets.SBB_POS_KEY_ALIAS }}
+          SBB_POS_KEY_PASSWORD: ${{ secrets.SBB_POS_KEY_PASSWORD }}
+        run: |
+          cat >> android/gradle.properties <<EOF
+          SBB_POS_STORE_FILE=sbb-pos-release.jks
+          SBB_POS_STORE_PASSWORD=$SBB_POS_KEYSTORE_PASSWORD
+          SBB_POS_KEY_ALIAS=$SBB_POS_KEY_ALIAS
+          SBB_POS_KEY_PASSWORD=$SBB_POS_KEY_PASSWORD
+          EOF
+
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle')
+          s = p.read_text()
+          marker = 'android {'
+          signing = '''android {\n    signingConfigs {\n        release {\n            storeFile file(project.findProperty("SBB_POS_STORE_FILE"))\n            storePassword project.findProperty("SBB_POS_STORE_PASSWORD")\n            keyAlias project.findProperty("SBB_POS_KEY_ALIAS")\n            keyPassword project.findProperty("SBB_POS_KEY_PASSWORD")\n        }\n    }'''
+          if 'signingConfigs {' not in s:
+              s = s.replace(marker, signing, 1)
+          release_marker = 'buildTypes {\n        release {'
+          if release_marker in s and 'signingConfig signingConfigs.release' not in s:
+              s = s.replace(release_marker, release_marker + '\n            signingConfig signingConfigs.release', 1)
+          p.write_text(s)
+          PY
+
+      - name: Build signed release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+
+      - name: Verify signed release APK
+        env:
+          SBB_POS_KEY_ALIAS: ${{ secrets.SBB_POS_KEY_ALIAS }}
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -s "$APK"
+          keytool -printcert -jarfile "$APK" | tee /tmp/apk-cert.txt
+          grep -q 'Owner:' /tmp/apk-cert.txt
+          echo "Release APK signed with persistent key alias: $SBB_POS_KEY_ALIAS"
+
+      - name: Prepare approved APK package
+        run: |
+          mkdir -p approved-pos-app
+          cp android/app/build/outputs/apk/release/app-release.apk approved-pos-app/Smash-Brothers-POS.apk
+          cp client/public/pos-app/latest.json approved-pos-app/latest.json
+          sha256sum approved-pos-app/Smash-Brothers-POS.apk > approved-pos-app/Smash-Brothers-POS.apk.sha256
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: smash-brothers-pos-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: smash-brothers-pos-approved
+          path: approved-pos-app/
           if-no-files-found: error
           retention-days: 14
