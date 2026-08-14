@@ -1,31 +1,17 @@
 BEGIN;
 
--- A menu item has one optional costing recipe. Earlier environments created
--- the link table without this column, so links could be posted but not read back.
-ALTER TABLE public.menu_item_recipes_v3
-  ADD COLUMN IF NOT EXISTS recipe_id INTEGER;
+-- Canonical one-to-one link between an ordering menu item and a costing recipe.
+-- This is deliberately separate from the legacy V3 ingredient mapping table.
+CREATE TABLE IF NOT EXISTS public.ordering_menu_item_recipe_links (
+  menu_item_id UUID PRIMARY KEY
+    REFERENCES public.ordering_menu_items(id) ON DELETE CASCADE,
+  recipe_id INTEGER NOT NULL
+    REFERENCES public.recipes(id) ON DELETE RESTRICT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-      FROM pg_constraint
-     WHERE conname = 'menu_item_recipes_v3_recipe_id_fkey'
-       AND conrelid = 'public.menu_item_recipes_v3'::regclass
-  ) THEN
-    ALTER TABLE public.menu_item_recipes_v3
-      ADD CONSTRAINT menu_item_recipes_v3_recipe_id_fkey
-      FOREIGN KEY (recipe_id) REFERENCES public.recipes(id)
-      ON DELETE SET NULL;
-  END IF;
-END $$;
-
--- Keeps a menu product to one live linked recipe while preserving any historic
--- ingredient rows that pre-date recipe linking.
-CREATE UNIQUE INDEX IF NOT EXISTS menu_item_recipes_v3_one_recipe_per_item
-  ON public.menu_item_recipes_v3 ("itemId")
-  WHERE recipe_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS ordering_menu_item_recipe_links_recipe_id_idx
+  ON public.ordering_menu_item_recipe_links(recipe_id);
 
 COMMIT;
-
--- Reviewed additive migration: 2026-08-14.
