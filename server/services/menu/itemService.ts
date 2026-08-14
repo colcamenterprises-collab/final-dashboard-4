@@ -32,12 +32,7 @@ export async function getAllItems() {
             mir.recipe_id
        FROM ordering_menu_items i
        JOIN ordering_menu_categories c ON c.id=i.category_id
-       LEFT JOIN LATERAL (
-         SELECT recipe_id
-           FROM menu_item_recipes_v3
-          WHERE "itemId"::text=i.id::text AND recipe_id IS NOT NULL
-          LIMIT 1
-       ) mir ON true
+       LEFT JOIN ordering_menu_item_recipe_links mir ON mir.menu_item_id=i.id
       ORDER BY c.sort_order, i.sort_order, i.name_en`,
   ).catch(async () => db().query(
     `SELECT i.*, c.name_en AS category_name, NULL::integer AS recipe_id
@@ -50,22 +45,13 @@ export async function getAllItems() {
 
 async function saveRecipeLink(client: any, itemId: string, recipeId: number | null | undefined) {
   if (recipeId === undefined) return;
-  await client.query(`DELETE FROM menu_item_recipes_v3 WHERE "itemId"::text=$1::text`, [itemId]);
+  await client.query(`DELETE FROM ordering_menu_item_recipe_links WHERE menu_item_id=$1`, [itemId]);
   if (recipeId === null) return;
-  const columns = await client.query(
-    `SELECT column_name FROM information_schema.columns
-      WHERE table_schema='public' AND table_name='menu_item_recipes_v3'`,
+  await client.query(
+    `INSERT INTO ordering_menu_item_recipe_links(menu_item_id, recipe_id, updated_at)
+     VALUES($1,$2,NOW())`,
+    [itemId, recipeId],
   );
-  const names = new Set(columns.rows.map((row: any) => row.column_name));
-  if (!names.has("itemId") || !names.has("recipe_id")) throw new Error("Recipe link table is not ready");
-  const insertColumns = ['"itemId"', 'recipe_id'];
-  const values: any[] = [itemId, recipeId];
-  if (names.has("recipe")) {
-    insertColumns.push('recipe');
-    values.push({});
-  }
-  const placeholders = values.map((_, index) => `$${index + 1}`);
-  await client.query(`INSERT INTO menu_item_recipes_v3(${insertColumns.join(",")}) VALUES(${placeholders.join(",")})`, values);
 }
 
 async function saveModifierLinks(client: any, itemId: string, modifierGroupIds: string[] | undefined) {
