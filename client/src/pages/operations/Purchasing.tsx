@@ -95,6 +95,7 @@ export default function PurchasingPage() {
   const [showDialog, setShowDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<PurchasingItem | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [recipeReference, setRecipeReference] = useState<{ id: number; item: string; recipes: Array<{ id: number; name: string }> } | null>(null);
   const [showCostWarning, setShowCostWarning] = useState(false);
   const [pendingCostUpdate, setPendingCostUpdate] = useState<{ id: number; oldCost: number | null; newCost: number } | null>(null);
   const [apiWarning, setApiWarning] = useState<string | null>(null);
@@ -175,17 +176,30 @@ export default function PurchasingPage() {
         method: 'DELETE',
         credentials: 'include',
       });
+      const body = await res.json();
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Failed to delete item');
+        const error = new Error(body.error || 'Failed to delete item') as Error & {
+          code?: string;
+          linkedRecipes?: Array<{ id: number; name: string }>;
+          item?: string;
+        };
+        error.code = body.code;
+        error.linkedRecipes = body.linkedRecipes;
+        error.item = body.item;
+        throw error;
       }
-      return res.json();
+      return body;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchasing-items'] });
       setDeleteId(null);
     },
-    onError: (err: Error) => {
+    onError: (err: Error & { code?: string; linkedRecipes?: Array<{ id: number; name: string }>; item?: string }) => {
+      if (err.code === 'RECIPE_REFERENCE_EXISTS') {
+        setRecipeReference({ id: deleteId!, item: err.item || 'This item', recipes: err.linkedRecipes || [] });
+        setDeleteId(null);
+        return;
+      }
       alert(err.message);
       setDeleteId(null);
     },
@@ -469,20 +483,17 @@ export default function PurchasingPage() {
       ) : (
         <Card className="rounded-[4px] border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <Table className="min-w-[1100px] table-fixed">
+            <Table className="w-full min-w-[760px] table-fixed text-[10px]">
               <TableHeader>
                 <TableRow className="border-slate-200">
-                  <TableHead className="w-[19%] text-[11px] font-medium text-slate-900 px-2 py-2">Item</TableHead>
-                  <TableHead className="w-[10%] text-[11px] font-medium text-slate-900 px-2 py-2">Supplier</TableHead>
-                  <TableHead className="w-[9%] text-[11px] font-medium text-slate-900 px-2 py-2">Brand</TableHead>
-                  <TableHead className="w-[8%] text-[11px] font-medium text-slate-900 px-2 py-2">SKU</TableHead>
-                  <TableHead className="w-[8%] text-[11px] font-medium text-slate-900 text-right px-2 py-2">Pack qty</TableHead>
-                  <TableHead className="w-[7%] text-[11px] font-medium text-slate-900 px-2 py-2">Unit</TableHead>
-                  <TableHead className="w-[10%] text-[11px] font-medium text-slate-900 text-right px-2 py-2">Purchase cost</TableHead>
-                  <TableHead className="w-[10%] text-[11px] font-medium text-slate-900 text-right px-2 py-2">Cost / unit</TableHead>
-                  <TableHead className="w-[9%] text-[11px] font-medium text-slate-900 px-2 py-2">Category</TableHead>
-                  <TableHead className="w-[5%] text-[11px] font-medium text-slate-900 text-center px-1 py-2">Active</TableHead>
-                  <TableHead className="w-[5%] text-[11px] font-medium text-slate-900 text-center px-1 py-2">Actions</TableHead>
+                  <TableHead className="w-[24%] px-2 py-1.5 text-[10px] font-medium text-slate-900">Item / brand</TableHead>
+                  <TableHead className="w-[17%] px-2 py-1.5 text-[10px] font-medium text-slate-900">Supplier / SKU</TableHead>
+                  <TableHead className="w-[12%] px-2 py-1.5 text-[10px] font-medium text-slate-900">Pack</TableHead>
+                  <TableHead className="w-[12%] px-1 py-1.5 text-right text-[10px] font-medium text-slate-900">Cost</TableHead>
+                  <TableHead className="w-[12%] px-1 py-1.5 text-right text-[10px] font-medium text-slate-900">Cost/unit</TableHead>
+                  <TableHead className="w-[11%] px-1 py-1.5 text-[10px] font-medium text-slate-900">Category</TableHead>
+                  <TableHead className="w-[6%] px-1 py-1.5 text-center text-[10px] font-medium text-slate-900">On</TableHead>
+                  <TableHead className="w-[6%] px-1 py-1.5 text-center text-[10px] font-medium text-slate-900">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -492,27 +503,28 @@ export default function PurchasingPage() {
                   const costPerUnit = purchaseCost !== null && Number.isFinite(quantity) && quantity > 0
                     ? Number(purchaseCost) / quantity : null;
                   return (
-                  <TableRow key={item.id} className={`border-slate-200 ${!item.active ? 'opacity-50 bg-slate-50' : ''}`} data-testid={`row-item-${item.id}`}>
-                    <TableCell className="truncate text-[11px] text-slate-900 font-medium px-2 py-1.5" title={item.item}>
-                      {item.item}{!item.active && <Badge variant="secondary" className="ml-1 text-[9px] px-1 py-0">Inactive</Badge>}
-                    </TableCell>
-                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5" title={item.supplierName || ''}>{item.supplierName || <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
-                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5" title={item.brand || ''}>{displayText(item.brand)}</TableCell>
-                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5" title={item.supplierSku || ''}>{displayText(item.supplierSku)}</TableCell>
-                    <TableCell className="text-[11px] text-slate-900 text-right px-2 py-1.5">{item.purchaseQuantity ?? '—'}</TableCell>
-                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5">{item.baseUnit || item.orderUnit || '—'}</TableCell>
-                    <TableCell className="text-[11px] text-slate-900 font-medium text-right px-2 py-1.5">{purchaseCost !== null ? thb(purchaseCost) : <span className="text-amber-600 text-[10px]">Missing</span>}</TableCell>
-                    <TableCell className="text-[11px] text-slate-600 text-right px-2 py-1.5">{costPerUnit === null ? '—' : thb(costPerUnit)}</TableCell>
-                    <TableCell className="truncate text-[11px] text-slate-600 px-2 py-1.5">{item.category || '—'}</TableCell>
-                    <TableCell className="text-center px-1 py-1.5"><Switch data-testid={`switch-active-${item.id}`} checked={item.active} onCheckedChange={(active) => toggleActiveMutation.mutate({ id: item.id, active })} disabled={toggleActiveMutation.isPending} className="scale-75" /></TableCell>
-                    <TableCell className="px-1 py-1.5"><div className="flex gap-0.5 justify-center">
-                      <Button data-testid={`button-edit-${item.id}`} variant="outline" size="sm" onClick={() => { setEditingItem(item); setCategoryError(null); setShowDialog(true); }} className="h-7 w-7 p-0 border-emerald-200 text-emerald-600 hover:bg-emerald-50"><Pencil className="h-3.5 w-3.5" /></Button>
-                      <Button data-testid={`button-delete-${item.id}`} variant="outline" size="sm" onClick={() => setDeleteId(item.id)} className="h-7 w-7 p-0 border-red-200 text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" /></Button>
-                    </div></TableCell>
-                  </TableRow>
+                    <TableRow key={item.id} className={`border-slate-200 ${!item.active ? 'bg-slate-50 opacity-50' : ''}`} data-testid={`row-item-${item.id}`}>
+                      <TableCell className="truncate px-2 py-1.5 text-[10px] text-slate-900" title={item.item}>
+                        <div className="truncate font-medium">{item.item}</div>
+                        <div className="truncate text-[9px] text-slate-500">{displayText(item.brand)}</div>
+                      </TableCell>
+                      <TableCell className="truncate px-2 py-1.5 text-[10px] text-slate-600">
+                        <div className="truncate" title={item.supplierName || ''}>{displayText(item.supplierName)}</div>
+                        <div className="truncate text-[9px] text-slate-400" title={item.supplierSku || ''}>{displayText(item.supplierSku)}</div>
+                      </TableCell>
+                      <TableCell className="truncate px-2 py-1.5 text-[10px] text-slate-600">{item.purchaseQuantity ?? '—'} {item.baseUnit || item.orderUnit || ''}</TableCell>
+                      <TableCell className="px-1 py-1.5 text-right text-[10px] font-medium text-slate-900">{purchaseCost !== null ? thb(purchaseCost) : <span className="text-amber-600">Missing</span>}</TableCell>
+                      <TableCell className="px-1 py-1.5 text-right text-[10px] text-slate-600">{costPerUnit === null ? '—' : thb(costPerUnit)}</TableCell>
+                      <TableCell className="truncate px-1 py-1.5 text-[10px] text-slate-600" title={item.category || ''}>{item.category || '—'}</TableCell>
+                      <TableCell className="px-1 py-1.5 text-center"><Switch data-testid={`switch-active-${item.id}`} checked={item.active} onCheckedChange={(active) => toggleActiveMutation.mutate({ id: item.id, active })} disabled={toggleActiveMutation.isPending} className="scale-[0.62]" /></TableCell>
+                      <TableCell className="px-1 py-1.5"><div className="flex justify-center gap-0.5">
+                        <Button data-testid={`button-edit-${item.id}`} variant="outline" size="sm" onClick={() => { setEditingItem(item); setCategoryError(null); setShowDialog(true); }} className="h-6 w-6 border-emerald-200 p-0 text-emerald-600 hover:bg-emerald-50"><Pencil className="h-3 w-3" /></Button>
+                        <Button data-testid={`button-delete-${item.id}`} variant="outline" size="sm" onClick={() => setDeleteId(item.id)} className="h-6 w-6 border-red-200 p-0 text-red-600 hover:bg-red-50"><Trash2 className="h-3 w-3" /></Button>
+                      </div></TableCell>
+                    </TableRow>
                   );
                 })}
-                {filteredItems.length === 0 && <TableRow><TableCell colSpan={11} className="text-center text-[11px] text-slate-600 py-6">No items found</TableCell></TableRow>}
+                {filteredItems.length === 0 && <TableRow><TableCell colSpan={8} className="py-6 text-center text-[11px] text-slate-600">No items found</TableCell></TableRow>}
               </TableBody>
             </Table>
           </div>
@@ -701,6 +713,21 @@ export default function PurchasingPage() {
             >
               {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={recipeReference !== null} onOpenChange={(open) => !open && setRecipeReference(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Item used in recipe</DialogTitle></DialogHeader>
+          <p className="py-2 text-sm text-slate-600"><strong>{recipeReference?.item}</strong> cannot be deleted while it is used in a recipe.</p>
+          <div className="rounded-[4px] border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+            {recipeReference?.recipes.map((recipe) => <div key={recipe.id}>{recipe.name}</div>)}
+          </div>
+          <p className="text-xs text-slate-600">Archive removes it from active purchasing, stock and shopping lists while retaining this recipe's saved costing data.</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRecipeReference(null)} className="text-xs">Cancel</Button>
+            <Button onClick={() => { if (recipeReference) toggleActiveMutation.mutate({ id: recipeReference.id, active: false }); setRecipeReference(null); }} className="bg-amber-600 text-xs hover:bg-amber-700">Archive item</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
