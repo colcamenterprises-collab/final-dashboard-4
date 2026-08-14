@@ -4,11 +4,19 @@ export type NativePrinterDevice = {
   bonded?: boolean;
 };
 
+export type NativeAppVersion = {
+  versionName: string;
+  versionCode: number;
+  packageName: string;
+};
+
 type NativeThermalPrinter = {
   listPrinters: () => Promise<{ printers: NativePrinterDevice[] }>;
   connect: (options: { address: string }) => Promise<{ connected: boolean; name?: string; address?: string; connectionMethod?: string }>;
   disconnect: () => Promise<{ connected: boolean }>;
   getStatus: () => Promise<{ connected: boolean; name?: string; address?: string; connectionMethod?: string }>;
+  getAppVersion: () => Promise<NativeAppVersion>;
+  openAppUpdate: (options: { url: string }) => Promise<{ ok: boolean }>;
   printRaw: (options: { base64: string }) => Promise<{ ok: boolean; connectionMethod?: string }>;
   printTest: () => Promise<{ ok: boolean; connectionMethod?: string }>;
   openCashDrawer: () => Promise<{ ok: boolean }>;
@@ -68,6 +76,14 @@ export async function reconnectSavedPrinter() {
 
 export async function getNativePrinterStatus() {
   return plugin().getStatus();
+}
+
+export async function getNativeAppVersion() {
+  return plugin().getAppVersion();
+}
+
+export async function openNativeAppUpdate(url: string) {
+  return plugin().openAppUpdate({ url });
 }
 
 export async function disconnectNativePrinter() {
