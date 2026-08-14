@@ -200,6 +200,18 @@ export async function printReceiptNative(payload: ReceiptPayload, openDrawer = f
     }
   }
 
-  if (openDrawer) await nativeOpenCashDrawer().catch(() => undefined);
-  return { attempted: true, ok: true, message: "Printed" };
+  if (openDrawer) {
+    try {
+      await nativeOpenCashDrawer();
+    } catch (drawerError) {
+      return {
+        attempted: true,
+        ok: false,
+        message: drawerError instanceof Error
+          ? `Receipt printed, but cash drawer failed: ${drawerError.message}`
+          : "Receipt printed, but cash drawer failed",
+      };
+    }
+  }
+  return { attempted: true, ok: true, message: openDrawer ? "Printed and cash drawer opened" : "Printed" };
 }
