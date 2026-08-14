@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ export default function RecipeEditorPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { recipeId } = useParams<{ recipeId?: string }>();
+  const [searchParams] = useSearchParams();
   const isNewRecipe = recipeId === "new" || location.pathname === "/menu/recipes/new";
   const [form, setForm] = useState(emptyRecipeForm());
   const [ingredients, setIngredients] = useState<RecipeIngredientRow[]>([]);
@@ -26,12 +27,21 @@ export default function RecipeEditorPage() {
   const categories = asArray<MenuCategory>(normalizeMenuCategories<MenuCategory>(rawCategories).items).filter((category) => category.isActive !== false);
   const recipes = Array.isArray(recipesData) ? recipesData : asArray<Recipe>(recipesData?.rows);
   const recipe = isNewRecipe ? null : recipes.find((candidate) => String(candidate.id) === recipeId) ?? null;
+  const cloneSource = isNewRecipe ? recipes.find((candidate) => String(candidate.id) === searchParams.get("cloneFrom")) ?? null : null;
 
   useEffect(() => {
     if (isNewRecipe) {
-      setForm(emptyRecipeForm());
-      setIngredients([]);
-      setPackagingCosts([]);
+      if (cloneSource) {
+        const split = splitInstructions(cloneSource.instructions);
+        setForm({ name: `Copy of ${cloneSource.name ?? "Recipe"}`, category: cloneSource.category ?? "", description: cloneSource.description ?? "", imageUrl: cloneSource.imageUrl ?? "", yieldQuantity: String(cloneSource.yieldQuantity ?? "1"), yieldUnit: cloneSource.yieldUnit ?? "servings", preparationInstructions: split.preparationInstructions, cookingInstructions: split.cookingInstructions, specialNotes: notesWithoutWorkflowData(cloneSource.notes), directPrice: cloneSource.sellingPrice === null || cloneSource.sellingPrice === undefined ? "" : String(cloneSource.sellingPrice), deliveryPartnerPrice: cloneSource.suggestedPrice === null || cloneSource.suggestedPrice === undefined ? "" : String(cloneSource.suggestedPrice), status: "Draft" });
+        const clonedRows = parseCostingRows(cloneSource);
+        setIngredients(clonedRows.filter((row) => row.lineType !== "packaging"));
+        setPackagingCosts(clonedRows.filter((row) => row.lineType === "packaging"));
+      } else {
+        setForm(emptyRecipeForm());
+        setIngredients([]);
+        setPackagingCosts([]);
+      }
       return;
     }
     if (!recipe) return;
@@ -40,7 +50,7 @@ export default function RecipeEditorPage() {
     const costingRows = parseCostingRows(recipe);
     setIngredients(costingRows.filter((row) => row.lineType !== "packaging"));
     setPackagingCosts(costingRows.filter((row) => row.lineType === "packaging"));
-  }, [isNewRecipe, recipe?.id]);
+  }, [isNewRecipe, recipe?.id, cloneSource?.id]);
 
   const allCostingRows = useMemo(() => [...ingredients, ...packagingCosts], [ingredients, packagingCosts]);
   const costRows = useMemo(() => allCostingRows.map((row) => ({ row, ...recipeIngredientCost(row) })), [allCostingRows]);
@@ -71,7 +81,7 @@ export default function RecipeEditorPage() {
   if (!isNewRecipe && !recipe) return <div className="space-y-3 p-4"><Link to="/menu/recipes" className="text-xs underline">Back to Recipes</Link>{blockerText("Recipe could not be loaded from /api/recipes.")}</div>;
 
   return <div className="mx-auto max-w-5xl space-y-4 p-4">
-    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><Link to="/menu/recipes" className="text-xs underline">Back to Recipes</Link><h1 className="text-xl font-semibold">{isNewRecipe ? "Add New Recipe" : recipe!.name}</h1><Badge variant={form.status === "Approved" ? "default" : "outline"}>{form.status}</Badge></div><button onClick={() => saveMutation.mutate()} disabled={!form.name || !form.category || saveMutation.isPending} className="rounded-lg bg-black px-4 py-2 text-xs text-white disabled:opacity-40">{saveMutation.isPending ? "Saving..." : "Save Recipe"}</button></div>
+    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div><Link to="/menu/recipes" className="text-xs underline">Back to Recipes</Link><h1 className="text-xl font-semibold">{isNewRecipe ? (cloneSource ? `Clone: ${cloneSource.name}` : "Add New Recipe") : recipe!.name}</h1><Badge variant={form.status === "Approved" ? "default" : "outline"}>{form.status}</Badge></div><button onClick={() => saveMutation.mutate()} disabled={!form.name || !form.category || saveMutation.isPending} className="rounded-lg bg-black px-4 py-2 text-xs text-white disabled:opacity-40">{saveMutation.isPending ? "Saving..." : "Save Recipe"}</button></div>
     <section className="space-y-3 rounded-lg border bg-white p-4"><div><h2 className="text-sm font-semibold">Recipe Details</h2><p className="mt-1 text-xs text-slate-500">Approved recipes automatically create or update their linked Menu item. Draft, Tested and Archived recipes never publish.</p></div><div className="grid grid-cols-1 gap-3 md:grid-cols-2"><Input placeholder="Recipe title" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} className="rounded border px-2 py-2 text-xs"><option value="">Menu category</option>{categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}</select><Input placeholder="Description" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} className="md:col-span-2" /><input type="file" accept="image/png,image/jpeg,image/webp" onChange={async (event) => { const file = event.target.files?.[0]; if (!file) return; const data = new FormData(); data.append("image", file); const res = await fetch("/api/upload/menu-item-image", { method: "POST", body: data }); const uploaded = await res.json(); if (!res.ok) throw new Error(uploaded?.error || "Image upload failed"); setForm({ ...form, imageUrl: uploaded.imageUrl || uploaded.url }); }} className="w-full rounded-md border border-slate-200 px-3 py-2 text-xs file:mr-3 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs md:col-span-2" /><label className="block text-xs font-medium">Yield unit<Input value={form.yieldUnit} onChange={(event) => setForm({ ...form, yieldUnit: event.target.value })} className="mt-1" /></label><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as typeof form.status })} className="rounded border px-2 py-2 text-xs"><option>Draft</option><option>Tested</option><option>Approved</option><option>Archived</option></select></div><div className="flex h-36 w-36 items-center justify-center overflow-hidden rounded-lg border bg-slate-100 text-xs text-slate-500">{form.imageUrl ? <img src={form.imageUrl} alt={form.name} className="h-full w-full object-cover" /> : "No image"}</div></section>
     <section className="space-y-3 rounded-lg border bg-white p-4"><h2 className="text-sm font-semibold">Reference Selling Prices</h2><div className="grid grid-cols-1 gap-3 md:grid-cols-2"><label className="block text-xs font-medium">Direct / in-store price<Input placeholder="Direct / in-store price" value={form.directPrice} onChange={(event) => setForm({ ...form, directPrice: event.target.value })} className="mt-1" /></label><label className="block text-xs font-medium">Delivery partner price<Input placeholder="Delivery partner price" value={form.deliveryPartnerPrice} onChange={(event) => setForm({ ...form, deliveryPartnerPrice: event.target.value })} className="mt-1" /></label></div></section>
     <RecipeIngredientEditor rows={ingredients} draft={draftIngredient} onDraftChange={setDraftIngredient} onRowsChange={setIngredients} />
