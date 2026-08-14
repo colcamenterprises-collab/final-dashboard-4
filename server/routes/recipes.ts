@@ -7,8 +7,9 @@ import { calculateRecipeWorkflow, decimalOrNull, recipeStatusFromBody } from '..
 const router = Router();
 
 async function refreshCatalogueCosts(ingredients: any[]): Promise<any[]> {
-  // Purchasing IDs belong to purchasing_items, never to the legacy ingredients table.
-  const ids = [...new Set(ingredients.map((row) => Number(row?.purchasingItemId)).filter((id) => Number.isInteger(id) && id > 0))];
+  // Only catalogue-linked rows are refreshed. Recipe-only/manual rows must keep
+  // their special price, package and unit values exactly as entered by the operator.
+  const ids = [...new Set(ingredients.filter((row) => row?.sourceType === 'purchasing').map((row) => Number(row?.purchasingItemId)).filter((id) => Number.isInteger(id) && id > 0))];
   if (!ids.length) return ingredients;
   const result = await pool!.query(
     'SELECT id, item, purchase_cost_thb, purchase_quantity, base_unit FROM purchasing_items WHERE id = ANY($1::int[]) AND active = true',
@@ -16,7 +17,7 @@ async function refreshCatalogueCosts(ingredients: any[]): Promise<any[]> {
   );
   const catalogue = new Map(result.rows.map((row: any) => [Number(row.id), row]));
   return ingredients.map((row) => {
-    const item = row?.purchasingItemId ? catalogue.get(Number(row.purchasingItemId)) : null;
+    const item = row?.sourceType === 'purchasing' && row?.purchasingItemId ? catalogue.get(Number(row.purchasingItemId)) : null;
     if (!item) return row;
     const cost = Number(item.purchase_cost_thb);
     const quantity = Number(item.purchase_quantity);
