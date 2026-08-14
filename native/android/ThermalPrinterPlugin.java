@@ -6,7 +6,10 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.speech.tts.TextToSpeech;
 import android.util.Base64;
@@ -155,7 +158,7 @@ public class ThermalPrinterPlugin extends Plugin {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
     if (!hasBluetoothPermission()) {
-      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.");
+      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS.");
       return;
     }
     connectGranted(call, adapter);
@@ -263,6 +266,47 @@ public class ThermalPrinterPlugin extends Plugin {
       ret.put("connectionMethod", connectionMethod);
     }
     call.resolve(ret);
+  }
+
+  @PluginMethod
+  public void getAppVersion(PluginCall call) {
+    try {
+      PackageManager packageManager = getContext().getPackageManager();
+      PackageInfo info = packageManager.getPackageInfo(getContext().getPackageName(), 0);
+      JSObject ret = new JSObject();
+      ret.put("versionName", info.versionName == null ? "" : info.versionName);
+      long versionCode = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ? info.getLongVersionCode() : info.versionCode;
+      ret.put("versionCode", versionCode);
+      ret.put("packageName", getContext().getPackageName());
+      call.resolve(ret);
+    } catch (Exception error) {
+      call.reject("Could not read installed app version", error);
+    }
+  }
+
+  @PluginMethod
+  public void openAppUpdate(PluginCall call) {
+    String url = call.getString("url");
+    if (url == null || url.trim().isEmpty()) {
+      call.reject("Update URL is required");
+      return;
+    }
+    try {
+      Uri uri = Uri.parse(url.trim());
+      String scheme = uri.getScheme();
+      if (scheme == null || !(scheme.equals("https") || scheme.equals("http"))) {
+        call.reject("Update URL must use http or https");
+        return;
+      }
+      Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+      intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+      getContext().startActivity(intent);
+      JSObject ret = new JSObject();
+      ret.put("ok", true);
+      call.resolve(ret);
+    } catch (Exception error) {
+      call.reject("Could not open app update", error);
+    }
   }
 
   @PluginMethod
