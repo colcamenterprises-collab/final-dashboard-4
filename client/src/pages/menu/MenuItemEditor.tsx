@@ -52,12 +52,15 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
     return before.length !== after.length || before.some((value, index) => value !== after[index]);
   }, [draft.modifierGroupIds, initiallyLinked]);
 
-  const refreshMenuData = async () => Promise.all([
-    queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/items"] }),
-    queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/modifiers/groups"] }),
-    queryClient.invalidateQueries({ queryKey: ["/api/pos/catalog"] }),
-    queryClient.invalidateQueries({ queryKey: ["/api/pos/menu"] }),
-  ]);
+  // Cache refreshes must never hold the save modal open: POS endpoints can be slow or unavailable.
+  const refreshMenuData = () => {
+    void Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/items"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/menu-v3/modifiers/groups"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/catalog"] }),
+      queryClient.invalidateQueries({ queryKey: ["/api/pos/menu"] }),
+    ]).catch(() => undefined);
+  };
 
   const uploadImage = async () => {
     if (!selectedFile) { setUploadError("Choose an image before uploading."); return; }
@@ -97,7 +100,7 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
 
   const save = useMutation({
     mutationFn: async () => {
-      await apiRequest("/api/menu-v3/items/update", { method: "POST", body: JSON.stringify({ id: item.id, name: draft.name, categoryId: draft.categoryId, description: draft.description, imageUrl: draft.imageUrl || null, clearImage: draft.clearImage, directPrice: Number(draft.directPrice), price: Number(draft.directPrice), grabPrice: Number(draft.grabPrice), recipeId: draft.recipeId ? Number(draft.recipeId) : null, ...(modifierLinksChanged ? { modifierGroupIds: draft.modifierGroupIds } : {}), displayOrder: Number(draft.displayOrder || 0), isActive: draft.isActive, isOnlineEnabled: true, posEnabled: true }) });
+      const savedItem = await apiRequest("/api/menu-v3/items/update", { method: "POST", body: JSON.stringify({ id: item.id, name: draft.name, categoryId: draft.categoryId, description: draft.description, imageUrl: draft.imageUrl || null, clearImage: draft.clearImage, directPrice: Number(draft.directPrice), price: Number(draft.directPrice), grabPrice: Number(draft.grabPrice), recipeId: draft.recipeId ? Number(draft.recipeId) : null, ...(modifierLinksChanged ? { modifierGroupIds: draft.modifierGroupIds } : {}), displayOrder: Number(draft.displayOrder || 0), isActive: draft.isActive, isOnlineEnabled: true, posEnabled: true }) });
       for (const group of choiceGroups) {
         const result = await apiRequest("/api/menu-v3/items/options/save", { method: "POST", body: JSON.stringify({ itemId: item.id, groupId: group.id || null, name: group.name, promptText: group.promptText, options: group.options.map((option) => ({ name: option.name, finalPrice: Number(option.finalPrice) })) }) });
         if (!group.id && result?.id) setChoiceGroups((current) => current.map((entry) => entry.key === group.key ? { ...entry, id: String(result.id) } : entry));
@@ -106,9 +109,21 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
       for (const groupId of originalChoiceGroupIds.current.filter((id) => !retained.has(id))) {
         await apiRequest("/api/menu-v3/items/options/delete", { method: "POST", body: JSON.stringify({ itemId: item.id, groupId }) });
       }
+      return savedItem;
     },
-    onSuccess: async () => { await refreshMenuData(); onClose(); },
-    onError: async () => { await refreshMenuData(); },
+    onSuccess: (savedItem) => {
+      queryClient.setQueryData(["/api/menu-v3/items"], (current: unknown) => {
+        const replaceItem = (items: unknown[]) => items.map((entry: any) => entry?.id === savedItem?.id ? savedItem : entry);
+        if (Array.isArray(current)) return replaceItem(current);
+        if (current && typeof current === "object" && Array.isArray((current as { items?: unknown[] }).items)) {
+          return { ...(current as object), items: replaceItem((current as { items: unknown[] }).items) };
+        }
+        return current;
+      });
+      refreshMenuData();
+      onClose();
+    },
+    onError: () => { refreshMenuData(); },
   });
 
   const toggleModifier = (id: string) => setDraft((current) => ({ ...current, modifierGroupIds: current.modifierGroupIds.includes(id) ? current.modifierGroupIds.filter((value) => value !== id) : [...current.modifierGroupIds, id] }));
@@ -138,7 +153,7 @@ export default function MenuItemEditor({ item, categories, recipes, modifierGrou
           <div className="rounded-2xl border bg-white p-4 shadow-sm sm:p-5"><h3 className="font-semibold text-slate-950">Recipe</h3><label className="mt-4 block text-xs font-semibold text-slate-600">Linked recipe<select value={draft.recipeId} onChange={(event) => setDraft({ ...draft, recipeId: event.target.value })} className="mt-1.5 w-full rounded-md border px-3 py-2 text-sm"><option value="">No recipe linked</option>{recipes.map((recipe) => <option key={recipe.id} value={recipe.id}>{recipe.name}</option>)}</select></label>{selectedRecipe && <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm"><span className="text-xs text-slate-500">Current recipe</span><strong className="mt-1 block">{selectedRecipe.name}</strong></div>}</div></section>
         <section className="space-y-4"><div className="rounded-2xl border bg-white p-4 shadow-sm"><h3 className="font-semibold text-slate-950">Pricing</h3><div className="mt-4 space-y-4"><label className="block text-xs font-semibold text-slate-600">Direct / POS base price (THB)<Input type="number" min="0.01" step="0.01" value={draft.directPrice} onChange={(event) => setDraft({ ...draft, directPrice: event.target.value })} className="mt-1.5 text-lg font-semibold" /></label><p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">For a product with choices, use the lowest option as the base price. Each option above stores only the difference.</p><label className="block text-xs font-semibold text-slate-600">Grab price (THB)<Input type="number" min="0" step="0.01" value={draft.grabPrice} onChange={(event) => setDraft({ ...draft, grabPrice: event.target.value })} className="mt-1.5 text-lg font-semibold" /></label></div></div><div className="rounded-2xl border bg-slate-950 p-4 text-white shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[11px] font-bold uppercase tracking-widest text-amber-400">Live POS preview</p><h3 className="mt-1 text-lg font-bold">{draft.name || "Product name"}</h3></div><span className="rounded-full bg-white/10 px-2 py-1 text-[10px]">PREVIEW</span></div><div className="mt-4 flex aspect-[4/3] items-center justify-center overflow-hidden rounded-xl bg-white/5">{draft.imageUrl ? <img src={draft.imageUrl} alt="Preview" className="h-full w-full object-contain" /> : <span className="text-xs text-white/40">Product image</span>}</div><div className="mt-4 flex items-center justify-between"><strong className="text-xl">{Number(draft.directPrice || 0).toLocaleString("en-AU")} THB</strong><span className={"rounded-full px-2 py-1 text-xs " + (draft.isActive ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-white/50")}>{draft.isActive ? "Available" : "Unavailable"}</span></div>{(linkedGroups.length > 0 || choiceGroups.length > 0) && <div className="mt-4 border-t border-white/10 pt-3"><p className="text-[11px] uppercase tracking-wide text-white/40">Selling flow</p><div className="mt-2 flex flex-wrap gap-2">{choiceGroups.map((group) => <span key={group.key} className="rounded-full bg-amber-400 px-2.5 py-1 text-xs font-bold text-black">{group.name || "Item options"}</span>)}{linkedGroups.filter((group) => !isExclusiveChoice(group,item.id)).map((group) => <span key={String(group.id)} className="rounded-full bg-white/10 px-2.5 py-1 text-xs">{group.name}</span>)}</div></div>}</div></section>
       </div></div>
-      <footer className="border-t bg-white px-4 py-3 sm:px-6 lg:px-8"><div className="mx-auto flex w-full max-w-[1800px] flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between"><div>{saveBlockedReason && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{saveBlockedReason}</p>}{save.isError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{(save.error as Error)?.message || "Could not save product"}</p>}</div><button disabled={Boolean(saveBlockedReason) || save.isPending} onClick={() => save.mutate()} className="rounded-xl bg-black px-8 py-3 text-sm font-bold text-white disabled:opacity-40">{save.isPending ? "Saving product and options…" : "Save product"}</button></div></footer>
+      <footer className="border-t bg-white px-4 py-3 sm:px-6 lg:px-8"><div className="mx-auto flex w-full max-w-[1800px] flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-between"><div>{saveBlockedReason && <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">{saveBlockedReason}</p>}{save.isError && <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{(save.error as Error)?.message || "Could not save product"}</p>}</div><button disabled={Boolean(saveBlockedReason) || save.isPending} onClick={() => save.mutate()} className="rounded-xl bg-black px-8 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-white disabled:opacity-100">{save.isPending ? "Saving product and options…" : "Save product"}</button></div></footer>
     </div>
   </div>;
 }
