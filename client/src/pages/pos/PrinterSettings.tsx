@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { CheckCircle2, Printer, RefreshCw, TriangleAlert } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, Download, Printer, RefreshCw, TriangleAlert } from "lucide-react";
 import {
   readPosPrinterSettings,
   savePosPrinterSettings,
@@ -9,14 +9,17 @@ import { readLastNativeCheckoutStatus } from "@/lib/posNativeCheckoutBridge";
 import {
   connectNativePrinter,
   disconnectNativePrinter,
+  getNativeAppVersion,
   getNativePrinterStatus,
   listNativePrinters,
   nativeOpenCashDrawer,
   nativePrinterAvailable,
   nativeTestPrint,
+  openNativeAppUpdate,
   readSavedPrinterAddress,
   reconnectSavedPrinter,
   savePrinterAddress,
+  type NativeAppVersion,
   type NativePrinterDevice,
 } from "@/lib/thermalPrinter";
 
@@ -25,6 +28,14 @@ type PrinterStatus = {
   name?: string;
   address?: string;
   connectionMethod?: string;
+};
+
+type PosAppRelease = {
+  channel: string;
+  versionName: string;
+  versionCode: number;
+  apkUrl: string;
+  releaseNotes?: string;
 };
 
 function utf8Base64(text: string) {
@@ -63,7 +74,15 @@ export default function PrinterSettings() {
   const [selectedAddress, setSelectedAddress] = useState(readSavedPrinterAddress());
   const [connected, setConnected] = useState(false);
   const [lastCheckout, setLastCheckout] = useState(readLastNativeCheckoutStatus);
+  const [installedApp, setInstalledApp] = useState<NativeAppVersion | null>(null);
+  const [latestRelease, setLatestRelease] = useState<PosAppRelease | null>(null);
+  const [updateStatus, setUpdateStatus] = useState("");
   const native = nativePrinterAvailable();
+
+  const updateAvailable = useMemo(() => {
+    if (!native || !installedApp || !latestRelease) return false;
+    return Number(latestRelease.versionCode || 0) > Number(installedApp.versionCode || 0);
+  }, [installedApp, latestRelease, native]);
 
   useEffect(() => {
     if (!native) return;
@@ -115,6 +134,32 @@ export default function PrinterSettings() {
     window.addEventListener("sbb:pos-native-checkout", updateLastCheckout);
     return () => window.removeEventListener("sbb:pos-native-checkout", updateLastCheckout);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadVersionInfo = async () => {
+      try {
+        const response = await fetch(`/pos-app/latest.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error("Could not load latest approved POS app release");
+        const release = (await response.json()) as PosAppRelease;
+        if (!cancelled) setLatestRelease(release);
+      } catch (error) {
+        if (!cancelled) setUpdateStatus(error instanceof Error ? error.message : "Could not check POS app updates");
+      }
+
+      if (native) {
+        try {
+          const installed = await getNativeAppVersion();
+          if (!cancelled) setInstalledApp(installed);
+        } catch (error) {
+          if (!cancelled) setUpdateStatus(error instanceof Error ? error.message : "Could not read installed POS app version");
+        }
+      }
+    };
+
+    void loadVersionInfo();
+    return () => { cancelled = true; };
+  }, [native]);
 
   const update = <K extends keyof PosPrinterSettings>(key: K, value: PosPrinterSettings[K]) => {
     setSettings((current) => ({ ...current, [key]: value }));
@@ -214,6 +259,18 @@ export default function PrinterSettings() {
     }
   };
 
+  const installUpdate = async () => {
+    if (!latestRelease?.apkUrl) return setUpdateStatus("No approved POS app download is available.");
+    setUpdateStatus("Opening approved POS app update…");
+    try {
+      if (native) await openNativeAppUpdate(latestRelease.apkUrl);
+      else window.location.assign(latestRelease.apkUrl);
+      setUpdateStatus("Download opened. Android will ask you to approve installation of the update.");
+    } catch (error) {
+      setUpdateStatus(error instanceof Error ? error.message : "Could not open POS app update");
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl space-y-5">
       <div>
@@ -231,6 +288,30 @@ export default function PrinterSettings() {
           <p className="mt-1 text-xs text-slate-600">
             {native ? "The POS can connect directly to Bluetooth without Android Print Service." : "Install the SBB Android app for direct in-app Bluetooth printing. RawBT remains available only as a test fallback."}
           </p>
+        </div>
+
+        <div className={`space-y-3 rounded-xl border p-4 ${updateAvailable ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-slate-50"}`}>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-600">POS app update</p>
+              <p className="text-sm font-black text-slate-900">
+                {native && installedApp ? `Installed ${installedApp.versionName || "unknown"} (build ${installedApp.versionCode})` : native ? "Reading installed version…" : "Browser mode"}
+              </p>
+              <p className="text-xs text-slate-600">
+                {latestRelease ? `Latest approved ${latestRelease.versionName} (build ${latestRelease.versionCode})` : "Checking latest approved release…"}
+              </p>
+            </div>
+            {native && latestRelease && (
+              <span className={`rounded-full px-3 py-1 text-xs font-black ${updateAvailable ? "bg-amber-200 text-amber-900" : "bg-emerald-100 text-emerald-800"}`}>
+                {updateAvailable ? "UPDATE AVAILABLE" : "UP TO DATE"}
+              </span>
+            )}
+          </div>
+          {latestRelease?.releaseNotes && <p className="text-xs leading-5 text-slate-600">{latestRelease.releaseNotes}</p>}
+          <button type="button" onClick={installUpdate} disabled={!latestRelease?.apkUrl} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#ffd400] px-4 py-3 text-sm font-black text-black disabled:cursor-not-allowed disabled:opacity-40">
+            <Download className="h-4 w-4" /> {updateAvailable ? "Download & Install Update" : "Download Latest POS App"}
+          </button>
+          {updateStatus && <p className="text-xs font-semibold text-slate-700">{updateStatus}</p>}
         </div>
 
         {native && (
