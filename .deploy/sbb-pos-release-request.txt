@@ -1,0 +1,4 @@
+SBB POS signed release request
+Version: 1.0.1
+Build: 2
+Requested: 2026-08-14
