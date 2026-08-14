@@ -40,7 +40,18 @@ router.get("/items", async (_req, res) => {
   }
 });
 router.post("/items/create", async (req, res) => res.json(await createItem(req.body)));
-router.post("/items/update", async (req, res) => res.json(await updateItem(req.body.id, req.body)));
+router.post("/items/update", async (req, res) => {
+  try {
+    return res.json(await updateItem(req.body.id, req.body));
+  } catch (error: any) {
+    console.error("[menu-v3] item update failed:", {
+      itemId: req.body?.id,
+      recipeId: req.body?.recipeId,
+      error: error?.message || String(error),
+    });
+    return res.status(400).json({ error: error?.message || "Could not save menu item" });
+  }
+});
 router.post("/items/toggle", async (req, res) => res.json(await toggleItem(req.body.id, req.body.isActive)));
 
 router.get("/modifiers/groups", async (_req, res) => {
