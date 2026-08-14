@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { asArray, normalizeMenuCategories } from "@/lib/menuData";
 import RecipeIngredientEditor from "./RecipeIngredientEditor";
-import { COSTING_NOTES_PREFIX, emptyRecipeForm, fmtMoney, fmtPercent, notesWithoutWorkflowData, parseCostingRows, parseStatus, recipeIngredientCost, splitInstructions, toNumber, type MenuCategory, type Recipe, type RecipeIngredientRow } from "./recipeTypes";
+import { COSTING_NOTES_PREFIX, createClientId, emptyRecipeForm, fmtMoney, fmtPercent, notesWithoutWorkflowData, parseCostingRows, parseStatus, recipeIngredientCost, splitInstructions, toNumber, type MenuCategory, type Recipe, type RecipeIngredientRow } from "./recipeTypes";
 
 function blockerText(message: string) { return <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"><p className="font-semibold">INSUFFICIENT DATA</p><p>{message}</p></div>; }
 
@@ -34,9 +34,11 @@ export default function RecipeEditorPage() {
       if (cloneSource) {
         const split = splitInstructions(cloneSource.instructions);
         setForm({ name: `Copy of ${cloneSource.name ?? "Recipe"}`, category: cloneSource.category ?? "", description: cloneSource.description ?? "", imageUrl: cloneSource.imageUrl ?? "", yieldQuantity: String(cloneSource.yieldQuantity ?? "1"), yieldUnit: cloneSource.yieldUnit ?? "servings", preparationInstructions: split.preparationInstructions, cookingInstructions: split.cookingInstructions, specialNotes: notesWithoutWorkflowData(cloneSource.notes), directPrice: cloneSource.sellingPrice === null || cloneSource.sellingPrice === undefined ? "" : String(cloneSource.sellingPrice), deliveryPartnerPrice: cloneSource.suggestedPrice === null || cloneSource.suggestedPrice === undefined ? "" : String(cloneSource.suggestedPrice), status: "Draft" });
-        const clonedRows = parseCostingRows(cloneSource);
+        const clonedRows = parseCostingRows(cloneSource).map((row) => ({ ...row, id: createClientId(row.lineType) }));
         setIngredients(clonedRows.filter((row) => row.lineType !== "packaging"));
         setPackagingCosts(clonedRows.filter((row) => row.lineType === "packaging"));
+        setDraftIngredient(null);
+        setDraftPackaging(null);
       } else {
         setForm(emptyRecipeForm());
         setIngredients([]);
