@@ -6,6 +6,7 @@ on:
     paths:
       - 'client/src/pages/pos/**'
       - 'client/src/lib/thermalPrinter.ts'
+      - 'client/public/pos-app/**'
       - 'native/android/**'
       - 'capacitor.config.json'
       - '.github/workflows/build-sbb-pos-apk.yml'
@@ -54,6 +55,18 @@ jobs:
 
           python3 - <<'PY'
           from pathlib import Path
+          import json, re
+
+          manifest = json.loads(Path('client/public/pos-app/latest.json').read_text())
+          version_name = str(manifest['versionName'])
+          version_code = int(manifest['versionCode'])
+
+          gradle = Path('android/app/build.gradle')
+          s = gradle.read_text()
+          s = re.sub(r'versionCode\s+\d+', f'versionCode {version_code}', s)
+          s = re.sub(r'versionName\s+"[^"]+"', f'versionName "{version_name}"', s)
+          gradle.write_text(s)
+
           p = Path('android/app/src/main/AndroidManifest.xml')
           s = p.read_text()
           marker = '<uses-permission android:name="android.permission.INTERNET" />'
@@ -69,16 +82,28 @@ jobs:
           p.write_text(s)
           PY
 
+      - name: Verify app version
+        run: |
+          grep -n 'versionCode' android/app/build.gradle
+          grep -n 'versionName' android/app/build.gradle
+
       - name: Build debug APK
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --stacktrace
 
+      - name: Prepare approved APK package
+        run: |
+          mkdir -p approved-pos-app
+          cp android/app/build/outputs/apk/debug/app-debug.apk approved-pos-app/Smash-Brothers-POS.apk
+          cp client/public/pos-app/latest.json approved-pos-app/latest.json
+          sha256sum approved-pos-app/Smash-Brothers-POS.apk > approved-pos-app/Smash-Brothers-POS.apk.sha256
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: smash-brothers-pos-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: smash-brothers-pos-approved
+          path: approved-pos-app/
           if-no-files-found: error
           retention-days: 14
