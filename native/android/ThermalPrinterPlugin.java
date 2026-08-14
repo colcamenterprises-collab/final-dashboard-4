@@ -1,4 +1,4 @@
-package io.customli.sbbpos;
+package io.customli.sbbpos.test;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
@@ -106,7 +106,7 @@ public class ThermalPrinterPlugin extends Plugin {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
     if (!hasBluetoothPermission()) {
-      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.");
+      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS Test in Android Settings.");
       return;
     }
     listPrintersGranted(call, adapter);
@@ -133,7 +133,7 @@ public class ThermalPrinterPlugin extends Plugin {
       ret.put("permissionGranted", true);
       call.resolve(ret);
     } catch (SecurityException error) {
-      call.reject("Android blocked access to paired Bluetooth devices. Allow Nearby devices for Smash Brothers POS.", error);
+      call.reject("Android blocked access to paired Bluetooth devices. Allow Nearby devices for Smash Brothers POS Test.", error);
     } catch (Exception error) {
       call.reject("Could not list paired Bluetooth devices", error);
     }
@@ -155,7 +155,7 @@ public class ThermalPrinterPlugin extends Plugin {
     BluetoothAdapter adapter = requireBluetooth(call);
     if (adapter == null) return;
     if (!hasBluetoothPermission()) {
-      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS in Android Settings.");
+      call.reject("Nearby devices permission was not granted. Allow Nearby devices for Smash Brothers POS Test in Android Settings.");
       return;
     }
     connectGranted(call, adapter);
@@ -230,7 +230,7 @@ public class ThermalPrinterPlugin extends Plugin {
         call.resolve(ret);
       } catch (SecurityException error) {
         disconnectInternal();
-        call.reject("Android blocked the Bluetooth connection. Allow Nearby devices for Smash Brothers POS.", error);
+        call.reject("Android blocked the Bluetooth connection. Allow Nearby devices for Smash Brothers POS Test.", error);
       } catch (Exception error) {
         disconnectInternal();
         call.reject("Could not connect to Bluetooth printer: " + rootMessage(error), error);
