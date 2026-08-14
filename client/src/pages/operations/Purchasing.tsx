@@ -122,6 +122,7 @@ export default function PurchasingPage() {
       const res = await fetch('/api/purchasing-items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(item),
       });
       if (!res.ok) throw new Error('Failed to create item');
@@ -139,6 +140,7 @@ export default function PurchasingPage() {
       const res = await fetch(`/api/purchasing-items/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify(data),
       });
       if (!res.ok) throw new Error('Failed to update item');
@@ -156,6 +158,7 @@ export default function PurchasingPage() {
       const res = await fetch(`/api/purchasing-items/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ active }),
       });
       if (!res.ok) throw new Error('Failed to toggle item');
@@ -170,6 +173,7 @@ export default function PurchasingPage() {
     mutationFn: async (id: number) => {
       const res = await fetch(`/api/purchasing-items/${id}`, {
         method: 'DELETE',
+        credentials: 'include',
       });
       if (!res.ok) {
         const data = await res.json();
@@ -277,7 +281,12 @@ export default function PurchasingPage() {
           purchaseUnitLabel: formData.get('purchaseUnitLabel') as string || null,
           orderUnit: formData.get('orderUnit') as string || null,
           unitDescription: formData.get('unitDescription') as string || null,
+          catalogueCode: formData.get('catalogueCode') as string || null,
+          purchaseCostThb: pendingCostUpdate.newCost,
           unitCost: pendingCostUpdate.newCost,
+          purchaseQuantity: formData.get('purchaseQuantity') ? parseFloat(formData.get('purchaseQuantity') as string) : null,
+          baseUnit: formData.get('baseUnit') as string || null,
+          reviewNotes: formData.get('reviewNotes') as string || null,
           lastReviewDate: formData.get('lastReviewDate') as string || null,
           active: (formData.get('active') as string) === 'true',
         };
@@ -615,6 +624,14 @@ export default function PurchasingPage() {
                   defaultValue={editingItem?.lastReviewDate || ''}
                   className="text-xs rounded-[4px] border-slate-200"
                 />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-slate-900 mb-1 block">Catalogue ID</label>
+                <Input data-testid="input-catalogue-code" name="catalogueCode" defaultValue={editingItem?.catalogueCode || ''} className="text-xs rounded-[4px] border-slate-200" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-slate-900 mb-1 block">Review notes</label>
+                <textarea data-testid="input-review-notes" name="reviewNotes" defaultValue={editingItem?.reviewNotes || ''} className="min-h-20 w-full rounded-[4px] border border-slate-200 px-3 py-2 text-xs" />
               </div>
               {editingItem && (
                 <div className="flex items-center gap-2">
