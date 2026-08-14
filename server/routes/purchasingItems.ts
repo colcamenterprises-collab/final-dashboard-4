@@ -195,31 +195,27 @@ router.delete('/:id', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Invalid ID' });
     }
 
-    // PATCH F: Production lock guard - block deletions if PRODUCTION_LOCK=1
-    if (process.env.PRODUCTION_LOCK === '1') {
-      return res.status(403).json({
+    // Historical stock/sales rows are immutable snapshots and must not block catalogue cleanup.
+    // Only a currently linked recipe prevents deletion, so the operator can archive it instead.
+    const linkedRecipes = await prisma.$queryRawUnsafe<Array<{ id: number; name: string }>>(
+      `SELECT id, name
+       FROM recipes
+       WHERE EXISTS (
+         SELECT 1
+         FROM jsonb_array_elements(COALESCE(ingredients, '[]'::jsonb)) AS ingredient
+         WHERE ingredient->>'purchasingItemId' = $1
+            OR ingredient->>'purchasingItemKey' = $1
+       )
+       ORDER BY name`,
+      String(id),
+    );
+    if (linkedRecipes.length > 0) {
+      return res.status(409).json({
         ok: false,
-        error: 'PRODUCTION_LOCK: Deleting items is blocked. Deactivate items instead.'
-      });
-    }
-
-    const item = await prisma.purchasingItem.findUnique({
-      where: { id },
-    });
-
-    if (!item) {
-      return res.status(404).json({ ok: false, error: 'Item not found' });
-    }
-
-    // Check if item is referenced in purchasing_shift_items (historical data)
-    const refCount = await prisma.purchasingShiftItem.count({
-      where: { purchasingItemId: id },
-    });
-
-    if (refCount > 0) {
-      return res.status(400).json({ 
-        ok: false, 
-        error: `Cannot delete: Item is referenced in ${refCount} shift records. Deactivate it instead to preserve historical data.` 
+        code: 'RECIPE_REFERENCE_EXISTS',
+        error: 'This item is used in a recipe. Remove it from the recipe or archive it instead.',
+        item: item.item,
+        linkedRecipes,
       });
     }
 
