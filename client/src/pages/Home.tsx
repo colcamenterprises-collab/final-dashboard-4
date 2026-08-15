@@ -1,15 +1,13 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ArrowRight, ArrowUpRight, Banknote, CreditCard, Receipt, ShoppingBag, Sparkles, UsersRound, WalletCards } from "lucide-react";
 import { DateTime } from "luxon";
-import { ExactDateTimeRange, reportingRangeParams, type ExactDateTimeRangeValue } from "@/components/reports/ExactDateTimeRange";
-import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
+import { reportingRangeParams, type ExactDateTimeRangeValue } from "@/components/reports/ExactDateTimeRange";
 
 const money = (value: number | null | undefined) => `฿${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
 const compactMoney = (value: number) => value >= 1000 ? `฿${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : `฿${value}`;
-const pct = (value: number, total: number) => total ? `${((value / total) * 100).toFixed(1)}%` : "—";
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function localDate(offset = 0) {
@@ -19,8 +17,6 @@ function localDate(offset = 0) {
 }
 
 type HourRow = { bucketStart: string; orders: number; netSales: number };
-type CategoryRow = { category: string; quantity: number; netSales: number };
-type ProductRow = { itemName: string; quantity: number; netSales: number };
 type OverviewResponse = {
   ok: boolean;
   source: string;
@@ -28,7 +24,7 @@ type OverviewResponse = {
   sourcesIncluded: string[];
   overview: { receiptCount: number; grossSales: number; discounts: number; refunds: number; netSales: number; averageOrder: number; historicalReceipts: number; liveReceipts: number; paymentSales: Record<string, number> };
   labor: { laborCost: number; paidStaffCount: number; laborCostPct: number | null; source: string };
-  breakdowns: { daily: Array<{ day: string; orders: number; netSales: number }>; hourly: HourRow[]; categories: CategoryRow[]; topProducts: ProductRow[] };
+  breakdowns: { daily: Array<{ day: string; orders: number; netSales: number }>; hourly: HourRow[]; categories: Array<{ category: string; quantity: number; netSales: number }>; topProducts: Array<{ itemName: string; quantity: number; netSales: number }> };
 };
 type ProfitLossResponse = { year: number; monthlyData: Record<string, { sales: number; bankDeposits: number | null; cogs: number; expenses: number; grossProfit: number; netProfit: number }> };
 type ShiftResponse = { shiftCount: number; pos: { receiptCount: number; totalSales: number }; dailySales: { formCount: number; totalSales: number | null }; rows: Array<{ key: string; label: string; pos: number; dailySales: number | null; delta: number | null; status: string }>; allMatched: boolean };
@@ -79,6 +75,7 @@ function paymentGroup(name: string) {
 const paymentStyle: Record<string, { icon: any; color: string }> = {
   Cash: { icon: Banknote, color: "bg-emerald-400" }, QR: { icon: WalletCards, color: "bg-blue-400" }, Grab: { icon: ShoppingBag, color: "bg-lime-300" }, Card: { icon: CreditCard, color: "bg-violet-400" }, Other: { icon: Sparkles, color: "bg-orange-300" },
 };
+const donutColors = ["#3b82f6", "#34d399", "#fb923c", "#a78bfa", "#facc15", "#2dd4bf", "#94a3b8"];
 
 function buildHourlySeries(rows: HourRow[], range: OverviewResponse["filters"]) {
   const totals = new Map(rows.map(row => [DateTime.fromISO(row.bucketStart).toUTC().startOf("hour").toISO(), row]));
@@ -98,7 +95,7 @@ function SmallStat({ label, value, sub, good }: { label: string; value: string; 
 }
 
 export default function Home() {
-  const [range, setRange] = useState<ExactDateTimeRangeValue>({ fromDate: localDate(-1), fromTime: "17:00", toDate: localDate(), toTime: "03:00", timezone: "Asia/Bangkok" });
+  const [range] = useState<ExactDateTimeRangeValue>({ fromDate: localDate(-1), fromTime: "17:00", toDate: localDate(), toTime: "03:00", timezone: "Asia/Bangkok" });
   const params = useMemo(() => reportingRangeParams(range), [range]);
   const overview = useQuery<OverviewResponse>({ queryKey: ["home-overview", params], queryFn: () => jsonFetch(`/api/reports/receipt-analytics/unified/overview?${params}`), refetchInterval: 60_000 });
   const finance = useQuery<ProfitLossResponse>({ queryKey: ["home-finance"], queryFn: () => jsonFetch("/api/profit-loss"), staleTime: 60_000 });
@@ -111,8 +108,8 @@ export default function Home() {
   const breakdowns = overview.data?.breakdowns;
   const hourly = useMemo(() => overview.data ? buildHourlySeries(overview.data.breakdowns.hourly, overview.data.filters) : [], [overview.data]);
   const paymentGroups = useMemo(() => { const grouped: Record<string, number> = { Cash: 0, QR: 0, Grab: 0, Card: 0, Other: 0 }; for (const [name, amount] of Object.entries(data?.paymentSales || {})) grouped[paymentGroup(name)] += Number(amount || 0); return grouped; }, [data]);
-  const categoryMax = Math.max(0, ...(breakdowns?.categories || []).map(row => row.netSales));
   const productMax = Math.max(0, ...(breakdowns?.topProducts || []).map(row => row.netSales));
+  const categoryDonut = (breakdowns?.categories || []).slice(0, 7).map(row => ({ name: row.category, value: row.netSales, quantity: row.quantity }));
   const financeRows = months.filter(m => finance.data?.monthlyData?.[m]).map(m => ({ month: m, ...finance.data!.monthlyData[m] }));
   const ytd = financeRows.reduce((acc, row) => ({ sales: acc.sales + row.sales, cogs: acc.cogs + row.cogs, expenses: acc.expenses + row.expenses, grossProfit: acc.grossProfit + row.grossProfit, netProfit: acc.netProfit + row.netProfit }), { sales: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 });
   const latestFinance = financeRows.at(-1);
@@ -121,51 +118,40 @@ export default function Home() {
   const stock = operations.data?.stockStatus || {};
 
   return <div className="min-h-screen rounded-[32px] bg-slate-50 p-4 text-slate-950 md:p-6">
-    <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-      <div><p className="text-xs font-black uppercase tracking-[.25em] text-blue-600">Restaurant intelligence</p><h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Command Centre</h1><p className="mt-2 text-sm text-slate-500">Sales, finance and operations from one trusted dashboard.</p></div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><div className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-900 shadow-sm"><ExactDateTimeRange value={range} onChange={setRange} timezoneLabel="Venue time · Asia/Bangkok" /></div><div className="flex gap-2"><ExpenseLodgmentModal triggerText="Expense" triggerClassName="bg-slate-950 text-white hover:bg-slate-800" /><Link to="/reports/overview" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 shadow-sm">Full reporting <ArrowRight className="h-3.5 w-3.5" /></Link></div></div>
-    </header>
-
-    {overview.isLoading ? <div className="rounded-3xl border border-slate-200 bg-white p-10 text-sm text-slate-500">Loading dashboard…</div> : null}
+    {overview.isLoading ? <div className="rounded-3xl border border-slate-200 bg-white p-10 text-sm text-slate-500">Loading…</div> : null}
     {overview.isError ? <div className="mb-5 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{(overview.error as Error).message}</div> : null}
 
     {data ? <>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Gross sales" value={money(data.grossSales)} sub="Before discounts and refunds" tone="blue" icon={ArrowUpRight} />
         <MetricCard label="Net sales" value={money(data.netSales)} sub={`${money(data.discounts + data.refunds)} adjustments`} tone="light" icon={Banknote} />
-        <MetricCard label="Orders" value={data.receiptCount.toLocaleString()} sub={`${data.historicalReceipts} historical · ${data.liveReceipts} live`} tone="amber" icon={Receipt} />
+        <MetricCard label="Orders" value={data.receiptCount.toLocaleString()} sub={`${data.liveReceipts} live POS`} tone="amber" icon={Receipt} />
         <MetricCard label="Average order" value={money(data.averageOrder)} sub="Net sales per paid receipt" tone="mint" icon={ShoppingBag} />
         <MetricCard label="Labor cost" value={labor?.laborCostPct == null ? "—" : `${labor.laborCostPct.toFixed(1)}%`} sub={`${money(labor?.laborCost || 0)} · ${labor?.paidStaffCount || 0} paid staff`} tone="violet" icon={UsersRound} />
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[1.65fr_1fr]">
-        <Panel title="Hourly Sales" subtitle={`One bar per trading hour · ${range.fromTime} opening to ${range.toTime} closing`}>
-          <ResponsiveContainer width="100%" height={300}><BarChart data={hourly} margin={{ top: 18, right: 4, left: 0, bottom: 0 }}><defs><linearGradient id="homeHourly" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 11, fontWeight: 700 }} /><YAxis axisLine={false} tickLine={false} width={50} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={compactMoney} /><Tooltip contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16 }} formatter={(value: number, _name: string, entry: any) => [`${money(value)} · ${entry.payload.orders} orders`, "Sales"]} /><Bar dataKey="sales" fill="url(#homeHourly)" radius={[10, 10, 3, 3]} maxBarSize={58} /></BarChart></ResponsiveContainer>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_.8fr_.85fr]">
+        <Panel title="Hourly Sales" subtitle="Last completed shift">
+          <ResponsiveContainer width="100%" height={280}><BarChart data={hourly} margin={{ top: 18, right: 4, left: 0, bottom: 0 }}><defs><linearGradient id="homeHourly" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 11, fontWeight: 700 }} /><YAxis axisLine={false} tickLine={false} width={50} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={compactMoney} /><Tooltip contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16 }} formatter={(value: number, _name: string, entry: any) => [`${money(value)} · ${entry.payload.orders} orders`, "Sales"]} /><Bar dataKey="sales" fill="url(#homeHourly)" radius={[10, 10, 3, 3]} maxBarSize={58} /></BarChart></ResponsiveContainer>
+        </Panel>
+        <Panel title="Category Mix" subtitle="Net sales by category">
+          <div className="relative h-[280px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={categoryDonut} dataKey="value" nameKey="name" innerRadius="58%" outerRadius="82%" paddingAngle={2}>{categoryDonut.map((_, index) => <Cell key={index} fill={donutColors[index % donutColors.length]} />)}</Pie><Tooltip formatter={(value: number) => money(value)} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 flex items-center justify-center"><div className="text-center"><div className="text-2xl font-black">{money(data.netSales)}</div><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Net sales</div></div></div></div>
         </Panel>
         <Panel title="Payment Mix" subtitle="Net sales by payment channel">
           <div className="space-y-3">{Object.entries(paymentGroups).map(([label, amount]) => { const Style = paymentStyle[label]; const Icon = Style.icon; const share = data.netSales > 0 ? amount / data.netSales * 100 : 0; return <div key={label} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><span className={`rounded-xl p-2 ${Style.color}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex justify-between text-xs"><span className="font-bold text-slate-700">{label}</span><span className="font-black">{money(amount)}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${Style.color}`} style={{ width: `${Math.max(share ? 3 : 0, share)}%` }} /></div></div><span className="w-10 text-right text-[10px] font-bold text-slate-500">{share.toFixed(0)}%</span></div>; })}</div>
         </Panel>
       </div>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-2">
-        <Panel title="Category Mix" subtitle="What guests spent on" action={<Link to="/reports/items" className="text-[10px] font-black uppercase text-slate-500">Items →</Link>}><div className="space-y-4">{(breakdowns?.categories || []).slice(0, 6).map((row, index) => <HorizontalBar key={row.category} label={row.category} value={row.netSales} max={categoryMax} meta={`${money(row.netSales)} · ${row.quantity.toLocaleString()} sold`} color={["bg-blue-400", "bg-orange-300", "bg-emerald-300", "bg-violet-400"][index % 4]} />)}</div></Panel>
-        <Panel title="Top Products" subtitle="Ranked by net sales" action={<Link to="/reports/items" className="text-[10px] font-black uppercase text-slate-500">Items →</Link>}><div className="space-y-4">{(breakdowns?.topProducts || []).slice(0, 6).map((row, index) => <HorizontalBar key={row.itemName} label={`${index + 1}. ${row.itemName}`} value={row.netSales} max={productMax} meta={`${money(row.netSales)} · ${row.quantity.toLocaleString()} sold`} color="bg-gradient-to-r from-blue-500 to-indigo-500" />)}</div></Panel>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[.9fr_1.25fr_1fr]">
+        <Panel title="Top Categories"><div className="space-y-3">{categoryDonut.slice(0, 6).map((row, index) => <div key={row.name} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2"><div className="flex min-w-0 items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: donutColors[index % donutColors.length] }} /><span className="truncate text-xs font-bold text-slate-700">{row.name}</span></div><span className="shrink-0 text-xs font-black">{money(row.value)}</span></div>)}</div></Panel>
+        <Panel title="Top Products"><div className="space-y-4">{(breakdowns?.topProducts || []).slice(0, 8).map((row, index) => <HorizontalBar key={row.itemName} label={`${index + 1}. ${row.itemName}`} value={row.netSales} max={productMax} meta={`${money(row.netSales)} · ${row.quantity.toLocaleString()} sold`} color="bg-gradient-to-r from-blue-500 to-indigo-500" />)}</div></Panel>
+        <Panel title="Finance Snapshot"><div className="space-y-3"><div className="flex justify-between text-xs"><span className="text-slate-500">YTD sales</span><span className="font-black">{money(ytd.sales)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">COGS</span><span className="font-black">{money(ytd.cogs)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">Expenses</span><span className="font-black">{money(ytd.expenses)}</span></div><div className="flex justify-between border-t border-slate-100 pt-3 text-xs"><span className="font-bold text-slate-700">YTD profit</span><span className={`font-black ${ytd.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{money(ytd.netProfit)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">Current month</span><span className="font-black">{money(latestFinance?.netProfit)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">Loan balance</span><span className="font-black">{money(loanBalance)}</span></div></div><Link to="/finance/profit-loss" className="mt-4 inline-flex items-center gap-1 text-[10px] font-black uppercase text-blue-600">View P&L <ArrowRight className="h-3 w-3" /></Link></Panel>
       </div>
     </> : null}
 
-    <div className="mt-5 grid gap-5 xl:grid-cols-2">
-      <Panel title="Finance" subtitle={`${finance.data?.year || ""} year to date`} action={<Link to="/finance/profit-loss" className="text-[10px] font-black uppercase text-slate-500">P&L →</Link>}>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><SmallStat label="YTD Sales" value={money(ytd.sales)} /><SmallStat label="YTD COGS" value={money(ytd.cogs)} /><SmallStat label="YTD Expenses" value={money(ytd.expenses)} /><SmallStat label="YTD Profit" value={money(ytd.netProfit)} good={ytd.netProfit >= 0} /></div>
-        <div className="mt-4 grid grid-cols-2 gap-3"><SmallStat label="Current Month Profit" value={money(latestFinance?.netProfit)} sub={latestFinance?.month || "Current month"} good={(latestFinance?.netProfit || 0) >= 0} /><SmallStat label="Loan Balance" value={money(loanBalance)} sub="Director / beneficiary" /></div>
-      </Panel>
-      <Panel title="Shift Reconciliation" subtitle="POS against shift form" action={<Link to="/reports/shift-reconciliation" className="text-[10px] font-black uppercase text-slate-500">Shift report →</Link>}>
-        <div className="grid grid-cols-3 gap-3"><SmallStat label="POS Sales" value={money(shift.data?.pos?.totalSales)} sub={`${shift.data?.pos?.receiptCount || 0} orders`} /><SmallStat label="Shift Form" value={shift.data?.dailySales?.formCount ? money(shift.data.dailySales.totalSales) : "Missing"} sub={`${shift.data?.dailySales?.formCount || 0} forms`} good={Boolean(shift.data?.dailySales?.formCount)} /><SmallStat label="Status" value={shift.data?.allMatched ? "Matched" : "Review"} sub={`${shift.data?.shiftCount || 0} POS shifts`} good={shift.data?.allMatched} /></div>
-      </Panel>
-    </div>
-
     <div className="mt-5 grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
-      <Panel title="Needs Attention" subtitle="Only exceptions that need owner action"><div className="grid gap-3 sm:grid-cols-2">{actions.length ? actions.slice(0, 6).map((action: any, index: number) => <div key={index} className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-black text-amber-900">{action.title || action.message || "Needs review"}</p><p className="mt-1 text-[11px] text-amber-700">{action.message || action.detail || "Open the related section for details."}</p></div>) : <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-black text-emerald-800">No urgent exceptions</div>}</div></Panel>
-      <Panel title="Operations" subtitle="Current forms and stock status"><div className="grid grid-cols-2 gap-3"><SmallStat label="Stock Form" value={stock.dailyStockSubmitted ? "Verified" : "Missing"} good={Boolean(stock.dailyStockSubmitted)} /><SmallStat label="Shopping" value={`${stock.requestedShopping?.length || 0}`} sub="Requested items" /><SmallStat label="Rolls" value={stock.rolls != null ? String(stock.rolls) : "—"} /><SmallStat label="Meat" value={stock.meat != null ? String(stock.meat) : "—"} /></div></Panel>
+      <Panel title="Shift Reconciliation"><div className="grid grid-cols-3 gap-3"><SmallStat label="POS Sales" value={money(shift.data?.pos?.totalSales)} sub={`${shift.data?.pos?.receiptCount || 0} orders`} /><SmallStat label="Shift Form" value={shift.data?.dailySales?.formCount ? money(shift.data.dailySales.totalSales) : "Missing"} sub={`${shift.data?.dailySales?.formCount || 0} forms`} good={Boolean(shift.data?.dailySales?.formCount)} /><SmallStat label="Status" value={shift.data?.allMatched ? "Matched" : "Review"} sub={`${shift.data?.shiftCount || 0} POS shifts`} good={shift.data?.allMatched} /></div></Panel>
+      <Panel title="Needs Attention"><div className="grid gap-3 sm:grid-cols-2">{actions.length ? actions.slice(0, 4).map((action: any, index: number) => <div key={index} className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-black text-amber-900">{action.title || action.message || "Needs review"}</p></div>) : <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-black text-emerald-800">No urgent exceptions</div>}<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">Stock form</p><p className="mt-2 text-lg font-black">{stock.dailyStockSubmitted ? "Verified" : "Missing"}</p></div></div></Panel>
     </div>
 
     <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">{[["Reporting", "/reports/overview"], ["Products", "/reports/items"], ["Receipts", "/reports/receipts"], ["Finance", "/finance"], ["Expenses", "/finance/expenses"], ["Shifts", "/reports/shift-reconciliation"]].map(([label, to]) => <Link key={label} to={to} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 shadow-sm">{label}<ArrowRight className="h-3.5 w-3.5 text-slate-400" /></Link>)}</div>
