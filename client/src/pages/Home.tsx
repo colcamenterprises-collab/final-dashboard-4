@@ -1,323 +1,215 @@
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell,
-} from "recharts";
-import {
-  AlertTriangle, CheckCircle, ArrowRight, Receipt, Package,
-  ShoppingBag, FileText, Activity, TrendingUp, AlertCircle,
-} from "lucide-react";
-import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ArrowRight, ArrowUpRight, Banknote, CreditCard, Receipt, ShoppingBag, Sparkles, UsersRound, WalletCards } from "lucide-react";
+import { DateTime } from "luxon";
+import { reportingRangeParams, type ExactDateTimeRangeValue } from "@/components/reports/ExactDateTimeRange";
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+const money = (value: number | null | undefined) => `฿${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const compactMoney = (value: number) => value >= 1000 ? `฿${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : `฿${value}`;
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function fmtMoney(v: number | null | undefined): string {
-  if (v == null || isNaN(Number(v))) return "—";
-  return "฿" + Number(v).toLocaleString("en-US", { maximumFractionDigits: 0 });
-}
+function lastCompletedShiftRange(): ExactDateTimeRangeValue {
+  const now = DateTime.now().setZone("Asia/Bangkok");
+  const endDay = now.hour < 3 ? now.minus({ days: 1 }) : now;
+  const endDate = endDay.toISODate()!;
+  const startDate = endDay.minus({ days: 1 }).toISODate()!;
 
-function fmtDate(s: string | null | undefined): string {
-  if (!s) return "—";
-  const [y, m, d] = s.slice(0, 10).split("-");
-  return `${d}/${m}/${y}`;
-}
-
-function fmtShortDate(s: string | null | undefined): string {
-  if (!s) return "—";
-  const [, m, d] = s.slice(0, 10).split("-");
-  return `${d}/${m}`;
-}
-
-function fmtDateTime(s: string | null | undefined): string {
-  if (!s) return "—";
-  const d = new Date(s);
-  if (isNaN(d.getTime())) return s;
-  const day = String(d.getDate()).padStart(2, "0");
-  const mon = String(d.getMonth() + 1).padStart(2, "0");
-  const hrs = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${day}/${mon}/${d.getFullYear()} ${hrs}:${min}`;
-}
-
-// ── Sub-components ────────────────────────────────────────────────────────────
-
-function KpiCard({
-  label, value, sub, accent, badge,
-}: {
-  label: string; value: React.ReactNode; sub?: string; accent: string; badge?: React.ReactNode;
-}) {
-  return (
-    <div className={`rounded-2xl border p-4 space-y-1 ${accent}`}>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-[10px] font-semibold uppercase tracking-widest opacity-60">{label}</p>
-        {badge}
-      </div>
-      <p className="text-2xl font-black tracking-tight leading-none">{value}</p>
-      {sub && <p className="text-[10px] opacity-50 pt-0.5">{sub}</p>}
-    </div>
-  );
-}
-
-function VerifyCard({
-  label, status, detail,
-}: { label: string; status: "ok" | "warn" | "missing" | "unknown"; detail?: string }) {
-  const colours = {
-    ok:      "border-emerald-200 bg-emerald-50 text-emerald-900",
-    warn:    "border-amber-200 bg-amber-50 text-amber-900",
-    missing: "border-red-200 bg-red-50 text-red-900",
-    unknown: "border-slate-200 bg-slate-50 text-slate-700",
+  return {
+    fromDate: startDate,
+    fromTime: "17:00",
+    toDate: endDate,
+    toTime: "03:00",
+    timezone: "Asia/Bangkok",
   };
-  const Icon = status === "ok" ? CheckCircle : status === "warn" ? AlertTriangle : status === "missing" ? AlertCircle : AlertCircle;
-  const iconColour = {
-    ok: "text-emerald-500", warn: "text-amber-500", missing: "text-red-500", unknown: "text-slate-400",
-  };
-  return (
-    <div className={`rounded-2xl border p-4 space-y-2 ${colours[status]}`}>
-      <div className="flex items-center gap-2">
-        <Icon className={`h-3.5 w-3.5 shrink-0 ${iconColour[status]}`} />
-        <p className="text-[10px] font-semibold uppercase tracking-widest opacity-60">{label}</p>
-      </div>
-      <p className="text-sm font-bold leading-tight">
-        {status === "ok" ? "Verified" : status === "warn" ? "Needs attention" : status === "missing" ? "Missing" : "Not available"}
-      </p>
-      {detail && <p className="text-[10px] opacity-60 leading-snug">{detail}</p>}
-    </div>
-  );
 }
 
-function ActionBadge({ severity, title, message }: { severity: string; title: string; message: string }) {
-  const isHigh = severity === "high";
-  return (
-    <div className={`rounded-xl border px-3 py-2.5 space-y-0.5 ${isHigh ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
-      <div className="flex items-center gap-1.5">
-        <AlertTriangle className={`h-3 w-3 shrink-0 ${isHigh ? "text-red-500" : "text-amber-500"}`} />
-        <p className={`text-xs font-bold ${isHigh ? "text-red-900" : "text-amber-900"}`}>{title}</p>
-      </div>
-      <p className={`text-[10px] pl-4.5 ${isHigh ? "text-red-700" : "text-amber-700"}`}>{message}</p>
-    </div>
-  );
+type HourRow = { bucketStart: string; orders: number; netSales: number };
+type OverviewResponse = {
+  ok: boolean;
+  source: string;
+  filters: ExactDateTimeRangeValue & { fromInstant: string; toInstant: string };
+  sourcesIncluded: string[];
+  overview: { receiptCount: number; grossSales: number; discounts: number; refunds: number; netSales: number; averageOrder: number; historicalReceipts: number; liveReceipts: number; paymentSales: Record<string, number> };
+  labor: { laborCost: number; paidStaffCount: number; laborCostPct: number | null; source: string };
+  breakdowns: { daily: Array<{ day: string; orders: number; netSales: number }>; hourly: HourRow[]; categories: Array<{ category: string; quantity: number; netSales: number }>; topProducts: Array<{ itemName: string; quantity: number; netSales: number }> };
+};
+type ProfitLossResponse = { year: number; monthlyData: Record<string, { sales: number; bankDeposits: number | null; cogs: number; expenses: number; grossProfit: number; netProfit: number }> };
+type ShiftResponse = { shiftCount: number; pos: { receiptCount: number; totalSales: number }; dailySales: { formCount: number; totalSales: number | null }; rows: Array<{ key: string; label: string; pos: number; dailySales: number | null; delta: number | null; status: string }>; allMatched: boolean };
+
+async function jsonFetch<T>(url: string): Promise<T> {
+  const response = await fetch(url, { credentials: "include", cache: "no-store" });
+  const body = await response.json();
+  if (!response.ok || body?.ok === false || body?.success === false) throw new Error(body?.error || `HTTP ${response.status}`);
+  return body;
 }
 
-const quickActions = [
-  { to: "/operations/daily-sales",        label: "Daily Sales",        icon: Receipt,     colour: "bg-blue-50 text-blue-800 border-blue-100" },
-  { to: "/operations/daily-stock",        label: "Daily Stock",        icon: Package,     colour: "bg-emerald-50 text-emerald-800 border-emerald-100" },
-  { to: "/operations/purchase-lodgement", label: "Purchases",          icon: ShoppingBag, colour: "bg-amber-50 text-amber-800 border-amber-100" },
-  { to: "/reports/shift-reports",         label: "Shift Verification", icon: FileText,    colour: "bg-purple-50 text-purple-800 border-purple-100" },
-  { to: "/operations/loyverse-mirror",    label: "POS Verification",   icon: Activity,    colour: "bg-slate-50 text-slate-800 border-slate-200" },
-];
-
-const PIE_COLORS = { Cash: "#10b981", QR: "#3b82f6", Grab: "#f97316", Other: "#94a3b8" };
-
-const CHART_TOOLTIP_STYLE = {
-  contentStyle: { borderRadius: "12px", border: "1px solid #e2e8f0", fontSize: "11px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" },
-  itemStyle: { color: "#1e293b" },
+const cardTones = {
+  blue: "from-blue-500 to-indigo-600 text-white",
+  amber: "from-amber-300 to-orange-400 text-slate-950",
+  mint: "from-emerald-300 to-teal-400 text-slate-950",
+  violet: "from-violet-400 to-fuchsia-500 text-white",
+  light: "from-white to-slate-100 text-slate-950",
 };
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+function MetricCard({ label, value, sub, tone = "light", icon: Icon }: { label: string; value: string; sub: string; tone?: keyof typeof cardTones; icon: any }) {
+  return <article className={`relative min-h-40 overflow-hidden rounded-[28px] bg-gradient-to-br p-5 shadow-[0_18px_50px_rgba(0,0,0,.24)] ${cardTones[tone]}`}>
+    <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/15 blur-2xl" />
+    <div className="relative flex items-start justify-between"><p className="text-xs font-black uppercase tracking-[.18em] opacity-70">{label}</p><span className="rounded-full bg-black/10 p-2.5"><Icon className="h-4 w-4" /></span></div>
+    <p className="relative mt-7 text-3xl font-black tracking-tight">{value}</p><p className="relative mt-2 text-xs font-semibold opacity-65">{sub}</p>
+  </article>;
+}
+
+function Panel({ title, subtitle, children, className = "", action }: { title: string; subtitle?: string; children: React.ReactNode; className?: string; action?: React.ReactNode }) {
+  return <section className={`rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,.08)] ${className}`}>
+    <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-black text-slate-950">{title}</h2>{subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}</div>{action}</div>
+    <div className="mt-5">{children}</div>
+  </section>;
+}
+
+function HorizontalBar({ label, value, max, meta, color }: { label: string; value: number; max: number; meta: string; color: string }) {
+  const width = max > 0 ? Math.max(3, Math.min(100, value / max * 100)) : 0;
+  return <div className="space-y-2"><div className="flex justify-between gap-3 text-xs"><span className="truncate font-bold text-slate-700">{label}</span><span className="shrink-0 text-slate-500">{meta}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${color}`} style={{ width: `${width}%` }} /></div></div>;
+}
+
+function paymentGroup(name: string) {
+  const key = name.toLowerCase();
+  if (key.includes("grab")) return "Grab";
+  if (key.includes("scan") || key.includes("prompt") || key.includes("qr") || key.includes("transfer")) return "QR";
+  if (key.includes("cash")) return "Cash";
+  if (key.includes("card")) return "Card";
+  return "Other";
+}
+const paymentStyle: Record<string, { icon: any; color: string }> = {
+  Cash: { icon: Banknote, color: "bg-emerald-400" }, QR: { icon: WalletCards, color: "bg-blue-400" }, Grab: { icon: ShoppingBag, color: "bg-lime-300" }, Card: { icon: CreditCard, color: "bg-violet-400" }, Other: { icon: Sparkles, color: "bg-orange-300" },
+};
+const donutColors = ["#3b82f6", "#34d399", "#fb923c", "#a78bfa", "#facc15", "#2dd4bf", "#94a3b8"];
+
+function buildHourlySeries(rows: HourRow[], range: OverviewResponse["filters"]) {
+  const totals = new Map(rows.map(row => [DateTime.fromISO(row.bucketStart).toUTC().startOf("hour").toISO(), row]));
+  const start = DateTime.fromISO(range.fromInstant).toUTC().startOf("hour");
+  const end = DateTime.fromISO(range.toInstant).toUTC().startOf("hour");
+  const result = []; let cursor = start;
+  while (cursor < end) {
+    const key = cursor.toISO(); const row = totals.get(key);
+    result.push({ bucketStart: key, label: cursor.setZone(range.timezone).toFormat("ha").toLowerCase(), sales: row?.netSales || 0, orders: row?.orders || 0 });
+    cursor = cursor.plus({ hours: 1 });
+  }
+  return result;
+}
+
+function SmallStat({ label, value, sub, good }: { label: string; value: string; sub?: string; good?: boolean }) {
+  return <div className={`rounded-2xl border p-4 ${good === true ? "border-emerald-200 bg-emerald-50" : good === false ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><p className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">{label}</p><p className="mt-2 text-xl font-black text-slate-950">{value}</p>{sub ? <p className="mt-1 text-[11px] text-slate-500">{sub}</p> : null}</div>;
+}
 
 export default function Home() {
-  const { data, isLoading, isError } = useQuery<any>({
-    queryKey: ["/api/operations-read/owner-dashboard"],
-    refetchInterval: 120_000,
-  });
+  const [range] = useState<ExactDateTimeRangeValue>(() => lastCompletedShiftRange());
+  const params = useMemo(() => reportingRangeParams(range), [range]);
+  const overview = useQuery<OverviewResponse>({ queryKey: ["home-overview", params], queryFn: () => jsonFetch(`/api/reports/receipt-analytics/unified/overview?${params}`), refetchInterval: 60_000 });
+  const finance = useQuery<ProfitLossResponse>({ queryKey: ["home-finance"], queryFn: () => jsonFetch("/api/profit-loss"), staleTime: 60_000 });
+  const shift = useQuery<ShiftResponse>({ queryKey: ["home-shift", params], queryFn: () => jsonFetch(`/api/reports/receipt-analytics/shift-review?${params}`), refetchInterval: 60_000 });
+  const loans = useQuery<any>({ queryKey: ["home-loans"], queryFn: () => jsonFetch("/api/finance/director-beneficiary-loans/summary"), staleTime: 60_000 });
+  const operations = useQuery<any>({ queryKey: ["home-ops"], queryFn: () => jsonFetch("/api/operations-read/owner-dashboard"), refetchInterval: 120_000 });
 
-  const shift    = data?.latestShift     ?? null;
-  const staff    = data?.staffComparison ?? {};
-  const stock    = data?.stockStatus     ?? {};
-  const actions  = data?.actionRequired  ?? [];
-  const seven    = data?.lastSevenShifts ?? [];
-  const mix      = data?.salesMix        ?? {};
-  const health   = data?.syncHealth      ?? {};
-  const latestDailySalesDate = data?.latestDailySalesDate ?? shift?.date ?? null;
+  const data = overview.data?.overview;
+  const labor = overview.data?.labor;
+  const breakdowns = overview.data?.breakdowns;
+  const hourly = useMemo(() => overview.data ? buildHourlySeries(overview.data.breakdowns.hourly, overview.data.filters) : [], [overview.data]);
+  const paymentGroups = useMemo(() => { const grouped: Record<string, number> = { Cash: 0, QR: 0, Grab: 0, Card: 0, Other: 0 }; for (const [name, amount] of Object.entries(data?.paymentSales || {})) grouped[paymentGroup(name)] += Number(amount || 0); return grouped; }, [data]);
+  const productMax = Math.max(0, ...(breakdowns?.topProducts || []).map(row => row.netSales));
+  const categoryDonut = (breakdowns?.categories || []).slice(0, 7).map(row => ({ name: row.category, value: row.netSales, quantity: row.quantity }));
+  const financeRows = months.filter(m => finance.data?.monthlyData?.[m]).map(m => ({ month: m, ...finance.data!.monthlyData[m] }));
+  const ytd = financeRows.reduce((acc, row) => ({ sales: acc.sales + row.sales, cogs: acc.cogs + row.cogs, expenses: acc.expenses + row.expenses, grossProfit: acc.grossProfit + row.grossProfit, netProfit: acc.netProfit + row.netProfit }), { sales: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 });
+  const bangkokNow = DateTime.now().setZone("Asia/Bangkok");
+  const currentMonthKey = months[bangkokNow.month - 1];
+  const currentFinance =
+    finance.data?.year === bangkokNow.year
+      ? finance.data?.monthlyData?.[currentMonthKey]
+      : undefined;
+  const loanBalance = loans.isSuccess
+    ? Number(loans.data?.data?.total_balance || 0)
+    : null;
+  const actions = operations.data?.actionRequired || [];
+  const stock = operations.data?.stockStatus || {};
 
-  const highCount = actions.filter((a: any) => a.severity === "high").length;
+  return <div className="min-h-screen rounded-[32px] bg-slate-50 p-4 text-slate-950 md:p-6">
+    {overview.isLoading ? <div className="rounded-3xl border border-slate-200 bg-white p-10 text-sm text-slate-500">Loading…</div> : null}
+    {overview.isError ? <div className="mb-5 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{(overview.error as Error).message}</div> : null}
 
-  const chartData = [...seven].reverse().map((s: any) => ({
-    date: fmtShortDate(s.date),
-    grossSales: s.grossSales,
-    receipts: s.receipts,
-    cash: s.cash,
-    qr: s.qr,
-    grab: s.grab,
-  }));
-
-  const trendData = chartData;
-
-  const pieData = Object.entries(mix)
-    .map(([k, v]) => ({ name: k.charAt(0).toUpperCase() + k.slice(1), value: Number(v ?? 0) }))
-    .filter(d => d.value > 0);
-
-  const receiptVerifyStatus: "ok" | "warn" | "missing" | "unknown" =
-    staff.receiptDifference === null ? "unknown" :
-    staff.receiptDifference === 0   ? "ok"      :
-    Math.abs(staff.receiptDifference) <= 2 ? "warn" : "warn";
-
-  const salesVerifyStatus: "ok" | "warn" | "missing" | "unknown" =
-    staff.salesDifference === null   ? "unknown" :
-    !staff.staffSalesEntered         ? "missing" :
-    staff.staffGrossSales === 0      ? "warn"    :
-    Math.abs(staff.salesDifference) < 50 ? "ok" : "warn";
-
-  const stockVerifyStatus: "ok" | "warn" | "missing" | "unknown" =
-    stock.dailyStockSubmitted ? "ok" : "missing";
-
-  const cashVarianceStatus: "ok" | "warn" | "missing" | "unknown" =
-    staff.cashVariance === null          ? "unknown" :
-    Math.abs(staff.cashVariance) <= 1    ? "ok"      :
-    Math.abs(staff.cashVariance) <= 200  ? "warn"    : "missing";
-
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-5xl space-y-5">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Operations Overview</h1>
-          <p className="text-xs text-slate-400 mt-1">Loading…</p>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => (
-            <div key={i} className="h-24 rounded-2xl bg-slate-100 animate-pulse" />
-          ))}
-        </div>
-        <div className="h-64 rounded-2xl bg-slate-100 animate-pulse" />
+    {data ? <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Gross sales" value={money(data.grossSales)} sub="Before discounts and refunds" tone="blue" icon={ArrowUpRight} />
+        <MetricCard label="Net sales" value={money(data.netSales)} sub={`${money(data.discounts + data.refunds)} adjustments`} tone="light" icon={Banknote} />
+        <MetricCard label="Orders" value={data.receiptCount.toLocaleString()} sub={`${data.liveReceipts} live POS`} tone="amber" icon={Receipt} />
+        <MetricCard label="Average order" value={money(data.averageOrder)} sub="Net sales per paid receipt" tone="mint" icon={ShoppingBag} />
+        <MetricCard label="Labor cost" value={labor?.laborCostPct == null ? "—" : `${labor.laborCostPct.toFixed(1)}%`} sub={`${money(labor?.laborCost || 0)} · ${labor?.paidStaffCount || 0} paid staff`} tone="violet" icon={UsersRound} />
       </div>
-    );
-  }
 
-  if (isError) {
-    return (
-      <div className="mx-auto max-w-5xl">
-        <div className="rounded-2xl border border-red-200 bg-red-50 p-6">
-          <p className="text-sm font-bold text-red-800">Failed to load dashboard</p>
-          <p className="text-xs text-red-600 mt-1">Check your connection and refresh the page.</p>
-        </div>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1.35fr_.8fr_.85fr]">
+        <Panel title="Hourly Sales" subtitle="Last completed shift">
+          <ResponsiveContainer width="100%" height={280}><BarChart data={hourly} margin={{ top: 18, right: 4, left: 0, bottom: 0 }}><defs><linearGradient id="homeHourly" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 11, fontWeight: 700 }} /><YAxis axisLine={false} tickLine={false} width={50} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={compactMoney} /><Tooltip contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16 }} formatter={(value: number, _name: string, entry: any) => [`${money(value)} · ${entry.payload.orders} orders`, "Sales"]} /><Bar dataKey="sales" fill="url(#homeHourly)" radius={[10, 10, 3, 3]} maxBarSize={58} /></BarChart></ResponsiveContainer>
+        </Panel>
+        <Panel title="Category Mix" subtitle="Net sales by category">
+          <div className="relative h-[280px]"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={categoryDonut} dataKey="value" nameKey="name" innerRadius="58%" outerRadius="82%" paddingAngle={2}>{categoryDonut.map((_, index) => <Cell key={index} fill={donutColors[index % donutColors.length]} />)}</Pie><Tooltip formatter={(value: number) => money(value)} /></PieChart></ResponsiveContainer><div className="pointer-events-none absolute inset-0 flex items-center justify-center"><div className="text-center"><div className="text-2xl font-black">{money(data.netSales)}</div><div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Net sales</div></div></div></div>
+        </Panel>
+        <Panel title="Payment Mix" subtitle="Net sales by payment channel">
+          <div className="space-y-3">{Object.entries(paymentGroups).map(([label, amount]) => { const Style = paymentStyle[label]; const Icon = Style.icon; const share = data.netSales > 0 ? amount / data.netSales * 100 : 0; return <div key={label} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><span className={`rounded-xl p-2 ${Style.color}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex justify-between text-xs"><span className="font-bold text-slate-700">{label}</span><span className="font-black">{money(amount)}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${Style.color}`} style={{ width: `${Math.max(share ? 3 : 0, share)}%` }} /></div></div><span className="w-10 text-right text-[10px] font-bold text-slate-500">{share.toFixed(0)}%</span></div>; })}</div>
+        </Panel>
       </div>
-    );
-  }
 
-  return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">Operations Overview</h1>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Latest completed shift:{" "}
-            <span className="font-semibold text-slate-600">{fmtDate(shift?.date)}</span>
-            <span className="ml-2">· 18:00–03:00 Asia/Bangkok</span>
-            <span className="ml-2">· Daily Sales & Stock V2: </span>
-            <span className="font-semibold text-slate-600">{fmtDate(latestDailySalesDate)}</span>
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <ExpenseLodgmentModal
-            triggerText="Lodge Business Expense"
-            triggerClassName="bg-slate-900 text-white hover:bg-slate-800"
-          />
-          {highCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-3 py-1 text-xs font-bold text-red-700">
-              <AlertTriangle className="h-3 w-3" />
-              {highCount} action{highCount > 1 ? "s" : ""} required
-            </span>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[.9fr_1.25fr_1fr]">
+        <Panel title="Top Categories"><div className="space-y-3">{categoryDonut.slice(0, 6).map((row, index) => <div key={row.name} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2"><div className="flex min-w-0 items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: donutColors[index % donutColors.length] }} /><span className="truncate text-xs font-bold text-slate-700">{row.name}</span></div><span className="shrink-0 text-xs font-black">{money(row.value)}</span></div>)}</div></Panel>
+        <Panel title="Top Products"><div className="space-y-4">{(breakdowns?.topProducts || []).slice(0, 8).map((row, index) => <HorizontalBar key={row.itemName} label={`${index + 1}. ${row.itemName}`} value={row.netSales} max={productMax} meta={`${money(row.netSales)} · ${row.quantity.toLocaleString()} sold`} color="bg-gradient-to-r from-blue-500 to-indigo-500" />)}</div></Panel>
+        <Panel title="Finance Snapshot">
+          {finance.isLoading ? (
+            <div className="rounded-2xl bg-slate-50 p-4 text-xs font-bold text-slate-500">Loading finance…</div>
+          ) : finance.isError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-800">Finance unavailable</div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <div className="flex justify-between text-xs"><span className="text-slate-500">YTD sales</span><span className="font-black">{money(ytd.sales)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">COGS</span><span className="font-black">{money(ytd.cogs)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">Expenses</span><span className="font-black">{money(ytd.expenses)}</span></div>
+                <div className="flex justify-between border-t border-slate-100 pt-3 text-xs"><span className="font-bold text-slate-700">YTD profit</span><span className={`font-black ${ytd.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{money(ytd.netProfit)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">Current month</span><span className="font-black">{currentFinance ? money(currentFinance.netProfit) : "Unavailable"}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">Loan balance</span><span className="font-black">{loans.isLoading ? "Loading…" : loans.isError ? "Unavailable" : money(loanBalance)}</span></div>
+              </div>
+              <Link to="/finance/profit-loss" className="mt-4 inline-flex items-center gap-1 text-[10px] font-black uppercase text-blue-600">View P&L <ArrowRight className="h-3 w-3" /></Link>
+            </>
           )}
-          {highCount === 0 && shift && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-              <CheckCircle className="h-3 w-3" />
-              All clear
-            </span>
-          )}
-        </div>
+        </Panel>
       </div>
+    </> : null}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <KpiCard label="Gross Sales" value={fmtMoney(shift?.grossSales)} sub={`${shift?.receiptCount ?? "—"} receipts`} accent="border-purple-200 bg-purple-50 text-purple-900" />
-        <KpiCard label="Receipts" value={shift?.receiptCount ?? "—"} sub={`POS · ${fmtDate(shift?.date)}`} accent="border-blue-200 bg-blue-50 text-blue-900" />
-        <KpiCard label="Cash Variance" value={staff.cashVariance != null ? fmtMoney(Math.abs(staff.cashVariance)) : "—"} sub={staff.cashVariance === null ? "No form data" : Math.abs(staff.cashVariance) <= 1 ? "Balanced" : "Difference detected"} accent={cashVarianceStatus === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : cashVarianceStatus === "warn" ? "border-amber-200 bg-amber-50 text-amber-900" : cashVarianceStatus === "missing" ? "border-red-200 bg-red-50 text-red-900" : "border-slate-200 bg-slate-50 text-slate-700"} />
-        <KpiCard label="Sync Status" value={health.status === "ok" ? "Healthy" : health.status === "warning" ? "Warning" : "—"} sub={health.latestReceiptAt ? `Latest receipt: ${fmtDateTime(health.latestReceiptAt)}` : "No receipts yet"} accent={health.status === "ok" ? "border-emerald-200 bg-emerald-50 text-emerald-900" : health.status === "warning" ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-700"} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-10 gap-5">
-        <div className="col-span-1 md:col-span-7 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Last 7 Shifts — Gross Sales</p>
-          {chartData.length === 0 ? <div className="h-52 flex items-center justify-center text-sm text-slate-400">No shift data available</div> : (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                <XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `฿${(v / 1000).toFixed(0)}k` : `฿${v}`} width={48} />
-                <Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v: any, name: string) => { const labels: Record<string, string> = { grossSales: "Gross Sales", cash: "Cash", qr: "QR", grab: "Grab" }; return [fmtMoney(v), labels[name] ?? name]; }} />
-                <Bar dataKey="grossSales" fill="#8b5cf6" radius={[4,4,0,0]} name="Gross Sales" />
-              </BarChart>
-            </ResponsiveContainer>
+    <div className="mt-5 grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
+      <Panel title="Shift Reconciliation"><div className="grid grid-cols-3 gap-3"><SmallStat label="POS Sales" value={money(shift.data?.pos?.totalSales)} sub={`${shift.data?.pos?.receiptCount || 0} orders`} /><SmallStat label="Shift Form" value={shift.data?.dailySales?.formCount ? money(shift.data.dailySales.totalSales) : "Missing"} sub={`${shift.data?.dailySales?.formCount || 0} forms`} good={Boolean(shift.data?.dailySales?.formCount)} /><SmallStat label="Status" value={shift.data?.allMatched ? "Matched" : "Review"} sub={`${shift.data?.shiftCount || 0} POS shifts`} good={shift.data?.allMatched} /></div></Panel>
+      <Panel title="Needs Attention">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {operations.isLoading ? (
+            <div className="rounded-2xl bg-slate-50 p-4 text-xs font-bold text-slate-500">Checking operations…</div>
+          ) : operations.isError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-800">Operations status unavailable</div>
+          ) : actions.length ? (
+            actions.slice(0, 4).map((action: any, index: number) => (
+              <div key={index} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-black text-amber-900">{action.title || action.message || "Needs review"}</p>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-black text-emerald-800">No urgent exceptions</div>
           )}
-          {shift && (
-            <div className="grid grid-cols-3 gap-2 pt-1 border-t border-slate-100">
-              {[{ label: "Cash", value: shift.cash, colour: "bg-emerald-400" }, { label: "QR", value: shift.qr, colour: "bg-blue-400" }, { label: "Grab", value: shift.grab, colour: "bg-orange-400" }].map(({ label, value, colour }) => (
-                <div key={label} className="space-y-1">
-                  <div className="flex items-center justify-between"><span className="text-[10px] font-semibold text-slate-500">{label}</span><span className="text-[10px] font-bold text-slate-700">{fmtMoney(value)}</span></div>
-                  <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full rounded-full ${colour}`} style={{ width: shift.grossSales > 0 ? `${Math.round((value / shift.grossSales) * 100)}%` : "0%" }} /></div>
-                </div>
-              ))}
+          {operations.isSuccess ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">Stock form</p>
+              <p className="mt-2 text-lg font-black">{stock.dailyStockSubmitted ? "Verified" : "Missing"}</p>
             </div>
-          )}
+          ) : null}
         </div>
-
-        <div className="col-span-1 md:col-span-3 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Action Required</p>
-          {actions.length === 0 ? <div className="flex flex-col items-center justify-center gap-3 py-8 text-center"><CheckCircle className="h-8 w-8 text-emerald-400" /><p className="text-xs font-semibold text-emerald-700">All clear</p><p className="text-[10px] text-slate-400">No actions required</p></div> : <div className="space-y-2">{actions.map((a: any, i: number) => <ActionBadge key={i} severity={a.severity} title={a.title} message={a.message} />)}</div>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <VerifyCard label="Receipt Verification" status={receiptVerifyStatus} detail={staff.receiptDifference === null ? "No staff form data" : staff.receiptDifference === 0 ? `POS & staff agree: ${shift?.receiptCount ?? "—"} receipts` : `POS ${shift?.receiptCount ?? "—"} · Staff ${staff.staffReceiptCount ?? "—"}`} />
-        <VerifyCard label="Sales Verification" status={salesVerifyStatus} detail={staff.staffGrossSales === null ? "No staff sales data" : staff.staffGrossSales === 0 ? "Staff entered ฿0 — check form" : `POS ${fmtMoney(shift?.grossSales)} · Staff ${fmtMoney(staff.staffGrossSales)}`} />
-        <VerifyCard label="Payment Breakdown" status={shift ? "ok" : "unknown"} detail={shift ? `Cash ${fmtMoney(shift.cash)} · QR ${fmtMoney(shift.qr)} · Grab ${fmtMoney(shift.grab)}` : "No POS data"} />
-        <VerifyCard label="Stock Verification" status={stockVerifyStatus} detail={stock.dailyStockSubmitted ? `Rolls: ${stock.rollsStatus} · Meat: ${stock.meatStatus}` : "Stock count not submitted"} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-10 gap-5">
-        <div className="col-span-1 md:col-span-3 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">Sales Mix</p>
-          {pieData.length === 0 ? <div className="h-40 flex items-center justify-center text-xs text-slate-400">No data</div> : (
-            <div className="flex flex-col items-center gap-3">
-              <PieChart width={140} height={140}>
-                <Pie data={pieData} cx={65} cy={65} innerRadius={38} outerRadius={60} paddingAngle={3} dataKey="value" stroke="none">{pieData.map((entry, i) => <Cell key={i} fill={PIE_COLORS[entry.name as keyof typeof PIE_COLORS] ?? "#94a3b8"} />)}</Pie>
-                <Tooltip formatter={(v: any) => fmtMoney(v)} contentStyle={{ borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: "11px" }} />
-              </PieChart>
-              <div className="w-full space-y-1">{pieData.map(d => <div key={d.name} className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full" style={{ backgroundColor: PIE_COLORS[d.name as keyof typeof PIE_COLORS] ?? "#94a3b8" }} /><span className="text-slate-600 font-medium">{d.name}</span></div><span className="font-bold text-slate-800">{fmtMoney(d.value)}</span></div>)}</div>
-            </div>
-          )}
-        </div>
-
-        <div className="col-span-1 md:col-span-7 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 space-y-3">
-          <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">7-Day Trend — Gross Sales</p>
-          {trendData.length === 0 ? <div className="h-40 flex items-center justify-center text-xs text-slate-400">No data</div> : (
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={trendData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" /><XAxis dataKey="date" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} /><YAxis tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`} width={36} /><Tooltip {...CHART_TOOLTIP_STYLE} formatter={(v: any, name: string) => name === "grossSales" ? [fmtMoney(v), "Gross Sales"] : [v, "Receipts"]} /><Bar dataKey="grossSales" fill="#6366f1" radius={[3,3,0,0]} name="grossSales" />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-          {trendData.length > 0 && <div className="flex items-center gap-2 overflow-x-auto pt-1 border-t border-slate-100">{trendData.map((d: any) => <div key={d.date} className="flex flex-col items-center min-w-0 flex-1"><span className="text-[9px] text-slate-400">{d.date}</span><span className="text-[10px] font-bold text-slate-700">{d.receipts}</span><span className="text-[8px] text-slate-400">rcpts</span></div>)}</div>}
-        </div>
-      </div>
-
-      <div>
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-3">Quick Actions</p>
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
-          {quickActions.map(({ to, label, icon: Icon, colour }) => (
-            <Link key={to} to={to} className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center text-[10px] font-semibold transition-all hover:shadow-md hover:-translate-y-0.5 ${colour}`}>
-              <Icon className="h-4 w-4" /><span className="leading-tight">{label}</span><ArrowRight className="h-2.5 w-2.5 opacity-40" />
-            </Link>
-          ))}
-          <div className="flex items-center justify-center rounded-xl border border-rose-100 bg-rose-50 p-1 text-rose-800">
-            <ExpenseLodgmentModal
-              triggerText="Expenses"
-              triggerIcon={<TrendingUp className="h-4 w-4" />}
-              triggerClassName="h-full w-full flex-col gap-1.5 bg-transparent p-3 text-[10px] font-semibold text-rose-800 shadow-none hover:bg-rose-100"
-            />
-          </div>
-        </div>
-      </div>
+      </Panel>
     </div>
-  );
+
+    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">{[["Reporting", "/reports/overview"], ["Products", "/reports/sales-by-item"], ["Receipts", "/reports/receipts"], ["Finance", "/finance"], ["Expenses", "/finance/expenses"], ["Shifts", "/reports/shift-reconciliation"]].map(([label, to]) => <Link key={label} to={to} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 shadow-sm">{label}<ArrowRight className="h-3.5 w-3.5 text-slate-400" /></Link>)}</div>
+  </div>;
 }
