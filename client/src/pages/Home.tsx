@@ -10,10 +10,19 @@ const money = (value: number | null | undefined) => `฿${Number(value || 0).toL
 const compactMoney = (value: number) => value >= 1000 ? `฿${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : `฿${value}`;
 const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function localDate(offset = 0) {
-  const date = new Date();
-  date.setDate(date.getDate() + offset);
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+function lastCompletedShiftRange(): ExactDateTimeRangeValue {
+  const now = DateTime.now().setZone("Asia/Bangkok");
+  const endDay = now.hour < 3 ? now.minus({ days: 1 }) : now;
+  const endDate = endDay.toISODate()!;
+  const startDate = endDay.minus({ days: 1 }).toISODate()!;
+
+  return {
+    fromDate: startDate,
+    fromTime: "17:00",
+    toDate: endDate,
+    toTime: "03:00",
+    timezone: "Asia/Bangkok",
+  };
 }
 
 type HourRow = { bucketStart: string; orders: number; netSales: number };
@@ -82,7 +91,7 @@ function buildHourlySeries(rows: HourRow[], range: OverviewResponse["filters"]) 
   const start = DateTime.fromISO(range.fromInstant).toUTC().startOf("hour");
   const end = DateTime.fromISO(range.toInstant).toUTC().startOf("hour");
   const result = []; let cursor = start;
-  while (cursor <= end) {
+  while (cursor < end) {
     const key = cursor.toISO(); const row = totals.get(key);
     result.push({ bucketStart: key, label: cursor.setZone(range.timezone).toFormat("ha").toLowerCase(), sales: row?.netSales || 0, orders: row?.orders || 0 });
     cursor = cursor.plus({ hours: 1 });
@@ -95,7 +104,7 @@ function SmallStat({ label, value, sub, good }: { label: string; value: string; 
 }
 
 export default function Home() {
-  const [range] = useState<ExactDateTimeRangeValue>({ fromDate: localDate(-1), fromTime: "17:00", toDate: localDate(), toTime: "03:00", timezone: "Asia/Bangkok" });
+  const [range] = useState<ExactDateTimeRangeValue>(() => lastCompletedShiftRange());
   const params = useMemo(() => reportingRangeParams(range), [range]);
   const overview = useQuery<OverviewResponse>({ queryKey: ["home-overview", params], queryFn: () => jsonFetch(`/api/reports/receipt-analytics/unified/overview?${params}`), refetchInterval: 60_000 });
   const finance = useQuery<ProfitLossResponse>({ queryKey: ["home-finance"], queryFn: () => jsonFetch("/api/profit-loss"), staleTime: 60_000 });
@@ -112,8 +121,15 @@ export default function Home() {
   const categoryDonut = (breakdowns?.categories || []).slice(0, 7).map(row => ({ name: row.category, value: row.netSales, quantity: row.quantity }));
   const financeRows = months.filter(m => finance.data?.monthlyData?.[m]).map(m => ({ month: m, ...finance.data!.monthlyData[m] }));
   const ytd = financeRows.reduce((acc, row) => ({ sales: acc.sales + row.sales, cogs: acc.cogs + row.cogs, expenses: acc.expenses + row.expenses, grossProfit: acc.grossProfit + row.grossProfit, netProfit: acc.netProfit + row.netProfit }), { sales: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 });
-  const latestFinance = financeRows.at(-1);
-  const loanBalance = Number(loans.data?.data?.total_balance || 0);
+  const bangkokNow = DateTime.now().setZone("Asia/Bangkok");
+  const currentMonthKey = months[bangkokNow.month - 1];
+  const currentFinance =
+    finance.data?.year === bangkokNow.year
+      ? finance.data?.monthlyData?.[currentMonthKey]
+      : undefined;
+  const loanBalance = loans.isSuccess
+    ? Number(loans.data?.data?.total_balance || 0)
+    : null;
   const actions = operations.data?.actionRequired || [];
   const stock = operations.data?.stockStatus || {};
 
@@ -145,13 +161,53 @@ export default function Home() {
       <div className="mt-5 grid gap-5 xl:grid-cols-[.9fr_1.25fr_1fr]">
         <Panel title="Top Categories"><div className="space-y-3">{categoryDonut.slice(0, 6).map((row, index) => <div key={row.name} className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-3 py-2"><div className="flex min-w-0 items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: donutColors[index % donutColors.length] }} /><span className="truncate text-xs font-bold text-slate-700">{row.name}</span></div><span className="shrink-0 text-xs font-black">{money(row.value)}</span></div>)}</div></Panel>
         <Panel title="Top Products"><div className="space-y-4">{(breakdowns?.topProducts || []).slice(0, 8).map((row, index) => <HorizontalBar key={row.itemName} label={`${index + 1}. ${row.itemName}`} value={row.netSales} max={productMax} meta={`${money(row.netSales)} · ${row.quantity.toLocaleString()} sold`} color="bg-gradient-to-r from-blue-500 to-indigo-500" />)}</div></Panel>
-        <Panel title="Finance Snapshot"><div className="space-y-3"><div className="flex justify-between text-xs"><span className="text-slate-500">YTD sales</span><span className="font-black">{money(ytd.sales)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">COGS</span><span className="font-black">{money(ytd.cogs)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">Expenses</span><span className="font-black">{money(ytd.expenses)}</span></div><div className="flex justify-between border-t border-slate-100 pt-3 text-xs"><span className="font-bold text-slate-700">YTD profit</span><span className={`font-black ${ytd.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{money(ytd.netProfit)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">Current month</span><span className="font-black">{money(latestFinance?.netProfit)}</span></div><div className="flex justify-between text-xs"><span className="text-slate-500">Loan balance</span><span className="font-black">{money(loanBalance)}</span></div></div><Link to="/finance/profit-loss" className="mt-4 inline-flex items-center gap-1 text-[10px] font-black uppercase text-blue-600">View P&L <ArrowRight className="h-3 w-3" /></Link></Panel>
+        <Panel title="Finance Snapshot">
+          {finance.isLoading ? (
+            <div className="rounded-2xl bg-slate-50 p-4 text-xs font-bold text-slate-500">Loading finance…</div>
+          ) : finance.isError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-800">Finance unavailable</div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <div className="flex justify-between text-xs"><span className="text-slate-500">YTD sales</span><span className="font-black">{money(ytd.sales)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">COGS</span><span className="font-black">{money(ytd.cogs)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">Expenses</span><span className="font-black">{money(ytd.expenses)}</span></div>
+                <div className="flex justify-between border-t border-slate-100 pt-3 text-xs"><span className="font-bold text-slate-700">YTD profit</span><span className={`font-black ${ytd.netProfit >= 0 ? "text-emerald-600" : "text-red-600"}`}>{money(ytd.netProfit)}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">Current month</span><span className="font-black">{currentFinance ? money(currentFinance.netProfit) : "Unavailable"}</span></div>
+                <div className="flex justify-between text-xs"><span className="text-slate-500">Loan balance</span><span className="font-black">{loans.isLoading ? "Loading…" : loans.isError ? "Unavailable" : money(loanBalance)}</span></div>
+              </div>
+              <Link to="/finance/profit-loss" className="mt-4 inline-flex items-center gap-1 text-[10px] font-black uppercase text-blue-600">View P&L <ArrowRight className="h-3 w-3" /></Link>
+            </>
+          )}
+        </Panel>
       </div>
     </> : null}
 
     <div className="mt-5 grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
       <Panel title="Shift Reconciliation"><div className="grid grid-cols-3 gap-3"><SmallStat label="POS Sales" value={money(shift.data?.pos?.totalSales)} sub={`${shift.data?.pos?.receiptCount || 0} orders`} /><SmallStat label="Shift Form" value={shift.data?.dailySales?.formCount ? money(shift.data.dailySales.totalSales) : "Missing"} sub={`${shift.data?.dailySales?.formCount || 0} forms`} good={Boolean(shift.data?.dailySales?.formCount)} /><SmallStat label="Status" value={shift.data?.allMatched ? "Matched" : "Review"} sub={`${shift.data?.shiftCount || 0} POS shifts`} good={shift.data?.allMatched} /></div></Panel>
-      <Panel title="Needs Attention"><div className="grid gap-3 sm:grid-cols-2">{actions.length ? actions.slice(0, 4).map((action: any, index: number) => <div key={index} className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-black text-amber-900">{action.title || action.message || "Needs review"}</p></div>) : <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-black text-emerald-800">No urgent exceptions</div>}<div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">Stock form</p><p className="mt-2 text-lg font-black">{stock.dailyStockSubmitted ? "Verified" : "Missing"}</p></div></div></Panel>
+      <Panel title="Needs Attention">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {operations.isLoading ? (
+            <div className="rounded-2xl bg-slate-50 p-4 text-xs font-bold text-slate-500">Checking operations…</div>
+          ) : operations.isError ? (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-xs font-bold text-amber-800">Operations status unavailable</div>
+          ) : actions.length ? (
+            actions.slice(0, 4).map((action: any, index: number) => (
+              <div key={index} className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-xs font-black text-amber-900">{action.title || action.message || "Needs review"}</p>
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-black text-emerald-800">No urgent exceptions</div>
+          )}
+          {operations.isSuccess ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">Stock form</p>
+              <p className="mt-2 text-lg font-black">{stock.dailyStockSubmitted ? "Verified" : "Missing"}</p>
+            </div>
+          ) : null}
+        </div>
+      </Panel>
     </div>
 
     <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">{[["Reporting", "/reports/overview"], ["Products", "/reports/sales-by-item"], ["Receipts", "/reports/receipts"], ["Finance", "/finance"], ["Expenses", "/finance/expenses"], ["Shifts", "/reports/shift-reconciliation"]].map(([label, to]) => <Link key={label} to={to} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 shadow-sm">{label}<ArrowRight className="h-3.5 w-3.5 text-slate-400" /></Link>)}</div>
