@@ -1,126 +1,72 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import {
-  AlertTriangle,
-  ArrowRight,
-  Banknote,
-  CircleDollarSign,
-  Receipt,
-  ShoppingBag,
-  TrendingDown,
-  TrendingUp,
-  WalletCards,
-} from "lucide-react";
-import {
-  ExactDateTimeRange,
-  reportingRangeParams,
-  type ExactDateTimeRangeValue,
-} from "@/components/reports/ExactDateTimeRange";
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { ArrowRight, ArrowUpRight, Banknote, CreditCard, Receipt, ShoppingBag, Sparkles, UsersRound, WalletCards } from "lucide-react";
+import { DateTime } from "luxon";
+import { ExactDateTimeRange, reportingRangeParams, type ExactDateTimeRangeValue } from "@/components/reports/ExactDateTimeRange";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
 
-const money = (value: unknown) =>
-  `฿${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
-const number = (value: unknown) => Number(value || 0).toLocaleString("en-US");
-const pct = (value: number, total: number) => (total ? `${((value / total) * 100).toFixed(1)}%` : "—");
+const money = (value: number | null | undefined) => `฿${Number(value || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+const compactMoney = (value: number) => value >= 1000 ? `฿${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : `฿${value}`;
+const pct = (value: number, total: number) => total ? `${((value / total) * 100).toFixed(1)}%` : "—";
+const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-function bangkokParts(date = new Date()) {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Bangkok",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(date);
-  const read = (type: string) => parts.find((part) => part.type === type)?.value || "";
-  return {
-    date: `${read("year")}-${read("month")}-${read("day")}`,
-    hour: Number(read("hour")),
-    time: `${read("hour")}:${read("minute")}`,
-  };
+function localDate(offset = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
-function addDays(date: string, amount: number) {
-  const base = new Date(`${date}T12:00:00Z`);
-  base.setUTCDate(base.getUTCDate() + amount);
-  return base.toISOString().slice(0, 10);
-}
-
-function defaultDashboardRange(): ExactDateTimeRangeValue {
-  const now = bangkokParts();
-  if (now.hour >= 17) {
-    return { fromDate: now.date, fromTime: "17:00", toDate: now.date, toTime: now.time, timezone: "Asia/Bangkok" };
-  }
-  if (now.hour < 3) {
-    return { fromDate: addDays(now.date, -1), fromTime: "17:00", toDate: now.date, toTime: now.time, timezone: "Asia/Bangkok" };
-  }
-  return { fromDate: addDays(now.date, -1), fromTime: "17:00", toDate: now.date, toTime: "03:00", timezone: "Asia/Bangkok" };
-}
+type HourRow = { bucketStart: string; orders: number; netSales: number };
+type CategoryRow = { category: string; quantity: number; netSales: number };
+type ProductRow = { itemName: string; quantity: number; netSales: number };
+type OverviewResponse = {
+  ok: boolean;
+  source: string;
+  filters: ExactDateTimeRangeValue & { fromInstant: string; toInstant: string };
+  sourcesIncluded: string[];
+  overview: { receiptCount: number; grossSales: number; discounts: number; refunds: number; netSales: number; averageOrder: number; historicalReceipts: number; liveReceipts: number; paymentSales: Record<string, number> };
+  labor: { laborCost: number; paidStaffCount: number; laborCostPct: number | null; source: string };
+  breakdowns: { daily: Array<{ day: string; orders: number; netSales: number }>; hourly: HourRow[]; categories: CategoryRow[]; topProducts: ProductRow[] };
+};
+type ProfitLossResponse = { year: number; monthlyData: Record<string, { sales: number; bankDeposits: number | null; cogs: number; expenses: number; grossProfit: number; netProfit: number }> };
+type ShiftResponse = { shiftCount: number; pos: { receiptCount: number; totalSales: number }; dailySales: { formCount: number; totalSales: number | null }; rows: Array<{ key: string; label: string; pos: number; dailySales: number | null; delta: number | null; status: string }>; allMatched: boolean };
 
 async function jsonFetch<T>(url: string): Promise<T> {
   const response = await fetch(url, { credentials: "include", cache: "no-store" });
   const body = await response.json();
-  if (!response.ok || body?.ok === false || body?.success === false) {
-    throw new Error(body?.error || `HTTP ${response.status}`);
-  }
+  if (!response.ok || body?.ok === false || body?.success === false) throw new Error(body?.error || `HTTP ${response.status}`);
   return body;
 }
 
-type OverviewResponse = {
-  overview: {
-    receiptCount: number;
-    grossSales: number;
-    discounts: number;
-    refunds: number;
-    netSales: number;
-    averageOrder: number;
-    historicalReceipts: number;
-    liveReceipts: number;
-    paymentSales: Record<string, number>;
-  };
-  breakdowns: {
-    daily: Array<{ day: string; orders: number; netSales: number }>;
-    hourly: Array<{ hour: number; orders: number; netSales: number }>;
-    categories: Array<{ category: string; quantity: number; netSales: number }>;
-    topProducts: Array<{ itemName: string; quantity: number; netSales: number }>;
-  };
+const cardTones = {
+  blue: "from-blue-500 to-indigo-600 text-white",
+  amber: "from-amber-300 to-orange-400 text-slate-950",
+  mint: "from-emerald-300 to-teal-400 text-slate-950",
+  violet: "from-violet-400 to-fuchsia-500 text-white",
+  light: "from-white to-slate-100 text-slate-950",
 };
 
-type ProfitLossResponse = {
-  year: number;
-  monthlyData: Record<string, {
-    sales: number;
-    bankDeposits: number | null;
-    cogs: number;
-    expenses: number;
-    grossProfit: number;
-    netProfit: number;
-  }>;
-};
+function MetricCard({ label, value, sub, tone = "light", icon: Icon }: { label: string; value: string; sub: string; tone?: keyof typeof cardTones; icon: any }) {
+  return <article className={`relative min-h-40 overflow-hidden rounded-[28px] bg-gradient-to-br p-5 shadow-[0_18px_50px_rgba(0,0,0,.24)] ${cardTones[tone]}`}>
+    <div className="absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/15 blur-2xl" />
+    <div className="relative flex items-start justify-between"><p className="text-xs font-black uppercase tracking-[.18em] opacity-70">{label}</p><span className="rounded-full bg-black/10 p-2.5"><Icon className="h-4 w-4" /></span></div>
+    <p className="relative mt-7 text-3xl font-black tracking-tight">{value}</p><p className="relative mt-2 text-xs font-semibold opacity-65">{sub}</p>
+  </article>;
+}
 
-type ShiftReconciliationResponse = {
-  shiftCount: number;
-  pos: { receiptCount: number; totalSales: number };
-  dailySales: { formCount: number; totalSales: number | null };
-  rows: Array<{ key: string; label: string; pos: number; dailySales: number | null; delta: number | null; status: string }>;
-  allMatched: boolean;
-};
+function Panel({ title, subtitle, children, className = "", action }: { title: string; subtitle?: string; children: React.ReactNode; className?: string; action?: React.ReactNode }) {
+  return <section className={`rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,.08)] ${className}`}>
+    <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-black text-slate-950">{title}</h2>{subtitle ? <p className="mt-1 text-xs text-slate-500">{subtitle}</p> : null}</div>{action}</div>
+    <div className="mt-5">{children}</div>
+  </section>;
+}
+
+function HorizontalBar({ label, value, max, meta, color }: { label: string; value: number; max: number; meta: string; color: string }) {
+  const width = max > 0 ? Math.max(3, Math.min(100, value / max * 100)) : 0;
+  return <div className="space-y-2"><div className="flex justify-between gap-3 text-xs"><span className="truncate font-bold text-slate-700">{label}</span><span className="shrink-0 text-slate-500">{meta}</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className={`h-full rounded-full ${color}`} style={{ width: `${width}%` }} /></div></div>;
+}
 
 function paymentGroup(name: string) {
   const key = name.toLowerCase();
@@ -130,286 +76,98 @@ function paymentGroup(name: string) {
   if (key.includes("card")) return "Card";
   return "Other";
 }
+const paymentStyle: Record<string, { icon: any; color: string }> = {
+  Cash: { icon: Banknote, color: "bg-emerald-400" }, QR: { icon: WalletCards, color: "bg-blue-400" }, Grab: { icon: ShoppingBag, color: "bg-lime-300" }, Card: { icon: CreditCard, color: "bg-violet-400" }, Other: { icon: Sparkles, color: "bg-orange-300" },
+};
 
-function Metric({ label, value, sub, tone = "default" }: { label: string; value: string; sub?: string; tone?: "default" | "good" | "bad" | "warn" }) {
-  const toneClass = tone === "good"
-    ? "border-emerald-200 bg-emerald-50"
-    : tone === "bad"
-      ? "border-red-200 bg-red-50"
-      : tone === "warn"
-        ? "border-amber-200 bg-amber-50"
-        : "border-slate-200 bg-white";
-  return (
-    <div className={`rounded-2xl border p-3.5 shadow-sm ${toneClass}`}>
-      <div className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-500">{label}</div>
-      <div className="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">{value}</div>
-      {sub ? <div className="mt-1 truncate text-[10px] font-medium text-slate-500">{sub}</div> : null}
-    </div>
-  );
+function buildHourlySeries(rows: HourRow[], range: OverviewResponse["filters"]) {
+  const totals = new Map(rows.map(row => [DateTime.fromISO(row.bucketStart).toUTC().startOf("hour").toISO(), row]));
+  const start = DateTime.fromISO(range.fromInstant).toUTC().startOf("hour");
+  const end = DateTime.fromISO(range.toInstant).toUTC().startOf("hour");
+  const result = []; let cursor = start;
+  while (cursor <= end) {
+    const key = cursor.toISO(); const row = totals.get(key);
+    result.push({ bucketStart: key, label: cursor.setZone(range.timezone).toFormat("ha").toLowerCase(), sales: row?.netSales || 0, orders: row?.orders || 0 });
+    cursor = cursor.plus({ hours: 1 });
+  }
+  return result;
 }
 
-function Panel({ title, action, children, className = "" }: { title: string; action?: React.ReactNode; children: React.ReactNode; className?: string }) {
-  return (
-    <section className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-sm ${className}`}>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h2 className="text-sm font-black text-slate-950">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </section>
-  );
+function SmallStat({ label, value, sub, good }: { label: string; value: string; sub?: string; good?: boolean }) {
+  return <div className={`rounded-2xl border p-4 ${good === true ? "border-emerald-200 bg-emerald-50" : good === false ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-slate-50"}`}><p className="text-[10px] font-black uppercase tracking-[.16em] text-slate-500">{label}</p><p className="mt-2 text-xl font-black text-slate-950">{value}</p>{sub ? <p className="mt-1 text-[11px] text-slate-500">{sub}</p> : null}</div>;
 }
-
-function MiniLink({ to, children }: { to: string; children: React.ReactNode }) {
-  return (
-    <Link to={to} className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 hover:text-slate-950">
-      {children}<ArrowRight className="h-3 w-3" />
-    </Link>
-  );
-}
-
-const paymentColors = ["#111827", "#facc15", "#64748b", "#cbd5e1", "#94a3b8"];
-const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export default function Home() {
-  const [range, setRange] = useState<ExactDateTimeRangeValue>(() => defaultDashboardRange());
+  const [range, setRange] = useState<ExactDateTimeRangeValue>({ fromDate: localDate(-1), fromTime: "17:00", toDate: localDate(), toTime: "03:00", timezone: "Asia/Bangkok" });
   const params = useMemo(() => reportingRangeParams(range), [range]);
-
-  const overview = useQuery<OverviewResponse>({
-    queryKey: ["home-unified-overview", params],
-    queryFn: () => jsonFetch(`/api/reports/receipt-analytics/unified/overview?${params}`),
-    refetchInterval: 60_000,
-  });
-  const shift = useQuery<ShiftReconciliationResponse>({
-    queryKey: ["home-shift-reconciliation", params],
-    queryFn: () => jsonFetch(`/api/reports/receipt-analytics/shift-review?${params}`),
-    refetchInterval: 60_000,
-  });
-  const finance = useQuery<ProfitLossResponse>({
-    queryKey: ["home-profit-loss"],
-    queryFn: () => jsonFetch("/api/profit-loss"),
-    staleTime: 60_000,
-  });
-  const loans = useQuery<any>({
-    queryKey: ["home-loan-liabilities"],
-    queryFn: () => jsonFetch("/api/finance/director-beneficiary-loans/summary"),
-    staleTime: 60_000,
-  });
-  const operations = useQuery<any>({
-    queryKey: ["home-owner-dashboard"],
-    queryFn: () => jsonFetch("/api/operations-read/owner-dashboard"),
-    refetchInterval: 120_000,
-  });
+  const overview = useQuery<OverviewResponse>({ queryKey: ["home-overview", params], queryFn: () => jsonFetch(`/api/reports/receipt-analytics/unified/overview?${params}`), refetchInterval: 60_000 });
+  const finance = useQuery<ProfitLossResponse>({ queryKey: ["home-finance"], queryFn: () => jsonFetch("/api/profit-loss"), staleTime: 60_000 });
+  const shift = useQuery<ShiftResponse>({ queryKey: ["home-shift", params], queryFn: () => jsonFetch(`/api/reports/receipt-analytics/shift-review?${params}`), refetchInterval: 60_000 });
+  const loans = useQuery<any>({ queryKey: ["home-loans"], queryFn: () => jsonFetch("/api/finance/director-beneficiary-loans/summary"), staleTime: 60_000 });
+  const operations = useQuery<any>({ queryKey: ["home-ops"], queryFn: () => jsonFetch("/api/operations-read/owner-dashboard"), refetchInterval: 120_000 });
 
   const data = overview.data?.overview;
+  const labor = overview.data?.labor;
   const breakdowns = overview.data?.breakdowns;
-  const groupedPayments = useMemo(() => {
-    const grouped: Record<string, number> = { Cash: 0, QR: 0, Grab: 0, Card: 0, Other: 0 };
-    for (const [name, amount] of Object.entries(data?.paymentSales || {})) grouped[paymentGroup(name)] += Number(amount || 0);
-    return Object.entries(grouped).map(([name, value]) => ({ name, value })).filter((row) => row.value > 0);
-  }, [data]);
-
-  const financeRows = months
-    .filter((month) => finance.data?.monthlyData?.[month])
-    .map((month) => ({ month, ...finance.data!.monthlyData[month] }));
+  const hourly = useMemo(() => overview.data ? buildHourlySeries(overview.data.breakdowns.hourly, overview.data.filters) : [], [overview.data]);
+  const paymentGroups = useMemo(() => { const grouped: Record<string, number> = { Cash: 0, QR: 0, Grab: 0, Card: 0, Other: 0 }; for (const [name, amount] of Object.entries(data?.paymentSales || {})) grouped[paymentGroup(name)] += Number(amount || 0); return grouped; }, [data]);
+  const categoryMax = Math.max(0, ...(breakdowns?.categories || []).map(row => row.netSales));
+  const productMax = Math.max(0, ...(breakdowns?.topProducts || []).map(row => row.netSales));
+  const financeRows = months.filter(m => finance.data?.monthlyData?.[m]).map(m => ({ month: m, ...finance.data!.monthlyData[m] }));
+  const ytd = financeRows.reduce((acc, row) => ({ sales: acc.sales + row.sales, cogs: acc.cogs + row.cogs, expenses: acc.expenses + row.expenses, grossProfit: acc.grossProfit + row.grossProfit, netProfit: acc.netProfit + row.netProfit }), { sales: 0, cogs: 0, expenses: 0, grossProfit: 0, netProfit: 0 });
   const latestFinance = financeRows.at(-1);
-  const ytd = financeRows.reduce((acc, row) => ({
-    sales: acc.sales + Number(row.sales || 0),
-    expenses: acc.expenses + Number(row.expenses || 0),
-    cogs: acc.cogs + Number(row.cogs || 0),
-    netProfit: acc.netProfit + Number(row.netProfit || 0),
-  }), { sales: 0, expenses: 0, cogs: 0, netProfit: 0 });
-
+  const loanBalance = Number(loans.data?.data?.total_balance || 0);
   const actions = operations.data?.actionRequired || [];
   const stock = operations.data?.stockStatus || {};
-  const loanBalance = Number(loans.data?.data?.total_balance || 0);
-  const shiftRows = shift.data?.rows || [];
-  const paymentTotal = groupedPayments.reduce((sum, row) => sum + row.value, 0);
-  const chartDaily = breakdowns?.daily || [];
-  const chartHourly = breakdowns?.hourly || [];
-  const topProducts = breakdowns?.topProducts?.slice(0, 5) || [];
-  const categories = breakdowns?.categories?.slice(0, 5) || [];
 
-  return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-4 pb-8">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Smash Brothers Burgers</div>
-          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 md:text-3xl">Command Centre</h1>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <ExpenseLodgmentModal triggerText="Expense" triggerClassName="bg-slate-950 text-white hover:bg-slate-800" />
-          <Link to="/reports/overview" className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
-            Full reporting <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
+  return <div className="min-h-screen rounded-[32px] bg-slate-50 p-4 text-slate-950 md:p-6">
+    <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+      <div><p className="text-xs font-black uppercase tracking-[.25em] text-blue-600">Restaurant intelligence</p><h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Command Centre</h1><p className="mt-2 text-sm text-slate-500">Sales, finance and operations from one trusted dashboard.</p></div>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center"><div className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-900 shadow-sm"><ExactDateTimeRange value={range} onChange={setRange} timezoneLabel="Venue time · Asia/Bangkok" /></div><div className="flex gap-2"><ExpenseLodgmentModal triggerText="Expense" triggerClassName="bg-slate-950 text-white hover:bg-slate-800" /><Link to="/reports/overview" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-700 shadow-sm">Full reporting <ArrowRight className="h-3.5 w-3.5" /></Link></div></div>
+    </header>
+
+    {overview.isLoading ? <div className="rounded-3xl border border-slate-200 bg-white p-10 text-sm text-slate-500">Loading dashboard…</div> : null}
+    {overview.isError ? <div className="mb-5 rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{(overview.error as Error).message}</div> : null}
+
+    {data ? <>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <MetricCard label="Gross sales" value={money(data.grossSales)} sub="Before discounts and refunds" tone="blue" icon={ArrowUpRight} />
+        <MetricCard label="Net sales" value={money(data.netSales)} sub={`${money(data.discounts + data.refunds)} adjustments`} tone="light" icon={Banknote} />
+        <MetricCard label="Orders" value={data.receiptCount.toLocaleString()} sub={`${data.historicalReceipts} historical · ${data.liveReceipts} live`} tone="amber" icon={Receipt} />
+        <MetricCard label="Average order" value={money(data.averageOrder)} sub="Net sales per paid receipt" tone="mint" icon={ShoppingBag} />
+        <MetricCard label="Labor cost" value={labor?.laborCostPct == null ? "—" : `${labor.laborCostPct.toFixed(1)}%`} sub={`${money(labor?.laborCost || 0)} · ${labor?.paidStaffCount || 0} paid staff`} tone="violet" icon={UsersRound} />
       </div>
 
-      <ExactDateTimeRange value={range} onChange={setRange} timezoneLabel="Venue time · Asia/Bangkok" />
-
-      {overview.isError ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700">Reporting data unavailable: {(overview.error as Error).message}</div>
-      ) : null}
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Metric label="Net Sales" value={overview.isLoading ? "…" : money(data?.netSales)} sub={`Gross ${money(data?.grossSales)}`} />
-        <Metric label="Orders" value={overview.isLoading ? "…" : number(data?.receiptCount)} sub={`${number(data?.liveReceipts)} live POS`} />
-        <Metric label="Avg Order" value={overview.isLoading ? "…" : money(data?.averageOrder)} />
-        <Metric label="Discounts" value={overview.isLoading ? "…" : money(Number(data?.discounts || 0) + Number(data?.refunds || 0))} />
-        <Metric label="Month Expenses" value={finance.isLoading ? "…" : money(latestFinance?.expenses)} sub={latestFinance?.month || "Current month"} />
-        <Metric
-          label="Month Profit"
-          value={finance.isLoading ? "…" : money(latestFinance?.netProfit)}
-          sub={latestFinance ? pct(latestFinance.netProfit, latestFinance.sales) : "—"}
-          tone={latestFinance ? (latestFinance.netProfit >= 0 ? "good" : "bad") : "default"}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-        <Panel title="Sales Trend" action={<MiniLink to="/reports/overview">Overview</MiniLink>} className="md:col-span-8">
-          <div className="h-[220px] md:h-[250px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartDaily} margin={{ top: 8, right: 6, left: -24, bottom: 0 }}>
-                <defs><linearGradient id="salesFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#111827" stopOpacity={0.22}/><stop offset="100%" stopColor="#111827" stopOpacity={0.02}/></linearGradient></defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="day" tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-                <Tooltip formatter={(value: any) => [money(value), "Net sales"]} contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0", fontSize: 11 }} />
-                <Area type="monotone" dataKey="netSales" stroke="#111827" strokeWidth={2.5} fill="url(#salesFill)" />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+      <div className="mt-5 grid gap-5 xl:grid-cols-[1.65fr_1fr]">
+        <Panel title="Hourly Sales" subtitle={`One bar per trading hour · ${range.fromTime} opening to ${range.toTime} closing`}>
+          <ResponsiveContainer width="100%" height={300}><BarChart data={hourly} margin={{ top: 18, right: 4, left: 0, bottom: 0 }}><defs><linearGradient id="homeHourly" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa" /><stop offset="100%" stopColor="#4f46e5" /></linearGradient></defs><CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" /><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 11, fontWeight: 700 }} /><YAxis axisLine={false} tickLine={false} width={50} tick={{ fill: "#64748b", fontSize: 10 }} tickFormatter={compactMoney} /><Tooltip contentStyle={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16 }} formatter={(value: number, _name: string, entry: any) => [`${money(value)} · ${entry.payload.orders} orders`, "Sales"]} /><Bar dataKey="sales" fill="url(#homeHourly)" radius={[10, 10, 3, 3]} maxBarSize={58} /></BarChart></ResponsiveContainer>
         </Panel>
-
-        <Panel title="Payments" action={<MiniLink to="/reports/receipts">Receipts</MiniLink>} className="md:col-span-4">
-          <div className="grid grid-cols-[1fr_1fr] items-center gap-2">
-            <div className="h-[180px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart><Pie data={groupedPayments} dataKey="value" nameKey="name" innerRadius="58%" outerRadius="82%" paddingAngle={2}>{groupedPayments.map((_, index) => <Cell key={index} fill={paymentColors[index % paymentColors.length]} />)}</Pie><Tooltip formatter={(value: any) => money(value)} /></PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="space-y-2">
-              {groupedPayments.map((row, index) => (
-                <div key={row.name} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="flex items-center gap-2 font-semibold text-slate-600"><span className="h-2 w-2 rounded-full" style={{ backgroundColor: paymentColors[index % paymentColors.length] }} />{row.name}</span>
-                  <span className="font-black text-slate-950">{pct(row.value, paymentTotal)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
+        <Panel title="Payment Mix" subtitle="Net sales by payment channel">
+          <div className="space-y-3">{Object.entries(paymentGroups).map(([label, amount]) => { const Style = paymentStyle[label]; const Icon = Style.icon; const share = data.netSales > 0 ? amount / data.netSales * 100 : 0; return <div key={label} className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"><span className={`rounded-xl p-2 ${Style.color}`}><Icon className="h-4 w-4" /></span><div className="min-w-0 flex-1"><div className="flex justify-between text-xs"><span className="font-bold text-slate-700">{label}</span><span className="font-black">{money(amount)}</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200"><div className={`h-full rounded-full ${Style.color}`} style={{ width: `${Math.max(share ? 3 : 0, share)}%` }} /></div></div><span className="w-10 text-right text-[10px] font-bold text-slate-500">{share.toFixed(0)}%</span></div>; })}</div>
         </Panel>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-        <Panel title="Hourly Sales" className="md:col-span-7">
-          <div className="h-[210px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartHourly} margin={{ top: 8, right: 4, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="hour" tick={{ fontSize: 9, fill: "#64748b" }} tickFormatter={(v) => `${String(v).padStart(2, "0")}:00`} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(value: any) => [money(value), "Net sales"]} labelFormatter={(v) => `${String(v).padStart(2, "0")}:00`} />
-                <Bar dataKey="netSales" fill="#111827" radius={[5, 5, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Panel>
-
-        <Panel title="Top Products" action={<MiniLink to="/reports/sales-by-item">Items</MiniLink>} className="md:col-span-5">
-          <div className="space-y-3">
-            {topProducts.map((row, index) => {
-              const max = topProducts[0]?.netSales || 1;
-              return (
-                <div key={`${row.itemName}-${index}`}>
-                  <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="truncate font-bold text-slate-700">{row.itemName}</span><span className="shrink-0 font-black text-slate-950">{money(row.netSales)}</span></div>
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-slate-900" style={{ width: `${Math.max(4, row.netSales / max * 100)}%` }} /></div>
-                </div>
-              );
-            })}
-            {!topProducts.length ? <div className="py-10 text-center text-xs text-slate-400">No product data</div> : null}
-          </div>
-        </Panel>
+      <div className="mt-5 grid gap-5 xl:grid-cols-2">
+        <Panel title="Category Mix" subtitle="What guests spent on" action={<Link to="/reports/items" className="text-[10px] font-black uppercase text-slate-500">Items →</Link>}><div className="space-y-4">{(breakdowns?.categories || []).slice(0, 6).map((row, index) => <HorizontalBar key={row.category} label={row.category} value={row.netSales} max={categoryMax} meta={`${money(row.netSales)} · ${row.quantity.toLocaleString()} sold`} color={["bg-blue-400", "bg-orange-300", "bg-emerald-300", "bg-violet-400"][index % 4]} />)}</div></Panel>
+        <Panel title="Top Products" subtitle="Ranked by net sales" action={<Link to="/reports/items" className="text-[10px] font-black uppercase text-slate-500">Items →</Link>}><div className="space-y-4">{(breakdowns?.topProducts || []).slice(0, 6).map((row, index) => <HorizontalBar key={row.itemName} label={`${index + 1}. ${row.itemName}`} value={row.netSales} max={productMax} meta={`${money(row.netSales)} · ${row.quantity.toLocaleString()} sold`} color="bg-gradient-to-r from-blue-500 to-indigo-500" />)}</div></Panel>
       </div>
+    </> : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-        <Panel title="Finance" action={<MiniLink to="/finance/profit-loss">P&L</MiniLink>} className="md:col-span-8">
-          <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Metric label="YTD Sales" value={finance.isLoading ? "…" : money(ytd.sales)} />
-            <Metric label="YTD COGS" value={finance.isLoading ? "…" : money(ytd.cogs)} />
-            <Metric label="YTD Expenses" value={finance.isLoading ? "…" : money(ytd.expenses)} />
-            <Metric label="YTD Profit" value={finance.isLoading ? "…" : money(ytd.netProfit)} tone={ytd.netProfit >= 0 ? "good" : "bad"} />
-          </div>
-          <div className="h-[210px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={financeRows} margin={{ top: 8, right: 4, left: -24, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: "#64748b" }} axisLine={false} tickLine={false} tickFormatter={(v) => v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
-                <Tooltip formatter={(value: any, name: string) => [money(value), name]} />
-                <Bar dataKey="sales" name="Sales" fill="#111827" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="expenses" name="Expenses" fill="#94a3b8" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Panel>
-
-        <div className="grid grid-cols-2 gap-3 md:col-span-4 md:grid-cols-1">
-          <Metric label="Loan Balance" value={loans.isLoading ? "…" : money(loanBalance)} sub="Director / beneficiary" tone={loanBalance > 0 ? "warn" : "default"} />
-          <Metric label="Live POS Sales" value={overview.isLoading ? "…" : money(groupedPayments.reduce((sum, row) => sum + row.value, 0))} sub={`${number(data?.liveReceipts)} live orders`} />
-          <Metric label="Categories" value={number(categories.length)} sub={categories[0]?.category ? `Top: ${categories[0].category}` : "Selected range"} />
-          <Metric label="Data Sources" value={data ? `${data.historicalReceipts > 0 ? "History" : ""}${data.historicalReceipts > 0 && data.liveReceipts > 0 ? " + " : ""}${data.liveReceipts > 0 ? "Live" : ""}` || "—" : "…"} sub="Unified ledger" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-12">
-        <Panel title="Shift Reconciliation" action={<MiniLink to="/reports/shift-reconciliation">Shift report</MiniLink>} className="md:col-span-8">
-          <div className="mb-3 grid grid-cols-3 gap-2">
-            <Metric label="POS Sales" value={shift.isLoading ? "…" : money(shift.data?.pos?.totalSales)} sub={`${number(shift.data?.pos?.receiptCount)} orders`} />
-            <Metric label="Shift Form" value={shift.isLoading ? "…" : shift.data?.dailySales?.totalSales == null ? "Missing" : money(shift.data.dailySales.totalSales)} sub={`${number(shift.data?.dailySales?.formCount)} forms`} tone={shift.data?.dailySales?.totalSales == null ? "warn" : "default"} />
-            <Metric label="Status" value={shift.isLoading ? "…" : shift.data?.allMatched ? "Matched" : "Review"} sub={`${number(shift.data?.shiftCount)} POS shifts`} tone={shift.data?.allMatched ? "good" : "warn"} />
-          </div>
-          <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
-            {shiftRows.map((row) => (
-              <div key={row.key} className="rounded-xl border border-slate-100 bg-slate-50 p-2.5">
-                <div className="truncate text-[9px] font-bold uppercase tracking-wide text-slate-400">{row.label.replace(" (฿)", "")}</div>
-                <div className="mt-1 text-sm font-black text-slate-900">{money(row.pos)}</div>
-                <div className={`mt-1 text-[9px] font-bold ${row.status === "match" ? "text-emerald-600" : row.status === "missing" ? "text-amber-600" : "text-red-600"}`}>{row.status === "match" ? "MATCH" : row.status.toUpperCase()}</div>
-              </div>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel title="Needs Attention" className="md:col-span-4">
-          <div className="space-y-2">
-            {actions.slice(0, 4).map((action: any, index: number) => (
-              <div key={`${action.title || action.code}-${index}`} className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
-                <div className="min-w-0"><div className="truncate text-xs font-black text-amber-900">{action.title || action.code || "Review"}</div><div className="mt-0.5 line-clamp-2 text-[10px] text-amber-700">{action.message || action.detail}</div></div>
-              </div>
-            ))}
-            {!actions.length ? <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center text-xs font-bold text-emerald-700">No urgent exceptions</div> : null}
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <div className="rounded-xl border border-slate-200 p-2.5"><div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Stock Form</div><div className="mt-1 text-sm font-black text-slate-900">{stock.dailyStockSubmitted ? "Done" : "Missing"}</div></div>
-              <div className="rounded-xl border border-slate-200 p-2.5"><div className="text-[9px] font-bold uppercase tracking-wide text-slate-400">Shopping</div><div className="mt-1 text-sm font-black text-slate-900">{number(stock.shoppingCount ?? stock.requestedShopping?.length ?? 0)}</div></div>
-            </div>
-          </div>
-        </Panel>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6">
-        {[
-          { to: "/reports/overview", label: "Reporting", icon: TrendingUp },
-          { to: "/reports/sales-by-item", label: "Products", icon: ShoppingBag },
-          { to: "/reports/receipts", label: "Receipts", icon: Receipt },
-          { to: "/finance", label: "Finance", icon: CircleDollarSign },
-          { to: "/finance/expenses", label: "Expenses", icon: WalletCards },
-          { to: "/reports/shift-reconciliation", label: "Shifts", icon: Banknote },
-        ].map((item) => (
-          <Link key={item.to} to={item.to} className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-black text-slate-700 shadow-sm hover:border-slate-300 hover:bg-slate-50">
-            <span className="flex items-center gap-2"><item.icon className="h-4 w-4 text-slate-400" />{item.label}</span><ArrowRight className="h-3 w-3 text-slate-300" />
-          </Link>
-        ))}
-      </div>
+    <div className="mt-5 grid gap-5 xl:grid-cols-2">
+      <Panel title="Finance" subtitle={`${finance.data?.year || ""} year to date`} action={<Link to="/finance/profit-loss" className="text-[10px] font-black uppercase text-slate-500">P&L →</Link>}>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4"><SmallStat label="YTD Sales" value={money(ytd.sales)} /><SmallStat label="YTD COGS" value={money(ytd.cogs)} /><SmallStat label="YTD Expenses" value={money(ytd.expenses)} /><SmallStat label="YTD Profit" value={money(ytd.netProfit)} good={ytd.netProfit >= 0} /></div>
+        <div className="mt-4 grid grid-cols-2 gap-3"><SmallStat label="Current Month Profit" value={money(latestFinance?.netProfit)} sub={latestFinance?.month || "Current month"} good={(latestFinance?.netProfit || 0) >= 0} /><SmallStat label="Loan Balance" value={money(loanBalance)} sub="Director / beneficiary" /></div>
+      </Panel>
+      <Panel title="Shift Reconciliation" subtitle="POS against shift form" action={<Link to="/reports/shift-reconciliation" className="text-[10px] font-black uppercase text-slate-500">Shift report →</Link>}>
+        <div className="grid grid-cols-3 gap-3"><SmallStat label="POS Sales" value={money(shift.data?.pos?.totalSales)} sub={`${shift.data?.pos?.receiptCount || 0} orders`} /><SmallStat label="Shift Form" value={shift.data?.dailySales?.formCount ? money(shift.data.dailySales.totalSales) : "Missing"} sub={`${shift.data?.dailySales?.formCount || 0} forms`} good={Boolean(shift.data?.dailySales?.formCount)} /><SmallStat label="Status" value={shift.data?.allMatched ? "Matched" : "Review"} sub={`${shift.data?.shiftCount || 0} POS shifts`} good={shift.data?.allMatched} /></div>
+      </Panel>
     </div>
-  );
+
+    <div className="mt-5 grid gap-5 xl:grid-cols-[1.15fr_.85fr]">
+      <Panel title="Needs Attention" subtitle="Only exceptions that need owner action"><div className="grid gap-3 sm:grid-cols-2">{actions.length ? actions.slice(0, 6).map((action: any, index: number) => <div key={index} className="rounded-2xl border border-amber-200 bg-amber-50 p-4"><p className="text-xs font-black text-amber-900">{action.title || action.message || "Needs review"}</p><p className="mt-1 text-[11px] text-amber-700">{action.message || action.detail || "Open the related section for details."}</p></div>) : <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-xs font-black text-emerald-800">No urgent exceptions</div>}</div></Panel>
+      <Panel title="Operations" subtitle="Current forms and stock status"><div className="grid grid-cols-2 gap-3"><SmallStat label="Stock Form" value={stock.dailyStockSubmitted ? "Verified" : "Missing"} good={Boolean(stock.dailyStockSubmitted)} /><SmallStat label="Shopping" value={`${stock.requestedShopping?.length || 0}`} sub="Requested items" /><SmallStat label="Rolls" value={stock.rolls != null ? String(stock.rolls) : "—"} /><SmallStat label="Meat" value={stock.meat != null ? String(stock.meat) : "—"} /></div></Panel>
+    </div>
+
+    <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">{[["Reporting", "/reports/overview"], ["Products", "/reports/items"], ["Receipts", "/reports/receipts"], ["Finance", "/finance"], ["Expenses", "/finance/expenses"], ["Shifts", "/reports/shift-reconciliation"]].map(([label, to]) => <Link key={label} to={to} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 shadow-sm">{label}<ArrowRight className="h-3.5 w-3.5 text-slate-400" /></Link>)}</div>
+  </div>;
 }
