@@ -77,6 +77,7 @@ export default function MenuWorkspace() {
   const { data: purchasingData, isLoading: purchasingLoading } = useQuery<PurchasingListResponse>({ queryKey: ["/api/purchasing-items?active=true"] });
   const { data: modifierData, isLoading: modifiersLoading } = useQuery<{ groups?: ModifierGroup[] } | ModifierGroup[]>({ queryKey: ["/api/menu-v3/modifiers/groups"] });
 
+  const exportDataLoading = itemsLoading || categoriesLoading || recipesLoading || modifiersLoading;
   const items = asArray<MenuItem>(normalizeMenuItems<MenuItem>(rawItems).items);
   const categories = asArray<MenuCategory>(normalizeMenuCategories<MenuCategory>(rawCategories).items);
   const recipes = Array.isArray(recipesData) ? recipesData : asArray<Recipe>(recipesData?.rows);
@@ -211,7 +212,7 @@ export default function MenuWorkspace() {
         <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700"><Search className="h-4 w-4" /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search" className="w-40 bg-transparent outline-none" /></label>
         <button type="button" onClick={() => setShowOutOfStockOnly((value) => !value)} className={`rounded-full border px-4 py-2 text-sm ${showOutOfStockOnly ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700"}`}>Out of Stock ({outOfStockCount})</button>
         <button type="button" className="inline-flex cursor-default items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500" title="No editable availability schedule is configured for this source"><Clock className="h-4 w-4" />Availability schedule</button>
-        <button type="button" onClick={exportMenuItems} disabled={itemsLoading || items.length === 0} className="inline-flex items-center gap-2 rounded-full border border-slate-900 bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Download className="h-4 w-4" />Export Menu CSV</button>
+        <button type="button" onClick={exportMenuItems} disabled={exportDataLoading || items.length === 0} className="inline-flex items-center gap-2 rounded-full border border-slate-900 bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Download className="h-4 w-4" />Export Menu CSV</button>
       </div>
       {(itemsLoading || categoriesLoading || recipesLoading) && <div className="text-center py-12 text-slate-400 text-xs">Loading menu items...</div>}
       {!itemsLoading && itemGroups.length === 0 && blockerText("No menu items matched the current filters. Existing records are not hidden unless a filter is active.")}
