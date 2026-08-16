@@ -6,7 +6,8 @@ const STAFFED_TYPES = new Set(["WAGES", "OVERTIME"]);
 
 export const LABOUR_EFFICIENCY_DEFAULTS = {
   breakMinutesPerStaff: 30,
-  prepAndCleaningMinutesPerShift: 105,
+  prepMinutesPerShift: 60,
+  cleaningMinutesPerShift: 60,
 } as const;
 
 export type LabourEfficiencyInput = {
@@ -15,7 +16,8 @@ export type LabourEfficiencyInput = {
   shiftCount?: number;
   shiftMinutes: number;
   breakMinutesPerStaff?: number;
-  prepAndCleaningMinutesPerShift?: number;
+  prepMinutesPerShift?: number;
+  cleaningMinutesPerShift?: number;
 };
 
 const nonNegative = (value: unknown) => {
@@ -38,13 +40,18 @@ export function calculateLabourEfficiency(input: LabourEfficiencyInput) {
   const breakMinutesPerStaff = nonNegative(
     input.breakMinutesPerStaff ?? LABOUR_EFFICIENCY_DEFAULTS.breakMinutesPerStaff,
   );
-  const prepAndCleaningMinutesPerShift = nonNegative(
-    input.prepAndCleaningMinutesPerShift ?? LABOUR_EFFICIENCY_DEFAULTS.prepAndCleaningMinutesPerShift,
+  const prepMinutesPerShift = nonNegative(
+    input.prepMinutesPerShift ?? LABOUR_EFFICIENCY_DEFAULTS.prepMinutesPerShift,
+  );
+  const cleaningMinutesPerShift = nonNegative(
+    input.cleaningMinutesPerShift ?? LABOUR_EFFICIENCY_DEFAULTS.cleaningMinutesPerShift,
   );
 
   const grossLabourMinutes = staffCount * shiftMinutes;
   const breakAllowanceMinutes = staffCount * breakMinutesPerStaff;
-  const prepAndCleaningMinutes = shiftCount * prepAndCleaningMinutesPerShift;
+  const prepMinutes = shiftCount * prepMinutesPerShift;
+  const cleaningMinutes = shiftCount * cleaningMinutesPerShift;
+  const prepAndCleaningMinutes = prepMinutes + cleaningMinutes;
   const totalAllowanceMinutes = breakAllowanceMinutes + prepAndCleaningMinutes;
   const availableProductionMinutes = Math.max(0, grossLabourMinutes - totalAllowanceMinutes);
   const availableProductionHours = availableProductionMinutes / 60;
@@ -66,6 +73,8 @@ export function calculateLabourEfficiency(input: LabourEfficiencyInput) {
     shiftMinutes,
     grossLabourMinutes,
     breakAllowanceMinutes,
+    prepMinutes,
+    cleaningMinutes,
     prepAndCleaningMinutes,
     totalAllowanceMinutes,
     availableProductionMinutes,

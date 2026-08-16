@@ -16,7 +16,9 @@ Available production time is calculated as:
 
 - Default reporting window: 17:55 to 02:15 next day (500 minutes).
 - Break allowance: 30 minutes per recorded staff member.
-- Prep and cleaning allowance: 105 minutes per recorded shift.
+- Prep allowance: 60 total staff-minutes per recorded shift.
+- Cleaning allowance: 60 total staff-minutes per recorded shift.
+- Prep and cleaning combined: 120 total staff-minutes per shift. These are shift-level totals and are not multiplied by staff count.
 - Staff source: unique positive WAGES/OVERTIME staff names within each Daily Sales & Stock V2 wage list. Bonus-only and reimbursement rows do not create a worked-staff record.
 - Item source: canonical unified reporting ledger quantities for paid, non-cancelled sales. Set components and refunds are excluded by the ledger.
 

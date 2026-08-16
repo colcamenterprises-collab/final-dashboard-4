@@ -52,7 +52,11 @@ export async function buildLabourAnalysis(date: string) {
       shiftEnd: "02:15",
       shiftMinutes: SBB_SHIFT_MINUTES,
       breakMinutesPerStaff: LABOUR_EFFICIENCY_DEFAULTS.breakMinutesPerStaff,
-      prepAndCleaningMinutesPerShift: LABOUR_EFFICIENCY_DEFAULTS.prepAndCleaningMinutesPerShift,
+      prepMinutesPerShift: LABOUR_EFFICIENCY_DEFAULTS.prepMinutesPerShift,
+      cleaningMinutesPerShift: LABOUR_EFFICIENCY_DEFAULTS.cleaningMinutesPerShift,
+      prepAndCleaningMinutesPerShift:
+        LABOUR_EFFICIENCY_DEFAULTS.prepMinutesPerShift
+        + LABOUR_EFFICIENCY_DEFAULTS.cleaningMinutesPerShift,
     },
     sources: {
       staff: "daily_sales_v2.payload.wages",
