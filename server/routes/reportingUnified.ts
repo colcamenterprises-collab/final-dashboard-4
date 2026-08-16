@@ -8,7 +8,7 @@ import {
 import { queryUnifiedReceiptDetails } from "../reporting/unifiedReceiptDetails";
 import { queryUnifiedComponents } from "../reporting/unifiedComponents";
 import { queryUnifiedOverviewBreakdowns } from "../reporting/unifiedOverviewBreakdowns";
-import { queryRecordedLabor } from "../reporting/unifiedLabor";
+import { calculateLabourEfficiency, queryRecordedLabor } from "../reporting/unifiedLabor";
 
 const router = Router();
 
@@ -24,14 +24,35 @@ function exactRange(query: Record<string, unknown>) {
   return resolveExactReportingRange({ fromDate, fromTime, toDate, toTime, timezone });
 }
 
+function dailyShiftMinutes(fromTime: string, toTime: string) {
+  const minutes = (value: string) => {
+    const [hours, mins] = value.split(":").map(Number);
+    return hours * 60 + mins;
+  };
+  const from = minutes(fromTime);
+  const to = minutes(toTime);
+  return to > from ? to - from : to + 24 * 60 - from;
+}
+
 router.get("/overview", async (req, res) => {
   try {
     const range = exactRange(req.query as Record<string, unknown>);
-    const [overview, breakdowns, labor] = await Promise.all([
+    const [overview, breakdowns, recordedLabor] = await Promise.all([
       queryUnifiedOverview(range),
       queryUnifiedOverviewBreakdowns(range),
       queryRecordedLabor(range),
     ]);
+    const itemCount = breakdowns.categories.reduce(
+      (sum: number, row: { quantity: number }) => sum + Number(row.quantity || 0),
+      0,
+    );
+    const shiftMinutes = dailyShiftMinutes(range.fromTime, range.toTime);
+    const efficiency = calculateLabourEfficiency({
+      itemCount,
+      staffCount: recordedLabor.staffShiftCount,
+      shiftCount: recordedLabor.recordedShiftCount,
+      shiftMinutes,
+    });
     res.json({
       ok: true,
       source: "unified_reporting_ledger",
@@ -43,9 +64,11 @@ router.get("/overview", async (req, res) => {
       overview,
       breakdowns,
       labor: {
-        ...labor,
-        laborCostPct: overview.netSales > 0 ? (labor.laborCost / overview.netSales) * 100 : null,
+        ...recordedLabor,
+        laborCostPct: overview.netSales > 0 ? (recordedLabor.laborCost / overview.netSales) * 100 : null,
+        efficiency,
         source: "daily_sales_v2_recorded_wages",
+        demandSource: "unified_reporting_ledger_paid_item_quantity",
       },
     });
   } catch (error: any) {
