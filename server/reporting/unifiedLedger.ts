@@ -317,6 +317,7 @@ export async function queryBurgerUsage(range: ResolvedReportingRange) {
       c.name_en AS category,
       link.recipe_id,
       r.name AS recipe_name,
+      COALESCE(r.yield_quantity, 1)::numeric AS yield_quantity,
       COALESCE(r.ingredients, '[]'::jsonb) AS ingredients,
       COALESCE(SUM(
         CASE
@@ -339,7 +340,7 @@ export async function queryBurgerUsage(range: ResolvedReportingRange) {
       AND o.payment_status IN ('paid', 'refunded')
     WHERE mi.is_active = true
       AND c.name_en IN ('Burgers', 'Chicken Burgers')
-    GROUP BY mi.id, mi.name_en, mi.source_sku, c.name_en, link.recipe_id, r.name, r.ingredients
+    GROUP BY mi.id, mi.name_en, mi.source_sku, c.name_en, link.recipe_id, r.name, r.yield_quantity, r.ingredients
     ORDER BY c.name_en, mi.name_en`,
     [range.fromInstant, range.toInstant, cutover],
   );
@@ -347,24 +348,24 @@ export async function queryBurgerUsage(range: ResolvedReportingRange) {
   return result.rows.map((row: any): BurgerUsageRow => {
     const soldQuantity = n(row.sold_quantity);
     const recipeIngredients = Array.isArray(row.ingredients) ? row.ingredients : [];
+    const recipeYield = Math.max(n(row.yield_quantity), 1);
+    const validatedIngredients = recipeIngredients.flatMap((ingredient: any): BurgerUsageIngredient[] => {
+      const name = String(ingredient?.name ?? "").trim();
+      const unit = String(ingredient?.unitUsed ?? "").trim();
+      const batchQuantity = n(ingredient?.quantityUsed);
+      if (!name || !unit || batchQuantity <= 0) return [];
+      const quantityPerItem = batchQuantity / recipeYield;
+      return [{
+        key: `${name.toLocaleLowerCase()}|${unit.toLocaleLowerCase()}`,
+        name,
+        unit,
+        quantityPerItem,
+        expectedQuantity: soldQuantity * quantityPerItem,
+      }];
+    });
     const recipeStatus: BurgerUsageRow["recipeStatus"] =
-      row.recipe_id == null ? "NOT_LINKED" : recipeIngredients.length === 0 ? "RECIPE_EMPTY" : "READY";
-
-    const ingredients = recipeStatus === "READY"
-      ? recipeIngredients.flatMap((ingredient: any): BurgerUsageIngredient[] => {
-          const name = String(ingredient?.name ?? "").trim();
-          const unit = String(ingredient?.unitUsed ?? "").trim();
-          const quantityPerItem = n(ingredient?.quantityUsed);
-          if (!name || !unit || quantityPerItem <= 0) return [];
-          return [{
-            key: `${name.toLocaleLowerCase()}|${unit.toLocaleLowerCase()}`,
-            name,
-            unit,
-            quantityPerItem,
-            expectedQuantity: soldQuantity * quantityPerItem,
-          }];
-        })
-      : [];
+      row.recipe_id == null ? "NOT_LINKED" : validatedIngredients.length === 0 ? "RECIPE_EMPTY" : "READY";
+    const ingredients = recipeStatus === "READY" ? validatedIngredients : [];
 
     return {
       menuItemId: String(row.menu_item_id),
