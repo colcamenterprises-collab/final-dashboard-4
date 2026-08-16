@@ -36,12 +36,15 @@ test("calculates V1 items per available labour hour for the SBB shift", () => {
   });
 
   assert.equal(result.grossLabourMinutes, 2000);
-  assert.equal(result.breakAllowanceMinutes, 120);
+  assert.equal(result.breakAllowanceMinutes, 240);
   assert.equal(result.prepMinutes, 60);
   assert.equal(result.cleaningMinutes, 60);
   assert.equal(result.prepAndCleaningMinutes, 120);
-  assert.equal(result.availableProductionMinutes, 1760);
-  assert.equal(result.itemsPerLabourHour?.toFixed(2), "10.23");
+  assert.equal(result.availableProductionMinutes, 1640);
+  assert.equal(result.itemsPerLabourHour?.toFixed(2), "10.98");
+  assert.equal(result.labourMinutesPerItem, 8);
+  assert.equal(result.estimatedWorkloadMinutes, 2400);
+  assert.equal(result.utilisationPct?.toFixed(1), "146.3");
   assert.deepEqual(result.warnings, []);
 });
 
