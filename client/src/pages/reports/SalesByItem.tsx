@@ -37,6 +37,7 @@ export default function SalesByItem(){
   });
   const burgers=useQuery<BurgerUsageData>({
     queryKey:["burger-recipe-usage",params],
+    enabled:tab==="burgers",
     queryFn:async()=>{const response=await fetch(`/api/reports/receipt-analytics/unified/burger-usage?${params}`,{credentials:"include",cache:"no-store"});const body=await response.json();if(!response.ok||!body.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;}
   });
 
@@ -54,8 +55,8 @@ export default function SalesByItem(){
   const totals=useMemo(()=>({quantity:rows.reduce((sum,row)=>sum+Number(row.quantity||0),0),net:rows.reduce((sum,row)=>sum+Number(row.net_sales||0),0),cogsAvailable:rows.length>0&&rows.every(row=>row.cost_of_goods!=null),cogs:rows.reduce((sum,row)=>sum+Number(row.cost_of_goods||0),0)}),[rows]);
   const profit=totals.cogsAvailable?totals.net-totals.cogs:null;
   const margin=profit!=null&&totals.net?profit/totals.net*100:null;
-  const loading=query.isLoading||components.isLoading||burgers.isLoading;
-  const error=query.isError?(query.error as Error):components.isError?(components.error as Error):burgers.isError?(burgers.error as Error):null;
+  const loading=query.isLoading||components.isLoading||(tab==="burgers"&&burgers.isLoading);
+  const error=query.isError?(query.error as Error):components.isError?(components.error as Error):tab==="burgers"&&burgers.isError?(burgers.error as Error):null;
 
   const exportItemCsv=()=>{
     const header=["Item","SKU","Category","Qty","Gross Sales","Discounts","Refunds","Net Sales","COGS","Gross Profit","Margin %","Sources"];
