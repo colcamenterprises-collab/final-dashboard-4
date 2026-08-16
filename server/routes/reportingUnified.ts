@@ -37,16 +37,22 @@ function dailyShiftMinutes(fromTime: string, toTime: string) {
 router.get("/overview", async (req, res) => {
   try {
     const range = exactRange(req.query as Record<string, unknown>);
-    const [overview, breakdowns, recordedLabor] = await Promise.all([
+    const [overview, breakdowns, recordedLabor, itemSales] = await Promise.all([
       queryUnifiedOverview(range),
       queryUnifiedOverviewBreakdowns(range),
       queryRecordedLabor(range),
+      queryUnifiedItemSales(range),
     ]);
     const itemCount = breakdowns.categories.reduce(
       (sum: number, row: { quantity: number }) => sum + Number(row.quantity || 0),
       0,
     );
     const shiftMinutes = dailyShiftMinutes(range.fromTime, range.toTime);
+    const costedItemSales = itemSales.filter((item: any) => item.cost_of_goods != null);
+    const costedNetSales = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
+    const costOfGoods = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.cost_of_goods || 0), 0);
+    const grossProfit = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.gross_profit || 0), 0);
+    const itemNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
     const efficiency = calculateLabourEfficiency({
       itemCount,
       staffCount: recordedLabor.staffShiftCount,
@@ -61,7 +67,18 @@ router.get("/overview", async (req, res) => {
         ...(overview.historicalReceipts ? ["loyverse"] : []),
         ...(overview.liveReceipts ? ["sbb_pos"] : []),
       ],
-      overview,
+      overview: {
+        ...overview,
+        costing: {
+          costOfGoods,
+          grossProfit,
+          costedNetSales,
+          itemNetSales,
+          coveragePct: itemNetSales > 0 ? (costedNetSales / itemNetSales) * 100 : null,
+          foodCostPct: costedNetSales > 0 ? (costOfGoods / costedNetSales) * 100 : null,
+          grossMarginPct: costedNetSales > 0 ? (grossProfit / costedNetSales) * 100 : null,
+        },
+      },
       breakdowns,
       labor: {
         ...recordedLabor,
