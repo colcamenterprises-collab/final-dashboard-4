@@ -11,7 +11,8 @@ function localDate(offset = 0) { const date = new Date(); date.setDate(date.getD
 type HourRow={bucketStart:string;orders:number;netSales:number};
 type CategoryRow={category:string;quantity:number;netSales:number};
 type ProductRow={itemName:string;quantity:number;netSales:number};
-type OverviewResponse = { ok:boolean; source:string; filters:ExactDateTimeRangeValue & {fromInstant:string;toInstant:string}; sourcesIncluded:string[]; overview:{receiptCount:number;grossSales:number;discounts:number;refunds:number;netSales:number;averageOrder:number;historicalReceipts:number;liveReceipts:number;paymentSales:Record<string,number>}; labor:{laborCost:number;paidStaffCount:number;laborCostPct:number|null;source:string}; breakdowns:{daily:Array<{day:string;orders:number;netSales:number}>;hourly:HourRow[];categories:CategoryRow[];topProducts:ProductRow[]}; error?:string };
+type LabourEfficiency={itemCount:number;staffCount:number;shiftCount:number;shiftMinutes:number;grossLabourMinutes:number;breakAllowanceMinutes:number;prepAndCleaningMinutes:number;totalAllowanceMinutes:number;availableProductionMinutes:number;availableProductionHours:number;itemsPerLabourHour:number|null;warnings:string[]};
+type OverviewResponse = { ok:boolean; source:string; filters:ExactDateTimeRangeValue & {fromInstant:string;toInstant:string}; sourcesIncluded:string[]; overview:{receiptCount:number;grossSales:number;discounts:number;refunds:number;netSales:number;averageOrder:number;historicalReceipts:number;liveReceipts:number;paymentSales:Record<string,number>}; labor:{laborCost:number;paidStaffCount:number;staffShiftCount:number;recordedShiftCount:number;laborCostPct:number|null;source:string;demandSource:string;efficiency:LabourEfficiency}; breakdowns:{daily:Array<{day:string;orders:number;netSales:number}>;hourly:HourRow[];categories:CategoryRow[];topProducts:ProductRow[]}; error?:string };
 
 const cardTones = {
   blue: "from-blue-500 to-indigo-600 text-white",
@@ -46,24 +47,36 @@ function buildHourlySeries(rows:HourRow[], range:OverviewResponse["filters"]) {
 }
 
 export default function ReportingOverview(){
- const [range,setRange]=useState<ExactDateTimeRangeValue>({fromDate:localDate(-1),fromTime:"17:00",toDate:localDate(),toTime:"03:00",timezone:"Asia/Bangkok"});
+ const [range,setRange]=useState<ExactDateTimeRangeValue>({fromDate:localDate(-1),fromTime:"17:55",toDate:localDate(),toTime:"02:15",timezone:"Asia/Bangkok"});
  const params=useMemo(()=>reportingRangeParams(range),[range]);
  const query=useQuery<OverviewResponse>({queryKey:["unified-reporting-overview",params],queryFn:async()=>{const response=await fetch(`/api/reports/receipt-analytics/unified/overview?${params}`,{credentials:"include",cache:"no-store"});const body=await response.json();if(!response.ok||!body.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;}});
  const paymentGroups=useMemo(()=>{const grouped:Record<string,number>={Cash:0,QR:0,Grab:0,Card:0,Other:0};for(const[name,amount]of Object.entries(query.data?.overview.paymentSales||{}))grouped[paymentGroup(name)]+=Number(amount||0);return grouped;},[query.data]);
  const hourly=useMemo(()=>query.data?buildHourlySeries(query.data.breakdowns.hourly,query.data.filters):[],[query.data]);
- const data=query.data?.overview; const breakdowns=query.data?.breakdowns; const labor=query.data?.labor;
+ const data=query.data?.overview; const breakdowns=query.data?.breakdowns; const labor=query.data?.labor; const efficiency=labor?.efficiency;
  const categoryMax=Math.max(0,...(breakdowns?.categories||[]).map(row=>row.netSales)); const productMax=Math.max(0,...(breakdowns?.topProducts||[]).map(row=>row.netSales));
  return <div className="min-h-screen rounded-[32px] bg-slate-50 p-4 text-slate-950 md:p-6">
   <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p className="text-xs font-black uppercase tracking-[.25em] text-blue-600">Restaurant intelligence</p><h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Reporting Overview</h1><p className="mt-2 text-sm text-slate-500">Fast decisions from one trusted sales ledger.</p></div><div className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-900 shadow-sm"><ExactDateTimeRange value={range} onChange={setRange} timezoneLabel="Venue time · Asia/Bangkok"/></div></header>
   {query.isLoading?<div className="rounded-3xl border border-slate-200 bg-white p-10 text-sm text-slate-500">Loading reporting data…</div>:null}
   {query.isError?<div className="rounded-3xl border border-red-200 bg-red-50 p-5 text-sm font-bold text-red-700">{(query.error as Error).message}</div>:null}
-  {data?<><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+  {data?<><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
     <MetricCard label="Gross sales" value={money(data.grossSales)} sub="Before discounts and refunds" tone="blue" icon={ArrowUpRight}/>
     <MetricCard label="Net sales" value={money(data.netSales)} sub={`${money(data.discounts+data.refunds)} adjustments`} tone="light" icon={Banknote}/>
     <MetricCard label="Orders" value={data.receiptCount.toLocaleString()} sub={`${data.historicalReceipts} historical · ${data.liveReceipts} live`} tone="amber" icon={Receipt}/>
     <MetricCard label="Average order" value={money(data.averageOrder)} sub="Net sales per paid receipt" tone="mint" icon={ShoppingBag}/>
     <MetricCard label="Labor cost" value={labor?.laborCostPct==null?"—":`${labor.laborCostPct.toFixed(1)}%`} sub={`${money(labor?.laborCost||0)} · ${labor?.paidStaffCount||0} paid staff · form recorded`} tone="violet" icon={UsersRound}/>
+    <MetricCard label="Items / labour hr" value={efficiency?.itemsPerLabourHour==null?"—":efficiency.itemsPerLabourHour.toFixed(2)} sub={`${efficiency?.itemCount||0} items · ${efficiency?.staffCount||0} staff worked`} tone="mint" icon={Clock3}/>
   </div>
+  {efficiency?<Panel className="mt-5" title="Labour Efficiency" subtitle="POS items divided by available production hours after recorded allowances">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Shift duration</p><p className="mt-1 text-lg font-black">{Math.floor(efficiency.shiftMinutes/60)}h {Math.round(efficiency.shiftMinutes%60)}m</p></div>
+      <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Gross staff hours</p><p className="mt-1 text-lg font-black">{(efficiency.grossLabourMinutes/60).toFixed(2)}</p></div>
+      <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Break allowance</p><p className="mt-1 text-lg font-black">{(efficiency.breakAllowanceMinutes/60).toFixed(2)}h</p><p className="text-[10px] text-slate-500">30 min per staff</p></div>
+      <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Prep & cleaning</p><p className="mt-1 text-lg font-black">{(efficiency.prepAndCleaningMinutes/60).toFixed(2)}h</p><p className="text-[10px] text-slate-500">105 min × {efficiency.shiftCount} shift{efficiency.shiftCount===1?"":"s"}</p></div>
+      <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Production hours</p><p className="mt-1 text-lg font-black text-emerald-950">{efficiency.availableProductionHours.toFixed(2)}</p></div>
+    </div>
+    {efficiency.warnings.length?<div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-900">{efficiency.warnings.join(" ")}</div>:null}
+    <p className="mt-3 text-[11px] text-slate-500">Staff source: itemised paid wage rows in Daily Sales & Stock V2. Item source: paid, non-cancelled POS item quantities. Refunds and set components are excluded.</p>
+  </Panel>:null}
   <div className="mt-5 grid gap-5 xl:grid-cols-[1.65fr_1fr]">
     <Panel title="Hourly Sales" subtitle={`One bar per trading hour · ${range.fromTime} opening to ${range.toTime} closing`}>
       {hourly.length?<ResponsiveContainer width="100%" height={300}><BarChart data={hourly} margin={{top:18,right:4,left:0,bottom:0}}><defs><linearGradient id="hourlySales" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60a5fa"/><stop offset="100%" stopColor="#4f46e5"/></linearGradient></defs><CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3"/><XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill:"#64748b",fontSize:11,fontWeight:700}}/><YAxis axisLine={false} tickLine={false} width={50} tick={{fill:"#64748b",fontSize:10}} tickFormatter={compactMoney}/><Tooltip cursor={{fill:"rgba(59,130,246,.06)"}} contentStyle={{background:"#ffffff",border:"1px solid #e2e8f0",borderRadius:16,color:"#0f172a",boxShadow:"0 8px 20px rgba(15,23,42,.12)"}} formatter={(value:number,_name:string,entry:any)=>[`${money(value)} · ${entry.payload.orders} orders`,"Sales"]}/><Bar dataKey="sales" fill="url(#hourlySales)" radius={[10,10,3,3]} maxBarSize={58}/></BarChart></ResponsiveContainer>:<p className="text-sm text-slate-500">No sales in this shift window.</p>}
