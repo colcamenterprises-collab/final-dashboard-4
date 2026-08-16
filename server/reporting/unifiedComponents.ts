@@ -4,7 +4,8 @@ import type { ResolvedReportingRange } from "./unifiedLedger";
 
 const n = (value: unknown) => Number(value ?? 0) || 0;
 const modifierTypeSql = `CASE
-  WHEN lower(COALESCE(group_name,'')) LIKE '%upgrade%'
+  WHEN lower(COALESCE(group_name,'')) LIKE '%level up%'
+    OR lower(COALESCE(group_name,'')) LIKE '%upgrade%'
     OR lower(COALESCE(group_name,'')) LIKE '%make it better%'
     OR lower(COALESCE(group_name,'')) LIKE '%extra%'
     OR lower(COALESCE(group_name,'')) LIKE '%add on%'
