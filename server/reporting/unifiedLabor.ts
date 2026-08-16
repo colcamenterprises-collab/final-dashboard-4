@@ -5,9 +5,10 @@ const LABOR_TYPES = new Set(["WAGES", "OVERTIME", "BONUS"]);
 const STAFFED_TYPES = new Set(["WAGES", "OVERTIME"]);
 
 export const LABOUR_EFFICIENCY_DEFAULTS = {
-  breakMinutesPerStaff: 30,
+  breakMinutesPerStaff: 60,
   prepMinutesPerShift: 60,
   cleaningMinutesPerShift: 60,
+  labourMinutesPerItem: 8,
 } as const;
 
 export type LabourEfficiencyInput = {
@@ -18,6 +19,7 @@ export type LabourEfficiencyInput = {
   breakMinutesPerStaff?: number;
   prepMinutesPerShift?: number;
   cleaningMinutesPerShift?: number;
+  labourMinutesPerItem?: number;
 };
 
 const nonNegative = (value: unknown) => {
@@ -46,6 +48,9 @@ export function calculateLabourEfficiency(input: LabourEfficiencyInput) {
   const cleaningMinutesPerShift = nonNegative(
     input.cleaningMinutesPerShift ?? LABOUR_EFFICIENCY_DEFAULTS.cleaningMinutesPerShift,
   );
+  const labourMinutesPerItem = nonNegative(
+    input.labourMinutesPerItem ?? LABOUR_EFFICIENCY_DEFAULTS.labourMinutesPerItem,
+  );
 
   const grossLabourMinutes = staffCount * shiftMinutes;
   const breakAllowanceMinutes = staffCount * breakMinutesPerStaff;
@@ -58,6 +63,11 @@ export function calculateLabourEfficiency(input: LabourEfficiencyInput) {
   const itemsPerLabourHour = availableProductionHours > 0
     ? itemCount / availableProductionHours
     : null;
+  const estimatedWorkloadMinutes = itemCount * labourMinutesPerItem;
+  const utilisationPct = availableProductionMinutes > 0
+    ? (estimatedWorkloadMinutes / availableProductionMinutes) * 100
+    : null;
+  const unoccupiedCapacityMinutes = Math.max(0, availableProductionMinutes - estimatedWorkloadMinutes);
 
   const warnings: string[] = [];
   if (staffCount === 0) warnings.push("No itemised paid staff rows were recorded for this shift.");
@@ -80,6 +90,10 @@ export function calculateLabourEfficiency(input: LabourEfficiencyInput) {
     availableProductionMinutes,
     availableProductionHours,
     itemsPerLabourHour,
+    labourMinutesPerItem,
+    estimatedWorkloadMinutes,
+    utilisationPct,
+    unoccupiedCapacityMinutes,
     warnings,
   };
 }
