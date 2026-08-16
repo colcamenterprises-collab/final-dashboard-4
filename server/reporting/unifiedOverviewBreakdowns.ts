@@ -28,7 +28,7 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
          AND o.status <> 'cancelled'
          AND o.payment_status IN ('paid','refunded')
      ), canonical_lines AS (
-       SELECT i.item_name, COALESCE(NULLIF(i.category,''),'Other') category, i.quantity, i.net_sales
+       SELECT h.occurred_at, i.item_name, COALESCE(NULLIF(i.category,''),'Other') category, i.quantity, i.net_sales
        FROM reporting_historical_transaction_items i
        JOIN reporting_historical_transactions h ON h.id=i.transaction_id
        JOIN reporting_import_batches b ON b.id=h.source_import_batch_id AND b.validation_status='validated'
@@ -36,7 +36,7 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
          AND h.occurred_at >= $1::timestamptz
          AND h.occurred_at < LEAST($2::timestamptz,$3::timestamptz)
        UNION ALL
-       SELECT i.item_name_en item_name, COALESCE(c.name_en,'Other') category, i.quantity::numeric quantity, i.line_total net_sales
+       SELECT o.created_at occurred_at, i.item_name_en item_name, COALESCE(c.name_en,'Other') category, i.quantity::numeric quantity, i.line_total net_sales
        FROM ordering_order_items i
        JOIN ordering_orders o ON o.id=i.order_id
        LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
@@ -60,6 +60,11 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
                 SUM(net_sales)::numeric AS net_sales
          FROM canonical_transactions GROUP BY 1
        ) x),'[]'::jsonb),
+       'hourlyItems', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.bucket_start) FROM (
+         SELECT date_trunc('hour', occurred_at) AS bucket_start,
+                SUM(quantity)::numeric AS quantity
+         FROM canonical_lines GROUP BY 1
+       ) x),'[]'::jsonb),
        'categories', COALESCE((SELECT jsonb_agg(row_to_json(x) ORDER BY x.net_sales DESC) FROM (
          SELECT category, SUM(quantity)::numeric AS quantity, SUM(net_sales)::numeric AS net_sales
          FROM canonical_lines GROUP BY category
@@ -75,6 +80,7 @@ export async function queryUnifiedOverviewBreakdowns(range: ResolvedReportingRan
   return {
     daily: (payload.daily || []).map((row: any) => ({ day: row.report_day, orders: n(row.orders), netSales: n(row.net_sales) })),
     hourly: (payload.hourly || []).map((row: any) => ({ bucketStart: row.bucket_start, orders: n(row.orders), netSales: n(row.net_sales) })),
+    hourlyItems: (payload.hourlyItems || []).map((row: any) => ({ bucketStart: row.bucket_start, quantity: n(row.quantity) })),
     categories: (payload.categories || []).map((row: any) => ({ category: row.category, quantity: n(row.quantity), netSales: n(row.net_sales) })),
     topProducts: (payload.topProducts || []).map((row: any) => ({ itemName: row.item_name, quantity: n(row.quantity), netSales: n(row.net_sales) })),
   };

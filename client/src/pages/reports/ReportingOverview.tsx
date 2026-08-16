@@ -9,10 +9,11 @@ const money = (value: number) => `฿${Number(value || 0).toLocaleString("en-US"
 const compactMoney = (value: number) => value >= 1000 ? `฿${(value / 1000).toFixed(value >= 10000 ? 0 : 1)}k` : `฿${value}`;
 function localDate(offset = 0) { const date = new Date(); date.setDate(date.getDate() + offset); return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit" }).format(date); }
 type HourRow={bucketStart:string;orders:number;netSales:number};
+type HourlyItemRow={bucketStart:string;quantity:number};
 type CategoryRow={category:string;quantity:number;netSales:number};
 type ProductRow={itemName:string;quantity:number;netSales:number};
-type LabourEfficiency={itemCount:number;staffCount:number;shiftCount:number;shiftMinutes:number;grossLabourMinutes:number;breakAllowanceMinutes:number;prepMinutes:number;cleaningMinutes:number;prepAndCleaningMinutes:number;totalAllowanceMinutes:number;availableProductionMinutes:number;availableProductionHours:number;itemsPerLabourHour:number|null;warnings:string[]};
-type OverviewResponse = { ok:boolean; source:string; filters:ExactDateTimeRangeValue & {fromInstant:string;toInstant:string}; sourcesIncluded:string[]; overview:{receiptCount:number;grossSales:number;discounts:number;refunds:number;netSales:number;averageOrder:number;historicalReceipts:number;liveReceipts:number;paymentSales:Record<string,number>}; labor:{laborCost:number;paidStaffCount:number;staffShiftCount:number;recordedShiftCount:number;laborCostPct:number|null;source:string;demandSource:string;efficiency:LabourEfficiency}; breakdowns:{daily:Array<{day:string;orders:number;netSales:number}>;hourly:HourRow[];categories:CategoryRow[];topProducts:ProductRow[]}; error?:string };
+type LabourEfficiency={itemCount:number;staffCount:number;shiftCount:number;shiftMinutes:number;grossLabourMinutes:number;breakAllowanceMinutes:number;prepMinutes:number;cleaningMinutes:number;prepAndCleaningMinutes:number;totalAllowanceMinutes:number;availableProductionMinutes:number;availableProductionHours:number;itemsPerLabourHour:number|null;labourMinutesPerItem:number;estimatedWorkloadMinutes:number;utilisationPct:number|null;unoccupiedCapacityMinutes:number;warnings:string[]};
+type OverviewResponse = { ok:boolean; source:string; filters:ExactDateTimeRangeValue & {fromInstant:string;toInstant:string}; sourcesIncluded:string[]; overview:{receiptCount:number;grossSales:number;discounts:number;refunds:number;netSales:number;averageOrder:number;historicalReceipts:number;liveReceipts:number;paymentSales:Record<string,number>}; labor:{laborCost:number;paidStaffCount:number;staffShiftCount:number;recordedShiftCount:number;laborCostPct:number|null;source:string;demandSource:string;efficiency:LabourEfficiency}; breakdowns:{daily:Array<{day:string;orders:number;netSales:number}>;hourly:HourRow[];hourlyItems:HourlyItemRow[];categories:CategoryRow[];topProducts:ProductRow[]}; error?:string };
 
 const cardTones = {
   blue: "from-blue-500 to-indigo-600 text-white",
@@ -46,13 +47,65 @@ function buildHourlySeries(rows:HourRow[], range:OverviewResponse["filters"]) {
   return result;
 }
 
+function utilisationTone(value:number|null) {
+  if (value == null) return "bg-slate-200 text-slate-600";
+  if (value < 40) return "bg-blue-200 text-blue-950";
+  if (value < 70) return "bg-emerald-300 text-emerald-950";
+  if (value < 90) return "bg-amber-300 text-amber-950";
+  if (value <= 100) return "bg-red-400 text-white";
+  return "bg-red-800 text-white";
+}
+
+function buildUtilisationBuckets(rows:HourlyItemRow[], range:OverviewResponse["filters"], staffCount:number, labourMinutesPerItem:number, capacityRatio:number) {
+  const itemTotals=new Map(rows.map(row=>[DateTime.fromISO(row.bucketStart).toUTC().startOf("hour").toISO(),Number(row.quantity||0)]));
+  const rangeStart=DateTime.fromISO(range.fromInstant).toUTC();
+  const rangeEnd=DateTime.fromISO(range.toInstant).toUTC();
+  const result=[]; let cursor=rangeStart.startOf("hour");
+  while(cursor<rangeEnd){
+    const bucketEnd=cursor.plus({hours:1});
+    const overlapStart=cursor<rangeStart?rangeStart:cursor;
+    const overlapEnd=bucketEnd>rangeEnd?rangeEnd:bucketEnd;
+    const minutes=Math.max(0,overlapEnd.diff(overlapStart,"minutes").minutes);
+    if(minutes>0){
+      const items=itemTotals.get(cursor.toISO())||0;
+      const capacityMinutes=staffCount*minutes*capacityRatio;
+      const workloadMinutes=items*labourMinutesPerItem;
+      const utilisationPct=capacityMinutes>0?workloadMinutes/capacityMinutes*100:null;
+      result.push({label:`${overlapStart.setZone(range.timezone).toFormat("h:mm a")}–${overlapEnd.setZone(range.timezone).toFormat("h:mm a")}`,items,capacityMinutes,workloadMinutes,utilisationPct});
+    }
+    cursor=bucketEnd;
+  }
+  return result;
+}
+
 export default function ReportingOverview(){
  const [range,setRange]=useState<ExactDateTimeRangeValue>({fromDate:localDate(-1),fromTime:"17:55",toDate:localDate(),toTime:"02:15",timezone:"Asia/Bangkok"});
+ const [staffOverride,setStaffOverride]=useState("");
+ const [breakMinutes,setBreakMinutes]=useState("60");
+ const [prepMinutes,setPrepMinutes]=useState("60");
+ const [cleaningMinutes,setCleaningMinutes]=useState("60");
+ const [itemMinutes,setItemMinutes]=useState("8");
  const params=useMemo(()=>reportingRangeParams(range),[range]);
  const query=useQuery<OverviewResponse>({queryKey:["unified-reporting-overview",params],queryFn:async()=>{const response=await fetch(`/api/reports/receipt-analytics/unified/overview?${params}`,{credentials:"include",cache:"no-store"});const body=await response.json();if(!response.ok||!body.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;}});
  const paymentGroups=useMemo(()=>{const grouped:Record<string,number>={Cash:0,QR:0,Grab:0,Card:0,Other:0};for(const[name,amount]of Object.entries(query.data?.overview.paymentSales||{}))grouped[paymentGroup(name)]+=Number(amount||0);return grouped;},[query.data]);
  const hourly=useMemo(()=>query.data?buildHourlySeries(query.data.breakdowns.hourly,query.data.filters):[],[query.data]);
  const data=query.data?.overview; const breakdowns=query.data?.breakdowns; const labor=query.data?.labor; const efficiency=labor?.efficiency;
+ const utilisation=useMemo(()=>{
+  if(!efficiency||!query.data)return null;
+  const staffCount=Math.max(0,Number(staffOverride===""?efficiency.staffCount:staffOverride)||0);
+  const breakPerStaff=Math.max(0,Number(breakMinutes)||0);
+  const prepPerShift=Math.max(0,Number(prepMinutes)||0);
+  const cleaningPerShift=Math.max(0,Number(cleaningMinutes)||0);
+  const labourMinutesPerItem=Math.max(0,Number(itemMinutes)||0);
+  const shiftCount=Math.max(1,efficiency.shiftCount||1);
+  const grossMinutes=staffCount*efficiency.shiftMinutes;
+  const allowanceMinutes=staffCount*breakPerStaff+shiftCount*(prepPerShift+cleaningPerShift);
+  const availableMinutes=Math.max(0,grossMinutes-allowanceMinutes);
+  const workloadMinutes=efficiency.itemCount*labourMinutesPerItem;
+  const utilisationPct=availableMinutes>0?workloadMinutes/availableMinutes*100:null;
+  const capacityRatio=grossMinutes>0?availableMinutes/grossMinutes:0;
+  return {staffCount,breakPerStaff,prepPerShift,cleaningPerShift,labourMinutesPerItem,grossMinutes,allowanceMinutes,availableMinutes,workloadMinutes,utilisationPct,unoccupiedMinutes:Math.max(0,availableMinutes-workloadMinutes),buckets:buildUtilisationBuckets(breakdowns?.hourlyItems||[],query.data.filters,staffCount,labourMinutesPerItem,capacityRatio)};
+ },[efficiency,query.data,breakdowns?.hourlyItems,staffOverride,breakMinutes,prepMinutes,cleaningMinutes,itemMinutes]);
  const categoryMax=Math.max(0,...(breakdowns?.categories||[]).map(row=>row.netSales)); const productMax=Math.max(0,...(breakdowns?.topProducts||[]).map(row=>row.netSales));
  return <div className="min-h-screen rounded-[32px] bg-slate-50 p-4 text-slate-950 md:p-6">
   <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between"><div><p className="text-xs font-black uppercase tracking-[.25em] text-blue-600">Restaurant intelligence</p><h1 className="mt-2 text-3xl font-black tracking-tight md:text-4xl">Reporting Overview</h1><p className="mt-2 text-sm text-slate-500">Fast decisions from one trusted sales ledger.</p></div><div className="rounded-2xl border border-slate-200 bg-white p-2 text-slate-900 shadow-sm"><ExactDateTimeRange value={range} onChange={setRange} timezoneLabel="Venue time · Asia/Bangkok"/></div></header>
@@ -66,11 +119,28 @@ export default function ReportingOverview(){
     <MetricCard label="Labor cost" value={labor?.laborCostPct==null?"—":`${labor.laborCostPct.toFixed(1)}%`} sub={`${money(labor?.laborCost||0)} · ${labor?.paidStaffCount||0} paid staff · form recorded`} tone="violet" icon={UsersRound}/>
     <MetricCard label="Items / labour hr" value={efficiency?.itemsPerLabourHour==null?"—":efficiency.itemsPerLabourHour.toFixed(2)} sub={`${efficiency?.itemCount||0} items · ${efficiency?.staffCount||0} staff worked`} tone="mint" icon={Clock3}/>
   </div>
+  {efficiency&&utilisation?<Panel className="mt-5" title="Staff Utilisation Heat Map" subtitle="Estimated labour demand by trading hour · colour shows percentage of available team capacity used">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {[
+        {label:"Staff",value:staffOverride,placeholder:String(efficiency.staffCount),set:setStaffOverride,suffix:"people"},
+        {label:"Break",value:breakMinutes,placeholder:"60",set:setBreakMinutes,suffix:"min per staff"},
+        {label:"Prep",value:prepMinutes,placeholder:"60",set:setPrepMinutes,suffix:"min total / shift"},
+        {label:"Cleaning",value:cleaningMinutes,placeholder:"60",set:setCleaningMinutes,suffix:"min total / shift"},
+        {label:"Item workload",value:itemMinutes,placeholder:"8",set:setItemMinutes,suffix:"labour-min / item"},
+      ].map(field=><label key={field.label} className="rounded-2xl bg-slate-50 p-3"><span className="text-[10px] font-black uppercase tracking-wide text-slate-500">{field.label}</span><input aria-label={field.label} min="0" step="1" type="number" value={field.value} placeholder={field.placeholder} onChange={event=>field.set(event.target.value)} className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-lg font-black outline-none focus:border-blue-500"/><span className="mt-1 block text-[10px] text-slate-500">{field.suffix}</span></label>)}
+    </div>
+    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className={`col-span-2 rounded-2xl p-4 sm:col-span-1 ${utilisationTone(utilisation.utilisationPct)}`}><p className="text-[10px] font-black uppercase tracking-wide opacity-70">Whole shift</p><p className="mt-1 text-3xl font-black">{utilisation.utilisationPct==null?"—":`${utilisation.utilisationPct.toFixed(1)}%`}</p><p className="text-[10px] opacity-75">{utilisation.workloadMinutes.toFixed(0)} workload min ÷ {utilisation.availableMinutes.toFixed(0)} available min</p></div>
+      {utilisation.buckets.map(bucket=><div key={bucket.label} title={`${bucket.items} items × ${utilisation.labourMinutesPerItem} min = ${bucket.workloadMinutes.toFixed(0)} workload min; ${bucket.capacityMinutes.toFixed(0)} available staff min`} className={`min-h-28 rounded-2xl p-4 ${utilisationTone(bucket.utilisationPct)}`}><p className="text-[10px] font-black uppercase tracking-wide opacity-70">{bucket.label}</p><p className="mt-2 text-2xl font-black">{bucket.utilisationPct==null?"—":`${bucket.utilisationPct.toFixed(0)}%`}</p><p className="mt-1 text-[10px] opacity-75">{bucket.items} items · {bucket.workloadMinutes.toFixed(0)} workload min</p></div>)}
+    </div>
+    <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-bold"><span className="rounded-full bg-blue-200 px-3 py-1 text-blue-950">&lt;40% quiet</span><span className="rounded-full bg-emerald-300 px-3 py-1 text-emerald-950">40–69%</span><span className="rounded-full bg-amber-300 px-3 py-1 text-amber-950">70–89% busy</span><span className="rounded-full bg-red-400 px-3 py-1 text-white">90–100%</span><span className="rounded-full bg-red-800 px-3 py-1 text-white">&gt;100% overloaded</span></div>
+    <p className="mt-3 text-[11px] text-slate-500">Hourly item demand comes from paid POS quantities. Because break, prep and cleaning timestamps are not recorded, those allowances are distributed proportionally across the selected shift. Changes above are temporary what-if assumptions and do not alter wage records.</p>
+  </Panel>:null}
   {efficiency?<Panel className="mt-5" title="Labour Efficiency" subtitle="POS items divided by available production hours after recorded allowances">
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Shift duration</p><p className="mt-1 text-lg font-black">{Math.floor(efficiency.shiftMinutes/60)}h {Math.round(efficiency.shiftMinutes%60)}m</p></div>
       <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Gross staff hours</p><p className="mt-1 text-lg font-black">{(efficiency.grossLabourMinutes/60).toFixed(2)}</p></div>
-      <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Break allowance</p><p className="mt-1 text-lg font-black">{(efficiency.breakAllowanceMinutes/60).toFixed(2)}h</p><p className="text-[10px] text-slate-500">30 min per staff</p></div>
+      <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Break allowance</p><p className="mt-1 text-lg font-black">{(efficiency.breakAllowanceMinutes/60).toFixed(2)}h</p><p className="text-[10px] text-slate-500">60 min per staff</p></div>
       <div className="rounded-2xl bg-slate-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-slate-500">Prep & cleaning</p><p className="mt-1 text-lg font-black">{(efficiency.prepAndCleaningMinutes/60).toFixed(2)}h</p><p className="text-[10px] text-slate-500">1h prep + 1h cleaning per shift · total allowance</p></div>
       <div className="rounded-2xl bg-emerald-50 p-4"><p className="text-[10px] font-black uppercase tracking-wide text-emerald-700">Production hours</p><p className="mt-1 text-lg font-black text-emerald-950">{efficiency.availableProductionHours.toFixed(2)}</p></div>
     </div>
