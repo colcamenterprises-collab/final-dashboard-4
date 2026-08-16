@@ -46,7 +46,7 @@ export default function SalesByItem(){
   const ingredientColumns=useMemo(()=>{
     const columns=new Map<string,{key:string;name:string;unit:string}>();
     burgerRows.forEach(row=>row.ingredients.forEach(ingredient=>columns.set(ingredient.key,{key:ingredient.key,name:ingredient.name,unit:ingredient.unit})));
-    return [...columns.values()].sort((a,b)=>a.name.localeCompare(b.name)||a.unit.localeCompare(b.unit));
+    return Array.from(columns.values()).sort((a,b)=>a.name.localeCompare(b.name)||a.unit.localeCompare(b.unit));
   },[burgerRows]);
   const modifierRows=(components.data?.modifiers||[]).filter(row=>!q||[row.group,row.name,...row.sources].some(value=>String(value||"").toLowerCase().includes(q)));
   const upsellRows=(components.data?.upsells||[]).filter(row=>!q||[row.group,row.name,...row.sources].some(value=>String(value||"").toLowerCase().includes(q)));
