@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { db, pool } from '../db';
 import { sql } from 'drizzle-orm';
@@ -102,145 +101,65 @@ function recipeOrder(columns: ColumnSet) {
   return columns.has('category') ? 'category NULLS LAST, name' : 'name';
 }
 
-function isLiveRecipe(row: any) {
-  return row?.isActive !== false && !String(row?.notes ?? '').includes('Recipe status: Draft');
-}
+async function enrichWithMenuLinks(rows: any[]): Promise<{ rows: any[]; blockers: Array<Record<string, string>> }> {
+  if (!pool || !rows.length) return { rows, blockers: [] };
 
-async function syncRecipeToMenu(recipeId: number) {
-  if (!pool) throw new Error('Database unavailable');
-  const [recipeColumns, itemColumns, linkColumns] = await Promise.all([
-    getRecipeColumns(),
-    getColumns('menu_items_v3'),
-    getColumns('menu_item_recipes_v3'),
-  ]);
+  try {
+    const ids = rows.map((row) => Number(row.id)).filter(Number.isInteger);
+    if (!ids.length) return { rows, blockers: [] };
 
-  if (!(await hasTable('menu_items_v3')) || !(await hasTable('menu_item_recipes_v3'))) {
-    return {
-      ok: false,
-      blocker: {
-        code: 'MENU_V3_TABLES_MISSING',
-        message: 'menu_items_v3/menu_item_recipes_v3 tables are unavailable.',
-        where: 'syncRecipeToMenu',
-        canonical_source: 'menu_items_v3',
-        auto_build_attempted: false,
-      },
-    };
-  }
-  if (!linkColumns.has('recipeId') && !linkColumns.has('recipe_id')) {
-    return {
-      ok: false,
-      blocker: {
-        code: 'MENU_RECIPE_LINK_COLUMN_MISSING',
-        message:
-          'menu_item_recipes_v3 requires additive recipe_id linkage migration before recipes can sync deterministically.',
-        where: 'syncRecipeToMenu',
-        canonical_source: 'menu_item_recipes_v3.recipe_id',
-        auto_build_attempted: false,
-      },
-    };
-  }
-
-  const result = await pool.query(
-    `SELECT ${recipeSelect(recipeColumns)} FROM recipes WHERE id = $1 LIMIT 1`,
-    [recipeId]
-  );
-  const recipe = result.rows[0];
-  if (!recipe)
-    return {
-      ok: false,
-      blocker: {
-        code: 'RECIPE_NOT_FOUND',
-        message: `Recipe ${recipeId} not found.`,
-        where: 'syncRecipeToMenu',
-        canonical_source: 'recipes',
-        auto_build_attempted: false,
-      },
-    };
-
-  const recipeIdColumn = linkColumns.has('recipe_id') ? 'recipe_id' : 'recipeId';
-  const existingLink = await pool.query(
-    `SELECT "itemId" FROM menu_item_recipes_v3 WHERE "${recipeIdColumn}" = $1 LIMIT 1`,
-    [recipeId]
-  );
-  const linkedItemId = existingLink.rows[0]?.itemId;
-
-  if (!isLiveRecipe(recipe)) {
-    if (linkedItemId)
-      await pool.query(
-        'UPDATE menu_items_v3 SET "isActive" = false, "updatedAt" = NOW() WHERE id = $1',
-        [linkedItemId]
-      );
-    return { ok: true, status: 'inactive' };
-  }
-
-  const price = decimalOrNull(recipe.sellingPrice) ?? decimalOrNull(recipe.suggestedPrice);
-  if (price === null) {
-    return {
-      ok: false,
-      blocker: {
-        code: 'LIVE_RECIPE_PRICE_MISSING',
-        message:
-          'Live recipe has no suggested or selling price, so no active menu item was created.',
-        where: 'recipes.selling_price',
-        canonical_source: 'recipes',
-        auto_build_attempted: false,
-      },
-    };
-  }
-
-  let categoryId: string | null = null;
-  if (recipe.category) {
-    const category = await pool.query(
-      'SELECT id FROM menu_categories_v3 WHERE lower(name) = lower($1) ORDER BY "sortOrder" ASC, id ASC LIMIT 1',
-      [recipe.category]
+    const links = await pool.query(
+      `SELECT l.recipe_id, i.id AS menu_item_id, i.name_en AS menu_item_name,
+              COALESCE(i.direct_price, i.price) AS menu_item_direct_price,
+              COALESCE(i.grab_price, i.direct_price, i.price) AS menu_item_partner_price
+         FROM ordering_menu_item_recipe_links l
+         JOIN ordering_menu_items i ON i.id = l.menu_item_id
+        WHERE l.recipe_id = ANY($1::int[])
+        ORDER BY i.name_en ASC, i.id ASC`,
+      [ids],
     );
-    categoryId = category.rows[0]?.id ?? null;
-  }
-  if (!categoryId)
+
+    const byRecipe = new Map<number, any[]>();
+    for (const link of links.rows) {
+      const recipeId = Number(link.recipe_id);
+      const recipeLinks = byRecipe.get(recipeId) || [];
+      recipeLinks.push({
+        id: String(link.menu_item_id),
+        name: link.menu_item_name,
+        directPrice: link.menu_item_direct_price,
+        partnerPrice: link.menu_item_partner_price,
+      });
+      byRecipe.set(recipeId, recipeLinks);
+    }
+
     return {
-      ok: false,
-      blocker: {
-        code: 'LIVE_RECIPE_CATEGORY_MISSING',
-        message: 'Live recipe has no category, so no active menu item was created.',
-        where: 'recipes.category',
-        canonical_source: 'recipes',
-        auto_build_attempted: false,
-      },
+      rows: rows.map((row) => {
+        const linkedMenuItems = byRecipe.get(Number(row.id)) || [];
+        const primary = linkedMenuItems[0];
+        return primary
+          ? {
+              ...row,
+              linkedMenuItems,
+              // Kept for existing API consumers; the full array is authoritative.
+              linkedMenuItemId: primary.id,
+              linkedMenuItemName: primary.name,
+              linkedMenuItemDirectPrice: primary.directPrice,
+              linkedMenuItemPartnerPrice: primary.partnerPrice,
+            }
+          : { ...row, linkedMenuItems };
+      }),
+      blockers: [],
     };
-
-  if (linkedItemId) {
-    await pool.query(
-      'UPDATE menu_items_v3 SET name = $2, description = $3, "categoryId" = $4, "basePrice" = $5, "imageUrl" = $6, "isActive" = true, "onlineEnabled" = true, "updatedAt" = NOW() WHERE id = $1',
-      [
-        linkedItemId,
-        recipe.name,
-        recipe.description ?? null,
-        categoryId,
-        Number(price),
-        recipe.imageUrl ?? null,
-      ]
-    );
-    return { ok: true, status: 'updated', menuItemId: linkedItemId };
+  } catch (error: any) {
+    return {
+      rows,
+      blockers: [{
+        code: 'MENU_RECIPE_LINKS_UNAVAILABLE',
+        message: error?.message || 'The recipe-to-menu link status could not be read.',
+        where: 'ordering_menu_item_recipe_links',
+      }],
+    };
   }
-
-  const itemId = randomUUID();
-  await pool.query(
-    'INSERT INTO menu_items_v3 (id, "categoryId", name, description, "basePrice", "imageUrl", "posEnabled", "onlineEnabled", "partnerEnabled", "kitchenStation", "sortOrder", "isActive", "createdAt", "updatedAt") VALUES ($1, $2, $3, $4, $5, $6, true, true, true, $7, 0, true, NOW(), NOW())',
-    [
-      itemId,
-      categoryId,
-      recipe.name,
-      recipe.description ?? null,
-      Number(price),
-      recipe.imageUrl ?? null,
-      itemColumns.has('kitchenStation') ? 'prep' : null,
-    ]
-  );
-  await pool.query(
-    `INSERT INTO menu_item_recipes_v3 (id, "itemId", "ingredientId", "quantityUsed", unit, "${recipeIdColumn}", "createdAt", "updatedAt") VALUES ($1, $2, $3, 0, $4, $5, NOW(), NOW())`,
-    [randomUUID(), itemId, `recipe:${recipeId}`, 'recipe', recipeId]
-  );
-  return { ok: true, status: 'created', menuItemId: itemId };
 }
 
 router.get('/', async (_req, res) => {
@@ -250,7 +169,7 @@ router.get('/', async (_req, res) => {
     const result = await pool.query(
       `SELECT ${recipeSelect(columns)} FROM recipes ORDER BY ${recipeOrder(columns)}`
     );
-    res.json(result.rows);
+    res.json(await enrichWithMenuLinks(result.rows));
   } catch (e: any) {
     res
       .status(200)
@@ -281,7 +200,8 @@ router.get('/:id', async (req, res) => {
       [id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Recipe not found' });
-    res.json(result.rows[0]);
+    const enriched = await enrichWithMenuLinks(result.rows);
+    res.json({ ...enriched.rows[0], linkBlockers: enriched.blockers });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -340,15 +260,15 @@ router.post('/', async (req, res) => {
     add('direct_margin_percent', workflow.directMarginPercent);
     add('instructions', instructions ?? null);
     add('notes', notes ?? null);
-    add('is_active', recipeStatus === 'Live');
+    // Approval makes the recipe available for linking and costing. It does not publish a product.
+    add('is_active', recipeStatus === 'Approved');
 
     const placeholders = values.map((_, index) => `$${index + 1}`).join(', ');
     const result = await pool.query(
       `INSERT INTO recipes (${insertColumns.join(', ')}) VALUES (${placeholders}) RETURNING ${recipeSelect(columns)}`,
       values
     );
-    const sync = await syncRecipeToMenu(Number((result.rows[0] as any).id));
-    res.json({ ...(result.rows[0] as any), costingBlockers: workflow.blockers, menuSync: sync });
+    res.json({ ...(result.rows[0] as any), costingBlockers: workflow.blockers });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
@@ -393,7 +313,7 @@ router.put('/:id', async (req, res) => {
     set('delivery_partner_margin_percent', workflow.deliveryPartnerMarginPercent);
     set('direct_margin_percent', workflow.directMarginPercent);
     if (columns.has('is_active')) {
-      values.push(recipeStatus === 'Live');
+      values.push(recipeStatus === 'Approved');
       sets.push(`is_active = $${values.length}`);
     }
     add('instructions', b.instructions ?? null);
@@ -406,8 +326,7 @@ router.put('/:id', async (req, res) => {
       values
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Recipe not found' });
-    const sync = await syncRecipeToMenu(id);
-    res.json({ ...(result.rows[0] as any), costingBlockers: workflow.blockers, menuSync: sync });
+    res.json({ ...(result.rows[0] as any), costingBlockers: workflow.blockers });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
