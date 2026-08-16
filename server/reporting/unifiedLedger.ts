@@ -180,7 +180,36 @@ export async function queryUnifiedItemSales(range: ResolvedReportingRange) {
   const db = requirePool();
   const cutover = new Date(SBB_REPORTING_CUTOVER_ISO).toISOString();
   const result = await db.query(
-    `WITH lines AS (
+    `WITH pos_lines AS (
+      SELECT
+        i.*,
+        o.payment_status,
+        COALESCE(c.name_en,'Other') category,
+        CASE
+          WHEN COALESCE(o.subtotal,o.total,0) > 0
+            THEN COALESCE(o.discount_amount,0) * i.line_total / COALESCE(o.subtotal,o.total,0)
+          ELSE 0::numeric
+        END allocated_discount,
+        CASE
+          WHEN recipe_link.recipe_id IS NOT NULL THEN NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric
+          WHEN cfg.costing_mode='direct' THEN cfg.direct_unit_cost
+          WHEN cfg.costing_mode='recipe' THEN NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric
+          ELSE NULL
+        END unit_cost
+      FROM ordering_order_items i
+      JOIN ordering_orders o ON o.id=i.order_id
+      LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+      LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
+      LEFT JOIN ordering_menu_item_recipe_links recipe_link ON recipe_link.menu_item_id=i.menu_item_id
+      LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.menu_item_id
+      LEFT JOIN recipes r ON r.id=COALESCE(recipe_link.recipe_id,cfg.recipe_id)
+      WHERE o.created_at >= GREATEST($1::timestamptz,$3::timestamptz)
+        AND o.created_at < $2::timestamptz
+        AND o.status <> 'cancelled'
+        AND o.payment_status IN ('paid','refunded')
+        AND COALESCE(i.is_set_component,false)=false
+    ),
+    lines AS (
       SELECT
         COALESCE(NULLIF(i.sku,''),i.item_name) item_key,
         i.item_name,
@@ -207,37 +236,20 @@ export async function queryUnifiedItemSales(range: ResolvedReportingRange) {
         COALESCE(NULLIF(i.source_sku,''),i.item_name_en) item_key,
         i.item_name_en item_name,
         i.source_sku sku,
-        COALESCE(c.name_en,'Other') category,
+        i.category,
         i.quantity::numeric quantity,
         i.line_total gross_sales,
-        0::numeric discount_total,
-        0::numeric refund_total,
-        i.line_total net_sales,
+        i.allocated_discount discount_total,
+        CASE WHEN i.payment_status='refunded' THEN i.line_total-i.allocated_discount ELSE 0::numeric END refund_total,
+        CASE WHEN i.payment_status='refunded' THEN 0::numeric ELSE i.line_total-i.allocated_discount END net_sales,
+        i.unit_cost * i.quantity cost_of_goods,
         CASE
-          WHEN recipe_link.recipe_id IS NOT NULL THEN NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric * i.quantity
-          WHEN cfg.costing_mode='direct' THEN cfg.direct_unit_cost * i.quantity
-          WHEN cfg.costing_mode='recipe' THEN NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric * i.quantity
-          ELSE NULL
-        END cost_of_goods,
-        CASE
-          WHEN recipe_link.recipe_id IS NOT NULL THEN i.line_total-(NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric*i.quantity)
-          WHEN cfg.costing_mode='direct' THEN i.line_total-(cfg.direct_unit_cost*i.quantity)
-          WHEN cfg.costing_mode='recipe' THEN i.line_total-(NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric*i.quantity)
-          ELSE NULL
+          WHEN i.unit_cost IS NULL THEN NULL
+          WHEN i.payment_status='refunded' THEN 0::numeric-(i.unit_cost*i.quantity)
+          ELSE (i.line_total-i.allocated_discount)-(i.unit_cost*i.quantity)
         END gross_profit,
         'sbb_pos'::text source_system
-      FROM ordering_order_items i
-      JOIN ordering_orders o ON o.id=i.order_id
-      LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
-      LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
-      LEFT JOIN ordering_menu_item_recipe_links recipe_link ON recipe_link.menu_item_id=i.menu_item_id
-      LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.menu_item_id
-      LEFT JOIN recipes r ON r.id=COALESCE(recipe_link.recipe_id,cfg.recipe_id)
-      WHERE o.created_at >= GREATEST($1::timestamptz,$3::timestamptz)
-        AND o.created_at < $2::timestamptz
-        AND o.status <> 'cancelled'
-        AND o.payment_status='paid'
-        AND COALESCE(i.is_set_component,false)=false
+      FROM pos_lines i
     )
     SELECT
       item_key,
