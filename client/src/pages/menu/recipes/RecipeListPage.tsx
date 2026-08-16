@@ -24,8 +24,9 @@ function missingReason(price: number | null, cost: number | null) {
 export default function RecipeListPage() {
   const navigate = useNavigate();
   const [cardRecipe, setCardRecipe] = useState<Recipe | null>(null);
-  const { data, isLoading } = useQuery<Recipe[] | { rows?: Recipe[] }>({ queryKey: ["/api/recipes"] });
+  const { data, isLoading } = useQuery<Recipe[] | { rows?: Recipe[]; blockers?: Array<{ code?: string; message?: string }> }>({ queryKey: ["/api/recipes"] });
   const recipes = Array.isArray(data) ? data : asArray<Recipe>(data?.rows);
+  const linkBlocker = Array.isArray(data) ? null : data?.blockers?.find((blocker) => blocker.code === "MENU_RECIPE_LINKS_UNAVAILABLE");
   const deleteMutation = useMutation({
     mutationFn: (id: number) => apiRequest(`/api/recipes/${id}`, { method: "DELETE" }),
     onSuccess: () => {
@@ -36,6 +37,7 @@ export default function RecipeListPage() {
 
   return <div className="space-y-3">
     <div className="flex items-center justify-between gap-3"><p className="text-xs text-slate-500">Recipe development and costing library. Recipe cards contain kitchen instructions only.</p><Link to="/menu/recipes/new" className="inline-flex items-center gap-2 rounded-lg bg-black px-3 py-1.5 text-xs text-white"><Plus className="h-4 w-4" />Add New Recipe</Link></div>
+    {linkBlocker && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Menu link status is temporarily unavailable: {linkBlocker.message || "please retry."}</p>}
     <div className="overflow-x-auto rounded-lg border bg-white dark:bg-slate-900"><table className="w-full min-w-[1390px] text-xs"><thead><tr className="border-b bg-slate-50"><th className="p-2 text-left">Thumbnail</th><th className="p-2 text-left">Recipe</th><th className="p-2 text-left">Category</th><th className="p-2 text-left">Description</th><th className="p-2 text-left">Food Cost</th><th className="p-2 text-left">Reference Direct</th><th className="p-2 text-left">Reference Margin %</th><th className="p-2 text-left">Reference Partner</th><th className="p-2 text-left">Reference Margin %</th><th className="p-2 text-left">Linked Menu Prices</th><th className="p-2 text-left">Status</th><th className="p-2 text-left">Actions</th></tr></thead><tbody>{isLoading ? <tr><td className="p-3" colSpan={12}>Loading recipes...</td></tr> : recipes.length === 0 ? <tr><td className="p-3" colSpan={12}>No recipes found.</td></tr> : recipes.map((recipe) => {
       const cost = toNumber(recipe.costPerServing);
       const directPrice = toNumber(recipe.sellingPrice);
@@ -43,9 +45,16 @@ export default function RecipeListPage() {
       const directMargin = calculateMargin(directPrice, cost, recipe.directMarginPercent);
       const deliveryMargin = calculateMargin(deliveryPrice, cost, recipe.deliveryPartnerMarginPercent);
       const status = parseStatus(recipe);
-      const linkedPrices = recipe.linkedMenuItemName
-        ? `${recipe.linkedMenuItemName} · POS ${fmtMoney(recipe.linkedMenuItemDirectPrice)} · Partner ${fmtMoney(recipe.linkedMenuItemPartnerPrice)}`
-        : "Not linked";
+      const linkedMenuItems = recipe.linkedMenuItems?.length
+        ? recipe.linkedMenuItems
+        : recipe.linkedMenuItemName
+          ? [{ id: recipe.linkedMenuItemId ?? "", name: recipe.linkedMenuItemName, directPrice: recipe.linkedMenuItemDirectPrice ?? null, partnerPrice: recipe.linkedMenuItemPartnerPrice ?? null }]
+          : [];
+      const linkedPrices = linkBlocker
+        ? "Link status unavailable"
+        : linkedMenuItems.length
+          ? linkedMenuItems.map((item) => `${item.name} · POS ${fmtMoney(item.directPrice)} · Partner ${fmtMoney(item.partnerPrice)}`).join(" | ")
+          : "Not linked";
       return <tr key={recipe.id} className="border-b"><td className="p-2"><div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded border bg-slate-100 text-[10px] text-slate-500">{recipe.imageUrl ? <img src={recipe.imageUrl} alt={recipe.name} className="h-full w-full object-contain" /> : "No image"}</div></td><td className="p-2 font-medium">{recipe.name || "Untitled"}</td><td className="p-2">{recipe.category || "—"}</td><td className="max-w-xs whitespace-normal p-2">{recipe.description || "—"}</td><td className="p-2 font-mono">{fmtMoney(cost)}</td><td className="p-2 font-mono">{fmtMoney(directPrice)}</td><td className="p-2 font-mono">{directMargin === null ? <span className="text-amber-700" title={missingReason(directPrice, cost)}>—</span> : fmtPercent(directMargin)}</td><td className="p-2 font-mono">{fmtMoney(deliveryPrice)}</td><td className="p-2 font-mono">{deliveryMargin === null ? <span className="text-amber-700" title={missingReason(deliveryPrice, cost)}>—</span> : fmtPercent(deliveryMargin)}</td><td className="p-2 text-[11px] text-slate-600">{linkedPrices}</td><td className="p-2"><Badge variant={status === "Approved" ? "default" : "outline"}>{status}</Badge></td><td className="p-2"><div className="flex gap-2"><button aria-label={`Recipe card ${recipe.name}`} title="Recipe Card" className="rounded border p-1.5" onClick={() => setCardRecipe(recipe)}><FileText className="h-4 w-4" /></button><button aria-label={`Clone ${recipe.name}`} title="Clone as new draft" className="rounded border p-1.5" onClick={() => navigate(`/menu/recipes/new?cloneFrom=${recipe.id}`)}><Copy className="h-4 w-4" /></button><button aria-label={`Edit ${recipe.name}`} title="Edit" className="rounded border p-1.5" onClick={() => navigate(`/menu/recipes/${recipe.id}/edit`)}><Pencil className="h-4 w-4" /></button><button aria-label={`Delete ${recipe.name}`} title="Delete permanently" className="rounded border border-red-300 p-1.5 text-red-700" onClick={() => window.confirm(`Permanently delete recipe "${recipe.name}"? This cannot be undone.`) && deleteMutation.mutate(recipe.id)}><Trash2 className="h-4 w-4" /></button></div></td></tr>;
     })}</tbody></table></div>
     {deleteMutation.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{(deleteMutation.error as Error)?.message || "Recipe could not be deleted. It may still be linked to a menu item."}</p>}
