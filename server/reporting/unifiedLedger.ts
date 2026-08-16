@@ -284,3 +284,99 @@ export async function queryUnifiedItemSales(range: ResolvedReportingRange) {
     margin_pct: row.margin_pct == null ? null : n(row.margin_pct),
   }));
 }
+
+
+export type BurgerUsageIngredient = {
+  key: string;
+  name: string;
+  unit: string;
+  quantityPerItem: number;
+  expectedQuantity: number;
+};
+
+export type BurgerUsageRow = {
+  menuItemId: string;
+  itemName: string;
+  sku: string | null;
+  category: string;
+  soldQuantity: number;
+  recipeId: number | null;
+  recipeName: string | null;
+  recipeStatus: "READY" | "NOT_LINKED" | "RECIPE_EMPTY";
+  ingredients: BurgerUsageIngredient[];
+};
+
+export async function queryBurgerUsage(range: ResolvedReportingRange) {
+  const db = requirePool();
+  const cutover = new Date(SBB_REPORTING_CUTOVER_ISO).toISOString();
+  const result = await db.query(
+    `SELECT
+      mi.id::text AS menu_item_id,
+      mi.name_en AS item_name,
+      NULLIF(mi.source_sku, '') AS sku,
+      c.name_en AS category,
+      link.recipe_id,
+      r.name AS recipe_name,
+      COALESCE(r.yield_quantity, 1)::numeric AS yield_quantity,
+      COALESCE(r.ingredients, '[]'::jsonb) AS ingredients,
+      COALESCE(SUM(
+        CASE
+          WHEN o.payment_status = 'paid' THEN i.quantity
+          ELSE 0
+        END
+      ), 0)::numeric AS sold_quantity
+    FROM ordering_menu_items mi
+    JOIN ordering_menu_categories c ON c.id = mi.category_id
+    LEFT JOIN ordering_menu_item_recipe_links link ON link.menu_item_id = mi.id
+    LEFT JOIN recipes r ON r.id = link.recipe_id
+    LEFT JOIN ordering_order_items i
+      ON i.menu_item_id = mi.id
+      AND COALESCE(i.is_set_component, false) = false
+    LEFT JOIN ordering_orders o
+      ON o.id = i.order_id
+      AND o.created_at >= GREATEST($1::timestamptz, $3::timestamptz)
+      AND o.created_at < $2::timestamptz
+      AND o.status <> 'cancelled'
+      AND o.payment_status IN ('paid', 'refunded')
+    WHERE mi.is_active = true
+      AND c.name_en IN ('Burgers', 'Chicken Burgers')
+    GROUP BY mi.id, mi.name_en, mi.source_sku, c.name_en, link.recipe_id, r.name, r.yield_quantity, r.ingredients
+    ORDER BY c.name_en, mi.name_en`,
+    [range.fromInstant, range.toInstant, cutover],
+  );
+
+  return result.rows.map((row: any): BurgerUsageRow => {
+    const soldQuantity = n(row.sold_quantity);
+    const recipeIngredients = Array.isArray(row.ingredients) ? row.ingredients : [];
+    const recipeYield = Math.max(n(row.yield_quantity), 1);
+    const validatedIngredients = recipeIngredients.flatMap((ingredient: any): BurgerUsageIngredient[] => {
+      const name = String(ingredient?.name ?? "").trim();
+      const unit = String(ingredient?.unitUsed ?? "").trim();
+      const batchQuantity = n(ingredient?.quantityUsed);
+      if (!name || !unit || batchQuantity <= 0) return [];
+      const quantityPerItem = batchQuantity / recipeYield;
+      return [{
+        key: `${name.toLocaleLowerCase()}|${unit.toLocaleLowerCase()}`,
+        name,
+        unit,
+        quantityPerItem,
+        expectedQuantity: soldQuantity * quantityPerItem,
+      }];
+    });
+    const recipeStatus: BurgerUsageRow["recipeStatus"] =
+      row.recipe_id == null ? "NOT_LINKED" : validatedIngredients.length === 0 ? "RECIPE_EMPTY" : "READY";
+    const ingredients = recipeStatus === "READY" ? validatedIngredients : [];
+
+    return {
+      menuItemId: String(row.menu_item_id),
+      itemName: String(row.item_name),
+      sku: row.sku == null ? null : String(row.sku),
+      category: String(row.category),
+      soldQuantity,
+      recipeId: row.recipe_id == null ? null : Number(row.recipe_id),
+      recipeName: row.recipe_name == null ? null : String(row.recipe_name),
+      recipeStatus,
+      ingredients,
+    };
+  });
+}

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import {
+  queryBurgerUsage,
   queryUnifiedItemSales,
   queryUnifiedOverview,
   queryUnifiedReceipts,
@@ -120,6 +121,32 @@ router.get("/items", async (req, res) => {
     res.json({ ok: true, source: "unified_reporting_ledger", filters: range, items });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
+  }
+});
+
+router.get("/burger-usage", async (req, res) => {
+  try {
+    const range = exactRange(req.query as Record<string, unknown>);
+    const burgers = await queryBurgerUsage(range);
+    const readyRows = burgers.filter((burger) => burger.recipeStatus === "READY");
+    const soldQuantity = burgers.reduce((sum, burger) => sum + Number(burger.soldQuantity || 0), 0);
+    const mappedSoldQuantity = readyRows.reduce((sum, burger) => sum + Number(burger.soldQuantity || 0), 0);
+    res.json({
+      ok: true,
+      source: "sbb_pos_recipe_usage",
+      filters: range,
+      scope: "Active Burgers and Chicken Burgers only; sets, sides, modifiers and historical Loyverse sales are excluded.",
+      burgers,
+      coverage: {
+        menuItems: burgers.length,
+        readyMenuItems: readyRows.length,
+        soldQuantity,
+        mappedSoldQuantity,
+        coveragePct: soldQuantity > 0 ? (mappedSoldQuantity / soldQuantity) * 100 : null,
+      },
+    });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, source: "sbb_pos_recipe_usage", error: error.message });
   }
 });
 
