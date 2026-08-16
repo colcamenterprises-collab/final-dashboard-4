@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ChevronDown, ChevronUp, Clock, ImageIcon, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, Download, ImageIcon, Plus, Search } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { asArray, normalizeMenuCategories, normalizeMenuItems } from "@/lib/menuData";
 import RecipeEditorPage from "./recipes/RecipeEditorPage";
@@ -41,6 +41,7 @@ const makeIngredient = (): IngredientDraft => ({ id: createClientId("ingredient"
 function toNumber(value: unknown): number | null { if (value === null || value === undefined || value === "") return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
 function fmtMoney(value: unknown) { const n = toNumber(value); return n === null ? "UNMAPPED" : `฿${n.toFixed(2)}`; }
 function fmtPercent(value: unknown) { const n = toNumber(value); return n === null ? "UNMAPPED" : `${n.toFixed(1)}%`; }
+function csvCell(value: unknown) { return `"${String(value ?? "").replace(/"/g, '""')}"`; }
 function yesNo(value: boolean | undefined) { return value ? "Yes" : "No"; }
 function itemCategoryName(item: MenuItem, categoryMap: Record<string, string>) { return typeof item.category === "string" ? item.category : categoryMap[item.categoryId || ""] || item.category?.name || "UNMAPPED"; }
 function itemAvailable(item: MenuItem) { return item.isActive !== false && item.soldOut !== true && (item.onlineEnabled ?? item.isOnlineEnabled ?? true) !== false; }
@@ -127,6 +128,42 @@ export default function MenuWorkspace() {
   const filteredPurchasing = purchasingLines;
   const editingItem = editingItemId ? items.find((item) => item.id === editingItemId) ?? null : null;
   const outOfStockCount = items.filter((item) => !itemAvailable(item)).length;
+  const exportMenuItems = () => {
+    const header = ["Menu Item", "Category", "Description", "Menu Price", "Linked Recipe", "Food Cost / Serve", "Direct Recipe Price", "Direct Margin %", "Delivery Recipe Price", "Delivery Margin %", "Available", "Online Enabled", "POS Enabled", "Sold Out", "Modifiers"];
+    const rows = items
+      .map((item) => {
+        const recipe = item.recipeId
+          ? recipes.find((candidate) => String(candidate.id) === String(item.recipeId))
+          : item.recipes?.[0]?.recipe ?? recipes.find((candidate) => candidate.name?.toLowerCase() === item.name?.toLowerCase());
+        const groupsForItem = modifierGroups.filter((group) => group.menuItemId === item.id || group.linkedMenuItemIds?.includes(item.id));
+        return [
+          item.name || "UNMAPPED",
+          itemCategoryName(item, categoryMap),
+          item.description || "",
+          toNumber(item.basePrice ?? item.price),
+          recipe?.name || "",
+          toNumber(recipe?.costPerServing),
+          toNumber(recipe?.sellingPrice),
+          toNumber(recipe?.directMarginPercent),
+          toNumber(recipe?.suggestedPrice),
+          toNumber(recipe?.deliveryPartnerMarginPercent),
+          itemAvailable(item) ? "Yes" : "No",
+          yesNo(item.onlineEnabled ?? item.isOnlineEnabled ?? true),
+          yesNo(item.posEnabled),
+          yesNo(item.soldOut),
+          groupsForItem.map((group) => group.name).join("; "),
+        ].map(csvCell).join(",");
+      })
+      .join("\n");
+    const blob = new Blob([[header.map(csvCell).join(","), rows].filter(Boolean).join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sbb-menu-items-pricing.csv";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const itemGroups = useMemo(() => {
     const groups = new Map<string, MenuItem[]>();
     for (const item of filteredItems) {
@@ -174,6 +211,7 @@ export default function MenuWorkspace() {
         <label className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700"><Search className="h-4 w-4" /><input value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search" className="w-40 bg-transparent outline-none" /></label>
         <button type="button" onClick={() => setShowOutOfStockOnly((value) => !value)} className={`rounded-full border px-4 py-2 text-sm ${showOutOfStockOnly ? "border-emerald-700 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-white text-slate-700"}`}>Out of Stock ({outOfStockCount})</button>
         <button type="button" className="inline-flex cursor-default items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500" title="No editable availability schedule is configured for this source"><Clock className="h-4 w-4" />Availability schedule</button>
+        <button type="button" onClick={exportMenuItems} disabled={itemsLoading || items.length === 0} className="inline-flex items-center gap-2 rounded-full border border-slate-900 bg-slate-950 px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"><Download className="h-4 w-4" />Export Menu CSV</button>
       </div>
       {(itemsLoading || categoriesLoading || recipesLoading) && <div className="text-center py-12 text-slate-400 text-xs">Loading menu items...</div>}
       {!itemsLoading && itemGroups.length === 0 && blockerText("No menu items matched the current filters. Existing records are not hidden unless a filter is active.")}
