@@ -214,11 +214,13 @@ export async function queryUnifiedItemSales(range: ResolvedReportingRange) {
         0::numeric refund_total,
         i.line_total net_sales,
         CASE
+          WHEN recipe_link.recipe_id IS NOT NULL THEN NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric * i.quantity
           WHEN cfg.costing_mode='direct' THEN cfg.direct_unit_cost * i.quantity
           WHEN cfg.costing_mode='recipe' THEN NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric * i.quantity
           ELSE NULL
         END cost_of_goods,
         CASE
+          WHEN recipe_link.recipe_id IS NOT NULL THEN i.line_total-(NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric*i.quantity)
           WHEN cfg.costing_mode='direct' THEN i.line_total-(cfg.direct_unit_cost*i.quantity)
           WHEN cfg.costing_mode='recipe' THEN i.line_total-(NULLIF(to_jsonb(r)->>'cost_per_serving','')::numeric*i.quantity)
           ELSE NULL
@@ -228,8 +230,9 @@ export async function queryUnifiedItemSales(range: ResolvedReportingRange) {
       JOIN ordering_orders o ON o.id=i.order_id
       LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
       LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
+      LEFT JOIN ordering_menu_item_recipe_links recipe_link ON recipe_link.menu_item_id=i.menu_item_id
       LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.menu_item_id
-      LEFT JOIN recipes r ON r.id=cfg.recipe_id
+      LEFT JOIN recipes r ON r.id=COALESCE(recipe_link.recipe_id,cfg.recipe_id)
       WHERE o.created_at >= GREATEST($1::timestamptz,$3::timestamptz)
         AND o.created_at < $2::timestamptz
         AND o.status <> 'cancelled'
