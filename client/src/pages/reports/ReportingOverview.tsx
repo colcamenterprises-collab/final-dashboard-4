@@ -13,7 +13,7 @@ type HourlyItemRow={bucketStart:string;quantity:number};
 type CategoryRow={category:string;quantity:number;netSales:number};
 type ProductRow={itemName:string;quantity:number;netSales:number};
 type LabourEfficiency={itemCount:number;staffCount:number;shiftCount:number;shiftMinutes:number;grossLabourMinutes:number;breakAllowanceMinutes:number;prepMinutes:number;cleaningMinutes:number;prepAndCleaningMinutes:number;totalAllowanceMinutes:number;availableProductionMinutes:number;availableProductionHours:number;itemsPerLabourHour:number|null;labourMinutesPerItem:number;estimatedWorkloadMinutes:number;utilisationPct:number|null;unoccupiedCapacityMinutes:number;warnings:string[]};
-type OverviewResponse = { ok:boolean; source:string; filters:ExactDateTimeRangeValue & {fromInstant:string;toInstant:string}; sourcesIncluded:string[]; overview:{receiptCount:number;grossSales:number;discounts:number;refunds:number;netSales:number;averageOrder:number;historicalReceipts:number;liveReceipts:number;paymentSales:Record<string,number>}; labor:{laborCost:number;paidStaffCount:number;staffShiftCount:number;recordedShiftCount:number;laborCostPct:number|null;source:string;demandSource:string;efficiency:LabourEfficiency}; breakdowns:{daily:Array<{day:string;orders:number;netSales:number}>;hourly:HourRow[];hourlyItems:HourlyItemRow[];categories:CategoryRow[];topProducts:ProductRow[]}; error?:string };
+type OverviewResponse = { ok:boolean; source:string; filters:ExactDateTimeRangeValue & {fromInstant:string;toInstant:string}; sourcesIncluded:string[]; overview:{receiptCount:number;grossSales:number;discounts:number;refunds:number;netSales:number;averageOrder:number;historicalReceipts:number;liveReceipts:number;paymentSales:Record<string,number>;costing:{costOfGoods:number;grossProfit:number;costedNetSales:number;itemNetSales:number;coveragePct:number|null;foodCostPct:number|null;grossMarginPct:number|null}}; labor:{laborCost:number;paidStaffCount:number;staffShiftCount:number;recordedShiftCount:number;laborCostPct:number|null;source:string;demandSource:string;efficiency:LabourEfficiency}; breakdowns:{daily:Array<{day:string;orders:number;netSales:number}>;hourly:HourRow[];hourlyItems:HourlyItemRow[];categories:CategoryRow[];topProducts:ProductRow[]}; error?:string };
 
 const cardTones = {
   blue: "from-blue-500 to-indigo-600 text-white",
@@ -89,7 +89,7 @@ export default function ReportingOverview(){
  const query=useQuery<OverviewResponse>({queryKey:["unified-reporting-overview",params],queryFn:async()=>{const response=await fetch(`/api/reports/receipt-analytics/unified/overview?${params}`,{credentials:"include",cache:"no-store"});const body=await response.json();if(!response.ok||!body.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;}});
  const paymentGroups=useMemo(()=>{const grouped:Record<string,number>={Cash:0,QR:0,Grab:0,Card:0,Other:0};for(const[name,amount]of Object.entries(query.data?.overview.paymentSales||{}))grouped[paymentGroup(name)]+=Number(amount||0);return grouped;},[query.data]);
  const hourly=useMemo(()=>query.data?buildHourlySeries(query.data.breakdowns.hourly,query.data.filters):[],[query.data]);
- const data=query.data?.overview; const breakdowns=query.data?.breakdowns; const labor=query.data?.labor; const efficiency=labor?.efficiency;
+ const data=query.data?.overview; const costing=data?.costing; const breakdowns=query.data?.breakdowns; const labor=query.data?.labor; const efficiency=labor?.efficiency;
  const utilisation=useMemo(()=>{
   if(!efficiency||!query.data)return null;
   const staffCount=Math.max(0,Number(staffOverride===""?efficiency.staffCount:staffOverride)||0);
@@ -116,6 +116,7 @@ export default function ReportingOverview(){
     <MetricCard label="Net sales" value={money(data.netSales)} sub={`${money(data.discounts+data.refunds)} adjustments`} tone="light" icon={Banknote}/>
     <MetricCard label="Orders" value={data.receiptCount.toLocaleString()} sub={`${data.historicalReceipts} historical · ${data.liveReceipts} live`} tone="amber" icon={Receipt}/>
     <MetricCard label="Average order" value={money(data.averageOrder)} sub="Net sales per paid receipt" tone="mint" icon={ShoppingBag}/>
+    <MetricCard label="Food cost" value={costing?.coveragePct ? money(costing.costOfGoods) : "—"} sub={costing?.coveragePct ? `${costing.foodCostPct?.toFixed(1) || "—"}% food cost · ${costing.coveragePct.toFixed(0)}% of item sales costed` : "Link recipes and record SBB POS sales"} tone="amber" icon={Receipt}/>
     <MetricCard label="Labor cost" value={labor?.laborCostPct==null?"—":`${labor.laborCostPct.toFixed(1)}%`} sub={`${money(labor?.laborCost||0)} · ${labor?.paidStaffCount||0} paid staff · form recorded`} tone="violet" icon={UsersRound}/>
     <MetricCard label="Items / labour hr" value={efficiency?.itemsPerLabourHour==null?"—":efficiency.itemsPerLabourHour.toFixed(2)} sub={`${efficiency?.itemCount||0} items · ${efficiency?.staffCount||0} staff worked`} tone="mint" icon={Clock3}/>
   </div>
