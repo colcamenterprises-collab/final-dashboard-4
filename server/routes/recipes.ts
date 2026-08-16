@@ -101,37 +101,64 @@ function recipeOrder(columns: ColumnSet) {
   return columns.has('category') ? 'category NULLS LAST, name' : 'name';
 }
 
-async function enrichWithMenuLinks(rows: any[]) {
-  if (!pool || !rows.length) return rows;
+async function enrichWithMenuLinks(rows: any[]): Promise<{ rows: any[]; blockers: Array<Record<string, string>> }> {
+  if (!pool || !rows.length) return { rows, blockers: [] };
+
   try {
     const ids = rows.map((row) => Number(row.id)).filter(Number.isInteger);
-    if (!ids.length) return rows;
+    if (!ids.length) return { rows, blockers: [] };
+
     const links = await pool.query(
       `SELECT l.recipe_id, i.id AS menu_item_id, i.name_en AS menu_item_name,
               COALESCE(i.direct_price, i.price) AS menu_item_direct_price,
               COALESCE(i.grab_price, i.direct_price, i.price) AS menu_item_partner_price
          FROM ordering_menu_item_recipe_links l
-         JOIN ordering_menu_items i ON i.id=l.menu_item_id
-        WHERE l.recipe_id = ANY($1::int[])`,
+         JOIN ordering_menu_items i ON i.id = l.menu_item_id
+        WHERE l.recipe_id = ANY($1::int[])
+        ORDER BY i.name_en ASC, i.id ASC`,
       [ids],
     );
-    const byRecipe = new Map(links.rows.map((link: any) => [Number(link.recipe_id), link]));
-    return rows.map((row) => {
-      const link = byRecipe.get(Number(row.id));
-      return link
-        ? {
-            ...row,
-            linkedMenuItemId: String(link.menu_item_id),
-            linkedMenuItemName: link.menu_item_name,
-            linkedMenuItemDirectPrice: link.menu_item_direct_price,
-            linkedMenuItemPartnerPrice: link.menu_item_partner_price,
-          }
-        : row;
-    });
-  } catch {
-    // The recipe library remains available if an older database has not yet
-    // received the additive menu-link table.
-    return rows;
+
+    const byRecipe = new Map<number, any[]>();
+    for (const link of links.rows) {
+      const recipeId = Number(link.recipe_id);
+      const recipeLinks = byRecipe.get(recipeId) || [];
+      recipeLinks.push({
+        id: String(link.menu_item_id),
+        name: link.menu_item_name,
+        directPrice: link.menu_item_direct_price,
+        partnerPrice: link.menu_item_partner_price,
+      });
+      byRecipe.set(recipeId, recipeLinks);
+    }
+
+    return {
+      rows: rows.map((row) => {
+        const linkedMenuItems = byRecipe.get(Number(row.id)) || [];
+        const primary = linkedMenuItems[0];
+        return primary
+          ? {
+              ...row,
+              linkedMenuItems,
+              // Kept for existing API consumers; the full array is authoritative.
+              linkedMenuItemId: primary.id,
+              linkedMenuItemName: primary.name,
+              linkedMenuItemDirectPrice: primary.directPrice,
+              linkedMenuItemPartnerPrice: primary.partnerPrice,
+            }
+          : { ...row, linkedMenuItems };
+      }),
+      blockers: [],
+    };
+  } catch (error: any) {
+    return {
+      rows,
+      blockers: [{
+        code: 'MENU_RECIPE_LINKS_UNAVAILABLE',
+        message: error?.message || 'The recipe-to-menu link status could not be read.',
+        where: 'ordering_menu_item_recipe_links',
+      }],
+    };
   }
 }
 
@@ -173,7 +200,8 @@ router.get('/:id', async (req, res) => {
       [id]
     );
     if (!result.rows.length) return res.status(404).json({ error: 'Recipe not found' });
-    res.json((await enrichWithMenuLinks(result.rows))[0]);
+    const enriched = await enrichWithMenuLinks(result.rows);
+    res.json({ ...enriched.rows[0], linkBlockers: enriched.blockers });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
