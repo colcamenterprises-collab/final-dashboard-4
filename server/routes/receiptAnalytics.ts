@@ -9,6 +9,37 @@ const n = (value: unknown) => Number(value ?? 0) || 0;
 
 router.use("/unified", reportingUnifiedRouter);
 
+router.get("/grab-references", async (req, res) => {
+  try {
+    if (!pool) throw new Error("Database unavailable");
+    const range = resolveExactReportingRange({
+      fromDate: String(req.query.fromDate || ""),
+      fromTime: String(req.query.fromTime || ""),
+      toDate: String(req.query.toDate || ""),
+      toTime: String(req.query.toTime || ""),
+      timezone: String(req.query.timezone || "Asia/Bangkok"),
+    });
+    const cutover = new Date(SBB_REPORTING_CUTOVER_ISO).toISOString();
+    const result = await pool.query(
+      `SELECT id::text id, grab_order_number
+       FROM ordering_orders
+       WHERE created_at >= GREATEST($1::timestamptz,$3::timestamptz)
+         AND created_at < $2::timestamptz
+         AND status <> 'cancelled'
+         AND payment_status IN ('paid','refunded')`,
+      [range.fromInstant, range.toInstant, cutover],
+    );
+    res.json({
+      ok: true,
+      source: "sbb_pos_core",
+      filters: range,
+      references: result.rows,
+    });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, source: "sbb_pos_core", error: error.message });
+  }
+});
+
 router.get("/shift-review", async (req, res) => {
   try {
     if (!pool) throw new Error("Database unavailable");
