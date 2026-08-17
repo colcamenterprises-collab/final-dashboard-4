@@ -100,7 +100,7 @@ router.get("/shift-review", async (req, res) => {
       const pv = n(posValue);
       const fv = formCount ? n(formValue) : null;
       const delta = fv == null ? null : Number((pv - fv).toFixed(2));
-      return { key, label, pos: pv, dailySales: fv, delta, status: fv == null ? "missing" : Math.abs(delta) <= 0.01 ? "match" : "flag" };
+      return { key, label, pos: pv, dailySales: fv, delta, status: delta == null ? "missing" : Math.abs(delta) <= 0.01 ? "match" : "flag" };
     };
     const rows = [
       row("cashSales", "Cash Sales (฿)", pos.cash_sales, forms.cash_sales),
