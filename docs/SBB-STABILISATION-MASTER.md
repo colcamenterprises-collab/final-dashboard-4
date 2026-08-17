@@ -31,7 +31,7 @@ The following controls apply throughout the programme:
 | Package manifests | 5 | Tracked `package.json` files |
 | Direct dependencies | 134 | Root `package.json` |
 | Development dependencies | 27 | Root `package.json` |
-| TypeScript diagnostics | 0 across 0 files | `npm run check` completed successfully on 2026-08-17; this measured checkout differs from the earlier audit finding and supersedes it only for this SHA |
+| TypeScript diagnostics | 1,539 across 206 files | Clean `npm run check -- --pretty false` after removing `node_modules/typescript/tsbuildinfo`; repository-wide check fails with exit code 2 |
 | Automated test files | 7 | Static filename/directory count; not equivalent to executed test cases |
 | Passing automated tests | Not established | Phase 0 does not invent a canonical test command or execute potentially data-dependent scripts; PR 2 owns that work |
 | Static server route registrations | 629 | `app`/`router` HTTP method calls in tracked server source; dynamic registrations require separate inventory |
@@ -50,10 +50,33 @@ The following controls apply throughout the programme:
 | Check | Result | Evidence |
 |---|---|---|
 | Production build | PASS | `npm run build`; Vite transformed 3,094 modules and esbuild produced `dist/index.js` |
-| TypeScript check | PASS | `npm run check`; zero diagnostics |
+| TypeScript check | FAIL (existing baseline) | A clean `npm run check -- --pretty false` reports 1,539 diagnostics across 206 files; no errors were repaired or suppressed in Phase 0 |
 | Build warnings | PRESENT | Stale Browserslist data, mixed static/dynamic jsPDF import, frontend chunk over 500 kB, and esbuild server bundle size warning |
 | Runtime behaviour | NOT CHANGED | Phase 0 adds documentation and a read-only inventory command only |
 | Database impact | NONE | No schema, migration, query, canonical data, or production operation changed or executed |
+
+### TypeScript baseline discrepancy verification
+
+**Verified status:** the earlier Phase 0 claim of zero diagnostics was incorrect. The settled baseline for this checkout is **1,539 diagnostics across 206 files**, and `npm run check` fails.
+
+The discrepancy was caused by the incremental compiler cache at `node_modules/typescript/tsbuildinfo`. The root configuration enables `incremental` and places its build-info file at that path. The first Phase 0 check reused the existing local build-info file and returned exit code 0 without reporting the repository's existing diagnostics. After deleting only that generated cache file and rerunning the unchanged command, TypeScript performed a clean analysis and returned exit code 2 with 1,539 diagnostics. This reproduces, rather than contradicts, the original audit's conclusion that repository-wide TypeScript checking fails.
+
+Verification facts:
+
+- Phase 0 HEAD before this documentation amendment was `ba3fc26b1b67c92fc457ebe34a785d06ac4677c7`; its parent/base is `06c57932090abcb6de40b3835fec850e14b3861e`.
+- The Phase 0 commit added only this register and `scripts/stabilisation/inventory.mjs`; it did not change TypeScript source, `package.json`, either lockfile, `tsconfig.json`, Prisma schema/generated source, or dependencies.
+- The root `package.json` command remains `"check": "tsc"` at HEAD and its parent.
+- Root `tsconfig.json` still includes `client/src/**/*`, `shared/**/*`, and `server/**/*`; it excludes `node_modules`, `build`, `dist`, `archive`, and `**/*.test.ts`. Imported files outside those glob roots can still enter the compiler program through the import graph.
+- The previously cited importer files `server/reporting/importers/loyverseControls.ts` and `server/reporting/importers/persistImport.ts` still exist and are present in `npx tsc --showConfig` output. The older `client/src/pages/IngredientManagement.tsx` cited by the February review no longer exists at this SHA, but extensive failures remain elsewhere.
+- The 12 August safety audit was made against an earlier repository state; many production TypeScript commits landed between that review and the 17 August base SHA. However, those later commits did not settle the discrepancy: a clean check of the current source still fails extensively.
+- TypeScript remains declared as `^5.9.2` and the installed compiler is 5.9.2. No Phase 0 dependency or Prisma-generated-type change explains the false pass.
+
+For a trustworthy local baseline, remove the ignored incremental cache before measuring:
+
+```bash
+rm -f node_modules/typescript/tsbuildinfo
+npm run check -- --pretty false
+```
 
 ### Major application packages and directories
 
@@ -118,7 +141,7 @@ No candidate below is approved for deletion. Phase 0 records questions; Phase 9 
 
 | PR | Purpose | Risk | Before metrics | After metrics | Tests/checks | Result | Rollback | Status |
 |---|---|---|---|---|---|---|---|---|
-| PR 1 (number pending) | Establish baseline documentation and read-only inventory tooling | LOW | 3,554 tracked files; no master register/inventory command | 3,556 tracked files after commit; baseline reproducible via one read-only command | `node scripts/stabilisation/inventory.mjs`; `npm run check`; `npm run build` | PASS; warnings recorded above | Revert the single PR commit; no data or runtime rollback required | Ready for review |
+| PR 1 (number pending) | Establish baseline documentation and read-only inventory tooling | LOW | 3,554 tracked files; no master register/inventory command | 3,556 tracked files after commit; baseline reproducible via one read-only command | `node scripts/stabilisation/inventory.mjs`; clean `npm run check`; `npm run build` | Inventory/build pass; TypeScript fails at the documented existing baseline | Revert the single PR commit; no data or runtime rollback required | Ready for review |
 
 ## Known unresolved risks
 
@@ -138,7 +161,8 @@ No candidate below is approved for deletion. Phase 0 records questions; Phase 9 
 From a clean checkout at the baseline SHA with dependencies installed:
 
 ```bash
-npm run check
+rm -f node_modules/typescript/tsbuildinfo
+npm run check -- --pretty false
 npm run build
 node scripts/stabilisation/inventory.mjs
 ```
