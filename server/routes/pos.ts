@@ -17,6 +17,11 @@ const value = (input: unknown) => {
 };
 const text = (input: unknown, max = 200) =>
   typeof input === "string" ? input.trim().slice(0, max) : "";
+const requestPriceMode = (req: Request) => {
+  if (req.query.price_mode === "grab") return "grab" as const;
+  if (req.query.price_mode === "direct") return "direct" as const;
+  return /(?:^|;\s*)sbb_pos_price_mode=grab(?:;|$)/.test(req.headers.cookie || "") ? "grab" as const : "direct" as const;
+};
 
 function shiftDateFor(date = DateTime.now().setZone("Asia/Bangkok")) {
   return (date.hour < 3 ? date.minus({ days: 1 }) : date).toFormat("yyyyLLdd");
@@ -73,7 +78,7 @@ function staffDevice(req: Request, res: Response, next: NextFunction) {
 
 router.get("/menu", async (req, res) => {
   try {
-    const mode = req.query.price_mode === "grab" ? "grab" : "direct";
+    const mode = requestPriceMode(req);
     const price = mode === "grab" ? "grab_price" : "direct_price";
     const rows = await db().query(
       `SELECT i.*, c.name_en category_name,
@@ -91,6 +96,7 @@ router.get("/menu", async (req, res) => {
             AND EXISTS(
               SELECT 1 FROM ordering_item_modifiers m
               WHERE m.modifier_group_id=g.id AND m.is_active
+                AND CASE WHEN $1='grab' THEN COALESCE(m.grab_enabled,true) ELSE COALESCE(m.direct_enabled,true) END
             )
         ) AS has_options
        FROM ordering_menu_items i
@@ -101,7 +107,9 @@ router.get("/menu", async (req, res) => {
          AND i.pos_enabled
          AND NOT i.is_sold_out
        ORDER BY c.sort_order, i.sort_order`,
+      [mode],
     );
+    res.cookie("sbb_pos_price_mode", mode, { httpOnly: true, sameSite: "lax", path: "/api/pos", maxAge: 12 * 60 * 60 * 1000 });
     res.json({ ok: true, source: "sbb_pos_core", price_mode: mode, data: rows.rows });
   } catch (e: any) {
     fail(res, e.message, 500);
@@ -226,6 +234,7 @@ router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
 
 router.get("/menu/:menuItemId/modifiers", staffDevice, async (req, res) => {
   try {
+    const mode = requestPriceMode(req);
     const groupsResult = await db().query(
       `SELECT DISTINCT g.id,g.name_en,g.name_th,g.group_type,g.selection_mode,
               COALESCE(g.min_selections,g.min_select,CASE WHEN g.is_required THEN 1 ELSE 0 END,0) AS min_selections,
@@ -243,23 +252,27 @@ router.get("/menu/:menuItemId/modifiers", staffDevice, async (req, res) => {
       [req.params.menuItemId],
     );
     const groupIds = groupsResult.rows.map((group) => group.id);
-    const optionsResult = groupIds.length
-      ? await db().query(
-          `SELECT m.*,g.name_en AS modifier_group_name_en,g.name_th AS modifier_group_name_th,g.group_type
+    const rawOptions = groupIds.length
+      ? (await db().query(
+          `SELECT m.*,
+                  CASE WHEN $2='grab' THEN COALESCE(m.grab_price_delta,m.price_delta) ELSE COALESCE(m.direct_price_delta,m.price_delta) END AS active_price_delta,
+                  g.name_en AS modifier_group_name_en,g.name_th AS modifier_group_name_th,g.group_type
            FROM ordering_item_modifiers m
            JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id
            WHERE m.modifier_group_id=ANY($1::uuid[]) AND m.is_active
+             AND CASE WHEN $2='grab' THEN COALESCE(m.grab_enabled,true) ELSE COALESCE(m.direct_enabled,true) END
            ORDER BY g.sort_order,m.sort_order,m.name_en`,
-          [groupIds],
-        )
-      : { rows: [] as any[] };
+          [groupIds, mode],
+        )).rows
+      : [] as any[];
+    const optionsResult = rawOptions.map((option: any) => ({ ...option, price_delta: value(option.active_price_delta) }));
     const optionsByGroup = new Map<string, any[]>();
-    for (const option of optionsResult.rows) {
+    for (const option of optionsResult) {
       const key = String(option.modifier_group_id);
       optionsByGroup.set(key, [...(optionsByGroup.get(key) || []), option]);
     }
     const groups = groupsResult.rows.map((group) => ({ ...group, options: optionsByGroup.get(String(group.id)) || [] })).filter((group) => group.options.length > 0);
-    res.json({ ok: true, source: "sbb_pos_core", data: optionsResult.rows, groups });
+    res.json({ ok: true, source: "sbb_pos_core", price_mode: mode, data: optionsResult, groups });
   } catch (e: any) {
     fail(res, e.message, 500);
   }
@@ -319,19 +332,26 @@ router.post("/orders", staffDevice, async (req, res) => {
            FROM ordering_modifier_groups g
            WHERE g.is_active
              AND (g.menu_item_id=$1 OR EXISTS(SELECT 1 FROM ordering_modifier_group_items a WHERE a.modifier_group_id=g.id AND a.menu_item_id=$1))
-             AND EXISTS(SELECT 1 FROM ordering_item_modifiers available WHERE available.modifier_group_id=g.id AND available.is_active)`,
-          [item.id],
+             AND EXISTS(
+               SELECT 1 FROM ordering_item_modifiers available
+               WHERE available.modifier_group_id=g.id AND available.is_active
+                 AND CASE WHEN $2='grab' THEN COALESCE(available.grab_enabled,true) ELSE COALESCE(available.direct_enabled,true) END
+             )`,
+          [item.id, mode],
         );
         if (modifierIds.length) {
           const modifierResult = await client.query(
-            `SELECT m.*,g.name_en AS modifier_group_name_en,g.group_type
+            `SELECT m.*,
+                    CASE WHEN $3='grab' THEN COALESCE(m.grab_price_delta,m.price_delta) ELSE COALESCE(m.direct_price_delta,m.price_delta) END AS active_price_delta,
+                    g.name_en AS modifier_group_name_en,g.group_type
              FROM ordering_item_modifiers m JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id
              WHERE m.id=ANY($1::uuid[]) AND m.is_active AND g.is_active
-               AND (g.menu_item_id=$2 OR EXISTS(SELECT 1 FROM ordering_modifier_group_items a WHERE a.modifier_group_id=g.id AND a.menu_item_id=$2))`,
-            [modifierIds, item.id],
+               AND (g.menu_item_id=$2 OR EXISTS(SELECT 1 FROM ordering_modifier_group_items a WHERE a.modifier_group_id=g.id AND a.menu_item_id=$2))
+               AND CASE WHEN $3='grab' THEN COALESCE(m.grab_enabled,true) ELSE COALESCE(m.direct_enabled,true) END`,
+            [modifierIds, item.id, mode],
           );
           selectedModifiers = modifierResult.rows;
-          if (selectedModifiers.length !== modifierIds.length) throw new Error("Invalid option for this item");
+          if (selectedModifiers.length !== modifierIds.length) throw new Error(`One or more selected options are not available for ${mode === "grab" ? "Grab" : "Direct"}`);
         }
         const selectionsByGroup = new Map<string, number>();
         for (const modifier of selectedModifiers) {
@@ -357,11 +377,12 @@ router.post("/orders", staffDevice, async (req, res) => {
 
       if (selectedModifiers.length) {
         for (const modifier of selectedModifiers) {
-          const delta = value(modifier.price_delta) * qty;
+          const modifierPrice = value(modifier.active_price_delta ?? modifier.price_delta);
+          const delta = modifierPrice * qty;
           await client.query(
             `INSERT INTO ordering_order_item_modifiers(order_item_id,item_modifier_id,modifier_group_name_en,modifier_name_en,modifier_name_th,price_delta,quantity)
              VALUES($1,$2,$3,$4,$5,$6,$7)`,
-            [parent.id,modifier.id,modifier.modifier_group_name_en,modifier.name_en,modifier.name_th,value(modifier.price_delta),qty],
+            [parent.id,modifier.id,modifier.modifier_group_name_en,modifier.name_en,modifier.name_th,modifierPrice,qty],
           );
           await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, delta]);
           total += delta;
