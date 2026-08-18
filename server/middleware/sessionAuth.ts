@@ -61,16 +61,18 @@ export function attachSessionUser(req: Request): boolean {
 
 /**
  * The legacy /api/finance router still has an old header-only auth guard.
- * Director/beneficiary loans are implemented by the newer finance router that
- * sits behind it. For this one route family, provide compatibility headers
- * after the real session/PIN authentication has already succeeded so the old
- * router passes through instead of incorrectly returning 401.
+ * Some newer finance route families sit behind it and authenticate using the
+ * real session/PIN owner context. Provide compatibility headers only after
+ * that real authentication has succeeded so the legacy router passes through
+ * instead of incorrectly returning 401.
  *
- * These values are routing compatibility only; the loan router performs its
- * own owner check from the PIN session and does not use them for persistence.
+ * These values are routing compatibility only; the canonical route handlers
+ * perform their own owner/session checks and do not use them for persistence.
  */
-function bridgeDirectorLoanLegacyFinanceGuard(req: Request) {
-  if (!req.path.startsWith("/api/finance/director-beneficiary-loans")) return;
+function bridgeLegacyFinanceGuard(req: Request) {
+  const isDirectorLoanRoute = req.path.startsWith("/api/finance/director-beneficiary-loans");
+  const isBankImportRoute = req.path.startsWith("/api/finance/bank-imports/");
+  if (!isDirectorLoanRoute && !isBankImportRoute) return;
 
   const user = (req as any).user;
   const userId = user?.uid ?? user?.id;
@@ -83,12 +85,12 @@ function bridgeDirectorLoanLegacyFinanceGuard(req: Request) {
 
 export function requireSessionAuth(req: Request, res: Response, next: NextFunction) {
   if (attachSessionUser(req)) {
-    bridgeDirectorLoanLegacyFinanceGuard(req);
+    bridgeLegacyFinanceGuard(req);
     return next();
   }
 
   if (attachLegacyUiSessionUser(req)) {
-    bridgeDirectorLoanLegacyFinanceGuard(req);
+    bridgeLegacyFinanceGuard(req);
     return next();
   }
 
@@ -103,7 +105,7 @@ export function requireSessionAuth(req: Request, res: Response, next: NextFuncti
       permissions: pinUser.permissions,
     };
     (req as any).tenantId = 1;
-    bridgeDirectorLoanLegacyFinanceGuard(req);
+    bridgeLegacyFinanceGuard(req);
     return next();
   }
 
