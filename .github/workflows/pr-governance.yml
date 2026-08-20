@@ -25,6 +25,27 @@ jobs:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: bash scripts/ci/pr-policy.sh
 
+  typescript-ratchet:
+    name: TypeScript debt ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install head dependencies
+        run: npm ci
+      - name: Self-test ratchet logic
+        run: node scripts/stabilisation/typescript-ratchet.mjs --self-test
+      - name: Compare TypeScript debt with PR base
+        env:
+          TSC_RATCHET_BASE: origin/${{ github.base_ref }}
+        run: node scripts/stabilisation/typescript-ratchet.mjs
+
   build:
     name: Production build
     runs-on: ubuntu-latest
