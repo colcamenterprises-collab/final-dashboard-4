@@ -15,9 +15,10 @@ The following controls apply throughout the programme:
 
 ## Current baseline
 
-**Baseline date:** 2026-08-17  
-**Repository SHA:** `06c57932090abcb6de40b3835fec850e14b3861e`  
-**Measurement command:** `node scripts/stabilisation/inventory.mjs`  
+- **Baseline date:** 2026-08-17
+- **Measured repository SHA:** `06c57932090abcb6de40b3835fec850e14b3861e` (the Phase 0 PR parent)
+- **Inventory tool source SHA:** `783e6cc1f23747372f678a2d09e469403c6359c1` (the Phase 0 PR revision containing the tool)
+- **Measurement command:** `node /tmp/sbb-phase0-inventory.mjs`, run from a checkout of the measured parent SHA
 **Scope note:** Counts are static repository measurements. Route registrations and table declarations are deliberately labelled as static counts rather than claims about the live production database or runtime surface.
 
 | Measure | Baseline | Method / qualification |
@@ -158,16 +159,32 @@ No candidate below is approved for deletion. Phase 0 records questions; Phase 9 
 
 ## Phase 0 reproduction
 
-From a clean checkout at the baseline SHA with dependencies installed:
+The inventory script does not exist in the measured parent revision. To reproduce the recorded parent baseline, use the tool from the Phase 0 PR revision while the working directory is a separate checkout of the parent. The script reads repository data relative to the current working directory, so invoking the copy in `/tmp` does not cause it to measure the tool revision.
+
+From the repository containing the Phase 0 revision, create a disposable parent worktree:
 
 ```bash
+ORIGINAL_WORKTREE=$(pwd)
+TOOL_REVISION=783e6cc1f23747372f678a2d09e469403c6359c1
+BASELINE_REVISION=06c57932090abcb6de40b3835fec850e14b3861e
+
+git show "$TOOL_REVISION:scripts/stabilisation/inventory.mjs" \
+  > /tmp/sbb-phase0-inventory.mjs
+git worktree add --detach /tmp/sbb-phase0-baseline "$BASELINE_REVISION"
+cd /tmp/sbb-phase0-baseline
+
+npm ci
 rm -f node_modules/typescript/tsbuildinfo
 npm run check -- --pretty false
 npm run build
-node scripts/stabilisation/inventory.mjs
+node /tmp/sbb-phase0-inventory.mjs
+
+cd "$ORIGINAL_WORKTREE"
+git worktree remove /tmp/sbb-phase0-baseline
+rm /tmp/sbb-phase0-inventory.mjs
 ```
 
-The inventory command reads Git metadata, tracked files, root package metadata, schema source text, route source text, and existing local build artifacts. It writes nothing and performs no network, database, migration, rebuild, or production operation. Build values are `null` until a local build has produced `dist` artifacts.
+`npm ci` installs the dependencies recorded by the measured revision without changing its lockfile. The inventory command reads Git metadata, tracked files, root package metadata, schema source text, route source text, and existing local build artifacts. It writes nothing and performs no database, migration, rebuild, or production operation. Build values are `null` until the local build has produced `dist` artifacts.
 
 ## Next approved sequence
 
