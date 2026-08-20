@@ -282,3 +282,55 @@ The complete repository diff from the historical measured SHA to the PR 2 base c
 The PR 2 base-to-HEAD diff contains only `package.json` (the canonical test scripts) and this register. It contains no production TypeScript, TypeScript configuration, schema, dependency declaration, lockfile, test assertion, or runtime-code change. The checkout has no `origin` remote or `origin/main` ref, so `git merge-base HEAD origin/main` and `git rev-parse origin/main` cannot be resolved locally; the exact local ancestry above is used without inventing a remote SHA.
 
 This PR intentionally changes no application/runtime behaviour, production data, database schema, migration, dependency, lockfile, or test assertion. Risk is **LOW**. Rollback is a single commit revert; no data or deployment rollback is required.
+
+## PR 3 — Critical Financial and Calculation Invariants
+
+### Purpose and result
+
+PR 3 adds deterministic, production-independent regression protection around the existing reporting importer, source cutover, money conversion, payment classification, and banking calculation helpers. The change is test protection only: no production calculation, query, route, schema, migration, ingestion path, dependency, or lockfile was changed.
+
+| Control | PR 3 result |
+|---|---|
+| Risk | **LOW** |
+| Files | Added `server/reporting/financialInvariants.test.ts`; updated the root `test:reporting` command in `package.json`; updated this register |
+| Tests added | 16 deterministic cases with explicit, human-checkable fixtures |
+| Safe test count | 28 total: 28 passed, 0 failed, 0 skipped/cancelled/todo |
+| `npm test` | PASS; 28/28 |
+| `npm run test:reporting` | PASS; 28/28 |
+| TypeScript baseline | Expected non-zero baseline reproduced after `npm ci`: exit 2, **1,539 diagnostics across 206 files**; no new diagnostics (test files remain excluded by the existing compiler configuration) |
+| Production build | PASS; only the previously accepted Browserslist, mixed jsPDF import, chunk-size, and server-bundle warnings remain |
+| Runtime impact | **NONE**; only tests, the safe test command's file list, and documentation changed |
+| Database impact | **NONE**; no database connection, mutation, schema operation, migration, seed, rebuild, or backfill was used |
+| Dependency impact | **NONE**; `npm ci` was lockfile-authoritative and neither manifest dependencies nor lockfiles changed |
+| Rollback | Revert the single PR 3 commit. No data, schema, migration, dependency, or deployment rollback is required. |
+
+### Financial Invariants Protected
+
+- A normal completed Loyverse sale keeps THB 500 gross, THB 50 discount, and THB 450 net, with `net = gross - discount - refund` for that sale representation.
+- A sale plus its full refund preserves the original positive gross history, records the refund explicitly, and produces zero combined net sales without adding refund gross as another sale.
+- A discounted sale plus full refund preserves THB 500 gross and THB 50 discount, refunds the THB 450 actually paid, and produces zero combined net sales.
+- A single canonical payment allocation equals its receipt total; a refund payment remains negative while reporting refund amount remains explicit and positive.
+- Loyverse CSV reporting values are THB major units at the canonical importer boundary. Loyverse API money objects containing `amount` or `value` are minor units divided by 100 exactly once, while scalar values remain major units.
+- Historical Loyverse ownership is strictly before the unchanged cutover; SBB POS ownership begins exactly at the cutover. Before, at, and after boundary fixtures are mutually exclusive.
+- Equivalent logical source copies at either side of the cutover produce exactly one owner, protecting against cutover double counting.
+- Reporting membership is half-open `[from, to)`: the configured start is included and the configured end is excluded. The 17:00–03:00 Asia/Bangkok range is only an SBB fixture supplied to the configurable range resolver, not a platform-wide restaurant-hours rule.
+- Known payment classifications preserve Cash, QR/PromptPay, Grab, and Other. Unknown tenders remain explicitly unmapped even though their fallback reporting bucket is Other.
+- A Grab sales channel remains a separate transaction field from a Cash payment method. The current Loyverse adapter also maps the same source `Dining option` value to `orderMode`; the test records this current representation without claiming those concepts are universally equivalent.
+- Existing banking arithmetic is protected for a normal shift, zero cash sales with retained float, cash expenses/pay-outs, a cash overage, and the existing non-negative deposit floor.
+- Existing labour tests continue to protect paid wage totals from reimbursements and tips; PR 3 does not duplicate those established assertions.
+
+### Financial Invariants Still Unprotected
+
+- **PARTIAL REFUND — NOT CURRENTLY REPRESENTED AS A VERIFIED CANONICAL INVARIANT.** No safe fixture proved an authoritative partial-refund lifecycle across current SBB reporting sources.
+- Split payments are not protected. The current isolated Loyverse CSV adapter creates one payment from one receipt-level payment method; PR 3 does not invent multi-tender support.
+- Grab gross, staff-entered Grab totals, POS Grab totals, and settlement payout remain separate concepts requiring later reconciliation evidence. No current isolated canonical helper accepts all three, so this PR neither sums them nor claims settlement coverage.
+- Official Grab settlement reconciliation and bank-statement reconciliation remain unprotected.
+- POS sales versus `daily_sales_v2` staff-entered sales requires a later integration/reconciliation test. No suitable isolated canonical calculation surface was found, and `daily_sales_v2` was not touched.
+- Database transaction integrity, payment persistence, refund workflow persistence, reporting SQL aggregation, and live cutover query behavior require a disposable integration-test environment and remain outside the safe default suite.
+- SQL numeric/decimal money boundaries outside the confirmed importer/API helper boundaries remain unresolved; no repository-wide money-unit standardisation is claimed.
+- Channel, payment method, and order mode are distinct concepts, but the historical adapter currently derives both channel and order mode from `Dining option`. That representation risk is documented rather than redesigned.
+- Paid labour versus all expense-ledger category interactions remain only partially protected beyond the existing pure labour summarisation tests.
+
+### Contradictions and stop-condition review
+
+No tested current invariant contradicted another and no existing financial defect was exposed by the deterministic fixtures. The investigation did not establish canonical partial-refund, split-payment, Grab-settlement, daily-form/POS reconciliation, or database-integrity semantics; those gaps are explicitly left unprotected rather than guessed. Production calculations did not need to change.
