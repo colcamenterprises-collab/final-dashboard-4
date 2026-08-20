@@ -13,22 +13,44 @@ function slash(value) {
   return String(value || "").replaceAll("\\", "/").replace(/^\.\//, "");
 }
 
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeDiagnosticMessage(message, repositoryRoot) {
+  let normalized = slash(message).replace(/\s+/g, " ").trim();
+  if (!repositoryRoot) return normalized;
+
+  // TypeScript diagnostics can embed absolute paths (especially TS7016 messages
+  // that point into node_modules). Base and head are intentionally compiled from
+  // different worktrees, so those environment-specific roots must not become part
+  // of the debt signature. Only the repository root itself is canonicalized; the
+  // remainder of the path stays intact so genuinely different modules still differ.
+  const normalizedRoot = slash(path.resolve(repositoryRoot)).replace(/\/$/, "");
+  normalized = normalized.replace(new RegExp(escapeRegExp(normalizedRoot), "g"), "<repo>");
+  return normalized;
+}
+
 function isProductionFile(file) {
   const normalized = slash(file);
   return PRODUCTION_PREFIXES.some((prefix) => normalized.startsWith(prefix));
 }
 
-export function parseDiagnostics(output) {
+export function parseDiagnostics(output, repositoryRoot) {
   const diagnostics = [];
   for (const match of String(output || "").matchAll(DIAGNOSTIC_RE)) {
-    const file = slash(match[1]);
+    let file = slash(match[1]);
+    if (repositoryRoot) {
+      const normalizedRoot = slash(path.resolve(repositoryRoot)).replace(/\/$/, "");
+      if (file.startsWith(`${normalizedRoot}/`)) file = file.slice(normalizedRoot.length + 1);
+    }
     if (!isProductionFile(file)) continue;
     diagnostics.push({
       file,
       line: Number(match[2]),
       column: Number(match[3]),
       code: `TS${match[4]}`,
-      message: match[5].trim(),
+      message: normalizeDiagnosticMessage(match[5], repositoryRoot),
     });
   }
   return diagnostics;
@@ -83,7 +105,7 @@ function runTsc(cwd) {
   );
 
   const output = `${result.stdout || ""}${result.stderr || ""}`;
-  const diagnostics = parseDiagnostics(output);
+  const diagnostics = parseDiagnostics(output, cwd);
 
   if (result.error) throw result.error;
   if (result.status !== 0 && result.status !== 2) {
@@ -147,6 +169,19 @@ function selfTest() {
   const newError = findRegressions([], [parsed[2]]);
   assert.equal(newError.length, 1);
   assert.equal(newError[0].file, "client/src/b.tsx");
+
+  const baseRoot = "/tmp/sbb-ts-ratchet-base-example";
+  const headRoot = "/home/runner/work/final-dashboard-4/final-dashboard-4";
+  const basePathDiagnostic = parseDiagnostics(
+    `server/path.ts(1,1): error TS7016: Could not find a declaration file for module 'example'. '${baseRoot}/node_modules/example/index.js' implicitly has an 'any' type.`,
+    baseRoot,
+  );
+  const headPathDiagnostic = parseDiagnostics(
+    `server/path.ts(99,8): error TS7016: Could not find a declaration file for module 'example'. '${headRoot}/node_modules/example/index.js' implicitly has an 'any' type.`,
+    headRoot,
+  );
+  assert.equal(findRegressions(basePathDiagnostic, headPathDiagnostic).length, 0);
+  assert.match(basePathDiagnostic[0].message, /<repo>\/node_modules\/example\/index\.js/);
 
   console.log("PASS: TypeScript ratchet self-test");
 }
