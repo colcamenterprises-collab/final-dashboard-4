@@ -143,6 +143,7 @@ No candidate below is approved for deletion. Phase 0 records questions; Phase 9 
 | PR | Purpose | Risk | Before metrics | After metrics | Tests/checks | Result | Rollback | Status |
 |---|---|---|---|---|---|---|---|---|
 | PR 1 (number pending) | Establish baseline documentation and read-only inventory tooling | LOW | 3,554 tracked files; no master register/inventory command | 3,556 tracked files after commit; baseline reproducible via one read-only command | `node scripts/stabilisation/inventory.mjs`; clean `npm run check`; `npm run build` | Inventory/build pass; TypeScript fails at the documented existing baseline | Revert the single PR commit; no data or runtime rollback required | Ready for review |
+| PR 2 (number pending) | Establish canonical safe tests and inventory existing validation infrastructure | LOW | No root `test` command; executable safety/status unproven | `npm test` runs 12 safe reporting cases; inventory and gaps documented | `npm test`; `npm run test:reporting`; inventory syntax/run; clean TypeScript check; production build | 12/12 tests pass; build passes; clean TypeScript check reproduces 1,539 diagnostics across 206 files | Revert the single PR commit; no data or runtime rollback required | Ready for review |
 
 ## Known unresolved risks
 
@@ -189,3 +190,95 @@ rm /tmp/sbb-phase0-inventory.mjs
 ## Next approved sequence
 
 Stop after PR 1 review. Do not automatically continue. The next separately reviewed task is PR 2: expose existing safe tests through one reproducible package command, without changing application behaviour.
+
+## Test Inventory
+
+### Canonical commands
+
+| Command | Supported purpose | Explicit exclusions |
+|---|---|---|
+| `npm test` | Canonical safe suite. Delegates to `test:reporting`, executes all three reporting test files with Node's test runner through the already-installed `tsx`, and propagates any failure as a non-zero exit. | No database, network, credentials, deployed server, migrations, fixtures, seeds, or operational smoke scripts. |
+| `npm run test:reporting` | Direct name for the same 12-case reporting regression suite, useful for reporting-focused CI. | Identical exclusions to `npm test`; it is an alias for the real supported family, not an additional suite. |
+| `npm run test:burger-metrics` | Existing opt-in HTTP smoke command against `SERVER_URL` (default local port 5000) and expected seeded historical data. | Not safe/default: needs a running service and known data state. |
+| `npm run test:stock-ledger-smoke` | Existing opt-in database smoke command which seeds rows and runs ledger upserts. | Not safe/default: requires an explicitly disposable database and mutates it. It was not executed during this PR. |
+
+No `test:db`, `test:integration`, or `test:smoke` umbrella was added: the discovered scripts do not yet share a safe isolated environment or trustworthy common contract. Naming an unsafe collection would imply support that does not exist.
+
+### Automated suite inventory
+
+The inventory tool's Phase 0 count of seven is a filename/directory heuristic, not seven executable test programs. It consists of three current `*.test.ts` files, two historical daily-form scripts, and two fixture assets (`test/data/05-versions-space.pdf` and `tests/fixtures/test-image.jpg`). Only the three reporting files use an automated test runner and are supported by the canonical command.
+
+| Family / traceable files | Purpose and domain | Class | Dependencies / requirements | Mutation risk | Deterministic | Result on 2026-08-20 | Default CI | Reason |
+|---|---|---|---|---|---|---|---|---|
+| Unified ledger/cutover: `server/reporting/unifiedLedger.test.ts` | Exact Bangkok time ranges and half-open Loyverse/SBB cutover ownership; reporting | B — Isolated application | Node, `tsx`, installed packages; DB **no**; network **no**; credentials **no** | None | Yes | 3/3 pass | YES | Assertions exercise pure range/cutover paths. Importing the application module initializes the no-database adapter and prints a missing-`DATABASE_URL` warning, but no tested path queries a database. |
+| Loyverse importer: `server/reporting/importers/loyverse.test.ts` | Cancellation, refunds, modifiers, and cutover rejection from in-memory CSV; reporting/import | A — Pure unit | Node, `tsx`; DB **no**; network **no**; credentials **no** | None | Yes | 4/4 pass | YES | All source descriptors and CSV content are in memory; no external Loyverse request or persistence occurs. |
+| Unified labour: `server/reporting/unifiedLabor.test.ts` | Wage summarisation and labour-efficiency calculations; labour/reporting | B — Isolated application | Node, `tsx`, installed packages; DB **no**; network **no**; credentials **no** | None | Yes | 5/5 pass | YES | Tested functions are calculation-only. Module loading prints the same no-database warning, but the cases do not execute database code. |
+| Daily form scripts: `client/test/dailyFormTest.js`, `client/test/dailyFormTest.mjs` | Submit, read, print and delete daily-form records against localhost; daily sales/stock | G — Historical/legacy operational test | Running local HTTP app, Axios, application database; DB **yes via service**; network **localhost**; credentials **no explicit** | **High:** creates and deletes persistent records | No: depends on service/data and catches individual failures | Not run (production-safety exclusion) | NO | Duplicate CommonJS/ESM generations, stale route assumptions, persistent mutations, and failure handling are unsuitable for CI; later usage verification is required. |
+| Fixture assets: `test/data/05-versions-space.pdf`, `tests/fixtures/test-image.jpg` | Input files only; PDF/image handling | Not executable (inventory artefacts) | Consumer unconfirmed | None by themselves | N/A | Not executable | NO | They contain no assertions or runner entry point and must not be counted as passing tests. |
+
+**Reporting confirmation:** `npm test` executes exactly 12 cases across the three listed files: 12 passed, 0 failed, 0 skipped/cancelled/todo. Running with `DATABASE_URL` removed produces two informational `[db] DATABASE_URL missing. Server running in no-database mode.` messages. The missing variable does not skip, alter, or fail any case; it is a module-initialisation warning only. The suite performs no database or network operation.
+
+### Other executable validation infrastructure
+
+These commands were discovered beyond conventional test names. They are retained and explicitly excluded from the canonical suite; discovery is not an endorsement to execute them against production.
+
+| Family / paths and commands | Domain / purpose | Class | Requirements (DB / network / credentials) | Mutation and determinism | Current result | Default CI / reason |
+|---|---|---|---|---|---|---|
+| Burger metrics: `server/scripts/run_burger_metrics_test.ts`; `npm run test:burger-metrics` | Receipt/burger totals over HTTP | E — Operational smoke | Indirect DB through server / localhost or configured server / none explicit | Read-only request but fixed historical state required; not deterministic from clean checkout | Not run: service/state requirement | NO — no isolated server fixture. |
+| Stock ledger: `server/scripts/stock_ledger_smoke.ts`; `npm run test:stock-ledger-smoke` | Rolls, meat, drinks ledgers | C — Database integration | PostgreSQL and Prisma / DB connection / `DATABASE_URL` | Inserts expenses, purchase, stock, and daily-sales rows and upserts ledgers; unsafe unless disposable | Not run: mutation stop condition | NO — explicit database writes. |
+| Golden/reporting acceptance: `server/scripts/golden_smoke_day.ts`, `golden_validate_vs_csv.ts`, `golden_validate_week.ts`, `validate_week_burgers.ts`, `labour_acceptance_check.ts`, `mm_reconcile_day.ts`, `test_mm_v1.ts` (invoke individually with `tsx`) | Reporting, historical CSV, labour and reconciliation checks | C/F — DB integration or manual diagnostic | PostgreSQL/Prisma and/or local CSV inputs; environment-specific | Several read or rebuild derived state; results depend on supplied dates/data | Not run: database/data requirement | NO — no disposable fixture contract; some are evidence diagnostics rather than test-runner suites. |
+| Local/deployed HTTP smoke: `scripts/smoke_v3.mjs`, `scripts/smoke_v3_strict.mjs`, `RUN_SMOKE_V3.sh`, `simple-v3-test.sh`, `test-frontend-flow.sh`, `test-v3-canonical.sh`, `server/scripts/run_burger_metrics_test.ts` | Daily forms, manager checks, stock and receipts | E/G — Operational smoke or historical | Running HTTP service / localhost; some direct `psql`; shell tools | Creates operational records; wrappers may rewrite scripts; data/time dependent | Not run: mutation and service stop conditions | NO — persistent writes and historical route assumptions. |
+| Production/deployment probes: `scripts/verify-production-access.mjs`, `scripts/architecture/verify-runtime.mjs`, `scripts/verify-shift-data.js`, `scripts/shift-go-live-audit.mjs`, `scripts/test_readonly.mjs`, `server/scripts/daily_readiness_check.js` and `scripts/run-daily-readiness.sh` | Auth, routes, release/readiness and live shift evidence | D/E/F — External integration, smoke, or manual diagnostic | Deployed/local service and/or DB; access tokens/owner credentials for some | Mostly read probes, but environment-dependent; not reproducible from clean checkout | Not run: production/external exclusion | NO — credentials/deployed systems required. Daily readiness remains read-only evidence, not a regression suite. |
+| Bob/static policy checks: `scripts/verify_bob_read_layer.mjs`, `scripts/bob-check.js`, `bob-workspace/audit-check.mjs`, `scripts/ci/pr-policy.sh`, `scripts/deny-layout-hacks.js`, `scripts/deny-unsafe.sh`, `scripts/guard-build.js`, `scripts/architecture/verify-runtime.mjs` | Read-layer contract, repository policy and architecture diagnostics | F — Manual diagnostic (some static, some runtime) | Static scripts need repository files only; runtime variants need a server/token | Static results can be deterministic; they are separate policy diagnostics, not business tests | Inventory/static sources inspected; not promoted or executed as a suite | NO — mixed contracts and purposes require a later explicit CI decision. |
+| Root patch/smoke wrapper: `PATCH_FIX_AND_SMOKE_20251011.sh` | Historical manager-check patch plus smoke | G — Historical/legacy | Shell, service and possibly DB | **High:** edits production source, creates scripts/migrations, may seed DB | Not run: prohibited production mutation | NO — it is a patch installer, not a safe test. |
+| Validation/audit utilities under `scripts/audit/**`, `server/validate-live-db.ts`, `server/migrations/checkConflict.ts`, `server/scripts/checkSchema.js`, `server/scripts/verify_prisma.ts`, `workers/parityAudit.mjs` | Repository/database investigation | F — Manual diagnostic | Varies; live-DB utilities require a database and environment | Environment-dependent; database scripts may query live state | Not run: manual/environment-specific | NO — investigation tools are not deterministic automated tests. |
+| Archived/auxiliary validation examples under `archive/**`, `extracted_dashboard/**`, `loyverse-ai-package/**`, `loyverse-ai-updated-package/**` | Superseded/reference generations | G — Historical/legacy | Varies, frequently service/database/API configuration | Usage and safety unconfirmed | Not run | NO — retained pending later usage verification. |
+| Android/native workflows: `.github/workflows/build-sbb-pos-android.yml`, `build-sbb-pos-apk.yml`, `build-sbb-pos-launch-apk.yml` | Native packaging/build validation | E — Operational build/smoke infrastructure | GitHub runner, Android/Gradle tooling; signing/deployment inputs vary | Build-oriented, environment-dependent | Statically inspected; not run locally | NO — not an application regression test and not safe/default test scope. |
+
+No standalone automated ordering, POS lifecycle, payment, receipt rendering, authentication, authorization, deployment rollback, or migration test suite was found. The reporting workflow previously ran the same three reporting files directly; the root command now provides the canonical repository interface without changing that workflow or production code.
+
+### Meaningful coverage assessment
+
+| Domain | Assessment | Evidence / gap |
+|---|---|---|
+| POS order creation | Not Covered | No safe automated order-creation assertion. |
+| POS item persistence | Not Covered | No isolated persistence fixture or disposable DB suite. |
+| Modifiers | Partial | Loyverse in-memory importer splitting is asserted; live POS modifier behaviour is not. |
+| Discounts | Partial | Import parsing includes discount fields, but no dedicated discount calculation/lifecycle assertion exists. |
+| Payments | Partial | Refund import status is asserted; payment creation/capture methods are not. |
+| Receipts | Partial | In-memory Loyverse receipt/refund parsing is asserted; SBB receipt creation/rendering/persistence is not. |
+| Refunds | Partial | Imported refund monetary mapping is asserted; operational refund workflow is not. |
+| Kitchen lifecycle | Not Covered | No automated lifecycle suite found. |
+| Public ordering | Not Covered | Subproject builds exist, but no behavioural tests. |
+| Authentication | Not Covered | Deployed/manual probes are not deterministic automated protection. |
+| Authorization | Not Covered | Static/manual probes do not assert the permission matrix in a safe suite. |
+| Reporting | Partial | Range/cutover, Loyverse import cases, and labour calculations are protected; queries, persistence and full output remain untested. |
+| Daily sales | Not Covered | Historical scripts mutate a service/database and are excluded. |
+| Daily stock | Not Covered | The stock smoke mutates a database and is not safe automated coverage. |
+| Purchasing | Not Covered | No safe behavioural assertions found. |
+| Recipes/costing | Not Covered | No safe behavioural assertions found. |
+| Expenses | Not Covered | No safe behavioural assertions found. |
+| Labour | Partial | Summarisation and efficiency calculations have five assertions; data acquisition/persistence does not. |
+| Deployment rollback | Not Covered | Operational scripts/workflows exist, but no automated rollback assertion. |
+
+### Phase 1 metrics and controls
+
+The pre-change and post-change Phase 1 inventories at repository SHA `bf4ce8d6d5bd8c0aa2275e716decb28af08e3849` report 3,556 tracked files, 754 production source files, 1,201 tracked source files, 517 archive/reference files, 899 images, 77 SQL files, five package manifests, 134 direct and 27 development dependencies, seven heuristic test files, 629 static route registrations, 144 Prisma models, 152 Drizzle declarations, 16 raw migration directories, 63 main-app static imports, and zero lazy imports. Relative to Phase 0, only the already-merged two Phase 0 infrastructure files explain tracked files 3,554 → 3,556 and source files 1,200 → 1,201. This PR adds no tracked file, dependency, source file, route, schema, migration, or lockfile; only root scripts and this register change. After the production build, artifacts are: server bundle 2,143,740 bytes; frontend JavaScript 2,477,736 bytes; largest frontend chunk 2,305,463 bytes minified / 642,340 bytes gzip; frontend CSS 172,030 bytes. The minor artifact changes from Phase 0 arise from source commits already present before this PR; this PR does not touch build inputs.
+
+#### TypeScript baseline timeline and discrepancy resolution
+
+| Repository state | Exact SHA | Clean reproducible result |
+|---|---|---|
+| Historical Phase 0 measured baseline (parent used by the Phase 0 register) | `06c57932090abcb6de40b3835fec850e14b3861e` | Exit 2; **1,539 diagnostics across 206 files** |
+| PR #369 Phase 0 merge/squash commit and PR 2 base | `bf4ce8d6d5bd8c0aa2275e716decb28af08e3849` | Exit 2; **1,539 diagnostics across 206 files** |
+| PR 2 initial HEAD before this verification amendment | `8bcee9f346b5bd22abe432ee4e6508e653ee1d6c` | Same source baseline; PR 2 changes only this register and root package scripts |
+
+Both historical states were checked independently in detached temporary worktrees. Each worktree ran a fresh `npm ci`, removed `node_modules/typescript/tsbuildinfo`, and ran `npx tsc --pretty false --incremental false` with TypeScript 5.9.2. Both produced exactly 1,539 diagnostics across 206 files. The worktrees were removed after evidence collection.
+
+The earlier zero result was **C — local environment/dependency-state related**, not repository improvement and not a trustworthy new baseline. Although the compiler, configuration, declared package versions, Prisma declaration checksums, and 725-file compiler input list matched, the existing main-worktree `node_modules` state returned the false zero. Running the lockfile-authoritative `npm ci` in that same worktree, followed by the identical cache removal and explicitly non-incremental compiler command, immediately restored exit 2 and the exact 1,539/206 baseline. Therefore zero is not recorded as a baseline; clean installation is part of the reproducibility requirement.
+
+The complete repository diff from the historical measured SHA to the PR 2 base contains four files. Commit `f5412f59b60bfac2d2d8f24a7890642edd8287fa` changes `client/src/pages/reports/ReceiptsReport.tsx`; commit `5418c8ef349cb8a6db37573a94c58b72db7ddce3` changes `server/middleware/sessionAuth.ts`; and PR #369 adds this register plus `scripts/stabilisation/inventory.mjs`. No `shared/**`, `lib/**`, `tsconfig*.json`, package manifest, lockfile, schema, generated/type configuration, or dependency declaration changes occur in that interval. The independent result at both endpoints proves the two production commits did not remove the TypeScript debt.
+
+The PR 2 base-to-HEAD diff contains only `package.json` (the canonical test scripts) and this register. It contains no production TypeScript, TypeScript configuration, schema, dependency declaration, lockfile, test assertion, or runtime-code change. The checkout has no `origin` remote or `origin/main` ref, so `git merge-base HEAD origin/main` and `git rev-parse origin/main` cannot be resolved locally; the exact local ancestry above is used without inventing a remote SHA.
+
+This PR intentionally changes no application/runtime behaviour, production data, database schema, migration, dependency, lockfile, or test assertion. Risk is **LOW**. Rollback is a single commit revert; no data or deployment rollback is required.
