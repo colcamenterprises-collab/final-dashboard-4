@@ -210,7 +210,11 @@ export default function Expenses() {
       if (!response.ok) throw new Error(payload?.error || "Failed to delete shift expense");
       return payload;
     },
-    onSuccess: refreshExpenses,
+    onSuccess: () => {
+      setEditingShiftExpenseId(null);
+      setShiftExpenseDraft(null);
+      refreshExpenses();
+    },
     onError: (error: Error) => window.alert(error.message),
   });
 
