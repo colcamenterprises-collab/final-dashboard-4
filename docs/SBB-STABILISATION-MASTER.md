@@ -292,17 +292,18 @@ PR 3 adds deterministic, production-independent regression protection around the
 | Control | PR 3 result |
 |---|---|
 | Risk | **LOW** |
-| Files | Added `server/reporting/financialInvariants.test.ts`; updated the root `test:reporting` command in `package.json`; updated this register |
-| Tests added | 16 deterministic cases with explicit, human-checkable fixtures |
-| Safe test count | 28 total: 28 passed, 0 failed, 0 skipped/cancelled/todo |
+| Files | Added `server/reporting/financialInvariants.test.ts` and the opt-in `server/reporting/unifiedLedger.db.test.ts`; updated root reporting test commands in `package.json`; updated this register |
+| Tests added | 16 pure deterministic cases plus two PostgreSQL-backed production-query cases with explicit, human-checkable fixtures |
+| Safe test count | 28 pure/default tests: 28 passed, 0 failed, 0 skipped/cancelled/todo; two additional opt-in database integration tests |
 | `npm test` | PASS; 28/28 |
 | `npm run test:reporting` | PASS; 28/28 |
+| `npm run test:reporting:db` | **PENDING EXTERNAL VERIFICATION**; the fail-closed test target was exercised, but no local PostgreSQL server was available and package installation was blocked by the environment proxy |
 | TypeScript baseline | Expected non-zero baseline reproduced after `npm ci`: exit 2, **1,539 diagnostics across 206 files**; no new diagnostics (test files remain excluded by the existing compiler configuration) |
 | Production build | PASS; only the previously accepted Browserslist, mixed jsPDF import, chunk-size, and server-bundle warnings remain |
 | Runtime impact | **NONE**; only tests, the safe test command's file list, and documentation changed |
-| Database impact | **NONE**; no database connection, mutation, schema operation, migration, seed, rebuild, or backfill was used |
+| Database impact | **NONE on application/production data and schema**; the opt-in harness creates and drops minimal fixture tables only inside the guarded disposable `sbb_reporting_test` database and runs no production migration |
 | Dependency impact | **NONE**; `npm ci` was lockfile-authoritative and neither manifest dependencies nor lockfiles changed |
-| Rollback | Revert the single PR 3 commit. No data, schema, migration, dependency, or deployment rollback is required. |
+| Rollback | Revert the PR 3 commits. No production data, schema, migration, dependency, or deployment rollback is required. |
 
 ### Financial Invariants Protected
 
@@ -311,9 +312,9 @@ PR 3 adds deterministic, production-independent regression protection around the
 - A discounted sale plus full refund preserves THB 500 gross and THB 50 discount, refunds the THB 450 actually paid, and produces zero combined net sales.
 - A single canonical payment allocation equals its receipt total; a refund payment remains negative while reporting refund amount remains explicit and positive.
 - Loyverse CSV reporting values are THB major units at the canonical importer boundary. Loyverse API money objects containing `amount` or `value` are minor units divided by 100 exactly once, while scalar values remain major units.
-- Historical Loyverse ownership is strictly before the unchanged cutover; SBB POS ownership begins exactly at the cutover. Before, at, and after boundary fixtures are mutually exclusive.
-- Equivalent logical source copies at either side of the cutover produce exactly one owner, protecting against cutover double counting.
-- Reporting membership is half-open `[from, to)`: the configured start is included and the configured end is excluded. The 17:00–03:00 Asia/Bangkok range is only an SBB fixture supplied to the configurable range resolver, not a platform-wide restaurant-hours rule.
+- Historical Loyverse ownership strictly before the unchanged cutover and SBB POS ownership beginning exactly at the cutover remain protected at helper level. SQL-backed fixtures have now been added for `queryUnifiedOverview`, `queryUnifiedReceipts`, `queryUnifiedItemSales`, and `queryUnifiedOverviewBreakdowns`; production-query protection status remains **PENDING EXTERNAL VERIFICATION** until the explicit database suite passes on disposable PostgreSQL.
+- Helper-level equivalent-source ownership remains protected. The new SQL suite is designed to prove that equivalent logical copies on both sides of each cutover fixture produce exactly one transaction and item through all four query paths; cross-source duplicate-inclusion status remains **PENDING EXTERNAL VERIFICATION** until that suite passes.
+- The half-open `[from, to)` rule remains protected at resolver/helper-fixture level. The new SQL suite adds records immediately before `from`, exactly at `from`, inside, immediately before `to`, exactly at `to`, and immediately after `to`; production-SQL membership status remains **PENDING EXTERNAL VERIFICATION** until that suite passes. The 17:00–03:00 Asia/Bangkok range remains only an SBB fixture supplied to the configurable resolver, not a platform-wide restaurant-hours rule.
 - Known payment classifications preserve Cash, QR/PromptPay, Grab, and Other. Unknown tenders remain explicitly unmapped even though their fallback reporting bucket is Other.
 - A Grab sales channel remains a separate transaction field from a Cash payment method. The current Loyverse adapter also maps the same source `Dining option` value to `orderMode`; the test records this current representation without claiming those concepts are universally equivalent.
 - Existing banking arithmetic is protected for a normal shift, zero cash sales with retained float, cash expenses/pay-outs, a cash overage, and the existing non-negative deposit floor.
@@ -334,3 +335,23 @@ PR 3 adds deterministic, production-independent regression protection around the
 ### Contradictions and stop-condition review
 
 No tested current invariant contradicted another and no existing financial defect was exposed by the deterministic fixtures. The investigation did not establish canonical partial-refund, split-payment, Grab-settlement, daily-form/POS reconciliation, or database-integrity semantics; those gaps are explicitly left unprotected rather than guessed. Production calculations did not need to change.
+
+### PR 3 review correction — production SQL boundary coverage
+
+The original PR 3 boundary cases protected `sourceOwnsTimestamp` and a local half-open membership expression only. Review correctly identified that those tests could remain green if one of the independently encoded production SQL predicates regressed. The opt-in command below now executes the actual four production reporting query functions against a dedicated local PostgreSQL database:
+
+```bash
+TEST_DATABASE_URL=postgresql://localhost/sbb_reporting_test npm run test:reporting:db
+```
+
+`server/reporting/unifiedLedger.db.test.ts` refuses to start unless `TEST_DATABASE_URL` uses `localhost`, `127.0.0.1`, or `::1` and the exact database name `sbb_reporting_test`. It ignores any ambient production `DATABASE_URL`, assigns the validated local URL before importing production reporting modules, creates only minimal disposable fixture tables in that dedicated database, and removes the disposable schema after the tests. It does not run production migrations or read application data. The explicit database suite is not included in `npm test`, because PostgreSQL is not guaranteed in every checkout.
+
+When run successfully on disposable PostgreSQL, the SQL-backed cases verify:
+
+- immediately before cutover: exactly the historical copy is returned;
+- exactly at and immediately after cutover: exactly the SBB POS copy is returned;
+- duplicate logical representations across both fixture sources never produce more than one returned receipt or item;
+- immediately before `from` is excluded, exactly `from` is included, an interior record is included, immediately before `to` is included, and exactly/after `to` are excluded;
+- `queryUnifiedOverview`, `queryUnifiedReceipts`, `queryUnifiedItemSales`, and `queryUnifiedOverviewBreakdowns` all agree on transaction/item membership.
+
+The local verification environment did not contain PostgreSQL, and its package mirrors rejected installation through the environment proxy. The DB-backed command therefore remains an explicit required CI/reviewer check on a disposable PostgreSQL service; no production or remotely hosted database was substituted. This environment limitation does not weaken the fail-closed database-target guard or add the suite to the default command prematurely.
