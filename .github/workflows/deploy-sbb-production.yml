@@ -132,8 +132,10 @@ jobs:
 
           echo
           echo "==> Fetch target metadata"
-          git fetch --prune origin
-          git fetch origin "$TARGET_REF"
+          # Fetch only the explicitly requested ref/SHA. Do not prune or update unrelated
+          # remote-tracking refs in the long-lived production checkout; those refs may
+          # have different historical ownership and are not needed for this deployment.
+          git fetch --no-tags origin "$TARGET_REF"
           TARGET_SHA="$(git rev-parse FETCH_HEAD)"
           echo "Target SHA: $TARGET_SHA"
 
