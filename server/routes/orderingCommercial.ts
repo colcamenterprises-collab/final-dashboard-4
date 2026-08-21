@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { requireSessionAuth } from "../middleware/sessionAuth";
+import { attachOwnerSessionUser, requireSessionAuth } from "../middleware/sessionAuth";
 import {
   createOrFindMember,
   createPartnerVenue,
@@ -23,12 +23,13 @@ const router = Router();
 export function requireCommercialAdmin(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV !== "production") return next();
 
+  // Prefer any current owner credential (UI owner cookie, owner PIN, owner JWT)
+  // so a stale non-owner JWT cannot override a newer owner login.
+  if (attachOwnerSessionUser(req)) return next();
+
+  // Distinguish a real non-owner login (403) from no valid login at all (401).
   return requireSessionAuth(req, res, () => {
-    const role = String((req as any).user?.role || "").trim().toLowerCase();
-    if (role !== "owner") {
-      return res.status(403).json({ ok: false, error: "OWNER_ACCESS_REQUIRED" });
-    }
-    return next();
+    return res.status(403).json({ ok: false, error: "OWNER_ACCESS_REQUIRED" });
   });
 }
 
