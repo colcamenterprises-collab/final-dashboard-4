@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
-import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode } from "lucide-react";
+import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode, Users } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; testId: string; ownerOnly?: boolean; subItem?: boolean; };
@@ -34,10 +34,11 @@ const navigationGroups: NavGroup[] = [
     { to: "/menu/modifiers", label: "Modifiers", icon: List, testId: "nav-modifiers" },
     { to: "/menu/categories", label: "Categories", icon: List, testId: "nav-menu-categories" },
   ]},
-  { title: "Online Ordering", icon: Globe2, items: [
+  { title: "Online Ordering & Growth", icon: Globe2, items: [
     { to: "/order", label: "Live Ordering Site", icon: Globe2, testId: "nav-online-ordering-live" },
     { to: "/ordering/orders", label: "Online Orders", icon: ShoppingCart, testId: "nav-online-orders" },
-    { to: "/admin/ordering/qr-codes", label: "QR Codes & Members", icon: QrCode, testId: "nav-online-qr-members", ownerOnly: true },
+    { to: "/admin/ordering/qr-codes?tab=venues", label: "Partner Venues & QR", icon: QrCode, testId: "nav-partner-venues", ownerOnly: true },
+    { to: "/admin/ordering/qr-codes?tab=members", label: "Members & Customers", icon: Users, testId: "nav-members-customers", ownerOnly: true },
     { to: "/admin/ordering/settings", label: "Delivery & Ordering Settings", icon: Settings, testId: "nav-online-settings", ownerOnly: true },
   ]},
   { title: "POS", icon: ShoppingBag, items: [
@@ -69,7 +70,15 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
     setOpenGroups(new Set([title]));
     onCollapseToggle?.();
   };
-  const isActive = (path: string) => path === "/dashboard" ? location.pathname === "/dashboard" : location.pathname.startsWith(path);
+  const isActive = (target: string) => {
+    const [path, query = ""] = target.split("?");
+    const pathMatches = path === "/dashboard" ? location.pathname === "/dashboard" : location.pathname.startsWith(path);
+    if (!pathMatches) return false;
+    if (!query) return true;
+    const expected = new URLSearchParams(query);
+    const current = new URLSearchParams(location.search);
+    return Array.from(expected.entries()).every(([key, value]) => current.get(key) === value);
+  };
   const visibleGroups = navigationGroups.map(group => ({ ...group, items: group.items.filter(item => !item.ownerOnly || currentUser?.role === "owner") })).filter(group => group.items.length > 0);
 
   return (
