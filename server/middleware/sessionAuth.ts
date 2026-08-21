@@ -22,7 +22,6 @@ function readCookie(req: Request, key: string): string | null {
   return null;
 }
 
-
 // Compatibility bridge: the established internal dashboard password gate issues
 // sbb_ui_session, while API protection originally checked only JWT/PIN sessions.
 // A valid internal dashboard cookie represents the existing owner access path.
@@ -35,6 +34,22 @@ function attachLegacyUiSessionUser(req: Request): boolean {
   const expectedBuffer = Buffer.from(expected);
   if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) return false;
   (req as any).user = { uid: "internal-dashboard", id: "internal-dashboard", tenantId: 1, name: "Dashboard owner", role: "owner", permissions: {} };
+  (req as any).tenantId = 1;
+  return true;
+}
+
+function attachPinSessionUser(req: Request, ownerOnly = false): boolean {
+  const pinUser = getPinSessionUser(req);
+  if (!pinUser) return false;
+  if (ownerOnly && String(pinUser.role || "").trim().toLowerCase() !== "owner") return false;
+  (req as any).user = {
+    uid: pinUser.id,
+    id: pinUser.id,
+    tenantId: 1,
+    name: pinUser.name,
+    role: pinUser.role,
+    permissions: pinUser.permissions,
+  };
   (req as any).tenantId = 1;
   return true;
 }
@@ -57,6 +72,18 @@ export function attachSessionUser(req: Request): boolean {
   (req as any).user = decoded;
   (req as any).tenantId = decoded.tenantId;
   return true;
+}
+
+/**
+ * Owner-only routes need to honour the strongest current owner credential.
+ * Check the dashboard owner cookie and owner PIN before JWT so a stale
+ * non-owner JWT cannot override a newer owner login in a dual-auth browser.
+ */
+export function attachOwnerSessionUser(req: Request): boolean {
+  if (attachLegacyUiSessionUser(req)) return true;
+  if (attachPinSessionUser(req, true)) return true;
+  if (!attachSessionUser(req)) return false;
+  return String((req as any).user?.role || "").trim().toLowerCase() === "owner";
 }
 
 /**
@@ -94,17 +121,7 @@ export function requireSessionAuth(req: Request, res: Response, next: NextFuncti
     return next();
   }
 
-  const pinUser = getPinSessionUser(req);
-  if (pinUser) {
-    (req as any).user = {
-      uid: pinUser.id,
-      id: pinUser.id,
-      tenantId: 1,
-      name: pinUser.name,
-      role: pinUser.role,
-      permissions: pinUser.permissions,
-    };
-    (req as any).tenantId = 1;
+  if (attachPinSessionUser(req)) {
     bridgeLegacyFinanceGuard(req);
     return next();
   }
