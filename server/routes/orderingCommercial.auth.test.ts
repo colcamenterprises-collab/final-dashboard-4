@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import test from "node:test";
 import type { Request, Response } from "express";
+import jwt from "jsonwebtoken";
+import { AuthService } from "../services/auth/authService";
 import { requireCommercialAdmin } from "./orderingCommercial";
 
 function responseHarness() {
@@ -19,6 +21,19 @@ function responseHarness() {
   return { state, res };
 }
 
+function requestWithCookie(cookie = "") {
+  return {
+    path: "/api/ordering/commercial/admin/venues",
+    headers: cookie ? { cookie } : {},
+  } as unknown as Request;
+}
+
+function ownerUiCookie(password: string) {
+  return createHmac("sha256", password)
+    .update("sbb_ui_auth_v1")
+    .digest("hex");
+}
+
 test("commercial admin accepts the existing internal dashboard owner cookie", () => {
   const previousNodeEnv = process.env.NODE_ENV;
   const previousPassword = process.env.INTERNAL_APP_PASSWORD;
@@ -26,10 +41,36 @@ test("commercial admin accepts the existing internal dashboard owner cookie", ()
   process.env.INTERNAL_APP_PASSWORD = "test-owner-password";
 
   try {
-    const cookie = createHmac("sha256", process.env.INTERNAL_APP_PASSWORD)
-      .update("sbb_ui_auth_v1")
-      .digest("hex");
-    const req = { headers: { cookie: `sbb_ui_session=${cookie}` } } as unknown as Request;
+    const req = requestWithCookie(`sbb_ui_session=${ownerUiCookie(process.env.INTERNAL_APP_PASSWORD)}`);
+    const { state, res } = responseHarness();
+    let nextCalled = false;
+
+    requireCommercialAdmin(req, res, () => { nextCalled = true; });
+
+    assert.equal(nextCalled, true);
+    assert.equal(state.statusCode, 200);
+    assert.equal((req as any).user?.role, "owner");
+  } finally {
+    process.env.NODE_ENV = previousNodeEnv;
+    process.env.INTERNAL_APP_PASSWORD = previousPassword;
+  }
+});
+
+test("current owner UI session wins over a stale non-owner JWT", () => {
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousPassword = process.env.INTERNAL_APP_PASSWORD;
+  process.env.NODE_ENV = "production";
+  process.env.INTERNAL_APP_PASSWORD = "test-owner-password";
+
+  try {
+    const staffJwt = jwt.sign(
+      { uid: 99, tenantId: 1, role: "staff" },
+      AuthService.getJwtSecret(),
+      { expiresIn: "7d" },
+    );
+    const req = requestWithCookie(
+      `sbb_session=${encodeURIComponent(staffJwt)}; sbb_ui_session=${ownerUiCookie(process.env.INTERNAL_APP_PASSWORD)}`,
+    );
     const { state, res } = responseHarness();
     let nextCalled = false;
 
@@ -49,7 +90,7 @@ test("commercial admin rejects an unauthenticated production request", () => {
   process.env.NODE_ENV = "production";
 
   try {
-    const req = { headers: {} } as unknown as Request;
+    const req = requestWithCookie();
     const { state, res } = responseHarness();
     let nextCalled = false;
 
