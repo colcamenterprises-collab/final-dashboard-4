@@ -4,8 +4,9 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "test": "npm run test:reporting",
+    "test": "npm run test:reporting && npm run test:ordering-commercial-auth",
     "test:reporting": "tsx --test server/reporting/unifiedLedger.test.ts server/reporting/importers/loyverse.test.ts server/reporting/unifiedLabor.test.ts server/reporting/financialInvariants.test.ts",
+    "test:ordering-commercial-auth": "tsx --test server/routes/orderingCommercial.auth.test.ts",
     "test:reporting:db": "tsx --test server/reporting/unifiedLedger.db.test.ts",
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "prisma generate && vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist",

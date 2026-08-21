@@ -1,5 +1,5 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
-import { attachSessionUser } from "../middleware/sessionAuth";
+import { attachOwnerSessionUser, requireSessionAuth } from "../middleware/sessionAuth";
 import {
   createOrFindMember,
   createPartnerVenue,
@@ -20,10 +20,17 @@ import {
 
 const router = Router();
 
-function requireAdmin(req: Request, res: Response, next: NextFunction) {
+export function requireCommercialAdmin(req: Request, res: Response, next: NextFunction) {
   if (process.env.NODE_ENV !== "production") return next();
-  if (attachSessionUser(req)) return next();
-  return res.status(401).json({ ok: false, error: "Authenticated owner session required" });
+
+  // Prefer any current owner credential (UI owner cookie, owner PIN, owner JWT)
+  // so a stale non-owner JWT cannot override a newer owner login.
+  if (attachOwnerSessionUser(req)) return next();
+
+  // Distinguish a real non-owner login (403) from no valid login at all (401).
+  return requireSessionAuth(req, res, () => {
+    return res.status(403).json({ ok: false, error: "OWNER_ACCESS_REQUIRED" });
+  });
 }
 
 function baseUrl(req: Request) {
@@ -79,7 +86,7 @@ router.get("/members/lookup", async (req, res) => {
   }
 });
 
-router.get("/admin/overview", requireAdmin, async (req, res) => {
+router.get("/admin/overview", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await commercialOverview(String(req.query.tenant || "sbb")) });
   } catch (error) {
@@ -87,7 +94,7 @@ router.get("/admin/overview", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/admin/venues", requireAdmin, async (req, res) => {
+router.get("/admin/venues", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await listPartnerVenues(String(req.query.tenant || "sbb")) });
   } catch (error) {
@@ -95,7 +102,7 @@ router.get("/admin/venues", requireAdmin, async (req, res) => {
   }
 });
 
-router.post("/admin/venues", requireAdmin, async (req, res) => {
+router.post("/admin/venues", requireCommercialAdmin, async (req, res) => {
   try {
     return res.status(201).json({ ok: true, data: await createPartnerVenue(req.body) });
   } catch (error) {
@@ -103,7 +110,7 @@ router.post("/admin/venues", requireAdmin, async (req, res) => {
   }
 });
 
-router.patch("/admin/venues/:id", requireAdmin, async (req, res) => {
+router.patch("/admin/venues/:id", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await updatePartnerVenue(req.params.id, req.body) });
   } catch (error) {
@@ -111,7 +118,7 @@ router.patch("/admin/venues/:id", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/admin/venues/:id/qr", requireAdmin, async (req, res) => {
+router.get("/admin/venues/:id/qr", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await getPartnerVenueQr(req.params.id, baseUrl(req)) });
   } catch (error) {
@@ -119,7 +126,7 @@ router.get("/admin/venues/:id/qr", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/admin/venues/:id/report", requireAdmin, async (req, res) => {
+router.get("/admin/venues/:id/report", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await detailedPartnerVenueReport(req.params.id) });
   } catch (error) {
@@ -127,7 +134,7 @@ router.get("/admin/venues/:id/report", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/admin/members", requireAdmin, async (req, res) => {
+router.get("/admin/members", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await listMembers(String(req.query.tenant || "sbb")) });
   } catch (error) {
@@ -135,7 +142,7 @@ router.get("/admin/members", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/admin/members/:id", requireAdmin, async (req, res) => {
+router.get("/admin/members/:id", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await getMemberProfile(req.params.id) });
   } catch (error: any) {
@@ -143,7 +150,7 @@ router.get("/admin/members/:id", requireAdmin, async (req, res) => {
   }
 });
 
-router.get("/admin/customers", requireAdmin, async (req, res) => {
+router.get("/admin/customers", requireCommercialAdmin, async (req, res) => {
   try {
     return res.json({ ok: true, data: await listCustomerDirectory(String(req.query.tenant || "sbb")) });
   } catch (error) {
