@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-09T11:56:00Z
+requested_at=2026-08-14T12:25:30Z
 requested_by=ChatGPT
 ref=main
-reason=Deploy live POS line removal, Grab modifiers without upsells, and shared Direct/Grab automatic ticket printing
+reason=Deploy merged PR #353 POS cash drawer fix and cash-only automatic drawer opening
