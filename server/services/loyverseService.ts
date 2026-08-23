@@ -78,7 +78,11 @@ function nullableNumeric(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function getOfficialGrabEvidence(windowStartUtc: string, windowEndUtc: string): Promise<OfficialGrabEvidence> {
+async function getOfficialGrabEvidence(
+  businessId: string,
+  windowStartUtc: string,
+  windowEndUtc: string,
+): Promise<OfficialGrabEvidence> {
   const prisma = db();
   try {
     const [totals, coverage] = await Promise.all([
@@ -91,12 +95,15 @@ async function getOfficialGrabEvidence(windowStartUtc: string, windowEndUtc: str
             SUM(t.other_deduction) FILTER (WHERE t.transaction_type IN ('sale','refund'))::numeric AS deductions
           FROM financial_transactions t
           JOIN financial_evidence_sources e ON e.id=t.evidence_source_id
-          WHERE e.provider_key='grabfood'
+          WHERE t.business_id=$3
+            AND e.business_id=$3
+            AND e.provider_key='grabfood'
             AND t.transaction_at >= $1::timestamptz
             AND t.transaction_at < $2::timestamptz
         `,
         windowStartUtc,
         windowEndUtc,
+        businessId,
       ),
       prisma.$queryRawUnsafe<any[]>(
         `
@@ -105,7 +112,9 @@ async function getOfficialGrabEvidence(windowStartUtc: string, windowEndUtc: str
               SELECT 1
               FROM financial_import_batches b
               JOIN financial_evidence_sources e ON e.id=b.evidence_source_id
-              WHERE e.provider_key='grabfood'
+              WHERE b.business_id=$3
+                AND e.business_id=$3
+                AND e.provider_key='grabfood'
                 AND b.status='validated'
                 AND b.coverage_start IS NOT NULL
                 AND b.coverage_end IS NOT NULL
@@ -116,10 +125,14 @@ async function getOfficialGrabEvidence(windowStartUtc: string, windowEndUtc: str
             MAX(b.coverage_end) AS coverage_end
           FROM financial_import_batches b
           JOIN financial_evidence_sources e ON e.id=b.evidence_source_id
-          WHERE e.provider_key='grabfood' AND b.status='validated'
+          WHERE b.business_id=$3
+            AND e.business_id=$3
+            AND e.provider_key='grabfood'
+            AND b.status='validated'
         `,
         windowStartUtc,
         windowEndUtc,
+        businessId,
       ),
     ]);
 
@@ -175,6 +188,7 @@ export async function storeShiftSnapshot(date: string): Promise<void> {
   const windowEnd = shiftDate.plus({ days: 1 }).set({ hour: 3, minute: 0, second: 0, millisecond: 0 });
   const windowStartUtc = windowStart.toUTC().toISO()!;
   const windowEndUtc = windowEnd.toUTC().toISO()!;
+  const businessId = process.env.SBB_BUSINESS_ID || 'sbb-rawai';
   const prisma = db();
 
   const [rows, officialGrab] = await Promise.all([
@@ -212,7 +226,7 @@ export async function storeShiftSnapshot(date: string): Promise<void> {
       windowStartUtc,
       windowEndUtc,
     ),
-    getOfficialGrabEvidence(windowStartUtc, windowEndUtc),
+    getOfficialGrabEvidence(businessId, windowStartUtc, windowEndUtc),
   ]);
 
   const row = rows[0] ?? {};
