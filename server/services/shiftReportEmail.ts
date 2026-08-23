@@ -124,8 +124,8 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
   const dateISO = date.toISODate()!;
 
   // Rebuild the comparison side from the live SBB POS for this exact business
-  // day before reading the snapshot. If the POS query fails, the audit fails
-  // rather than emailing false 0.00 values.
+  // day before reading the snapshot. External marketplace evidence is attached
+  // separately and never overwrites the POS facts.
   await storeShiftSnapshot(dateISO);
   const formData = await getDailySalesFormNormalized(dateISO);
   await upsertFormSnapshot(dateISO, formData);
@@ -134,9 +134,11 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
   const posData = snapshot?.pos_data ?? null;
   const approved = Boolean(snapshot?.approved);
   const flags = computeFlags(formData, posData);
-  const anomalies = flags.filter((f) => f.flagged);
+  const captureGap = posData?.grab_capture_gap === true;
+  const anomalies = flags.filter((f) => f.flagged).length + (captureGap ? 1 : 0);
+  const officialGrab = posData?.official_grab ?? null;
 
-  if (approved && anomalies.length === 0) {
+  if (approved && anomalies === 0) {
     return { skipped: true, reason: 'approved_and_clean', date: dateISO };
   }
 
@@ -157,6 +159,12 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
   const sourceSummary = posData?.sourceAvailable === true
     ? `SBB POS · ${toNumber(posData.receipt_count)} receipts · ${posData.window_start ?? ''} → ${posData.window_end ?? ''}`
     : 'SBB POS data unavailable';
+  const officialGrabSummary = officialGrab?.sourceAvailable === true
+    ? `Official Grab evidence · ${toNumber(officialGrab.receipt_count)} orders · gross ${officialGrab.gross == null ? 'N/A' : Number(officialGrab.gross).toFixed(2)} · net ${officialGrab.net == null ? 'N/A' : Number(officialGrab.net).toFixed(2)} · deductions ${officialGrab.deductions == null ? 'N/A' : Number(officialGrab.deductions).toFixed(2)} · coverage ${officialGrab.coverageComplete ? 'COMPLETE' : 'PARTIAL'}`
+    : 'Official Grab evidence unavailable for this shift';
+  const captureWarning = captureGap
+    ? `<p style="padding:10px;background:#fee2e2;color:#991b1b"><strong>GRAB CAPTURE GAP:</strong> Official Grab transactions exist for this complete shift window, but SBB POS recorded Grab as 0.00. Do not treat POS Grab zero as authoritative.</p>`
+    : '';
 
   await transporter.sendMail({
     from: "Shift Reports <colcamenterprises@gmail.com>",
@@ -165,6 +173,8 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
     html: `
       <h3>Shift Reconciliation Summary</h3>
       <p><strong>POS source:</strong> ${sourceSummary}</p>
+      <p><strong>External Grab source:</strong> ${officialGrabSummary}</p>
+      ${captureWarning}
       <table border="1" cellpadding="6" cellspacing="0">
         <thead>
           <tr><th>Category</th><th>Form</th><th>POS</th><th>Difference</th><th>Status</th></tr>
@@ -179,8 +189,10 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
   return {
     sent: true,
     date: dateISO,
-    anomalies: anomalies.length,
+    anomalies,
     approved,
     posReceiptCount: posData?.sourceAvailable === true ? toNumber(posData.receipt_count) : null,
+    grabCaptureGap: captureGap,
+    officialGrab: officialGrab?.sourceAvailable === true ? officialGrab : null,
   };
 }
