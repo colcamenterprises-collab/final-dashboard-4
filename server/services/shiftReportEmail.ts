@@ -74,14 +74,46 @@ function toNumber(v: any): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function computeFlags(formData: any, posData: any) {
-  const categories: Array<keyof typeof formData> = ['total', 'cash', 'qr', 'grab', 'other', 'exp_cash', 'exp'];
-  return categories.map((category) => {
+type AuditFlag = {
+  category: string;
+  form: number;
+  pos: number | null;
+  diff: number | null;
+  flagged: boolean;
+  status: 'OK' | 'FLAG' | 'UNAVAILABLE';
+};
+
+function computeFlags(formData: any, posData: any): AuditFlag[] {
+  // POS reconciliation is sales-only. Expenses are reconciled from their own
+  // canonical expense sources and must not be compared to a made-up POS zero.
+  const categories = ['total', 'cash', 'qr', 'grab', 'other'];
+  const sourceAvailable = posData?.sourceAvailable === true;
+
+  return categories.map((category): AuditFlag => {
     const form = toNumber(formData?.[category]);
+    if (!sourceAvailable) {
+      return {
+        category,
+        form,
+        pos: null,
+        diff: null,
+        flagged: true,
+        status: 'UNAVAILABLE',
+      };
+    }
+
     const pos = toNumber(posData?.[category]);
     const diff = Math.abs(form - pos);
-    const threshold = Math.max(5, pos * 0.05);
-    return { category, form, pos, diff, flagged: diff > threshold };
+    const threshold = Math.max(5, Math.abs(pos) * 0.05);
+    const flagged = diff > threshold;
+    return {
+      category,
+      form,
+      pos,
+      diff,
+      flagged,
+      status: flagged ? 'FLAG' : 'OK',
+    };
   });
 }
 
@@ -91,12 +123,15 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
     : DateTime.now().setZone('Asia/Bangkok').minus({ days: 1 });
   const dateISO = date.toISODate()!;
 
+  // Rebuild the comparison side from the live SBB POS for this exact business
+  // day before reading the snapshot. If the POS query fails, the audit fails
+  // rather than emailing false 0.00 values.
   await storeShiftSnapshot(dateISO);
   const formData = await getDailySalesFormNormalized(dateISO);
   await upsertFormSnapshot(dateISO, formData);
 
   const snapshot = await getShiftSnapshot(dateISO);
-  const posData = snapshot?.pos_data ?? {};
+  const posData = snapshot?.pos_data ?? null;
   const approved = Boolean(snapshot?.approved);
   const flags = computeFlags(formData, posData);
   const anomalies = flags.filter((f) => f.flagged);
@@ -109,9 +144,9 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
     .map((f) => `<tr>
       <td>${String(f.category)}</td>
       <td>${f.form.toFixed(2)}</td>
-      <td>${f.pos.toFixed(2)}</td>
-      <td>${f.diff.toFixed(2)}</td>
-      <td>${f.flagged ? 'FLAG' : 'OK'}</td>
+      <td>${f.pos == null ? 'UNAVAILABLE' : f.pos.toFixed(2)}</td>
+      <td>${f.diff == null ? '—' : f.diff.toFixed(2)}</td>
+      <td>${f.status}</td>
     </tr>`)
     .join('');
 
@@ -119,6 +154,9 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
   if (!appBaseUrl) return { sent: false, date: dateISO, reason: 'missing_APP_BASE_URL' };
 
   const shiftUrl = `${appBaseUrl}/operations/analysis/daily-shift-analysis?date=${dateISO}`;
+  const sourceSummary = posData?.sourceAvailable === true
+    ? `SBB POS · ${toNumber(posData.receipt_count)} receipts · ${posData.window_start ?? ''} → ${posData.window_end ?? ''}`
+    : 'SBB POS data unavailable';
 
   await transporter.sendMail({
     from: "Shift Reports <colcamenterprises@gmail.com>",
@@ -126,6 +164,7 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
     subject: `Shift anomaly summary ${dateISO} (approved: ${approved ? 'yes' : 'no'})`,
     html: `
       <h3>Shift Reconciliation Summary</h3>
+      <p><strong>POS source:</strong> ${sourceSummary}</p>
       <table border="1" cellpadding="6" cellspacing="0">
         <thead>
           <tr><th>Category</th><th>Form</th><th>POS</th><th>Difference</th><th>Status</th></tr>
@@ -137,5 +176,11 @@ export async function runDailyShiftAnomalyAudit(targetDate?: string) {
     `,
   });
 
-  return { sent: true, date: dateISO, anomalies: anomalies.length, approved };
+  return {
+    sent: true,
+    date: dateISO,
+    anomalies: anomalies.length,
+    approved,
+    posReceiptCount: posData?.sourceAvailable === true ? toNumber(posData.receipt_count) : null,
+  };
 }
