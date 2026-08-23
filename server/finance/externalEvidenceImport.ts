@@ -43,11 +43,13 @@ function firstValue(row: Record<string, unknown>, candidates: string[]): unknown
   const entries = Object.entries(row);
   for (const candidate of candidates) {
     const wanted = compact(candidate);
-    const match = entries.find(([key]) => {
-      const keyCompact = compact(key);
-      return keyCompact === wanted || keyCompact.includes(wanted) || wanted.includes(keyCompact);
-    });
-    if (match && String(match[1] ?? '').trim() !== '') return match[1];
+    const exact = entries.find(([key]) => compact(key) === wanted);
+    if (exact && String(exact[1] ?? '').trim() !== '') return exact[1];
+  }
+  for (const candidate of candidates) {
+    const wanted = compact(candidate);
+    const contained = entries.find(([key]) => compact(key).includes(wanted));
+    if (contained && String(contained[1] ?? '').trim() !== '') return contained[1];
   }
   return undefined;
 }
