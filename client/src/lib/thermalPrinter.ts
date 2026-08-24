@@ -66,6 +66,13 @@ function pluginMethod<K extends keyof NativeThermalPrinter>(name: K): NativeTher
   return method as NativeThermalPrinter[K];
 }
 
+function buildExternalAndroidIntent(url: string) {
+  const target = new URL(url, window.location.href);
+  const scheme = target.protocol.replace(":", "");
+  const destination = `${target.host}${target.pathname}${target.search}${target.hash}`;
+  return `intent://${destination}#Intent;scheme=${scheme};action=android.intent.action.VIEW;category=android.intent.category.BROWSABLE;end`;
+}
+
 export function readSavedPrinterAddress() {
   return localStorage.getItem(STORAGE_KEY) || "";
 }
@@ -110,9 +117,18 @@ export async function openNativeAppUpdate(url: string) {
     return value.openAppUpdate({ url });
   }
 
-  // Older APKs do not expose openAppUpdate. The update button must still be
-  // able to escape the old native bridge and download the replacement APK.
-  window.location.assign(url);
+  // Older APKs do not expose openAppUpdate. On Android, use an explicit
+  // ACTION_VIEW intent so the approved APK leaves the embedded Capacitor
+  // WebView and opens in the system browser/download flow. In browser mode,
+  // open a new browsing context rather than replacing the POS application.
+  const cap = (window as CapacitorWindow).Capacitor;
+  if (cap?.isNativePlatform?.()) {
+    window.location.href = buildExternalAndroidIntent(url);
+    return { ok: true };
+  }
+
+  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  if (!opened) throw new Error("Could not open the POS app update. Allow pop-ups and try again.");
   return { ok: true };
 }
 
