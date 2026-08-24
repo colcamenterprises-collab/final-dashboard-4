@@ -31,17 +31,39 @@ type CapacitorWindow = Window & {
 };
 
 const STORAGE_KEY = "sbb.nativePrinter.address";
+const CORE_PRINTER_METHODS: (keyof NativeThermalPrinter)[] = [
+  "listPrinters",
+  "connect",
+  "disconnect",
+  "getStatus",
+  "printRaw",
+  "printTest",
+  "openCashDrawer",
+];
+
+function rawPlugin(): Partial<NativeThermalPrinter> | undefined {
+  const cap = (window as CapacitorWindow).Capacitor;
+  return cap?.Plugins?.ThermalPrinter as Partial<NativeThermalPrinter> | undefined;
+}
+
+export function nativeBridgeMissingMethods(methods: (keyof NativeThermalPrinter)[] = CORE_PRINTER_METHODS) {
+  const value = rawPlugin();
+  if (!value) return methods.map(String);
+  return methods.filter((method) => typeof value[method] !== "function").map(String);
+}
 
 export function nativePrinterAvailable() {
   const cap = (window as CapacitorWindow).Capacitor;
-  return Boolean(cap?.isNativePlatform?.() && cap?.Plugins?.ThermalPrinter);
+  return Boolean(cap?.isNativePlatform?.() && rawPlugin() && nativeBridgeMissingMethods().length === 0);
 }
 
-function plugin(): NativeThermalPrinter {
-  const cap = (window as CapacitorWindow).Capacitor;
-  const value = cap?.Plugins?.ThermalPrinter as NativeThermalPrinter | undefined;
-  if (!value) throw new Error("Native thermal printer is not available in this browser");
-  return value;
+function pluginMethod<K extends keyof NativeThermalPrinter>(name: K): NativeThermalPrinter[K] {
+  const value = rawPlugin();
+  const method = value?.[name];
+  if (typeof method !== "function") {
+    throw new Error(`POS app update required: native ThermalPrinter bridge is missing ${String(name)}.`);
+  }
+  return method as NativeThermalPrinter[K];
 }
 
 export function readSavedPrinterAddress() {
@@ -54,11 +76,11 @@ export function savePrinterAddress(address: string) {
 }
 
 export async function listNativePrinters() {
-  return (await plugin().listPrinters()).printers || [];
+  return (await pluginMethod("listPrinters")()).printers || [];
 }
 
 export async function connectNativePrinter(address: string) {
-  const result = await plugin().connect({ address });
+  const result = await pluginMethod("connect")({ address });
   if (result.connected) savePrinterAddress(address);
   return result;
 }
@@ -75,40 +97,59 @@ export async function reconnectSavedPrinter() {
 }
 
 export async function getNativePrinterStatus() {
-  return plugin().getStatus();
+  return pluginMethod("getStatus")();
 }
 
 export async function getNativeAppVersion() {
-  return plugin().getAppVersion();
+  return pluginMethod("getAppVersion")();
 }
 
 export async function openNativeAppUpdate(url: string) {
-  return plugin().openAppUpdate({ url });
+  const value = rawPlugin();
+  if (typeof value?.openAppUpdate === "function") {
+    return value.openAppUpdate({ url });
+  }
+
+  // Older APKs do not expose openAppUpdate. The update button must still be
+  // able to escape the old native bridge and download the replacement APK.
+  window.location.assign(url);
+  return { ok: true };
 }
 
 export async function disconnectNativePrinter() {
   savePrinterAddress("");
-  return plugin().disconnect();
+  return pluginMethod("disconnect")();
 }
 
 export async function nativeTestPrint() {
-  return plugin().printTest();
+  return pluginMethod("printTest")();
 }
 
 export async function nativeOpenCashDrawer() {
-  return plugin().openCashDrawer();
+  return pluginMethod("openCashDrawer")();
 }
 
 export async function nativeSpeak(text: string, language = "en-US") {
-  if (!nativePrinterAvailable()) throw new Error("Native device bridge unavailable");
-  return plugin().speak({ text, language });
+  const value = rawPlugin();
+  if (typeof value?.speak === "function") return value.speak({ text, language });
+
+  // Keep order callouts working on an older APK while the user upgrades.
+  if ("speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = language;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return { ok: true };
+  }
+
+  throw new Error("POS app update required: native ThermalPrinter bridge is missing speak.");
 }
 
 export async function printEscPosBytes(bytes: Uint8Array) {
-  if (!nativePrinterAvailable()) throw new Error("Native printer unavailable");
+  if (!nativePrinterAvailable()) throw new Error("Native printer bridge is incomplete. Install the latest SBB POS app.");
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return plugin().printRaw({ base64: btoa(binary) });
+  return pluginMethod("printRaw")({ base64: btoa(binary) });
 }
 
 const enc = new TextEncoder();
@@ -188,7 +229,7 @@ export function buildReceiptEscPos(payload: ReceiptPayload) {
 }
 
 export async function printReceiptNative(payload: ReceiptPayload, openDrawer = false) {
-  if (!nativePrinterAvailable()) return { attempted: false, ok: false, message: "Native printer unavailable" };
+  if (!nativePrinterAvailable()) return { attempted: false, ok: false, message: "Native printer unavailable or POS app update required" };
   let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
   if (!status.connected) status = await reconnectSavedPrinter();
   if (!status.connected) return { attempted: true, ok: false, message: "Printer is not connected" };
