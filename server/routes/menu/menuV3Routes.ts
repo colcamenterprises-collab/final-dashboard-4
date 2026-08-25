@@ -11,6 +11,10 @@ import {
   deleteItemChoiceGroup
 } from "../../services/menu/modifierService";
 import {
+  listModifierChannelSettings,
+  updateModifierChannelSettings,
+} from "../../services/menu/modifierChannelService";
+import {
   getModifierGroupsWithLegacyAssignments,
   saveItemChoiceGroupCompatible,
 } from "../../services/menu/itemOptionCompatibilityService";
@@ -60,6 +64,14 @@ router.get("/modifiers/groups", async (_req, res) => {
     console.error('[menu-v3] modifiers unavailable:', error);
     return res.status(200).json({ ok: false, groups: [], source: 'modifier_groups_v3', blockers: [{ code: 'MODIFIERS_UNAVAILABLE', message: error?.message || 'Failed to load modifier groups', where: '/api/menu-v3/modifiers/groups', canonical_source: 'modifier_groups_v3', auto_build_attempted: false }] });
   }
+});
+router.get("/modifiers/channel-settings", async (_req, res) => {
+  try { return res.json({ ok: true, settings: await listModifierChannelSettings() }); }
+  catch (error: any) { return res.status(400).json({ ok: false, error: error?.message || "Could not load modifier channel settings" }); }
+});
+router.post("/modifiers/channel-settings/update", async (req, res) => {
+  try { return res.json({ ok: true, setting: await updateModifierChannelSettings(String(req.body?.id || ""), req.body) }); }
+  catch (error: any) { return res.status(400).json({ ok: false, error: error?.message || "Could not save modifier channel settings" }); }
 });
 router.post("/modifiers/groups/create", async (req, res) => res.json(await createModifierGroup(req.body)));
 router.post("/modifiers/groups/update", async (req, res) => res.json(await updateModifierGroup(req.body.id, req.body)));

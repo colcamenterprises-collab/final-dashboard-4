@@ -3,11 +3,44 @@ import { pool } from "../db";
 import reportingUnifiedRouter from "./reportingUnified";
 import { resolveExactReportingRange } from "../reporting/unifiedLedger";
 import { SBB_REPORTING_CUTOVER_ISO } from "../reporting/reportingCutover";
+import { createGrabCampaign, deleteGrabCampaign, listGrabCampaigns, updateGrabCampaign } from "../reporting/grabCampaigns";
 
 const router = Router();
 const n = (value: unknown) => Number(value ?? 0) || 0;
 
 router.use("/unified", reportingUnifiedRouter);
+
+router.get("/grab-campaigns", async (_req, res) => {
+  try {
+    res.json({ ok: true, campaigns: await listGrabCampaigns() });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+router.post("/grab-campaigns", async (req, res) => {
+  try {
+    res.status(201).json({ ok: true, campaign: await createGrabCampaign(req.body) });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+router.patch("/grab-campaigns/:id", async (req, res) => {
+  try {
+    res.json({ ok: true, campaign: await updateGrabCampaign(String(req.params.id), req.body) });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
+
+router.delete("/grab-campaigns/:id", async (req, res) => {
+  try {
+    res.json({ ok: true, deleted: await deleteGrabCampaign(String(req.params.id)) });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, error: error.message });
+  }
+});
 
 router.get("/grab-references", async (req, res) => {
   try {

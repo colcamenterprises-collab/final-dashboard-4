@@ -38,6 +38,7 @@ export async function queryUnifiedReceiptDetails(source: string, id: string) {
              'costOfGoods', i.cost_of_goods,
              'grossProfit', i.gross_profit,
              'isSetComponent', i.is_set_component,
+             'isSetProduct', (lower(COALESCE(i.item_name,'')) LIKE '% set%'),
              'modifiers', COALESCE((
                SELECT jsonb_agg(jsonb_build_object(
                  'group', m.modifier_group,
@@ -103,6 +104,13 @@ export async function queryUnifiedReceiptDetails(source: string, id: string) {
              'costOfGoods', NULL,
              'grossProfit', NULL,
              'isSetComponent', COALESCE(i.is_set_component,false),
+             'isSetProduct', (
+               lower(COALESCE(i.item_name_en,'')) LIKE '% set%'
+               OR EXISTS(
+                 SELECT 1 FROM ordering_order_item_modifiers sm
+                 WHERE sm.order_item_id=i.id AND upper(COALESCE(sm.modifier_group_name_en,''))='SET UPGRADE'
+               )
+             ),
              'notes', i.notes,
              'modifiers', COALESCE((
                SELECT jsonb_agg(jsonb_build_object(
