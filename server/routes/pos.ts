@@ -35,9 +35,21 @@ function ticketNumber(sequence: number) {
 
 function ensureDisplayTicketSchema() {
   if (!displayTicketSchemaReady) {
-    displayTicketSchemaReady = db().query(
-      `ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_ticket_number_unique`,
-    );
+    displayTicketSchemaReady = (async () => {
+      await db().query(
+        `ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_ticket_number_unique`,
+      );
+      // Grab's short GF number is not globally unique. It may legitimately repeat on a later shift.
+      // Keep duplicate protection where it matters: within the same POS shift.
+      await db().query(
+        `ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_grab_order_number_unique`,
+      );
+      await db().query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS ordering_orders_shift_grab_order_number_unique
+         ON ordering_orders(pos_shift_id, grab_order_number)
+         WHERE pos_shift_id IS NOT NULL AND grab_order_number IS NOT NULL`,
+      );
+    })();
   }
   return displayTicketSchemaReady;
 }
@@ -176,7 +188,6 @@ router.get("/catalog", staffDevice, async (_req, res) => {
     fail(res, e.message, 500);
   }
 });
-
 router.post("/catalog/items", staffDevice, async (req, res) => {
   const { category_id, name_en, description_en, price, direct_price, grab_price, image_url, sort_order } = req.body || {};
   if (!category_id || !String(name_en || "").trim()) return fail(res, "Category and item name are required");
@@ -215,6 +226,7 @@ router.patch("/catalog/items/:id", staffDevice, async (req, res) => {
 
 router.get("/orders/next-ticket", staffDevice, async (_req, res) => {
   try {
+    await ensureDisplayTicketSchema();
     const result = await db().query(`SELECT COALESCE(MAX(order_number),0) + 1 AS next_order_number FROM ordering_orders`);
     const nextOrderNumber = Number(result.rows[0]?.next_order_number || 1);
     const display = ticketNumber(((nextOrderNumber - 1) % DISPLAY_TICKET_MAX) + 1);
@@ -282,6 +294,7 @@ router.post("/orders", staffDevice, async (req, res) => {
     if (!/^[+0-9][0-9 ()-]{5,29}$/.test(customerMobile)) return fail(res, "Enter the Grab customer mobile number");
   }
 
+  await ensureDisplayTicketSchema();
   const client = await db().connect();
   try {
     await client.query("BEGIN");
@@ -289,9 +302,9 @@ router.post("/orders", staffDevice, async (req, res) => {
     if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
     const activeShiftId = openShiftResult.rows[0].id;
     const order = (await client.query(
-      `INSERT INTO ordering_orders(channel, order_mode, dining_type, order_notes, status, payment_status, payment_method, grab_order_number, customer_name, customer_mobile)
-       VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8) RETURNING *`,
-      [mode === "grab" ? "grab" : "pos_direct", mode, input.dining_type || null, input.order_notes || null, input.payment_method, mode === "grab" ? grabOrderNumber : null, mode === "grab" ? customerName : null, mode === "grab" ? customerMobile : null],
+      `INSERT INTO ordering_orders(channel, order_mode, dining_type, order_notes, status, payment_status, payment_method, grab_order_number, customer_name, customer_mobile, pos_shift_id)
+       VALUES($1,$2,$3,$4,'submitted','paid',$5,$6,$7,$8,$9) RETURNING *`,
+      [mode === "grab" ? "grab" : "pos_direct", mode, input.dining_type || null, input.order_notes || null, input.payment_method, mode === "grab" ? grabOrderNumber : null, mode === "grab" ? customerName : null, mode === "grab" ? customerMobile : null, activeShiftId],
     )).rows[0];
     const numericOrderNumber = Number(order.order_number || 1);
     const displayTicket = ticketNumber(((numericOrderNumber - 1) % DISPLAY_TICKET_MAX) + 1);
@@ -427,6 +440,9 @@ router.post("/orders", staffDevice, async (req, res) => {
     res.status(201).json({ ok:true, source:"sbb_pos_core", data:{ id:order.id,ticket_number:displayTicket,receipt_number:displayTicket,shift_id:activeShiftId,subtotal,discount_amount:discountAmount,total,created_at:order.created_at } });
   } catch (e: any) {
     await client.query("ROLLBACK");
+    if (e.code === "23505" && e.constraint === "ordering_orders_shift_grab_order_number_unique") {
+      return fail(res, `Grab order ${grabOrderNumber} has already been entered for this shift`, 409);
+    }
     fail(res, e.message);
   } finally {
     client.release();
@@ -517,5 +533,4 @@ router.patch("/orders/:id/status", staffDevice, async (req, res) => {
     res.json({ ok:true, source:"sbb_pos_core", data:row });
   } catch (e: any) { fail(res, e.message, 500); }
 });
-
 export default router;
