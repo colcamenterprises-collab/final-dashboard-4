@@ -9,7 +9,7 @@ Production audit confirmed:
 - The runtime DB user owns `ordering_orders`.
 - Legacy global unique indexes existed on `grab_order_number` and `ticket_number`.
 
-Apply `migrations/20260831_pos_shift_schema_cutover.sql` before deploying the backend code that assumes the cutover is complete.
+Apply `migrations/20260831_pos_shift_schema_cutover.sql` before retrying standalone POS checkout.
 
 The migration:
 
@@ -19,4 +19,4 @@ The migration:
 4. Adds per-shift Grab uniqueness.
 5. Adds a lookup index for `pos_shift_id`.
 
-Runtime request handlers must not perform DDL. Schema changes belong to controlled deployment/migration steps.
+Runtime DDL cleanup is intentionally deferred until physical checkout acceptance passes. The cutover migration makes the existing compatibility check idempotent and non-blocking for this schema.
