@@ -1,5 +1,5 @@
 SBB production deployment request
-requested_at=2026-08-09T11:56:00Z
-requested_by=ChatGPT
+requested_at=2026-08-12T15:58:00Z
+requested_by=Codex
 ref=main
-reason=Deploy live POS line removal, Grab modifiers without upsells, and shared Direct/Grab automatic ticket printing
+reason=Deploy Reporting Overview light-theme correction from PR #338
