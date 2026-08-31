@@ -20,6 +20,12 @@ function staffDevice(req: Request, res: Response, next: NextFunction) {
     (req as any).user = pinUser;
     return next();
   }
+  if (
+    process.env.POS_DEVICE_TOKEN &&
+    req.header("x-pos-device-token") === process.env.POS_DEVICE_TOKEN
+  ) {
+    return next();
+  }
   return fail(res, "Registered POS device required", 401);
 }
 
