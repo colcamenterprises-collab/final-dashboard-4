@@ -1,11 +1,11 @@
 import { Router } from "express";
 import {
   queryBurgerUsage,
-  queryUnifiedItemSales,
   queryUnifiedOverview,
   queryUnifiedReceipts,
   resolveExactReportingRange,
 } from "../reporting/unifiedLedger";
+import { querySnapshotItemSales } from "../reporting/snapshotItemSales";
 import { queryUnifiedReceiptDetails } from "../reporting/unifiedReceiptDetails";
 import { queryUnifiedComponents } from "../reporting/unifiedComponents";
 import { queryUnifiedOverviewBreakdowns } from "../reporting/unifiedOverviewBreakdowns";
@@ -73,7 +73,7 @@ router.get("/overview", async (req, res) => {
       queryUnifiedOverview(range),
       queryUnifiedOverviewBreakdowns(range),
       queryRecordedLabor(range),
-      queryUnifiedItemSales(range),
+      querySnapshotItemSales(range),
       queryIngredientUsage(range),
     ]);
     const itemCount = breakdowns.categories.reduce(
@@ -137,7 +137,7 @@ router.get("/overview", async (req, res) => {
           label: "Uncosted sales",
           amount: uncostedNetSales,
           count: uncostedItemSales.length,
-          message: `${uncostedItemSales.length} sold menu item${uncostedItemSales.length === 1 ? "" : "s"} do not have a complete cost basis. Gross profit and food cost are withheld until coverage is complete.`,
+          message: `${uncostedItemSales.length} sold menu item${uncostedItemSales.length === 1 ? "" : "s"} do not have a complete sale-time cost snapshot. Gross profit and food cost are withheld until coverage is complete.`,
         }] : []),
         ...(ingredientUsage.coverage.unmappedItemQuantity > 0 ? [{
           code: "UNMAPPED_INGREDIENT_USAGE",
@@ -194,7 +194,7 @@ router.get("/receipts/:source/:id", async (req, res) => {
 router.get("/items", async (req, res) => {
   try {
     const range = exactRange(req.query as Record<string, unknown>);
-    const items = await queryUnifiedItemSales(range);
+    const items = await querySnapshotItemSales(range);
     res.json({ ok: true, source: "unified_reporting_ledger", filters: range, items });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
