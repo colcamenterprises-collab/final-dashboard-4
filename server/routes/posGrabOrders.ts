@@ -14,6 +14,24 @@ const db = () => {
   return pool;
 };
 
+let grabOrderSchemaReady: Promise<void> | null = null;
+function ensureGrabOrderSchema() {
+  if (!grabOrderSchemaReady) {
+    grabOrderSchemaReady = (async () => {
+      await db().query(`ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_grab_order_number_unique`);
+      await db().query(
+        `CREATE UNIQUE INDEX IF NOT EXISTS ordering_orders_shift_grab_order_number_unique
+         ON ordering_orders(pos_shift_id, grab_order_number)
+         WHERE pos_shift_id IS NOT NULL AND grab_order_number IS NOT NULL`,
+      );
+    })().catch((error) => {
+      grabOrderSchemaReady = null;
+      throw error;
+    });
+  }
+  return grabOrderSchemaReady;
+}
+
 function staffDevice(req: Request, res: Response, next: NextFunction) {
   if (process.env.EMERGENCY_STAFF_ACCESS === "true") return next();
   if (process.env.NODE_ENV !== "production") return next();
@@ -58,15 +76,10 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
   if (!customerName) return fail(res, "Grab customer name is required");
   if (requestedGrabDiscount < 0) return fail(res, "Grab discount cannot be negative");
 
+  await ensureGrabOrderSchema();
   const client = await db().connect();
   try {
     await client.query("BEGIN");
-    await client.query(`ALTER TABLE ordering_orders DROP CONSTRAINT IF EXISTS ordering_orders_grab_order_number_unique`);
-    await client.query(
-      `CREATE UNIQUE INDEX IF NOT EXISTS ordering_orders_shift_grab_order_number_unique
-       ON ordering_orders(pos_shift_id, grab_order_number)
-       WHERE pos_shift_id IS NOT NULL AND grab_order_number IS NOT NULL`,
-    );
 
     const openShiftResult = await client.query(`SELECT id FROM public.pos_shifts WHERE status='open' ORDER BY opened_at DESC LIMIT 1 FOR SHARE`);
     if (!openShiftResult.rowCount) throw new Error("Open a POS shift before taking orders");
@@ -94,7 +107,7 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
       if (line.set_upgrade) throw new Error("Grab orders cannot use staff upsells");
 
       const modifierIds: string[] = Array.isArray(line.modifier_ids)
-        ? [...new Set<string>(line.modifier_ids.filter((id: any): id is string => typeof id === "string"))]
+        ? Array.from(new Set<string>(line.modifier_ids.filter((id: any): id is string => typeof id === "string")))
         : [];
       const groupResult = await client.query(
         `SELECT DISTINCT g.id,g.name_en,g.selection_mode,
