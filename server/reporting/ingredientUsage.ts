@@ -149,7 +149,7 @@ export async function queryIngredientUsage(range: ResolvedReportingRange) {
   itemResult.rows.forEach((row) => consume(row, true));
   modifierResult.rows.forEach((row) => consume(row, false));
 
-  const ingredients = [...aggregate.values()].sort((a,b) => b.expectedQuantity-a.expectedQuantity || a.name.localeCompare(b.name));
+  const ingredients = Array.from(aggregate.values()).sort((a,b) => b.expectedQuantity-a.expectedQuantity || a.name.localeCompare(b.name));
   const totalItemQuantity = mappedItemQuantity + unmappedItemQuantity;
 
   return {
