@@ -1,15 +1,16 @@
 import { Router } from "express";
 import {
   queryBurgerUsage,
-  queryUnifiedItemSales,
   queryUnifiedOverview,
   queryUnifiedReceipts,
   resolveExactReportingRange,
 } from "../reporting/unifiedLedger";
+import { querySnapshotItemSales } from "../reporting/snapshotItemSales";
 import { queryUnifiedReceiptDetails } from "../reporting/unifiedReceiptDetails";
 import { queryUnifiedComponents } from "../reporting/unifiedComponents";
 import { queryUnifiedOverviewBreakdowns } from "../reporting/unifiedOverviewBreakdowns";
 import { calculateLabourEfficiency, queryRecordedLabor } from "../reporting/unifiedLabor";
+import { queryIngredientUsage } from "../reporting/ingredientUsage";
 
 const router = Router();
 
@@ -35,14 +36,45 @@ function dailyShiftMinutes(fromTime: string, toTime: string) {
   return to > from ? to - from : to + 24 * 60 - from;
 }
 
+function categoryProfitability(itemSales: any[]) {
+  const categories = new Map<string, { category: string; quantity: number; grossSales: number; discounts: number; netSales: number; costOfGoods: number; costedNetSales: number; uncostedNetSales: number }>();
+  for (const item of itemSales) {
+    const category = String(item.category || "Other");
+    const current = categories.get(category) || { category, quantity: 0, grossSales: 0, discounts: 0, netSales: 0, costOfGoods: 0, costedNetSales: 0, uncostedNetSales: 0 };
+    current.quantity += Number(item.quantity || 0);
+    current.grossSales += Number(item.gross_sales || 0);
+    current.discounts += Number(item.discounts || 0);
+    current.netSales += Number(item.net_sales || 0);
+    if (item.cost_of_goods == null) current.uncostedNetSales += Number(item.net_sales || 0);
+    else {
+      current.costOfGoods += Number(item.cost_of_goods || 0);
+      current.costedNetSales += Number(item.net_sales || 0);
+    }
+    categories.set(category, current);
+  }
+  return Array.from(categories.values()).map((row) => {
+    const fullyCosted = Math.abs(row.uncostedNetSales) < 0.005;
+    const grossProfit = fullyCosted ? row.netSales - row.costOfGoods : null;
+    return {
+      ...row,
+      fullyCosted,
+      grossProfit,
+      foodCostPct: fullyCosted && row.netSales > 0 ? row.costOfGoods / row.netSales * 100 : null,
+      grossMarginPct: grossProfit != null && row.netSales > 0 ? grossProfit / row.netSales * 100 : null,
+      costingCoveragePct: row.netSales > 0 ? row.costedNetSales / row.netSales * 100 : null,
+    };
+  }).sort((a,b) => b.netSales-a.netSales || a.category.localeCompare(b.category));
+}
+
 router.get("/overview", async (req, res) => {
   try {
     const range = exactRange(req.query as Record<string, unknown>);
-    const [overview, breakdowns, recordedLabor, itemSales] = await Promise.all([
+    const [overview, breakdowns, recordedLabor, itemSales, ingredientUsage] = await Promise.all([
       queryUnifiedOverview(range),
       queryUnifiedOverviewBreakdowns(range),
       queryRecordedLabor(range),
-      queryUnifiedItemSales(range),
+      querySnapshotItemSales(range),
+      queryIngredientUsage(range),
     ]);
     const itemCount = breakdowns.categories.reduce(
       (sum: number, row: { quantity: number }) => sum + Number(row.quantity || 0),
@@ -50,16 +82,23 @@ router.get("/overview", async (req, res) => {
     );
     const shiftMinutes = dailyShiftMinutes(range.fromTime, range.toTime);
     const costedItemSales = itemSales.filter((item: any) => item.cost_of_goods != null);
+    const uncostedItemSales = itemSales.filter((item: any) => item.cost_of_goods == null && Number(item.net_sales || 0) !== 0);
     const costedNetSales = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
     const costOfGoods = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.cost_of_goods || 0), 0);
-    const grossProfit = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.gross_profit || 0), 0);
+    const knownGrossProfit = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.gross_profit || 0), 0);
     const itemNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
+    const uncostedNetSales = uncostedItemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
+    const fullyCosted = Math.abs(uncostedNetSales) < 0.005;
+    const grossProfit = fullyCosted ? overview.netSales - costOfGoods : null;
     const efficiency = calculateLabourEfficiency({
       itemCount,
       staffCount: recordedLabor.staffShiftCount,
       shiftCount: recordedLabor.recordedShiftCount,
       shiftMinutes,
     });
+    const profitabilityByCategory = categoryProfitability(itemSales);
+    const costingCoveragePct = itemNetSales > 0 ? (costedNetSales / itemNetSales) * 100 : null;
+
     res.json({
       ok: true,
       source: "unified_reporting_ledger",
@@ -73,14 +112,42 @@ router.get("/overview", async (req, res) => {
         costing: {
           costOfGoods,
           grossProfit,
+          knownGrossProfit,
           costedNetSales,
+          uncostedNetSales,
+          uncostedItemCount: uncostedItemSales.length,
           itemNetSales,
-          coveragePct: itemNetSales > 0 ? (costedNetSales / itemNetSales) * 100 : null,
-          foodCostPct: costedNetSales > 0 ? (costOfGoods / costedNetSales) * 100 : null,
-          grossMarginPct: costedNetSales > 0 ? (grossProfit / costedNetSales) * 100 : null,
+          coveragePct: costingCoveragePct,
+          fullyCosted,
+          foodCostPct: fullyCosted && overview.netSales > 0 ? (costOfGoods / overview.netSales) * 100 : null,
+          knownFoodCostPct: costedNetSales > 0 ? (costOfGoods / costedNetSales) * 100 : null,
+          grossMarginPct: grossProfit != null && overview.netSales > 0 ? (grossProfit / overview.netSales) * 100 : null,
+          knownGrossMarginPct: costedNetSales > 0 ? (knownGrossProfit / costedNetSales) * 100 : null,
         },
       },
-      breakdowns,
+      breakdowns: {
+        ...breakdowns,
+        profitabilityByCategory,
+      },
+      ingredientUsage,
+      exceptions: [
+        ...(uncostedItemSales.length ? [{
+          code: "UNCOSTED_SALES",
+          severity: "warning",
+          label: "Uncosted sales",
+          amount: uncostedNetSales,
+          count: uncostedItemSales.length,
+          message: `${uncostedItemSales.length} sold menu item${uncostedItemSales.length === 1 ? "" : "s"} do not have a complete sale-time cost snapshot. Gross profit and food cost are withheld until coverage is complete.`,
+        }] : []),
+        ...(ingredientUsage.coverage.unmappedItemQuantity > 0 ? [{
+          code: "UNMAPPED_INGREDIENT_USAGE",
+          severity: "warning",
+          label: "Ingredient mapping incomplete",
+          amount: null,
+          count: ingredientUsage.coverage.unmappedItemQuantity,
+          message: `${ingredientUsage.coverage.unmappedItemQuantity} sold item units have no usable recipe ingredient mapping.`,
+        }] : []),
+      ],
       labor: {
         ...recordedLabor,
         laborCostPct: overview.netSales > 0 ? (recordedLabor.laborCost / overview.netSales) * 100 : null,
@@ -91,6 +158,16 @@ router.get("/overview", async (req, res) => {
     });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
+  }
+});
+
+router.get("/ingredient-usage", async (req, res) => {
+  try {
+    const range = exactRange(req.query as Record<string, unknown>);
+    const usage = await queryIngredientUsage(range);
+    res.json({ ok: true, source: "sbb_pos_recipe_ingredient_usage", filters: range, ...usage });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, source: "sbb_pos_recipe_ingredient_usage", error: error.message });
   }
 });
 
@@ -117,7 +194,7 @@ router.get("/receipts/:source/:id", async (req, res) => {
 router.get("/items", async (req, res) => {
   try {
     const range = exactRange(req.query as Record<string, unknown>);
-    const items = await queryUnifiedItemSales(range);
+    const items = await querySnapshotItemSales(range);
     res.json({ ok: true, source: "unified_reporting_ledger", filters: range, items });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });

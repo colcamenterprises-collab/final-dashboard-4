@@ -7,10 +7,6 @@ type Shift = {
   starting_float: number;
   status: "open" | "closed";
   closed_at?: string | null;
-  closing_cash?: number | null;
-  cash_banked?: number | null;
-  expected_cash?: number | null;
-  variance?: number | null;
 };
 
 type Movement = {
@@ -27,7 +23,6 @@ export default function PosShifts() {
   const [shift, setShift] = useState<Shift | null>(null);
   const [history, setHistory] = useState<Shift[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
-  const [cashSales, setCashSales] = useState(0);
   const [staffName, setStaffName] = useState("");
   const [startingFloat, setStartingFloat] = useState("2500");
   const [movementType, setMovementType] = useState<"cash_in" | "cash_out">("cash_out");
@@ -45,7 +40,6 @@ export default function PosShifts() {
     setShift(body.data.shift || null);
     setMovements(body.data.movements || []);
     setHistory(body.data.history || []);
-    setCashSales(Number(body.data.cashSales || 0));
   };
 
   useEffect(() => {
@@ -58,9 +52,6 @@ export default function PosShifts() {
     () => movements.reduce((sum, movement) => sum + (movement.movement_type === "cash_in" ? Number(movement.amount) : -Number(movement.amount)), 0),
     [movements],
   );
-  const expectedBeforeBanking = Number(shift?.starting_float || 0) + cashSales + movementTotal;
-  const expectedAfterBanking = expectedBeforeBanking - Number(cashBanked || 0);
-  const previewVariance = closingCash === "" ? null : Number(closingCash) - expectedAfterBanking;
 
   const run = async (request: () => Promise<Response>, success: string) => {
     setBusy(true);
@@ -117,7 +108,7 @@ export default function PosShifts() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ closing_cash: Number(closingCash), cash_banked: Number(cashBanked) }),
       }),
-      "Shift closed and locked.",
+      "Shift submitted and locked.",
     ).then(() => {
       setClosingCash("");
       setCashBanked("");
@@ -150,12 +141,11 @@ export default function PosShifts() {
           <div className="space-y-5">
             <div className="rounded-3xl border bg-white p-6 shadow-sm">
               <div className="flex justify-between gap-4"><div><p className="text-xs font-black tracking-widest text-emerald-600">SHIFT OPEN — REGISTER ACTIVE</p><h2 className="mt-1 text-2xl font-black">{shift.staff_name}</h2><p className="text-sm text-zinc-500">Opened {new Date(shift.opened_at).toLocaleString()}</p></div><a href="/pos" className="h-fit rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white">Go to POS</a></div>
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-bold text-zinc-500">Starting float</p><p className="mt-1 text-xl font-black">{thb(shift.starting_float)}</p></div>
-                <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-bold text-zinc-500">Cash sales</p><p className="mt-1 text-xl font-black">{thb(cashSales)}</p></div>
                 <div className="rounded-2xl bg-zinc-50 p-4"><p className="text-xs font-bold text-zinc-500">Net movements</p><p className="mt-1 text-xl font-black">{thb(movementTotal)}</p></div>
-                <div className="rounded-2xl bg-[#fff8cc] p-4"><p className="text-xs font-bold text-zinc-600">Expected cash now</p><p className="mt-1 text-xl font-black">{thb(expectedBeforeBanking)}</p></div>
               </div>
+              <p className="mt-4 rounded-xl bg-[#fff8cc] px-4 py-3 text-sm font-bold text-zinc-700">Reconciliation results are intentionally hidden from staff. Management reviews expected cash and variance after submission.</p>
             </div>
             <div className="rounded-3xl border bg-white p-6 shadow-sm">
               <h3 className="text-xl font-black">Money in / money out</h3>
@@ -166,17 +156,16 @@ export default function PosShifts() {
             </div>
             <div className="rounded-3xl border border-red-200 bg-white p-6 shadow-sm">
               <h3 className="text-xl font-black">Close shift</h3>
-              <p className="mt-1 text-sm text-zinc-500">Expected cash includes starting float + confirmed cash sales + cash movements − cash banked.</p>
+              <p className="mt-1 text-sm text-zinc-500">Enter the physical figures only. Expected cash and any over/short result are calculated privately for management after submission.</p>
               <div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-sm font-bold">Cash physically in register<input type="number" min="0" value={closingCash} onChange={(event) => setClosingCash(event.target.value)} className="mt-2 w-full rounded-xl border px-3 py-3" /></label><label className="text-sm font-bold">Cash banked<input type="number" min="0" value={cashBanked} onChange={(event) => setCashBanked(event.target.value)} className="mt-2 w-full rounded-xl border px-3 py-3" /></label></div>
-              <div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-xl bg-zinc-50 p-3"><p className="text-xs font-bold text-zinc-500">Expected after banking</p><p className="text-lg font-black">{thb(expectedAfterBanking)}</p></div><div className={`rounded-xl p-3 ${previewVariance === null ? "bg-zinc-50" : Math.abs(previewVariance) <= 30 ? "bg-emerald-50" : "bg-red-50"}`}><p className="text-xs font-bold text-zinc-500">Preview variance</p><p className="text-lg font-black">{previewVariance === null ? "—" : thb(previewVariance)}</p></div></div>
-              <button disabled={busy} onClick={closeShift} className="mt-5 w-full rounded-xl bg-red-600 px-5 py-4 text-lg font-black text-white disabled:opacity-50">Close and lock shift</button>
+              <button disabled={busy} onClick={closeShift} className="mt-5 w-full rounded-xl bg-red-600 px-5 py-4 text-lg font-black text-white disabled:opacity-50">Submit and lock shift</button>
             </div>
           </div>
         )}
 
         <div className="rounded-3xl border bg-white p-6 shadow-sm">
           <h3 className="text-xl font-black">Recent shifts</h3>
-          <div className="mt-3 divide-y">{history.map((item) => <div key={item.id} className="py-3 text-sm"><div className="flex justify-between"><b>{item.staff_name}</b><span className={item.status === "open" ? "font-black text-emerald-600" : "font-bold text-zinc-500"}>{item.status.toUpperCase()}</span></div><div className="mt-1 flex justify-between text-zinc-500"><span>{new Date(item.opened_at).toLocaleString()}</span><span>{thb(item.starting_float)}</span></div>{item.status === "closed" && <div className="mt-1 flex justify-between text-xs"><span>Closing {thb(Number(item.closing_cash || 0))} · Banked {thb(Number(item.cash_banked || 0))}</span><b>Variance {thb(Number(item.variance || 0))}</b></div>}</div>)}</div>
+          <div className="mt-3 divide-y">{history.map((item) => <div key={item.id} className="py-3 text-sm"><div className="flex justify-between"><b>{item.staff_name}</b><span className={item.status === "open" ? "font-black text-emerald-600" : "font-bold text-zinc-500"}>{item.status.toUpperCase()}</span></div><div className="mt-1 flex justify-between text-zinc-500"><span>{new Date(item.opened_at).toLocaleString()}</span><span>{thb(item.starting_float)}</span></div>{item.status === "closed" && <p className="mt-1 text-xs font-bold text-zinc-400">Submitted · reconciliation hidden from staff</p>}</div>)}</div>
         </div>
       </section>
     </main>
