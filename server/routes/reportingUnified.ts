@@ -52,7 +52,7 @@ function categoryProfitability(itemSales: any[]) {
     }
     categories.set(category, current);
   }
-  return [...categories.values()].map((row) => {
+  return Array.from(categories.values()).map((row) => {
     const fullyCosted = Math.abs(row.uncostedNetSales) < 0.005;
     const grossProfit = fullyCosted ? row.netSales - row.costOfGoods : null;
     return {
