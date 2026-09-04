@@ -49,13 +49,32 @@ async function cashSalesSince(openedAt: Date | string) {
   return numberValue(result.rows[0]?.total);
 }
 
+function staffSafeShift(row: any) {
+  if (!row) return null;
+  const {
+    expected_cash: _expectedCash,
+    variance: _variance,
+    closing_cash: _closingCash,
+    cash_banked: _cashBanked,
+    ...safe
+  } = row;
+  return safe;
+}
+
 router.get("/current", staffDevice, async (_req, res) => {
   try {
     const shift = await currentShift();
     const movements = shift ? (await pool.query(`SELECT * FROM public.pos_shift_movements WHERE shift_id=$1 ORDER BY created_at DESC`, [shift.id])).rows : [];
     const history = (await pool.query(`SELECT * FROM public.pos_shifts ORDER BY opened_at DESC LIMIT 20`)).rows;
-    const cashSales = shift ? await cashSalesSince(shift.opened_at) : 0;
-    res.json({ ok: true, source: "sbb_pos_shifts", data: { shift, movements, history, cashSales } });
+    res.json({
+      ok: true,
+      source: "sbb_pos_shifts",
+      data: {
+        shift: staffSafeShift(shift),
+        movements,
+        history: history.map(staffSafeShift),
+      },
+    });
   } catch (error: any) {
     fail(res, error.message, 500);
   }
@@ -69,7 +88,7 @@ router.post("/open", staffDevice, async (req, res) => {
     if (!staffName || startingFloat < 0) return fail(res, "Cashier name and valid starting float are required");
     const actor = (req as any).user?.username || (req as any).user?.id || staffName;
     const result = await pool.query(`INSERT INTO public.pos_shifts(staff_name,starting_float,opened_by) VALUES($1,$2,$3) RETURNING *`, [staffName, startingFloat, actor]);
-    res.status(201).json({ ok: true, source: "sbb_pos_shifts", data: result.rows[0] });
+    res.status(201).json({ ok: true, source: "sbb_pos_shifts", data: staffSafeShift(result.rows[0]) });
   } catch (error: any) {
     if (error.code === "23505") return fail(res, "A shift is already open", 409);
     fail(res, error.message, 500);
@@ -114,7 +133,9 @@ router.post("/:id/close", staffDevice, async (req, res) => {
     const actor = (req as any).user?.username || (req as any).user?.id || null;
     const closed = (await client.query(`UPDATE public.pos_shifts SET status='closed',closed_at=NOW(),closing_cash=$2,cash_banked=$3,expected_cash=$4,variance=$5,closed_by=$6,updated_at=NOW() WHERE id=$1 RETURNING *`, [req.params.id, closingCash, cashBanked, expected, variance, actor])).rows[0];
     await client.query("COMMIT");
-    res.json({ ok: true, source: "sbb_pos_shifts", data: { ...closed, cash_sales: cashSales } });
+    // Deliberately do not return the calculated expected cash or variance to the staff device.
+    // Management reporting reads the stored values through authenticated owner/reporting surfaces.
+    res.json({ ok: true, source: "sbb_pos_shifts", data: staffSafeShift(closed) });
   } catch (error: any) {
     await client.query("ROLLBACK");
     fail(res, error.message, 500);
