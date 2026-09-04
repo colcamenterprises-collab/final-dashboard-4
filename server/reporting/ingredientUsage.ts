@@ -35,12 +35,9 @@ function normalizedIngredient(raw: any, soldQuantity: number, recipeYield: numbe
 /**
  * Theoretical ingredient usage for SBB POS-era orders.
  *
- * Priority is the immutable sale-time recipe snapshot. When an older order predates
- * snapshots, the current linked recipe is used as an explicit fallback so coverage
- * can be repaired without silently treating an uncosted/unmapped sale as zero usage.
- * Set components are counted only when their parent order item has no recipe mapping,
- * preventing a recipe-backed meal/set and its generated components from double-counting.
- * Modifier recipe snapshots/config are included separately.
+ * Priority is the immutable sale-time recipe snapshot, including its frozen recipe yield.
+ * When an older order predates snapshots, the current linked recipe is used as an explicit
+ * fallback so coverage can be repaired without silently treating an unmapped sale as zero.
  */
 export async function queryIngredientUsage(range: ResolvedReportingRange) {
   if (!pool) throw new Error("Database unavailable");
@@ -54,7 +51,11 @@ export async function queryIngredientUsage(range: ResolvedReportingRange) {
          i.quantity::numeric AS sold_quantity,
          COALESCE(s.recipe_id, link.recipe_id, cfg.recipe_id) AS recipe_id,
          COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb), r.ingredients, '[]'::jsonb) AS ingredients,
-         COALESCE(r.yield_quantity,1)::numeric AS recipe_yield,
+         CASE
+           WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb)) > 0
+             THEN COALESCE(s.recipe_yield,1)::numeric
+           ELSE COALESCE(r.yield_quantity,1)::numeric
+         END AS recipe_yield,
          CASE
            WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb)) > 0 THEN 'sale_snapshot'
            WHEN COALESCE(link.recipe_id,cfg.recipe_id) IS NOT NULL THEN 'current_recipe_fallback'
@@ -93,7 +94,11 @@ export async function queryIngredientUsage(range: ResolvedReportingRange) {
        m.quantity::numeric AS sold_quantity,
        COALESCE(s.recipe_id,cfg.recipe_id) AS recipe_id,
        COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb),r.ingredients,'[]'::jsonb) AS ingredients,
-       COALESCE(r.yield_quantity,1)::numeric AS recipe_yield,
+       CASE
+         WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb)) > 0
+           THEN COALESCE(s.recipe_yield,1)::numeric
+         ELSE COALESCE(r.yield_quantity,1)::numeric
+       END AS recipe_yield,
        CASE
          WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb)) > 0 THEN 'sale_snapshot'
          WHEN cfg.recipe_id IS NOT NULL THEN 'current_recipe_fallback'
@@ -164,7 +169,7 @@ export async function queryIngredientUsage(range: ResolvedReportingRange) {
       fallbackItemQuantity,
     },
     provenance: {
-      primary: "ordering_order_item_cost_snapshots / ordering_modifier_cost_snapshots",
+      primary: "sale-time ingredient snapshot + frozen recipe yield",
       fallback: "current recipe links/config for pre-snapshot sales",
       scope: "SBB POS-era paid/refunded non-cancelled orders; set components suppressed when parent recipe is mapped",
     },
