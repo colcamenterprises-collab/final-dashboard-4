@@ -1,6 +1,6 @@
 import { Router } from "express";
 import grabOrdersRouter from "./posGrabOrders";
-import legacyPosRouter from "./posLegacy";
+import legacyPosRouter from "../../legacy/server/routes/posLegacy";
 
 /**
  * POS route composition after the dedicated device split.
