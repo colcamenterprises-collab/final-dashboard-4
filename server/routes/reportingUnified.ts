@@ -82,6 +82,7 @@ router.get("/overview", async (req, res) => {
     const uncostedItemSales = itemSales.filter((item: any) => Math.abs(Number(item.uncosted_net_sales || 0)) >= 0.005);
     const costedNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.costed_net_sales || 0), 0);
     const costOfGoods = itemSales.reduce((sum: number, item: any) => sum + Number(item.known_cost_of_goods || 0), 0);
+    const profitCoveredNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.profit_covered_net_sales || 0), 0);
     const knownGrossProfit = itemSales.reduce((sum: number, item: any) => sum + Number(item.known_gross_profit || 0), 0);
     const itemNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
     const uncostedNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.uncosted_net_sales || 0), 0);
@@ -119,7 +120,7 @@ router.get("/overview", async (req, res) => {
           foodCostPct: fullyCosted && overview.netSales > 0 ? (costOfGoods / overview.netSales) * 100 : null,
           knownFoodCostPct: costedNetSales > 0 ? (costOfGoods / costedNetSales) * 100 : null,
           grossMarginPct: grossProfit != null && overview.netSales > 0 ? (grossProfit / overview.netSales) * 100 : null,
-          knownGrossMarginPct: costedNetSales > 0 ? (knownGrossProfit / costedNetSales) * 100 : null,
+          knownGrossMarginPct: profitCoveredNetSales > 0 ? (knownGrossProfit / profitCoveredNetSales) * 100 : null,
         },
       },
       breakdowns: {
