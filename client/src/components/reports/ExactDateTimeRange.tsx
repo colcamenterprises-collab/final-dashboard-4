@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { loadReportingRange, REPORTING_RANGE_EVENT, saveReportingRange } from "./reportingRangeStore";
 
 export type ExactDateTimeRangeValue = {
   fromDate: string;
@@ -18,6 +19,14 @@ export function reportingRangeParams(value: ExactDateTimeRangeValue): string {
   }).toString();
 }
 
+function sameRange(a: ExactDateTimeRangeValue, b: ExactDateTimeRangeValue) {
+  return a.fromDate === b.fromDate
+    && a.fromTime === b.fromTime
+    && a.toDate === b.toDate
+    && a.toTime === b.toTime
+    && a.timezone === b.timezone;
+}
+
 export function ExactDateTimeRange({
   value,
   onChange,
@@ -27,13 +36,29 @@ export function ExactDateTimeRange({
   onChange: (value: ExactDateTimeRangeValue) => void;
   timezoneLabel?: string;
 }) {
+  useEffect(() => {
+    const stored = loadReportingRange();
+    if (!sameRange(stored, value)) onChange(stored);
+
+    const handleRangeChange = (event: Event) => {
+      const next = (event as CustomEvent<ExactDateTimeRangeValue>).detail;
+      if (next && !sameRange(next, value)) onChange(next);
+    };
+    window.addEventListener(REPORTING_RANGE_EVENT, handleRangeChange);
+    return () => window.removeEventListener(REPORTING_RANGE_EVENT, handleRangeChange);
+  }, []); // hydrate once when each reporting page opens
+
   const invalid = useMemo(() => {
     const from = new Date(`${value.fromDate}T${value.fromTime}:00`);
     const to = new Date(`${value.toDate}T${value.toTime}:00`);
     return !value.fromDate || !value.fromTime || !value.toDate || !value.toTime || !Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || to <= from;
   }, [value]);
 
-  const patch = (key: keyof ExactDateTimeRangeValue, next: string) => onChange({ ...value, [key]: next });
+  const patch = (key: keyof ExactDateTimeRangeValue, nextValue: string) => {
+    const next = { ...value, [key]: nextValue };
+    saveReportingRange(next);
+    onChange(next);
+  };
 
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Reporting date and time range">
