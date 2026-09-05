@@ -7,6 +7,10 @@ const n = (value: unknown) => Number(value ?? 0) || 0;
 /**
  * Overview/item profitability using immutable sale-time POS cost snapshots.
  * Missing snapshots remain uncosted rather than falling back to mutable current recipe costs.
+ *
+ * Aggregates retain both costed and uncosted sales portions so a historical missing
+ * snapshot for an item does not cause a later correctly-costed sale of the same item
+ * to be counted as uncosted.
  */
 export async function querySnapshotItemSales(range: ResolvedReportingRange) {
   if (!pool) throw new Error("Database unavailable");
@@ -88,6 +92,10 @@ export async function querySnapshotItemSales(range: ResolvedReportingRange) {
       SUM(discount_total)::numeric discounts,
       SUM(refund_total)::numeric refunds,
       SUM(net_sales)::numeric net_sales,
+      SUM(CASE WHEN cost_of_goods IS NOT NULL THEN net_sales ELSE 0::numeric END)::numeric costed_net_sales,
+      SUM(CASE WHEN cost_of_goods IS NULL THEN net_sales ELSE 0::numeric END)::numeric uncosted_net_sales,
+      SUM(CASE WHEN cost_of_goods IS NOT NULL THEN cost_of_goods ELSE 0::numeric END)::numeric known_cost_of_goods,
+      SUM(CASE WHEN gross_profit IS NOT NULL THEN gross_profit ELSE 0::numeric END)::numeric known_gross_profit,
       CASE WHEN COUNT(cost_of_goods)=COUNT(*) THEN SUM(cost_of_goods) ELSE NULL END cost_of_goods,
       CASE WHEN COUNT(gross_profit)=COUNT(*) THEN SUM(gross_profit) ELSE NULL END gross_profit,
       CASE WHEN COUNT(cost_of_goods)=COUNT(*) AND SUM(net_sales)<>0
@@ -106,6 +114,10 @@ export async function querySnapshotItemSales(range: ResolvedReportingRange) {
     discounts: n(row.discounts),
     refunds: n(row.refunds),
     net_sales: n(row.net_sales),
+    costed_net_sales: n(row.costed_net_sales),
+    uncosted_net_sales: n(row.uncosted_net_sales),
+    known_cost_of_goods: n(row.known_cost_of_goods),
+    known_gross_profit: n(row.known_gross_profit),
     cost_of_goods: row.cost_of_goods == null ? null : n(row.cost_of_goods),
     gross_profit: row.gross_profit == null ? null : n(row.gross_profit),
     margin_pct: row.margin_pct == null ? null : n(row.margin_pct),
