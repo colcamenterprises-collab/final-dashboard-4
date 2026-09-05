@@ -45,11 +45,9 @@ function categoryProfitability(itemSales: any[]) {
     current.grossSales += Number(item.gross_sales || 0);
     current.discounts += Number(item.discounts || 0);
     current.netSales += Number(item.net_sales || 0);
-    if (item.cost_of_goods == null) current.uncostedNetSales += Number(item.net_sales || 0);
-    else {
-      current.costOfGoods += Number(item.cost_of_goods || 0);
-      current.costedNetSales += Number(item.net_sales || 0);
-    }
+    current.costOfGoods += Number(item.known_cost_of_goods || 0);
+    current.costedNetSales += Number(item.costed_net_sales || 0);
+    current.uncostedNetSales += Number(item.uncosted_net_sales || 0);
     categories.set(category, current);
   }
   return Array.from(categories.values()).map((row) => {
@@ -81,13 +79,13 @@ router.get("/overview", async (req, res) => {
       0,
     );
     const shiftMinutes = dailyShiftMinutes(range.fromTime, range.toTime);
-    const costedItemSales = itemSales.filter((item: any) => item.cost_of_goods != null);
-    const uncostedItemSales = itemSales.filter((item: any) => item.cost_of_goods == null && Number(item.net_sales || 0) !== 0);
-    const costedNetSales = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
-    const costOfGoods = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.cost_of_goods || 0), 0);
-    const knownGrossProfit = costedItemSales.reduce((sum: number, item: any) => sum + Number(item.gross_profit || 0), 0);
+    const uncostedItemSales = itemSales.filter((item: any) => Math.abs(Number(item.uncosted_net_sales || 0)) >= 0.005);
+    const costedNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.costed_net_sales || 0), 0);
+    const costOfGoods = itemSales.reduce((sum: number, item: any) => sum + Number(item.known_cost_of_goods || 0), 0);
+    const profitCoveredNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.profit_covered_net_sales || 0), 0);
+    const knownGrossProfit = itemSales.reduce((sum: number, item: any) => sum + Number(item.known_gross_profit || 0), 0);
     const itemNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
-    const uncostedNetSales = uncostedItemSales.reduce((sum: number, item: any) => sum + Number(item.net_sales || 0), 0);
+    const uncostedNetSales = itemSales.reduce((sum: number, item: any) => sum + Number(item.uncosted_net_sales || 0), 0);
     const fullyCosted = Math.abs(uncostedNetSales) < 0.005;
     const grossProfit = fullyCosted ? overview.netSales - costOfGoods : null;
     const efficiency = calculateLabourEfficiency({
@@ -122,7 +120,7 @@ router.get("/overview", async (req, res) => {
           foodCostPct: fullyCosted && overview.netSales > 0 ? (costOfGoods / overview.netSales) * 100 : null,
           knownFoodCostPct: costedNetSales > 0 ? (costOfGoods / costedNetSales) * 100 : null,
           grossMarginPct: grossProfit != null && overview.netSales > 0 ? (grossProfit / overview.netSales) * 100 : null,
-          knownGrossMarginPct: costedNetSales > 0 ? (knownGrossProfit / costedNetSales) * 100 : null,
+          knownGrossMarginPct: profitCoveredNetSales > 0 ? (knownGrossProfit / profitCoveredNetSales) * 100 : null,
         },
       },
       breakdowns: {
@@ -137,7 +135,7 @@ router.get("/overview", async (req, res) => {
           label: "Uncosted sales",
           amount: uncostedNetSales,
           count: uncostedItemSales.length,
-          message: `${uncostedItemSales.length} sold menu item${uncostedItemSales.length === 1 ? "" : "s"} do not have a complete sale-time cost snapshot. Gross profit and food cost are withheld until coverage is complete.`,
+          message: `${uncostedItemSales.length} sold menu item${uncostedItemSales.length === 1 ? "" : "s"} include sales without a complete sale-time cost snapshot. Gross profit and food cost are withheld until coverage is complete.`,
         }] : []),
         ...(ingredientUsage.coverage.unmappedItemQuantity > 0 ? [{
           code: "UNMAPPED_INGREDIENT_USAGE",
