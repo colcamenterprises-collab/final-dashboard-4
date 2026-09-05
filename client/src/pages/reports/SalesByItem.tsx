@@ -61,7 +61,11 @@ export default function SalesByItem(){
     const knownCogs=rows.reduce((sum,row)=>sum+Number(row.known_cost_of_goods||0),0);
     const knownGrossProfit=rows.reduce((sum,row)=>sum+Number(row.known_gross_profit||0),0);
     const profitCoveredNet=rows.reduce((sum,row)=>sum+Number(row.profit_covered_net_sales||0),0);
-    return {quantity,net,costedNet,uncostedNet,knownCogs,knownGrossProfit,profitCoveredNet,coveragePct:net!==0?costedNet/net*100:null,fullyCosted:Math.abs(uncostedNet)<0.005};
+    const fullCogs=rows.reduce((sum,row)=>sum+Number(row.cost_of_goods||0),0);
+    const fullGrossProfit=rows.reduce((sum,row)=>sum+Number(row.gross_profit||0),0);
+    const fullyCosted=rows.length>0&&rows.every(row=>row.cost_of_goods!=null&&row.gross_profit!=null);
+    const fullMarginPct=fullyCosted&&net!==0?fullGrossProfit/net*100:null;
+    return {quantity,net,costedNet,uncostedNet,knownCogs,knownGrossProfit,profitCoveredNet,fullCogs,fullGrossProfit,coveragePct:net!==0?costedNet/net*100:null,fullyCosted,fullMarginPct};
   },[rows]);
   const loading=query.isLoading||components.isLoading||(tab==="burgers"&&burgers.isLoading);
   const error=query.isError?(query.error as Error):components.isError?(components.error as Error):tab==="burgers"&&burgers.isError?(burgers.error as Error):null;
@@ -91,7 +95,7 @@ export default function SalesByItem(){
       {tab==="burgers"?<button onClick={exportBurgerCsv} disabled={!burgerRows.length} className="inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-2 text-xs font-black disabled:opacity-40"><Download className="h-4 w-4"/>Export burger matrix</button>:null}
     </div>
     <div className="flex flex-wrap gap-2">{([['items','Items'],['burgers','Burger Usage'],['modifiers','Modifiers'],['upsells','Upsells'],['set-components','Set Components']] as [Tab,string][]).map(([key,label])=><button key={key} onClick={()=>setTab(key)} className={`rounded-xl px-4 py-2 text-xs font-black ${tab===key?"bg-slate-950 text-white":"border bg-white text-slate-600"}`}>{label}</button>)}</div>
-    {tab==="items"?<><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Items sold" value={totals.quantity.toLocaleString()}/><Metric label="Net sales" value={money(totals.net)}/><Metric label={totals.fullyCosted?"COGS":"Known COGS"} value={money(totals.knownCogs)}/><Metric label="Cost coverage" value={percent(totals.coveragePct)}/></div>{!totals.fullyCosted&&rows.length?<div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-950">Known COGS and known gross profit include only sales with verified sale-time cost snapshots. Full COGS, gross profit and margin remain withheld until coverage reaches 100%.</div>:null}</>:null}
+    {tab==="items"?<><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Items sold" value={totals.quantity.toLocaleString()}/><Metric label="Net sales" value={money(totals.net)}/><Metric label={totals.fullyCosted?"COGS":"Known COGS"} value={money(totals.fullyCosted?totals.fullCogs:totals.knownCogs)}/><Metric label={totals.fullyCosted?"Gross margin":"Cost coverage"} value={totals.fullyCosted?percent(totals.fullMarginPct):percent(totals.coveragePct)}/></div>{!totals.fullyCosted&&rows.length?<div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-950">Known COGS and known gross profit include only sales with verified sale-time cost snapshots. Full COGS, gross profit and margin remain withheld until coverage reaches 100%.</div>:null}</>:null}
     {tab==="burgers"?<div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"><Metric label="Burger items" value={String(burgers.data?.coverage.menuItems??0)}/><Metric label="Burgers sold" value={quantity(burgers.data?.coverage.soldQuantity??0)}/><Metric label="Recipe-linked sold" value={quantity(burgers.data?.coverage.mappedSoldQuantity??0)}/><Metric label="Usage coverage" value={percent(burgers.data?.coverage.coveragePct)}/></div>:null}
     {loading&&<div className="rounded-2xl border bg-white p-8 text-center text-sm text-slate-500">Loading sales analysis…</div>}
     {error&&<div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">{error.message}</div>}
