@@ -47,7 +47,13 @@ Flow:
 6. Credential is stored hashed server-side and can be revoked.
 7. Device role is returned by the backend and controls whether the app launches Register, Kitchen Display or Customer Display.
 
-Current release uses the six-digit pairing code. Native QR/app-link provisioning is a planned productisation step, not yet a production dependency.
+### Current QR/deep-link status
+
+The Back Office provisioning implementation already returns a `customli://provision?code=...` URI and renders that URI as a QR code. This is therefore an **existing exposed provisioning path**, not a future architecture concept.
+
+The universal Android application also supports the six-digit code claim flow. However, native Android handling/certification of the `customli://` QR/deep-link path has not yet been physically accepted on the target devices. Until that acceptance is complete, the six-digit pairing code is the supported onboarding path and QR scanning must not be marketed as production-certified.
+
+Track A therefore needs to **certify/complete native QR/app-link handling**, not invent a second QR provisioning architecture.
 
 ## Sales and order architecture
 
