@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, Download, ShieldCheck, WandSparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -53,6 +53,18 @@ function normalizeText(value: unknown) {
     .replace(/\s+/g, " ")
     .trim();
 }
+function normalizeCategory(value: unknown) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/&/g, " AND ")
+    .replace(/[^A-Z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+function isCogsOverlapCategory(value: unknown) {
+  const category = normalizeCategory(value);
+  return category === "FOOD AND BEVERAGE" || category === "KITCHEN SUPPLIES AND PACKAGING";
+}
 function merchantKey(row: any) {
   const supplier = normalizeText(row?.supplier);
   if (supplier.length >= 3) return supplier;
@@ -69,6 +81,11 @@ function rowDate(row: any) {
 function dayValue(value: string) {
   const parsed = Date.parse(`${value}T00:00:00Z`);
   return Number.isFinite(parsed) ? parsed : Number.NaN;
+}
+function addDays(value: string, days: number) {
+  const parsed = dayValue(value);
+  if (!Number.isFinite(parsed)) return value;
+  return new Date(parsed + days * 86400000).toISOString().slice(0, 10);
 }
 function dateDiffDays(a: string, b: string) {
   const left = dayValue(a);
@@ -117,15 +134,35 @@ function clearDuplicateCandidates(rows: any[]) {
 }
 
 function duplicateExposureAmount(candidates: DuplicateCandidate[]) {
-  const groups = new Map<string, { amount: number; rowIds: Set<string> }>();
-  candidates.forEach((candidate, index) => {
-    const key = `${candidate.merchant}|${candidate.amount.toFixed(2)}`;
-    const group = groups.get(key) || { amount: candidate.amount, rowIds: new Set<string>() };
-    group.rowIds.add(rowIdentity(candidate.left, index * 2));
-    group.rowIds.add(rowIdentity(candidate.right, index * 2 + 1));
-    groups.set(key, group);
+  const adjacency = new Map<any, Set<any>>();
+  candidates.forEach((candidate) => {
+    const leftLinks = adjacency.get(candidate.left) || new Set<any>();
+    const rightLinks = adjacency.get(candidate.right) || new Set<any>();
+    leftLinks.add(candidate.right);
+    rightLinks.add(candidate.left);
+    adjacency.set(candidate.left, leftLinks);
+    adjacency.set(candidate.right, rightLinks);
   });
-  return Array.from(groups.values()).reduce((sum, group) => sum + group.amount * Math.max(0, group.rowIds.size - 1), 0);
+
+  const visited = new Set<any>();
+  let exposure = 0;
+  adjacency.forEach((_links, start) => {
+    if (visited.has(start)) return;
+    const stack = [start];
+    let componentSize = 0;
+    let componentAmount = absNumber(start?.amount);
+    while (stack.length) {
+      const node = stack.pop();
+      if (!node || visited.has(node)) continue;
+      visited.add(node);
+      componentSize += 1;
+      if (!componentAmount) componentAmount = absNumber(node?.amount);
+      const links = adjacency.get(node);
+      if (links) Array.from(links).forEach((linked) => { if (!visited.has(linked)) stack.push(linked); });
+    }
+    exposure += componentAmount * Math.max(0, componentSize - 1);
+  });
+  return exposure;
 }
 
 function categorySuggestions(rows: any[], vendorRules: VendorRule[]) {
@@ -200,7 +237,9 @@ export default function InvestorFinanceReport({
   canManageCategories: boolean;
   onStageCategories: (changes: Record<string, string>) => void;
 }) {
-  const params = useMemo(() => new URLSearchParams({ fromDate: dateFrom, fromTime: "00:00", toDate: dateTo, toTime: "23:59", timezone: "Asia/Bangkok" }).toString(), [dateFrom, dateTo]);
+  const queryClient = useQueryClient();
+  const inclusiveEndDate = addDays(dateTo, 1);
+  const params = useMemo(() => new URLSearchParams({ fromDate: dateFrom, fromTime: "00:00", toDate: inclusiveEndDate, toTime: "00:00", timezone: "Asia/Bangkok" }).toString(), [dateFrom, inclusiveEndDate]);
   const overviewQuery = useQuery<OverviewResponse>({
     queryKey: ["finance-investor-overview", dateFrom, dateTo],
     enabled: Boolean(dateFrom && dateTo),
@@ -216,22 +255,24 @@ export default function InvestorFinanceReport({
   const duplicateCandidates = useMemo(() => clearDuplicateCandidates(allExpenseRows), [allExpenseRows]);
   const suggestions = useMemo(() => categorySuggestions(businessExpenses, vendorRules), [businessExpenses, vendorRules]);
   const suggestionSignature = useMemo(() => suggestions.map((item) => `${item.id}:${item.category}`).sort().join("|"), [suggestions]);
+  const vendorRulesReady = queryClient.getQueryState(["/api/bank-imports/rules"])?.status === "success";
   const businessTotal = useMemo(() => businessExpenses.reduce((sum, row) => sum + absNumber(row.amount), 0), [businessExpenses]);
   const shiftTotal = useMemo(() => inShiftExpenses.reduce((sum, row) => sum + absNumber(row.amount), 0), [inShiftExpenses]);
   const depositTotal = useMemo(() => deposits.reduce((sum, row) => sum + absNumber(row.amount), 0), [deposits]);
   const expenseTotal = businessTotal + shiftTotal;
   const duplicateExposure = duplicateExposureAmount(duplicateCandidates);
   const overview = overviewQuery.data?.overview;
-  const hasFoodPurchaseOverlap = allExpenseRows.some((row) => ["Food & Beverage", "Kitchen Supplies & Packaging"].includes(String(row?.category || "")));
+  const hasFoodPurchaseOverlap = allExpenseRows.some((row) => isCogsOverlapCategory(row?.category));
   const canShowOperatingResult = Boolean(overview?.costing?.fullyCosted && !hasFoodPurchaseOverlap);
   const operatingResult = canShowOperatingResult ? rawNumber(overview?.netSales) - rawNumber(overview?.costing?.costOfGoods) - expenseTotal : null;
 
   useEffect(() => {
-    if (!canManageCategories || !suggestionSignature) return;
+    if (!canManageCategories || !vendorRulesReady || !suggestionSignature) return;
     onStageCategories(Object.fromEntries(suggestions.map((item) => [item.id, item.category])));
-    // Auto-mark only. Existing Save & Learn Categories remains the owner confirmation/write step.
+    // Wait for vendor rules before auto-marking so a later rule cannot be shadowed by an earlier repeat-history suggestion.
+    // Existing Save & Learn Categories remains the owner confirmation/write step.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canManageCategories, suggestionSignature]);
+  }, [canManageCategories, vendorRulesReady, suggestionSignature]);
 
   const downloadAuditCsv = () => {
     const rows: unknown[][] = [
@@ -281,7 +322,7 @@ export default function InvestorFinanceReport({
       {overviewQuery.isError ? <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-bold text-red-700">{(overviewQuery.error as Error).message}</div> : null}
       <div className="mt-5 grid gap-4 xl:grid-cols-2">
         <div className="rounded-2xl border border-slate-200 p-4"><div className="flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-600" /><h3 className="text-sm font-black">Duplicate expense review</h3></div><p className="mt-1 text-[11px] text-slate-500">Flags exact amounts with the same normalised supplier/payee within two days. Nothing is automatically deleted or excluded.</p><div className="mt-3 max-h-64 overflow-auto">{duplicateCandidates.length === 0 ? <div className="rounded-xl bg-emerald-50 p-3 text-xs font-bold text-emerald-800"><ShieldCheck className="mr-2 inline h-4 w-4" />No clear duplicate pairs found.</div> : duplicateCandidates.slice(0, 40).map((candidate, index) => <div key={`${candidate.left?.id}-${candidate.right?.id}-${index}`} className="mb-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs"><div className="flex justify-between gap-3"><span className="font-black text-amber-950">{candidate.merchant}</span><span className="font-mono font-black">{money(candidate.amount)}</span></div><div className="mt-1 text-[11px] text-amber-800">{rowDate(candidate.left)} ↔ {rowDate(candidate.right)} · {candidate.dayGap} day gap · {candidate.crossSource ? "cross-source" : "same-source"}</div></div>)}</div></div>
-        <div className="rounded-2xl border border-slate-200 p-4"><div className="flex items-center gap-2"><WandSparkles className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-black">Repetitive expense categories</h3></div><p className="mt-1 text-[11px] text-slate-500">Owner rows are auto-marked only when an existing vendor rule matches or at least two prior expenses for the same merchant unanimously use one category. Save & Learn remains the confirmation step.</p><div className="mt-3 max-h-64 overflow-auto">{suggestions.length === 0 ? <div className="rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-600">No unambiguous repetitive-category suggestions in this period.</div> : suggestions.slice(0, 40).map((suggestion) => { const row = businessExpenses.find((item) => String(item?.id || "") === suggestion.id); return <div key={suggestion.id} className="mb-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs"><div className="flex justify-between gap-3"><span className="font-black text-blue-950">{row?.supplier || row?.description || suggestion.id}</span><span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-blue-700">{suggestion.category}</span></div><div className="mt-1 text-[11px] text-blue-700">{suggestion.reason}</div></div>; })}</div></div>
+        <div className="rounded-2xl border border-slate-200 p-4"><div className="flex items-center gap-2"><WandSparkles className="h-4 w-4 text-blue-600" /><h3 className="text-sm font-black">Repetitive expense categories</h3></div><p className="mt-1 text-[11px] text-slate-500">Owner rows are auto-marked only after vendor rules finish loading, when an existing vendor rule matches or at least two prior expenses for the same merchant unanimously use one category. Save & Learn remains the confirmation step.</p><div className="mt-3 max-h-64 overflow-auto">{suggestions.length === 0 ? <div className="rounded-xl bg-slate-50 p-3 text-xs font-bold text-slate-600">No unambiguous repetitive-category suggestions in this period.</div> : suggestions.slice(0, 40).map((suggestion) => { const row = businessExpenses.find((item) => String(item?.id || "") === suggestion.id); return <div key={suggestion.id} className="mb-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-xs"><div className="flex justify-between gap-3"><span className="font-black text-blue-950">{row?.supplier || row?.description || suggestion.id}</span><span className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-blue-700">{suggestion.category}</span></div><div className="mt-1 text-[11px] text-blue-700">{suggestion.reason}</div></div>; })}</div></div>
       </div>
       {overview ? <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600"><strong>Accounting guardrail:</strong> {overview.costing.fullyCosted ? "COGS is fully costed for this range." : `COGS is incomplete (${overview.costing.coveragePct == null ? "unknown" : `${overview.costing.coveragePct.toFixed(1)}%`} coverage).`} {hasFoodPurchaseOverlap ? " Operating profit is withheld because recorded food/packaging purchases overlap with recipe-based COGS and subtracting both could double count costs." : canShowOperatingResult ? ` Indicative operating result before tax/owner adjustments: ${signedMoney(operatingResult)}` : " Derived operating profit is withheld until costing coverage is complete."}</div> : null}
     </section>
