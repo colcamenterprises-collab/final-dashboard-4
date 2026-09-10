@@ -93,8 +93,8 @@ function clearDuplicateCandidates(rows: any[]) {
   });
 
   const candidates: DuplicateCandidate[] = [];
-  for (const bucket of buckets.values()) {
-    bucket.sort((a, b) => dayValue(rowDate(a.row)) - dayValue(rowDate(b.row)));
+  for (const bucket of Array.from(buckets.values())) {
+    bucket.sort((a: { row: any; index: number }, b: { row: any; index: number }) => dayValue(rowDate(a.row)) - dayValue(rowDate(b.row)));
     for (let i = 0; i < bucket.length; i += 1) {
       for (let j = i + 1; j < bucket.length; j += 1) {
         const left = bucket[i].row;
@@ -113,7 +113,7 @@ function clearDuplicateCandidates(rows: any[]) {
       }
     }
   }
-  return candidates.sort((a, b) => Number(b.crossSource) - Number(a.crossSource) || a.dayGap - b.dayGap || b.amount - a.amount);
+  return candidates.sort((a: DuplicateCandidate, b: DuplicateCandidate) => Number(b.crossSource) - Number(a.crossSource) || a.dayGap - b.dayGap || b.amount - a.amount);
 }
 
 function duplicateExposureAmount(candidates: DuplicateCandidate[]) {
@@ -125,7 +125,7 @@ function duplicateExposureAmount(candidates: DuplicateCandidate[]) {
     group.rowIds.add(rowIdentity(candidate.right, index * 2 + 1));
     groups.set(key, group);
   });
-  return [...groups.values()].reduce((sum, group) => sum + group.amount * Math.max(0, group.rowIds.size - 1), 0);
+  return Array.from(groups.values()).reduce((sum, group) => sum + group.amount * Math.max(0, group.rowIds.size - 1), 0);
 }
 
 function categorySuggestions(rows: any[], vendorRules: VendorRule[]) {
@@ -137,7 +137,7 @@ function categorySuggestions(rows: any[], vendorRules: VendorRule[]) {
     if (!merchant) continue;
     knownByMerchant.set(merchant, [...(knownByMerchant.get(merchant) || []), category]);
   }
-  const orderedRules = [...vendorRules].sort((a, b) => normalizeText(b.matchText).length - normalizeText(a.matchText).length);
+  const orderedRules = [...vendorRules].sort((a: VendorRule, b: VendorRule) => normalizeText(b.matchText).length - normalizeText(a.matchText).length);
   const suggestions: CategorySuggestion[] = [];
   for (const row of rows) {
     const id = String(row?.id || "");
@@ -252,8 +252,8 @@ export default function InvestorFinanceReport({
       const category = String(row?.category || "Review");
       categoryTotals.set(category, (categoryTotals.get(category) || 0) + absNumber(row?.amount));
     });
-    const categoryRows = [...categoryTotals.entries()].sort((a, b) => b[1] - a[1]).map(([category, amount]) => `<tr><td>${escapeHtml(category)}</td><td class="r">${escapeHtml(money(amount))}</td></tr>`).join("");
-    const paymentRows = Object.entries(overview.paymentSales || {}).sort((a, b) => Number(b[1]) - Number(a[1])).map(([channel, amount]) => `<tr><td>${escapeHtml(channel)}</td><td class="r">${escapeHtml(money(amount))}</td></tr>`).join("");
+    const categoryRows = Array.from(categoryTotals.entries()).sort((a: [string, number], b: [string, number]) => b[1] - a[1]).map(([category, amount]) => `<tr><td>${escapeHtml(category)}</td><td class="r">${escapeHtml(money(amount))}</td></tr>`).join("");
+    const paymentRows = Object.entries(overview.paymentSales || {}).sort((a: [string, number], b: [string, number]) => Number(b[1]) - Number(a[1])).map(([channel, amount]) => `<tr><td>${escapeHtml(channel)}</td><td class="r">${escapeHtml(money(amount))}</td></tr>`).join("");
     const duplicateRows = duplicateCandidates.map((candidate) => `<tr><td>${escapeHtml(rowDate(candidate.left))}</td><td>${escapeHtml(rowDate(candidate.right))}</td><td>${escapeHtml(candidate.merchant)}</td><td class="r">${escapeHtml(money(candidate.amount))}</td><td>${candidate.crossSource ? "Cross-source" : "Same-source"}</td></tr>`).join("");
     const warnings = [
       !overview.costing.fullyCosted ? `COGS coverage is ${overview.costing.coveragePct == null ? "unknown" : `${overview.costing.coveragePct.toFixed(1)}%`}; full profit is withheld.` : "",
