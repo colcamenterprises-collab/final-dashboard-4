@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { BankStatementUpload as BankStatementUploadComponent } from "@/components/BankStatementUpload";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { ExpenseLodgmentModal } from "@/components/operations/ExpenseLodgmentModal";
+import InvestorFinanceReport from "@/components/finance/InvestorFinanceReport";
 import DirectorBeneficiaryLoans from "./DirectorBeneficiaryLoans";
 
 type DashboardResponse = {
@@ -256,7 +257,6 @@ export default function Expenses() {
       if (!changes.length) return { saved: 0, learned: 0, conflicts: 0 };
       let learned = 0;
       let conflicts = 0;
-
       for (const [id, category] of changes) {
         const row = businessExpenses.find((item: any) => String(item.id) === id);
         if (!row) continue;
@@ -274,7 +274,6 @@ export default function Expenses() {
         });
         const payload = await response.json().catch(() => null);
         if (!response.ok) throw new Error(payload?.error || `Failed to save category for ${row.supplier || row.description || id}`);
-
         const description = String(row.description || "");
         const supplier = String(row.supplier || "").trim();
         const matchingRule = vendorRules.find((rule) => description.toUpperCase().includes(String(rule.matchText || "").toUpperCase()));
@@ -297,9 +296,7 @@ export default function Expenses() {
     onSuccess: (result) => {
       setCategoryChanges({});
       refreshExpenses();
-      if (result.conflicts) {
-        window.alert(`${result.saved} category changes saved. ${result.learned} supplier rules learned. ${result.conflicts} existing auto-category rule conflict(s) were left unchanged for safety.`);
-      }
+      if (result.conflicts) window.alert(`${result.saved} category changes saved. ${result.learned} supplier rules learned. ${result.conflicts} existing auto-category rule conflict(s) were left unchanged for safety.`);
     },
     onError: (error: Error) => window.alert(error.message),
   });
@@ -327,11 +324,7 @@ export default function Expenses() {
       if (!response.ok) throw new Error(payload?.error || "Failed to delete shift expense");
       return payload;
     },
-    onSuccess: () => {
-      setEditingShiftExpenseId(null);
-      setShiftExpenseDraft(null);
-      refreshExpenses();
-    },
+    onSuccess: () => { setEditingShiftExpenseId(null); setShiftExpenseDraft(null); refreshExpenses(); },
     onError: (error: Error) => window.alert(error.message),
   });
 
@@ -412,6 +405,11 @@ export default function Expenses() {
     setDateTo(range.to);
   };
 
+  const setRequestedAuditRange = () => {
+    setDateFrom("2026-01-01");
+    setDateTo("2026-08-15");
+  };
+
   return (
     <div className="min-h-screen rounded-[32px] bg-slate-50 p-4 text-slate-950 md:p-6">
       <header className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -422,24 +420,13 @@ export default function Expenses() {
         </div>
         {isOwner ? (
           <div className="flex flex-wrap gap-2">
-            <ExpenseLodgmentModal
-              onSuccess={refreshExpenses}
-              triggerText="Lodge Business Expense"
-              triggerIcon={<Plus className="mr-2 h-4 w-4" />}
-              triggerClassName="h-10 rounded-xl bg-slate-950 px-4 text-white hover:bg-slate-800"
-            />
-            <Button className="h-10 rounded-xl" variant="outline" onClick={() => setShowImport((value) => !value)}>
-              <Upload className="mr-2 h-4 w-4" />Import Bank Statement
-            </Button>
+            <ExpenseLodgmentModal onSuccess={refreshExpenses} triggerText="Lodge Business Expense" triggerIcon={<Plus className="mr-2 h-4 w-4" />} triggerClassName="h-10 rounded-xl bg-slate-950 px-4 text-white hover:bg-slate-800" />
+            <Button className="h-10 rounded-xl" variant="outline" onClick={() => setShowImport((value) => !value)}><Upload className="mr-2 h-4 w-4" />Import Bank Statement</Button>
           </div>
         ) : null}
       </header>
 
-      {showImport ? (
-        <section className="mb-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,.08)]">
-          <BankStatementUploadComponent onUploadComplete={refreshExpenses} />
-        </section>
-      ) : null}
+      {showImport ? <section className="mb-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,.08)]"><BankStatementUploadComponent onUploadComplete={refreshExpenses} /></section> : null}
 
       <section className="mb-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_32px_rgba(15,23,42,.08)]">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -447,11 +434,14 @@ export default function Expenses() {
             <label className="space-y-2 text-xs font-bold text-slate-700"><span>Start date</span><Input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
             <label className="space-y-2 text-xs font-bold text-slate-700"><span>End date</span><Input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
           </div>
-          <Button variant="outline" className="h-10 rounded-xl" onClick={setThisMonth}>This Month</Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="h-10 rounded-xl border-blue-200 bg-blue-50 text-blue-800" onClick={setRequestedAuditRange}>Audit 1 Jan – 15 Aug 2026</Button>
+            <Button variant="outline" className="h-10 rounded-xl" onClick={setThisMonth}>This Month</Button>
+          </div>
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
           <span className="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700">Reporting Period: {periodLabel}</span>
-          <span>Every summary and table below uses this period.</span>
+          <span>Every summary, audit and table below uses this period.</span>
         </div>
       </section>
 
@@ -467,6 +457,20 @@ export default function Expenses() {
 
       {!isLoading && !isError ? (
         <div className="mt-5 space-y-5">
+          <InvestorFinanceReport
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            businessExpenses={businessExpenses}
+            inShiftExpenses={inShiftExpenses}
+            deposits={deposits}
+            vendorRules={vendorRules}
+            canManageCategories={isOwner}
+            onStageCategories={(changes) => {
+              if (!isOwner) return;
+              setCategoryChanges((current) => ({ ...changes, ...current }));
+            }}
+          />
+
           <DataTable title="Shift Expenses" subtitle="Expenses entered during the daily shift workflow.">
             <thead><tr className="bg-slate-50 text-left text-slate-500"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Category / Type</th><th className="px-3 py-2">Supplier / Payee</th><th className="px-3 py-2">Description</th><th className="px-3 py-2 text-right">Amount</th><th className="px-3 py-2">Entered By</th>{isOwner && <th className="w-[92px] px-2 py-2 text-right">Actions</th>}</tr></thead>
             <tbody>
@@ -481,7 +485,7 @@ export default function Expenses() {
 
           <DataTable
             title="Business Expenses"
-            subtitle="Direct business expenses and approved bank-statement expenses. Category changes are staged and saved together."
+            subtitle="Direct business expenses and approved bank-statement expenses. High-confidence repetitive categories are auto-marked; Save & Learn confirms them."
             actions={isOwner ? (
               <div className="flex flex-wrap gap-2">
                 <Button size="sm" variant="outline" onClick={exportPersonalCsv} disabled={!personalTransactions.length || personalQuery.isLoading}><Download className="mr-2 h-4 w-4" />Export Personal CSV ({personalTransactions.length})</Button>
@@ -503,28 +507,7 @@ export default function Expenses() {
                   <tr key={row.id} className="border-t border-slate-100">
                     <td className="px-3 py-2">{draft ? <Input type="date" value={draft.date} onChange={(e) => setExpenseDraft({ ...draft, date: e.target.value })} className="h-8" /> : formatDate(row.date)}</td>
                     <td className="px-3 py-2">{draft ? <Input value={draft.supplier} onChange={(e) => setExpenseDraft({ ...draft, supplier: e.target.value })} className="h-8" /> : row.supplier || "—"}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex min-w-[210px] items-center gap-2">
-                        <select
-                          value={selectedCategory}
-                          disabled={!isOwner}
-                          onChange={(event) => {
-                            const next = event.target.value;
-                            setCategoryChanges((current) => {
-                              const copy = { ...current };
-                              if (next === String(row.category || "Review")) delete copy[id];
-                              else copy[id] = next;
-                              return copy;
-                            });
-                            if (draft) setExpenseDraft({ ...draft, category: next });
-                          }}
-                          className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800 disabled:cursor-default disabled:bg-transparent"
-                        >
-                          {BUSINESS_EXPENSE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
-                        </select>
-                        {id in categoryChanges ? <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800">Unsaved</span> : isSuggested ? <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-700">Suggested</span> : null}
-                      </div>
-                    </td>
+                    <td className="px-3 py-2"><div className="flex min-w-[210px] items-center gap-2"><select value={selectedCategory} disabled={!isOwner} onChange={(event) => { const next = event.target.value; setCategoryChanges((current) => { const copy = { ...current }; if (next === String(row.category || "Review")) delete copy[id]; else copy[id] = next; return copy; }); if (draft) setExpenseDraft({ ...draft, category: next }); }} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-800 disabled:cursor-default disabled:bg-transparent">{BUSINESS_EXPENSE_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}</select>{id in categoryChanges ? <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-800">Auto/Unsaved</span> : isSuggested ? <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-700">Suggested</span> : null}</div></td>
                     <td className="px-3 py-2">{draft ? <Input value={draft.description} onChange={(e) => setExpenseDraft({ ...draft, description: e.target.value })} className="h-8" /> : row.description || "—"}</td>
                     <td className="px-3 py-2 text-right font-mono">{draft ? <Input type="number" value={draft.amount} onChange={(e) => setExpenseDraft({ ...draft, amount: e.target.value })} className="ml-auto h-8 w-24 text-right" /> : money(row.amount)}</td>
                     {isOwner && <td className="px-2 py-2"><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => beginExpenseEdit(row)} aria-label="Edit business expense" title="Edit business expense"><Pencil className="h-3.5 w-3.5" /></Button><Button size="icon" variant="ghost" className="h-7 w-7" onClick={saveExpense} disabled={!draft || updateBusinessExpense.isPending} aria-label="Save business expense" title="Save business expense"><Save className="h-3.5 w-3.5" /></Button>{canMarkPersonal ? <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" onClick={() => window.confirm(`Mark ${row.description || row.supplier || "this transaction"} as Personal?`) && markBusinessExpensePersonal.mutate(row)}>Personal</Button> : null}<Button size="icon" variant="ghost" className="h-7 w-7 text-red-600" onClick={() => window.confirm(`Delete ${row.description || row.supplier || "this expense"}?`) && deleteBusinessExpense.mutate(id)} aria-label="Delete business expense" title="Delete business expense"><Trash2 className="h-3.5 w-3.5" /></Button></div></td>}
@@ -537,7 +520,7 @@ export default function Expenses() {
 
           <DirectorBeneficiaryLoans isOwner={isOwner} />
 
-          <DataTable title="Bank Deposits / Credits — Reconciliation Only" subtitle="Incoming bank entries are shown here for reconciliation and are not counted as expenses.">
+          <DataTable title="Bank Deposits / Credits — Reconciliation Only" subtitle="Incoming bank entries are shown here for reconciliation and are not counted as income or expenses.">
             <thead><tr className="bg-slate-50 text-left text-slate-500"><th className="px-3 py-2">Date</th><th className="px-3 py-2">Description</th><th className="px-3 py-2">Reference</th><th className="px-3 py-2">Bank Source</th><th className="px-3 py-2">Classification</th><th className="px-3 py-2 text-right">Amount</th></tr></thead>
             <tbody>{deposits.length === 0 ? <tr><td colSpan={6} className="px-3 py-8 text-center text-slate-400">No bank deposits found for this date range.</td></tr> : deposits.map((row) => <tr key={row.id} className="border-t border-slate-100"><td className="px-3 py-2">{formatDate(row.date)}</td><td className="px-3 py-2">{row.description || "—"}</td><td className="px-3 py-2">{row.ref || "—"}</td><td className="px-3 py-2">{row.source || "—"}</td><td className="px-3 py-2">{row.classification || "Unclassified Deposit"}</td><td className="px-3 py-2 text-right font-mono text-emerald-700">{money(row.amount)}</td></tr>)}</tbody>
             <tfoot><tr className="border-t-2 border-slate-300 bg-slate-50 font-black"><td colSpan={5} className="px-3 py-3 text-right">TOTAL</td><td className="px-3 py-3 text-right font-mono text-emerald-700">{money(depositTotal)}</td></tr></tfoot>
