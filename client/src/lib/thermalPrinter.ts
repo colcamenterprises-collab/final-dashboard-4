@@ -1,3 +1,5 @@
+import { readPosPrinterSettings } from "@/lib/posPrinterSettings";
+
 export type NativePrinterDevice = {
   name: string;
   address: string;
@@ -113,14 +115,8 @@ export async function getNativeAppVersion() {
 
 export async function openNativeAppUpdate(url: string) {
   const value = rawPlugin();
-  if (typeof value?.openAppUpdate === "function") {
-    return value.openAppUpdate({ url });
-  }
+  if (typeof value?.openAppUpdate === "function") return value.openAppUpdate({ url });
 
-  // Older APKs do not expose openAppUpdate. On Android, use an explicit
-  // ACTION_VIEW intent so the approved APK leaves the embedded Capacitor
-  // WebView and opens in the system browser/download flow. In browser mode,
-  // open a new browsing context rather than replacing the POS application.
   const cap = (window as CapacitorWindow).Capacitor;
   if (cap?.isNativePlatform?.()) {
     window.location.href = buildExternalAndroidIntent(url);
@@ -130,6 +126,15 @@ export async function openNativeAppUpdate(url: string) {
   const opened = window.open(url, "_blank", "noopener,noreferrer");
   if (!opened) throw new Error("Could not open the POS app update. Allow pop-ups and try again.");
   return { ok: true };
+}
+
+export async function releaseNativePrinter() {
+  if (!nativePrinterAvailable()) return { connected: false };
+  try {
+    return await pluginMethod("disconnect")();
+  } catch {
+    return { connected: false };
+  }
 }
 
 export async function disconnectNativePrinter() {
@@ -145,13 +150,12 @@ export async function nativeOpenCashDrawer() {
   return pluginMethod("openCashDrawer")();
 }
 
-export async function nativeSpeak(text: string, language = "en-US") {
-  const value = rawPlugin();
-  if (typeof value?.speak === "function") return value.speak({ text, language });
+export async function nativeSpeak(value: string, language = "en-US") {
+  const plugin = rawPlugin();
+  if (typeof plugin?.speak === "function") return plugin.speak({ text: value, language });
 
-  // Keep order callouts working on an older APK while the user upgrades.
   if ("speechSynthesis" in window && typeof SpeechSynthesisUtterance !== "undefined") {
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(value);
     utterance.lang = language;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
@@ -202,46 +206,124 @@ export type ReceiptPayload = {
 };
 
 const money = (value: number) => `THB ${Number(value || 0).toFixed(2)}`;
-const WIDTH = 32;
-const pair = (left: string, right: string) => {
-  const r = right.slice(0, WIDTH);
-  return `${left.slice(0, Math.max(1, WIDTH - r.length - 1)).padEnd(Math.max(1, WIDTH - r.length - 1))} ${r}`;
-};
 
-export function buildReceiptEscPos(payload: ReceiptPayload) {
+function pair(left: string, right: string, width: number) {
+  const r = right.slice(0, width);
+  const available = Math.max(1, width - r.length - 1);
+  return `${left.slice(0, available).padEnd(available)} ${r}`;
+}
+
+async function rasterImage(dataUrl: string, maxDots: number) {
+  if (!dataUrl) return new Uint8Array();
+  const image = new Image();
+  image.decoding = "async";
+  image.src = dataUrl;
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("Receipt image could not be loaded"));
+  });
+
+  const scale = Math.min(1, maxDots / Math.max(1, image.naturalWidth));
+  const width = Math.max(1, Math.floor(image.naturalWidth * scale));
+  const height = Math.max(1, Math.floor(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) throw new Error("Receipt image renderer is unavailable");
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(image, 0, 0, width, height);
+  const rgba = ctx.getImageData(0, 0, width, height).data;
+  const bytesPerRow = Math.ceil(width / 8);
+  const bitmap = new Uint8Array(bytesPerRow * height);
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const pixel = (y * width + x) * 4;
+      const alpha = rgba[pixel + 3] / 255;
+      const luminance = (rgba[pixel] * 0.299 + rgba[pixel + 1] * 0.587 + rgba[pixel + 2] * 0.114) * alpha + 255 * (1 - alpha);
+      if (luminance < 170) bitmap[y * bytesPerRow + Math.floor(x / 8)] |= 0x80 >> (x % 8);
+    }
+  }
+
+  return concat(
+    new Uint8Array([0x1d, 0x76, 0x30, 0x00, bytesPerRow & 0xff, (bytesPerRow >> 8) & 0xff, height & 0xff, (height >> 8) & 0xff]),
+    bitmap,
+    text("\n"),
+  );
+}
+
+function qrEscPos(value: string) {
+  const data = enc.encode(value.trim());
+  if (!data.length) return new Uint8Array();
+  const storeLength = data.length + 3;
+  return concat(
+    new Uint8Array([0x1d, 0x28, 0x6b, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00]),
+    new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x43, 0x06]),
+    new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x45, 0x31]),
+    new Uint8Array([0x1d, 0x28, 0x6b, storeLength & 0xff, (storeLength >> 8) & 0xff, 0x31, 0x50, 0x30]),
+    data,
+    new Uint8Array([0x1d, 0x28, 0x6b, 0x03, 0x00, 0x31, 0x51, 0x30]),
+    text("\n"),
+  );
+}
+
+export async function buildReceiptEscPos(payload: ReceiptPayload) {
+  const settings = readPosPrinterSettings();
+  const width = settings.paperWidth === 80 ? 48 : 32;
+  const separator = "-".repeat(width);
+  const maxDots = settings.paperWidth === 80 ? 576 : 384;
+  const chunks: Uint8Array[] = [new Uint8Array([0x1b, 0x40])];
+
+  chunks.push(new Uint8Array([0x1b, 0x61, 0x01]));
+  if (settings.headerLogoDataUrl) {
+    try { chunks.push(await rasterImage(settings.headerLogoDataUrl, maxDots)); } catch { /* receipt text must still print */ }
+  }
+  chunks.push(new Uint8Array([0x1b, 0x45, 0x01]));
+  chunks.push(text("SMASH BROTHERS BURGERS\n"));
+  chunks.push(new Uint8Array([0x1b, 0x45, 0x00]));
+  chunks.push(text("Rawai, Phuket\n"));
+  chunks.push(new Uint8Array([0x1b, 0x61, 0x00]));
+
   const lines: string[] = [
-    "SMASH BROTHERS BURGERS",
-    "Rawai, Phuket",
-    "--------------------------------",
-    pair("ORDER", payload.ticketNumber),
-    pair("PAYMENT", payload.paymentMethod.toUpperCase()),
-    pair("DATE", new Date().toLocaleString("en-GB", { hour12: false })),
-    "--------------------------------",
+    separator,
+    pair("ORDER", payload.ticketNumber, width),
+    pair("PAYMENT", payload.paymentMethod.toUpperCase(), width),
+    pair("DATE", new Date().toLocaleString("en-GB", { hour12: false }), width),
+    separator,
   ];
 
   for (const line of payload.lines) {
-    lines.push(pair(`${line.quantity} x ${line.name}`, money(line.quantity * line.unitPrice)));
-    for (const modifier of line.modifiers || []) lines.push(`  + ${modifier.name} ${money(modifier.price)}`.slice(0, WIDTH));
+    lines.push(pair(`${line.quantity} x ${line.name}`, money(line.quantity * line.unitPrice), width));
+    for (const modifier of line.modifiers || []) lines.push(`  + ${modifier.name} ${money(modifier.price)}`.slice(0, width));
     if (line.setUpgrade) lines.push("  + SET UPGRADE");
-    if (line.drinkName) lines.push(`  + ${line.drinkName}`.slice(0, WIDTH));
-    if (line.notes) lines.push(`  NOTE: ${line.notes}`.slice(0, WIDTH));
+    if (line.drinkName) lines.push(`  + ${line.drinkName}`.slice(0, width));
+    if (line.notes) lines.push(`  NOTE: ${line.notes}`.slice(0, width));
   }
 
-  lines.push("--------------------------------", pair("SUBTOTAL", money(payload.subtotal)));
-  if (payload.discount > 0) lines.push(pair("DISCOUNT", `-${money(payload.discount)}`));
-  lines.push(pair("TOTAL", money(payload.total)));
-  if (payload.cashReceived !== undefined) lines.push(pair("CASH", money(payload.cashReceived)));
-  if (payload.change !== undefined) lines.push(pair("CHANGE", money(payload.change)));
-  lines.push("--------------------------------", "THANK YOU", "", "", "");
+  lines.push(separator, pair("SUBTOTAL", money(payload.subtotal), width));
+  if (payload.discount > 0) lines.push(pair("DISCOUNT", `-${money(payload.discount)}`, width));
+  chunks.push(text(lines.join("\n") + "\n"));
+  chunks.push(new Uint8Array([0x1b, 0x45, 0x01]));
+  chunks.push(text(pair("TOTAL", money(payload.total), width) + "\n"));
+  chunks.push(new Uint8Array([0x1b, 0x45, 0x00]));
+  if (payload.cashReceived !== undefined) chunks.push(text(pair("CASH", money(payload.cashReceived), width) + "\n"));
+  if (payload.change !== undefined) chunks.push(text(pair("CHANGE", money(payload.change), width) + "\n"));
+  chunks.push(text(separator + "\n"));
 
-  return concat(
-    new Uint8Array([0x1b, 0x40]),
-    new Uint8Array([0x1b, 0x61, 0x01]),
-    text(lines[0] + "\n" + lines[1] + "\n"),
-    new Uint8Array([0x1b, 0x61, 0x00]),
-    text(lines.slice(2).join("\n") + "\n"),
-    new Uint8Array([0x1d, 0x56, 0x00]),
-  );
+  chunks.push(new Uint8Array([0x1b, 0x61, 0x01]));
+  if (settings.footerImageDataUrl) {
+    try { chunks.push(await rasterImage(settings.footerImageDataUrl, maxDots)); } catch { /* continue */ }
+  }
+  if (settings.footerText.trim()) chunks.push(text(settings.footerText.trim().slice(0, width) + "\n"));
+  if (settings.qrText.trim()) {
+    if (settings.qrLabel.trim()) chunks.push(text(settings.qrLabel.trim().slice(0, width) + "\n"));
+    chunks.push(qrEscPos(settings.qrText));
+  }
+  chunks.push(text("\n\n\n"));
+  chunks.push(new Uint8Array([0x1d, 0x56, 0x00]));
+  return concat(...chunks);
 }
 
 export async function printReceiptNative(payload: ReceiptPayload, openDrawer = false) {
@@ -250,41 +332,48 @@ export async function printReceiptNative(payload: ReceiptPayload, openDrawer = f
   if (!status.connected) status = await reconnectSavedPrinter();
   if (!status.connected) return { attempted: true, ok: false, message: "Printer is not connected" };
 
-  const bytes = buildReceiptEscPos(payload);
+  const bytes = await buildReceiptEscPos(payload);
   try {
-    await printEscPosBytes(bytes);
-  } catch (firstError) {
-    const reconnected = await reconnectSavedPrinter();
-    if (!reconnected.connected) {
-      return {
-        attempted: true,
-        ok: false,
-        message: firstError instanceof Error ? firstError.message : "Printing failed and printer could not reconnect",
-      };
-    }
     try {
       await printEscPosBytes(bytes);
-    } catch (retryError) {
-      return {
-        attempted: true,
-        ok: false,
-        message: retryError instanceof Error ? retryError.message : "Printing failed after reconnect",
-      };
+    } catch (firstError) {
+      const reconnected = await reconnectSavedPrinter();
+      if (!reconnected.connected) {
+        return {
+          attempted: true,
+          ok: false,
+          message: firstError instanceof Error ? firstError.message : "Printing failed and printer could not reconnect",
+        };
+      }
+      try {
+        await printEscPosBytes(bytes);
+      } catch (retryError) {
+        return {
+          attempted: true,
+          ok: false,
+          message: retryError instanceof Error ? retryError.message : "Printing failed after reconnect",
+        };
+      }
     }
-  }
 
-  if (openDrawer) {
-    try {
-      await nativeOpenCashDrawer();
-    } catch (drawerError) {
-      return {
-        attempted: true,
-        ok: false,
-        message: drawerError instanceof Error
-          ? `Receipt printed, but cash drawer failed: ${drawerError.message}`
-          : "Receipt printed, but cash drawer failed",
-      };
+    if (openDrawer) {
+      try {
+        await nativeOpenCashDrawer();
+      } catch (drawerError) {
+        return {
+          attempted: true,
+          ok: false,
+          message: drawerError instanceof Error
+            ? `Receipt printed, but cash drawer failed: ${drawerError.message}`
+            : "Receipt printed, but cash drawer failed",
+        };
+      }
     }
+    return { attempted: true, ok: true, message: openDrawer ? "Printed and cash drawer opened" : "Printed" };
+  } finally {
+    // Do not monopolise the Bluetooth RFCOMM socket. Releasing the printer after
+    // each POS job allows Grab Merchant or another Android app to use the same
+    // paired ESC/POS printer between SBB transactions.
+    await releaseNativePrinter();
   }
-  return { attempted: true, ok: true, message: openDrawer ? "Printed and cash drawer opened" : "Printed" };
 }
