@@ -1,8 +1,9 @@
 export type RecipeWorkflowIngredient = {
   name?: string;
-  sourceType?: 'purchasing' | 'manual';
+  sourceType?: 'purchasing' | 'manual' | 'recipe';
   purchasingItemId?: number | null;
   purchasingItemKey?: string | null;
+  recipeId?: number | null;
   quantityUsed?: string | number | null;
   unitUsed?: string | null;
   purchaseCost?: string | number | null;
@@ -49,8 +50,15 @@ export function calculateRecipeWorkflow(input: { ingredients?: RecipeWorkflowIng
     const purchaseCost = numberOrNull(ingredient.manualOverrideUnitCost) ?? numberOrNull(ingredient.purchaseCost);
     const packQuantity = numberOrNull(ingredient.packageQuantity);
     if (!ingredient.name || used === null || used <= 0 || !ingredient.unitUsed || waste < 0 || waste >= 100) {
-      blockers.push({ code: 'INSUFFICIENT_INGREDIENT_DATA', message: `Ingredient row ${index + 1} requires a name, positive usage quantity, unit, and valid waste percentage.`, where: `recipeIngredients[${index}]`, canonical_source: 'recipes.ingredients', auto_build_attempted: false });
+      blockers.push({ code: 'INSUFFICIENT_INGREDIENT_DATA', message: `Cost row ${index + 1} requires a name, positive usage quantity, unit, and valid waste percentage.`, where: `recipeIngredients[${index}]`, canonical_source: 'recipes.ingredients', auto_build_attempted: false });
       return null;
+    }
+    if (ingredient.sourceType === 'recipe') {
+      if (!Number.isInteger(Number(ingredient.recipeId)) || purchaseCost === null || purchaseCost < 0) {
+        blockers.push({ code: 'MISSING_COMPONENT_RECIPE_COST', message: `Component recipe row ${index + 1} has no current cost per serving.`, where: `recipeIngredients[${index}]`, canonical_source: 'recipes.cost_per_serving', auto_build_attempted: false });
+        return null;
+      }
+      return purchaseCost * used;
     }
     // Backward compatible for historical recipes that stored a per-unit cost.
     if (purchaseCost === null) {
