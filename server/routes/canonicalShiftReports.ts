@@ -20,6 +20,7 @@ const round = (value: number) => Math.round((value + Number.EPSILON) * 100) / 10
 
 router.get("/history", async (req, res) => {
   try {
+    if (!pool) throw new Error("Database unavailable");
     const limit = Math.min(Math.max(Number(req.query.limit) || 60, 1), 365);
     const result = await pool.query(`
       WITH shifts AS (
