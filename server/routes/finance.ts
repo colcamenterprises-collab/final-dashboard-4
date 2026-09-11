@@ -5,9 +5,11 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getPinSessionUser } from "./pinAuth";
 import directorBeneficiaryLoansRouter from "./directorBeneficiaryLoans";
+import expenseReviewActionsRouter from "./expenseReviewActions";
 
 const router = express.Router();
 router.use("/director-beneficiary-loans", directorBeneficiaryLoansRouter);
+router.use("/expense-review", expenseReviewActionsRouter);
 
 const BUSINESS_EXPENSE_CATEGORIES = [
   "Review",
