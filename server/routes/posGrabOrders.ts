@@ -70,10 +70,8 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
 
   const grabOrderDigits = String(input.grab_order_number || "").slice(0, 64).replace(/\D/g, "");
   const grabOrderNumber = grabOrderDigits ? `GF-${grabOrderDigits}` : "";
-  const customerName = String(input.customer_name || "").trim().slice(0, 120);
   const requestedGrabDiscount = Math.round(value(input.grab_discount_amount) * 100) / 100;
   if (!grabOrderDigits) return fail(res, "Enter the Grab order number");
-  if (!customerName) return fail(res, "Grab customer name is required");
   if (requestedGrabDiscount < 0) return fail(res, "Grab discount cannot be negative");
 
   await ensureGrabOrderSchema();
@@ -87,8 +85,8 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
 
     const order = (await client.query(
       `INSERT INTO ordering_orders(channel,order_mode,dining_type,order_notes,status,payment_status,payment_method,grab_order_number,customer_name,customer_mobile,pos_shift_id)
-       VALUES('grab','grab',$1,$2,'submitted','paid','grab',$3,$4,NULL,$5) RETURNING *`,
-      [input.dining_type || null, input.order_notes || null, grabOrderNumber, customerName, activeShiftId],
+       VALUES('grab','grab',$1,$2,'submitted','paid','grab',$3,NULL,NULL,$4) RETURNING *`,
+      [input.dining_type || null, input.order_notes || null, grabOrderNumber, activeShiftId],
     )).rows[0];
 
     const numericOrderNumber = Number(order.order_number || 1);
@@ -176,7 +174,7 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
     await client.query(`INSERT INTO ordering_payments(order_id,method,status,amount) VALUES($1,'grab','confirmed',$2)`, [order.id,total]);
     await client.query(
       `INSERT INTO pos_order_events(order_id,event_type,payload) VALUES($1,'order_created',$2)`,
-      [order.id,JSON.stringify({ticket_number:displayTicket,receipt_number:displayTicket,shift_id:activeShiftId,discount_code:discountCode||undefined,discount_name:discountName||undefined,discount_amount:discountAmount,subtotal,total,privacy:{customer_mobile_stored:false}})],
+      [order.id,JSON.stringify({ticket_number:displayTicket,receipt_number:displayTicket,shift_id:activeShiftId,discount_code:discountCode||undefined,discount_name:discountName||undefined,discount_amount:discountAmount,subtotal,total,privacy:{customer_name_stored:false,customer_mobile_stored:false}})],
     );
     await client.query("COMMIT");
 
