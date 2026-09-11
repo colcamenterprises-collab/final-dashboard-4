@@ -34,6 +34,7 @@ import Export from "./pages/reports/Export";
 import ReportingOverview from "./pages/reports/ReportingOverview";
 import ReceiptsReport from "./pages/reports/ReceiptsReport";
 import ShiftReviewReport from "./pages/reports/ShiftReviewReport";
+import CanonicalShiftReports from "./pages/reports/CanonicalShiftReports";
 import SalesByItem from "./pages/reports/SalesByItem";
 import InventoryReconciliation from "./pages/reports/InventoryReconciliation";
 import Orders from "./pages/ordering/Orders";
@@ -90,8 +91,8 @@ export default function App() {
       <Route path="/reports/shift-reconciliation" element={<Navigate to="/reports/shift-summary" replace />} />
       <Route path="/reports/receipts" element={<ProtectedRoute><OwnerRoute><ReceiptsReport /></OwnerRoute></ProtectedRoute>} />
       <Route path="/reports/sales-by-item" element={<ProtectedRoute><OwnerRoute><SalesByItem /></OwnerRoute></ProtectedRoute>} />
-      <Route path="/reports/shift-report" element={<Navigate to="/reports/shift-summary" replace />} />
-      <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
+      <Route path="/reports/shift-report" element={<ProtectedRoute><OwnerRoute><CanonicalShiftReports /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-report" replace />} />
       <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-summary" replace />} />
       <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} /><Route path="/reports/receipts-analysis" element={<Navigate to="/reports/overview" replace />} /><Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
       <Route path="/online-ordering" element={<OnlineOrdering />} /><Route path="/online-ordering/checkout" element={<Checkout />} /><Route path="/online-ordering/confirmation" element={<Confirmation />} /><Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} /><Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} /><Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} /><Route path="/admin/ordering/menu" element={<ProtectedRoute><AdminMenu /></ProtectedRoute>} /><Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} /><Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} /><Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
