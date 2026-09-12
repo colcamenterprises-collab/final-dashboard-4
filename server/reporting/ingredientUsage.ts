@@ -55,7 +55,8 @@ export function aggregateIngredientUsageRows(
 
   const consume = (row: IngredientUsageSourceRow, countCoverage: boolean) => {
     const baseSoldQuantity = n(row.sold_quantity);
-    const multiplier = countCoverage ? 1 : (row.usage_multiplier === undefined || row.usage_multiplier === null ? 1 : n(row.usage_multiplier));
+    const configuredMultiplier = n(row.usage_multiplier);
+    const multiplier = countCoverage ? 1 : (configuredMultiplier === 0 ? 1 : configuredMultiplier);
     const soldQuantity = baseSoldQuantity * multiplier;
     const ingredients = Array.isArray(row.ingredients) ? row.ingredients : [];
     const mapped = row.recipe_id != null && ingredients.length > 0;
@@ -167,7 +168,7 @@ export async function queryIngredientUsage(range: ResolvedReportingRange) {
            THEN COALESCE(s.recipe_yield,1)::numeric
          ELSE COALESCE(r.yield_quantity,1)::numeric
        END AS recipe_yield,
-       COALESCE(s.usage_multiplier,cfg.usage_multiplier,1)::numeric AS usage_multiplier,
+       COALESCE(NULLIF(s.usage_multiplier,0),NULLIF(cfg.usage_multiplier,0),1)::numeric AS usage_multiplier,
        CASE
          WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb)) > 0 THEN 'sale_snapshot'
          WHEN cfg.recipe_id IS NOT NULL THEN 'current_recipe_fallback'
