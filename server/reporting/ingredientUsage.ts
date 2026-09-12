@@ -168,7 +168,11 @@ export async function queryIngredientUsage(range: ResolvedReportingRange) {
            THEN COALESCE(s.recipe_yield,1)::numeric
          ELSE COALESCE(r.yield_quantity,1)::numeric
        END AS recipe_yield,
-       COALESCE(NULLIF(s.usage_multiplier,0),NULLIF(cfg.usage_multiplier,0),1)::numeric AS usage_multiplier,
+       CASE
+         WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb)) > 0
+           THEN COALESCE(NULLIF(s.usage_multiplier,0),1)::numeric
+         ELSE COALESCE(NULLIF(cfg.usage_multiplier,0),1)::numeric
+       END AS usage_multiplier,
        CASE
          WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb)) > 0 THEN 'sale_snapshot'
          WHEN cfg.recipe_id IS NOT NULL THEN 'current_recipe_fallback'
