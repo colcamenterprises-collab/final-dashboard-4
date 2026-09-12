@@ -23,13 +23,31 @@ const RULE_CATEGORIES = [
   "Other Business Expense",
 ] as const;
 
-function requireOwner(req: any, res: any): boolean {
+function getAuthenticatedUser(req: any, res: any) {
+  const user = getPinSessionUser(req);
+  if (!user) {
+    res.status(403).json({ error: "Authenticated access required" });
+    return null;
+  }
+  return user;
+}
+
+function requireOwner(req: any, res: any) {
   const user = getPinSessionUser(req);
   if (!user || user.role !== "owner") {
     res.status(403).json({ error: "Owner access required" });
-    return false;
+    return null;
   }
-  return true;
+  return user;
+}
+
+function requireDatabase(res: any) {
+  const database = db;
+  if (!database) {
+    res.status(503).json({ error: "Database unavailable" });
+    return null;
+  }
+  return database;
 }
 
 const duplicateResolutionSchema = z.object({
@@ -42,17 +60,14 @@ const duplicateResolutionSchema = z.object({
 
 router.get("/duplicate-resolutions", async (req, res) => {
   try {
-    if (!requireOwner(req, res)) return;
-    const result = await db.execute(sql`
+    if (!getAuthenticatedUser(req, res)) return;
+    const database = requireDatabase(res);
+    if (!database) return;
+    const result = await database.execute(sql`
       SELECT
-        id,
         pair_key AS "pairKey",
-        left_ref AS "leftRef",
-        right_ref AS "rightRef",
         outcome,
-        reviewed_by AS "reviewedBy",
-        reviewed_at AS "reviewedAt",
-        note
+        reviewed_at AS "reviewedAt"
       FROM finance_duplicate_resolution
       ORDER BY reviewed_at DESC
       LIMIT 5000
@@ -66,11 +81,13 @@ router.get("/duplicate-resolutions", async (req, res) => {
 
 router.post("/duplicate-resolutions", async (req, res) => {
   try {
-    if (!requireOwner(req, res)) return;
+    const owner = requireOwner(req, res);
+    if (!owner) return;
+    const database = requireDatabase(res);
+    if (!database) return;
     const parsed = duplicateResolutionSchema.parse(req.body || {});
-    const owner = getPinSessionUser(req)!;
     const reviewedBy = `${owner.name || "Owner"}${owner.id != null ? ` (${owner.id})` : ""}`;
-    const result = await db.execute(sql`
+    const result = await database.execute(sql`
       INSERT INTO finance_duplicate_resolution (
         pair_key, left_ref, right_ref, outcome, reviewed_by, reviewed_at, note
       ) VALUES (
@@ -86,18 +103,30 @@ router.post("/duplicate-resolutions", async (req, res) => {
       RETURNING
         id,
         pair_key AS "pairKey",
-        left_ref AS "leftRef",
-        right_ref AS "rightRef",
         outcome,
-        reviewed_by AS "reviewedBy",
-        reviewed_at AS "reviewedAt",
-        note
+        reviewed_at AS "reviewedAt"
     `);
     return res.json({ ok: true, resolution: result.rows?.[0] || null });
   } catch (error: any) {
     if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid duplicate resolution", details: error.issues });
     console.error("[FINANCE_DUPLICATE_RESOLUTION_SAVE_FAILED]", error);
     return res.status(500).json({ error: "Failed to save duplicate resolution", reason: error?.message || String(error) });
+  }
+});
+
+router.delete("/duplicate-resolutions/:pairKey", async (req, res) => {
+  try {
+    if (!requireOwner(req, res)) return;
+    const database = requireDatabase(res);
+    if (!database) return;
+    await database.execute(sql`
+      DELETE FROM finance_duplicate_resolution
+      WHERE pair_key = ${req.params.pairKey}
+    `);
+    return res.json({ ok: true });
+  } catch (error: any) {
+    console.error("[FINANCE_DUPLICATE_RESOLUTION_DELETE_FAILED]", error);
+    return res.status(500).json({ error: "Failed to clear duplicate resolution", reason: error?.message || String(error) });
   }
 });
 
@@ -110,7 +139,9 @@ const ruleSchema = z.object({
 router.get("/vendor-rules", async (req, res) => {
   try {
     if (!requireOwner(req, res)) return;
-    const rules = await db.select().from(vendorRule).orderBy(vendorRule.createdAt);
+    const database = requireDatabase(res);
+    if (!database) return;
+    const rules = await database.select().from(vendorRule).orderBy(vendorRule.createdAt);
     return res.json({ ok: true, rules });
   } catch (error: any) {
     console.error("[FINANCE_VENDOR_RULE_LIST_FAILED]", error);
@@ -121,14 +152,16 @@ router.get("/vendor-rules", async (req, res) => {
 router.post("/vendor-rules", async (req, res) => {
   try {
     if (!requireOwner(req, res)) return;
+    const database = requireDatabase(res);
+    if (!database) return;
     const parsed = ruleSchema.parse(req.body || {});
-    const existing = await db.execute(sql`
+    const existing = await database.execute(sql`
       SELECT id FROM vendor_rule WHERE lower(trim(match_text)) = lower(trim(${parsed.matchText})) LIMIT 1
     `);
     if (existing.rows?.length) {
       return res.status(409).json({ error: "A rule for this supplier/match text already exists", existingRuleId: existing.rows[0].id });
     }
-    const [rule] = await db.insert(vendorRule).values(parsed).returning();
+    const [rule] = await database.insert(vendorRule).values(parsed).returning();
     return res.status(201).json({ ok: true, rule });
   } catch (error: any) {
     if (error instanceof z.ZodError) return res.status(400).json({ error: "Invalid expense category rule", details: error.issues });
@@ -140,8 +173,10 @@ router.post("/vendor-rules", async (req, res) => {
 router.patch("/vendor-rules/:id", async (req, res) => {
   try {
     if (!requireOwner(req, res)) return;
+    const database = requireDatabase(res);
+    if (!database) return;
     const parsed = ruleSchema.parse(req.body || {});
-    const [rule] = await db.update(vendorRule)
+    const [rule] = await database.update(vendorRule)
       .set(parsed)
       .where(eq(vendorRule.id, req.params.id))
       .returning();
@@ -157,7 +192,9 @@ router.patch("/vendor-rules/:id", async (req, res) => {
 router.delete("/vendor-rules/:id", async (req, res) => {
   try {
     if (!requireOwner(req, res)) return;
-    const [rule] = await db.delete(vendorRule).where(eq(vendorRule.id, req.params.id)).returning();
+    const database = requireDatabase(res);
+    if (!database) return;
+    const [rule] = await database.delete(vendorRule).where(eq(vendorRule.id, req.params.id)).returning();
     if (!rule) return res.status(404).json({ error: "Expense category rule not found" });
     return res.json({ ok: true, id: req.params.id });
   } catch (error: any) {
