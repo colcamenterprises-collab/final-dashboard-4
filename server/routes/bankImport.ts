@@ -470,6 +470,15 @@ function classifyImportedTransaction(txn: ParsedTransaction, rule?: any): Enhanc
   });
 }
 
+function normalizeVendorRuleText(value: unknown): string {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9ก-๙]+/g, " ")
+    .replace(/\b(CO|LTD|LIMITED|COMPANY|THAILAND|TH|PAYMENT|TRANSFER|DEBIT|CREDIT|QR|PROMPTPAY|ONLINE)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTransaction[]> {
   let rules: any[];
   try {
@@ -484,9 +493,11 @@ async function applyVendorRules(txns: ParsedTransaction[]): Promise<EnhancedTran
   
   return txns.map(txn => {
     // Find matching rule
-    const rule = rules.find((r: any) => 
-      txn.description.toUpperCase().includes(r.matchText.toUpperCase())
-    );
+    const normalizedDescription = normalizeVendorRuleText(txn.description);
+    const rule = rules.find((r: any) => {
+      const normalizedMatch = normalizeVendorRuleText(r.matchText);
+      return normalizedMatch.length >= 2 && normalizedDescription.includes(normalizedMatch);
+    });
     
     return classifyImportedTransaction(txn, rule);
   });
