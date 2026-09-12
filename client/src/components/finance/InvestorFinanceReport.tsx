@@ -429,7 +429,7 @@ export default function InvestorFinanceReport({ dateFrom, dateTo, businessExpens
           const response = await fetch(`/api/finance/bank-imports/txns/${encodeURIComponent(bankId)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ category: rule.category }) });
           if (!response.ok) throw new Error(`Failed to apply rule to ${row?.supplier || row?.description || bankId}`);
         } else {
-          const response = await fetch(`/api/expensesV2/${encodeURIComponent(String(row.id))}`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ date: rowDate(row), supplier: String(row?.supplier || "").trim(), category: rule.category, description: String(row?.description || "").trim(), amount: Number(row?.amount || 0) }) });
+          const response = await fetch(`/api/expensesV2/${encodeURIComponent(String(row.id))}`, { method: "PUT", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ date: rowDate(row), supplier: String(row?.supplier || rule.supplier || rule.matchText).trim(), category: rule.category, description: String(row?.description || "").trim(), amount: Number(row?.amount || 0) }) });
           if (!response.ok) throw new Error(`Failed to apply rule to ${row?.supplier || row?.description || row.id}`);
         }
       }

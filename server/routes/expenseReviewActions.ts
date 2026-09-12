@@ -176,6 +176,16 @@ router.patch("/vendor-rules/:id", async (req, res) => {
     const database = requireDatabase(res);
     if (!database) return;
     const parsed = ruleSchema.parse(req.body || {});
+    const duplicate = await database.execute(sql`
+      SELECT id
+      FROM vendor_rule
+      WHERE lower(trim(match_text)) = lower(trim(${parsed.matchText}))
+        AND id <> ${req.params.id}::uuid
+      LIMIT 1
+    `);
+    if (duplicate.rows?.length) {
+      return res.status(409).json({ error: "Another rule already uses this supplier/match text", existingRuleId: duplicate.rows[0].id });
+    }
     const [rule] = await database.update(vendorRule)
       .set(parsed)
       .where(eq(vendorRule.id, req.params.id))
