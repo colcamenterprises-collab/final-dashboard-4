@@ -99,7 +99,17 @@ function rowDate(row: any) {
 function rowRef(row: any) {
   const bankId = bankTxnId(row);
   if (bankId) return `bank:${bankId}`;
-  if (row?.submission_id) return `shift:${row.submission_id}:${row.kind ?? "expense"}:${row.ordinality ?? "0"}`;
+  if (row?.submission_id) {
+    const fingerprint = [
+      String(row.submission_id),
+      String(row.kind ?? "expense"),
+      rowDate(row),
+      normalizeText(row?.supplier),
+      normalizeText(row?.description),
+      absNumber(row?.amount).toFixed(2),
+    ].join(":");
+    return `shift:${fingerprint}`;
+  }
   return `expense:${String(row?.id || `${rowDate(row)}:${merchantKey(row)}:${absNumber(row?.amount)}`)}`;
 }
 function pairKeyFor(left: any, right: any) {
@@ -267,7 +277,7 @@ export default function InvestorFinanceReport({ dateFrom, dateTo, businessExpens
   });
   const resolutionQuery = useQuery<{ ok: boolean; resolutions: DuplicateResolution[] }>({
     queryKey: ["/api/finance/expense-review/duplicate-resolutions"],
-    enabled: canManageCategories,
+    enabled: true,
     queryFn: async () => {
       const response = await fetch("/api/finance/expense-review/duplicate-resolutions", { credentials: "include", cache: "no-store" });
       const payload = await response.json().catch(() => null);
@@ -317,6 +327,15 @@ export default function InvestorFinanceReport({ dateFrom, dateTo, businessExpens
     if (!response.ok || !payload?.ok) throw new Error(payload?.error || "Failed to record duplicate decision");
   };
 
+  const clearResolution = async (candidate: DuplicateCandidate) => {
+    const response = await fetch(`/api/finance/expense-review/duplicate-resolutions/${encodeURIComponent(candidate.pairKey)}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    const payload = await response.json().catch(() => null);
+    if (!response.ok || !payload?.ok) throw new Error(payload?.error || "Failed to clear duplicate decision");
+  };
+
   const actOnExpenseRow = async (row: any, action: "remove" | "personal") => {
     const bankId = bankTxnId(row);
     if (action === "personal") {
@@ -350,11 +369,23 @@ export default function InvestorFinanceReport({ dateFrom, dateTo, businessExpens
         return;
       }
       const row = side === "right" ? candidate.right : candidate.left;
-      await actOnExpenseRow(row, action);
-      await recordResolution(candidate, `${action === "remove" ? "removed" : "personal"}_${side || "left"}`);
+      const outcome = `${action === "remove" ? "removed" : "personal"}_${side || "left"}`;
+      await recordResolution(candidate, outcome);
+      try {
+        await actOnExpenseRow(row, action);
+      } catch (error) {
+        try {
+          await clearResolution(candidate);
+        } catch (rollbackError) {
+          refreshFinance();
+          const actionMessage = error instanceof Error ? error.message : String(error);
+          throw new Error(`${actionMessage}. The duplicate decision could not be rolled back; refresh before retrying.`);
+        }
+        throw error;
+      }
     },
     onSuccess: refreshFinance,
-    onError: (error: Error) => window.alert(error.message),
+    onError: (error: Error) => { refreshFinance(); window.alert(error.message); },
   });
 
   const createRule = useMutation({
@@ -433,7 +464,7 @@ export default function InvestorFinanceReport({ dateFrom, dateTo, businessExpens
   const renderExpenseSide = (candidate: DuplicateCandidate, side: "left" | "right") => {
     const row = side === "left" ? candidate.left : candidate.right;
     const canPersonal = Boolean(bankTxnId(row));
-    return <div className="rounded-xl border border-amber-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-black text-slate-950">{row?.supplier || row?.description || candidate.merchant}</p><p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">{sourceKey(row)} · {rowDate(row)}</p></div><span className="font-mono font-black">{money(row?.amount)}</span></div><p className="mt-2 text-[11px] text-slate-600">{row?.description || "No description"}</p><p className="mt-1 text-[10px] font-bold text-slate-500">Category: {row?.category || "Review"}</p>{canManageCategories ? <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" className="h-7 px-2 text-[10px] text-red-700" disabled={duplicateAction.isPending} onClick={() => window.confirm(`Remove this ${sourceKey(row)} expense from reporting?`) && duplicateAction.mutate({ candidate, action: "remove", side })}><Trash2 className="mr-1 h-3 w-3" />Remove</Button>{canPersonal ? <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={duplicateAction.isPending} onClick={() => window.confirm("Move this bank expense to Personal / Owner?") && duplicateAction.mutate({ candidate, action: "personal", side })}><UserRound className="mr-1 h-3 w-3" />Personal</Button> : null}</div> : null}</div>;
+    return <div className="rounded-xl border border-amber-200 bg-white p-3"><div className="flex items-start justify-between gap-3"><div><p className="font-black text-slate-950">{row?.supplier || row?.description || candidate.merchant}</p><p className="mt-1 text-[10px] uppercase tracking-wide text-slate-400">{sourceKey(row)} · {rowDate(row)}</p></div><span className="font-mono font-black">{money(row?.amount)}</span></div><p className="mt-2 text-[11px] text-slate-600">{row?.description || "No description"}</p><p className="mt-1 text-[10px] font-bold text-slate-500">Category: {row?.category || "Review"}</p>{canManageCategories ? <div className="mt-3 flex flex-wrap gap-2"><Button size="sm" variant="outline" className="h-7 px-2 text-[10px] text-red-700" disabled={duplicateAction.isPending || resolutionQuery.isError} onClick={() => window.confirm(`Remove this ${sourceKey(row)} expense from reporting?`) && duplicateAction.mutate({ candidate, action: "remove", side })}><Trash2 className="mr-1 h-3 w-3" />Remove</Button>{canPersonal ? <Button size="sm" variant="outline" className="h-7 px-2 text-[10px]" disabled={duplicateAction.isPending || resolutionQuery.isError} onClick={() => window.confirm("Move this bank expense to Personal / Owner?") && duplicateAction.mutate({ candidate, action: "personal", side })}><UserRound className="mr-1 h-3 w-3" />Personal</Button> : null}</div> : null}</div>;
   };
 
   return (
