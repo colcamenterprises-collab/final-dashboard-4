@@ -9,12 +9,6 @@
 ALTER TABLE pos_modifier_costing_config
   ADD COLUMN IF NOT EXISTS usage_multiplier NUMERIC(14,4) NOT NULL DEFAULT 1;
 
-ALTER TABLE pos_modifier_costing_config
-  DROP CONSTRAINT IF EXISTS pos_modifier_costing_config_usage_multiplier_nonzero;
-ALTER TABLE pos_modifier_costing_config
-  ADD CONSTRAINT pos_modifier_costing_config_usage_multiplier_nonzero
-  CHECK (usage_multiplier <> 0);
-
 COMMENT ON COLUMN pos_modifier_costing_config.usage_multiplier IS
 'Signed recipe consumption effect. Use 1 for additions and -1 for removals (for example No Cheese).';
 
@@ -25,7 +19,8 @@ COMMENT ON COLUMN ordering_modifier_cost_snapshots.usage_multiplier IS
 'Immutable sale-time signed modifier recipe multiplier copied from pos_modifier_costing_config.';
 
 -- Freeze the modifier usage direction at sale time. This keeps historical usage stable if a
--- modifier is reconfigured later.
+-- modifier is reconfigured later. A zero value is treated as the safe default (+1) by reporting;
+-- configuration UIs should expose only +1 (addition) and -1 (removal).
 CREATE OR REPLACE FUNCTION freeze_modifier_usage_multiplier()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 DECLARE
@@ -36,9 +31,9 @@ BEGIN
       INTO v_multiplier
       FROM pos_modifier_costing_config c
      WHERE c.item_modifier_id = NEW.item_modifier_id;
-    NEW.usage_multiplier := COALESCE(v_multiplier, NEW.usage_multiplier, 1);
+    NEW.usage_multiplier := COALESCE(NULLIF(v_multiplier, 0), NULLIF(NEW.usage_multiplier, 0), 1);
   ELSE
-    NEW.usage_multiplier := COALESCE(NEW.usage_multiplier, 1);
+    NEW.usage_multiplier := COALESCE(NULLIF(NEW.usage_multiplier, 0), 1);
   END IF;
   RETURN NEW;
 END;
@@ -74,7 +69,3 @@ WHERE COALESCE(child.is_set_component, FALSE) = TRUE;
 
 COMMENT ON VIEW reporting_set_component_lines IS
 'Canonical recorded set expansion for accounting/reporting. Parent carries sale revenue; each child is an independently costed/consumed set component such as fries or the selected drink.';
-
-CREATE INDEX IF NOT EXISTS ordering_order_items_set_parent_idx
-  ON ordering_order_items(parent_order_item_id)
-  WHERE is_set_component = TRUE;
