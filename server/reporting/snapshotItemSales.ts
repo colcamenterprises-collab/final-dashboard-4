@@ -27,14 +27,43 @@ export async function querySnapshotItemSales(range: ResolvedReportingRange) {
           ELSE 0::numeric
         END allocated_discount,
         CASE
-          WHEN snap.costing_status IN ('complete','direct') THEN snap.unit_cost
+          WHEN snap.costing_status IN ('complete','direct')
+           AND (snap.costing_mode='direct' OR COALESCE(children.missing_count,0)=0)
+           AND COALESCE(modifiers.missing_count,0)=0
+          THEN COALESCE(snap.total_cost,snap.unit_cost*i.quantity,0)
+             + CASE WHEN snap.costing_mode='direct' THEN 0 ELSE COALESCE(children.total_cost,0) END
+             + COALESCE(modifiers.total_cost,0)
           ELSE NULL
-        END unit_cost
+        END line_cost
       FROM ordering_order_items i
       JOIN ordering_orders o ON o.id=i.order_id
       LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
       LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id
       LEFT JOIN ordering_order_item_cost_snapshots snap ON snap.order_item_id=i.id
+      LEFT JOIN LATERAL (
+        SELECT
+          COALESCE(SUM(CASE WHEN cs.costing_status IN ('complete','direct')
+                            THEN COALESCE(cs.total_cost,cs.unit_cost*child.quantity,0) ELSE 0 END),0)::numeric total_cost,
+          COUNT(*) FILTER (WHERE cs.order_item_id IS NULL
+                            OR cs.costing_status NOT IN ('complete','direct')
+                            OR (cs.total_cost IS NULL AND cs.unit_cost IS NULL))::int missing_count
+        FROM ordering_order_items child
+        LEFT JOIN ordering_order_item_cost_snapshots cs ON cs.order_item_id=child.id
+        WHERE child.parent_order_item_id=i.id
+          AND COALESCE(child.is_set_component,false)=true
+      ) children ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          COALESCE(SUM(CASE WHEN ms.costing_status IN ('complete','direct')
+                            THEN COALESCE(ms.total_cost,ms.unit_cost*m.quantity,0) ELSE 0 END),0)::numeric total_cost,
+          COUNT(*) FILTER (WHERE ms.order_item_modifier_id IS NULL
+                            OR ms.costing_status NOT IN ('complete','direct')
+                            OR (ms.total_cost IS NULL AND ms.unit_cost IS NULL))::int missing_count
+        FROM ordering_order_item_modifiers m
+        LEFT JOIN ordering_modifier_cost_snapshots ms ON ms.order_item_modifier_id=m.id
+        WHERE m.order_item_id=i.id
+          AND m.item_modifier_id IS NOT NULL
+      ) modifiers ON TRUE
       WHERE o.created_at >= GREATEST($1::timestamptz,$3::timestamptz)
         AND o.created_at < $2::timestamptz
         AND o.status <> 'cancelled'
@@ -73,11 +102,11 @@ export async function querySnapshotItemSales(range: ResolvedReportingRange) {
         i.allocated_discount discount_total,
         CASE WHEN i.payment_status='refunded' THEN i.line_total-i.allocated_discount ELSE 0::numeric END refund_total,
         CASE WHEN i.payment_status='refunded' THEN 0::numeric ELSE i.line_total-i.allocated_discount END net_sales,
-        CASE WHEN i.unit_cost IS NULL THEN NULL ELSE i.unit_cost*i.quantity END cost_of_goods,
+        i.line_cost cost_of_goods,
         CASE
-          WHEN i.unit_cost IS NULL THEN NULL
-          WHEN i.payment_status='refunded' THEN 0::numeric-(i.unit_cost*i.quantity)
-          ELSE (i.line_total-i.allocated_discount)-(i.unit_cost*i.quantity)
+          WHEN i.line_cost IS NULL THEN NULL
+          WHEN i.payment_status='refunded' THEN 0::numeric-i.line_cost
+          ELSE (i.line_total-i.allocated_discount)-i.line_cost
         END gross_profit,
         'sbb_pos'::text source_system
       FROM pos_lines i

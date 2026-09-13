@@ -10,6 +10,7 @@ on:
       - 'server/routes/receiptAnalytics.ts'
       - 'server/migrations/20260810*.sql'
       - 'server/migrations/20260912*.sql'
+      - 'server/migrations/20260913*.sql'
       - 'server/scripts/import_reporting_history.ts'
       - 'client/src/App.tsx'
       - 'client/src/components/navigation/ModernSidebar.tsx'
