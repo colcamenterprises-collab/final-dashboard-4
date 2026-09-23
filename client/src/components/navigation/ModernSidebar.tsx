@@ -133,7 +133,7 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
 
                 return <div key={group.title} className="mb-2">
                   <button onClick={() => toggleGroup(group.title)} className="w-full flex items-center justify-between rounded-xl px-3 py-2 text-[11px] font-black uppercase tracking-[0.14em] text-neutral-500 hover:bg-white/5 hover:text-neutral-300" aria-expanded={isGroupOpen}>
-                    <span>{group.title}</span><ChevronDown className={cn("h-3 w-3 transition-transform", isGroupOpen && "rotate-180")} />
+                    <span className="min-w-0 flex-1 text-left">{group.title}</span><ChevronDown className={cn("h-3 w-3 flex-shrink-0 transition-transform", isGroupOpen && "rotate-180")} />
                   </button>
                   <div className={cn("space-y-1 mt-1", !isGroupOpen && "hidden")}>
                     {group.items.map(item => {
