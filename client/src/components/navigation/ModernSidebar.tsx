@@ -21,6 +21,7 @@ const navigationGroups: NavGroup[] = [
     { to: "/reports/overview", label: "Overview", icon: TrendingUp, testId: "nav-reporting-overview", ownerOnly: true },
     { to: "/reports/sales-by-item", label: "Sales by Item", icon: BarChart3, testId: "nav-sales-by-item", ownerOnly: true },
     { to: "/reports/receipts", label: "Receipts", icon: Receipt, testId: "nav-receipts", ownerOnly: true },
+    { to: "/reports/shift-report", label: "Shift Reports", icon: ClipboardList, testId: "nav-shift-reports", ownerOnly: true },
     { to: "/reports/shift-summary", label: "Shift Reconciliation", icon: ClipboardList, testId: "nav-shift-reconciliation", ownerOnly: true },
   ]},
   { title: "Finance", icon: Wallet, items: [

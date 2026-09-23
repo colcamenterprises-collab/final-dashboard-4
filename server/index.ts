@@ -418,6 +418,8 @@ async function checkSchema() {
   app.use("/api/ordering", orderingRouter);
   app.use("/api/pos", posRouter);
   app.use("/api/pos-shifts", posShiftsRouter);
+  const canonicalShiftReportsRouter = (await import("./routes/canonicalShiftReports")).default;
+  app.use("/api/canonical-shift-reports", canonicalShiftReportsRouter);
 
   // Setup webhooks for real-time Loyverse data
   setupWebhooks(app);
