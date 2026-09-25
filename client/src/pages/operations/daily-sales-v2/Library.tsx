@@ -515,10 +515,10 @@ export default function DailySalesV2Library() {
 
       {/* View Modal */}
       {selected && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full mx-auto p-4 md:p-6 overflow-y-auto max-h-[95vh] font-[Poppins]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black bg-opacity-40 p-0 sm:p-4">
+          <div className="max-h-[100dvh] w-screen min-w-0 overflow-x-hidden overflow-y-auto bg-white p-3 font-[Poppins] shadow-lg sm:max-h-[95vh] sm:max-w-3xl sm:rounded-lg sm:p-4 md:p-6">
             <h2 className="text-xl font-bold mb-4">Complete Daily Sales & Stock Form</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
               
               {/* FORM 1 - Daily Sales Data */}
               <div className="space-y-3">
@@ -638,7 +638,8 @@ export default function DailySalesV2Library() {
                       <p className="font-semibold">Cleaning Score</p>
                       <p>{selected.cleaning[0]?.cleaningScore ?? 0}%</p>
                     </div>
-                    <table className="w-full text-xs">
+                    <div className="w-full min-w-0 overflow-x-auto">
+                    <table className="w-full min-w-[520px] text-xs">
                       <thead>
                         <tr className="border-b">
                           <th className="text-left p-1">Task</th>
@@ -663,6 +664,7 @@ export default function DailySalesV2Library() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
               </div>
