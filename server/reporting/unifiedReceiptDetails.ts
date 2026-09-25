@@ -82,7 +82,7 @@ export async function queryUnifiedReceiptDetails(source: string, id: string) {
          o.order_mode,
          o.payment_status,
          COALESCE(o.subtotal,o.total) subtotal,
-         COALESCE((to_jsonb(o)->>'discount_total')::numeric,0) discount_total,
+         COALESCE(o.discount_amount,0) discount_total,
          CASE WHEN o.payment_status='refunded' THEN COALESCE(o.total,0) ELSE 0 END refund_total,
          0::numeric tax_total,
          CASE WHEN o.payment_status='refunded' THEN 0 ELSE COALESCE(o.total,0) END net_sales,
