@@ -49,7 +49,6 @@ export default function InventoryReconciliation() {
         <div className="overflow-x-auto"><table className="min-w-[1120px] w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{["Ingredient","Opening","Stock in","Waste / out","Expected use","Expected close","Staff reported","Physical count","Variance","Status"].map((heading, index) => <th key={heading} className={`px-3 py-2 ${index === 0 || index === 9 ? "text-left" : "text-right"}`}>{heading}</th>)}</tr></thead><tbody>{groups.map(([group, rows]) => <FragmentRows key={group} group={group} rows={rows} open={open} toggle={toggle} draft={draft} setDraft={setDraft} />)}</tbody></table></div>
       </section>
       <div className={`text-xs font-semibold ${dirty ? "text-amber-700" : "text-emerald-700"}`}>{dirty ? "Unsaved physical count changes" : "All entered physical counts are saved"}</div>
-
     </>}
   </main>;
 }
