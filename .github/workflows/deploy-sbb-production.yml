@@ -159,12 +159,10 @@ jobs:
 
           echo
           echo "==> Apply additive SBB inventory migration"
-          if [ -f "$APP_DIR/.env" ]; then
-            set -a
-            . "$APP_DIR/.env"
-            set +a
-          fi
-          node --input-type=module <<'NODE'
+          # The production .env is root-owned by design. Execute only the migration
+          # process as root so dotenv can read it; keep the runner/build unprivileged.
+          cd "$APP_DIR"
+          sudo env MIGRATION_FILE="$BUILD_DIR/server/migrations/202610070001_sbb_sales_stock_anomaly_engine.sql" node --input-type=module <<'NODE'
           import 'dotenv/config';
           import pg from 'pg';
           import fs from 'node:fs';
@@ -174,7 +172,7 @@ jobs:
           try {
             await client.query('BEGIN');
             await client.query("SELECT pg_advisory_xact_lock(hashtext('sbb-sales-stock-migration'))");
-            await client.query(fs.readFileSync('server/migrations/202610070001_sbb_sales_stock_anomaly_engine.sql', 'utf8'));
+            await client.query(fs.readFileSync(process.env.MIGRATION_FILE, 'utf8'));
             await client.query('COMMIT');
           } catch (error) {
             await client.query('ROLLBACK');
