@@ -1,4 +1,4 @@
 SBB production deployment request
-requested_at=2026-10-07T21:15:00+07:00
+requested_at=2026-10-07T22:35:00+07:00
 ref=main
-reason=Deploy SBB overnight range and consumption mapping warning fixes
+reason=Deploy SBB meal deal component persistence and reporting fix
