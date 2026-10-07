@@ -161,6 +161,36 @@ async function expectedUsage(date: string, fromInstant?: string, toInstant?: str
        LEFT JOIN recipes r ON r.id=COALESCE(s.recipe_id,link.recipe_id,cfg.recipe_id)
        WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
          AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
+     ), historical_meal_components AS (
+       SELECT cm.name_en product_name,i.item_name_en sale_source,i.quantity::numeric sold_quantity,
+              COALESCE(r.ingredients,'[]'::jsonb) ingredients,COALESCE(r.yield_quantity,1)::numeric recipe_yield,
+              'historical_meal_definition' provenance
+       FROM ordering_order_items i
+       JOIN ordering_orders o ON o.id=i.order_id
+       JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+       JOIN ordering_menu_categories cat ON cat.id=mi.category_id
+       CROSS JOIN LATERAL (VALUES
+         (CASE i.item_name_en
+           WHEN 'Chicken Fillet Meal Deal' THEN 'Crispy Chicken Fillet Burger'
+           WHEN 'Karaage Chicken Meal Deal' THEN 'Karaage Chicken Burger'
+           WHEN 'Single Smash Burger Set' THEN 'Original Single Smash Burger'
+           WHEN 'Ultimate Double Smash Burger Set' THEN 'Ultimate Double Smash Burger'
+           WHEN 'Super Double Bacon and Cheese Set' THEN 'Super Double Bacon and Cheese'
+           WHEN 'Triple Smash Burger Set' THEN 'Triple Smash Burger'
+           WHEN 'Kids Cheeseburger Set' THEN 'Kids Cheeseburger'
+          END),
+         ('French Fries')
+       ) component(component_name)
+       JOIN ordering_menu_items cm ON lower(cm.name_en)=lower(component.component_name)
+       LEFT JOIN ordering_menu_item_recipe_links link ON link.menu_item_id=cm.id
+       LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=cm.id AND cfg.costing_mode='recipe'
+       LEFT JOIN recipes r ON r.id=COALESCE(link.recipe_id,cfg.recipe_id)
+       WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
+         AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
+         AND COALESCE(i.is_set_component,false)=false
+         AND lower(COALESCE(cat.name_en,''))='meal deals'
+         AND component.component_name IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM ordering_order_items child WHERE child.parent_order_item_id=i.id AND COALESCE(child.is_set_component,false)=true)
      ), modifier_usage AS (
        SELECT i.item_name_en product_name,COALESCE(NULLIF(m.modifier_name_en,''),'Modifier') sale_source,
               (m.quantity*COALESCE(NULLIF(s.usage_multiplier,0),NULLIF(cfg.usage_multiplier,0),1))::numeric sold_quantity,
@@ -176,7 +206,7 @@ async function expectedUsage(date: string, fromInstant?: string, toInstant?: str
        LEFT JOIN recipes r ON r.id=COALESCE(s.recipe_id,cfg.recipe_id)
        WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
          AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
-     ), usage_rows AS (SELECT * FROM item_usage UNION ALL SELECT * FROM modifier_usage), expanded AS (
+     ), usage_rows AS (SELECT * FROM item_usage UNION ALL SELECT * FROM modifier_usage UNION ALL SELECT * FROM historical_meal_components), expanded AS (
        SELECT product_name,sale_source,provenance,
               COALESCE(x->>'name','') ingredient_name,
               COALESCE(NULLIF(x->>'unitUsed',''),NULLIF(x->>'unit',''),'unit') unit,
@@ -234,7 +264,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     [window.fromISO,window.toISO],
   );
   const canonicalWindow = shiftWindow(date);
-  const customStockBoundary = window.fromISO !== canonicalWindow.fromISO || window.toISO !== canonicalWindow.toISO;
+  const customStockBoundary = Date.parse(window.fromISO) !== Date.parse(canonicalWindow.fromISO) || Date.parse(window.toISO) !== Date.parse(canonicalWindow.toISO);
   const reportBlockers: DataBlocker[] = missingRecipes.rows.flatMap((row: any) => {
     if (row.costing_mode === "direct" && !String(row.notes || "").includes("Bundle COGS")) return [];
     if (row.costing_mode === "direct" && String(row.notes || "").includes("Bundle COGS")) return [{
@@ -246,13 +276,6 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
       where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
     }];
   });
-  reportBlockers.push(...missingMealDealComponents.rows.map((row: any) => ({
-    code: "MEAL_DEAL_COMPONENTS_MISSING",
-    message: `${row.product} is correctly counted as a meal deal, but this historical sale did not save its burger/fries/drink component rows; component consumption cannot be reconstructed reliably.`,
-    where: `meal deal component usage ${date}`,
-    canonical_source: "ordering_order_items.parent_order_item_id",
-    auto_build_attempted: false,
-  })));
   if (customStockBoundary) reportBlockers.push({
     code: "CUSTOM_RANGE_STOCK_BOUNDARY_UNVERIFIED",
     message: "Expected usage follows the selected time range, but expected closing and variance are withheld because physical counts and stock movements are recorded against the full SBB business shift.",
