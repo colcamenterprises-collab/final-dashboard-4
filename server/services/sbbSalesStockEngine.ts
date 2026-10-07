@@ -171,6 +171,23 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "") {
   const db = requireDb();
   if (shiftKey) throw new Error("Named shift reconciliation is unavailable; use the business-date report");
   const usageRows = await expectedUsage(date);
+  const window = shiftWindow(date);
+  const missingRecipes = await db.query(
+    `SELECT DISTINCT i.item_name_en product
+     FROM ordering_order_items i JOIN ordering_orders o ON o.id=i.order_id
+     LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
+     LEFT JOIN ordering_menu_item_recipe_links l ON l.menu_item_id=i.menu_item_id
+     LEFT JOIN pos_item_costing_config c ON c.menu_item_id=i.menu_item_id AND c.costing_mode='recipe'
+     LEFT JOIN recipes r ON r.id=COALESCE(s.recipe_id,l.recipe_id,c.recipe_id)
+     WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
+       AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
+       AND jsonb_array_length(COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb),r.ingredients,'[]'::jsonb))=0`,
+    [window.fromISO,window.toISO],
+  );
+  const reportBlockers: DataBlocker[] = missingRecipes.rows.map((row: any) => ({
+    code: "SALE_INGREDIENT_MAPPING_MISSING", message: `${row.product} has no recorded ingredient recipe; its consumption is unknown.`,
+    where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
+  }));
   const [counts, configs, movements] = await Promise.all([
     db.query(`SELECT * FROM sbb_inventory_physical_count WHERE business_date=$1::date AND shift_key=$2`, [date, shiftKey]),
     db.query(`SELECT * FROM sbb_inventory_item_config WHERE active=true`),
@@ -229,19 +246,21 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "") {
       canonical_source: "ordering_order_item_cost_snapshots",
       auto_build_attempted: true,
     });
+    if (reportBlockers.length) blockers.push(...reportBlockers);
+    const verified = !reportBlockers.length && !blockers.some(blocker => blocker.code === "HISTORICAL_RECIPE_SNAPSHOT_MISSING");
     return {
       ingredientKey: key, ingredient, unit,
       group: config?.group_name || "Other", opening: opening ? number(opening.quantity) : null,
       openingDate: opening?.business_date || null, stockIn: number(movement.STOCK_IN),
       transfersIn: number(movement.TRANSFER_IN), transfersOut: number(movement.TRANSFER_OUT),
       waste: number(movement.WASTE), adjustments: number(movement.ADJUSTMENT), expectedConsumption,
-      expectedClosing: calculated.expectedClosing, staffReported: null,
-      physicalCount: count ? number(count.quantity) : null, variance: calculated.variance,
+      expectedClosing: verified ? calculated.expectedClosing : null, staffReported: null,
+      physicalCount: count ? number(count.quantity) : null, variance: verified ? calculated.variance : null,
       tolerance, materialTolerance: config?.material_tolerance_quantity == null ? null : number(config.material_tolerance_quantity),
-      severity: calculated.severity, savedAt: count?.updated_at || null, sources: usage?.sources || [], blockers,
+      severity: verified ? calculated.severity : "missing_data", savedAt: count?.updated_at || null, sources: usage?.sources || [], blockers,
     };
   });
-  return { date, shiftKey, signConvention: "variance = physicalCount - expectedClosing", rows };
+  return { date, shiftKey, signConvention: "variance = physicalCount - expectedClosing", blockers: reportBlockers, rows };
 }
 
 export async function savePhysicalCounts(input: { date: string; shiftKey?: string; user: { id: number; name: string }; counts: Array<{ ingredientKey: string; ingredient: string; quantity: number; unit: string }> }) {

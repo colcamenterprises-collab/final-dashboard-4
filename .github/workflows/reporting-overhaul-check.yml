@@ -11,6 +11,8 @@ on:
       - 'server/migrations/20260810*.sql'
       - 'server/migrations/20260912*.sql'
       - 'server/migrations/20260913*.sql'
+      - 'server/migrations/20261007*.sql'
+      - 'server/services/sbbSalesStockEngine*'
       - 'server/scripts/import_reporting_history.ts'
       - 'client/src/App.tsx'
       - 'client/src/components/navigation/ModernSidebar.tsx'
@@ -35,6 +37,8 @@ jobs:
         run: echo 'Repository-wide TypeScript debt ratchet is enforced by PR Governance.'
       - name: Reporting regression tests
         run: npm test
+      - name: SBB stock anomaly regression tests
+        run: node --import tsx --test server/services/sbbSalesStockEngine.test.ts
       - name: Set and modifier recipe accounting regression tests
         run: npx tsx --test server/reporting/ingredientUsage.test.ts
       - name: Production build

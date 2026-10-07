@@ -1063,7 +1063,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         limitations: [
           "Historical Loyverse set components are not inferred when the source export does not record the selected components.",
           "Pre-snapshot recipe usage is labelled current_recipe_fallback and must not be treated as historically verified.",
-          "Opening stock remains missing until an earlier independent physical count exists.",
+          "Opening stock requires an independent count from the immediately preceding business date; older counts are not carried forward without intervening activity.",
         ],
       });
     } catch (error: any) {
