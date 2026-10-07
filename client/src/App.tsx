@@ -68,6 +68,12 @@ function OwnerRoute({ children }: { children: JSX.Element }) {
   return children;
 }
 
+function OwnerManagerRoute({ children }: { children: JSX.Element }) {
+  const { currentUser } = usePinAuth();
+  if (!currentUser || !["owner", "manager"].includes(currentUser.role)) return <Navigate to="/dashboard" replace />;
+  return children;
+}
+
 export default function App() {
   return <ErrorBoundary><QueryClientProvider client={queryClient}><AuthProvider><TooltipProvider><BrowserRouter><PinLoginGate><Routes>
     <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -93,7 +99,7 @@ export default function App() {
       <Route path="/reports/shift-report" element={<Navigate to="/reports/shift-summary" replace />} />
       <Route path="/reports/shift-reports" element={<Navigate to="/reports/shift-summary" replace />} />
       <Route path="/reports/shift-history" element={<Navigate to="/reports/shift-summary" replace />} />
-      <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} /><Route path="/reports/receipts-analysis" element={<Navigate to="/reports/overview" replace />} /><Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerRoute><InventoryReconciliation /></OwnerRoute></ProtectedRoute>} />
+      <Route path="/reports/export" element={<ProtectedRoute><Export /></ProtectedRoute>} /><Route path="/reports/receipts-analysis" element={<Navigate to="/reports/overview" replace />} /><Route path="/reports/inventory-reconciliation" element={<ProtectedRoute><OwnerManagerRoute><InventoryReconciliation /></OwnerManagerRoute></ProtectedRoute>} />
       <Route path="/online-ordering" element={<OnlineOrdering />} /><Route path="/online-ordering/checkout" element={<Checkout />} /><Route path="/online-ordering/confirmation" element={<Confirmation />} /><Route path="/ordering/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} /><Route path="/ordering/catalog" element={<ProtectedRoute><Catalog /></ProtectedRoute>} /><Route path="/kitchen/orders" element={<ProtectedRoute><KitchenDisplay /></ProtectedRoute>} /><Route path="/admin/ordering/menu" element={<ProtectedRoute><AdminMenu /></ProtectedRoute>} /><Route path="/admin/ordering/orders" element={<ProtectedRoute><AdminOrders /></ProtectedRoute>} /><Route path="/admin/ordering/settings" element={<ProtectedRoute><AdminSettings /></ProtectedRoute>} /><Route path="/admin/ordering/qr-codes" element={<ProtectedRoute><AdminQrCodes /></ProtectedRoute>} />
       <Route path="/staff/dashboard" element={<ProtectedRoute><StaffDashboard /></ProtectedRoute>} /><Route path="/staff/members" element={<ProtectedRoute><StaffMembers /></ProtectedRoute>} /><Route path="/staff/roster" element={<ProtectedRoute><StaffRoster /></ProtectedRoute>} /><Route path="/staff/cleaning" element={<ProtectedRoute><StaffCleaning /></ProtectedRoute>} /><Route path="/staff/attendance" element={<ProtectedRoute><StaffAttendance /></ProtectedRoute>} /><Route path="/staff/settings" element={<ProtectedRoute><StaffSettings /></ProtectedRoute>} /><Route path="/settings/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} /><Route path="/settings/staff-access" element={<ProtectedRoute><OwnerRoute><StaffAccess /></OwnerRoute></ProtectedRoute>} /><Route path="*" element={<NotFound />} />
     </Route>
