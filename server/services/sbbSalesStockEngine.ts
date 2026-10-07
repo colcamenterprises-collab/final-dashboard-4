@@ -201,11 +201,13 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
      LEFT JOIN recipes r ON r.id=COALESCE(s.recipe_id,l.recipe_id,CASE WHEN c.costing_mode='recipe' THEN c.recipe_id END)
      WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
        AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
-       AND i.source_sku NOT IN ('10012','10013','10021','10026','10027','10028','10029','10031','10039','10040')
+       AND (i.source_sku IS NULL OR i.source_sku NOT IN ('10012','10013','10021','10026','10027','10028','10029','10031','10039','10040'))
        AND NOT (COALESCE(i.is_set_component,false)=false AND EXISTS (SELECT 1 FROM ordering_order_items child WHERE child.parent_order_item_id=i.id AND COALESCE(child.is_set_component,false)=true))
        AND jsonb_array_length(COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb),r.ingredients,'[]'::jsonb))=0`,
     [window.fromISO,window.toISO],
   );
+  const canonicalWindow = shiftWindow(date);
+  const customStockBoundary = window.fromISO !== canonicalWindow.fromISO || window.toISO !== canonicalWindow.toISO;
   const reportBlockers: DataBlocker[] = missingRecipes.rows.flatMap((row: any) => {
     if (row.costing_mode === "direct" && !String(row.notes || "").includes("Bundle COGS")) return [];
     if (row.costing_mode === "direct" && String(row.notes || "").includes("Bundle COGS")) return [{
@@ -216,6 +218,13 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
       code: "SALE_INGREDIENT_MAPPING_MISSING", message: `${row.product} has no recorded ingredient recipe; its consumption is unknown.`,
       where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
     }];
+  });
+  if (customStockBoundary) reportBlockers.push({
+    code: "CUSTOM_RANGE_STOCK_BOUNDARY_UNVERIFIED",
+    message: "Expected usage follows the selected time range, but expected closing and variance are withheld because physical counts and stock movements are recorded against the full SBB business shift.",
+    where: `inventory reconciliation ${date}`,
+    canonical_source: "sbb_inventory_physical_count + sbb_inventory_movement",
+    auto_build_attempted: false,
   });
   const [counts, configs, movements] = await Promise.all([
     db.query(`SELECT * FROM sbb_inventory_physical_count WHERE business_date=$1::date AND shift_key=$2`, [date, shiftKey]),
