@@ -381,7 +381,7 @@ router.post("/orders", staffDevice, async (req, res) => {
         }
       }
 
-      if (mode === "direct" && line.set_upgrade) {
+      if (mode === "direct" && (line.set_upgrade || line.meal_deal)) {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
           client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active AND pos_enabled LIMIT 1`),
@@ -390,22 +390,27 @@ router.post("/orders", staffDevice, async (req, res) => {
         ]);
         const fries = friesResult.rows[0];
         const drink = drinkResult.rows[0];
-        const upgrade = value(setting.rows[0]?.value || 80);
         if (!fries || !drink) throw new Error("Set fries or drink is not configured");
-        await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, upgrade * qty]);
-        await client.query(
-          `INSERT INTO ordering_order_item_modifiers(order_item_id,modifier_group_name_en,modifier_name_en,price_delta,quantity)
-           VALUES($1,'SET UPGRADE','Burger + French Fries + Drink',$2,$3)`,
-          [parent.id, upgrade, qty],
-        );
-        for (const component of [fries, drink]) {
+
+        if (line.set_upgrade) {
+          const upgrade = value(setting.rows[0]?.value || 80);
+          await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, upgrade * qty]);
+          await client.query(
+            `INSERT INTO ordering_order_item_modifiers(order_item_id,modifier_group_name_en,modifier_name_en,price_delta,quantity)
+             VALUES($1,'SET UPGRADE','Burger + French Fries + Drink',$2,$3)`,
+            [parent.id, upgrade, qty],
+          );
+          total += upgrade * qty;
+        }
+
+        const components = line.meal_deal ? [item, fries, drink] : [fries, drink];
+        for (const component of components) {
           await client.query(
             `INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,sort_order,source_sku,price_mode,is_set_component,parent_order_item_id)
              VALUES($1,$2,$3,$4,0,$5,0,$6,$7,$8,true,$9)`,
             [order.id,component.id,component.name_en,component.name_th,qty,sort++,component.source_sku||null,mode,parent.id],
           );
         }
-        total += upgrade * qty;
       }
     }
 
