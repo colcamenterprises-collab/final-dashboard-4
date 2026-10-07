@@ -1,4 +1,4 @@
 SBB production deployment request
-requested_at=2026-10-07T17:35:00+07:00
+requested_at=2026-10-07T21:15:00+07:00
 ref=main
-reason=Expose SBB Sales and Stock Usage report in Reporting navigation
+reason=Deploy SBB overnight range and consumption mapping warning fixes
