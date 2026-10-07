@@ -6,6 +6,14 @@ const text = (value: unknown) => String(value ?? "").trim();
 
 export type AnomalySeverity = "within_tolerance" | "warning" | "material_anomaly" | "missing_data";
 
+export type DataBlocker = {
+  code: string;
+  message: string;
+  where: string;
+  canonical_source: string;
+  auto_build_attempted: boolean;
+};
+
 export function ingredientKey(name: string, unit: string) {
   return `${name.trim().toLocaleLowerCase()}|${unit.trim().toLocaleLowerCase()}`;
 }
@@ -148,10 +156,10 @@ async function expectedUsage(date: string) {
        WHERE jsonb_typeof(ingredients)='array'
      )
      SELECT lower(trim(ingredient_name))||'|'||lower(trim(unit)) ingredient_key,
-            ingredient_name,unit,SUM(quantity)::numeric expected_consumption,
+            MAX(trim(ingredient_name)) ingredient_name,MAX(trim(unit)) unit,SUM(quantity)::numeric expected_consumption,
             jsonb_agg(jsonb_build_object('product',product_name,'source',sale_source,'usage',quantity,'provenance',provenance) ORDER BY product_name,sale_source) sources
      FROM expanded WHERE ingredient_name<>''
-     GROUP BY lower(trim(ingredient_name))||'|'||lower(trim(unit)),ingredient_name,unit
+     GROUP BY lower(trim(ingredient_name))||'|'||lower(trim(unit))
      HAVING ABS(SUM(quantity))>0.0000001 ORDER BY ingredient_name`,
     [window.fromISO, window.toISO],
   );
@@ -182,13 +190,18 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "") {
   );
   const openingByKey = new Map(openingResult.rows.map((row: any) => [row.ingredient_key, row]));
 
-  const rows = usageRows.map((usage: any) => {
-    const key = text(usage.ingredient_key);
+  const usageByKey = new Map(usageRows.map((row: any) => [text(row.ingredient_key), row]));
+  const keys = new Set<string>([
+    ...usageByKey.keys(), ...countByKey.keys(), ...configByKey.keys(),
+    ...movementByKey.keys(), ...openingByKey.keys(),
+  ]);
+  const rows = Array.from(keys).sort().map((key) => {
+    const usage: any = usageByKey.get(key);
     const count: any = countByKey.get(key);
     const config: any = configByKey.get(key);
     const opening: any = openingByKey.get(key);
     const movement = movementByKey.get(key) || {};
-    const expectedConsumption = number(usage.expected_consumption);
+    const expectedConsumption = number(usage?.expected_consumption);
     const tolerance = number(config?.tolerance_quantity);
     const calculated = calculateInventoryPosition({
       opening: opening ? number(opening.quantity) : null,
@@ -198,8 +211,25 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "") {
       physicalCount: count ? number(count.quantity) : null, tolerance,
       materialTolerance: config?.material_tolerance_quantity == null ? null : number(config.material_tolerance_quantity),
     });
+    const ingredient = usage?.ingredient_name || config?.ingredient_name || count?.ingredient_name || key.split("|")[0];
+    const unit = usage?.unit || config?.unit || count?.unit || opening?.unit || key.split("|")[1] || "unit";
+    const blockers: DataBlocker[] = [];
+    if (!opening) blockers.push({
+      code: "OPENING_PHYSICAL_COUNT_MISSING",
+      message: `No prior independent physical count exists for ${ingredient}.`,
+      where: `inventory reconciliation ${date}${shiftKey ? ` shift ${shiftKey}` : ""}`,
+      canonical_source: "sbb_inventory_physical_count",
+      auto_build_attempted: false,
+    });
+    if (usage?.sources?.some((source: any) => source.provenance === "current_recipe_fallback")) blockers.push({
+      code: "HISTORICAL_RECIPE_SNAPSHOT_MISSING",
+      message: `${ingredient} usage includes a current-recipe fallback because a sale-time recipe snapshot is unavailable.`,
+      where: `expected ingredient consumption ${date}`,
+      canonical_source: "ordering_order_item_cost_snapshots",
+      auto_build_attempted: true,
+    });
     return {
-      ingredientKey: key, ingredient: usage.ingredient_name, unit: usage.unit,
+      ingredientKey: key, ingredient, unit,
       group: config?.group_name || "Other", opening: opening ? number(opening.quantity) : null,
       openingDate: opening?.business_date || null, stockIn: number(movement.STOCK_IN),
       transfersIn: number(movement.TRANSFER_IN), transfersOut: number(movement.TRANSFER_OUT),
@@ -207,8 +237,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "") {
       expectedClosing: calculated.expectedClosing, staffReported: null,
       physicalCount: count ? number(count.quantity) : null, variance: calculated.variance,
       tolerance, materialTolerance: config?.material_tolerance_quantity == null ? null : number(config.material_tolerance_quantity),
-      severity: calculated.severity, savedAt: count?.updated_at || null, sources: usage.sources || [],
-      blockers: [!opening ? "OPENING_PHYSICAL_COUNT_MISSING" : null, usage.sources?.some((s: any) => s.provenance === "current_recipe_fallback") ? "HISTORICAL_RECIPE_SNAPSHOT_MISSING" : null].filter(Boolean),
+      severity: calculated.severity, savedAt: count?.updated_at || null, sources: usage?.sources || [], blockers,
     };
   });
   return { date, shiftKey, signConvention: "variance = physicalCount - expectedClosing", rows };
