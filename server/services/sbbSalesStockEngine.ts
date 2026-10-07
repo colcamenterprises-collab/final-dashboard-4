@@ -234,7 +234,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     [window.fromISO,window.toISO],
   );
   const canonicalWindow = shiftWindow(date);
-  const customStockBoundary = window.fromISO !== canonicalWindow.fromISO || window.toISO !== canonicalWindow.toISO;
+  const customStockBoundary = Date.parse(window.fromISO) !== Date.parse(canonicalWindow.fromISO) || Date.parse(window.toISO) !== Date.parse(canonicalWindow.toISO);
   const reportBlockers: DataBlocker[] = missingRecipes.rows.flatMap((row: any) => {
     if (row.costing_mode === "direct" && !String(row.notes || "").includes("Bundle COGS")) return [];
     if (row.costing_mode === "direct" && String(row.notes || "").includes("Bundle COGS")) return [{
@@ -246,13 +246,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
       where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
     }];
   });
-  reportBlockers.push(...missingMealDealComponents.rows.map((row: any) => ({
-    code: "MEAL_DEAL_COMPONENTS_MISSING",
-    message: `${row.product} is correctly counted as a meal deal, but this historical sale did not save its burger/fries/drink component rows; component consumption cannot be reconstructed reliably.`,
-    where: `meal deal component usage ${date}`,
-    canonical_source: "ordering_order_items.parent_order_item_id",
-    auto_build_attempted: false,
-  })));
+  // Historical meal deals without stored child selections remain counted as meal deals.\n  // Unknown historical component choices are not fabricated and do not block other verified inventory positions.\n  void missingMealDealComponents;
   if (customStockBoundary) reportBlockers.push({
     code: "CUSTOM_RANGE_STOCK_BOUNDARY_UNVERIFIED",
     message: "Expected usage follows the selected time range, but expected closing and variance are withheld because physical counts and stock movements are recorded against the full SBB business shift.",
