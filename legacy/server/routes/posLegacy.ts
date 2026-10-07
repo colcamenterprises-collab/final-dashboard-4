@@ -403,7 +403,25 @@ router.post("/orders", staffDevice, async (req, res) => {
           total += upgrade * qty;
         }
 
-        const components = line.meal_deal ? [item, fries, drink] : [fries, drink];
+        let components = [fries, drink];
+        if (line.meal_deal) {
+          const mealBurgerNames: Record<string, string> = {
+            "Chicken Fillet Meal Deal": "Crispy Chicken Fillet Burger",
+            "Karaage Chicken Meal Deal": "Karaage Chicken Burger",
+            "Single Smash Burger Set": "Original Single Smash Burger",
+            "Ultimate Double Smash Burger Set": "Ultimate Double Smash Burger",
+            "Super Double Bacon and Cheese Set": "Super Double Bacon and Cheese",
+            "Triple Smash Burger Set": "Triple Smash Burger",
+          };
+          const burgerName = mealBurgerNames[item.name_en];
+          if (!burgerName) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
+          const burger = (await client.query(
+            `SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower($1) AND is_active AND pos_enabled LIMIT 1`,
+            [burgerName],
+          )).rows[0];
+          if (!burger) throw new Error(`Meal deal burger component is unavailable for ${item.name_en}`);
+          components = [burger, fries, drink];
+        }
         for (const component of components) {
           await client.query(
             `INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,sort_order,source_sku,price_mode,is_set_component,parent_order_item_id)
