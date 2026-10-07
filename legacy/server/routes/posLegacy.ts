@@ -314,7 +314,7 @@ router.post("/orders", staffDevice, async (req, res) => {
     let total = 0;
     let sort = 0;
     for (const line of input.items) {
-      const item = (await client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled AND NOT is_sold_out`, [line.menu_item_id])).rows[0];
+      const item = (await client.query(`SELECT mi.*,c.name_en AS category_name FROM ordering_menu_items mi LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE mi.id=$1 AND mi.is_active AND mi.pos_enabled AND NOT mi.is_sold_out`, [line.menu_item_id])).rows[0];
       if (!item) throw new Error("POS item unavailable");
       const qty = Math.max(1, Math.trunc(value(line.quantity) || 1));
       const unit = value(mode === "grab" ? item.grab_price : item.direct_price ?? item.price);
@@ -381,7 +381,8 @@ router.post("/orders", staffDevice, async (req, res) => {
         }
       }
 
-      if (mode === "direct" && (line.set_upgrade || line.meal_deal)) {
+      const dedicatedMealDeal = String(item.category_name || "").toLowerCase() === "meal deals";
+      if ((mode === "direct" && line.set_upgrade) || dedicatedMealDeal) {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
           client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active AND pos_enabled LIMIT 1`),
@@ -401,16 +402,16 @@ router.post("/orders", staffDevice, async (req, res) => {
           );
         }
         const baseNameByDeal: Record<string,string> = {
-          'Single Smash Burger Set':'Single Smash Burger',
+          'Single Smash Burger Set':'Original Single Smash Burger',
           'Ultimate Double Smash Burger Set':'Ultimate Double Smash Burger',
           'Super Double Bacon and Cheese Set':'Super Double Bacon and Cheese',
           'Triple Smash Burger Set':'Triple Smash Burger',
-          'Chicken Fillet Meal Deal':'Chicken Fillet Burger',
+          'Chicken Fillet Meal Deal':'Crispy Chicken Fillet Burger',
           'Karaage Chicken Meal Deal':'Karaage Chicken Burger',
           'Kids Cheeseburger Set':'Kids Cheeseburger',
         };
         const components:any[] = [fries, drink];
-        if (line.meal_deal) {
+        if (dedicatedMealDeal) {
           const baseName=baseNameByDeal[item.name_en];
           if (baseName) {
             const base=(await client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower($1) AND is_active LIMIT 1`,[baseName])).rows[0];
