@@ -314,7 +314,7 @@ router.post("/orders", staffDevice, async (req, res) => {
     let total = 0;
     let sort = 0;
     for (const line of input.items) {
-      const item = (await client.query(`SELECT mi.*,c.name_en AS category_name FROM ordering_menu_items mi LEFT JOIN ordering_menu_categories c ON c.id=mi.category_id WHERE mi.id=$1 AND mi.is_active AND mi.pos_enabled AND NOT mi.is_sold_out`, [line.menu_item_id])).rows[0];
+      const item = (await client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled AND NOT is_sold_out`, [line.menu_item_id])).rows[0];
       if (!item) throw new Error("POS item unavailable");
       const qty = Math.max(1, Math.trunc(value(line.quantity) || 1));
       const unit = value(mode === "grab" ? item.grab_price : item.direct_price ?? item.price);
@@ -381,8 +381,7 @@ router.post("/orders", staffDevice, async (req, res) => {
         }
       }
 
-      const dedicatedMealDeal = String(item.category_name || "").toLowerCase() === "meal deals";
-      if ((mode === "direct" && line.set_upgrade) || dedicatedMealDeal) {
+      if (mode === "direct" && (line.set_upgrade || line.meal_deal)) {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
           client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active AND pos_enabled LIMIT 1`),
@@ -391,32 +390,37 @@ router.post("/orders", staffDevice, async (req, res) => {
         ]);
         const fries = friesResult.rows[0];
         const drink = drinkResult.rows[0];
-        const upgrade = line.set_upgrade ? value(setting.rows[0]?.value || 80) : 0;
         if (!fries || !drink) throw new Error("Set fries or drink is not configured");
+
         if (line.set_upgrade) {
+          const upgrade = value(setting.rows[0]?.value || 80);
           await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, upgrade * qty]);
           await client.query(
             `INSERT INTO ordering_order_item_modifiers(order_item_id,modifier_group_name_en,modifier_name_en,price_delta,quantity)
              VALUES($1,'SET UPGRADE','Burger + French Fries + Drink',$2,$3)`,
             [parent.id, upgrade, qty],
           );
+          total += upgrade * qty;
         }
-        const baseNameByDeal: Record<string,string> = {
-          'Single Smash Burger Set':'Original Single Smash Burger',
-          'Ultimate Double Smash Burger Set':'Ultimate Double Smash Burger',
-          'Super Double Bacon and Cheese Set':'Super Double Bacon and Cheese',
-          'Triple Smash Burger Set':'Triple Smash Burger',
-          'Chicken Fillet Meal Deal':'Crispy Chicken Fillet Burger',
-          'Karaage Chicken Meal Deal':'Karaage Chicken Burger',
-          'Kids Cheeseburger Set':'Kids Cheeseburger',
-        };
-        const components:any[] = [fries, drink];
-        if (dedicatedMealDeal) {
-          const baseName=baseNameByDeal[item.name_en];
-          if (baseName) {
-            const base=(await client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower($1) AND is_active LIMIT 1`,[baseName])).rows[0];
-            if (base) components.unshift(base);
-          }
+
+        let components = [fries, drink];
+        if (line.meal_deal) {
+          const mealBurgerNames: Record<string, string> = {
+            "Chicken Fillet Meal Deal": "Crispy Chicken Fillet Burger",
+            "Karaage Chicken Meal Deal": "Karaage Chicken Burger",
+            "Single Smash Burger Set": "Original Single Smash Burger",
+            "Ultimate Double Smash Burger Set": "Ultimate Double Smash Burger",
+            "Super Double Bacon and Cheese Set": "Super Double Bacon and Cheese",
+            "Triple Smash Burger Set": "Triple Smash Burger",
+          };
+          const burgerName = mealBurgerNames[item.name_en];
+          if (!burgerName) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
+          const burger = (await client.query(
+            `SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower($1) AND is_active AND pos_enabled LIMIT 1`,
+            [burgerName],
+          )).rows[0];
+          if (!burger) throw new Error(`Meal deal burger component is unavailable for ${item.name_en}`);
+          components = [burger, fries, drink];
         }
         for (const component of components) {
           await client.query(
@@ -425,7 +429,6 @@ router.post("/orders", staffDevice, async (req, res) => {
             [order.id,component.id,component.name_en,component.name_th,qty,sort++,component.source_sku||null,mode,parent.id],
           );
         }
-        total += upgrade * qty;
       }
     }
 
