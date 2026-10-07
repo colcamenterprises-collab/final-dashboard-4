@@ -1,4 +1,4 @@
 SBB production deployment request
-requested_at=2026-10-07T22:35:00+07:00
+requested_at=2026-10-07T22:45:00+07:00
 ref=main
-reason=Deploy SBB meal deal component persistence and reporting fix
+reason=Deploy corrected SBB meal deal classification and component persistence
