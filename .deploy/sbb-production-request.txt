@@ -1,4 +1,4 @@
 SBB production deployment request
-requested_at=2026-10-07T17:15:00+07:00
+requested_at=2026-10-07T17:35:00+07:00
 ref=main
-reason=Deploy SBB discount usage breakdown and drilldown
+reason=Expose SBB Sales and Stock Usage report in Reporting navigation
