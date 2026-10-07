@@ -381,7 +381,7 @@ router.post("/orders", staffDevice, async (req, res) => {
         }
       }
 
-      if (mode === "direct" && line.set_upgrade) {
+      if (mode === "direct" && (line.set_upgrade || line.meal_deal)) {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
           client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active AND pos_enabled LIMIT 1`),
@@ -390,15 +390,34 @@ router.post("/orders", staffDevice, async (req, res) => {
         ]);
         const fries = friesResult.rows[0];
         const drink = drinkResult.rows[0];
-        const upgrade = value(setting.rows[0]?.value || 80);
+        const upgrade = line.set_upgrade ? value(setting.rows[0]?.value || 80) : 0;
         if (!fries || !drink) throw new Error("Set fries or drink is not configured");
-        await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, upgrade * qty]);
-        await client.query(
-          `INSERT INTO ordering_order_item_modifiers(order_item_id,modifier_group_name_en,modifier_name_en,price_delta,quantity)
-           VALUES($1,'SET UPGRADE','Burger + French Fries + Drink',$2,$3)`,
-          [parent.id, upgrade, qty],
-        );
-        for (const component of [fries, drink]) {
+        if (line.set_upgrade) {
+          await client.query(`UPDATE ordering_order_items SET line_total=line_total+$2 WHERE id=$1`, [parent.id, upgrade * qty]);
+          await client.query(
+            `INSERT INTO ordering_order_item_modifiers(order_item_id,modifier_group_name_en,modifier_name_en,price_delta,quantity)
+             VALUES($1,'SET UPGRADE','Burger + French Fries + Drink',$2,$3)`,
+            [parent.id, upgrade, qty],
+          );
+        }
+        const baseNameByDeal: Record<string,string> = {
+          'Single Smash Burger Set':'Single Smash Burger',
+          'Ultimate Double Smash Burger Set':'Ultimate Double Smash Burger',
+          'Super Double Bacon and Cheese Set':'Super Double Bacon and Cheese',
+          'Triple Smash Burger Set':'Triple Smash Burger',
+          'Chicken Fillet Meal Deal':'Chicken Fillet Burger',
+          'Karaage Chicken Meal Deal':'Karaage Chicken Burger',
+          'Kids Cheeseburger Set':'Kids Cheeseburger',
+        };
+        const components:any[] = [fries, drink];
+        if (line.meal_deal) {
+          const baseName=baseNameByDeal[item.name_en];
+          if (baseName) {
+            const base=(await client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower($1) AND is_active LIMIT 1`,[baseName])).rows[0];
+            if (base) components.unshift(base);
+          }
+        }
+        for (const component of components) {
           await client.query(
             `INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,sort_order,source_sku,price_mode,is_set_component,parent_order_item_id)
              VALUES($1,$2,$3,$4,0,$5,0,$6,$7,$8,true,$9)`,
