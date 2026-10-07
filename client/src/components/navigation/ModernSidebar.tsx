@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
-import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode, Users } from "lucide-react";
+import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode, Users, PackageSearch } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; testId: string; ownerOnly?: boolean; subItem?: boolean; };
@@ -20,6 +20,7 @@ const navigationGroups: NavGroup[] = [
   { title: "Reporting", icon: BarChart3, items: [
     { to: "/reports/overview", label: "Overview", icon: TrendingUp, testId: "nav-reporting-overview", ownerOnly: true },
     { to: "/reports/sales-by-item", label: "Sales by Item", icon: BarChart3, testId: "nav-sales-by-item", ownerOnly: true },
+    { to: "/reports/inventory-reconciliation", label: "Sales & Stock Usage", icon: PackageSearch, testId: "nav-sales-stock-usage" },
     { to: "/reports/receipts", label: "Receipts", icon: Receipt, testId: "nav-receipts", ownerOnly: true },
     { to: "/reports/shift-summary", label: "Shift Reconciliation", icon: ClipboardList, testId: "nav-shift-reconciliation", ownerOnly: true },
   ]},
