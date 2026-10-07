@@ -234,7 +234,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     [window.fromISO,window.toISO],
   );
   const canonicalWindow = shiftWindow(date);
-  const customStockBoundary = window.fromISO !== canonicalWindow.fromISO || window.toISO !== canonicalWindow.toISO;
+  const customStockBoundary = Date.parse(window.fromISO) !== Date.parse(canonicalWindow.fromISO) || Date.parse(window.toISO) !== Date.parse(canonicalWindow.toISO);
   const reportBlockers: DataBlocker[] = missingRecipes.rows.flatMap((row: any) => {
     if (row.costing_mode === "direct" && !String(row.notes || "").includes("Bundle COGS")) return [];
     if (row.costing_mode === "direct" && String(row.notes || "").includes("Bundle COGS")) return [{
