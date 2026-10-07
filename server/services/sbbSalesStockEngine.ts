@@ -74,8 +74,8 @@ export async function getSbbProductSales(date: string, fromInstant?: string, toI
        FROM ordering_order_items i
        JOIN ordering_orders o ON o.id=i.order_id
        LEFT JOIN ordering_order_items parent ON parent.id=i.parent_order_item_id
-       LEFT JOIN ordering_menu_items menu ON menu.id=i.menu_item_id
-       LEFT JOIN ordering_menu_categories cat ON cat.id=menu.category_id
+       LEFT JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+       LEFT JOIN ordering_menu_categories cat ON cat.id=mi.category_id
        LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
        LEFT JOIN ordering_menu_item_recipe_links link ON link.menu_item_id=i.menu_item_id
        LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.menu_item_id AND cfg.costing_mode='recipe'
@@ -90,7 +90,7 @@ export async function getSbbProductSales(date: string, fromInstant?: string, toI
               CASE WHEN COALESCE(is_set_component,false) OR parent_name IS NOT NULL THEN 'meal_deal' ELSE 'direct' END source_type,
               SUM(quantity)::numeric quantity
        FROM valid_lines
-       WHERE COALESCE(is_set_component,false)=true OR parent_name IS NOT NULL OR lower(COALESCE(category_name,'')) <> 'meal deals'
+       WHERE NOT (COALESCE(is_set_component,false)=false AND lower(COALESCE(category_name,''))='meal deals')
        GROUP BY COALESCE(recipe_id::text,NULLIF(source_sku,''),item_name_en),product_name,
                 CASE WHEN COALESCE(is_set_component,false) OR parent_name IS NOT NULL THEN COALESCE(parent_name,'Meal Deal') ELSE 'Direct' END,
                 CASE WHEN COALESCE(is_set_component,false) OR parent_name IS NOT NULL THEN 'meal_deal' ELSE 'direct' END
@@ -110,8 +110,13 @@ export async function getSbbProductSales(date: string, fromInstant?: string, toI
      WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
        AND o.status <> 'cancelled' AND o.payment_status='paid'
        AND COALESCE(i.is_set_component,false)=false
-       AND (EXISTS (SELECT 1 FROM ordering_order_items c WHERE c.parent_order_item_id=i.id AND COALESCE(c.is_set_component,false)=true)
-            OR EXISTS (SELECT 1 FROM ordering_menu_items mi JOIN ordering_menu_categories cat ON cat.id=mi.category_id WHERE mi.id=i.menu_item_id AND lower(cat.name_en)='meal deals'))
+       AND (
+         EXISTS (SELECT 1 FROM ordering_order_items c WHERE c.parent_order_item_id=i.id AND COALESCE(c.is_set_component,false)=true)
+         OR EXISTS (
+           SELECT 1 FROM ordering_menu_items mi JOIN ordering_menu_categories cat ON cat.id=mi.category_id
+           WHERE mi.id=i.menu_item_id AND lower(COALESCE(cat.name_en,''))='meal deals'
+         )
+       )
      GROUP BY i.item_name_en ORDER BY SUM(i.quantity) DESC,i.item_name_en`,
     [window.fromISO, window.toISO],
   );
@@ -150,8 +155,6 @@ async function expectedUsage(date: string, fromInstant?: string, toInstant?: str
                    THEN 'sale_snapshot' WHEN COALESCE(link.recipe_id,cfg.recipe_id) IS NOT NULL THEN 'current_recipe_fallback' ELSE 'unmapped' END provenance
        FROM ordering_order_items i JOIN ordering_orders o ON o.id=i.order_id
        LEFT JOIN ordering_order_items parent ON parent.id=i.parent_order_item_id
-       LEFT JOIN ordering_menu_items menu ON menu.id=i.menu_item_id
-       LEFT JOIN ordering_menu_categories cat ON cat.id=menu.category_id
        LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
        LEFT JOIN ordering_menu_item_recipe_links link ON link.menu_item_id=i.menu_item_id
        LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.menu_item_id AND cfg.costing_mode='recipe'
@@ -208,8 +211,26 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
      WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
        AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
        AND (i.source_sku IS NULL OR i.source_sku NOT IN ('10012','10013','10021','10026','10027','10028','10029','10031','10039','10040'))
-       AND NOT (COALESCE(i.is_set_component,false)=false AND EXISTS (SELECT 1 FROM ordering_order_items child WHERE child.parent_order_item_id=i.id AND COALESCE(child.is_set_component,false)=true))
+       AND NOT (
+         COALESCE(i.is_set_component,false)=false AND (
+           EXISTS (SELECT 1 FROM ordering_order_items child WHERE child.parent_order_item_id=i.id AND COALESCE(child.is_set_component,false)=true)
+           OR EXISTS (SELECT 1 FROM ordering_menu_items mi2 JOIN ordering_menu_categories cat2 ON cat2.id=mi2.category_id WHERE mi2.id=i.menu_item_id AND lower(COALESCE(cat2.name_en,''))='meal deals')
+         )
+       )
        AND jsonb_array_length(COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb),r.ingredients,'[]'::jsonb))=0`,
+    [window.fromISO,window.toISO],
+  );
+  const missingMealDealComponents = await db.query(
+    `SELECT DISTINCT i.item_name_en product
+     FROM ordering_order_items i
+     JOIN ordering_orders o ON o.id=i.order_id
+     JOIN ordering_menu_items mi ON mi.id=i.menu_item_id
+     JOIN ordering_menu_categories cat ON cat.id=mi.category_id
+     WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
+       AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
+       AND COALESCE(i.is_set_component,false)=false
+       AND lower(COALESCE(cat.name_en,''))='meal deals'
+       AND NOT EXISTS (SELECT 1 FROM ordering_order_items child WHERE child.parent_order_item_id=i.id AND COALESCE(child.is_set_component,false)=true)`,
     [window.fromISO,window.toISO],
   );
   const canonicalWindow = shiftWindow(date);
@@ -225,6 +246,13 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
       where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
     }];
   });
+  reportBlockers.push(...missingMealDealComponents.rows.map((row: any) => ({
+    code: "MEAL_DEAL_COMPONENTS_MISSING",
+    message: `${row.product} is correctly counted as a meal deal, but this historical sale did not save its burger/fries/drink component rows; component consumption cannot be reconstructed reliably.`,
+    where: `meal deal component usage ${date}`,
+    canonical_source: "ordering_order_items.parent_order_item_id",
+    auto_build_attempted: false,
+  })));
   if (customStockBoundary) reportBlockers.push({
     code: "CUSTOM_RANGE_STOCK_BOUNDARY_UNVERIFIED",
     message: "Expected usage follows the selected time range, but expected closing and variance are withheld because physical counts and stock movements are recorded against the full SBB business shift.",
