@@ -68,12 +68,14 @@ export async function getSbbProductSales(date: string, fromInstant?: string, toI
   const window = reportWindow(date, fromInstant, toInstant);
   const result = await db.query(
     `WITH valid_lines AS (
-       SELECT i.*, parent.item_name_en AS parent_name,
+       SELECT i.*, parent.item_name_en AS parent_name, cat.name_en AS category_name,
               COALESCE(s.recipe_id,link.recipe_id,cfg.recipe_id) AS recipe_id,
               COALESCE(r.name,i.item_name_en) AS product_name
        FROM ordering_order_items i
        JOIN ordering_orders o ON o.id=i.order_id
        LEFT JOIN ordering_order_items parent ON parent.id=i.parent_order_item_id
+       LEFT JOIN ordering_menu_items menu ON menu.id=i.menu_item_id
+       LEFT JOIN ordering_menu_categories cat ON cat.id=menu.category_id
        LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
        LEFT JOIN ordering_menu_item_recipe_links link ON link.menu_item_id=i.menu_item_id
        LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.menu_item_id AND cfg.costing_mode='recipe'
@@ -88,6 +90,7 @@ export async function getSbbProductSales(date: string, fromInstant?: string, toI
               CASE WHEN COALESCE(is_set_component,false) OR parent_name IS NOT NULL THEN 'meal_deal' ELSE 'direct' END source_type,
               SUM(quantity)::numeric quantity
        FROM valid_lines
+       WHERE COALESCE(is_set_component,false)=true OR parent_name IS NOT NULL OR lower(COALESCE(category_name,'')) <> 'meal deals'
        GROUP BY COALESCE(recipe_id::text,NULLIF(source_sku,''),item_name_en),product_name,
                 CASE WHEN COALESCE(is_set_component,false) OR parent_name IS NOT NULL THEN COALESCE(parent_name,'Meal Deal') ELSE 'Direct' END,
                 CASE WHEN COALESCE(is_set_component,false) OR parent_name IS NOT NULL THEN 'meal_deal' ELSE 'direct' END
@@ -107,7 +110,8 @@ export async function getSbbProductSales(date: string, fromInstant?: string, toI
      WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
        AND o.status <> 'cancelled' AND o.payment_status='paid'
        AND COALESCE(i.is_set_component,false)=false
-       AND EXISTS (SELECT 1 FROM ordering_order_items c WHERE c.parent_order_item_id=i.id AND COALESCE(c.is_set_component,false)=true)
+       AND (EXISTS (SELECT 1 FROM ordering_order_items c WHERE c.parent_order_item_id=i.id AND COALESCE(c.is_set_component,false)=true)
+            OR EXISTS (SELECT 1 FROM ordering_menu_items mi JOIN ordering_menu_categories cat ON cat.id=mi.category_id WHERE mi.id=i.menu_item_id AND lower(cat.name_en)='meal deals'))
      GROUP BY i.item_name_en ORDER BY SUM(i.quantity) DESC,i.item_name_en`,
     [window.fromISO, window.toISO],
   );
@@ -146,6 +150,8 @@ async function expectedUsage(date: string, fromInstant?: string, toInstant?: str
                    THEN 'sale_snapshot' WHEN COALESCE(link.recipe_id,cfg.recipe_id) IS NOT NULL THEN 'current_recipe_fallback' ELSE 'unmapped' END provenance
        FROM ordering_order_items i JOIN ordering_orders o ON o.id=i.order_id
        LEFT JOIN ordering_order_items parent ON parent.id=i.parent_order_item_id
+       LEFT JOIN ordering_menu_items menu ON menu.id=i.menu_item_id
+       LEFT JOIN ordering_menu_categories cat ON cat.id=menu.category_id
        LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
        LEFT JOIN ordering_menu_item_recipe_links link ON link.menu_item_id=i.menu_item_id
        LEFT JOIN pos_item_costing_config cfg ON cfg.menu_item_id=i.menu_item_id AND cfg.costing_mode='recipe'
