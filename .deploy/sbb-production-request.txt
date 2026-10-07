@@ -1,4 +1,4 @@
 SBB production deployment request
-requested_at=2026-10-07
+requested_at=2026-10-07T15:10:00+07:00
 ref=main
-reason=Release SBB-only sales, stock usage, independent physical counts and anomaly reporting
+reason=Retry SBB sales stock anomaly engine release after production environment loading fix
