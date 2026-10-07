@@ -123,6 +123,91 @@ export async function queryUnifiedOverview(range: ResolvedReportingRange) {
   };
 }
 
+
+export async function queryDiscountUsage(range: ResolvedReportingRange) {
+  const db = requirePool();
+  const cutover = new Date(SBB_REPORTING_CUTOVER_ISO).toISOString();
+  const result = await db.query(
+    `WITH discounted AS (
+      SELECT
+        h.id::text id, h.occurred_at, 'loyverse'::text source_system,
+        h.source_receipt_number receipt_number, h.channel,
+        h.subtotal gross_sales, h.discount_total discount_amount, h.net_sales,
+        COALESCE(h.source_payload, '{}'::jsonb) source_payload,
+        NULL::text discount_name, NULL::text discount_code
+      FROM reporting_historical_transactions h
+      JOIN reporting_import_batches b ON b.id=h.source_import_batch_id AND b.validation_status='validated'
+      WHERE h.venue_key='sbb-rawai'
+        AND h.occurred_at >= $1::timestamptz
+        AND h.occurred_at < LEAST($2::timestamptz,$3::timestamptz)
+        AND h.discount_total > 0
+      UNION ALL
+      SELECT
+        o.id::text id, o.created_at, 'sbb_pos'::text source_system,
+        COALESCE(o.ticket_number,o.order_number::text) receipt_number, o.channel,
+        COALESCE(o.subtotal,o.total) gross_sales, COALESCE(o.discount_amount,0) discount_amount,
+        CASE WHEN o.payment_status='refunded' THEN 0 ELSE COALESCE(o.total,0) END net_sales,
+        '{}'::jsonb source_payload, o.discount_name, o.discount_code
+      FROM ordering_orders o
+      WHERE o.created_at >= GREATEST($1::timestamptz,$3::timestamptz)
+        AND o.created_at < $2::timestamptz
+        AND o.status <> 'cancelled'
+        AND o.payment_status IN ('paid','refunded')
+        AND COALESCE(o.discount_amount,0) > 0
+    ), classified AS (
+      SELECT *,
+        CASE
+          WHEN lower(COALESCE(discount_name,'') || ' ' || COALESCE(discount_code,'') || ' ' || COALESCE(channel,'') || ' ' || source_payload::text) LIKE '%grab%' THEN 'Grab'
+          WHEN lower(COALESCE(discount_name,'') || ' ' || COALESCE(discount_code,'') || ' ' || source_payload::text) ~ '(member|membership|smash club)' THEN 'Members'
+          WHEN lower(COALESCE(discount_name,'') || ' ' || COALESCE(discount_code,'') || ' ' || source_payload::text) ~ '(staff|employee|team)' THEN 'Staff'
+          WHEN lower(COALESCE(discount_name,'') || ' ' || COALESCE(discount_code,'') || ' ' || source_payload::text) ~ '(promo|promotion|google review|voucher|coupon)' THEN 'Promotions'
+          WHEN source_system='sbb_pos' AND (discount_name IS NOT NULL OR discount_code IS NOT NULL) THEN 'Manual / Other'
+          ELSE 'Unclassified'
+        END discount_type
+      FROM discounted
+    )
+    SELECT * FROM classified ORDER BY occurred_at DESC, receipt_number DESC`,
+    [range.fromInstant, range.toInstant, cutover],
+  );
+  const order = ["Grab", "Members", "Staff", "Promotions", "Manual / Other", "Unclassified"];
+  const details = result.rows.map((row: any) => ({
+    id: String(row.id),
+    occurredAt: row.occurred_at,
+    sourceSystem: String(row.source_system),
+    receiptNumber: row.receipt_number == null ? null : String(row.receipt_number),
+    channel: row.channel == null ? null : String(row.channel),
+    discountType: String(row.discount_type),
+    discountName: row.discount_name == null ? null : String(row.discount_name),
+    discountCode: row.discount_code == null ? null : String(row.discount_code),
+    grossSales: n(row.gross_sales),
+    discountAmount: n(row.discount_amount),
+    netSales: n(row.net_sales),
+  }));
+  const groups = order.map(discountType => {
+    const rows = details.filter(row => row.discountType === discountType);
+    const grossSales = rows.reduce((sum, row) => sum + row.grossSales, 0);
+    const discountAmount = rows.reduce((sum, row) => sum + row.discountAmount, 0);
+    return {
+      discountType,
+      uses: rows.length,
+      grossSales,
+      discountAmount,
+      netSales: rows.reduce((sum, row) => sum + row.netSales, 0),
+      averageDiscount: rows.length ? discountAmount / rows.length : 0,
+    };
+  }).filter(group => group.uses > 0);
+  return {
+    groups,
+    details,
+    totals: {
+      uses: details.length,
+      grossSales: details.reduce((sum, row) => sum + row.grossSales, 0),
+      discountAmount: details.reduce((sum, row) => sum + row.discountAmount, 0),
+      netSales: details.reduce((sum, row) => sum + row.netSales, 0),
+    },
+  };
+}
+
 export async function queryUnifiedReceipts(range: ResolvedReportingRange) {
   const db = requirePool();
   const cutover = new Date(SBB_REPORTING_CUTOVER_ISO).toISOString();
