@@ -151,9 +151,6 @@ jobs:
           ORIGIN_URL="$(git remote get-url origin)"
           git clone --quiet "$ORIGIN_URL" "$BUILD_DIR"
           git -C "$BUILD_DIR" checkout --quiet --detach "$TARGET_SHA"
-          if [ -f "$APP_DIR/.env" ]; then
-            ln -s "$APP_DIR/.env" "$BUILD_DIR/.env"
-          fi
           cd "$BUILD_DIR"
           npm ci --no-audit --no-fund
           NODE_OPTIONS=--max-old-space-size=4096 npm run build
@@ -162,6 +159,11 @@ jobs:
 
           echo
           echo "==> Apply additive SBB inventory migration"
+          if [ -f "$APP_DIR/.env" ]; then
+            set -a
+            . "$APP_DIR/.env"
+            set +a
+          fi
           node --input-type=module <<'NODE'
           import 'dotenv/config';
           import pg from 'pg';
