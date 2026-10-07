@@ -412,6 +412,7 @@ router.post("/orders", staffDevice, async (req, res) => {
             "Ultimate Double Smash Burger Set": "Ultimate Double Smash Burger",
             "Super Double Bacon and Cheese Set": "Super Double Bacon and Cheese",
             "Triple Smash Burger Set": "Triple Smash Burger",
+            "Kids Cheeseburger Set": "Kids Cheeseburger",
           };
           const burgerName = mealBurgerNames[item.name_en];
           if (!burgerName) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
