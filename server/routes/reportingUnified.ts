@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   queryBurgerUsage,
+  queryDiscountUsage,
   queryUnifiedOverview,
   queryUnifiedReceipts,
   resolveExactReportingRange,
@@ -166,6 +167,16 @@ router.get("/ingredient-usage", async (req, res) => {
     res.json({ ok: true, source: "sbb_pos_recipe_ingredient_usage", filters: range, ...usage });
   } catch (error: any) {
     res.status(400).json({ ok: false, source: "sbb_pos_recipe_ingredient_usage", error: error.message });
+  }
+});
+
+router.get("/discount-usage", async (req, res) => {
+  try {
+    const range = exactRange(req.query as Record<string, unknown>);
+    const usage = await queryDiscountUsage(range);
+    res.json({ ok: true, source: "unified_reporting_ledger", filters: range, ...usage });
+  } catch (error: any) {
+    res.status(400).json({ ok: false, source: "unified_reporting_ledger", error: error.message });
   }
 });
 
