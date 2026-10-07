@@ -1,172 +1,53 @@
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronRight, Save } from "lucide-react";
 
-type Status = 'OK' | 'FLAG' | 'Missing Data';
-
-type Blocker = {
-  code: string;
-  message: string;
-  where: string;
-  canonical_source: string;
-  auto_build_attempted: boolean;
-};
-
-type Row = {
-  item: string;
-  previous: number | null;
-  purchased: number | null;
-  used: number | null;
-  expected: number | null;
-  actual: number | null;
-  variance: number | null;
-  status: Status;
-  blockers: Blocker[];
-};
-
-type Response = {
-  ok: boolean;
-  source: string[];
-  missingSources?: string[];
-  scope: { date: string };
-  status: 'complete' | 'partial';
-  data: Row[];
-  warnings: string[];
-  blockers: Blocker[];
-  last_updated: string;
-  error?: string;
-};
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function formatCell(value: number | null) {
-  return value === null ? 'Missing data' : new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
-}
-
-function formatDisplayDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const [year, month, day] = value.split('-');
-  return `${day}/${month}/${year}`;
-}
-
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
-  return <th className={`px-3 py-2 text-xs font-semibold text-slate-600 border-b border-slate-200 bg-slate-50 ${right ? 'text-right' : 'text-left'}`}>{children}</th>;
-}
-
-function Td({ children, right, flagged, missing }: { children: React.ReactNode; right?: boolean; flagged?: boolean; missing?: boolean }) {
-  return <td className={`px-3 py-2 text-sm border-b border-slate-100 ${right ? 'text-right tabular-nums' : 'text-left'} ${flagged ? 'bg-red-50 text-red-700 font-semibold' : missing ? 'bg-amber-50 text-amber-800' : 'text-slate-700'}`}>{children}</td>;
-}
+type Source = { product: string; source: string; usage: number; provenance: string };
+type Blocker = { code: string; message: string; where: string; canonical_source: string; auto_build_attempted: boolean };
+type Row = { ingredientKey: string; ingredient: string; unit: string; group: string; opening: number | null; stockIn: number; transfersIn: number; transfersOut: number; waste: number; expectedConsumption: number; expectedClosing: number | null; staffReported: number | null; physicalCount: number | null; variance: number | null; severity: string; sources: Source[]; blockers: Blocker[] };
+type Product = { product_key: string; product_name: string; total: number; direct: number; mealDeal: number; sources: Array<{ source: string; quantity: number }> };
+type Payload = { sales: { products: Product[]; mealDeals: Array<{ name: string; quantity: number }> }; inventory: { rows: Row[]; blockers: Blocker[] }; limitations: string[] };
+const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+const show = (value: number | null, unit = "") => value == null ? "Missing" : `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }).format(value)}${unit ? ` ${unit}` : ""}`;
 
 export default function InventoryReconciliation() {
-  const [date, setDate] = useState(todayISO());
-  const { data, isLoading, error } = useQuery<Response>({
-    queryKey: ['/api/analysis/inventory-reconciliation', date],
-    queryFn: async () => {
-      const res = await fetch(`/api/analysis/inventory-reconciliation?date=${date}`);
-      const body = await res.json();
-      if (!res.ok) throw new Error(body?.error ?? 'Inventory reconciliation request failed');
-      return body;
-    },
-    enabled: /^\d{4}-\d{2}-\d{2}$/.test(date),
-  });
+  const [date, setDate] = useState(today());
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const queryClient = useQueryClient();
+  const queryKey = ["sbb-sales-stock", date];
+  const query = useQuery<Payload>({ queryKey, queryFn: async () => { const response = await fetch(`/api/analysis/sbb-sales-stock?date=${date}`); const body = await response.json(); if (!response.ok) throw new Error(body.error || "Unable to load SBB reconciliation"); return body; } });
+  useEffect(() => { if (query.data) setDraft(Object.fromEntries(query.data.inventory.rows.map(row => [row.ingredientKey, row.physicalCount == null ? "" : String(row.physicalCount)]))); }, [query.data]);
+  const dirty = query.data?.inventory.rows.some(row => (draft[row.ingredientKey] ?? "") !== (row.physicalCount == null ? "" : String(row.physicalCount))) ?? false;
+  const save = useMutation({ mutationFn: async () => {
+    const counts = (query.data?.inventory.rows || []).filter(row => draft[row.ingredientKey] !== "").map(row => ({ ingredientKey: row.ingredientKey, ingredient: row.ingredient, unit: row.unit, quantity: Number(draft[row.ingredientKey]) }));
+    if (counts.some(row => !Number.isFinite(row.quantity) || row.quantity < 0)) throw new Error("Physical counts must be zero or greater");
+    const response = await fetch("/api/analysis/sbb-sales-stock/physical-counts", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ date, counts }) }); const body = await response.json(); if (!response.ok) throw new Error(body.error || "Unable to save counts"); return body;
+  }, onSuccess: () => queryClient.invalidateQueries({ queryKey }) });
+  const groups = useMemo(() => { const map = new Map<string, Row[]>(); for (const row of query.data?.inventory.rows || []) map.set(row.group, [...(map.get(row.group) || []), row]); return Array.from(map.entries()); }, [query.data]);
+  const toggle = (key: string) => setOpen(value => ({ ...value, [key]: !value[key] }));
 
-  const blockers = useMemo(() => data?.blockers ?? [], [data]);
+  return <main className="space-y-5 p-4 md:p-6">
+    <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-950">SBB Sales & Stock</h1><p className="text-sm text-slate-500">Physical − expected = variance. Staff forms do not set physical stock.</p></div><label className="text-sm font-semibold text-slate-700">Shift date<input type="date" value={date} onChange={event => setDate(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label></div>
+    {query.isLoading && <div className="rounded-xl border bg-white p-4 text-sm text-slate-500">Loading SBB sale and recipe facts…</div>}
+    {query.error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{(query.error as Error).message}</div>}
+    {query.data && <>
+      {query.data.inventory.blockers?.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Expected closing and variance are withheld until these recipes are mapped: {query.data.inventory.blockers.map(blocker => blocker.message).join(" ")}</div>}
+      <section className="grid gap-4 xl:grid-cols-2">
+        <div className="overflow-hidden rounded-xl border bg-white"><h2 className="border-b px-4 py-3 font-bold">Products sold</h2><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-2 text-left">Product</th><th className="px-3 py-2 text-right">Direct</th><th className="px-3 py-2 text-right">Meal Deal</th><th className="px-4 py-2 text-right">Total</th></tr></thead><tbody>{query.data.sales.products.map(product => <tr key={product.product_key} className="border-t"><td className="px-4 py-3"><button className="flex items-center gap-1 font-semibold" onClick={() => toggle(`p-${product.product_key}`)}>{open[`p-${product.product_key}`] ? <ChevronDown size={15}/> : <ChevronRight size={15}/>} {product.product_name}</button>{open[`p-${product.product_key}`] && <div className="ml-5 mt-2 space-y-1 text-xs text-slate-500">{product.sources.map((source, index) => <div key={index}>{source.source}: {show(source.quantity)}</div>)}</div>}</td><td className="px-3 py-3 text-right">{show(product.direct)}</td><td className="px-3 py-3 text-right">{show(product.mealDeal)}</td><td className="px-4 py-3 text-right font-bold">{show(product.total)}</td></tr>)}</tbody></table></div>
+        <div className="overflow-hidden rounded-xl border bg-white"><h2 className="border-b px-4 py-3 font-bold">Meal deals sold</h2>{query.data.sales.mealDeals.map(deal => <div key={deal.name} className="flex justify-between border-t px-4 py-3 text-sm"><span>{deal.name}</span><strong>{show(deal.quantity)}</strong></div>)}{!query.data.sales.mealDeals.length && <p className="p-4 text-sm text-slate-500">No recorded meal deals for this shift.</p>}</div>
+      </section>
+      <section className="overflow-hidden rounded-xl border bg-white">
+        <div className="flex items-center justify-between gap-3 border-b px-4 py-3"><div><h2 className="font-bold">Inventory reconciliation</h2><p className="text-xs text-slate-500">Enter the independent physical count directly in the table.</p></div><button disabled={!dirty || save.isPending} onClick={() => save.mutate()} className="inline-flex items-center gap-2 rounded-lg bg-slate-950 px-4 py-2 text-sm font-bold text-white disabled:opacity-40"><Save size={16}/>{save.isPending ? "Saving…" : dirty ? "Save counts" : "Saved"}</button></div>
+        {save.error && <div className="border-b bg-red-50 px-4 py-2 text-sm text-red-700">{(save.error as Error).message}</div>}
+        <div className="overflow-x-auto"><table className="min-w-[1120px] w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr>{["Ingredient","Opening","Stock in","Waste / out","Expected use","Expected close","Staff reported","Physical count","Variance","Status"].map((heading, index) => <th key={heading} className={`px-3 py-2 ${index === 0 || index === 9 ? "text-left" : "text-right"}`}>{heading}</th>)}</tr></thead><tbody>{groups.map(([group, rows]) => <FragmentRows key={group} group={group} rows={rows} open={open} toggle={toggle} draft={draft} setDraft={setDraft} />)}</tbody></table></div>
+      </section>
+      <div className={`text-xs font-semibold ${dirty ? "text-amber-700" : "text-emerald-700"}`}>{dirty ? "Unsaved physical count changes" : "All entered physical counts are saved"}</div>
+      <section className="rounded-xl border border-amber-200 bg-amber-50 p-4"><h2 className="text-sm font-bold text-amber-900">Data limitations</h2><ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-amber-800">{query.data.limitations.map(item => <li key={item}>{item}</li>)}</ul></section>
+    </>}
+  </main>;
+}
 
-  return (
-    <main className="p-6 space-y-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Inventory Reconciliation</h1>
-          <p className="text-sm text-slate-500">Expected = Previous + Purchased - Used. Variance = Actual - Expected.</p>
-        </div>
-        <label className="text-sm font-medium text-slate-700">
-          Shift date
-          <input
-            type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
-            className="mt-1 block rounded-md border border-slate-300 px-3 py-2 text-sm"
-          />
-        </label>
-      </div>
-
-      {isLoading && <div className="rounded-md border border-slate-200 bg-white p-4 text-sm text-slate-500">Loading reconciliation.</div>}
-      {error && <div className="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-700">{(error as Error).message}</div>}
-
-      {data?.ok && (
-        <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-          <div className="flex flex-col gap-1 border-b border-slate-200 px-4 py-3">
-            <div className="text-sm font-semibold text-slate-800">Tracked inventory items</div>
-            <div className="text-xs text-slate-500">Shift date: {formatDisplayDate(data.scope.date)}</div>
-            <div className="text-xs text-slate-500">Sources: {data.source.join(', ')}</div>
-            {(data.missingSources?.length ?? 0) > 0 && <div className="text-xs text-amber-700">Missing sources: {data.missingSources?.join(', ')}</div>}
-            <div className="text-xs text-slate-500">Last updated: {new Date(data.last_updated).toLocaleString()}</div>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <Th>Item</Th>
-                  <Th right>Previous</Th>
-                  <Th right>Purchased</Th>
-                  <Th right>Used</Th>
-                  <Th right>Expected</Th>
-                  <Th right>Actual</Th>
-                  <Th right>Variance</Th>
-                  <Th>Status</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.data.map((row) => {
-                  const flagged = row.status === 'FLAG';
-                  const missing = row.status === 'Missing Data';
-                  return (
-                    <tr key={row.item}>
-                      <Td missing={missing}>{row.item}</Td>
-                      <Td right missing={row.previous === null}>{formatCell(row.previous)}</Td>
-                      <Td right missing={row.purchased === null}>{formatCell(row.purchased)}</Td>
-                      <Td right missing={row.used === null}>{formatCell(row.used)}</Td>
-                      <Td right missing={row.expected === null}>{formatCell(row.expected)}</Td>
-                      <Td right missing={row.actual === null}>{formatCell(row.actual)}</Td>
-                      <Td right flagged={flagged} missing={row.variance === null}>{formatCell(row.variance)}</Td>
-                      <Td flagged={flagged} missing={missing}>{row.status}</Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
-      {blockers.length > 0 && (
-        <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-          <h2 className="text-sm font-semibold text-amber-900">Missing data blockers</h2>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full border-collapse text-xs">
-              <thead>
-                <tr>
-                  <Th>Code</Th>
-                  <Th>Message</Th>
-                  <Th>Where</Th>
-                  <Th>Canonical source</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {blockers.map((blocker, index) => (
-                  <tr key={`${blocker.code}-${index}`}>
-                    <Td>{blocker.code}</Td>
-                    <Td>{blocker.message}</Td>
-                    <Td>{blocker.where}</Td>
-                    <Td>{blocker.canonical_source}</Td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-    </main>
-  );
+function FragmentRows({ group, rows, open, toggle, draft, setDraft }: { group: string; rows: Row[]; open: Record<string, boolean>; toggle: (key: string) => void; draft: Record<string, string>; setDraft: React.Dispatch<React.SetStateAction<Record<string, string>>> }) {
+  return <><tr className="border-t bg-slate-50"><td colSpan={10} className="px-4 py-2 text-xs font-bold uppercase text-slate-600">{group}</td></tr>{rows.map(row => <tr key={row.ingredientKey} className="border-t align-top"><td className="px-3 py-3"><button className="flex items-center gap-1 font-semibold" onClick={() => toggle(row.ingredientKey)}>{open[row.ingredientKey] ? <ChevronDown size={15}/> : <ChevronRight size={15}/>} {row.ingredient}</button><div className="ml-5 text-xs text-slate-400">{row.unit}</div>{open[row.ingredientKey] && <div className="ml-5 mt-2 space-y-1 text-xs text-slate-500">{row.sources.map((source, index) => <div key={index}>{source.product} · {source.source}: {show(source.usage, row.unit)}</div>)}{row.blockers.map(blocker => <div key={blocker.code} className="text-amber-700" title={`${blocker.where} · ${blocker.canonical_source}`}>{blocker.message}</div>)}</div>}</td><td className="px-3 py-3 text-right">{show(row.opening, row.unit)}</td><td className="px-3 py-3 text-right">{show(row.stockIn + row.transfersIn, row.unit)}</td><td className="px-3 py-3 text-right">{show(row.waste + row.transfersOut, row.unit)}</td><td className="px-3 py-3 text-right font-semibold">{show(row.expectedConsumption, row.unit)}</td><td className="px-3 py-3 text-right font-semibold">{show(row.expectedClosing, row.unit)}</td><td className="px-3 py-3 text-right text-slate-400">{show(row.staffReported, row.unit)}</td><td className="px-3 py-2"><div className="flex justify-end gap-2"><input inputMode="decimal" aria-label={`${row.ingredient} physical count`} value={draft[row.ingredientKey] ?? ""} onChange={event => setDraft(value => ({ ...value, [row.ingredientKey]: event.target.value }))} className="w-28 rounded-lg border px-3 py-2 text-right text-base focus:border-slate-950 focus:outline-none"/><span className="w-10 py-2 text-left text-xs text-slate-500">{row.unit}</span></div></td><td className={`px-3 py-3 text-right font-bold ${row.variance != null && row.variance < 0 ? "text-red-700" : ""}`}>{show(row.variance, row.unit)}</td><td className="px-3 py-3 text-left"><span className={`rounded-full px-2 py-1 text-xs font-bold ${row.severity === "within_tolerance" ? "bg-emerald-100 text-emerald-800" : row.severity === "warning" ? "bg-amber-100 text-amber-800" : row.severity === "material_anomaly" ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600"}`}>{row.severity.replaceAll("_", " ")}</span></td></tr>)}</>;
 }

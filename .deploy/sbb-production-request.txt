@@ -1,5 +1,4 @@
 SBB production deployment request
-requested_at=2026-08-09T11:56:00Z
-requested_by=ChatGPT
+requested_at=2026-10-07
 ref=main
-reason=Deploy live POS line removal, Grab modifiers without upsells, and shared Direct/Grab automatic ticket printing
+reason=Release SBB-only sales, stock usage, independent physical counts and anomaly reporting

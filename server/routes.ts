@@ -1045,6 +1045,68 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  app.get("/api/analysis/sbb-sales-stock", async (req, res) => {
+    try {
+      const date = typeof req.query.date === "string" ? req.query.date : "";
+      const shiftKey = typeof req.query.shift === "string" ? req.query.shift : "";
+      const { getSbbProductSales, getSbbStockReconciliation } = await import("./services/sbbSalesStockEngine.js");
+      const [sales, inventory] = await Promise.all([
+        getSbbProductSales(date),
+        getSbbStockReconciliation(date, shiftKey),
+      ]);
+      res.json({
+        ok: true,
+        source: "SBB POS sale facts + sale-time recipe snapshots + independent physical counts",
+        scope: { date, shiftKey },
+        sales,
+        inventory,
+        limitations: [
+          "Historical Loyverse set components are not inferred when the source export does not record the selected components.",
+          "Pre-snapshot recipe usage is labelled current_recipe_fallback and must not be treated as historically verified.",
+          "Opening stock requires an independent count from the immediately preceding business date; older counts are not carried forward without intervening activity.",
+        ],
+      });
+    } catch (error: any) {
+      console.error("[SBB_SALES_STOCK_LOAD_FAIL]", error);
+      res.status(400).json({ ok: false, error: error?.message || String(error) });
+    }
+  });
+
+  app.put("/api/analysis/sbb-sales-stock/physical-counts", async (req, res) => {
+    try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || !["owner", "manager"].includes(user.role)) {
+        return res.status(403).json({ ok: false, error: "Owner or manager access required" });
+      }
+      const date = typeof req.body?.date === "string" ? req.body.date : "";
+      const shiftKey = typeof req.body?.shiftKey === "string" ? req.body.shiftKey : "";
+      const counts = Array.isArray(req.body?.counts) ? req.body.counts : [];
+      const { savePhysicalCounts, getSbbStockReconciliation } = await import("./services/sbbSalesStockEngine.js");
+      await savePhysicalCounts({ date, shiftKey, user: { id: user.id, name: user.name }, counts });
+      res.json({ ok: true, inventory: await getSbbStockReconciliation(date, shiftKey) });
+    } catch (error: any) {
+      console.error("[SBB_PHYSICAL_COUNT_SAVE_FAIL]", error);
+      res.status(400).json({ ok: false, error: error?.message || String(error) });
+    }
+  });
+
+  app.get("/api/analysis/sbb-sales-stock/physical-count-audit", async (req, res) => {
+    try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || !["owner", "manager"].includes(user.role)) {
+        return res.status(403).json({ ok: false, error: "Owner or manager access required" });
+      }
+      const date = typeof req.query.date === "string" ? req.query.date : "";
+      const shiftKey = typeof req.query.shift === "string" ? req.query.shift : "";
+      const { getPhysicalCountAudit } = await import("./services/sbbSalesStockEngine.js");
+      res.json({ ok: true, data: await getPhysicalCountAudit(date, shiftKey) });
+    } catch (error: any) {
+      res.status(400).json({ ok: false, error: error?.message || String(error) });
+    }
+  });
+
   app.get("/api/analysis/owner-stock-control", async (req, res) => {
     try {
       const { getPinSessionUser } = await import("./routes/pinAuth.js");
