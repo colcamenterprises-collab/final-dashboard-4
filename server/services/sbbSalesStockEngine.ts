@@ -246,7 +246,13 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
       where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
     }];
   });
-  // Historical meal deals without stored child selections remain counted as meal deals.\n  // Unknown historical component choices are not fabricated and do not block other verified inventory positions.\n  void missingMealDealComponents;
+  reportBlockers.push(...missingMealDealComponents.rows.map((row: any) => ({
+    code: "MEAL_DEAL_COMPONENTS_MISSING",
+    message: `${row.product} is counted as a meal deal, but this historical sale did not save its selected components. Verified inventory positions remain available; unknown component consumption is excluded rather than estimated.`,
+    where: `historical meal deal component usage ${date}`,
+    canonical_source: "ordering_order_items.parent_order_item_id",
+    auto_build_attempted: false,
+  })));
   if (customStockBoundary) reportBlockers.push({
     code: "CUSTOM_RANGE_STOCK_BOUNDARY_UNVERIFIED",
     message: "Expected usage follows the selected time range, but expected closing and variance are withheld because physical counts and stock movements are recorded against the full SBB business shift.",
@@ -312,8 +318,9 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
       canonical_source: "ordering_order_item_cost_snapshots",
       auto_build_attempted: true,
     });
-    if (reportBlockers.length) blockers.push(...reportBlockers);
-    const verified = !reportBlockers.length && !blockers.some(blocker => blocker.code === "HISTORICAL_RECIPE_SNAPSHOT_MISSING");
+    const rowReportBlockers = reportBlockers.filter(blocker => blocker.code !== "MEAL_DEAL_COMPONENTS_MISSING");
+    if (rowReportBlockers.length) blockers.push(...rowReportBlockers);
+    const verified = !rowReportBlockers.length && !blockers.some(blocker => blocker.code === "HISTORICAL_RECIPE_SNAPSHOT_MISSING");
     return {
       ingredientKey: key, ingredient, unit,
       group: config?.group_name || "Other", opening: opening ? number(opening.quantity) : null,
