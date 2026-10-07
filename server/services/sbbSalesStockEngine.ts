@@ -55,10 +55,17 @@ function assertDate(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("date must use YYYY-MM-DD");
 }
 
-export async function getSbbProductSales(date: string) {
+function reportWindow(date: string, fromInstant?: string, toInstant?: string) {
   assertDate(date);
+  if (!fromInstant && !toInstant) return shiftWindow(date);
+  if (!fromInstant || !toInstant || !Number.isFinite(Date.parse(fromInstant)) || !Number.isFinite(Date.parse(toInstant))) throw new Error("from and to must be valid ISO timestamps");
+  if (Date.parse(toInstant) <= Date.parse(fromInstant)) throw new Error("Report end must be after report start");
+  return { fromISO: new Date(fromInstant).toISOString(), toISO: new Date(toInstant).toISOString() };
+}
+
+export async function getSbbProductSales(date: string, fromInstant?: string, toInstant?: string) {
   const db = requireDb();
-  const window = shiftWindow(date);
+  const window = reportWindow(date, fromInstant, toInstant);
   const result = await db.query(
     `WITH valid_lines AS (
        SELECT i.*, parent.item_name_en AS parent_name,
@@ -110,19 +117,32 @@ export async function getSbbProductSales(date: string) {
   };
 }
 
-async function expectedUsage(date: string) {
+async function expectedUsage(date: string, fromInstant?: string, toInstant?: string) {
   const db = requireDb();
-  const window = shiftWindow(date);
+  const window = reportWindow(date, fromInstant, toInstant);
   const result = await db.query(
     `WITH item_usage AS (
        SELECT i.item_name_en product_name,
               CASE WHEN COALESCE(i.is_set_component,false) OR i.parent_order_item_id IS NOT NULL
                    THEN COALESCE(parent.item_name_en,'Meal Deal') ELSE 'Direct' END sale_source,
               i.quantity::numeric sold_quantity,
-              COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb),r.ingredients,'[]'::jsonb) ingredients,
-              CASE WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb))>0
+              CASE i.source_sku
+                WHEN '10012' THEN jsonb_build_array(jsonb_build_object('name','Coke','unitUsed','each','quantityUsed',1))
+                WHEN '10013' THEN jsonb_build_array(jsonb_build_object('name','Coke Zero','unitUsed','each','quantityUsed',1))
+                WHEN '10021' THEN jsonb_build_array(jsonb_build_object('name','Schweppes Manow','unitUsed','each','quantityUsed',1))
+                WHEN '10026' THEN jsonb_build_array(jsonb_build_object('name','Sprite','unitUsed','each','quantityUsed',1))
+                WHEN '10027' THEN jsonb_build_array(jsonb_build_object('name','Fanta Orange','unitUsed','each','quantityUsed',1))
+                WHEN '10028' THEN jsonb_build_array(jsonb_build_object('name','Fanta Strawberry','unitUsed','each','quantityUsed',1))
+                WHEN '10029' THEN jsonb_build_array(jsonb_build_object('name','Soda Water','unitUsed','each','quantityUsed',1))
+                WHEN '10031' THEN jsonb_build_array(jsonb_build_object('name','Bottled Water','unitUsed','each','quantityUsed',1))
+                WHEN '10039' THEN jsonb_build_array(jsonb_build_object('name','Kids Juice (Orange)','unitUsed','each','quantityUsed',1))
+                WHEN '10040' THEN jsonb_build_array(jsonb_build_object('name','Kids Juice (Apple)','unitUsed','each','quantityUsed',1))
+                ELSE COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb),r.ingredients,'[]'::jsonb) END ingredients,
+              CASE WHEN i.source_sku IN ('10012','10013','10021','10026','10027','10028','10029','10031','10039','10040') THEN 1::numeric
+                   WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb))>0
                    THEN COALESCE(s.recipe_yield,1)::numeric ELSE COALESCE(r.yield_quantity,1)::numeric END recipe_yield,
-              CASE WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb))>0
+              CASE WHEN i.source_sku IN ('10012','10013','10021','10026','10027','10028','10029','10031','10039','10040') THEN 'direct_stock_mapping'
+                   WHEN s.recipe_id IS NOT NULL AND jsonb_array_length(COALESCE(s.ingredient_snapshot,'[]'::jsonb))>0
                    THEN 'sale_snapshot' WHEN COALESCE(link.recipe_id,cfg.recipe_id) IS NOT NULL THEN 'current_recipe_fallback' ELSE 'unmapped' END provenance
        FROM ordering_order_items i JOIN ordering_orders o ON o.id=i.order_id
        LEFT JOIN ordering_order_items parent ON parent.id=i.parent_order_item_id
@@ -166,28 +186,46 @@ async function expectedUsage(date: string) {
   return result.rows;
 }
 
-export async function getSbbStockReconciliation(date: string, shiftKey = "") {
-  assertDate(date);
+export async function getSbbStockReconciliation(date: string, shiftKey = "", fromInstant?: string, toInstant?: string) {
   const db = requireDb();
   if (shiftKey) throw new Error("Named shift reconciliation is unavailable; use the business-date report");
-  const usageRows = await expectedUsage(date);
-  const window = shiftWindow(date);
+  const usageRows = await expectedUsage(date, fromInstant, toInstant);
+  const window = reportWindow(date, fromInstant, toInstant);
   const missingRecipes = await db.query(
-    `SELECT DISTINCT i.item_name_en product
+    `SELECT DISTINCT i.item_name_en product,i.source_sku,c.costing_mode,c.notes,
+            EXISTS (SELECT 1 FROM ordering_order_items child WHERE child.parent_order_item_id=i.id AND COALESCE(child.is_set_component,false)=true) has_components
      FROM ordering_order_items i JOIN ordering_orders o ON o.id=i.order_id
      LEFT JOIN ordering_order_item_cost_snapshots s ON s.order_item_id=i.id
      LEFT JOIN ordering_menu_item_recipe_links l ON l.menu_item_id=i.menu_item_id
-     LEFT JOIN pos_item_costing_config c ON c.menu_item_id=i.menu_item_id AND c.costing_mode='recipe'
-     LEFT JOIN recipes r ON r.id=COALESCE(s.recipe_id,l.recipe_id,c.recipe_id)
+     LEFT JOIN pos_item_costing_config c ON c.menu_item_id=i.menu_item_id
+     LEFT JOIN recipes r ON r.id=COALESCE(s.recipe_id,l.recipe_id,CASE WHEN c.costing_mode='recipe' THEN c.recipe_id END)
      WHERE o.created_at >= $1::timestamptz AND o.created_at < $2::timestamptz
        AND o.status <> 'cancelled' AND o.payment_status IN ('paid','refunded')
+       AND (i.source_sku IS NULL OR i.source_sku NOT IN ('10012','10013','10021','10026','10027','10028','10029','10031','10039','10040'))
+       AND NOT (COALESCE(i.is_set_component,false)=false AND EXISTS (SELECT 1 FROM ordering_order_items child WHERE child.parent_order_item_id=i.id AND COALESCE(child.is_set_component,false)=true))
        AND jsonb_array_length(COALESCE(NULLIF(s.ingredient_snapshot,'[]'::jsonb),r.ingredients,'[]'::jsonb))=0`,
     [window.fromISO,window.toISO],
   );
-  const reportBlockers: DataBlocker[] = missingRecipes.rows.map((row: any) => ({
-    code: "SALE_INGREDIENT_MAPPING_MISSING", message: `${row.product} has no recorded ingredient recipe; its consumption is unknown.`,
-    where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
-  }));
+  const canonicalWindow = shiftWindow(date);
+  const customStockBoundary = window.fromISO !== canonicalWindow.fromISO || window.toISO !== canonicalWindow.toISO;
+  const reportBlockers: DataBlocker[] = missingRecipes.rows.flatMap((row: any) => {
+    if (row.costing_mode === "direct" && !String(row.notes || "").includes("Bundle COGS")) return [];
+    if (row.costing_mode === "direct" && String(row.notes || "").includes("Bundle COGS")) return [{
+      code: "MEAL_DEAL_COMPONENTS_MISSING", message: `${row.product} was sold without recorded burger/fries/drink component selections; component consumption cannot be verified.`,
+      where: `meal deal component usage ${date}`, canonical_source: "ordering_order_items.parent_order_item_id", auto_build_attempted: false,
+    }];
+    return [{
+      code: "SALE_INGREDIENT_MAPPING_MISSING", message: `${row.product} has no recorded ingredient recipe; its consumption is unknown.`,
+      where: `expected ingredient consumption ${date}`, canonical_source: "ordering_order_item_cost_snapshots", auto_build_attempted: false,
+    }];
+  });
+  if (customStockBoundary) reportBlockers.push({
+    code: "CUSTOM_RANGE_STOCK_BOUNDARY_UNVERIFIED",
+    message: "Expected usage follows the selected time range, but expected closing and variance are withheld because physical counts and stock movements are recorded against the full SBB business shift.",
+    where: `inventory reconciliation ${date}`,
+    canonical_source: "sbb_inventory_physical_count + sbb_inventory_movement",
+    auto_build_attempted: false,
+  });
   const [counts, configs, movements] = await Promise.all([
     db.query(`SELECT * FROM sbb_inventory_physical_count WHERE business_date=$1::date AND shift_key=$2`, [date, shiftKey]),
     db.query(`SELECT * FROM sbb_inventory_item_config WHERE active=true`),

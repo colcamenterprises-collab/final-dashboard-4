@@ -8,15 +8,20 @@ type Row = { ingredientKey: string; ingredient: string; unit: string; group: str
 type Product = { product_key: string; product_name: string; total: number; direct: number; mealDeal: number; sources: Array<{ source: string; quantity: number }> };
 type Payload = { sales: { products: Product[]; mealDeals: Array<{ name: string; quantity: number }> }; inventory: { rows: Row[]; blockers: Blocker[] }; limitations: string[] };
 const today = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+const addDay = (date: string) => { const d = new Date(`${date}T12:00:00+07:00`); d.setUTCDate(d.getUTCDate() + 1); return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(d); };
+const toInstant = (local: string) => new Date(`${local}:00+07:00`).toISOString();
 const show = (value: number | null, unit = "") => value == null ? "Missing" : `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 3 }).format(value)}${unit ? ` ${unit}` : ""}`;
 
 export default function InventoryReconciliation() {
-  const [date, setDate] = useState(today());
+  const initialDate = today();
+  const [fromLocal, setFromLocal] = useState(`${initialDate}T17:00`);
+  const [toLocal, setToLocal] = useState(`${addDay(initialDate)}T03:00`);
+  const date = fromLocal.slice(0, 10);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const queryClient = useQueryClient();
-  const queryKey = ["sbb-sales-stock", date];
-  const query = useQuery<Payload>({ queryKey, queryFn: async () => { const response = await fetch(`/api/analysis/sbb-sales-stock?date=${date}`); const body = await response.json(); if (!response.ok) throw new Error(body.error || "Unable to load SBB reconciliation"); return body; } });
+  const queryKey = ["sbb-sales-stock", fromLocal, toLocal];
+  const query = useQuery<Payload>({ queryKey, enabled: Boolean(fromLocal && toLocal && toLocal > fromLocal), queryFn: async () => { const params = new URLSearchParams({ date, from: toInstant(fromLocal), to: toInstant(toLocal) }); const response = await fetch(`/api/analysis/sbb-sales-stock?${params}`); const body = await response.json(); if (!response.ok) throw new Error(body.error || "Unable to load SBB reconciliation"); return body; } });
   useEffect(() => { if (query.data) setDraft(Object.fromEntries(query.data.inventory.rows.map(row => [row.ingredientKey, row.physicalCount == null ? "" : String(row.physicalCount)]))); }, [query.data]);
   const dirty = query.data?.inventory.rows.some(row => (draft[row.ingredientKey] ?? "") !== (row.physicalCount == null ? "" : String(row.physicalCount))) ?? false;
   const save = useMutation({ mutationFn: async () => {
@@ -28,11 +33,12 @@ export default function InventoryReconciliation() {
   const toggle = (key: string) => setOpen(value => ({ ...value, [key]: !value[key] }));
 
   return <main className="space-y-5 p-4 md:p-6">
-    <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-950">SBB Sales & Stock</h1><p className="text-sm text-slate-500">Physical − expected = variance. Staff forms do not set physical stock.</p></div><label className="text-sm font-semibold text-slate-700">Shift date<input type="date" value={date} onChange={event => setDate(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label></div>
+    <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold text-slate-950">SBB Sales & Stock</h1><p className="text-sm text-slate-500">Physical − expected = variance. Staff forms do not set physical stock.</p></div><div className="flex flex-wrap gap-2"><label className="text-sm font-semibold text-slate-700">From<input type="datetime-local" value={fromLocal} onChange={event => setFromLocal(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label><label className="text-sm font-semibold text-slate-700">To<input type="datetime-local" value={toLocal} onChange={event => setToLocal(event.target.value)} className="mt-1 block rounded-lg border border-slate-300 px-3 py-2" /></label></div></div>
+    {toLocal <= fromLocal && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">The report end must be after the report start.</div>}
     {query.isLoading && <div className="rounded-xl border bg-white p-4 text-sm text-slate-500">Loading SBB sale and recipe facts…</div>}
     {query.error && <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{(query.error as Error).message}</div>}
     {query.data && <>
-      {query.data.inventory.blockers?.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Expected closing and variance are withheld until these recipes are mapped: {query.data.inventory.blockers.map(blocker => blocker.message).join(" ")}</div>}
+      {query.data.inventory.blockers?.length > 0 && <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Expected closing and variance are withheld until these consumption mappings are resolved: {query.data.inventory.blockers.map(blocker => blocker.message).join(" ")}</div>}
       <section className="grid gap-4 xl:grid-cols-2">
         <div className="overflow-hidden rounded-xl border bg-white"><h2 className="border-b px-4 py-3 font-bold">Products sold</h2><table className="w-full text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-4 py-2 text-left">Product</th><th className="px-3 py-2 text-right">Direct</th><th className="px-3 py-2 text-right">Meal Deal</th><th className="px-4 py-2 text-right">Total</th></tr></thead><tbody>{query.data.sales.products.map(product => <tr key={product.product_key} className="border-t"><td className="px-4 py-3"><button className="flex items-center gap-1 font-semibold" onClick={() => toggle(`p-${product.product_key}`)}>{open[`p-${product.product_key}`] ? <ChevronDown size={15}/> : <ChevronRight size={15}/>} {product.product_name}</button>{open[`p-${product.product_key}`] && <div className="ml-5 mt-2 space-y-1 text-xs text-slate-500">{product.sources.map((source, index) => <div key={index}>{source.source}: {show(source.quantity)}</div>)}</div>}</td><td className="px-3 py-3 text-right">{show(product.direct)}</td><td className="px-3 py-3 text-right">{show(product.mealDeal)}</td><td className="px-4 py-3 text-right font-bold">{show(product.total)}</td></tr>)}</tbody></table></div>
         <div className="overflow-hidden rounded-xl border bg-white"><h2 className="border-b px-4 py-3 font-bold">Meal deals sold</h2>{query.data.sales.mealDeals.map(deal => <div key={deal.name} className="flex justify-between border-t px-4 py-3 text-sm"><span>{deal.name}</span><strong>{show(deal.quantity)}</strong></div>)}{!query.data.sales.mealDeals.length && <p className="p-4 text-sm text-slate-500">No recorded meal deals for this shift.</p>}</div>

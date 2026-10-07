@@ -1049,15 +1049,17 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     try {
       const date = typeof req.query.date === "string" ? req.query.date : "";
       const shiftKey = typeof req.query.shift === "string" ? req.query.shift : "";
+      const fromInstant = typeof req.query.from === "string" ? req.query.from : undefined;
+      const toInstant = typeof req.query.to === "string" ? req.query.to : undefined;
       const { getSbbProductSales, getSbbStockReconciliation } = await import("./services/sbbSalesStockEngine.js");
       const [sales, inventory] = await Promise.all([
-        getSbbProductSales(date),
-        getSbbStockReconciliation(date, shiftKey),
+        getSbbProductSales(date, fromInstant, toInstant),
+        getSbbStockReconciliation(date, shiftKey, fromInstant, toInstant),
       ]);
       res.json({
         ok: true,
         source: "SBB POS sale facts + sale-time recipe snapshots + independent physical counts",
-        scope: { date, shiftKey },
+        scope: { date, shiftKey, fromInstant: fromInstant || null, toInstant: toInstant || null },
         sales,
         inventory,
         limitations: [
