@@ -1,4 +1,4 @@
-SBB production deployment request
-requested_at=2026-10-07T22:50:00+07:00
-ref=main
-reason=Deploy corrected SBB meal deal classification and component persistence
+Deploy SBB production
+Requested: 2026-10-08T00:27:00Z
+Reason: standard customer V3 migration CSV export pack
+Source merge: 54b841b3e46d7a300f92e9332a45ede6d3e6a577
