@@ -73,7 +73,7 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
   const customerName = String(input.customer_name || "").trim().slice(0, 120);
   const requestedGrabDiscount = Math.round(value(input.grab_discount_amount) * 100) / 100;
   if (!grabOrderDigits) return fail(res, "Enter the Grab order number");
-  if (!customerName) return fail(res, "Grab customer name is required");
+
   if (requestedGrabDiscount < 0) return fail(res, "Grab discount cannot be negative");
 
   await ensureGrabOrderSchema();
