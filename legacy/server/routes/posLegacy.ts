@@ -384,8 +384,8 @@ router.post("/orders", staffDevice, async (req, res) => {
       if (mode === "direct" && (line.set_upgrade || line.meal_deal)) {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
-          client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active AND pos_enabled LIMIT 1`),
-          client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled`, [line.set_drink_menu_item_id]),
+          client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active LIMIT 1`),
+          client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active`, [line.set_drink_menu_item_id]),
           client.query(`SELECT value FROM ordering_settings WHERE key='pos_set_upgrade_amount'`),
         ]);
         const fries = friesResult.rows[0];
@@ -417,7 +417,7 @@ router.post("/orders", staffDevice, async (req, res) => {
           const burgerName = mealBurgerNames[item.name_en];
           if (!burgerName) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
           const burger = (await client.query(
-            `SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower($1) AND is_active AND pos_enabled LIMIT 1`,
+            `SELECT * FROM ordering_menu_items WHERE lower(trim(name_en))=lower(trim($1)) AND is_active ORDER BY pos_enabled DESC LIMIT 1`,
             [burgerName],
           )).rows[0];
           if (!burger) throw new Error(`Meal deal burger component is unavailable for ${item.name_en}`);
