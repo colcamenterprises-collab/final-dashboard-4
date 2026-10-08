@@ -56,8 +56,7 @@ export default function PosRegister() {
   const [discounts,setDiscounts] = useState<Discount[]>([]);
   const [selectedDiscount,setSelectedDiscount] = useState("");
   const [grabOrderNumber,setGrabOrderNumber] = useState("");
-  const [grabCustomerName,setGrabCustomerName] = useState("");
-  const [grabCustomerMobile,setGrabCustomerMobile] = useState("");
+  const [grabDiscount,setGrabDiscount] = useState("");
   const [marketingOpen,setMarketingOpen] = useState(false);
   const [marketingPrompt,setMarketingPrompt] = useState("Are you a member? If you join you get 10% off every meal, starting with your next order");
   const [marketingConsent,setMarketingConsent] = useState(false);
@@ -127,7 +126,7 @@ export default function PosRegister() {
   const subtotal = cart.reduce((sum,line) => sum + lineTotal(line),0);
   const selectedDiscountData = discounts.find(discount => discount.code === selectedDiscount);
   const discountPreview = selectedDiscountData ? Math.min(subtotal, selectedDiscountData.discount_type === "percent" ? subtotal * selectedDiscountData.value / 100 : selectedDiscountData.value) : 0;
-  const total = Math.max(0,subtotal - discountPreview);
+  const total = Math.max(0,subtotal - discountPreview - (mode === "grab" ? Math.max(0,Number(grabDiscount || 0)) : 0));
   const change = Math.max(0,Number(cash || 0) - total);
 
   useEffect(() => {
@@ -227,7 +226,7 @@ export default function PosRegister() {
     if (!cart.length) return;
     if (mode === "grab") {
       if (!grabOrderNumber.trim()) return setNotice("Enter the Grab order number");
-      if (!grabCustomerName.trim() || !grabCustomerMobile.trim()) return setNotice("Grab customer name and mobile number are required");
+      if (!Number.isFinite(Number(grabDiscount || 0)) || Number(grabDiscount || 0) < 0) return setNotice("Enter a valid Grab discount");
     }
     // Membership/marketing capture is temporarily disabled in production.
     // Checkout must never be delayed or blocked before kitchen dispatch.
@@ -247,8 +246,7 @@ export default function PosRegister() {
           order_mode:mode,
           payment_method:mode === "grab" ? "grab" : payment,
           grab_order_number:mode === "grab" ? grabOrderNumber.trim() : undefined,
-          customer_name:mode === "grab" ? grabCustomerName.trim() : undefined,
-          customer_mobile:mode === "grab" ? grabCustomerMobile.trim() : undefined,
+          grab_discount_amount:mode === "grab" ? Number(grabDiscount || 0) : undefined,
           discount_code:selectedDiscount || undefined,
           marketing:skipMarketing ? undefined : {
             consent:marketingConsent,
@@ -272,7 +270,7 @@ export default function PosRegister() {
       setNotice(`${body.data.ticket_number} sent to kitchen`);
       if (body.data?.id) void processCreatedPosOrder(String(body.data.id),String(body.data.ticket_number || ""));
       speakKitchenOrder(kitchenCalloutItems(),language);
-      setCart([]); setCash(""); setSelectedDiscount(""); setGrabOrderNumber(""); setGrabCustomerName(""); setGrabCustomerMobile("");
+      setCart([]); setCash(""); setSelectedDiscount(""); setGrabOrderNumber(""); setGrabDiscount("");
       setMarketingConsent(false); setMarketingFirstName(""); setMarketingMobile(""); setMarketingEmail(""); setMarketingSkipReason(""); setCheckoutError("");
       refreshOrderNumber(); window.setTimeout(()=>setNotice(""),4000);
     } catch (error:any) {
@@ -350,7 +348,7 @@ export default function PosRegister() {
           <div className="flex items-end justify-between"><span className="text-lg font-black">{ui.total}</span><span className="text-3xl font-black">{thb(total)}</span></div>
           {selectedDiscountData && <div className="mt-1 flex justify-between text-xs font-bold text-[#15945c]"><span>{selectedDiscountData.code} — {selectedDiscountData.name}</span><span>-{thb(discountPreview)}</span></div>}
           <label className="mt-3 block text-xs font-black text-zinc-600">{ui.discount}<select value={selectedDiscount} onChange={event=>setSelectedDiscount(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9e4d5] bg-white px-3 py-3 text-sm outline-none focus:border-[#ffd400]"><option value="">{ui.noDiscount}</option>{discounts.filter(discount=>discount.code !== "OWNER100").map(discount => <option key={discount.id} value={discount.code}>{discount.name}</option>)}{discounts.some(discount=>discount.code === "OWNER100") && <option disabled>────────────────</option>}{discounts.filter(discount=>discount.code === "OWNER100").map(discount => <option key={discount.id} value={discount.code}>{discount.name}</option>)}</select></label>
-          {mode === "grab" && <div className="mt-4 space-y-2 rounded-2xl border border-[#ffd400] bg-[#fff9d9] p-3"><p className="text-xs font-black text-[#856a00]">{ui.grabDetails}</p><label className="block text-xs font-bold">{ui.grabOrder}<input inputMode="numeric" value={grabOrderNumber} onChange={event=>setGrabOrderNumber(event.target.value.replace(/\D/g,""))} placeholder="123456" className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label><label className="block text-xs font-bold">{ui.customerName}<input value={grabCustomerName} onChange={event=>setGrabCustomerName(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label><label className="block text-xs font-bold">{ui.mobile}<input inputMode="tel" value={grabCustomerMobile} onChange={event=>setGrabCustomerMobile(event.target.value)} className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label></div>}
+          {mode === "grab" && <div className="mt-4 space-y-2 rounded-2xl border border-[#ffd400] bg-[#fff9d9] p-3"><p className="text-xs font-black text-[#856a00]">{ui.grabDetails}</p><label className="block text-xs font-bold">{ui.grabOrder}<input inputMode="numeric" value={grabOrderNumber} onChange={event=>setGrabOrderNumber(event.target.value.replace(/\D/g,""))} placeholder="123456" className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label><label className="block text-xs font-bold">Grab Discount (฿)<input inputMode="decimal" type="number" min="0" step="0.01" value={grabDiscount} onChange={event=>setGrabDiscount(event.target.value)} placeholder="0" className="mt-1 w-full rounded-xl border border-[#e9d678] bg-white px-3 py-2 text-sm outline-none focus:border-black"/></label></div>}
           {mode === "direct" && payment === "cash" && <><input inputMode="decimal" value={cash} onChange={event=>setCash(event.target.value)} placeholder={ui.cash} className="mt-3 w-full rounded-xl border border-[#e9e4d5] bg-white px-3 py-3 text-sm outline-none focus:border-[#ffd400]"/><div className="mt-2 flex justify-between text-sm font-bold"><span>{ui.change}</span><span>{thb(change)}</span></div></>}
           <div className="mt-4 grid grid-cols-3 gap-2">{["cash","manual_qr_transfer","grab"].map(method => <button key={method} disabled={mode === "grab" && method !== "grab"} onClick={()=>setPayment(method)} className={`rounded-xl py-3 text-xs font-black transition ${payment === method ? "bg-[#171717] text-white" : "bg-[#f4f2eb] text-zinc-600 hover:bg-[#ebe7d8]"}`}>{method === "manual_qr_transfer" ? "QR" : method}</button>)}</div>
           <button type="button" disabled={!cart.length || checkoutBusy} onClick={startCheckout} className="mt-3 w-full rounded-xl bg-[#ffd400] py-4 text-base font-black text-black shadow-[0_7px_0_#d7ae00] transition hover:bg-[#ffe042] active:translate-y-0.5 active:shadow-[0_4px_0_#d7ae00] disabled:cursor-not-allowed disabled:opacity-40">{checkoutBusy ? "PROCESSING…" : `${ui.continue} ${thb(total)}`}</button>
