@@ -314,7 +314,7 @@ router.post("/orders", staffDevice, async (req, res) => {
     let total = 0;
     let sort = 0;
     for (const line of input.items) {
-      const item = (await client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND NOT is_sold_out`, [line.menu_item_id])).rows[0];
+      const item = (await client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled AND NOT is_sold_out`, [line.menu_item_id])).rows[0];
       if (!item) throw new Error("POS item unavailable");
       const qty = Math.max(1, Math.trunc(value(line.quantity) || 1));
       const unit = value(mode === "grab" ? item.grab_price : item.direct_price ?? item.price);
@@ -385,7 +385,7 @@ router.post("/orders", staffDevice, async (req, res) => {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
           client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active LIMIT 1`),
-          client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active AND pos_enabled`, [line.set_drink_menu_item_id]),
+          client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active`, [line.set_drink_menu_item_id]),
           client.query(`SELECT value FROM ordering_settings WHERE key='pos_set_upgrade_amount'`),
         ]);
         const fries = friesResult.rows[0];
