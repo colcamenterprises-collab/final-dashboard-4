@@ -226,7 +226,7 @@ export default function PosRegister() {
     if (!cart.length) return;
     if (mode === "grab") {
       if (!grabOrderNumber.trim()) return setNotice("Enter the Grab order number");
-      if (!Number.isFinite(Number(grabDiscount || 0)) || Number(grabDiscount || 0) < 0) return setNotice("Enter a valid Grab discount");
+      if (!Number.isFinite(Number(grabDiscount || 0)) || Number(grabDiscount || 0) < 0 || Number(grabDiscount || 0) > subtotal) return setNotice("Grab discount must be between ฿0 and the order subtotal");
     }
     // Membership/marketing capture is temporarily disabled in production.
     // Checkout must never be delayed or blocked before kitchen dispatch.
