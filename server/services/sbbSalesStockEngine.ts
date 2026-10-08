@@ -262,7 +262,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
   });
   const [counts, configs, movements] = await Promise.all([
     db.query(`SELECT * FROM sbb_inventory_physical_count WHERE business_date=$1::date AND shift_key=$2`, [date, shiftKey]),
-    db.query(`SELECT * FROM sbb_inventory_item_config WHERE active=true`),
+    db.query(`SELECT * FROM sbb_inventory_item_config`),
     db.query(`SELECT ingredient_key,movement_type,SUM(quantity)::numeric quantity FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key=$2 GROUP BY ingredient_key,movement_type`, [date, shiftKey]),
   ]);
   const countByKey = new Map(counts.rows.map((row: any) => [row.ingredient_key, row]));
@@ -323,7 +323,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     const verified = !rowReportBlockers.length && !blockers.some(blocker => blocker.code === "HISTORICAL_RECIPE_SNAPSHOT_MISSING");
     return {
       ingredientKey: key, ingredient, unit,
-      group: config?.group_name || "Other", opening: opening ? number(opening.quantity) : null,
+      group: config?.group_name || "Other", active: config?.active !== false, opening: opening ? number(opening.quantity) : null,
       openingDate: opening?.business_date || null, stockIn: number(movement.STOCK_IN),
       transfersIn: number(movement.TRANSFER_IN), transfersOut: number(movement.TRANSFER_OUT),
       waste: number(movement.WASTE), adjustments: number(movement.ADJUSTMENT), expectedConsumption,
@@ -374,4 +374,42 @@ export async function getPhysicalCountAudit(date: string, shiftKey = "") {
     `SELECT ingredient_key,ingredient_name,unit,previous_quantity,new_quantity,changed_by,changed_by_name,changed_at
      FROM sbb_inventory_physical_count_audit WHERE business_date=$1::date AND shift_key=$2 ORDER BY changed_at DESC,id DESC`, [date, shiftKey],
   )).rows;
+}
+
+export async function saveSbbPurchases(input: { date: string; user: { id: number; name: string }; purchases: Array<{ ingredientKey: string; ingredient: string; unit: string; quantity: number }> }) {
+  assertDate(input.date);
+  const db = requireDb();
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    for (const p of input.purchases) {
+      if (p.ingredientKey !== ingredientKey(p.ingredient,p.unit) || !Number.isFinite(p.quantity) || p.quantity < 0) throw new Error("Invalid purchase ingredient or quantity");
+      // Replacing the manual daily purchase entry is idempotent; never overwrite imports or other stock movements.
+      const sourceId = `daily-purchase:${input.date}:${p.ingredientKey}`;
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [sourceId]);
+      await client.query("DELETE FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key='' AND movement_type='STOCK_IN' AND source_type='sbb_daily_purchase' AND source_id=$2", [input.date,sourceId]);
+      if (p.quantity > 0) await client.query(
+        `INSERT INTO sbb_inventory_movement(business_date,shift_key,ingredient_key,ingredient_name,quantity,unit,movement_type,source_type,source_id,recorded_by,recorded_by_name)
+         VALUES($1::date,'',$2,$3,$4,$5,'STOCK_IN','sbb_daily_purchase',$6,$7,$8)`,
+        [input.date,p.ingredientKey,p.ingredient,p.quantity,p.unit,sourceId,input.user.id,input.user.name]);
+    }
+    await client.query("COMMIT");
+  } catch(e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
+}
+
+export async function saveSbbCountVisibility(input: { user: { id: number }; ingredients: Array<{ ingredientKey: string; ingredient: string; unit: string; active: boolean }> }) {
+  const db = requireDb();
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    for (const item of input.ingredients) {
+      if (item.ingredientKey !== ingredientKey(item.ingredient,item.unit) || typeof item.active !== "boolean") throw new Error("Invalid ingredient visibility");
+      await client.query(
+        `INSERT INTO sbb_inventory_item_config(ingredient_key,ingredient_name,unit,active,updated_by)
+         VALUES($1,$2,$3,$4,$5)
+         ON CONFLICT(ingredient_key) DO UPDATE SET active=EXCLUDED.active,updated_by=EXCLUDED.updated_by,updated_at=now()`,
+        [item.ingredientKey,item.ingredient,item.unit,item.active,input.user.id]);
+    }
+    await client.query("COMMIT");
+  } catch(e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
 }
