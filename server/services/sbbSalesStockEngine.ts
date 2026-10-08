@@ -263,14 +263,15 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
   const [counts, configs, movements] = await Promise.all([
     db.query(`SELECT * FROM sbb_inventory_physical_count WHERE business_date=$1::date AND shift_key=$2`, [date, shiftKey]),
     db.query(`SELECT * FROM sbb_inventory_item_config`),
-    db.query(`SELECT ingredient_key,movement_type,SUM(quantity)::numeric quantity FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key=$2 GROUP BY ingredient_key,movement_type`, [date, shiftKey]),
+    db.query(`SELECT ingredient_key,movement_type,source_type,SUM(quantity)::numeric quantity FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key=$2 GROUP BY ingredient_key,movement_type,source_type`, [date, shiftKey]),
   ]);
   const countByKey = new Map(counts.rows.map((row: any) => [row.ingredient_key, row]));
   const configByKey = new Map(configs.rows.map((row: any) => [row.ingredient_key, row]));
   const movementByKey = new Map<string, Record<string, number>>();
   for (const row of movements.rows as any[]) {
     const current = movementByKey.get(row.ingredient_key) || {};
-    current[row.movement_type] = number(row.quantity);
+    current[row.movement_type] = (current[row.movement_type] || 0) + number(row.quantity);
+    if (row.movement_type === "STOCK_IN" && row.source_type === "sbb_daily_purchase") current.PURCHASED = number(row.quantity);
     movementByKey.set(row.ingredient_key, current);
   }
   const openingResult = await db.query(
@@ -324,7 +325,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     return {
       ingredientKey: key, ingredient, unit,
       group: config?.group_name || "Other", active: config?.active !== false, opening: opening ? number(opening.quantity) : null,
-      openingDate: opening?.business_date || null, stockIn: number(movement.STOCK_IN),
+      openingDate: opening?.business_date || null, purchased: number(movement.PURCHASED), stockIn: number(movement.STOCK_IN),
       transfersIn: number(movement.TRANSFER_IN), transfersOut: number(movement.TRANSFER_OUT),
       waste: number(movement.WASTE), adjustments: number(movement.ADJUSTMENT), expectedConsumption,
       expectedClosing: verified ? calculated.expectedClosing : null, staffReported: null,
@@ -387,11 +388,16 @@ export async function saveSbbPurchases(input: { date: string; user: { id: number
       // Replacing the manual daily purchase entry is idempotent; never overwrite imports or other stock movements.
       const sourceId = `daily-purchase:${input.date}:${p.ingredientKey}`;
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [sourceId]);
-      await client.query("DELETE FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key='' AND movement_type='STOCK_IN' AND source_type='sbb_daily_purchase' AND source_id=$2", [input.date,sourceId]);
-      if (p.quantity > 0) await client.query(
-        `INSERT INTO sbb_inventory_movement(business_date,shift_key,ingredient_key,ingredient_name,quantity,unit,movement_type,source_type,source_id,recorded_by,recorded_by_name)
+      const prior = await client.query("SELECT id,quantity FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key='' AND movement_type='STOCK_IN' AND source_type='sbb_daily_purchase' AND source_id=$2 FOR UPDATE", [input.date,sourceId]);
+      if (prior.rows.length) {
+        await client.query("UPDATE sbb_inventory_movement SET quantity=$1,recorded_by=$2,recorded_by_name=$3,recorded_at=now() WHERE id=$4", [p.quantity,input.user.id,input.user.name,prior.rows[0].id]);
+      } else if (p.quantity > 0) {
+        await client.query(`INSERT INTO sbb_inventory_movement(business_date,shift_key,ingredient_key,ingredient_name,quantity,unit,movement_type,source_type,source_id,recorded_by,recorded_by_name)
          VALUES($1::date,'',$2,$3,$4,$5,'STOCK_IN','sbb_daily_purchase',$6,$7,$8)`,
-        [input.date,p.ingredientKey,p.ingredient,p.quantity,p.unit,sourceId,input.user.id,input.user.name]);
+         [input.date,p.ingredientKey,p.ingredient,p.quantity,p.unit,sourceId,input.user.id,input.user.name]);
+      }
+      await client.query(`INSERT INTO sbb_inventory_purchase_audit(business_date,ingredient_key,ingredient_name,unit,previous_quantity,new_quantity,changed_by,changed_by_name)
+        VALUES($1::date,$2,$3,$4,$5,$6,$7,$8)`,[input.date,p.ingredientKey,p.ingredient,p.unit,prior.rows.length ? number(prior.rows[0].quantity) : null,p.quantity,input.user.id,input.user.name]);
     }
     await client.query("COMMIT");
   } catch(e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
