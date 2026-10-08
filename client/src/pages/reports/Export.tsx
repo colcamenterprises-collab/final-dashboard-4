@@ -17,9 +17,9 @@ export default function Export() {
   const [downloading, setDownloading] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  const download = async (id: string) => {
+  const download = async (id: string, clearError = true) => {
     setDownloading(id);
-    setError("");
+    if (clearError) setError("");
     try {
       const response = await fetch(downloadUrl(id), { credentials: "include" });
       if (!response.ok) {
@@ -39,6 +39,7 @@ export default function Export() {
       URL.revokeObjectURL(href);
     } catch (e: any) {
       setError(e.message || "Export failed");
+      throw e;
     } finally {
       setDownloading(null);
     }
@@ -47,7 +48,11 @@ export default function Export() {
   const downloadPack = async () => {
     setError("");
     for (const dataset of DATASETS) {
-      await download(dataset.id);
+      try {
+        await download(dataset.id, false);
+      } catch {
+        return;
+      }
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   };
