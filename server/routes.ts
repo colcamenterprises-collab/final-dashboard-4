@@ -112,6 +112,7 @@ import productMenuRouter from "./routes/productMenu";
 import productIngredientsRouter from "./routes/productIngredients";
 import productActivationRouter from "./routes/productActivation";
 import purchasesRouter from "./routes/purchases";
+import v3MigrationExportRouter from "./routes/v3MigrationExport";
 
 import refundsRouter from "./routes/refunds";
 import shiftReviewRouter from "./routes/shiftReview";
@@ -1322,6 +1323,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
 
   // Purchases import
   app.use("/api/purchases", purchasesRouter);
+  app.use("/api/data-export", v3MigrationExportRouter);
 
   // Serve static uploaded menu item images
   const uploadsDir = path.join(process.cwd(), "uploads");
