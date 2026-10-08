@@ -1,4 +1,4 @@
 Deploy SBB production
-Requested: 2026-10-08T00:27:00Z
-Reason: standard customer V3 migration CSV export pack
-Source merge: 54b841b3e46d7a300f92e9332a45ede6d3e6a577
+Requested: 2026-10-08
+Reason: P0 live shift meal deal POS checkout fix, PR #437
+Source merge: 198332d8055b62fd40bdf1ead36c8e1528b0da0a
