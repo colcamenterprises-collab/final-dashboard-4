@@ -417,7 +417,7 @@ router.post("/orders", staffDevice, async (req, res) => {
           const burgerName = mealBurgerNames[item.name_en];
           if (!burgerName) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
           const burger = (await client.query(
-            `SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower($1) AND is_active AND pos_enabled LIMIT 1`,
+            `SELECT * FROM ordering_menu_items WHERE lower(trim(name_en))=lower(trim($1)) AND is_active ORDER BY pos_enabled DESC LIMIT 1`,
             [burgerName],
           )).rows[0];
           if (!burger) throw new Error(`Meal deal burger component is unavailable for ${item.name_en}`);
