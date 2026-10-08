@@ -1,0 +1,2 @@
+CREATE TABLE IF NOT EXISTS sbb_inventory_purchase_audit (id bigserial PRIMARY KEY,business_date date NOT NULL,ingredient_key text NOT NULL,ingredient_name text NOT NULL,unit text NOT NULL,previous_quantity numeric(14,4),new_quantity numeric(14,4) NOT NULL CHECK(new_quantity>=0),changed_by integer NOT NULL,changed_by_name text NOT NULL,changed_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS sbb_inventory_purchase_audit_lookup_idx ON sbb_inventory_purchase_audit(business_date,ingredient_key,changed_at DESC);
