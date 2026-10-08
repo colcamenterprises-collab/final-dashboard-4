@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { pool } from "../db";
+import { requireSessionAuth } from "../middleware/sessionAuth";
 
 const router = Router();
+router.use(requireSessionAuth);
 
 const csvCell = (value: unknown) => {
   const text = value == null ? "" : String(value);
@@ -19,23 +21,30 @@ function sendCsv(res: any, name: string, headers: string[], rows: unknown[][]) {
 router.get("/menu.csv", async (_req, res) => {
   try {
     const result = await pool!.query(`
-      SELECT id, name, category, description, price, image_url, is_active
-      FROM menu_item_v3 ORDER BY display_order NULLS LAST, name
+      SELECT i.id, i.name_en AS name, i.description_en AS description, c.name_en AS category,
+             COALESCE(i.direct_price,i.price) AS direct_price,
+             COALESCE(i.grab_price,i.direct_price,i.price) AS delivery_partner_price,
+             i.image_url, i.is_active
+      FROM ordering_menu_items i
+      JOIN ordering_menu_categories c ON c.id=i.category_id
+      ORDER BY c.sort_order, i.sort_order, i.name_en
     `);
     sendCsv(res, "menu", ["external_id","name","description","category","direct_price","delivery_partner_price","sku","image_url","availability"],
-      result.rows.map((r: any) => [r.id,r.name,r.description,r.category,r.price,"","",r.image_url,r.is_active]));
+      result.rows.map((r: any) => [r.id,r.name,r.description,r.category,r.direct_price,r.delivery_partner_price,"",r.image_url,r.is_active]));
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 router.get("/modifiers.csv", async (_req, res) => {
   try {
     const result = await pool!.query(`
-      SELECT m.id, g.name AS group_name, m.name, i.name AS product_name, m.price_delta,
-             g.min_select, g.max_select, g.is_required
-      FROM modifier m
-      JOIN modifier_group g ON g.id=m.modifier_group_id
-      JOIN menu_item_v3 i ON i.id=g.menu_item_id
-      ORDER BY i.name, g.display_order, m.display_order, m.name
+      SELECT m.id, g.name_en AS group_name, m.name_en AS name, i.name_en AS product_name, m.price_delta,
+             COALESCE(g.min_selections,0) AS min_select, g.max_selections AS max_select,
+             (COALESCE(g.min_selections,0) > 0) AS is_required
+      FROM ordering_item_modifiers m
+      JOIN ordering_modifier_groups g ON g.id=m.modifier_group_id
+      JOIN ordering_modifier_group_items a ON a.modifier_group_id=g.id
+      JOIN ordering_menu_items i ON i.id=a.menu_item_id
+      ORDER BY i.name_en, g.sort_order, m.sort_order, m.name_en
     `);
     sendCsv(res, "modifiers", ["external_id","group_name","name","menu_item","price_adjustment","min_select","max_select","required"],
       result.rows.map((r: any) => [r.id,r.group_name,r.name,r.product_name,r.price_delta,r.min_select,r.max_select,r.is_required]));
@@ -63,8 +72,8 @@ router.get("/recipes-costings.csv", async (_req, res) => {
         rows.push([
           r.id,r.name,r.menu_item,
           ingredient.name ?? ingredient.ingredientName ?? "",
-          ingredient.quantity ?? ingredient.qty ?? ingredient.amount ?? "",
-          ingredient.unit ?? ingredient.purchaseUnit ?? "",
+          ingredient.quantityUsed ?? ingredient.quantity ?? ingredient.qty ?? ingredient.amount ?? "",
+          ingredient.unitUsed ?? ingredient.unit ?? ingredient.purchaseUnit ?? "",
           r.yield_quantity,r.yield_unit,
           ingredient.purchaseCost ?? ingredient.packCost ?? r.total_cost ?? "",
           r.cost_per_serving,
@@ -95,8 +104,10 @@ router.get("/purchasing.csv", async (_req, res) => {
   try {
     const result = await pool!.query(`
       SELECT id, item, category, COALESCE("supplierName",supplier) AS supplier, brand,
-             "supplierSku" AS supplier_sku, "orderUnit" AS order_unit,
-             COALESCE(pack_cost,"unitCost") AS unit_price, purchase_unit_qty, purchase_unit_label, active
+             "supplierSku" AS supplier_sku, COALESCE(base_unit,"orderUnit") AS order_unit,
+             COALESCE(purchase_cost_thb,pack_cost,"unitCost") AS unit_price,
+             COALESCE(purchase_quantity,purchase_unit_qty) AS purchase_unit_qty,
+             purchase_unit_label, active
       FROM purchasing_items ORDER BY category NULLS LAST, item
     `);
     sendCsv(res, "purchasing", ["external_id","item","category","supplier","brand","supplier_sku","unit","unit_price","pack_quantity","pack_description","status"],
