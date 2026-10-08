@@ -30,8 +30,7 @@ export function calculateInventoryPosition(input: {
   tolerance: number;
   materialTolerance?: number | null;
 }) {
-  const expectedClosing = input.opening == null ? null : input.opening + input.stockIn + input.transfersIn
-    - input.transfersOut - input.waste + input.adjustments - input.expectedConsumption;
+  const expectedClosing = input.opening == null ? null : input.opening + input.stockIn - input.expectedConsumption;
   const variance = expectedClosing == null || input.physicalCount == null ? null : input.physicalCount - expectedClosing;
   const material = input.materialTolerance == null
     ? Math.max(input.tolerance * 2, input.tolerance)
@@ -296,7 +295,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     const tolerance = number(config?.tolerance_quantity);
     const calculated = calculateInventoryPosition({
       opening: opening ? number(opening.quantity) : null,
-      stockIn: number(movement.STOCK_IN), transfersIn: number(movement.TRANSFER_IN),
+      stockIn: number(movement.PURCHASED), transfersIn: number(movement.TRANSFER_IN),
       transfersOut: number(movement.TRANSFER_OUT), waste: number(movement.WASTE),
       adjustments: number(movement.ADJUSTMENT), expectedConsumption,
       physicalCount: count ? number(count.quantity) : null, tolerance,
