@@ -274,9 +274,8 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     movementByKey.set(row.ingredient_key, current);
   }
   const openingResult = await db.query(
-    `SELECT DISTINCT ON (ingredient_key) ingredient_key,quantity,unit,business_date
-     FROM sbb_inventory_physical_count WHERE business_date=($1::date - 1) AND shift_key=''
-     ORDER BY ingredient_key,business_date DESC,updated_at DESC`, [date],
+    `SELECT ingredient_key,quantity,unit,business_date FROM sbb_inventory_opening_stock
+     WHERE business_date=$1::date AND quantity IS NOT NULL`, [date],
   );
   const openingByKey = new Map(openingResult.rows.map((row: any) => [row.ingredient_key, row]));
 
@@ -309,10 +308,10 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
       where: `daily purchases ${date}`, canonical_source: "sbb_inventory_movement", auto_build_attempted: false,
     });
     if (!opening) blockers.push({
-      code: "OPENING_PHYSICAL_COUNT_MISSING",
-      message: `No independent physical count for the immediately preceding business date exists for ${ingredient}.`,
+      code: "OPENING_STOCK_MISSING",
+      message: `Opening stock for ${ingredient} has not been entered; enter 0 to confirm none.`,
       where: `inventory reconciliation ${date}${shiftKey ? ` shift ${shiftKey}` : ""}`,
-      canonical_source: "sbb_inventory_physical_count",
+      canonical_source: "sbb_inventory_opening_stock",
       auto_build_attempted: false,
     });
     if (usage?.sources?.some((source: any) => source.provenance === "current_recipe_fallback")) blockers.push({
@@ -425,12 +424,29 @@ export async function saveSbbCountVisibility(input: { user: { id: number }; ingr
   } catch(e) { if (!transactionClient) await client.query("ROLLBACK"); throw e; } finally { if (!transactionClient) client.release(); }
 }
 
-export async function saveSbbStockEdits(input: { date: string; user: { id: number; name: string }; purchases: Parameters<typeof saveSbbPurchases>[0]["purchases"]; counts: Parameters<typeof savePhysicalCounts>[0]["counts"]; ingredients: Parameters<typeof saveSbbCountVisibility>[0]["ingredients"] }) {
+export async function saveSbbOpeningStock(input: { date: string; user: { id: number; name: string }; openings: Array<{ ingredientKey: string; ingredient: string; unit: string; quantity: number | null }> }, client: import("pg").PoolClient) {
   assertDate(input.date);
-  if (![input.purchases,input.counts,input.ingredients].every(Array.isArray)) throw new Error("Stock edits must contain lists");
+  for (const entry of input.openings) {
+    if (!entry.ingredient || !entry.unit || entry.ingredientKey !== ingredientKey(entry.ingredient,entry.unit) || (entry.quantity !== null && (!Number.isFinite(entry.quantity) || entry.quantity < 0))) throw new Error("Invalid opening ingredient or quantity");
+    await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`opening:${input.date}:${entry.ingredientKey}`]);
+    const prior = await client.query("SELECT quantity FROM sbb_inventory_opening_stock WHERE business_date=$1::date AND ingredient_key=$2 FOR UPDATE", [input.date,entry.ingredientKey]);
+    const previous = prior.rows[0]?.quantity == null ? null : number(prior.rows[0].quantity);
+    if (previous === entry.quantity) continue;
+    await client.query(`INSERT INTO sbb_inventory_opening_stock(business_date,ingredient_key,ingredient_name,unit,quantity,changed_by,changed_by_name)
+      VALUES($1::date,$2,$3,$4,$5,$6,$7) ON CONFLICT(business_date,ingredient_key) DO UPDATE SET quantity=EXCLUDED.quantity,changed_by=EXCLUDED.changed_by,changed_by_name=EXCLUDED.changed_by_name,updated_at=now()`,
+      [input.date,entry.ingredientKey,entry.ingredient,entry.unit,entry.quantity,input.user.id,input.user.name]);
+    await client.query(`INSERT INTO sbb_inventory_opening_stock_audit(business_date,ingredient_key,ingredient_name,unit,previous_quantity,new_quantity,changed_by,changed_by_name)
+      VALUES($1::date,$2,$3,$4,$5,$6,$7,$8)`, [input.date,entry.ingredientKey,entry.ingredient,entry.unit,previous,entry.quantity,input.user.id,input.user.name]);
+  }
+}
+
+export async function saveSbbStockEdits(input: { date: string; user: { id: number; name: string }; openings?: Parameters<typeof saveSbbOpeningStock>[0]["openings"]; purchases: Parameters<typeof saveSbbPurchases>[0]["purchases"]; counts: Parameters<typeof savePhysicalCounts>[0]["counts"]; ingredients: Parameters<typeof saveSbbCountVisibility>[0]["ingredients"] }) {
+  assertDate(input.date);
+  if (![input.openings ?? [],input.purchases,input.counts,input.ingredients].every(Array.isArray)) throw new Error("Stock edits must contain lists");
   const client = await requireDb().connect();
   try {
     await client.query("BEGIN");
+    await saveSbbOpeningStock({ ...input, openings: input.openings ?? [] },client);
     await saveSbbPurchases(input,client);
     await savePhysicalCounts(input,client);
     await saveSbbCountVisibility(input,client);

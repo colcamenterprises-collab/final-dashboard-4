@@ -1081,7 +1081,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const user = getPinSessionUser(req);
       if (!user || !["owner","manager"].includes(user.role)) return res.status(403).json({ error: "Owner or manager access required" });
       const { saveSbbStockEdits } = await import("./services/sbbSalesStockEngine.js");
-      await saveSbbStockEdits({ date: req.body?.date, purchases: req.body?.purchases ?? [], counts: req.body?.counts ?? [], ingredients: req.body?.ingredients ?? [], user: { id: user.id, name: user.name } });
+      await saveSbbStockEdits({ date: req.body?.date, openings: req.body?.openings ?? [], purchases: req.body?.purchases ?? [], counts: req.body?.counts ?? [], ingredients: req.body?.ingredients ?? [], user: { id: user.id, name: user.name } });
       res.json({ ok: true });
     } catch(error: any) { res.status(400).json({ error: error?.message || String(error) }); }
   });
