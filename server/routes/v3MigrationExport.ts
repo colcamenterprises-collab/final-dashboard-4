@@ -7,7 +7,8 @@ router.use(requireSessionAuth);
 
 const csvCell = (value: unknown) => {
   const text = value == null ? "" : String(value);
-  const safe = /^[=+@\t\r]/.test(text) ? `\u0027${text}` : text;\n  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+  const safe = /^[=+@\t\r]/.test(text) ? `\u0027${text}` : text;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 const csv = (headers: string[], rows: unknown[][]) =>
   [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n") + "\n";
