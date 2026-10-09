@@ -28,3 +28,9 @@ test("missing independent opening or count is never manufactured", () => {
 test("ingredient keys are stable across display casing", () => {
   assert.equal(ingredientKey(" Beef ", "G"), "beef|g");
 });
+
+ test("daily purchased quantities use previous closing plus purchased minus usage", () => {
+ const result = calculateInventoryPosition({ opening: 100, stockIn: 50, transfersIn: 20, transfersOut: 10, waste: 5, adjustments: 3, expectedConsumption: 30, physicalCount: 120, tolerance: 0 });
+ assert.equal(result.expectedClosing,120);
+ assert.equal(result.variance,0);
+ });

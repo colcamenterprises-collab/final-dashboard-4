@@ -163,6 +163,7 @@ jobs:
           # process as root so dotenv can read it; keep the runner/build unprivileged.
           cd "$APP_DIR"
           sudo -n /usr/bin/bash /usr/local/sbin/sbb-apply-reporting-migration "$BUILD_DIR/server/migrations/202610070001_sbb_sales_stock_anomaly_engine.sql"
+          sudo -n /usr/bin/bash /usr/local/sbin/sbb-apply-reporting-migration "$BUILD_DIR/server/migrations/202610080001_sbb_inventory_purchase_audit.sql"
 
           echo
           echo "==> Atomically replace compiled production release"
