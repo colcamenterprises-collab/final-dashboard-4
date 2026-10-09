@@ -76,3 +76,7 @@ COMMENT ON TABLE sbb_inventory_physical_count_audit IS
 'Append-only before/after evidence for every physical count save.';
 COMMENT ON TABLE sbb_inventory_movement IS
 'Auditable SBB ingredient movements used by expected-closing reconciliation.';
+
+-- Daily purchase edits use the same additive SBB inventory schema deployment.
+CREATE TABLE IF NOT EXISTS sbb_inventory_purchase_audit (id bigserial PRIMARY KEY,business_date date NOT NULL,ingredient_key text NOT NULL,ingredient_name text NOT NULL,unit text NOT NULL,previous_quantity numeric(14,4),new_quantity numeric(14,4) NOT NULL CHECK(new_quantity>=0),changed_by integer NOT NULL,changed_by_name text NOT NULL,changed_at timestamptz NOT NULL DEFAULT now());
+CREATE INDEX IF NOT EXISTS sbb_inventory_purchase_audit_lookup_idx ON sbb_inventory_purchase_audit(business_date,ingredient_key,changed_at DESC);
