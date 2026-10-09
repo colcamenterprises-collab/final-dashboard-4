@@ -34,3 +34,8 @@ test("ingredient keys are stable across display casing", () => {
  assert.equal(result.expectedClosing,120);
  assert.equal(result.variance,0);
  });
+
+test("unconfirmed daily purchases do not manufacture a zero purchase", () => {
+ const result = calculateInventoryPosition({ opening: 100, stockIn: null, transfersIn: 0, transfersOut: 0, waste: 0, adjustments: 0, expectedConsumption: 30, physicalCount: 70, tolerance: 0 });
+ assert.equal(result.expectedClosing,null); assert.equal(result.variance,null); assert.equal(result.severity,"missing_data");
+});
