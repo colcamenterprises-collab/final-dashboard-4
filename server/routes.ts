@@ -1075,6 +1075,38 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
     }
   });
 
+  app.put("/api/analysis/sbb-sales-stock/stock-edits", async (req,res) => {
+    try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || !["owner","manager"].includes(user.role)) return res.status(403).json({ error: "Owner or manager access required" });
+      const { saveSbbStockEdits } = await import("./services/sbbSalesStockEngine.js");
+      await saveSbbStockEdits({ date: req.body?.date, purchases: req.body?.purchases ?? [], counts: req.body?.counts ?? [], ingredients: req.body?.ingredients ?? [], user: { id: user.id, name: user.name } });
+      res.json({ ok: true });
+    } catch(error: any) { res.status(400).json({ error: error?.message || String(error) }); }
+  });
+
+  app.put("/api/analysis/sbb-sales-stock/purchases", async (req,res) => {
+    try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || !["owner","manager"].includes(user.role)) return res.status(403).json({ error: "Owner or manager access required" });
+      const { saveSbbPurchases } = await import("./services/sbbSalesStockEngine.js");
+      await saveSbbPurchases({ date: req.body.date, purchases: req.body.purchases, user: { id: user.id, name: user.name } });
+      res.json({ ok: true });
+    } catch(error: any) { res.status(400).json({ error: error?.message || String(error) }); }
+  });
+  app.put("/api/analysis/sbb-sales-stock/ingredient-visibility", async (req,res) => {
+    try {
+      const { getPinSessionUser } = await import("./routes/pinAuth.js");
+      const user = getPinSessionUser(req);
+      if (!user || !["owner","manager"].includes(user.role)) return res.status(403).json({ error: "Owner or manager access required" });
+      const { saveSbbCountVisibility } = await import("./services/sbbSalesStockEngine.js");
+      await saveSbbCountVisibility({ ingredients: req.body.ingredients, user: { id: user.id } });
+      res.json({ ok: true });
+    } catch(error: any) { res.status(400).json({ error: error?.message || String(error) }); }
+  });
+
   app.put("/api/analysis/sbb-sales-stock/physical-counts", async (req, res) => {
     try {
       const { getPinSessionUser } = await import("./routes/pinAuth.js");

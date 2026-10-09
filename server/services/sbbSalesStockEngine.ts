@@ -20,7 +20,7 @@ export function ingredientKey(name: string, unit: string) {
 
 export function calculateInventoryPosition(input: {
   opening: number | null;
-  stockIn: number;
+  stockIn: number | null;
   transfersIn: number;
   transfersOut: number;
   waste: number;
@@ -30,8 +30,7 @@ export function calculateInventoryPosition(input: {
   tolerance: number;
   materialTolerance?: number | null;
 }) {
-  const expectedClosing = input.opening == null ? null : input.opening + input.stockIn + input.transfersIn
-    - input.transfersOut - input.waste + input.adjustments - input.expectedConsumption;
+  const expectedClosing = input.opening == null || input.stockIn == null ? null : input.opening + input.stockIn - input.expectedConsumption;
   const variance = expectedClosing == null || input.physicalCount == null ? null : input.physicalCount - expectedClosing;
   const material = input.materialTolerance == null
     ? Math.max(input.tolerance * 2, input.tolerance)
@@ -262,15 +261,16 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
   });
   const [counts, configs, movements] = await Promise.all([
     db.query(`SELECT * FROM sbb_inventory_physical_count WHERE business_date=$1::date AND shift_key=$2`, [date, shiftKey]),
-    db.query(`SELECT * FROM sbb_inventory_item_config WHERE active=true`),
-    db.query(`SELECT ingredient_key,movement_type,SUM(quantity)::numeric quantity FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key=$2 GROUP BY ingredient_key,movement_type`, [date, shiftKey]),
+    db.query(`SELECT * FROM sbb_inventory_item_config`),
+    db.query(`SELECT ingredient_key,movement_type,source_type,SUM(quantity)::numeric quantity FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key=$2 GROUP BY ingredient_key,movement_type,source_type`, [date, shiftKey]),
   ]);
   const countByKey = new Map(counts.rows.map((row: any) => [row.ingredient_key, row]));
   const configByKey = new Map(configs.rows.map((row: any) => [row.ingredient_key, row]));
   const movementByKey = new Map<string, Record<string, number>>();
   for (const row of movements.rows as any[]) {
     const current = movementByKey.get(row.ingredient_key) || {};
-    current[row.movement_type] = number(row.quantity);
+    current[row.movement_type] = (current[row.movement_type] || 0) + number(row.quantity);
+    if (row.movement_type === "STOCK_IN" && row.source_type === "sbb_daily_purchase") current.PURCHASED = number(row.quantity);
     movementByKey.set(row.ingredient_key, current);
   }
   const openingResult = await db.query(
@@ -295,7 +295,7 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     const tolerance = number(config?.tolerance_quantity);
     const calculated = calculateInventoryPosition({
       opening: opening ? number(opening.quantity) : null,
-      stockIn: number(movement.STOCK_IN), transfersIn: number(movement.TRANSFER_IN),
+      stockIn: movement.PURCHASED == null ? null : number(movement.PURCHASED), transfersIn: number(movement.TRANSFER_IN),
       transfersOut: number(movement.TRANSFER_OUT), waste: number(movement.WASTE),
       adjustments: number(movement.ADJUSTMENT), expectedConsumption,
       physicalCount: count ? number(count.quantity) : null, tolerance,
@@ -304,6 +304,10 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     const ingredient = usage?.ingredient_name || config?.ingredient_name || count?.ingredient_name || key.split("|")[0];
     const unit = usage?.unit || config?.unit || count?.unit || opening?.unit || key.split("|")[1] || "unit";
     const blockers: DataBlocker[] = [];
+    if (movement.PURCHASED == null) blockers.push({
+      code: "PURCHASE_QUANTITY_MISSING", message: `Purchased quantity for ${ingredient} has not been entered; enter 0 to confirm none purchased.`,
+      where: `daily purchases ${date}`, canonical_source: "sbb_inventory_movement", auto_build_attempted: false,
+    });
     if (!opening) blockers.push({
       code: "OPENING_PHYSICAL_COUNT_MISSING",
       message: `No independent physical count for the immediately preceding business date exists for ${ingredient}.`,
@@ -323,8 +327,8 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
     const verified = !rowReportBlockers.length && !blockers.some(blocker => blocker.code === "HISTORICAL_RECIPE_SNAPSHOT_MISSING");
     return {
       ingredientKey: key, ingredient, unit,
-      group: config?.group_name || "Other", opening: opening ? number(opening.quantity) : null,
-      openingDate: opening?.business_date || null, stockIn: number(movement.STOCK_IN),
+      group: config?.group_name || "Other", active: config?.active !== false, opening: opening ? number(opening.quantity) : null,
+      openingDate: opening?.business_date || null, purchased: movement.PURCHASED == null ? null : number(movement.PURCHASED), stockIn: number(movement.STOCK_IN),
       transfersIn: number(movement.TRANSFER_IN), transfersOut: number(movement.TRANSFER_OUT),
       waste: number(movement.WASTE), adjustments: number(movement.ADJUSTMENT), expectedConsumption,
       expectedClosing: verified ? calculated.expectedClosing : null, staffReported: null,
@@ -336,12 +340,12 @@ export async function getSbbStockReconciliation(date: string, shiftKey = "", fro
   return { date, shiftKey, signConvention: "variance = physicalCount - expectedClosing", blockers: reportBlockers, rows };
 }
 
-export async function savePhysicalCounts(input: { date: string; shiftKey?: string; user: { id: number; name: string }; counts: Array<{ ingredientKey: string; ingredient: string; quantity: number; unit: string }> }) {
+export async function savePhysicalCounts(input: { date: string; shiftKey?: string; user: { id: number; name: string }; counts: Array<{ ingredientKey: string; ingredient: string; quantity: number; unit: string }> }, transactionClient?: import("pg").PoolClient) {
   assertDate(input.date);
   const db = requireDb();
-  const client = await db.connect();
+  const client = transactionClient || await db.connect();
   try {
-    await client.query("BEGIN");
+    if (!transactionClient) await client.query("BEGIN");
     for (const entry of input.counts) {
       if (!entry.ingredientKey || !entry.ingredient || !entry.unit || !Number.isFinite(entry.quantity) || entry.quantity < 0) throw new Error("Every physical count requires a non-negative quantity, ingredient and unit");
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`${input.date}|${input.shiftKey || ""}|${entry.ingredientKey}`]);
@@ -359,12 +363,12 @@ export async function savePhysicalCounts(input: { date: string; shiftKey?: strin
         [saved.rows[0].id, input.date, input.shiftKey || "", entry.ingredientKey, entry.ingredient, entry.unit, prior.rows[0]?.quantity ?? null, entry.quantity, input.user.id, input.user.name],
       );
     }
-    await client.query("COMMIT");
+    if (!transactionClient) await client.query("COMMIT");
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (!transactionClient) await client.query("ROLLBACK");
     throw error;
   } finally {
-    client.release();
+    if (!transactionClient) client.release();
   }
 }
 
@@ -374,4 +378,63 @@ export async function getPhysicalCountAudit(date: string, shiftKey = "") {
     `SELECT ingredient_key,ingredient_name,unit,previous_quantity,new_quantity,changed_by,changed_by_name,changed_at
      FROM sbb_inventory_physical_count_audit WHERE business_date=$1::date AND shift_key=$2 ORDER BY changed_at DESC,id DESC`, [date, shiftKey],
   )).rows;
+}
+
+export async function saveSbbPurchases(input: { date: string; user: { id: number; name: string }; purchases: Array<{ ingredientKey: string; ingredient: string; unit: string; quantity: number }> }, transactionClient?: import("pg").PoolClient) {
+  assertDate(input.date);
+  if (!Array.isArray(input.purchases)) throw new Error("Purchases must be a list");
+  const db = requireDb();
+  const client = transactionClient || await db.connect();
+  try {
+    if (!transactionClient) await client.query("BEGIN");
+    for (const p of input.purchases) {
+      if (p.ingredientKey !== ingredientKey(p.ingredient,p.unit) || !Number.isFinite(p.quantity) || p.quantity < 0) throw new Error("Invalid purchase ingredient or quantity");
+      // Replacing the manual daily purchase entry is idempotent; never overwrite imports or other stock movements.
+      const sourceId = `daily-purchase:${input.date}:${p.ingredientKey}`;
+      await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [sourceId]);
+      const prior = await client.query("SELECT id,quantity FROM sbb_inventory_movement WHERE business_date=$1::date AND shift_key='' AND movement_type='STOCK_IN' AND source_type='sbb_daily_purchase' AND source_id=$2 FOR UPDATE", [input.date,sourceId]);
+      if (prior.rows.length && number(prior.rows[0].quantity) === p.quantity) continue;
+      if (prior.rows.length) {
+        await client.query("UPDATE sbb_inventory_movement SET quantity=$1,recorded_by=$2,recorded_by_name=$3,recorded_at=now() WHERE id=$4", [p.quantity,input.user.id,input.user.name,prior.rows[0].id]);
+      } else {
+        await client.query(`INSERT INTO sbb_inventory_movement(business_date,shift_key,ingredient_key,ingredient_name,quantity,unit,movement_type,source_type,source_id,recorded_by,recorded_by_name)
+         VALUES($1::date,'',$2,$3,$4,$5,'STOCK_IN','sbb_daily_purchase',$6,$7,$8)`,
+         [input.date,p.ingredientKey,p.ingredient,p.quantity,p.unit,sourceId,input.user.id,input.user.name]);
+      }
+      await client.query(`INSERT INTO sbb_inventory_purchase_audit(business_date,ingredient_key,ingredient_name,unit,previous_quantity,new_quantity,changed_by,changed_by_name)
+        VALUES($1::date,$2,$3,$4,$5,$6,$7,$8)`,[input.date,p.ingredientKey,p.ingredient,p.unit,prior.rows.length ? number(prior.rows[0].quantity) : null,p.quantity,input.user.id,input.user.name]);
+    }
+    if (!transactionClient) await client.query("COMMIT");
+  } catch(e) { if (!transactionClient) await client.query("ROLLBACK"); throw e; } finally { if (!transactionClient) client.release(); }
+}
+
+export async function saveSbbCountVisibility(input: { user: { id: number }; ingredients: Array<{ ingredientKey: string; ingredient: string; unit: string; active: boolean }> }, transactionClient?: import("pg").PoolClient) {
+  const db = requireDb();
+  const client = transactionClient || await db.connect();
+  try {
+    if (!transactionClient) await client.query("BEGIN");
+    for (const item of input.ingredients) {
+      if (item.ingredientKey !== ingredientKey(item.ingredient,item.unit) || typeof item.active !== "boolean") throw new Error("Invalid ingredient visibility");
+      await client.query(
+        `INSERT INTO sbb_inventory_item_config(ingredient_key,ingredient_name,unit,active,updated_by)
+         VALUES($1,$2,$3,$4,$5)
+         ON CONFLICT(ingredient_key) DO UPDATE SET active=EXCLUDED.active,updated_by=EXCLUDED.updated_by,updated_at=now()`,
+        [item.ingredientKey,item.ingredient,item.unit,item.active,input.user.id]);
+    }
+    if (!transactionClient) await client.query("COMMIT");
+  } catch(e) { if (!transactionClient) await client.query("ROLLBACK"); throw e; } finally { if (!transactionClient) client.release(); }
+}
+
+export async function saveSbbStockEdits(input: { date: string; user: { id: number; name: string }; purchases: Parameters<typeof saveSbbPurchases>[0]["purchases"]; counts: Parameters<typeof savePhysicalCounts>[0]["counts"]; ingredients: Parameters<typeof saveSbbCountVisibility>[0]["ingredients"] }) {
+  assertDate(input.date);
+  if (![input.purchases,input.counts,input.ingredients].every(Array.isArray)) throw new Error("Stock edits must contain lists");
+  const client = await requireDb().connect();
+  try {
+    await client.query("BEGIN");
+    await saveSbbPurchases(input,client);
+    await savePhysicalCounts(input,client);
+    await saveSbbCountVisibility(input,client);
+    await client.query("COMMIT");
+  } catch (error) { await client.query("ROLLBACK"); throw error; }
+  finally { client.release(); }
 }
