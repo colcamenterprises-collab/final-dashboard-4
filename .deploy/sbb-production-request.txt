@@ -1,4 +1,4 @@
 SBB production deployment request
 requested_at=2026-10-09
 ref=main
-reason=Enable editable daily purchased ingredient quantities in Stock Usage with audited saves
+reason=Manual opening stock and aligned reconciliation column headers

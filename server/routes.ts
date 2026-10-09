@@ -1066,7 +1066,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
         limitations: [
           "Historical Loyverse set components are not inferred when the source export does not record the selected components.",
           "Pre-snapshot recipe usage is labelled current_recipe_fallback and must not be treated as historically verified.",
-          "Opening stock requires an independent count from the immediately preceding business date; older counts are not carried forward without intervening activity.",
+          "Opening stock is entered manually for the selected business date; it does not change previous closing counts.",
         ],
       });
     } catch (error: any) {
@@ -1081,7 +1081,7 @@ export async function registerRoutes(app: express.Application): Promise<Server> 
       const user = getPinSessionUser(req);
       if (!user || !["owner","manager"].includes(user.role)) return res.status(403).json({ error: "Owner or manager access required" });
       const { saveSbbStockEdits } = await import("./services/sbbSalesStockEngine.js");
-      await saveSbbStockEdits({ date: req.body?.date, purchases: req.body?.purchases ?? [], counts: req.body?.counts ?? [], ingredients: req.body?.ingredients ?? [], user: { id: user.id, name: user.name } });
+      await saveSbbStockEdits({ date: req.body?.date, openings: req.body?.openings ?? [], purchases: req.body?.purchases ?? [], counts: req.body?.counts ?? [], ingredients: req.body?.ingredients ?? [], user: { id: user.id, name: user.name } });
       res.json({ ok: true });
     } catch(error: any) { res.status(400).json({ error: error?.message || String(error) }); }
   });
