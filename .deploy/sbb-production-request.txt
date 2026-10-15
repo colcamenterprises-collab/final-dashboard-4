@@ -1,4 +1,5 @@
 SBB production deployment request
-requested_at=2026-10-09
+requested_at=2026-10-15
 ref=main
-reason=Manual opening stock and aligned reconciliation column headers
+reason=P0 live POS meal deal checkout hotfix PR #443
+merged_fix_sha=eed40f7d0ec16be872e03ff9472b42d6798dfcf6
