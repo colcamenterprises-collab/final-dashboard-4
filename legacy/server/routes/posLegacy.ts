@@ -416,9 +416,20 @@ router.post("/orders", staffDevice, async (req, res) => {
           };
           const burgerName = mealBurgerNames[item.name_en];
           if (!burgerName) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
+          // Catalog names can differ from their meal-deal labels. Resolve known
+          // legacy aliases without bypassing the active-item safety check.
+          const burgerAliases: Record<string, string[]> = {
+            "Ultimate Double Smash Burger": ["Ultimate Double", "Ultimate Double Burger"],
+            "Original Single Smash Burger": ["Single Smash Burger"],
+            "Super Double Bacon and Cheese": ["Super Double Bacon & Cheese"],
+          };
+          const candidateNames = [burgerName, ...(burgerAliases[burgerName] || [])];
           const burger = (await client.query(
-            `SELECT * FROM ordering_menu_items WHERE lower(trim(name_en))=lower(trim($1)) AND is_active ORDER BY pos_enabled DESC LIMIT 1`,
-            [burgerName],
+            `SELECT * FROM ordering_menu_items
+             WHERE is_active AND lower(trim(name_en)) = ANY($1::text[])
+             ORDER BY CASE WHEN lower(trim(name_en))=lower(trim($2)) THEN 0 ELSE 1 END,
+                      pos_enabled DESC LIMIT 1`,
+            [candidateNames.map(name => name.trim().toLowerCase()), burgerName],
           )).rows[0];
           if (!burger) throw new Error(`Meal deal burger component is unavailable for ${item.name_en}`);
           components = [burger, fries, drink];
