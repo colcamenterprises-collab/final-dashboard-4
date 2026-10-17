@@ -63,7 +63,7 @@ export default function Export() {
         <Database className="h-5 w-5 text-slate-500" />
         <div>
           <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Export Data</h1>
-          <p className="text-xs text-slate-500">Download your restaurant data as standard CSV files.</p>
+          <p className="text-xs text-slate-500">Download your restaurant data manually as standard CSV files. The complete ZIP package is not available yet.</p>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ export default function Export() {
         className="w-full rounded-xl bg-slate-950 text-white dark:bg-white dark:text-slate-950 px-4 py-3 text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
       >
         <Download className="h-4 w-4" />
-        Download Migration Pack
+        Download All CSV Files
       </button>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

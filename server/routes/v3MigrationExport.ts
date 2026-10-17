@@ -7,7 +7,8 @@ router.use(requireSessionAuth);
 
 const csvCell = (value: unknown) => {
   const text = value == null ? "" : String(value);
-  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  const safe = /^[=+@\t\r]/.test(text) ? `\u0027${text}` : text;
+  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 const csv = (headers: string[], rows: unknown[][]) =>
   [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n") + "\n";
@@ -75,7 +76,7 @@ router.get("/recipes-costings.csv", async (_req, res) => {
           ingredient.quantityUsed ?? ingredient.quantity ?? ingredient.qty ?? ingredient.amount ?? "",
           ingredient.unitUsed ?? ingredient.unit ?? ingredient.purchaseUnit ?? "",
           r.yield_quantity,r.yield_unit,
-          ingredient.purchaseCost ?? ingredient.packCost ?? r.total_cost ?? "",
+          ingredient.purchaseCost ?? ingredient.packCost ?? "",
           r.cost_per_serving,
         ]);
       }
