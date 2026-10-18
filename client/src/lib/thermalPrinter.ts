@@ -244,7 +244,15 @@ export function buildReceiptEscPos(payload: ReceiptPayload) {
   );
 }
 
-export async function printReceiptNative(payload: ReceiptPayload, openDrawer = false) {
+let receiptPrintQueue: Promise<void> = Promise.resolve();
+
+export function printReceiptNative(payload: ReceiptPayload, openDrawer = false) {
+  const job = receiptPrintQueue.then(() => printReceiptNativeExclusive(payload, openDrawer));
+  receiptPrintQueue = job.then(() => undefined, () => undefined);
+  return job;
+}
+
+async function printReceiptNativeExclusive(payload: ReceiptPayload, openDrawer = false) {
   if (!nativePrinterAvailable()) return { attempted: false, ok: false, message: "Native printer unavailable or POS app update required" };
   let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
   if (!status.connected) status = await reconnectSavedPrinter();
@@ -277,6 +285,7 @@ export async function printReceiptNative(payload: ReceiptPayload, openDrawer = f
     try {
       await nativeOpenCashDrawer();
     } catch (drawerError) {
+      try { await pluginMethod("disconnect")(); } catch { /* best effort */ }
       return {
         attempted: true,
         ok: false,
@@ -285,6 +294,13 @@ export async function printReceiptNative(payload: ReceiptPayload, openDrawer = f
           : "Receipt printed, but cash drawer failed",
       };
     }
+  }
+  // Release the RFCOMM socket after each receipt so GrabFood can use the same printer.
+  // Keep the paired address saved for the next POS checkout.
+  try {
+    await pluginMethod("disconnect")();
+  } catch {
+    // The receipt has already printed; closing the socket is best-effort.
   }
   return { attempted: true, ok: true, message: openDrawer ? "Printed and cash drawer opened" : "Printed" };
 }
