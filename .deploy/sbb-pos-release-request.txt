@@ -1,5 +1,5 @@
 SBB POS signed release request
-Version: 1.0.2
-Build: 3
-Requested: 2026-08-24
-Reason: Restore Bluetooth printer pairing/connection, automatic printing, cash drawer support, and native bridge compatibility.
+Version: 1.0.3
+Build: 4
+Requested: 2026-10-19
+Reason: Release merged Bluetooth printing fix with serialized POS receipts and socket release for GrabFood coexistence.
