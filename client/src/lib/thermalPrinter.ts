@@ -277,6 +277,7 @@ export async function printReceiptNative(payload: ReceiptPayload, openDrawer = f
     try {
       await nativeOpenCashDrawer();
     } catch (drawerError) {
+      try { await pluginMethod("disconnect")(); } catch { /* best effort */ }
       return {
         attempted: true,
         ok: false,
@@ -285,6 +286,13 @@ export async function printReceiptNative(payload: ReceiptPayload, openDrawer = f
           : "Receipt printed, but cash drawer failed",
       };
     }
+  }
+  // Release the RFCOMM socket after each receipt so GrabFood can use the same printer.
+  // Keep the paired address saved for the next POS checkout.
+  try {
+    await pluginMethod("disconnect")();
+  } catch {
+    // The receipt has already printed; closing the socket is best-effort.
   }
   return { attempted: true, ok: true, message: openDrawer ? "Printed and cash drawer opened" : "Printed" };
 }
