@@ -244,7 +244,15 @@ export function buildReceiptEscPos(payload: ReceiptPayload) {
   );
 }
 
-export async function printReceiptNative(payload: ReceiptPayload, openDrawer = false) {
+let receiptPrintQueue: Promise<void> = Promise.resolve();
+
+export function printReceiptNative(payload: ReceiptPayload, openDrawer = false) {
+  const job = receiptPrintQueue.then(() => printReceiptNativeExclusive(payload, openDrawer));
+  receiptPrintQueue = job.then(() => undefined, () => undefined);
+  return job;
+}
+
+async function printReceiptNativeExclusive(payload: ReceiptPayload, openDrawer = false) {
   if (!nativePrinterAvailable()) return { attempted: false, ok: false, message: "Native printer unavailable or POS app update required" };
   let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
   if (!status.connected) status = await reconnectSavedPrinter();
