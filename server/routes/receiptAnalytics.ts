@@ -78,8 +78,8 @@ router.get("/shift-review", async (req, res) => {
            COALESCE(SUM("totalSales"),0) total_sales
          FROM daily_sales_v2
          WHERE "deletedAt" IS NULL
-           AND ((COALESCE("shiftDate"::date,shift_date) + time '17:00') AT TIME ZONE 'Asia/Bangkok') >= $1::timestamptz
-           AND ((COALESCE("shiftDate"::date,shift_date) + time '17:00') AT TIME ZONE 'Asia/Bangkok') < $2::timestamptz`,
+           AND ((COALESCE("shiftDate"::date,shift_date) + time '17:00') AT TIME ZONE 'Asia/Bangkok') < $2::timestamptz
+           AND ((COALESCE("shiftDate"::date,shift_date) + time '03:00' + interval '1 day') AT TIME ZONE 'Asia/Bangkok') > $1::timestamptz`,
         [range.fromInstant, range.toInstant],
       ),
       pool.query(
