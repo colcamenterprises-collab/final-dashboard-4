@@ -71,6 +71,30 @@ function storeStatus(status: NativeCheckoutStatus) {
   }
 }
 
+function showPrinterFailure(message: string) {
+  const existing = document.getElementById("sbb-printer-failure");
+  existing?.remove();
+  const panel = document.createElement("div");
+  panel.id = "sbb-printer-failure";
+  panel.setAttribute("role", "alert");
+  panel.style.cssText = "position:fixed;z-index:2147483647;left:16px;right:16px;bottom:20px;max-width:540px;margin:auto;background:#fff;border:1px solid #d6dbe2;border-radius:16px;box-shadow:0 12px 36px #0003;padding:18px;color:#171717;font:14px system-ui,sans-serif";
+  const title = document.createElement("strong");
+  title.textContent = "Receipt not printed";
+  title.style.cssText = "display:block;font-size:17px;margin-bottom:8px";
+  const detail = document.createElement("p");
+  detail.textContent = message || "The printer could not complete this receipt. Check the printer connection.";
+  detail.style.cssText = "margin:0 0 12px;line-height:1.5";
+  const actions = document.createElement("div");
+  actions.style.cssText = "display:flex;justify-content:flex-end;gap:12px";
+  const dismiss = document.createElement("button");
+  dismiss.textContent = "Close";
+  dismiss.style.cssText = "border:1px solid #ddd;border-radius:9px;padding:9px 16px;background:white";
+  dismiss.onclick = () => panel.remove();
+  actions.append(dismiss);
+  panel.append(title, detail, actions);
+  document.body.append(panel);
+}
+
 export function readLastNativeCheckoutStatus(): NativeCheckoutStatus | null {
   try {
     const raw = window.localStorage.getItem(STATUS_KEY);
@@ -199,6 +223,8 @@ async function handleCreatedOrder(
   } catch (error) {
     printMessage = error instanceof Error ? error.message : "Automatic checkout processing failed";
   }
+
+  if (readPosPrinterSettings().autoPrint && !printed) showPrinterFailure(printMessage);
 
   storeStatus({
     orderId,
