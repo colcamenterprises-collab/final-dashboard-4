@@ -79,7 +79,7 @@ function showPrinterFailure(message: string) {
   panel.setAttribute("role", "alert");
   panel.style.cssText = "position:fixed;z-index:2147483647;left:16px;right:16px;bottom:20px;max-width:540px;margin:auto;background:#fff;border:1px solid #d6dbe2;border-radius:16px;box-shadow:0 12px 36px #0003;padding:18px;color:#171717;font:14px system-ui,sans-serif";
   const title = document.createElement("strong");
-  title.textContent = "Receipt not printed";
+  title.textContent = message.startsWith("Receipt printed, but cash drawer failed") ? "Cash drawer did not open" : "Receipt not printed";
   title.style.cssText = "display:block;font-size:17px;margin-bottom:8px";
   const detail = document.createElement("p");
   detail.textContent = message || "The printer could not complete this receipt. Check the printer connection.";
