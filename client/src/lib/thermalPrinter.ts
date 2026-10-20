@@ -96,11 +96,14 @@ export async function reconnectSavedPrinter() {
   if (!nativePrinterAvailable()) return { connected: false };
   const address = readSavedPrinterAddress();
   if (!address) return { connected: false };
-  try {
-    return await connectNativePrinter(address);
-  } catch {
-    return { connected: false };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await connectNativePrinter(address);
+      if (result.connected) return result;
+    } catch { /* Another app may still be releasing the printer socket. */ }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
   }
+  return { connected: false };
 }
 
 export async function getNativePrinterStatus() {
