@@ -96,11 +96,14 @@ export async function reconnectSavedPrinter() {
   if (!nativePrinterAvailable()) return { connected: false };
   const address = readSavedPrinterAddress();
   if (!address) return { connected: false };
-  try {
-    return await connectNativePrinter(address);
-  } catch {
-    return { connected: false };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const result = await connectNativePrinter(address);
+      if (result.connected) return result;
+    } catch { /* Another app may still be releasing the printer socket. */ }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 700));
   }
+  return { connected: false };
 }
 
 export async function getNativePrinterStatus() {
@@ -253,10 +256,10 @@ export function printReceiptNative(payload: ReceiptPayload, openDrawer = false) 
 }
 
 async function printReceiptNativeExclusive(payload: ReceiptPayload, openDrawer = false) {
-  if (!nativePrinterAvailable()) return { attempted: false, ok: false, message: "Native printer unavailable or POS app update required" };
+  if (!nativePrinterAvailable()) return { attempted: false, ok: false, message: "Printer unavailable. Restart the POS app or update it, then check Printer Settings." };
   let status = await getNativePrinterStatus().catch(() => ({ connected: false }));
   if (!status.connected) status = await reconnectSavedPrinter();
-  if (!status.connected) return { attempted: true, ok: false, message: "Printer is not connected" };
+  if (!status.connected) return { attempted: true, ok: false, message: "Printer could not reconnect. Check Bluetooth and printer power, then retry from Printer Settings." };
 
   const bytes = buildReceiptEscPos(payload);
   try {
