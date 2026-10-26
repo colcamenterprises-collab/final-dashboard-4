@@ -41,6 +41,38 @@ const chime = () => {
   }
 };
 
+// Meal-set burger components are recorded for inventory and reporting, but
+// showing the burger again under its parent set looks like a second order.
+// Keep fries, drinks, and all standalone burgers visible.
+const mealSetBurgerSkus = new Set([
+  "sbb-pos-crispy-chicken-fillet-burger",
+  "sbb-pos-karaage-chicken-burger",
+  "sbb-pos-original-single-smash-burger",
+  "sbb-pos-ultimate-double-smash-burger",
+  "sbb-pos-super-double-bacon-and-cheese",
+  "sbb-pos-triple-smash-burger",
+]);
+const mealSetParentSkus = new Set([
+  "sbb-pos-chicken-fillet-meal-deal",
+  "sbb-pos-karaage-chicken-meal-deal",
+  "sbb-pos-single-smash-burger-set",
+  "sbb-pos-ultimate-double-smash-burger-set",
+  "sbb-pos-super-double-bacon-and-cheese-set",
+  "sbb-pos-triple-smash-burger-set",
+]);
+function kitchenItems(items: any[] = []) {
+  const byId = new Map(items.map(item => [String(item.id), item]));
+  return items.filter(item => {
+    if (!item.is_set_component || !item.parent_order_item_id) return true;
+    const parent = byId.get(String(item.parent_order_item_id));
+    if (!parent) return true;
+    const parentSku = String(parent.source_sku || "").toLowerCase();
+    const componentSku = String(item.source_sku || "").toLowerCase();
+    const isMealSet = mealSetParentSkus.has(parentSku) || /meal deal|burger set|smash.*set/i.test(String(parent.item_name_en || ""));
+    return !(isMealSet && mealSetBurgerSkus.has(componentSku));
+  });
+}
+
 function orderSource(order: any) {
   const origin = order.pos_origin_channel || order.channel;
   if (order.channel_source === "partner_venue") return "PARTNER DELIVERY";
@@ -183,7 +215,7 @@ export default function PosKitchen() {
           {minutes} min · {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
         <ul className="my-4 space-y-3">
-          {order.items?.map((item: any) => (
+          {kitchenItems(order.items).map((item: any) => (
             <li key={item.id}>
               <strong>{item.quantity} × {item.item_name_en}</strong>
               {item.is_set_component && <p className="text-sm font-black text-amber-700">SET COMPONENT</p>}
