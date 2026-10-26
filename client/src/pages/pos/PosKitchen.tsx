@@ -90,7 +90,7 @@ function kitchenDisplayItems(items: any[] = []) {
     if (!parent) return true;
     const parentSku = String(parent.source_sku || "").toLowerCase();
     const parentName = String(parent.item_name_en || "").toLowerCase();
-    const isSet = /-set$|-meal-deal$/.test(parentSku) || /\\b(set|meal deal)\\b/.test(parentName);
+    const isSet = /-set$|-meal-deal$/.test(parentSku) || parentName.endsWith(" set") || parentName.endsWith(" meal deal");
     if (!isSet) return true;
     const sku = String(item.source_sku || "").toLowerCase();
     const name = String(item.item_name_en || "").trim().toLowerCase();
