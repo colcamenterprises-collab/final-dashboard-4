@@ -80,3 +80,7 @@ These are real routes in `client/src/App.tsx`, not dead modules. **Not deleted i
 - Require passing TypeScript ratchet, production build, reporting regression and PR governance checks.
 - Check deployed source SHA and endpoints after actual deployment. No statement of production success without a successful deployment run and production validation.
 - No changes to Prisma/database schemas, migrations, protected ingredient/purchasing/costing files, or live financial source tables in Wave 1.
+
+## Wave 2: remove non-runtime Loyverse copy packages
+
+Deleted 49 files (~602 KB) under `loyverse-ai-package/` and `loyverse-ai-updated-package/`, both historical standalone copies. The active build enters `client/` and `server/`; production Loyverse routes, POS ingestion, archived business data, and all database tables are untouched. Source references in architecture/stabilisation documentation remain historical references. Deleting Git-tracked files reduces the current checkout, **not repository history size**.
