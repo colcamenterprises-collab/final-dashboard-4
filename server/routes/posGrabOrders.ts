@@ -50,6 +50,23 @@ function grabOnly(req: Request, _res: Response, next: NextFunction) {
   next();
 }
 
+const grabMealSetBurgerSkus: Record<string, string> = {
+  "sbb-pos-chicken-fillet-meal-deal": "sbb-pos-crispy-chicken-fillet-burger",
+  "sbb-pos-karaage-chicken-meal-deal": "sbb-pos-karaage-chicken-burger",
+  "sbb-pos-single-smash-burger-set": "sbb-pos-original-single-smash-burger",
+  "sbb-pos-ultimate-double-smash-burger-set": "sbb-pos-ultimate-double-smash-burger",
+  "sbb-pos-super-double-bacon-and-cheese-set": "sbb-pos-super-double-bacon-and-cheese",
+  "sbb-pos-triple-smash-burger-set": "sbb-pos-triple-smash-burger",
+};
+const grabMealSetNames: Record<string, string> = {
+  "Chicken Fillet Meal Deal": "sbb-pos-crispy-chicken-fillet-burger",
+  "Karaage Chicken Meal Deal": "sbb-pos-karaage-chicken-burger",
+  "Single Smash Burger Set": "sbb-pos-original-single-smash-burger",
+  "Ultimate Double Smash Burger Set": "sbb-pos-ultimate-double-smash-burger",
+  "Super Double Bacon and Cheese Set": "sbb-pos-super-double-bacon-and-cheese",
+  "Triple Smash Burger Set": "sbb-pos-triple-smash-burger",
+};
+
 const DISPLAY_TICKET_MAX = 999;
 const DISPLAY_TICKET_DIGITS = 3;
 const ticketNumber = (sequence: number) => String(sequence).padStart(DISPLAY_TICKET_DIGITS, "0");
@@ -150,6 +167,32 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
         [order.id,item.id,item.name_en,item.name_th,unit,qty,unit*qty,line.notes||null,sort++,item.source_sku||null],
       )).rows[0];
       subtotal += unit * qty;
+
+      // Grab sets have included components, just like counter sets. Record
+      // actual drink choice as a zero-priced child for receipts and stock.
+      const burgerSku = grabMealSetBurgerSkus[String(item.source_sku || "").toLowerCase()] || grabMealSetNames[item.name_en];
+      if (burgerSku) {
+        if (!line.set_drink_menu_item_id) throw new Error("Select the included drink for this Grab meal deal");
+        const componentResult = await client.query(
+          `SELECT i.*, c.name_en AS category_name FROM ordering_menu_items i
+           JOIN ordering_menu_categories c ON c.id=i.category_id
+           WHERE i.is_active AND (i.source_sku=ANY($1::text[]) OR i.id=$2)`,
+          [[burgerSku,"sbb-pos-french-fries"],line.set_drink_menu_item_id],
+        );
+        const burger = componentResult.rows.find((row: any) => row.source_sku === burgerSku);
+        const fries = componentResult.rows.find((row: any) => row.source_sku === "sbb-pos-french-fries");
+        const drink = componentResult.rows.find((row: any) => String(row.id) === String(line.set_drink_menu_item_id));
+        if (!burger || !fries || !drink || String(drink.category_name).toLowerCase() !== "drinks") {
+          throw new Error("Grab meal deal burger, fries or selected drink is unavailable");
+        }
+        for (const component of [burger, fries, drink]) {
+          await client.query(
+            `INSERT INTO ordering_order_items(order_id,menu_item_id,item_name_en,item_name_th,unit_price,quantity,line_total,sort_order,source_sku,price_mode,is_set_component,parent_order_item_id)
+             VALUES($1,$2,$3,$4,0,$5,0,$6,$7,'grab',true,$8)`,
+            [order.id,component.id,component.name_en,component.name_th,qty,sort++,component.source_sku||null,parent.id],
+          );
+        }
+      }
 
       for (const modifier of selectedModifiers) {
         const delta = value(modifier.price_delta) * qty;
