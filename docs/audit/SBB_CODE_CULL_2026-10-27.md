@@ -84,3 +84,7 @@ These are real routes in `client/src/App.tsx`, not dead modules. **Not deleted i
 ## Wave 2: remove non-runtime Loyverse copy packages
 
 Deleted 49 files (~602 KB) under `loyverse-ai-package/` and `loyverse-ai-updated-package/`, both historical standalone copies. The active build enters `client/` and `server/`; production Loyverse routes, POS ingestion, archived business data, and all database tables are untouched. Source references in architecture/stabilisation documentation remain historical references. Deleting Git-tracked files reduces the current checkout, **not repository history size**.
+
+### Legacy archive retired in Wave 2
+
+Also deleted 161 tracked source-only files (~1.46 MB) under `archive/` after confirming this directory is outside Vite and Express entrypoints and has no current implementation imports identified by repository search. It contains historical code copies, not the active POS/reporting modules. Git history retains all removed versions for recovery. Historical documentation links to archived paths are not runtime dependencies.
