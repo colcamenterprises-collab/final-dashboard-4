@@ -1,4 +1,4 @@
 SBB production deployment request
-requested_at=2026-10-09
+requested_at=2026-10-26
 ref=main
-reason=Manual opening stock and aligned reconciliation column headers
+reason=Deploy PR #449 counter meal set stable SKU fix
