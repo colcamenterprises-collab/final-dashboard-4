@@ -63,6 +63,41 @@ function statusEndpoint(order: any) {
     : `/api/pos/orders/${order.id}/status`;
 }
 
+// Keep all set components in the order for receipts, inventory and reporting.
+// On kitchen tickets the parent set already represents its burger; only
+// included sides and drinks should be shown beneath it.
+const mealSetBurgerSkus = new Set([
+  "sbb-pos-crispy-chicken-fillet-burger",
+  "sbb-pos-karaage-chicken-burger",
+  "sbb-pos-original-single-smash-burger",
+  "sbb-pos-ultimate-double-smash-burger",
+  "sbb-pos-super-double-bacon-and-cheese",
+  "sbb-pos-triple-smash-burger",
+]);
+const mealSetBurgerNames = new Set([
+  "crispy chicken fillet burger", "chicken fillet burger",
+  "karaage chicken burger", "original single smash burger",
+  "single smash burger", "ultimate double smash burger",
+  "ultimate double", "ultimate double burger",
+  "super double bacon and cheese", "super double bacon & cheese",
+  "triple smash burger", "triple",
+]);
+function kitchenDisplayItems(items: any[] = []) {
+  const parents = new Map(items.map(item => [String(item.id), item]));
+  return items.filter(item => {
+    if (!item.is_set_component || !item.parent_order_item_id) return true;
+    const parent = parents.get(String(item.parent_order_item_id));
+    if (!parent) return true;
+    const parentSku = String(parent.source_sku || "").toLowerCase();
+    const parentName = String(parent.item_name_en || "").toLowerCase();
+    const isSet = /-set$|-meal-deal$/.test(parentSku) || /\\b(set|meal deal)\\b/.test(parentName);
+    if (!isSet) return true;
+    const sku = String(item.source_sku || "").toLowerCase();
+    const name = String(item.item_name_en || "").trim().toLowerCase();
+    return !(mealSetBurgerSkus.has(sku) || mealSetBurgerNames.has(name));
+  });
+}
+
 export default function PosKitchen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [error, setError] = useState("");
@@ -183,7 +218,7 @@ export default function PosKitchen() {
           {minutes} min · {new Date(order.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
         </p>
         <ul className="my-4 space-y-3">
-          {order.items?.map((item: any) => (
+          {kitchenDisplayItems(order.items).map((item: any) => (
             <li key={item.id}>
               <strong>{item.quantity} × {item.item_name_en}</strong>
               {item.is_set_component && <p className="text-sm font-black text-amber-700">SET COMPONENT</p>}
