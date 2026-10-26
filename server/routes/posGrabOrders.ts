@@ -173,15 +173,30 @@ router.post("/orders", grabOnly, staffDevice, async (req, res) => {
       const burgerSku = grabMealSetBurgerSkus[String(item.source_sku || "").toLowerCase()] || grabMealSetNames[item.name_en];
       if (burgerSku) {
         if (!line.set_drink_menu_item_id) throw new Error("Select the included drink for this Grab meal deal");
-        const componentResult = await client.query(
-          `SELECT i.*, c.name_en AS category_name FROM ordering_menu_items i
+        const burgerNames: Record<string, string[]> = {
+          "sbb-pos-crispy-chicken-fillet-burger": ["Crispy Chicken Fillet Burger", "Chicken Fillet Burger"],
+          "sbb-pos-karaage-chicken-burger": ["Karaage Chicken Burger"],
+          "sbb-pos-original-single-smash-burger": ["Original Single Smash Burger", "Single Smash Burger"],
+          "sbb-pos-ultimate-double-smash-burger": ["Ultimate Double Smash Burger", "Ultimate Double", "Ultimate Double Burger"],
+          "sbb-pos-super-double-bacon-and-cheese": ["Super Double Bacon and Cheese", "Super Double Bacon & Cheese"],
+          "sbb-pos-triple-smash-burger": ["Triple Smash Burger", "Triple"],
+        };
+        const burger = (await client.query(
+          `SELECT * FROM ordering_menu_items WHERE is_active
+           AND (source_sku=$1 OR lower(trim(name_en))=ANY($2::text[]))
+           ORDER BY CASE WHEN source_sku=$1 THEN 0 ELSE 1 END LIMIT 1`,
+          [burgerSku,(burgerNames[burgerSku] || []).map(name => name.toLowerCase())],
+        )).rows[0];
+        const fries = (await client.query(
+          `SELECT * FROM ordering_menu_items WHERE is_active
+           AND (source_sku='sbb-pos-french-fries' OR lower(trim(name_en))='french fries')
+           ORDER BY CASE WHEN source_sku='sbb-pos-french-fries' THEN 0 ELSE 1 END LIMIT 1`,
+        )).rows[0];
+        const drink = (await client.query(
+          `SELECT i.*,c.name_en AS category_name FROM ordering_menu_items i
            JOIN ordering_menu_categories c ON c.id=i.category_id
-           WHERE i.is_active AND (i.source_sku=ANY($1::text[]) OR i.id=$2)`,
-          [[burgerSku,"sbb-pos-french-fries"],line.set_drink_menu_item_id],
-        );
-        const burger = componentResult.rows.find((row: any) => row.source_sku === burgerSku);
-        const fries = componentResult.rows.find((row: any) => row.source_sku === "sbb-pos-french-fries");
-        const drink = componentResult.rows.find((row: any) => String(row.id) === String(line.set_drink_menu_item_id));
+           WHERE i.id=$1 AND i.is_active`, [line.set_drink_menu_item_id],
+        )).rows[0];
         if (!burger || !fries || !drink || String(drink.category_name).toLowerCase() !== "drinks") {
           throw new Error("Grab meal deal burger, fries or selected drink is unavailable");
         }
