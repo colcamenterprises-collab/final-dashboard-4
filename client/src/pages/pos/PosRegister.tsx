@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { processCreatedPosOrder } from "@/lib/posNativeCheckoutBridge";
 
-type Item = { id:string; name_en:string; name_th?:string; category_name:string; category_name_th?:string; active_price:number; image_url?:string; set_upgrade_eligible:boolean; has_options?:boolean };
+type Item = { id:string; name_en:string; name_th?:string; category_name:string; category_name_th?:string; active_price:number; image_url?:string; set_upgrade_eligible:boolean; has_options?:boolean; source_sku?:string };
 type Modifier = { id:string; name_en:string; name_th?:string; price_delta:number; modifier_group_id:string; modifier_group_name_en:string; group_type?:string };
 type ModifierGroup = { id:string; name_en:string; name_th?:string; group_type?:string; selection_mode:"single"|"multiple"; min_selections:number; max_selections?:number|null; prompt_text?:string|null; options:Modifier[] };
 type Line = Item & { quantity:number; set_upgrade?:boolean; meal_deal?:boolean; set_drink_menu_item_id?:string; modifiers?:Modifier[]; notes?:string };
@@ -11,7 +11,7 @@ type Discount = { id:string; code:string; name:string; discount_type:"percent"|"
 const thb = (n:number) => `฿${Number(n || 0).toLocaleString()}`;
 const burgerImage = "/burger-placeholder.png";
 const isBurger = (item:Item) => /burger|smash/i.test(item.category_name + item.name_en);
-const isMealDeal = (item:Item) => /meal deals?/i.test(item.category_name);
+const isMealDeal = (item:Item) => /meal deals?/i.test(item.category_name) || /^(sbb-pos-)(chicken-fillet-meal-deal|karaage-chicken-meal-deal|single-smash-burger-set|ultimate-double-smash-burger-set|super-double-bacon-and-cheese-set|triple-smash-burger-set)$/.test(String(item.source_sku || '').toLowerCase());
 const thaiCategoryNames: Record<string, string> = {
   "Burgers":"เบอร์เกอร์", "Chicken Burgers":"เบอร์เกอร์ไก่", "Shaker Fries":"เชคเฟรนช์ฟรายส์",
   "Meal Deals":"ชุดสุดคุ้ม", "Sides":"ของทานเล่น", "Drinks":"เครื่องดื่ม",
