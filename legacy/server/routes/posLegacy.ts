@@ -384,7 +384,7 @@ router.post("/orders", staffDevice, async (req, res) => {
       if (mode === "direct" && (line.set_upgrade || line.meal_deal)) {
         if (!line.set_drink_menu_item_id) throw new Error("Set drink selection is required");
         const [friesResult, drinkResult, setting] = await Promise.all([
-          client.query(`SELECT * FROM ordering_menu_items WHERE lower(name_en)=lower('French Fries') AND is_active LIMIT 1`),
+          client.query(`SELECT * FROM ordering_menu_items WHERE is_active AND (source_sku='sbb-pos-french-fries' OR lower(name_en)=lower('French Fries')) ORDER BY CASE WHEN source_sku='sbb-pos-french-fries' THEN 0 ELSE 1 END LIMIT 1`),
           client.query(`SELECT * FROM ordering_menu_items WHERE id=$1 AND is_active`, [line.set_drink_menu_item_id]),
           client.query(`SELECT value FROM ordering_settings WHERE key='pos_set_upgrade_amount'`),
         ]);
@@ -405,6 +405,16 @@ router.post("/orders", staffDevice, async (req, res) => {
 
         let components = [fries, drink];
         if (line.meal_deal) {
+          // Stable catalog SKUs survive POS display-name changes. Keep legacy
+          // names as a compatibility fallback for older imported menus.
+          const mealBurgerSkus: Record<string, string> = {
+            "sbb-pos-chicken-fillet-meal-deal": "sbb-pos-crispy-chicken-fillet-burger",
+            "sbb-pos-karaage-chicken-meal-deal": "sbb-pos-karaage-chicken-burger",
+            "sbb-pos-single-smash-burger-set": "sbb-pos-original-single-smash-burger",
+            "sbb-pos-ultimate-double-smash-burger-set": "sbb-pos-ultimate-double-smash-burger",
+            "sbb-pos-super-double-bacon-and-cheese-set": "sbb-pos-super-double-bacon-and-cheese",
+            "sbb-pos-triple-smash-burger-set": "sbb-pos-triple-smash-burger",
+          };
           const mealBurgerNames: Record<string, string> = {
             "Chicken Fillet Meal Deal": "Crispy Chicken Fillet Burger",
             "Karaage Chicken Meal Deal": "Karaage Chicken Burger",
@@ -414,22 +424,22 @@ router.post("/orders", staffDevice, async (req, res) => {
             "Triple Smash Burger Set": "Triple Smash Burger",
             "Kids Cheeseburger Set": "Kids Cheeseburger",
           };
-          const burgerName = mealBurgerNames[item.name_en];
-          if (!burgerName) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
-          // Catalog names can differ from their meal-deal labels. Resolve known
-          // legacy aliases without bypassing the active-item safety check.
           const burgerAliases: Record<string, string[]> = {
             "Ultimate Double Smash Burger": ["Ultimate Double", "Ultimate Double Burger"],
             "Original Single Smash Burger": ["Single Smash Burger"],
             "Super Double Bacon and Cheese": ["Super Double Bacon & Cheese"],
           };
-          const candidateNames = [burgerName, ...(burgerAliases[burgerName] || [])];
+          const burgerName = mealBurgerNames[item.name_en];
+          const burgerSku = mealBurgerSkus[String(item.source_sku || "").toLowerCase()];
+          if (!burgerName && !burgerSku) throw new Error(`Meal deal component mapping is not configured for ${item.name_en}`);
+          const candidateNames = burgerName ? [burgerName, ...(burgerAliases[burgerName] || [])] : [];
           const burger = (await client.query(
             `SELECT * FROM ordering_menu_items
-             WHERE is_active AND lower(trim(name_en)) = ANY($1::text[])
-             ORDER BY CASE WHEN lower(trim(name_en))=lower(trim($2)) THEN 0 ELSE 1 END,
+             WHERE is_active
+               AND (source_sku=$1 OR lower(trim(name_en)) = ANY($2::text[]))
+             ORDER BY CASE WHEN source_sku=$1 THEN 0 ELSE 1 END,
                       pos_enabled DESC LIMIT 1`,
-            [candidateNames.map(name => name.trim().toLowerCase()), burgerName],
+            [burgerSku || null, candidateNames.map(name => name.trim().toLowerCase())],
           )).rows[0];
           if (!burger) throw new Error(`Meal deal burger component is unavailable for ${item.name_en}`);
           components = [burger, fries, drink];
