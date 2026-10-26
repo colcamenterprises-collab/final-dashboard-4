@@ -1,7 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { usePinAuth } from "@/components/PinLoginGate";
 import { cn } from "@/lib/utils";
-import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Crown, Globe2, QrCode, Users, PackageSearch } from "lucide-react";
+import { Home, BarChart3, Receipt, ShoppingCart, ChevronDown, X, ShoppingBag, UtensilsCrossed, TrendingUp, DollarSign, List, ShieldCheck, ClipboardList, BookOpen, Wallet, Settings, Monitor, CookingPot, Globe2, QrCode, Users, PackageSearch } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 
 type NavItem = { to: string; label: string; icon: React.ComponentType<{ className?: string }>; testId: string; ownerOnly?: boolean; subItem?: boolean; };
@@ -153,14 +153,6 @@ export function ModernSidebar({ isOpen, onClose, isCollapsed = false, onCollapse
               })}
             </nav>
 
-            {!isCollapsed && <div className="px-4 pb-5 pt-3">
-              <div className="rounded-[24px] border border-neutral-200 bg-white p-4 text-black shadow-[0_18px_40px_rgba(0,0,0,0.28)]">
-                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[#DFFF00] shadow-[0_0_24px_rgba(223,255,0,0.55)]"><Crown className="h-5 w-5 stroke-[2.4]" /></div>
-                <h3 className="mt-4 text-xl font-bold tracking-tight">Upgrade to Premium</h3>
-                <p className="mt-2 text-xs leading-5 text-neutral-500">Unlock advanced reporting, automation and premium business tools.</p>
-                <button type="button" className="mt-4 w-full rounded-full bg-black px-4 py-3 text-xs font-bold text-white transition hover:bg-neutral-800">Upgrade to Premium</button>
-              </div>
-            </div>}
           </div>
         </div>
       </aside>
