@@ -1,4 +1,4 @@
 SBB production deployment request
 requested_at=2026-10-26
 ref=main
-reason=Deploy PR #452 Grab meal set included drink and fries components
+reason=Deploy PR #454 KDS meal set component presentation fix
